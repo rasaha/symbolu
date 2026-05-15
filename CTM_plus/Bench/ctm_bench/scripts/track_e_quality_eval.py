@@ -217,8 +217,22 @@ class GenerationRow:
     """One side-by-side generation comparison row: baseline vs compressed
     cache produce a stream of tokens from the same prompt; we measure
     how often they agree on the next token and how far their logit
-    distributions diverge."""
+    distributions diverge.
+
+    Mode is one of:
+      * ``autoregressive`` — each cache greedy-decodes its own
+        trajectory. Top-1 agreement reflects "do the two caches trace
+        the same exact greedy path." Drops fast under exposure bias
+        (one diff token cascades). Less partner-relevant.
+      * ``teacher_forced`` — baseline greedy-decodes its trajectory
+        first; the compressed cache then runs through the same
+        baseline-token sequence and we compare what compressed PREDICTED
+        at each step. Isolates "does the compressed cache make the
+        same next-token prediction given the same context." More
+        partner-relevant.
+    """
     cache_type: str               # "baseline" vs the quant name being compared
+    mode: str                      # "autoregressive" or "teacher_forced"
     num_prompts: int
     num_generated_per_prompt: int
     total_positions: int
@@ -361,12 +375,29 @@ def _generate_with_cache(
     prompt: str,
     num_tokens: int,
     cache,
+    forced_tokens: Optional[List[int]] = None,
 ) -> "Tuple[List[int], List[Any]]":
-    """Greedy-decode ``num_tokens`` after ``prompt``, using ``cache`` as
-    the past_key_values store. Returns the generated token IDs and the
-    next-token-logit tensor at each step (CPU float32).
+    """Decode ``num_tokens`` after ``prompt``, using ``cache`` as the
+    past_key_values store.
+
+    Args:
+        forced_tokens: when ``None`` (default), greedy-decodes (each
+            step's argmax becomes the next input). When provided
+            (length must equal ``num_tokens``), the cache's prediction
+            is RECORDED but ignored — the next input is always the
+            forced token. This is teacher-forced decoding: it makes
+            the cache process the same context the baseline saw, so
+            the recorded predictions can be compared like-for-like.
+
+    Returns the *picked* token IDs (= forced_tokens when forced, else
+    the cache's argmax picks) and the predictive logit at each step.
     """
     import torch
+    if forced_tokens is not None and len(forced_tokens) != num_tokens:
+        raise ValueError(
+            f"forced_tokens must have length {num_tokens}; got {len(forced_tokens)}"
+        )
+
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     input_ids = inputs["input_ids"]
 
@@ -375,16 +406,20 @@ def _generate_with_cache(
         out = model(input_ids=input_ids, use_cache=True, past_key_values=cache)
     next_token_logits = out.logits[0, -1, :]
 
-    generated: List[int] = []
+    picked: List[int] = []
     logits_list: List[Any] = []
-    for _step in range(num_tokens):
+    for step in range(num_tokens):
         # Record this step's predictive distribution.
         logits_list.append(next_token_logits.detach().cpu().to(torch.float32))
-        # Greedy pick.
-        next_token_id = int(next_token_logits.argmax().item())
-        generated.append(next_token_id)
-        # Decode-step forward pass with just the new token.
-        next_token_tensor = torch.tensor([[next_token_id]], device=model.device)
+        # In teacher-forced mode, ignore the cache's argmax and feed
+        # the forced token. Otherwise greedy-pick.
+        if forced_tokens is not None:
+            input_token_id = int(forced_tokens[step])
+        else:
+            input_token_id = int(next_token_logits.argmax().item())
+        picked.append(input_token_id)
+        # Decode-step forward pass with the picked / forced token.
+        next_token_tensor = torch.tensor([[input_token_id]], device=model.device)
         with torch.no_grad():
             out = model(
                 input_ids=next_token_tensor,
@@ -392,7 +427,7 @@ def _generate_with_cache(
                 past_key_values=cache,
             )
         next_token_logits = out.logits[0, -1, :]
-    return generated, logits_list
+    return picked, logits_list
 
 
 def compute_generation_agreement(
@@ -404,11 +439,24 @@ def compute_generation_agreement(
     baseline_factory: Callable[[], Any],
     compressed_factory: Callable[[], Any],
     compressed_label: str,
+    mode: str = "autoregressive",
 ) -> GenerationRow:
-    """For each prompt, greedy-decode ``num_tokens`` with the baseline
-    cache and with the compressed cache. Compare next-token picks +
+    """For each prompt, decode ``num_tokens`` with the baseline cache
+    and with the compressed cache, then compare next-token picks +
     logit-distribution KL across all positions.
+
+    Modes:
+      * ``autoregressive``: each cache greedy-decodes its own
+        trajectory. Top-1 agreement reflects "do they trace the
+        same exact greedy path." Drops fast under exposure bias.
+      * ``teacher_forced``: baseline greedy-decodes, then compressed
+        re-runs with the same baseline tokens forced as input at each
+        step. Top-1 agreement reflects "given the same context, does
+        the compressed cache predict the same next token." More
+        partner-relevant for "is the compressed cache faithful".
     """
+    if mode not in ("autoregressive", "teacher_forced"):
+        raise ValueError(f"mode must be autoregressive or teacher_forced; got {mode!r}")
     import torch
     import torch.nn.functional as F
 
@@ -428,22 +476,35 @@ def compute_generation_agreement(
             model=model, tokenizer=tokenizer, prompt=prompt,
             num_tokens=num_tokens, cache=base_cache,
         )
+        # In teacher-forced mode, we feed compressed the baseline's
+        # tokens at each step (ignoring its own argmax). In
+        # autoregressive mode, compressed picks freely.
+        forced = base_tokens if mode == "teacher_forced" else None
         comp_tokens, comp_logits = _generate_with_cache(
             model=model, tokenizer=tokenizer, prompt=prompt,
             num_tokens=num_tokens, cache=comp_cache,
+            forced_tokens=forced,
         )
 
-        # Top-1 agreement: same next-token id?
-        for b_tok, c_tok in zip(base_tokens, comp_tokens):
-            if b_tok == c_tok:
+        # Top-1 agreement: do baseline and compressed PREDICT the same
+        # next token at each step? Always compare argmax(logits), not
+        # the input/picked tokens — this works correctly in both
+        # autoregressive (where input==argmax) and teacher_forced
+        # (where input was forced to baseline's choice but argmax is
+        # compressed's actual prediction).
+        for b_log, c_log in zip(base_logits, comp_logits):
+            b_pred = int(b_log.argmax().item())
+            c_pred = int(c_log.argmax().item())
+            if b_pred == c_pred:
                 top1_match_count += 1
             total_positions += 1
 
-        # Top-5 inclusion: is the baseline's top-1 in the compressed
-        # cache's top-5? (a softer compatibility measure)
-        for b_tok, c_logits in zip(base_tokens, comp_logits):
+        # Top-5 inclusion: is the baseline's top-1 prediction in the
+        # compressed cache's top-5? (a softer compatibility measure)
+        for b_log, c_logits in zip(base_logits, comp_logits):
+            b_pred = int(b_log.argmax().item())
             top5 = torch.topk(c_logits, k=5).indices.tolist()
-            if b_tok in top5:
+            if b_pred in top5:
                 top5_inclusion_count += 1
 
         # KL(compressed || baseline) per step. We use the compressed
@@ -477,6 +538,7 @@ def compute_generation_agreement(
 
     return GenerationRow(
         cache_type=compressed_label,
+        mode=mode,
         num_prompts=len(prompts),
         num_generated_per_prompt=num_tokens,
         total_positions=total_positions,
@@ -729,9 +791,25 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument(
         "--generation-num-tokens", type=int, default=50,
         help=(
-            "Tokens to greedy-decode per prompt in --eval generation. "
+            "Tokens to decode per prompt in --eval generation. "
             "Default 50. Each token is one decode step which exercises "
             "the cache.update() path with S=1."
+        ),
+    )
+    parser.add_argument(
+        "--generation-mode", default="autoregressive",
+        choices=["autoregressive", "teacher_forced"],
+        help=(
+            "How to compare baseline vs compressed during generation. "
+            "'autoregressive' (default): each cache greedy-decodes its "
+            "own trajectory. Top-1 agreement reflects 'do they trace "
+            "the same exact greedy path' — drops fast under exposure "
+            "bias (1 different token cascades). "
+            "'teacher_forced': baseline picks tokens, compressed runs "
+            "with the same tokens forced as input at each step. Top-1 "
+            "agreement reflects 'given identical context, does "
+            "compressed predict the same next token' — more partner-"
+            "relevant for 'is the compressed cache faithful'."
         ),
     )
     parser.add_argument(
@@ -1027,8 +1105,9 @@ def main(argv: Sequence[str]) -> int:
 
     if "generation" in eval_kinds:
         LOG.info(
-            "Generation: %d prompts × %d tokens baseline-vs-%s...",
-            len(GENERATION_PROMPTS), args.generation_num_tokens, quant_label,
+            "Generation (%s): %d prompts × %d tokens baseline-vs-%s...",
+            args.generation_mode, len(GENERATION_PROMPTS),
+            args.generation_num_tokens, quant_label,
         )
         gen_row = compute_generation_agreement(
             model=model, tokenizer=tokenizer,
@@ -1037,6 +1116,7 @@ def main(argv: Sequence[str]) -> int:
             baseline_factory=baseline_factory,
             compressed_factory=tq_factory,
             compressed_label=quant_label,
+            mode=args.generation_mode,
         )
         summary.generation = gen_row
         summary.deltas["generation_top1_agreement"] = gen_row.top1_agreement_rate
@@ -1097,7 +1177,7 @@ def main(argv: Sequence[str]) -> int:
         print(f"    {'delta'.ljust(label_w)}:  {delta:+.2f}pt  → {gate}")
     if summary.generation:
         g = summary.generation
-        print(f"  Generation:")
+        print(f"  Generation ({g.mode}):")
         print(f"    prompts:               {g.num_prompts} × {g.num_generated_per_prompt} tokens")
         print(f"    top-1 agreement:       {g.top1_agreement_rate * 100:.2f}%  "
               f"({g.top1_match_count}/{g.total_positions})")

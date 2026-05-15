@@ -422,17 +422,53 @@ python -m ctm_bench.scripts.track_e_quality_eval \
     --output-dir /tmp/track_e_int4_generation/ 2>&1 | tee /tmp/track_e_int4_generation/run.log
 ```
 
-**Decision tree on top-1 agreement rate:**
+### Two modes — pick the one that answers your question
+
+* **`--generation-mode autoregressive`** (default): each cache greedy-
+  decodes its own trajectory. Measures "do they trace the same exact
+  greedy path." Drops fast under exposure bias — one token difference
+  cascades. Less partner-relevant but cheaper conceptually.
+* **`--generation-mode teacher_forced`** (recommended): baseline
+  picks tokens, compressed runs with the same baseline tokens forced
+  as input at each step. Measures "given identical context, does
+  compressed predict the same next token." More partner-relevant for
+  "is the cache faithful."
+
+Use teacher_forced for the partner pitch:
+
+```bash
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval generation --generation-num-tokens 50 \
+    --generation-mode teacher_forced \
+    --quant int4-per-channel \
+    --k-group-size 32 --v-group-size 32 --asymmetric-int4 \
+    --output-dir /tmp/track_e_int4_generation_tf/ 2>&1 | tee /tmp/track_e_int4_generation_tf/run.log
+```
+
+**Decision tree on top-1 agreement rate (teacher_forced mode):**
 
 | Top-1 agreement | Interpretation |
 |---|---|
-| ≥ 90% | ✅ Compressed cache produces nearly-identical generation. Headline partner number. |
-| 80-90% | Cache diverges occasionally but generation stays coherent. Mean KL should be < 0.05. |
-| 60-80% | Generations diverge meaningfully early; partial degradation. Check sample text. |
-| < 60% | Significant decode-quality damage; perplexity/MMLU were probably lucky. |
+| ≥ 95% | ✅ Compressed cache faithfully reproduces baseline next-token picks. |
+| 90-95% | Strong faithful — small per-token disagreements but distributions overlap. |
+| 80-90% | Real divergence in next-token predictions; check KL too. |
+| < 80% | Significant decode-quality damage. |
 
-KL is a softer measure: small KL (< 0.05) means the logit distributions
-overlap heavily even when the top-1 picks differ.
+**Decision tree on top-1 agreement rate (autoregressive mode):**
+
+These numbers will be MUCH lower than teacher_forced because of
+exposure bias — even tiny differences cascade into completely
+different generation trajectories. Coherent text from both caches +
+high mean KL doesn't necessarily mean "broken"; it means "two
+different valid completions of the same prompt."
+
+| Top-1 agreement | Interpretation |
+|---|---|
+| ≥ 90% | ✅ Two caches usually trace the same greedy path. |
+| 60-90% | Caches diverge after a few steps but both produce coherent text. NORMAL for any quantized model — eyeball the sample text to confirm quality. |
+| < 60% | Hard to interpret without checking sample text quality. Run teacher_forced mode for the cleaner number. |
 
 ## 5f. INT3 experiment (Path B from post-§18 audit)
 
