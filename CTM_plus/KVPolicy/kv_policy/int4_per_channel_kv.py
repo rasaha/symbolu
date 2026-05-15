@@ -136,34 +136,44 @@ def quantize_per_channel_int4(
     *,
     group_size: int = 0,
     asymmetric: bool = False,
+    bits: int = 4,
 ) -> "Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]":
-    """Per-channel INT4 quantization along the seq axis.
+    """Per-channel signed-INTb quantization along the seq axis.
+
+    Despite the historical "int4" in the function name, ``bits`` is
+    parametric. INT3 values still fit in the INT4 storage slot (range
+    ⊂ [−8, +7]) so the bit-packing layer doesn't change — only the
+    quantization math and the theoretical bit-rate change.
 
     Args:
         tensor: ``(S, H, D)``.
         group_size: 0 = plain per-channel (one scale per (h, d) covering
-            all S positions). > 0 = split seq axis into groups of this
-            size, each with its own scale.
+            all S positions). > 0 = split seq axis into groups.
         asymmetric: if True, use affine quantization (scale + offset
-            mapping [x_min, x_max] → [-8, +7]). KIVI's actual config.
-            Uses all 16 INT4 bins effectively when the distribution is
-            not centred on zero. Adds one FP32 offset per scale (~10%
-            storage overhead).
+            mapping [x_min, x_max] → signed range).
+        bits: bit width per value. Must be 2..8. ``4`` (the default)
+            is the validated KIVI config. ``3`` is an experimental
+            "more aggressive compression" option — quality TBD per
+            model. Note: storage stays in int8 (or packed-int4 form);
+            real-heap savings at <4 bits require additional packing
+            work (separate engineering item).
 
-    Returns:
-        ``(quantized, scale, offset)``:
-          * ``quantized``: ``(S, H, D) int8`` values in [−8, +7].
-          * ``scale``: float32. Shape is (n_groups, H, D) where
-            n_groups=1 for plain per-channel.
-          * ``offset``: float32, same shape as scale. ``None`` for
-            symmetric quantization. For asymmetric:
-            ``dequantized = quantized * scale + offset``.
+    Returns ``(quantized, scale, offset)`` where ``quantized`` is in
+    the symmetric signed range ``[-(2**(bits-1)), +(2**(bits-1)-1)]``.
     """
     if tensor.ndim != 3:
         raise ValueError(
             f"quantize_per_channel_int4 expected 3-D (S, H, D) tensor; "
             f"got shape {tuple(tensor.shape)}"
         )
+    if not (2 <= bits <= 8):
+        raise ValueError(f"bits must be in [2, 8]; got {bits}")
+    qmin = -(1 << (bits - 1))         # e.g., -8 for INT4, -4 for INT3
+    qmax = (1 << (bits - 1)) - 1      # e.g., +7 for INT4, +3 for INT3
+    sym_div = float(qmax)             # 7 for INT4, 3 for INT3
+    asym_div = float((1 << bits) - 1)  # 15 for INT4, 7 for INT3
+    sym_zero_shift = -qmin            # 8 for INT4, 4 for INT3
+
     s, h, d = tensor.shape
     t_f32 = tensor.to(torch.float32)
 
@@ -172,17 +182,15 @@ def quantize_per_channel_int4(
         if asymmetric:
             x_max = t_f32.amax(dim=0, keepdim=True)  # (1, H, D)
             x_min = t_f32.amin(dim=0, keepdim=True)
-            scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
-            # Map [x_min, x_max] → [-8, +7]: q = round((x - x_min)/scale) - 8
-            q_unsigned = ((t_f32 - x_min) / scale).round().clamp(min=0, max=15)
-            quantized = (q_unsigned - 8).to(torch.int8)
-            # offset = x_min + 8*scale so dequant = q*scale + offset reconstructs x
-            offset = x_min + 8.0 * scale
+            scale = ((x_max - x_min) / asym_div).clamp(min=1e-8)
+            q_unsigned = ((t_f32 - x_min) / scale).round().clamp(min=0, max=int(asym_div))
+            quantized = (q_unsigned - sym_zero_shift).to(torch.int8)
+            offset = x_min + sym_zero_shift * scale
             return quantized, scale, offset
         else:
             max_abs = t_f32.abs().amax(dim=0, keepdim=True)
-            scale = (max_abs / 7.0).clamp(min=1e-8)
-            quantized = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
+            scale = (max_abs / sym_div).clamp(min=1e-8)
+            quantized = (t_f32 / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
             return quantized, scale, None
 
     # Group-wise.
@@ -200,19 +208,19 @@ def quantize_per_channel_int4(
     if asymmetric:
         x_max = t_grouped.amax(dim=1, keepdim=True)  # (n_groups, 1, H, D)
         x_min = t_grouped.amin(dim=1, keepdim=True)
-        scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
-        q_unsigned = ((t_grouped - x_min) / scale).round().clamp(min=0, max=15)
-        quantized_grouped = (q_unsigned - 8).to(torch.int8)
-        offset = x_min + 8.0 * scale
+        scale = ((x_max - x_min) / asym_div).clamp(min=1e-8)
+        q_unsigned = ((t_grouped - x_min) / scale).round().clamp(min=0, max=int(asym_div))
+        quantized_grouped = (q_unsigned - sym_zero_shift).to(torch.int8)
+        offset = x_min + sym_zero_shift * scale
         offset_out = offset.squeeze(1)
     else:
         max_abs = t_grouped.abs().amax(dim=1, keepdim=True)
-        scale = (max_abs / 7.0).clamp(min=1e-8)
-        quantized_grouped = (t_grouped / scale).round().clamp(min=-8, max=7).to(torch.int8)
+        scale = (max_abs / sym_div).clamp(min=1e-8)
+        quantized_grouped = (t_grouped / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
         offset_out = None
 
     quantized_flat = quantized_grouped.view(s_padded, h, d)[:s].contiguous()
-    return quantized_flat, scale.squeeze(1), offset_out  # (n_groups, H, D) for both
+    return quantized_flat, scale.squeeze(1), offset_out
 
 
 def dequantize_per_channel_int4(
@@ -268,20 +276,27 @@ def quantize_per_token_int4(
     *,
     group_size: int = 0,
     asymmetric: bool = False,
+    bits: int = 4,
 ) -> "Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]":
-    """Per-token INT4 quantization along the head_dim axis.
+    """Per-token signed-INTb quantization along the head_dim axis.
 
-    Mirrors ``quantize_per_channel_int4`` but aggregates over the last
-    axis (head_dim) instead of axis 0 (seq). KIVI's V-side choice.
-
-    Returns: ``(quantized, scale, offset)`` where offset is None for
-    symmetric mode and ``(S, H, n_groups) float32`` for asymmetric.
+    Mirrors ``quantize_per_channel_int4`` parametrically. ``bits``
+    semantics match — INT3 fits in INT4 storage, real-heap savings at
+    <4 bits require additional packing.
     """
     if tensor.ndim != 3:
         raise ValueError(
             f"quantize_per_token_int4 expected 3-D (S, H, D) tensor; "
             f"got shape {tuple(tensor.shape)}"
         )
+    if not (2 <= bits <= 8):
+        raise ValueError(f"bits must be in [2, 8]; got {bits}")
+    qmin = -(1 << (bits - 1))
+    qmax = (1 << (bits - 1)) - 1
+    sym_div = float(qmax)
+    asym_div = float((1 << bits) - 1)
+    sym_zero_shift = -qmin
+
     s, h, d = tensor.shape
     t_f32 = tensor.to(torch.float32)
 
@@ -289,14 +304,14 @@ def quantize_per_token_int4(
         if asymmetric:
             x_max = t_f32.amax(dim=2, keepdim=True)  # (S, H, 1)
             x_min = t_f32.amin(dim=2, keepdim=True)
-            scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
-            q_unsigned = ((t_f32 - x_min) / scale).round().clamp(min=0, max=15)
-            quantized = (q_unsigned - 8).to(torch.int8)
-            offset = x_min + 8.0 * scale
+            scale = ((x_max - x_min) / asym_div).clamp(min=1e-8)
+            q_unsigned = ((t_f32 - x_min) / scale).round().clamp(min=0, max=int(asym_div))
+            quantized = (q_unsigned - sym_zero_shift).to(torch.int8)
+            offset = x_min + sym_zero_shift * scale
             return quantized, scale, offset
         max_abs = t_f32.abs().amax(dim=2, keepdim=True)
-        scale = (max_abs / 7.0).clamp(min=1e-8)
-        quantized = (t_f32 / scale).round().clamp(min=-8, max=7).to(torch.int8)
+        scale = (max_abs / sym_div).clamp(min=1e-8)
+        quantized = (t_f32 / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
         return quantized, scale, None
 
     pad = (-d) % group_size
@@ -313,15 +328,15 @@ def quantize_per_token_int4(
     if asymmetric:
         x_max = t_grouped.amax(dim=3, keepdim=True)  # (S, H, n_groups, 1)
         x_min = t_grouped.amin(dim=3, keepdim=True)
-        scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
-        q_unsigned = ((t_grouped - x_min) / scale).round().clamp(min=0, max=15)
-        quantized_grouped = (q_unsigned - 8).to(torch.int8)
-        offset = x_min + 8.0 * scale
+        scale = ((x_max - x_min) / asym_div).clamp(min=1e-8)
+        q_unsigned = ((t_grouped - x_min) / scale).round().clamp(min=0, max=int(asym_div))
+        quantized_grouped = (q_unsigned - sym_zero_shift).to(torch.int8)
+        offset = x_min + sym_zero_shift * scale
         offset_out = offset.squeeze(3)
     else:
         max_abs = t_grouped.abs().amax(dim=3, keepdim=True)
-        scale = (max_abs / 7.0).clamp(min=1e-8)
-        quantized_grouped = (t_grouped / scale).round().clamp(min=-8, max=7).to(torch.int8)
+        scale = (max_abs / sym_div).clamp(min=1e-8)
+        quantized_grouped = (t_grouped / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
         offset_out = None
 
     quantized_flat = quantized_grouped.view(s, h, d_padded)[:, :, :d].contiguous()
@@ -406,24 +421,31 @@ class INT4Block:
     # Same shapes as k_scale / v_scale respectively, float16.
     k_offset: Optional["torch.Tensor"] = None
     v_offset: Optional["torch.Tensor"] = None
+    # Effective bit width. The storage layout always uses 4-bit packing
+    # (values fit in [-8, +7]) but at bits < 4 the quantizer clamps to a
+    # narrower range. Theoretical compression-ratio formulas use ``bits``;
+    # actual heap is the same as INT4 until we add proper sub-4-bit
+    # packing (separate engineering item).
+    bits: int = 4
 
     @property
     def theoretical_packed_bytes(self) -> int:
         """Theoretical bit-packed storage (independent of actual heap):
-          * K: 4 bits/elem * S*H*D + 16 bits * n_groups_s * H*D × (2 if asymmetric else 1)
-          * V: 4 bits/elem * S*H*D + 16 bits * S*H * n_groups_d × (2 if asymmetric else 1)
-        Asymmetric mode adds one FP16 offset per scale.
+          * K: ``bits`` * S*H*D + 16 * n_groups_s * H*D × (2 if asymmetric else 1)
+          * V: ``bits`` * S*H*D + 16 * S*H * n_groups_d × (2 if asymmetric else 1)
 
-        After bit-packing landed, this should be ≈ ``actual_stored_bytes``.
-        The ≈ accounts for any padding byte from odd D.
+        At bits=4 (default KIVI), this is ≈ ``actual_stored_bytes``.
+        At bits=3 (experimental), the theoretical bit-rate is lower
+        but actual heap stays at 4-bit packing until proper INT3
+        packing is implemented.
         """
         s, h, d = self.original_shape
         n_groups_s = int(self.k_scale.shape[0])
         n_groups_d = int(self.v_scale.shape[2])
         k_scale_factor = 2 if self.k_offset is not None else 1
         v_scale_factor = 2 if self.v_offset is not None else 1
-        k_bits = 4 * s * h * d + 16 * n_groups_s * h * d * k_scale_factor
-        v_bits = 4 * s * h * d + 16 * s * h * n_groups_d * v_scale_factor
+        k_bits = self.bits * s * h * d + 16 * n_groups_s * h * d * k_scale_factor
+        v_bits = self.bits * s * h * d + 16 * s * h * n_groups_d * v_scale_factor
         return max(1, (k_bits + v_bits + 7) // 8)
 
     @property
@@ -479,6 +501,7 @@ class INT4PerChannelKVStore:
         k_group_size: int = 0,
         v_group_size: int = 0,
         asymmetric: bool = False,
+        bits: int = 4,
     ) -> None:
         if torch is None:
             raise ImportError("INT4PerChannelKVStore requires PyTorch.")
@@ -486,10 +509,13 @@ class INT4PerChannelKVStore:
             raise ValueError(
                 f"group sizes must be >= 0; got k={k_group_size}, v={v_group_size}"
             )
+        if not (2 <= bits <= 8):
+            raise ValueError(f"bits must be in [2, 8]; got {bits}")
         self._torch_device = torch_device
         self._k_group_size = int(k_group_size)
         self._v_group_size = int(v_group_size)
         self._asymmetric = bool(asymmetric)
+        self._bits = int(bits)
         self._blocks: Dict[int, INT4Block] = {}
         self._stats: Dict[str, Any] = {
             "writes": 0,
@@ -529,9 +555,11 @@ class INT4PerChannelKVStore:
 
         k_q, k_scale, k_offset = quantize_per_channel_int4(
             k_in, group_size=self._k_group_size, asymmetric=self._asymmetric,
+            bits=self._bits,
         )
         v_q, v_scale, v_offset = quantize_per_token_int4(
             v_in, group_size=self._v_group_size, asymmetric=self._asymmetric,
+            bits=self._bits,
         )
 
         # Bit-pack the int8 quantized tensors (two 4-bit values per byte)
@@ -557,6 +585,7 @@ class INT4PerChannelKVStore:
             v_group_size=self._v_group_size,
             k_offset=k_offset_fp16,
             v_offset=v_offset_fp16,
+            bits=self._bits,
         )
         self._blocks[block_id] = block
         self._stats["writes"] += 1
@@ -651,6 +680,7 @@ class INT4PerChannelKVStore:
         s["k_group_size"] = self._k_group_size
         s["v_group_size"] = self._v_group_size
         s["asymmetric"] = self._asymmetric
-        s["bits_per_element"] = 4
+        s["bits_per_element"] = self._bits
         s["bit_packed_storage"] = True
+        s["bit_packed_at_full_bit_width"] = (self._bits == 4)
         return s

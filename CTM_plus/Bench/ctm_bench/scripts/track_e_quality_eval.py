@@ -254,7 +254,7 @@ def _turboquant_cache_factory(
 
 def _int4_per_channel_cache_factory(
     *, sink_size: int = 0, k_group_size: int = 0, v_group_size: int = 0,
-    asymmetric: bool = False,
+    asymmetric: bool = False, bits: int = 4,
 ) -> Callable[[], Any]:
     from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
 
@@ -264,6 +264,7 @@ def _int4_per_channel_cache_factory(
             k_group_size=k_group_size,
             v_group_size=v_group_size,
             asymmetric=asymmetric,
+            bits=bits,
         )
     return factory
 
@@ -595,6 +596,18 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--bits", type=int, default=4,
+        help=(
+            "Bit width per quantized value (per element). 4 (default) "
+            "is the validated KIVI config. 3 is experimental — quality "
+            "TBD per model; theoretical compression ~4.3× vs FP16 if "
+            "quality holds. Note: actual heap savings at bits<4 "
+            "require additional sub-4-bit packing work (not in this "
+            "commit); the QUALITY effect of bits<4 is what this flag "
+            "tests. Must be in [2, 8]."
+        ),
+    )
+    parser.add_argument(
         "--per-channel-scale", action="store_true",
         help=(
             "KIVI-style per-channel pre-quantisation normalisation: "
@@ -720,6 +733,7 @@ def main(argv: Sequence[str]) -> int:
             k_group_size=args.k_group_size,
             v_group_size=args.v_group_size,
             asymmetric=args.asymmetric_int4,
+            bits=args.bits,
         )
         config_dict = dict(
             quant="int4-per-channel",
@@ -727,7 +741,8 @@ def main(argv: Sequence[str]) -> int:
             k_group_size=args.k_group_size,
             v_group_size=args.v_group_size,
             asymmetric=args.asymmetric_int4,
-            scheme="K=per-channel INT4, V=per-token INT4"
+            bits=args.bits,
+            scheme=f"K=per-channel INT{args.bits}, V=per-token INT{args.bits}"
                    + (", asymmetric" if args.asymmetric_int4 else ", symmetric"),
         )
     else:

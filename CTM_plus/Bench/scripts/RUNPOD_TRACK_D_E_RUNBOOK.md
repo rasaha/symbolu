@@ -336,6 +336,49 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 | 1.05–1.5 | Helps but not full quality. | Try INT4 + group quantization (see §5d). |
 | > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
 
+## 5f. INT3 experiment (Path B from post-§18 audit)
+
+After INT4 + group + asymmetric landed GREEN (perplexity 1.02×, MMLU
+0.00pt, real heap 3.2×), the next-cheapest compression-bump experiment
+is INT3: 3 bits/elem instead of 4. Theoretical compression climbs from
+~3.2× to ~4.5× vs FP16.
+
+**Caveat about storage**: at this implementation tier, INT3 quantized
+values are stored in the existing 4-bit-packed slots (INT3 values fit
+in the [-8, +7] INT4 range). Actual heap savings stay at the INT4 level
+until proper sub-4-bit packing is implemented separately. What `--bits 3`
+tests is the **quality effect** of using 8 levels instead of 16; if
+quality holds, proper INT3 packing becomes a worthwhile follow-on.
+
+Re-run cost: ~$0.07, ~5 min.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int3
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --asymmetric-int4 \
+    --bits 3 \
+    --output-dir /tmp/track_e_int3/ 2>&1 | tee /tmp/track_e_int3/run.log
+```
+
+**Decision tree**:
+
+| INT3 ratio | Verdict |
+|---|---|
+| ≤ 1.10 | ✅ Quality holds. Worth implementing proper INT3 packing (~1-2 days) → ~4.5× real heap. |
+| 1.10–1.30 | YELLOW. Run MMLU 200 to see if accuracy drop is partner-acceptable. |
+| > 1.30 | Quality cliff. INT3 is too aggressive for Qwen2.5-7B with current rescue config. Ship INT4. |
+
 ## 5e. INT4 + group + asymmetric (full KIVI config)
 
 Symmetric INT4 wastes ~half its 16 bins when the distribution is not

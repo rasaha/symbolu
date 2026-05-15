@@ -742,6 +742,120 @@ def test_int4_asymmetric_non_divisible_s_round_trip(torch_module):
     )
 
 
+# --------------------------------------------------------------------- #
+# bits parameter — INT3 experiment + INT4 default backward compat       #
+# --------------------------------------------------------------------- #
+
+
+def test_bits_param_default_4_matches_no_bits(torch_module):
+    """bits=4 (default) must produce identical output to calling
+    without the bits kwarg — backward compat pin."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    q_default, s_default, off_default = quantize_per_channel_int4(t)
+    q_explicit, s_explicit, off_explicit = quantize_per_channel_int4(t, bits=4)
+    assert torch.equal(q_default, q_explicit)
+    assert torch.equal(s_default, s_explicit)
+    assert (off_default is None) == (off_explicit is None)
+
+
+def test_bits_param_int3_clamps_to_correct_range(torch_module):
+    """INT3 should produce values in [-4, +3]. Verifies the qmin/qmax
+    bounds compute correctly for non-4 bit widths."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g) * 10
+    q, _, _ = quantize_per_channel_int4(t, bits=3)
+    assert q.dtype == torch.int8
+    assert q.min().item() >= -4
+    assert q.max().item() <= 3
+
+
+def test_bits_param_int3_asymmetric_clamps_to_correct_range(torch_module):
+    """INT3 asymmetric: range still [-4, +3] in signed storage; offset
+    handles the shift."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g) * 10
+    q, scale, offset = quantize_per_channel_int4(t, bits=3, asymmetric=True)
+    assert q.min().item() >= -4
+    assert q.max().item() <= 3
+    assert offset is not None
+
+
+def test_bits_param_int3_round_trip_meets_lower_cosine(torch_module):
+    """INT3 has 8 levels vs INT4's 16 levels — reconstruction is
+    noisier by definition. The bar is "still reconstructs well enough
+    to be a candidate for the GPU quality test", which we set at
+    cosine ≥ 0.97 on Qwen-shape Gaussian (vs INT4's ≥ 0.99 target).
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    q, scale, offset = quantize_per_channel_int4(
+        t, group_size=32, asymmetric=True, bits=3,
+    )
+    back = dequantize_per_channel_int4(
+        q, scale, dtype=torch.float32, group_size=32, offset=offset,
+    )
+    cos = _cosine(t, back)
+    assert cos >= 0.97, (
+        f"INT3 + group + asymmetric cosine {cos:.4f} below 0.97; "
+        f"INT3 may be too aggressive for this quantization scheme"
+    )
+
+
+def test_bits_param_int3_kvstore_round_trip(torch_module):
+    """End-to-end INT3 via the kvstore. Source dtype FP16 (the
+    partner-relevant deployment dtype for KV cache)."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True, bits=3,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float16)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float16)
+    store.write_block(0, k, v)
+    k_back, v_back = store.read_block(0)
+    cos_k = _cosine(k, k_back)
+    cos_v = _cosine(v, v_back)
+    assert cos_k >= 0.97, f"INT3 K cosine {cos_k:.4f} below 0.97"
+    assert cos_v >= 0.97, f"INT3 V cosine {cos_v:.4f} below 0.97"
+
+    stats = store.get_stats()
+    assert stats["bits_per_element"] == 3
+    # INT3 vs FP16: theoretical ~4.3-4.5× with asymmetric + group overhead.
+    assert 3.5 <= stats["compression_ratio"] <= 5.5, (
+        f"INT3 theoretical ratio {stats['compression_ratio']:.2f}× outside "
+        f"expected 3.5-5.5× range vs FP16 source"
+    )
+
+
+def test_bits_param_int3_threads_through_hf_cache(torch_module, transformers_module):
+    """The HF cache wrapper plumbs bits through to the kvstore so
+    Track E's --bits flag actually changes behaviour."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    cache = INT4PerChannelCache(bits=3, k_group_size=32, asymmetric=True)
+    cfg = cache.int4_config
+    assert cfg["bits"] == 3
+    assert "int3" in cfg["scheme"]
+    stats = cache.int4_stats
+    assert stats["bits_per_element"] == 3
+
+
 def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module):
     """The whole motivation: INT4 per-channel should resolve outlier-
     channel data with min per-channel cosine ≥ 0.99 (much better than
