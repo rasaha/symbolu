@@ -264,6 +264,16 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--int4-kv-num-kv-heads", type=int, default=None,
+        help=(
+            "Route-A INT4: KV-head count, needed to reshape vLLM's "
+            "2-D K/V (num_tokens, num_kv_heads*head_dim) to the 3-D "
+            "(S, H, D) the quantizer wants. Default None = auto-detect "
+            "from model.config (num_key_value_heads). Pass explicitly "
+            "if the run-end log shows skipped_unknown_shape > 0."
+        ),
+    )
+    parser.add_argument(
         "--turboquant-kv",
         action="store_true",
         help=(
@@ -353,6 +363,7 @@ def main(argv: Sequence[str]) -> int:
         int4_kv_asymmetric=not args.int4_kv_symmetric,
         int4_kv_bits=args.int4_kv_bits,
         int4_kv_sink_size=args.int4_kv_sink_size,
+        int4_kv_num_kv_heads=args.int4_kv_num_kv_heads,
         max_decode_tokens=args.max_decode_tokens,
     )
 

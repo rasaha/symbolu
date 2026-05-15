@@ -2653,10 +2653,21 @@ and CPU-validated**; Days 4-5 (GPU verification) pending. Full plan
   threaded through `AsyncEngineDriver`. The driver installs route-A
   after engine construction, composes with `--ctm-plus`, and tears
   down the wraps on shutdown.
-* 12 CPU regression tests (`Bench/tests/test_int4_cache_kv_route_a.py`)
+* 16 CPU regression tests (`Bench/tests/test_int4_cache_kv_route_a.py`)
   validate the install + interception against faked vLLM attention
   modules — the `test_vllm_protocol_fixture.py` pattern. Plus 2
   driver-wiring tests in `test_runner_vllm_streaming.py`.
+
+**Post-implementation audit fix:** the first cut only handled 3-D
+K/V `(num_tokens, num_kv_heads, head_dim)`. vLLM actually hands
+`Attention.forward` flat **2-D** K/V `(num_tokens,
+num_kv_heads*head_dim)` (confirmed by the repo's GPU-validated
+`triattention.py` Phase 4 hook). The 3-D-only version would have
+silently no-op'd on real vLLM. Fixed: `round_trip_kv` handles 2-D
+(reshape→quantize→reshape-back, using `num_kv_heads` auto-detected
+from `model.config` or `--int4-kv-num-kv-heads`); the driver logs
+`forward_calls` at run-end and WARNs if 0. Two new tests pin the
+2-D path end-to-end.
 
 **This tier vs the memory-realizing tier:** what landed runs the
 INT4 *quality path* under vLLM — the compressed K/V flow through

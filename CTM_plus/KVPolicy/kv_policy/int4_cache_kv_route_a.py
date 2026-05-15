@@ -84,6 +84,19 @@ class INT4CacheKVRouteA:
         sink_size                   : StreamingLLM sink-FP16 passthrough
                                       (>0 keeps the first N positions
                                       of a multi-token forward in FP16).
+        num_kv_heads                : KV-head count. REQUIRED to handle
+                                      vLLM's 2-D K/V layout — vLLM
+                                      passes K/V to ``Attention.forward``
+                                      as ``(num_tokens, num_kv_heads *
+                                      head_dim)`` (confirmed by the
+                                      repo's GPU-validated
+                                      ``triattention.py`` Phase 4 hook,
+                                      which asserts the same 2-D
+                                      shape). ``round_trip_kv`` reshapes
+                                      2-D → 3-D ``(num_tokens,
+                                      num_kv_heads, head_dim)`` using
+                                      this. May be ``None`` if every
+                                      call is guaranteed 3-D (rare).
     """
 
     def __init__(
@@ -94,6 +107,7 @@ class INT4CacheKVRouteA:
         asymmetric: bool = True,
         bits: int = 4,
         sink_size: int = 0,
+        num_kv_heads: Optional[int] = None,
     ) -> None:
         if torch is None:
             raise ImportError("INT4CacheKVRouteA requires PyTorch.")
@@ -106,14 +120,25 @@ class INT4CacheKVRouteA:
             raise ValueError(f"bits must be in [2, 8]; got {bits}")
         if sink_size < 0:
             raise ValueError(f"sink_size must be >= 0; got {sink_size}")
+        if num_kv_heads is not None and num_kv_heads < 1:
+            raise ValueError(
+                f"num_kv_heads must be >= 1 or None; got {num_kv_heads}"
+            )
         self._k_group_size = int(k_group_size)
         self._v_group_size = int(v_group_size)
         self._asymmetric = bool(asymmetric)
         self._bits = int(bits)
         self._sink_size = int(sink_size)
+        self._num_kv_heads = (
+            int(num_kv_heads) if num_kv_heads is not None else None
+        )
         self._forward_calls = 0
         self._tokens_compressed = 0
         self._sink_tokens_passed_through = 0
+        # Counts forwards skipped because a 2-D K/V arrived but
+        # num_kv_heads is unknown — surfaced in stats so a silent
+        # no-op is detectable.
+        self._skipped_unknown_shape = 0
 
     @property
     def config(self) -> dict:
@@ -125,6 +150,7 @@ class INT4CacheKVRouteA:
             "asymmetric": self._asymmetric,
             "bits": self._bits,
             "sink_size": self._sink_size,
+            "num_kv_heads": self._num_kv_heads,
             "scheme": (
                 f"K=per-channel INT{self._bits}, V=per-token INT{self._bits}, "
                 f"{'asymmetric' if self._asymmetric else 'symmetric'}, "
@@ -140,6 +166,7 @@ class INT4CacheKVRouteA:
             "forward_calls": self._forward_calls,
             "tokens_compressed": self._tokens_compressed,
             "sink_tokens_passed_through": self._sink_tokens_passed_through,
+            "skipped_unknown_shape": self._skipped_unknown_shape,
         }
 
     def round_trip_kv(
@@ -149,34 +176,73 @@ class INT4CacheKVRouteA:
     ) -> "Tuple[torch.Tensor, torch.Tensor]":
         """Run K/V through the KIVI INT4 compress→decompress.
 
-        Args:
-            key:   ``(num_tokens, num_kv_heads, head_dim)`` — vLLM's
-                   Attention-layer K layout, which IS the quantizer's
-                   ``(S, H, D)``. A flattened 2-D
-                   ``(num_tokens, num_kv_heads * head_dim)`` input is
-                   also accepted and reshaped (caller must then pass
-                   ``num_kv_heads`` via ``reshape_2d_hint``); 3-D is
-                   the supported path.
-            value: same shape as ``key``.
+        Accepts BOTH layouts vLLM uses at the attention boundary:
 
-        Returns the lossy ``(key, value)`` — same shape and dtype as
-        the inputs. When ``sink_size > 0`` and the forward carries
-        more than ``sink_size`` tokens, the first ``sink_size``
-        positions pass through bit-identical FP16 and only positions
-        ``[sink_size:]`` are quantized (StreamingLLM sink protection,
-        the §20.2 path).
+        * **2-D** ``(num_tokens, num_kv_heads * head_dim)`` — the
+          common case. vLLM's ``qkv_proj → split → rotary_emb →
+          self.attn(q,k,v)`` flow hands ``Attention.forward`` flat
+          2-D K/V (confirmed by the repo's GPU-validated
+          ``triattention.py`` Phase 4 hook, which asserts the same
+          ``key must be 2D [num_tokens, num_kv_heads*head_dim]``).
+          Requires ``num_kv_heads`` to have been set on the manager;
+          the tensor is reshaped to 3-D for the quantizer and
+          reshaped back to 2-D on return.
+        * **3-D** ``(num_tokens, num_kv_heads, head_dim)`` — already
+          the quantizer's ``(S, H, D)``; used directly.
+
+        Returns the lossy ``(key, value)`` — SAME shape and dtype as
+        the inputs (2-D in, 2-D out; 3-D in, 3-D out). When
+        ``sink_size > 0`` and the forward carries more than
+        ``sink_size`` tokens, the first ``sink_size`` positions pass
+        through bit-identical FP16 and only positions ``[sink_size:]``
+        are quantized (StreamingLLM sink protection, the §20.2 path).
+
+        If a 2-D tensor arrives but ``num_kv_heads`` is unknown, the
+        inputs are returned UNCHANGED and ``stats['skipped_unknown_shape']``
+        is incremented — a detectable no-op rather than a crash.
         """
         from kv_policy.int4_per_channel_kv import (
             quantize_per_channel_int4, dequantize_per_channel_int4,
             quantize_per_token_int4, dequantize_per_token_int4,
         )
-        if key.ndim != 3 or value.ndim != 3:
+        if key.ndim not in (2, 3) or value.ndim not in (2, 3):
             raise ValueError(
-                "INT4CacheKVRouteA.round_trip_kv expects 3-D "
+                "INT4CacheKVRouteA.round_trip_kv expects 2-D "
+                "(num_tokens, num_kv_heads*head_dim) or 3-D "
                 "(num_tokens, num_kv_heads, head_dim) tensors; got "
-                f"K {tuple(key.shape)}, V {tuple(value.shape)}. "
-                "Reshape a flattened 2-D K/V to 3-D before calling."
+                f"K {tuple(key.shape)}, V {tuple(value.shape)}."
             )
+
+        # Normalise to 3-D (S, H, D) for the quantizer. Remember
+        # whether to flatten back on return.
+        was_2d = key.ndim == 2
+        if was_2d:
+            if self._num_kv_heads is None:
+                # Can't reshape — surface a detectable no-op.
+                self._skipped_unknown_shape += 1
+                logger.warning(
+                    "route-A INT4 got 2-D K/V (shape %s) but "
+                    "num_kv_heads is unknown — passing through "
+                    "UNCHANGED. Set num_kv_heads on the manager / via "
+                    "install_int4_cache_kv_route_a so the 2-D vLLM "
+                    "layout can be reshaped.",
+                    tuple(key.shape),
+                )
+                return key, value
+            h = self._num_kv_heads
+            if key.shape[-1] % h != 0 or value.shape[-1] % h != 0:
+                self._skipped_unknown_shape += 1
+                logger.warning(
+                    "route-A INT4: 2-D K/V last dim %d not divisible "
+                    "by num_kv_heads=%d — passing through unchanged.",
+                    key.shape[-1], h,
+                )
+                return key, value
+            num_tokens = key.shape[0]
+            d = key.shape[-1] // h
+            key = key.reshape(num_tokens, h, d)
+            value = value.reshape(num_tokens, h, d)
+
         num_tokens = key.shape[0]
         self._forward_calls += 1
 
@@ -213,6 +279,12 @@ class INT4CacheKVRouteA:
         else:
             k_out, v_out = _rt(key, value)
             self._tokens_compressed += num_tokens
+
+        # Flatten back to the 2-D layout vLLM gave us, so the wrapped
+        # Attention.forward sees the shape it expects.
+        if was_2d:
+            k_out = k_out.reshape(num_tokens, -1)
+            v_out = v_out.reshape(num_tokens, -1)
         return k_out, v_out
 
 
@@ -255,9 +327,12 @@ def _wrap_attention_forward_with_kv_rewrite(
 
     Robustness:
       * If the positional args are too short, or the K/V slots don't
-        hold 3-D tensors, the wrapper logs once and passes the call
-        through untouched (a malformed interception must never crash
-        the engine mid-decode).
+        hold 2-D / 3-D tensors, the wrapper passes the call through
+        untouched (a malformed interception must never crash the
+        engine mid-decode). vLLM passes K/V as 2-D
+        ``(num_tokens, num_kv_heads*head_dim)`` — the common case —
+        or 3-D ``(num_tokens, num_kv_heads, head_dim)``;
+        ``round_trip_kv`` handles both.
       * A round-trip exception is swallowed (logged) and the original
         K/V are used — fail-open, same posture as
         ``_capture_pre_rope_k_to_evictor``.
@@ -273,8 +348,8 @@ def _wrap_attention_forward_with_kv_rewrite(
                 and torch is not None
                 and isinstance(args[key_arg_index], torch.Tensor)
                 and isinstance(args[value_arg_index], torch.Tensor)
-                and args[key_arg_index].ndim == 3
-                and args[value_arg_index].ndim == 3
+                and args[key_arg_index].ndim in (2, 3)
+                and args[value_arg_index].ndim in (2, 3)
             ):
                 k_lossy, v_lossy = manager.round_trip_kv(
                     args[key_arg_index], args[value_arg_index],
@@ -298,6 +373,25 @@ def _wrap_attention_forward_with_kv_rewrite(
     )
 
 
+def _detect_num_kv_heads(model: Any) -> Optional[int]:
+    """Best-effort read of the KV-head count from a model's config.
+
+    vLLM models expose ``model.config`` (the HF config). KV-head field
+    names vary: ``num_key_value_heads`` (Llama/Qwen/Mistral GQA),
+    falling back to ``num_attention_heads`` (MHA models where KV heads
+    == attention heads). Returns None if neither is found — the caller
+    then requires an explicit ``num_kv_heads``.
+    """
+    cfg = getattr(model, "config", None)
+    if cfg is None:
+        return None
+    for attr in ("num_key_value_heads", "num_attention_heads", "n_head"):
+        val = getattr(cfg, attr, None)
+        if isinstance(val, int) and val > 0:
+            return val
+    return None
+
+
 def install_int4_cache_kv_route_a(
     *,
     model: Any,
@@ -306,6 +400,7 @@ def install_int4_cache_kv_route_a(
     asymmetric: bool = True,
     bits: int = 4,
     sink_size: int = 0,
+    num_kv_heads: Optional[int] = None,
     key_arg_index: int = 1,
     value_arg_index: int = 2,
 ) -> "Tuple[INT4CacheKVRouteA, Callable[[], None]]":
@@ -322,32 +417,57 @@ def install_int4_cache_kv_route_a(
             model_runner → model`` walk).
         k_group_size / v_group_size / asymmetric / bits / sink_size:
             KIVI config — same knobs as ``INT4PerChannelCache``.
+        num_kv_heads: KV-head count. REQUIRED for vLLM's 2-D K/V
+            layout — vLLM hands ``Attention.forward`` flat 2-D K/V
+            ``(num_tokens, num_kv_heads*head_dim)`` (the common case;
+            confirmed by ``triattention.py``'s GPU-validated Phase 4
+            hook). When ``None``, auto-detected from ``model.config``
+            (``num_key_value_heads`` / ``num_attention_heads``). If
+            auto-detection fails AND no explicit value is given, the
+            install still succeeds but 2-D K/V will pass through
+            uncompressed (logged + counted in
+            ``manager.stats['skipped_unknown_shape']``).
         key_arg_index / value_arg_index: positional indices of K and V
             in the attention module's ``forward(self, query, key,
             value, ...)`` signature. Defaults (1, 2) match the classic
             vLLM signature; override if the pod's vLLM version moved
-            them (route-A plan open question 6 — verify on day 1
+            them (route-A plan open question — verify on day 1
             against the actual vLLM source).
 
     Returns ``(manager, teardown)``:
         * ``manager`` — the ``INT4CacheKVRouteA``; read ``.stats`` /
-          ``.config`` off it.
+          ``.config`` off it. After a run, ``stats['forward_calls']``
+          should be > 0; if it's 0 the interception never fired
+          (wrong arg indices, or a vLLM version whose attention layer
+          doesn't take K/V positionally).
         * ``teardown`` — call to revert every wrapped ``forward``
           (LIFO). Used by tests and by clean engine shutdown.
 
-    Raises ``ValueError`` if no attention modules are found — that
-    means the class-name heuristic missed (a vLLM version with a
-    differently-named attention class) and the caller must pass the
-    right model or extend ``_ATTENTION_CLASS_HINTS``.
+    Raises ``ValueError`` if no attention modules are found — the
+    class-name heuristic missed (a vLLM version with a differently-
+    named attention class); the caller must pass the right model or
+    adjust ``_looks_like_attention``.
     """
     if torch is None:
         raise ImportError("install_int4_cache_kv_route_a requires PyTorch.")
+    resolved_num_kv_heads = (
+        num_kv_heads if num_kv_heads is not None
+        else _detect_num_kv_heads(model)
+    )
+    if resolved_num_kv_heads is None:
+        logger.warning(
+            "install_int4_cache_kv_route_a: num_kv_heads not given and "
+            "not auto-detectable from model.config. vLLM's 2-D K/V "
+            "layout cannot be reshaped — 2-D forwards will pass "
+            "through uncompressed. Pass num_kv_heads explicitly."
+        )
     manager = INT4CacheKVRouteA(
         k_group_size=k_group_size,
         v_group_size=v_group_size,
         asymmetric=asymmetric,
         bits=bits,
         sink_size=sink_size,
+        num_kv_heads=resolved_num_kv_heads,
     )
     teardown_list: List[Callable[[], None]] = []
 
@@ -374,8 +494,8 @@ def install_int4_cache_kv_route_a(
         )
     logger.info(
         "route-A INT4 KV-cache installed: %d attention modules wrapped "
-        "(%s)",
-        n_wrapped, manager.config["scheme"],
+        "(%s, num_kv_heads=%s)",
+        n_wrapped, manager.config["scheme"], resolved_num_kv_heads,
     )
 
     def teardown() -> None:

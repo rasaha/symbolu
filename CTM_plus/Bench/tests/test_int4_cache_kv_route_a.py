@@ -83,9 +83,10 @@ QWEN_NUM_KV_HEADS = 4
 QWEN_HEAD_DIM = 128
 
 
-def test_round_trip_kv_preserves_shape_and_is_faithful():
-    """`round_trip_kv` returns lossy K/V of the same shape/dtype as
-    the input, faithful at cosine ≥ 0.99 on Gaussian data."""
+def test_round_trip_kv_3d_preserves_shape_and_is_faithful():
+    """`round_trip_kv` on 3-D `(num_tokens, num_kv_heads, head_dim)`
+    input returns lossy K/V of the same shape/dtype, faithful at
+    cosine ≥ 0.99 on Gaussian data."""
     import torch
     from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
 
@@ -93,7 +94,6 @@ def test_round_trip_kv_preserves_shape_and_is_faithful():
         k_group_size=32, v_group_size=32, asymmetric=True, bits=4,
     )
     g = torch.Generator().manual_seed(2026)
-    # vLLM Attention-layer K/V layout: (num_tokens, num_kv_heads, head_dim).
     k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
                     dtype=torch.float32, generator=g)
     v = torch.randn(k.shape, dtype=torch.float32, generator=g)
@@ -101,25 +101,83 @@ def test_round_trip_kv_preserves_shape_and_is_faithful():
     assert k_lossy.shape == k.shape
     assert v_lossy.shape == v.shape
     assert k_lossy.dtype == k.dtype
-    # Lossy but faithful — not bit-identical, cosine high.
     assert not torch.equal(k_lossy, k)
     assert _cosine(k, k_lossy) >= 0.99
     assert _cosine(v, v_lossy) >= 0.99
-    # Stats updated.
     assert mgr.stats["forward_calls"] == 1
     assert mgr.stats["tokens_compressed"] == 64
 
 
-def test_round_trip_rejects_non_3d_input():
-    """A flattened 2-D K/V must be rejected with a clear error — the
-    quantizer ops need (S, H, D)."""
+def test_round_trip_kv_2d_vllm_layout_is_the_real_path():
+    """THE audit-fix test. vLLM passes K/V to Attention.forward as 2-D
+    `(num_tokens, num_kv_heads*head_dim)` — confirmed by the repo's
+    GPU-validated triattention.py Phase 4 hook. `round_trip_kv` must
+    handle 2-D input: reshape to 3-D, quantize, reshape back to 2-D.
+
+    Before the audit fix this raised ValueError and the interception
+    silently no-op'd on real vLLM.
+    """
+    import torch
+    from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
+
+    # num_kv_heads MUST be set for the 2-D path.
+    mgr = INT4CacheKVRouteA(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+        num_kv_heads=QWEN_NUM_KV_HEADS,
+    )
+    g = torch.Generator().manual_seed(2026)
+    # 2-D vLLM layout: (num_tokens, num_kv_heads * head_dim).
+    k2d = torch.randn(64, QWEN_NUM_KV_HEADS * QWEN_HEAD_DIM,
+                      dtype=torch.float32, generator=g)
+    v2d = torch.randn(k2d.shape, dtype=torch.float32, generator=g)
+    k_lossy, v_lossy = mgr.round_trip_kv(k2d, v2d)
+    # Output is 2-D, same shape as input — vLLM gets back what it expects.
+    assert k_lossy.shape == k2d.shape
+    assert v_lossy.shape == v2d.shape
+    assert k_lossy.ndim == 2
+    # Lossy but faithful.
+    assert not torch.equal(k_lossy, k2d)
+    assert _cosine(k2d, k_lossy) >= 0.99
+    assert _cosine(v2d, v_lossy) >= 0.99
+    # The interception fired — NOT skipped.
+    assert mgr.stats["forward_calls"] == 1
+    assert mgr.stats["skipped_unknown_shape"] == 0
+    # 2-D round-trip equals 3-D round-trip of the same data reshaped.
+    k3d = k2d.reshape(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    mgr2 = INT4CacheKVRouteA(k_group_size=32, v_group_size=32,
+                             asymmetric=True)
+    k3d_lossy, _ = mgr2.round_trip_kv(k3d, k3d)
+    assert torch.allclose(
+        k_lossy, k3d_lossy.reshape(64, -1), atol=1e-5,
+    ), "2-D path must produce the same values as the 3-D path"
+
+
+def test_round_trip_2d_without_num_kv_heads_is_detectable_noop():
+    """If 2-D K/V arrives but num_kv_heads is unknown, the manager
+    passes the input through UNCHANGED and increments
+    `skipped_unknown_shape` — a detectable no-op, not a crash."""
+    import torch
+    from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
+
+    mgr = INT4CacheKVRouteA()  # num_kv_heads not set
+    k2d = torch.randn(64, QWEN_NUM_KV_HEADS * QWEN_HEAD_DIM)
+    k_lossy, v_lossy = mgr.round_trip_kv(k2d, k2d)
+    # Passed through unchanged.
+    assert torch.equal(k_lossy, k2d)
+    assert mgr.stats["skipped_unknown_shape"] == 1
+    assert mgr.stats["forward_calls"] == 0
+
+
+def test_round_trip_rejects_1d_and_4d():
+    """Only 2-D and 3-D are valid; 1-D / 4-D raise a clear error."""
     import torch
     from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
 
     mgr = INT4CacheKVRouteA()
-    k2d = torch.randn(64, QWEN_NUM_KV_HEADS * QWEN_HEAD_DIM)
-    with pytest.raises(ValueError, match="3-D"):
-        mgr.round_trip_kv(k2d, k2d)
+    with pytest.raises(ValueError, match="2-D .* or 3-D"):
+        mgr.round_trip_kv(torch.randn(64), torch.randn(64))
+    with pytest.raises(ValueError, match="2-D .* or 3-D"):
+        mgr.round_trip_kv(torch.randn(2, 4, 8, 16), torch.randn(2, 4, 8, 16))
 
 
 def test_install_wraps_every_attention_module():
@@ -128,7 +186,9 @@ def test_install_wraps_every_attention_module():
     from kv_policy.int4_cache_kv_route_a import install_int4_cache_kv_route_a
 
     model = _build_fake_vllm_model(num_layers=4)
-    manager, teardown = install_int4_cache_kv_route_a(model=model)
+    manager, teardown = install_int4_cache_kv_route_a(
+        model=model, num_kv_heads=QWEN_NUM_KV_HEADS,
+    )
     try:
         # Count wrapped attention modules by checking forward identity
         # changed. (The wrapped forward is a fresh closure.)
@@ -142,17 +202,16 @@ def test_install_wraps_every_attention_module():
         teardown()
 
 
-def test_wrapped_forward_sees_int4_round_tripped_kv():
-    """The whole point: after install, when an attention module's
-    forward runs, the K/V it receives are INT4-round-tripped, NOT the
-    originals. This is route-A interception working end-to-end.
-    """
+def test_wrapped_forward_sees_int4_round_tripped_kv_3d():
+    """After install, an attention module's forward receives
+    INT4-round-tripped K/V (3-D input path)."""
     import torch
     from kv_policy.int4_cache_kv_route_a import install_int4_cache_kv_route_a
 
     model = _build_fake_vllm_model(num_layers=2)
     manager, teardown = install_int4_cache_kv_route_a(
         model=model, k_group_size=32, v_group_size=32, asymmetric=True,
+        num_kv_heads=QWEN_NUM_KV_HEADS,
     )
     try:
         g = torch.Generator().manual_seed(7)
@@ -163,9 +222,6 @@ def test_wrapped_forward_sees_int4_round_tripped_kv():
         attn0 = model.layers[0].attn
         attn0.forward(q, k, v, None, None)
 
-        # The attention module recorded what it received. It should be
-        # the INT4-round-tripped K/V — lossy, not bit-identical, but
-        # faithful.
         assert attn0.received_k is not None
         assert not torch.equal(attn0.received_k, k), (
             "attention module received the ORIGINAL K — the route-A "
@@ -173,8 +229,54 @@ def test_wrapped_forward_sees_int4_round_tripped_kv():
         )
         assert _cosine(k, attn0.received_k) >= 0.99
         assert _cosine(v, attn0.received_v) >= 0.99
-        # The manager logged the forward call.
         assert manager.stats["forward_calls"] >= 1
+    finally:
+        teardown()
+
+
+def test_wrapped_forward_sees_int4_round_tripped_kv_2d_vllm_layout():
+    """THE realistic end-to-end test: vLLM hands Attention.forward 2-D
+    K/V `(num_tokens, num_kv_heads*head_dim)`. After install, the
+    attention module must receive INT4-round-tripped 2-D K/V, and the
+    interception must NOT silently no-op (forward_calls > 0,
+    skipped_unknown_shape == 0).
+
+    Before the audit fix this test would fail — the wrapper's 3-D-only
+    guard skipped 2-D K/V and the attention module saw the originals.
+    """
+    import torch
+    from kv_policy.int4_cache_kv_route_a import install_int4_cache_kv_route_a
+
+    model = _build_fake_vllm_model(num_layers=2)
+    manager, teardown = install_int4_cache_kv_route_a(
+        model=model, k_group_size=32, v_group_size=32, asymmetric=True,
+        num_kv_heads=QWEN_NUM_KV_HEADS,
+    )
+    try:
+        g = torch.Generator().manual_seed(7)
+        # 2-D vLLM layout.
+        q = torch.randn(64, QWEN_NUM_KV_HEADS * QWEN_HEAD_DIM, generator=g)
+        k = torch.randn(64, QWEN_NUM_KV_HEADS * QWEN_HEAD_DIM, generator=g)
+        v = torch.randn(64, QWEN_NUM_KV_HEADS * QWEN_HEAD_DIM, generator=g)
+
+        attn0 = model.layers[0].attn
+        attn0.forward(q, k, v, None, None)
+
+        assert attn0.received_k is not None
+        # Received 2-D K/V, same shape as input.
+        assert attn0.received_k.shape == k.shape
+        assert attn0.received_k.ndim == 2
+        # Lossy — the interception fired.
+        assert not torch.equal(attn0.received_k, k), (
+            "attention module received the ORIGINAL 2-D K — the "
+            "route-A interception silently skipped the 2-D layout "
+            "(this is the audit bug A1)"
+        )
+        assert _cosine(k, attn0.received_k) >= 0.99
+        assert _cosine(v, attn0.received_v) >= 0.99
+        # No silent no-op.
+        assert manager.stats["forward_calls"] >= 1
+        assert manager.stats["skipped_unknown_shape"] == 0
     finally:
         teardown()
 
@@ -215,25 +317,62 @@ def test_non_attention_modules_untouched():
         teardown()
 
 
-def test_interception_fails_open_on_malformed_call():
-    """A forward called with too few positional args (K/V slots
-    absent) must pass through untouched — never crash the engine."""
+def test_interception_fails_open_on_unsupported_rank():
+    """A forward whose K/V slots hold tensors of an unsupported rank
+    (here 4-D) must pass through untouched — the wrapper's
+    `ndim in (2, 3)` guard skips it; never crash the engine."""
     import torch
     from kv_policy.int4_cache_kv_route_a import install_int4_cache_kv_route_a
 
     model = _build_fake_vllm_model(num_layers=1)
-    manager, teardown = install_int4_cache_kv_route_a(model=model)
+    manager, teardown = install_int4_cache_kv_route_a(
+        model=model, num_kv_heads=QWEN_NUM_KV_HEADS,
+    )
     try:
         attn0 = model.layers[0].attn
-        # Call forward with the right arity but non-3-D K/V — the
-        # wrapper should detect the shape mismatch and pass through.
         q = torch.zeros(8, 4)
-        k_2d = torch.zeros(8, 512)  # 2-D, not (S,H,D)
-        v_2d = torch.zeros(8, 512)
+        k_4d = torch.zeros(2, 4, 8, 16)  # 4-D — unsupported rank
+        v_4d = torch.zeros(2, 4, 8, 16)
         # Should not raise.
-        out = attn0.forward(q, k_2d, v_2d, None, None)
-        # K passed through untouched (interception skipped non-3-D).
-        assert torch.equal(attn0.received_k, k_2d)
+        attn0.forward(q, k_4d, v_4d, None, None)
+        # K passed through untouched (interception skipped 4-D).
+        assert torch.equal(attn0.received_k, k_4d)
+        assert manager.stats["forward_calls"] == 0
+    finally:
+        teardown()
+
+
+def test_interception_fails_open_on_too_few_args():
+    """A forward called with too few positional args (K/V slots
+    absent) must pass through untouched — never crash."""
+    import torch
+    from kv_policy.int4_cache_kv_route_a import install_int4_cache_kv_route_a
+
+    model = _build_fake_vllm_model(num_layers=1)
+    manager, teardown = install_int4_cache_kv_route_a(
+        model=model, num_kv_heads=QWEN_NUM_KV_HEADS,
+    )
+    try:
+        attn0 = model.layers[0].attn
+
+        # A forward variant that takes only `q` — too few args for the
+        # key_arg_index=1 / value_arg_index=2 the wrapper expects.
+        def short_forward(q):
+            attn0.received_k = "untouched"
+            return q
+        # Re-wrap a short-signature forward by calling the wrapped
+        # forward with just one arg.
+        wrapped = attn0.forward  # the installed wrapper
+        # Should not raise even though args is length 1.
+        try:
+            wrapped(torch.zeros(8, 4))
+        except TypeError:
+            # The ORIGINAL forward needs 5 args — a TypeError from the
+            # original is fine; what matters is the wrapper itself
+            # didn't crash in the interception logic.
+            pass
+        # The interception didn't fire (too few args) — no compression.
+        assert manager.stats["forward_calls"] == 0
     finally:
         teardown()
 

@@ -27,6 +27,18 @@ known single-token-decode degeneracy that route-B shares (per-call
 quant of one decode token is near-lossless; the paged-buffer tier's
 per-16/32-token-block quant fixes it).
 
+**Post-audit fix (the K/V layout):** vLLM hands `Attention.forward`
+flat **2-D** K/V `(num_tokens, num_kv_heads*head_dim)` — confirmed by
+the repo's GPU-validated `triattention.py` Phase 4 hook, which
+asserts the same shape. The first cut of `INT4CacheKVRouteA` only
+accepted 3-D `(S, H, D)` and would have silently no-op'd on real
+vLLM. `round_trip_kv` now handles both layouts: 2-D is reshaped to
+3-D using `num_kv_heads` (auto-detected from `model.config`,
+overridable via `--int4-kv-num-kv-heads`), quantized, reshaped back
+to 2-D. The driver logs `forward_calls` at run-end and WARNs loudly
+if it's 0 (interception never fired) — so a silent no-op is now
+detectable, not invisible.
+
 **What's left (Days 4-5, the GPU pod):** verify the install applies
 to the real vLLM `Attention` class (open question 6), GPU smoke run,
 chat_32k throughput + quality re-validation. Plus the memory-realizing

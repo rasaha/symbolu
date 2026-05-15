@@ -541,6 +541,7 @@ class AsyncEngineDriver:
         int4_kv_asymmetric: bool = True,
         int4_kv_bits: int = 4,
         int4_kv_sink_size: int = 0,
+        int4_kv_num_kv_heads: Optional[int] = None,
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -648,6 +649,12 @@ class AsyncEngineDriver:
         self.int4_kv_asymmetric = bool(int4_kv_asymmetric)
         self.int4_kv_bits = int(int4_kv_bits)
         self.int4_kv_sink_size = int(int4_kv_sink_size)
+        # KV-head count for route-A's 2-D→3-D reshape. None → the
+        # install auto-detects from model.config.
+        self.int4_kv_num_kv_heads = (
+            int(int4_kv_num_kv_heads)
+            if int4_kv_num_kv_heads is not None else None
+        )
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -1060,6 +1067,7 @@ class AsyncEngineDriver:
                         asymmetric=self.int4_kv_asymmetric,
                         bits=self.int4_kv_bits,
                         sink_size=self.int4_kv_sink_size,
+                        num_kv_heads=self.int4_kv_num_kv_heads,
                     )
                 )
                 logger.info(
@@ -1197,6 +1205,36 @@ class AsyncEngineDriver:
                 await sampler_task
             except asyncio.CancelledError:
                 pass
+            # Surface route-A INT4 stats so a silent no-op is
+            # detectable: if `forward_calls == 0` the interception
+            # never fired (wrong K/V arg indices, or this vLLM
+            # version's attention layer doesn't take K/V positionally).
+            if self._int4_route_a_manager is not None:
+                st = self._int4_route_a_manager.stats
+                if st["forward_calls"] == 0:
+                    logger.warning(
+                        "route-A INT4: forward_calls=0 — the "
+                        "interception NEVER FIRED. Output is "
+                        "baseline-identical. Check --int4-kv-* arg "
+                        "indices against this vLLM version's "
+                        "Attention.forward signature."
+                    )
+                else:
+                    logger.info(
+                        "route-A INT4 stats: forward_calls=%d, "
+                        "tokens_compressed=%d, sink_passthrough=%d, "
+                        "skipped_unknown_shape=%d",
+                        st["forward_calls"], st["tokens_compressed"],
+                        st["sink_tokens_passed_through"],
+                        st["skipped_unknown_shape"],
+                    )
+                    if st["skipped_unknown_shape"] > 0:
+                        logger.warning(
+                            "route-A INT4: %d forwards skipped — 2-D "
+                            "K/V arrived but num_kv_heads was unknown. "
+                            "Pass --int4-kv-num-kv-heads explicitly.",
+                            st["skipped_unknown_shape"],
+                        )
             # Revert the route-A INT4 attention-forward wraps before
             # engine shutdown. Best-effort; never crash the run.
             if self._int4_route_a_teardown is not None:
