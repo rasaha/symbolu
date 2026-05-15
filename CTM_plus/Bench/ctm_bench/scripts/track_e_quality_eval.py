@@ -824,9 +824,27 @@ def main(argv: Sequence[str]) -> int:
         print(f"    {'baseline'.ljust(label_w)}:  {b.accuracy * 100:.2f}%   ({b.correct}/{b.num_questions})")
         print(f"    {quant_label.ljust(label_w)}:  {t.accuracy * 100:.2f}%   ({t.correct}/{t.num_questions})")
         delta = summary.deltas['mmlu_accuracy_delta_pt']
-        gate = "PASS (within ±0.5pt)" if abs(delta) <= 0.5 else (
-            "PARTIAL (within ±1.0pt)" if abs(delta) <= 1.0 else "REGRESSION (> 1.0pt)"
-        )
+        # Direction-aware label: a positive delta is "compressed scored
+        # higher than baseline" (usually statistical noise at small
+        # sample sizes, but never a regression). Treat magnitudes
+        # symmetrically when within the noise bands, but never call
+        # an improvement a "regression".
+        absd = abs(delta)
+        if absd <= 0.5:
+            gate = "PASS (within ±0.5pt)"
+        elif absd <= 1.0:
+            gate = "PARTIAL (within ±1.0pt)"
+        elif delta < 0:
+            gate = "REGRESSION (> 1.0pt)"
+        else:
+            # delta > 1.0pt and positive: compressed beat baseline.
+            # That's not a regression — it's likely noise on a small
+            # MMLU subset (e.g., 200q CI ≈ ±3.4pt). Annotate explicitly.
+            gate = (
+                f"IMPROVEMENT (+{delta:.2f}pt) — likely noise at "
+                f"{t.num_questions}q sample size; rerun with more "
+                f"questions to confirm"
+            )
         print(f"    {'delta'.ljust(label_w)}:  {delta:+.2f}pt  → {gate}")
     print()
     print(f"  Full results: {out_path}")
