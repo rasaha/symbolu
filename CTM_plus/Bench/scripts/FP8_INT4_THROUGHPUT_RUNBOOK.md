@@ -141,15 +141,31 @@ The 32768 prefill length is the §20.4 long-context cell (KV memory pressure is 
 
 ## 3. Compose the partner-shareable comparison
 
-After all four cells, run the reader script (to be landed alongside this runbook in a follow-up commit; for now the JSON files contain everything):
-
 ```bash
-# Compose the four numbers manually until the reader script lands.
-echo "Cell A (vLLM FP16):   $(jq .tokens_per_second bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json) tok/s"
-echo "Cell B (vLLM FP8):    $(jq .tokens_per_second bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json) tok/s"
-echo "Cell C (HF FP16):     $(jq '.aggregates."baseline@prefill=2048".best_decode_tokens_per_sec' bench_out/track_e_audit_followups/int4_throughput_hf.json) tok/s (decode-only, prefill=2048)"
-echo "Cell D (HF INT4):     $(jq '.aggregates."int4-per-channel@prefill=2048".best_decode_tokens_per_sec' bench_out/track_e_audit_followups/int4_throughput_hf.json) tok/s (decode-only, prefill=2048)"
+cd /workspace/symbolu/CTM_plus/Bench
+python -m ctm_bench.scripts.compose_throughput_comparison \
+    --json-output bench_out/track_e_audit_followups/fp8_int4_comparison.json \
+    > /tmp/section_20_1_table.md
+cat /tmp/section_20_1_table.md
 ```
+
+The composer reads the four JSONs (cells A and B from vLLM, cells C
+and D from the HF throughput script), computes the B/A and D/C ratios,
+maps them to the runbook's GREEN / YELLOW / RED bands, and writes
+both a markdown table for `PHASE4_GPU_FINDINGS.md` §20.1 and a
+partner-shareable merged JSON (schema version pinned at `§20.1.v1`).
+
+Partial input is handled: if a cell's JSON is missing or malformed,
+the composer prints `MEASUREMENT MISSING — GPU run pending` for that
+row rather than fabricating a number. So an operator who wants to
+land the §20.1 update incrementally (vLLM cells first, HF cells in a
+follow-on session) gets a half-filled table that's still safe to
+commit.
+
+The composer is the operator's last step before pasting numbers into
+`PHASE4_GPU_FINDINGS.md` §20.1. Six CPU regression tests in
+`Bench/tests/test_compose_throughput_comparison.py` pin the schema,
+the ratio computation, and the band-boundary contracts.
 
 Drop the four numbers into `PHASE4_GPU_FINDINGS.md` §20.1 (template populated, awaiting GPU run). Also update the "Honest Validation Status" table in `INVESTOR_PITCH.md` and `CTM_PLUS_PCAM_FSCS_VC_BRIEF.md` — likely the right row reads:
 

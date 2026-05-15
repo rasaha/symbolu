@@ -2323,6 +2323,25 @@ should reproduce that. Qwen2.5-7B at FP16 in HF transformers is
 typically 20-40 tok/s decode on A100 40 GB; Cell C will land in that
 range.
 
+**Once the four cells exist on the GPU pod, replace this entire
+"Expected measured outcomes" block with the output of:**
+
+```bash
+cd CTM_plus/Bench
+python -m ctm_bench.scripts.compose_throughput_comparison \
+    --json-output bench_out/track_e_audit_followups/fp8_int4_comparison.json
+```
+
+The composer reads the four JSONs, computes the B/A and D/C ratios,
+maps them to the runbook's GREEN/YELLOW/RED verdict bands, and emits
+a copy-paste-ready markdown table plus a partner-shareable merged
+JSON. It handles partial-input gracefully (prints
+`MEASUREMENT MISSING` for absent cells; never emits fake numbers).
+Six CPU regression tests in
+`Bench/tests/test_compose_throughput_comparison.py` pin the schema,
+the ratio computation, and the band boundaries (D/C boundary at
+0.80 for GREEN/YELLOW, 0.50 for YELLOW/RED).
+
 **Verdict band (pre-decided here so post-hoc rationalisation is harder):**
 
 | D / C ratio | Verdict | Next step |
