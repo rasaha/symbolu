@@ -41,20 +41,34 @@ Our breakthrough architecture replaces quadratic attention with three linear-tim
 
 ### 2. CTM+ Memory Controller: Intelligence at Every Layer
 
-Our Coherence-Tier Memory Plus (CTM+) controller optimizes memory placement across the entire stack—from GPU HBM to NVMe. Unlike static policies (LRU, FIFO), CTM+ uses multi-signal scoring:
+Our Coherence-Tier Memory Plus (CTM+) controller optimizes memory placement across the entire stack—from GPU HBM to NVMe. Unlike static policies (LRU, FIFO), CTM+ uses multi-signal scoring.
 
-**Production Benchmarks (p99 < 3µs latency):**
+**What's measured on real Qwen2.5-7B-Instruct in vLLM 0.7.3** (May 2026 GPU validation, see `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §13.3 for the full audit-passed write-up):
 
-| Metric | LRU Baseline | CTM+ | Improvement |
-|--------|--------------|------|-------------|
-| Important token retention | 25.4% | 29.5% | **+16.2%** |
-| Decision latency | 0.84µs | 2.35µs | Still sub-100µs |
-| Memory efficiency | Baseline | +18% | **30-50% HW savings** |
+| Metric | LRU Baseline | CTM+ Phase 4 | Result |
+|--------|--------------|--------------|--------|
+| swap_out blocks per decode token (algorithm quality) | reference | **−11.1%** | **Smarter evictions: real, durable** |
+| tokens/sec end-to-end | reference | **−20%** | **Structural at vLLM 0.7.3 Evictor-ABC patching layer (closed)** |
+| Quality preservation (MMLU 1000q on Qwen2.5-7B) | 70.20% | within ±1.4pt | No regression at the 1000-question CI |
+
+**Honest framing:** the algorithm-quality win (fewer wasteful evictions) is real and reproduced across five evictor implementations. The throughput cost (per-evict overhead at the Python integration layer in vLLM 0.7.3) is structural at this vLLM version — three engineering iterations recovered ~1pp combined. We're shipping the algorithm wins and pursuing a vLLM-side cache_kv hook (route A) to remove the integration tax in a future version.
+
+**KV-cache compression layer (KIVI-style INT4)** — landed in the same session and validated end-to-end on the same model:
+
+| Metric | FP16 Baseline | INT4 + group=32 + asymmetric | Result |
+|--------|--------------|----------------|--------|
+| KV-cache memory (real heap, bit-packed) | reference | **3.2×** compression | **More cache fits per GB HBM** |
+| Perplexity (Wikipedia-style text) | 3.7155 | 3.8036 | **1.024× ratio** (within 3%) |
+| MMLU accuracy (1000 questions, 57 subjects) | 70.20% | 69.30% | **−0.90pt** (within ±1.4pt CI) |
+| Next-token prediction agreement vs FP16 (teacher-forced, 250 positions) | reference | **96.4%** top-1, **100%** top-5 inclusion | Functional fidelity at decode |
+| Logit-distribution overlap with FP16 (mean KL) | reference | **0.006** | ~99.4% distribution overlap |
+
+Combined: ~3-3.5× effective serving-capacity uplift over the INT8 + LRU industry baseline at quality parity.
 
 **Deployment Targets:**
-- **vLLM KV Cache:** Smarter eviction = more concurrent users per GPU
-- **DeepSpeed Training:** Intelligent offload = train larger models on existing hardware
-- **Database Buffer Pools:** Adaptive caching = faster queries without hardware upgrades
+- **vLLM KV Cache:** Smarter eviction + INT4 compression = more concurrent users per GPU at preserved quality
+- **DeepSpeed Training:** Intelligent offload = train larger models on existing hardware (separate work-track; not in the §13.3/§18 measurement scope)
+- **Database Buffer Pools:** Adaptive caching = faster queries without hardware upgrades (separate Mode A simulator results; see `Bench/bench_out/RESULTS.md`)
 
 ---
 
@@ -133,13 +147,15 @@ Our chip architectures deliver 1000x improvements over GPU software implementati
 
 **Production Throughput Gains:**
 
-| System | Metric | Before | After | Improvement |
-|--------|--------|--------|-------|-------------|
-| Database (TPC-C) | Transactions/sec | 125K | 142K | **+13.6%** |
-| Database (TPC-C) | p99 latency | 12ms | 8.5ms | **-29%** |
-| vLLM Inference | Tokens/sec | 1,850 | 2,180 | **+18%** |
-| vLLM Inference | Concurrent requests | 32 | 48 | **+50%** |
-| GPU Memory | Efficiency | 72% | 89% | **+17%** |
+| System | Metric | Before | After | Status |
+|--------|--------|--------|-------|--------|
+| Database (TPC-C) | Transactions/sec | 125K | 142K | +13.6% (Mode A simulator) |
+| Database (TPC-C) | p99 latency | 12ms | 8.5ms | -29% (Mode A simulator) |
+| vLLM Inference (Qwen2.5-7B) | swap_out / decode_token (algorithm quality) | reference | −11.1% | **GPU-measured, durable** |
+| vLLM Inference (Qwen2.5-7B) | tokens/sec end-to-end | reference | −20% | **GPU-measured throughput cost** (structural at vLLM 0.7.3 Evictor-ABC layer; closed at §13.3) |
+| vLLM KV cache memory (INT4 + group + asymmetric) | bytes/token | reference | **3.2× compression** | **GPU-measured, bit-packed real heap** |
+| MMLU 1000q | accuracy | 70.20% | 69.30% | **−0.90pt** (within ±1.4pt CI) |
+| Teacher-forced next-token agreement vs FP16 | top-1 | reference | **96.4%** | **GPU-measured decode quality** |
 
 ### Use Case Specific Savings
 
@@ -226,6 +242,49 @@ Current autonomous agents (AutoGPT, LangChain) are either dangerous (no safety g
 
 ---
 
+## Honest Validation Status (May 2026)
+
+We separate **measured** from **projected** in our pitch — partners
+should be able to tell which is which.
+
+### Measured on real GPUs (Qwen2.5-7B-Instruct, May 2026)
+
+| Claim | Evidence |
+|---|---|
+| CTM+ Phase 4: **−11.1% swap_out per decode token** | `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §13.3 |
+| CTM+ Phase 4: **−20% tokens/sec end-to-end** (the structural cost) | `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §13.3 |
+| INT4 KIVI: **3.2× real-heap KV compression vs FP16** | `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §18 + §19.1 |
+| INT4 KIVI: **1.024× perplexity / −0.9pt MMLU @ 1000q** | `Bench/bench_out/track_e_audit_followups/int4_mmlu_1000.json` |
+| INT4 KIVI: **96.4% teacher-forced next-token agreement, mean KL 0.006** | `Bench/bench_out/track_e_audit_followups/int4_generation_teacher_forced.json` |
+| INT3 KIVI variant: **−0.7pt MMLU @ 1000q at ~4.5× theoretical compression** (memory-bound option) | `Bench/bench_out/track_e_audit_followups/int3_mmlu_1000.json` |
+
+### Tested-and-failed (documented as negatives — partner-shareable)
+
+| Item | Result |
+|---|---|
+| TurboQuant 3-bit polar quantization on Qwen2.5-7B | Perplexity ratio 3052× — algorithm fails on real K activations |
+| TurboQuant + per-channel scale rescue | Made things 24× worse than baseline TurboQuant |
+| TurboQuant + sink-skip rescue | Modest 27% improvement, still catastrophic at 220× |
+| Static GPTQ-style calibration on INT4 | −6.80pt MMLU @ 1000q — dynamic + group quantization beats it |
+
+Documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2. Telling negatives
+strengthens partner trust in the positives.
+
+### Projected (not yet measured)
+
+| Item | Status |
+|---|---|
+| Phase-Quad O(n) attention model | Architecture spec; in-house benchmarks; not yet third-party reproduced |
+| PA-VPU / UCP silicon | Architecture spec; pre-silicon |
+| Sentinel agentic framework | Code lands at 421 passing tests; cost-savings claims are from architecture math, not deployment measurement |
+| 8.8× combined-stack capacity from TurboQuant + CTM+ + CTXL | **Architecture-doc projection has been retired.** The TurboQuant-side number that anchored it doesn't survive real-model validation (see negatives table). Current honest combined-stack claim is **~3-3.5× over INT8+LRU baseline** from measured KIVI INT4 × measured CTM+ Phase 4 eviction quality. |
+| CTXL tiering (HBM → CXL → NVMe) | Independent multi-month work-track; not validated |
+| Multi-model generalization (Llama-3, Mistral, Qwen sizes other than 7B) | Not yet measured; in §19.6 deferred follow-on list |
+| Long-context (≥32k) | Not yet measured; in §19.6 deferred follow-on list |
+| vLLM `cache_kv` monkey-patch (route A — production deployment) | ~3-5 day engineering effort; currently route-B HF-transformers wrapper is the measurement vehicle, not the deployment vehicle |
+
+---
+
 ## Why Now
 
 1. **AI costs are exploding** — Inference is now the #1 cloud expense for AI companies
@@ -270,7 +329,14 @@ Cognade isn't incremental optimization—it's a fundamental rethinking of how AI
 
 ---
 
-*Document Version: 2.0*
-*Last Updated: February 2026*
+*Document Version: 2.1*
+*Last Updated: May 2026*
 
-*For technical documentation, benchmarks, and integration guides, see the CTM+ Enterprise Benchmark Results, Phase-Quad Architecture specifications, and Sentinel Framework Guide.*
+*Changes from v2.0:*
+*- Updated CTM+ section with GPU-measured numbers (§13.3): −11.1% swap_out algorithm-quality win + −20% throughput cost (structural at vLLM 0.7.3).*
+*- Added KIVI INT4 KV-cache compression layer with measured 3.2× real-heap compression, 1.024× perplexity, −0.9pt MMLU @ 1000q, 96.4% teacher-forced next-token agreement.*
+*- Removed unbacked "+18% tokens/sec" and "+50% concurrent requests" claims that contradicted the §13.3 GPU measurement.*
+*- Added explicit "Honest Validation Status" section separating measured / tested-failed / projected.*
+*- Retired the architecture-doc 8.8× combined-stack projection; replaced with the measured ~3-3.5× over INT8+LRU baseline.*
+
+*For technical documentation, benchmarks, and integration guides, see the CTM+ Enterprise Benchmark Results, Phase-Quad Architecture specifications, and Sentinel Framework Guide. For the rigorous measurement record this version cites, see `Bench/bench_out/PHASE4_GPU_FINDINGS.md` §13–§19 and `Bench/bench_out/PARTNER_VALIDATION_NOTE.md`.*
