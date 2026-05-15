@@ -336,6 +336,52 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 | 1.05–1.5 | Helps but not full quality. | Try INT4 + group quantization (see §5d). |
 | > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
 
+## 5g. Generation-mode test (audit Path #7 — decode quality direct measurement)
+
+Track E's perplexity + MMLU measure prefill compression quality. They
+don't directly test "does the model produce the same generated text
+with compressed K/V?" This eval does: greedy-decode 50 tokens with
+baseline FP16 cache vs INT4-KIVI cache, report top-1 next-token
+agreement rate + KL divergence of per-step logits.
+
+Output includes a sample text comparison so a human can eyeball the
+first prompt's generation side-by-side.
+
+Re-run cost: ~5 prompts × 50 tokens × 2 generations = 500 decode
+steps. On A100 ~5-10 sec/decode-step batch ≈ ~1-2 min total. Cost
+~$0.03 spot.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4_generation
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval generation \
+    --generation-num-tokens 50 \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --asymmetric-int4 \
+    --output-dir /tmp/track_e_int4_generation/ 2>&1 | tee /tmp/track_e_int4_generation/run.log
+```
+
+**Decision tree on top-1 agreement rate:**
+
+| Top-1 agreement | Interpretation |
+|---|---|
+| ≥ 90% | ✅ Compressed cache produces nearly-identical generation. Headline partner number. |
+| 80-90% | Cache diverges occasionally but generation stays coherent. Mean KL should be < 0.05. |
+| 60-80% | Generations diverge meaningfully early; partial degradation. Check sample text. |
+| < 60% | Significant decode-quality damage; perplexity/MMLU were probably lucky. |
+
+KL is a softer measure: small KL (< 0.05) means the logit distributions
+overlap heavily even when the top-1 picks differ.
+
 ## 5f. INT3 experiment (Path B from post-§18 audit)
 
 After INT4 + group + asymmetric landed GREEN (perplexity 1.02×, MMLU

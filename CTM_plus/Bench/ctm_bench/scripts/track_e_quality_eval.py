@@ -56,7 +56,7 @@ import math
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 from ctm_bench.policies import _add_kv_policy_to_path
 _add_kv_policy_to_path()
@@ -213,6 +213,26 @@ class MMLURow:
 
 
 @dataclass
+class GenerationRow:
+    """One side-by-side generation comparison row: baseline vs compressed
+    cache produce a stream of tokens from the same prompt; we measure
+    how often they agree on the next token and how far their logit
+    distributions diverge."""
+    cache_type: str               # "baseline" vs the quant name being compared
+    num_prompts: int
+    num_generated_per_prompt: int
+    total_positions: int
+    top1_match_count: int          # how many positions had exact same top-1 token
+    top1_agreement_rate: float     # ratio in [0, 1]
+    top5_inclusion_count: int      # how many baseline-top-1 tokens were in compressed-top-5
+    top5_inclusion_rate: float
+    mean_kl_divergence: float      # mean KL(compressed || baseline) across positions
+    max_kl_divergence: float
+    sample_baseline_text: str       # first prompt's baseline generation (truncated)
+    sample_compressed_text: str     # first prompt's compressed generation
+
+
+@dataclass
 class TrackESummary:
     model_id: str
     dtype: str
@@ -220,6 +240,7 @@ class TrackESummary:
     turboquant_config: dict
     perplexity: List[PerplexityRow] = field(default_factory=list)
     mmlu: List[MMLURow] = field(default_factory=list)
+    generation: Optional[GenerationRow] = None
     deltas: dict = field(default_factory=dict)
 
 
@@ -304,6 +325,172 @@ def compute_perplexity(
 # --------------------------------------------------------------------------- #
 # MMLU                                                                        #
 # --------------------------------------------------------------------------- #
+
+
+# --------------------------------------------------------------------------- #
+# Generation-mode evaluation                                                  #
+#                                                                             #
+# Directly tests decode quality: greedy-generate N tokens with each cache,    #
+# measure how often the compressed cache picks the same next token as the    #
+# baseline and how far the logit distributions diverge. Complements the      #
+# perplexity / MMLU tests which only measure prefill quality (perplexity)    #
+# or short-prompt accuracy (MMLU).                                            #
+# --------------------------------------------------------------------------- #
+
+
+GENERATION_PROMPTS: List[str] = [
+    # Chat-like
+    "The three primary colors are red, blue, and",
+    # Code completion
+    "def fibonacci(n):\n    if n <= 1:\n        return n\n    return",
+    # Factual continuation
+    "The capital of France is Paris, which is famous for the",
+    # Multi-step reasoning
+    "If Alice has 5 apples and gives 2 to Bob, she has",
+    # Multilingual / mixed
+    "In Japanese, the word for 'hello' is 'konnichiwa', which is written",
+]
+
+
+def _generate_with_cache(
+    *,
+    model,
+    tokenizer,
+    prompt: str,
+    num_tokens: int,
+    cache,
+) -> "Tuple[List[int], List[Any]]":
+    """Greedy-decode ``num_tokens`` after ``prompt``, using ``cache`` as
+    the past_key_values store. Returns the generated token IDs and the
+    next-token-logit tensor at each step (CPU float32).
+    """
+    import torch
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    input_ids = inputs["input_ids"]
+
+    # Prefill.
+    with torch.no_grad():
+        out = model(input_ids=input_ids, use_cache=True, past_key_values=cache)
+    next_token_logits = out.logits[0, -1, :]
+
+    generated: List[int] = []
+    logits_list: List[Any] = []
+    for _step in range(num_tokens):
+        # Record this step's predictive distribution.
+        logits_list.append(next_token_logits.detach().cpu().to(torch.float32))
+        # Greedy pick.
+        next_token_id = int(next_token_logits.argmax().item())
+        generated.append(next_token_id)
+        # Decode-step forward pass with just the new token.
+        next_token_tensor = torch.tensor([[next_token_id]], device=model.device)
+        with torch.no_grad():
+            out = model(
+                input_ids=next_token_tensor,
+                use_cache=True,
+                past_key_values=cache,
+            )
+        next_token_logits = out.logits[0, -1, :]
+    return generated, logits_list
+
+
+def compute_generation_agreement(
+    *,
+    model,
+    tokenizer,
+    prompts: List[str],
+    num_tokens: int,
+    baseline_factory: Callable[[], Any],
+    compressed_factory: Callable[[], Any],
+    compressed_label: str,
+) -> GenerationRow:
+    """For each prompt, greedy-decode ``num_tokens`` with the baseline
+    cache and with the compressed cache. Compare next-token picks +
+    logit-distribution KL across all positions.
+    """
+    import torch
+    import torch.nn.functional as F
+
+    total_positions = 0
+    top1_match_count = 0
+    top5_inclusion_count = 0
+    kl_values: List[float] = []
+    sample_baseline_text = ""
+    sample_compressed_text = ""
+
+    for prompt_idx, prompt in enumerate(prompts):
+        # Two independent caches — one for each generation pass.
+        base_cache = baseline_factory()
+        comp_cache = compressed_factory()
+
+        base_tokens, base_logits = _generate_with_cache(
+            model=model, tokenizer=tokenizer, prompt=prompt,
+            num_tokens=num_tokens, cache=base_cache,
+        )
+        comp_tokens, comp_logits = _generate_with_cache(
+            model=model, tokenizer=tokenizer, prompt=prompt,
+            num_tokens=num_tokens, cache=comp_cache,
+        )
+
+        # Top-1 agreement: same next-token id?
+        for b_tok, c_tok in zip(base_tokens, comp_tokens):
+            if b_tok == c_tok:
+                top1_match_count += 1
+            total_positions += 1
+
+        # Top-5 inclusion: is the baseline's top-1 in the compressed
+        # cache's top-5? (a softer compatibility measure)
+        for b_tok, c_logits in zip(base_tokens, comp_logits):
+            top5 = torch.topk(c_logits, k=5).indices.tolist()
+            if b_tok in top5:
+                top5_inclusion_count += 1
+
+        # KL(compressed || baseline) per step. We use the compressed
+        # distribution as P (what's actually emitted in deployment) and
+        # the baseline as Q (the ideal reference) — partner-relevant
+        # framing of "how far is what we'd actually generate from what
+        # we should generate."
+        for b_log, c_log in zip(base_logits, comp_logits):
+            base_log_probs = F.log_softmax(b_log, dim=-1)
+            comp_log_probs = F.log_softmax(c_log, dim=-1)
+            comp_probs = comp_log_probs.exp()
+            kl = (comp_probs * (comp_log_probs - base_log_probs)).sum().item()
+            kl_values.append(float(kl))
+
+        # Capture the first prompt's generation for human-eyeball
+        # inspection in the artefact.
+        if prompt_idx == 0:
+            sample_baseline_text = (
+                prompt + tokenizer.decode(base_tokens, skip_special_tokens=True)
+            )
+            sample_compressed_text = (
+                prompt + tokenizer.decode(comp_tokens, skip_special_tokens=True)
+            )
+
+        del base_cache, comp_cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    mean_kl = sum(kl_values) / len(kl_values) if kl_values else 0.0
+    max_kl = max(kl_values) if kl_values else 0.0
+
+    return GenerationRow(
+        cache_type=compressed_label,
+        num_prompts=len(prompts),
+        num_generated_per_prompt=num_tokens,
+        total_positions=total_positions,
+        top1_match_count=top1_match_count,
+        top1_agreement_rate=(
+            top1_match_count / total_positions if total_positions else 0.0
+        ),
+        top5_inclusion_count=top5_inclusion_count,
+        top5_inclusion_rate=(
+            top5_inclusion_count / total_positions if total_positions else 0.0
+        ),
+        mean_kl_divergence=mean_kl,
+        max_kl_divergence=max_kl,
+        sample_baseline_text=sample_baseline_text[:500],
+        sample_compressed_text=sample_compressed_text[:500],
+    )
 
 
 def _format_mmlu_prompt(q: dict) -> str:
@@ -478,6 +665,11 @@ def _build_fake_model(*, vocab_size: int = 200, hidden: int = 64,
                     ids.append(0)
             return ids
 
+        def decode(self, ids, skip_special_tokens=True, **kwargs):
+            # Inverse of encode: map int → ASCII char if in our vocab.
+            inv = {v: k for k, v in self._vocab.items()}
+            return "".join(inv.get(int(i), "?") for i in ids)
+
         def __call__(self, text, return_tensors=None, **kwargs):
             import torch
             ids = self.encode(text, add_special_tokens=True)
@@ -522,7 +714,23 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--device", default="auto")
     parser.add_argument(
         "--eval", default="perplexity,mmlu",
-        help="Comma-separated: perplexity,mmlu",
+        help=(
+            "Comma-separated: perplexity, mmlu, generation. "
+            "'generation' greedy-decodes a fixed set of prompts with "
+            "baseline and compressed caches side-by-side, reporting "
+            "top-1 next-token agreement rate + mean/max KL divergence "
+            "of per-step logits. Directly validates decode quality "
+            "(complementing perplexity which measures prefill, MMLU "
+            "which measures short-prompt accuracy)."
+        ),
+    )
+    parser.add_argument(
+        "--generation-num-tokens", type=int, default=50,
+        help=(
+            "Tokens to greedy-decode per prompt in --eval generation. "
+            "Default 50. Each token is one decode step which exercises "
+            "the cache.update() path with S=1."
+        ),
     )
     parser.add_argument(
         "--mmlu-num-questions", type=int, default=200,
@@ -800,6 +1008,30 @@ def main(argv: Sequence[str]) -> int:
             summary.deltas["mmlu_accuracy_delta_pt"],
         )
 
+    if "generation" in eval_kinds:
+        LOG.info(
+            "Generation: %d prompts × %d tokens baseline-vs-%s...",
+            len(GENERATION_PROMPTS), args.generation_num_tokens, quant_label,
+        )
+        gen_row = compute_generation_agreement(
+            model=model, tokenizer=tokenizer,
+            prompts=GENERATION_PROMPTS,
+            num_tokens=args.generation_num_tokens,
+            baseline_factory=baseline_factory,
+            compressed_factory=tq_factory,
+            compressed_label=quant_label,
+        )
+        summary.generation = gen_row
+        summary.deltas["generation_top1_agreement"] = gen_row.top1_agreement_rate
+        summary.deltas["generation_top5_inclusion"] = gen_row.top5_inclusion_rate
+        summary.deltas["generation_mean_kl"] = gen_row.mean_kl_divergence
+        LOG.info(
+            "  top-1 agreement %.4f (%d/%d), top-5 inclusion %.4f, mean KL %.4f",
+            gen_row.top1_agreement_rate,
+            gen_row.top1_match_count, gen_row.total_positions,
+            gen_row.top5_inclusion_rate, gen_row.mean_kl_divergence,
+        )
+
     out_path = args.output_dir / "results.json"
     with open(out_path, "w") as f:
         json.dump(asdict(summary), f, indent=2)
@@ -846,6 +1078,20 @@ def main(argv: Sequence[str]) -> int:
                 f"questions to confirm"
             )
         print(f"    {'delta'.ljust(label_w)}:  {delta:+.2f}pt  → {gate}")
+    if summary.generation:
+        g = summary.generation
+        print(f"  Generation:")
+        print(f"    prompts:               {g.num_prompts} × {g.num_generated_per_prompt} tokens")
+        print(f"    top-1 agreement:       {g.top1_agreement_rate * 100:.2f}%  "
+              f"({g.top1_match_count}/{g.total_positions})")
+        print(f"    top-5 inclusion:       {g.top5_inclusion_rate * 100:.2f}%  "
+              f"({g.top5_inclusion_count}/{g.total_positions})")
+        print(f"    mean KL per step:      {g.mean_kl_divergence:.4f}")
+        print(f"    max KL per step:       {g.max_kl_divergence:.4f}")
+        # Sample-text comparison so a human can eyeball the first prompt
+        # and see if the compressed generation is recognisable.
+        print(f"    sample baseline text:  {g.sample_baseline_text[:150]!r}")
+        print(f"    sample {quant_label} text: {g.sample_compressed_text[:150]!r}")
     print()
     print(f"  Full results: {out_path}")
     return 0
