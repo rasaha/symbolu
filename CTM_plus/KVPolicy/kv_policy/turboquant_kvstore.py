@@ -90,6 +90,31 @@ def _is_torch_tensor(obj: Any) -> bool:
     return cls.__module__.startswith("torch") and cls.__name__ == "Tensor"
 
 
+def _compute_per_channel_scale_and_normalise(tensor):
+    """KIVI-style per-channel pre-quantisation normalisation.
+
+    Input shape: ``(S, H, D)`` — seq × num_kv_heads × head_dim, the
+    vLLM-block layout the kvstore uses. Computes a per-(H, D) scale
+    via ``mean(|x|)`` along the sequence axis (axis 0) and divides the
+    tensor by it. The scale is the (1, H, D) tensor that ``read_block``
+    multiplies back to restore the original magnitude.
+
+    The clamp at 1e-8 prevents division-by-zero on dead channels (all
+    zeros along the seq axis). Such channels do happen in early
+    Qwen2.5-7B layers; without the clamp the resulting NaN propagates
+    through PolarQuant and produces silent garbage.
+
+    Computed in float32 regardless of the input dtype so the scale
+    itself doesn't suffer FP16 rounding noise (per-channel scales of
+    1e-3 / 1e+3 are common and FP16 loses precision at both extremes).
+    """
+    import torch as _torch
+    t_f32 = tensor.to(_torch.float32)
+    scale = t_f32.abs().mean(dim=0, keepdim=True).clamp(min=1e-8)
+    normalised = (t_f32 / scale).to(tensor.dtype)
+    return scale, normalised
+
+
 def _import_turboquant():
     """Locate the TurboQuant compressor from the sibling DeepSpeed package.
 
@@ -150,11 +175,18 @@ class TurboQuantKVStore:
         config_factory: Optional[Any] = None,
         backend: str = "numpy",
         torch_device: Optional[Any] = None,
+        per_channel_scale: bool = False,
     ) -> None:
         if backend not in ("numpy", "torch"):
             raise ValueError(
                 f"TurboQuantKVStore backend must be 'numpy' or 'torch', got "
                 f"{backend!r}"
+            )
+        if per_channel_scale and backend != "torch":
+            raise ValueError(
+                "per_channel_scale=True requires backend='torch' (the "
+                "normalisation is implemented in torch ops and lives on "
+                "whatever device the tensor arrives on)."
             )
         if np is None:
             raise ImportError(
@@ -200,10 +232,13 @@ class TurboQuantKVStore:
                 )
             self._compressor_k = TQC(config)
             self._compressor_v = TQC(config)
+        self._per_channel_scale = bool(per_channel_scale)
         # block_id -> (k_buf, v_buf, k_shape, v_shape, original_dtype,
-        #              is_torch_input)
+        #              k_scale, v_scale)   where scales are None unless
+        #              per_channel_scale=True (torch only).
         self._compressed_blocks: Dict[
-            int, Tuple[Any, Any, Tuple[int, ...], Tuple[int, ...], Any, bool]
+            int,
+            Tuple[Any, Any, Tuple[int, ...], Tuple[int, ...], Any, Any, Any],
         ] = {}
         self._stats: Dict[str, Any] = {
             "writes": 0,
@@ -276,12 +311,26 @@ class TurboQuantKVStore:
             k_in = k_array.astype(np.float32, copy=False)
             v_in = v_array.astype(np.float32, copy=False)
 
+        # Per-channel scaling (KIVI-style): normalise each (head, head_dim)
+        # location to ~unit magnitude before polar quantisation, then
+        # multiply back on read. Targets the K-outlier-channel failure
+        # mode (PHASE4_GPU_FINDINGS.md §17.3). Torch-only; computed in
+        # FP32 against the input tensor BEFORE the f32 cast inside the
+        # compressor (so the scale lives in the original device + tensor
+        # context).
+        k_scale = None
+        v_scale = None
+        if self._per_channel_scale:
+            k_scale, k_in = _compute_per_channel_scale_and_normalise(k_in)
+            v_scale, v_in = _compute_per_channel_scale_and_normalise(v_in)
+
         k_buf = self._compressor_k.compress(k_in)
         v_buf = self._compressor_v.compress(v_in)
 
         self._compressed_blocks[block_id] = (
             k_buf, v_buf, tuple(int(s) for s in k_array.shape),
             tuple(int(s) for s in v_array.shape), original_dtype,
+            k_scale, v_scale,
         )
         self._stats["writes"] += 1
         self._stats["bytes_in"] += bytes_in
@@ -301,7 +350,7 @@ class TurboQuantKVStore:
         if block_id not in self._compressed_blocks:
             raise KeyError(f"TurboQuantKVStore: block {block_id} not held")
         t0 = time.perf_counter()
-        k_buf, v_buf, k_shape, v_shape, original_dtype = (
+        k_buf, v_buf, k_shape, v_shape, original_dtype, k_scale, v_scale = (
             self._compressed_blocks[block_id]
         )
         k = self._compressor_k.decompress(k_buf)
@@ -311,6 +360,21 @@ class TurboQuantKVStore:
             # Torch decompress already restores the original torch dtype.
             k = k.reshape(k_shape)
             v = v.reshape(v_shape)
+            if k_scale is not None:
+                # Multiply back: the compressed payload reconstructs to
+                # the *normalised* tensor; the per-channel scale carries
+                # the magnitude info. The scale is in float32; cast to
+                # the same dtype AND device as the decompressed tensor.
+                # Device matters because the compressor's working device
+                # (typically CPU here, as TurboQuantTorchCompressor
+                # defaults to ``torch.device("cpu")``) may differ from
+                # where the input tensor lived (GPU in a real route-B
+                # forward pass). The implicit-copy slice assignment in
+                # ``_compress_decompress_kv`` handles the recon→input
+                # device transfer; the explicit ``k * k_scale`` multiply
+                # here would otherwise raise a cross-device error.
+                k = k * k_scale.to(device=k.device, dtype=k.dtype)
+                v = v * v_scale.to(device=v.device, dtype=v.dtype)
         else:
             k = k.reshape(k_shape).astype(original_dtype, copy=False)
             v = v.reshape(v_shape).astype(original_dtype, copy=False)
@@ -362,6 +426,10 @@ class TurboQuantKVStore:
     def backend(self) -> str:
         return self._backend
 
+    @property
+    def per_channel_scale(self) -> bool:
+        return self._per_channel_scale
+
     def get_stats(self) -> Dict[str, Any]:
         s = dict(self._stats)
         s["compression_ratio"] = self.compression_ratio
@@ -372,6 +440,7 @@ class TurboQuantKVStore:
         s["config_enable_qjl"] = self._config.enable_qjl
         s["config_segment_dim"] = self._config.segment_dim
         s["backend"] = self._backend
+        s["per_channel_scale"] = self._per_channel_scale
         return s
 
 

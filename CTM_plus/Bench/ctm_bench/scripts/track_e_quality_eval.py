@@ -56,7 +56,7 @@ import math
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 from ctm_bench.policies import _add_kv_policy_to_path
 _add_kv_policy_to_path()
@@ -213,6 +213,40 @@ class MMLURow:
 
 
 @dataclass
+class GenerationRow:
+    """One side-by-side generation comparison row: baseline vs compressed
+    cache produce a stream of tokens from the same prompt; we measure
+    how often they agree on the next token and how far their logit
+    distributions diverge.
+
+    Mode is one of:
+      * ``autoregressive`` — each cache greedy-decodes its own
+        trajectory. Top-1 agreement reflects "do the two caches trace
+        the same exact greedy path." Drops fast under exposure bias
+        (one diff token cascades). Less partner-relevant.
+      * ``teacher_forced`` — baseline greedy-decodes its trajectory
+        first; the compressed cache then runs through the same
+        baseline-token sequence and we compare what compressed PREDICTED
+        at each step. Isolates "does the compressed cache make the
+        same next-token prediction given the same context." More
+        partner-relevant.
+    """
+    cache_type: str               # "baseline" vs the quant name being compared
+    mode: str                      # "autoregressive" or "teacher_forced"
+    num_prompts: int
+    num_generated_per_prompt: int
+    total_positions: int
+    top1_match_count: int          # how many positions had exact same top-1 token
+    top1_agreement_rate: float     # ratio in [0, 1]
+    top5_inclusion_count: int      # how many baseline-top-1 tokens were in compressed-top-5
+    top5_inclusion_rate: float
+    mean_kl_divergence: float      # mean KL(compressed || baseline) across positions
+    max_kl_divergence: float
+    sample_baseline_text: str       # first prompt's baseline generation (truncated)
+    sample_compressed_text: str     # first prompt's compressed generation
+
+
+@dataclass
 class TrackESummary:
     model_id: str
     dtype: str
@@ -220,6 +254,7 @@ class TrackESummary:
     turboquant_config: dict
     perplexity: List[PerplexityRow] = field(default_factory=list)
     mmlu: List[MMLURow] = field(default_factory=list)
+    generation: Optional[GenerationRow] = None
     deltas: dict = field(default_factory=dict)
 
 
@@ -233,7 +268,11 @@ def _baseline_cache_factory() -> Callable[[], Any]:
     return lambda: DynamicCache()
 
 
-def _turboquant_cache_factory(*, angle_bits: int, segment_dim: int, enable_qjl: bool, backend: str) -> Callable[[], Any]:
+def _turboquant_cache_factory(
+    *, angle_bits: int, segment_dim: int, enable_qjl: bool, backend: str,
+    per_channel_scale: bool = False,
+    sink_size: int = 0,
+) -> Callable[[], Any]:
     from kv_policy.turboquant_hf_cache import TurboQuantCache
 
     def factory():
@@ -242,6 +281,27 @@ def _turboquant_cache_factory(*, angle_bits: int, segment_dim: int, enable_qjl: 
             segment_dim=segment_dim,
             enable_qjl=enable_qjl,
             backend=backend,
+            per_channel_scale=per_channel_scale,
+            sink_size=sink_size,
+        )
+    return factory
+
+
+def _int4_per_channel_cache_factory(
+    *, sink_size: int = 0, k_group_size: int = 0, v_group_size: int = 0,
+    asymmetric: bool = False, bits: int = 4,
+    calibration_path: Optional[str] = None,
+) -> Callable[[], Any]:
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    def factory():
+        return INT4PerChannelCache(
+            sink_size=sink_size,
+            k_group_size=k_group_size,
+            v_group_size=v_group_size,
+            asymmetric=asymmetric,
+            bits=bits,
+            calibration_path=calibration_path,
         )
     return factory
 
@@ -281,6 +341,220 @@ def compute_perplexity(
 # --------------------------------------------------------------------------- #
 # MMLU                                                                        #
 # --------------------------------------------------------------------------- #
+
+
+# --------------------------------------------------------------------------- #
+# Generation-mode evaluation                                                  #
+#                                                                             #
+# Directly tests decode quality: greedy-generate N tokens with each cache,    #
+# measure how often the compressed cache picks the same next token as the    #
+# baseline and how far the logit distributions diverge. Complements the      #
+# perplexity / MMLU tests which only measure prefill quality (perplexity)    #
+# or short-prompt accuracy (MMLU).                                            #
+# --------------------------------------------------------------------------- #
+
+
+GENERATION_PROMPTS: List[str] = [
+    # Chat-like
+    "The three primary colors are red, blue, and",
+    # Code completion
+    "def fibonacci(n):\n    if n <= 1:\n        return n\n    return",
+    # Factual continuation
+    "The capital of France is Paris, which is famous for the",
+    # Multi-step reasoning
+    "If Alice has 5 apples and gives 2 to Bob, she has",
+    # Multilingual / mixed
+    "In Japanese, the word for 'hello' is 'konnichiwa', which is written",
+]
+
+
+def _generate_with_cache(
+    *,
+    model,
+    tokenizer,
+    prompt: str,
+    num_tokens: int,
+    cache,
+    forced_tokens: Optional[List[int]] = None,
+) -> "Tuple[List[int], List[Any]]":
+    """Decode ``num_tokens`` after ``prompt``, using ``cache`` as the
+    past_key_values store.
+
+    Args:
+        forced_tokens: when ``None`` (default), greedy-decodes (each
+            step's argmax becomes the next input). When provided
+            (length must equal ``num_tokens``), the cache's prediction
+            is RECORDED but ignored — the next input is always the
+            forced token. This is teacher-forced decoding: it makes
+            the cache process the same context the baseline saw, so
+            the recorded predictions can be compared like-for-like.
+
+    Returns the *picked* token IDs (= forced_tokens when forced, else
+    the cache's argmax picks) and the predictive logit at each step.
+    """
+    import torch
+    if forced_tokens is not None and len(forced_tokens) != num_tokens:
+        raise ValueError(
+            f"forced_tokens must have length {num_tokens}; got {len(forced_tokens)}"
+        )
+
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    input_ids = inputs["input_ids"]
+
+    # Prefill.
+    with torch.no_grad():
+        out = model(input_ids=input_ids, use_cache=True, past_key_values=cache)
+    next_token_logits = out.logits[0, -1, :]
+
+    picked: List[int] = []
+    logits_list: List[Any] = []
+    for step in range(num_tokens):
+        # Record this step's predictive distribution.
+        logits_list.append(next_token_logits.detach().cpu().to(torch.float32))
+        # In teacher-forced mode, ignore the cache's argmax and feed
+        # the forced token. Otherwise greedy-pick.
+        if forced_tokens is not None:
+            input_token_id = int(forced_tokens[step])
+        else:
+            input_token_id = int(next_token_logits.argmax().item())
+        picked.append(input_token_id)
+        # Decode-step forward pass with the picked / forced token.
+        next_token_tensor = torch.tensor([[input_token_id]], device=model.device)
+        with torch.no_grad():
+            out = model(
+                input_ids=next_token_tensor,
+                use_cache=True,
+                past_key_values=cache,
+            )
+        next_token_logits = out.logits[0, -1, :]
+    return picked, logits_list
+
+
+def compute_generation_agreement(
+    *,
+    model,
+    tokenizer,
+    prompts: List[str],
+    num_tokens: int,
+    baseline_factory: Callable[[], Any],
+    compressed_factory: Callable[[], Any],
+    compressed_label: str,
+    mode: str = "autoregressive",
+) -> GenerationRow:
+    """For each prompt, decode ``num_tokens`` with the baseline cache
+    and with the compressed cache, then compare next-token picks +
+    logit-distribution KL across all positions.
+
+    Modes:
+      * ``autoregressive``: each cache greedy-decodes its own
+        trajectory. Top-1 agreement reflects "do they trace the
+        same exact greedy path." Drops fast under exposure bias.
+      * ``teacher_forced``: baseline greedy-decodes, then compressed
+        re-runs with the same baseline tokens forced as input at each
+        step. Top-1 agreement reflects "given the same context, does
+        the compressed cache predict the same next token." More
+        partner-relevant for "is the compressed cache faithful".
+    """
+    if mode not in ("autoregressive", "teacher_forced"):
+        raise ValueError(f"mode must be autoregressive or teacher_forced; got {mode!r}")
+    import torch
+    import torch.nn.functional as F
+
+    total_positions = 0
+    top1_match_count = 0
+    top5_inclusion_count = 0
+    kl_values: List[float] = []
+    sample_baseline_text = ""
+    sample_compressed_text = ""
+
+    for prompt_idx, prompt in enumerate(prompts):
+        # Two independent caches — one for each generation pass.
+        base_cache = baseline_factory()
+        comp_cache = compressed_factory()
+
+        base_tokens, base_logits = _generate_with_cache(
+            model=model, tokenizer=tokenizer, prompt=prompt,
+            num_tokens=num_tokens, cache=base_cache,
+        )
+        # In teacher-forced mode, we feed compressed the baseline's
+        # tokens at each step (ignoring its own argmax). In
+        # autoregressive mode, compressed picks freely.
+        forced = base_tokens if mode == "teacher_forced" else None
+        comp_tokens, comp_logits = _generate_with_cache(
+            model=model, tokenizer=tokenizer, prompt=prompt,
+            num_tokens=num_tokens, cache=comp_cache,
+            forced_tokens=forced,
+        )
+
+        # Top-1 agreement: do baseline and compressed PREDICT the same
+        # next token at each step? Always compare argmax(logits), not
+        # the input/picked tokens — this works correctly in both
+        # autoregressive (where input==argmax) and teacher_forced
+        # (where input was forced to baseline's choice but argmax is
+        # compressed's actual prediction).
+        for b_log, c_log in zip(base_logits, comp_logits):
+            b_pred = int(b_log.argmax().item())
+            c_pred = int(c_log.argmax().item())
+            if b_pred == c_pred:
+                top1_match_count += 1
+            total_positions += 1
+
+        # Top-5 inclusion: is the baseline's top-1 prediction in the
+        # compressed cache's top-5? (a softer compatibility measure)
+        for b_log, c_logits in zip(base_logits, comp_logits):
+            b_pred = int(b_log.argmax().item())
+            top5 = torch.topk(c_logits, k=5).indices.tolist()
+            if b_pred in top5:
+                top5_inclusion_count += 1
+
+        # KL(compressed || baseline) per step. We use the compressed
+        # distribution as P (what's actually emitted in deployment) and
+        # the baseline as Q (the ideal reference) — partner-relevant
+        # framing of "how far is what we'd actually generate from what
+        # we should generate."
+        for b_log, c_log in zip(base_logits, comp_logits):
+            base_log_probs = F.log_softmax(b_log, dim=-1)
+            comp_log_probs = F.log_softmax(c_log, dim=-1)
+            comp_probs = comp_log_probs.exp()
+            kl = (comp_probs * (comp_log_probs - base_log_probs)).sum().item()
+            kl_values.append(float(kl))
+
+        # Capture the first prompt's generation for human-eyeball
+        # inspection in the artefact.
+        if prompt_idx == 0:
+            sample_baseline_text = (
+                prompt + tokenizer.decode(base_tokens, skip_special_tokens=True)
+            )
+            sample_compressed_text = (
+                prompt + tokenizer.decode(comp_tokens, skip_special_tokens=True)
+            )
+
+        del base_cache, comp_cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    mean_kl = sum(kl_values) / len(kl_values) if kl_values else 0.0
+    max_kl = max(kl_values) if kl_values else 0.0
+
+    return GenerationRow(
+        cache_type=compressed_label,
+        mode=mode,
+        num_prompts=len(prompts),
+        num_generated_per_prompt=num_tokens,
+        total_positions=total_positions,
+        top1_match_count=top1_match_count,
+        top1_agreement_rate=(
+            top1_match_count / total_positions if total_positions else 0.0
+        ),
+        top5_inclusion_count=top5_inclusion_count,
+        top5_inclusion_rate=(
+            top5_inclusion_count / total_positions if total_positions else 0.0
+        ),
+        mean_kl_divergence=mean_kl,
+        max_kl_divergence=max_kl,
+        sample_baseline_text=sample_baseline_text[:500],
+        sample_compressed_text=sample_compressed_text[:500],
+    )
 
 
 def _format_mmlu_prompt(q: dict) -> str:
@@ -455,6 +729,11 @@ def _build_fake_model(*, vocab_size: int = 200, hidden: int = 64,
                     ids.append(0)
             return ids
 
+        def decode(self, ids, skip_special_tokens=True, **kwargs):
+            # Inverse of encode: map int → ASCII char if in our vocab.
+            inv = {v: k for k, v in self._vocab.items()}
+            return "".join(inv.get(int(i), "?") for i in ids)
+
         def __call__(self, text, return_tensors=None, **kwargs):
             import torch
             ids = self.encode(text, add_special_tokens=True)
@@ -499,7 +778,39 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--device", default="auto")
     parser.add_argument(
         "--eval", default="perplexity,mmlu",
-        help="Comma-separated: perplexity,mmlu",
+        help=(
+            "Comma-separated: perplexity, mmlu, generation. "
+            "'generation' greedy-decodes a fixed set of prompts with "
+            "baseline and compressed caches side-by-side, reporting "
+            "top-1 next-token agreement rate + mean/max KL divergence "
+            "of per-step logits. Directly validates decode quality "
+            "(complementing perplexity which measures prefill, MMLU "
+            "which measures short-prompt accuracy)."
+        ),
+    )
+    parser.add_argument(
+        "--generation-num-tokens", type=int, default=50,
+        help=(
+            "Tokens to decode per prompt in --eval generation. "
+            "Default 50. Each token is one decode step which exercises "
+            "the cache.update() path with S=1."
+        ),
+    )
+    parser.add_argument(
+        "--generation-mode", default="autoregressive",
+        choices=["autoregressive", "teacher_forced"],
+        help=(
+            "How to compare baseline vs compressed during generation. "
+            "'autoregressive' (default): each cache greedy-decodes its "
+            "own trajectory. Top-1 agreement reflects 'do they trace "
+            "the same exact greedy path' — drops fast under exposure "
+            "bias (1 different token cascades). "
+            "'teacher_forced': baseline picks tokens, compressed runs "
+            "with the same tokens forced as input at each step. Top-1 "
+            "agreement reflects 'given identical context, does "
+            "compressed predict the same next token' — more partner-"
+            "relevant for 'is the compressed cache faithful'."
+        ),
     )
     parser.add_argument(
         "--mmlu-num-questions", type=int, default=200,
@@ -522,6 +833,105 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument(
         "--turboquant-backend", default="torch",
         choices=["numpy", "torch"],
+    )
+    parser.add_argument(
+        "--quant", default="turboquant",
+        choices=["turboquant", "int4-per-channel"],
+        help=(
+            "Which KV compression algorithm to test. "
+            "'turboquant' = PolarQuant + optional QJL (the architecture-"
+            "doc default; documented to fail at 3-4 bit on Qwen2.5-7B in "
+            "PHASE4_GPU_FINDINGS.md §17). "
+            "'int4-per-channel' = KIVI-style INT4 with per-channel K + "
+            "per-token V scales; no rotation step, no polar "
+            "decomposition. Recommended after the §17 PolarQuant negative "
+            "result. The TurboQuant-specific flags (--angle-bits, "
+            "--segment-dim, --no-qjl, --per-channel-scale) are silently "
+            "ignored when --quant is int4-per-channel."
+        ),
+    )
+    parser.add_argument(
+        "--k-group-size", type=int, default=0,
+        help=(
+            "INT4 K quantization group size along the seq axis. "
+            "0 = plain per-channel (one scale per (head, head_dim) "
+            "covering all seq positions). Recommended for KIVI-style "
+            "operation: 32 (smaller groups improve outlier-position "
+            "resolution at marginal scale-storage cost). KIVI's "
+            "published Qwen-family numbers use group_size=32 or 128."
+        ),
+    )
+    parser.add_argument(
+        "--v-group-size", type=int, default=0,
+        help=(
+            "INT4 V quantization group size along the head_dim axis. "
+            "0 = plain per-token. For Qwen2.5-7B (head_dim=128) and "
+            "group_size=32: each (seq, head) gets 4 scales (one per "
+            "32 head_dim elements) instead of one."
+        ),
+    )
+    parser.add_argument(
+        "--asymmetric-int4", action="store_true",
+        help=(
+            "Use asymmetric (affine) INT4 quantization with scale + "
+            "zero-point/offset. Maps [x_min, x_max] → [-8, +7] using "
+            "all 16 bins. Symmetric (default) uses max(|x|)/7, "
+            "wasting bins for asymmetric distributions. Real K-after-"
+            "RoPE is typically not centred on zero — asymmetric is "
+            "what KIVI's published quality numbers use. Adds one FP16 "
+            "offset per scale (~6%% storage overhead). Recommended "
+            "with --quant int4-per-channel; ignored otherwise."
+        ),
+    )
+    parser.add_argument(
+        "--calibration-path", type=str, default=None,
+        help=(
+            "Path to a .pt calibration file produced by "
+            "calibrate_int4_scales.py. When provided, INT4 scales are "
+            "static per-layer (loaded from this file) instead of "
+            "dynamic per-block (computed from each forward's max(|x|)). "
+            "Requires --k-group-size 0 --v-group-size 0 (static "
+            "calibration is per-channel, not per-(channel, group)). "
+            "Ignored when --quant is not int4-per-channel."
+        ),
+    )
+    parser.add_argument(
+        "--bits", type=int, default=4,
+        help=(
+            "Bit width per quantized value (per element). 4 (default) "
+            "is the validated KIVI config. 3 is experimental — quality "
+            "TBD per model; theoretical compression ~4.3× vs FP16 if "
+            "quality holds. Note: actual heap savings at bits<4 "
+            "require additional sub-4-bit packing work (not in this "
+            "commit); the QUALITY effect of bits<4 is what this flag "
+            "tests. Must be in [2, 8]."
+        ),
+    )
+    parser.add_argument(
+        "--per-channel-scale", action="store_true",
+        help=(
+            "KIVI-style per-channel pre-quantisation normalisation: "
+            "divide K and V by their per-(head, head_dim) magnitude "
+            "before PolarQuant, multiply back on decompress. Targets "
+            "the K-outlier-channel failure mode that produced the 3052x "
+            "perplexity blow-up at 3-bit (PHASE4_GPU_FINDINGS.md §17). "
+            "Adds 2 KB of scale storage per K (or V) block (~6%% overhead)."
+        ),
+    )
+    parser.add_argument(
+        "--sink-size", type=int, default=0,
+        help=(
+            "StreamingLLM-style attention-sink passthrough: keep the "
+            "first N positions of context at full precision; compress "
+            "only positions [N:]. Targets the position-outlier failure "
+            "mode where the first 1-4 tokens carry disproportionate "
+            "attention mass and quantising them destroys generation "
+            "quality. Reasonable values: 4 (StreamingLLM default), 8, "
+            "16. Cost: ~4 KB per layer per K+V at sink_size=4 (2 bytes "
+            "* 4 sink positions * 4 KV heads * 128 head_dim * 2 for K+V); "
+            "negligible against the model's tens-of-GB weights. Default "
+            "0 means no sink-skip."
+        ),
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
@@ -598,24 +1008,61 @@ def main(argv: Sequence[str]) -> int:
             mmlu_questions = MMLU_SAMPLE
 
     baseline_factory = _baseline_cache_factory()
-    tq_factory = _turboquant_cache_factory(
-        angle_bits=args.angle_bits,
-        segment_dim=args.segment_dim,
-        enable_qjl=enable_qjl,
-        backend=args.turboquant_backend,
-    )
+    # Pick the right cache factory based on --quant
+    if args.quant == "turboquant":
+        tq_factory = _turboquant_cache_factory(
+            angle_bits=args.angle_bits,
+            segment_dim=args.segment_dim,
+            enable_qjl=enable_qjl,
+            backend=args.turboquant_backend,
+            per_channel_scale=args.per_channel_scale,
+            sink_size=args.sink_size,
+        )
+        config_dict = dict(
+            quant="turboquant",
+            angle_bits=args.angle_bits,
+            segment_dim=args.segment_dim,
+            enable_qjl=enable_qjl,
+            backend=args.turboquant_backend,
+            per_channel_scale=args.per_channel_scale,
+            sink_size=args.sink_size,
+        )
+    elif args.quant == "int4-per-channel":
+        tq_factory = _int4_per_channel_cache_factory(
+            sink_size=args.sink_size,
+            k_group_size=args.k_group_size,
+            v_group_size=args.v_group_size,
+            asymmetric=args.asymmetric_int4,
+            bits=args.bits,
+            calibration_path=args.calibration_path,
+        )
+        config_dict = dict(
+            quant="int4-per-channel",
+            sink_size=args.sink_size,
+            k_group_size=args.k_group_size,
+            v_group_size=args.v_group_size,
+            asymmetric=args.asymmetric_int4,
+            bits=args.bits,
+            calibration_path=args.calibration_path,
+            scheme=f"K=per-channel INT{args.bits}, V=per-token INT{args.bits}"
+                   + (", asymmetric" if args.asymmetric_int4 else ", symmetric")
+                   + (f", calibrated[{args.calibration_path}]" if args.calibration_path else ""),
+        )
+    else:
+        raise SystemExit(f"unknown --quant {args.quant!r}")
 
     summary = TrackESummary(
         model_id=model_id_for_summary,
         dtype=args.dtype,
         eval_kinds=eval_kinds,
-        turboquant_config=dict(
-            angle_bits=args.angle_bits,
-            segment_dim=args.segment_dim,
-            enable_qjl=enable_qjl,
-            backend=args.turboquant_backend,
-        ),
+        turboquant_config=config_dict,
     )
+
+    # Label used in the row.cache_type field and summary output for the
+    # compressed-cache leg. Reflects what --quant was actually selected
+    # so a multi-algorithm artefact archive doesn't ambiguously say
+    # "turboquant" for an INT4 run.
+    quant_label = args.quant
 
     if "perplexity" in eval_kinds:
         LOG.info("Perplexity: baseline...")
@@ -623,17 +1070,18 @@ def main(argv: Sequence[str]) -> int:
             model=model, tokenizer=tokenizer, text=PERPLEXITY_TEXT,
             cache_factory=baseline_factory, cache_type="baseline",
         )
-        LOG.info("Perplexity: turboquant...")
+        LOG.info("Perplexity: %s...", quant_label)
         tq = compute_perplexity(
             model=model, tokenizer=tokenizer, text=PERPLEXITY_TEXT,
-            cache_factory=tq_factory, cache_type="turboquant",
+            cache_factory=tq_factory, cache_type=quant_label,
         )
         summary.perplexity = [base, tq]
         summary.deltas["perplexity_ratio"] = tq.perplexity / base.perplexity
         summary.deltas["nll_delta"] = tq.nll_per_token - base.nll_per_token
         LOG.info(
-            "  baseline ppl=%.4f  turboquant ppl=%.4f  ratio=%.4f",
-            base.perplexity, tq.perplexity, summary.deltas["perplexity_ratio"],
+            "  baseline ppl=%.4f  %s ppl=%.4f  ratio=%.4f",
+            base.perplexity, quant_label, tq.perplexity,
+            summary.deltas["perplexity_ratio"],
         )
 
     if "mmlu" in eval_kinds:
@@ -642,16 +1090,43 @@ def main(argv: Sequence[str]) -> int:
             model=model, tokenizer=tokenizer, questions=mmlu_questions,
             cache_factory=baseline_factory, cache_type="baseline",
         )
-        LOG.info("MMLU: turboquant...")
+        LOG.info("MMLU: %s...", quant_label)
         tq = compute_mmlu_accuracy(
             model=model, tokenizer=tokenizer, questions=mmlu_questions,
-            cache_factory=tq_factory, cache_type="turboquant",
+            cache_factory=tq_factory, cache_type=quant_label,
         )
         summary.mmlu = [base, tq]
         summary.deltas["mmlu_accuracy_delta_pt"] = (tq.accuracy - base.accuracy) * 100.0
         LOG.info(
-            "  baseline acc=%.4f  turboquant acc=%.4f  delta=%.2fpt",
-            base.accuracy, tq.accuracy, summary.deltas["mmlu_accuracy_delta_pt"],
+            "  baseline acc=%.4f  %s acc=%.4f  delta=%.2fpt",
+            base.accuracy, quant_label, tq.accuracy,
+            summary.deltas["mmlu_accuracy_delta_pt"],
+        )
+
+    if "generation" in eval_kinds:
+        LOG.info(
+            "Generation (%s): %d prompts × %d tokens baseline-vs-%s...",
+            args.generation_mode, len(GENERATION_PROMPTS),
+            args.generation_num_tokens, quant_label,
+        )
+        gen_row = compute_generation_agreement(
+            model=model, tokenizer=tokenizer,
+            prompts=GENERATION_PROMPTS,
+            num_tokens=args.generation_num_tokens,
+            baseline_factory=baseline_factory,
+            compressed_factory=tq_factory,
+            compressed_label=quant_label,
+            mode=args.generation_mode,
+        )
+        summary.generation = gen_row
+        summary.deltas["generation_top1_agreement"] = gen_row.top1_agreement_rate
+        summary.deltas["generation_top5_inclusion"] = gen_row.top5_inclusion_rate
+        summary.deltas["generation_mean_kl"] = gen_row.mean_kl_divergence
+        LOG.info(
+            "  top-1 agreement %.4f (%d/%d), top-5 inclusion %.4f, mean KL %.4f",
+            gen_row.top1_agreement_rate,
+            gen_row.top1_match_count, gen_row.total_positions,
+            gen_row.top5_inclusion_rate, gen_row.mean_kl_divergence,
         )
 
     out_path = args.output_dir / "results.json"
@@ -663,22 +1138,57 @@ def main(argv: Sequence[str]) -> int:
     print("=" * 60)
     print(f"Track E summary — {summary.model_id}")
     print("=" * 60)
+    # Width to right-align the compressed-cache label so it doesn't
+    # offset the numbers vs the baseline row.
+    label_w = max(len("baseline"), len(quant_label))
     if summary.perplexity:
         b, t = summary.perplexity
         print(f"  Perplexity:")
-        print(f"    baseline:    {b.perplexity:.4f}  (NLL/tok {b.nll_per_token:.4f})")
-        print(f"    turboquant:  {t.perplexity:.4f}  (NLL/tok {t.nll_per_token:.4f})")
-        print(f"    ratio:       {summary.deltas['perplexity_ratio']:.4f}  (gate ≤ 1.05)")
+        print(f"    {'baseline'.ljust(label_w)}:  {b.perplexity:.4f}  (NLL/tok {b.nll_per_token:.4f})")
+        print(f"    {quant_label.ljust(label_w)}:  {t.perplexity:.4f}  (NLL/tok {t.nll_per_token:.4f})")
+        print(f"    {'ratio'.ljust(label_w)}:  {summary.deltas['perplexity_ratio']:.4f}  (gate ≤ 1.05)")
     if summary.mmlu:
         b, t = summary.mmlu
         print(f"  MMLU:")
-        print(f"    baseline:    {b.accuracy * 100:.2f}%   ({b.correct}/{b.num_questions})")
-        print(f"    turboquant:  {t.accuracy * 100:.2f}%   ({t.correct}/{t.num_questions})")
+        print(f"    {'baseline'.ljust(label_w)}:  {b.accuracy * 100:.2f}%   ({b.correct}/{b.num_questions})")
+        print(f"    {quant_label.ljust(label_w)}:  {t.accuracy * 100:.2f}%   ({t.correct}/{t.num_questions})")
         delta = summary.deltas['mmlu_accuracy_delta_pt']
-        gate = "PASS (within ±0.5pt)" if abs(delta) <= 0.5 else (
-            "PARTIAL (within ±1.0pt)" if abs(delta) <= 1.0 else "REGRESSION (> 1.0pt)"
-        )
-        print(f"    delta:       {delta:+.2f}pt  → {gate}")
+        # Direction-aware label: a positive delta is "compressed scored
+        # higher than baseline" (usually statistical noise at small
+        # sample sizes, but never a regression). Treat magnitudes
+        # symmetrically when within the noise bands, but never call
+        # an improvement a "regression".
+        absd = abs(delta)
+        if absd <= 0.5:
+            gate = "PASS (within ±0.5pt)"
+        elif absd <= 1.0:
+            gate = "PARTIAL (within ±1.0pt)"
+        elif delta < 0:
+            gate = "REGRESSION (> 1.0pt)"
+        else:
+            # delta > 1.0pt and positive: compressed beat baseline.
+            # That's not a regression — it's likely noise on a small
+            # MMLU subset (e.g., 200q CI ≈ ±3.4pt). Annotate explicitly.
+            gate = (
+                f"IMPROVEMENT (+{delta:.2f}pt) — likely noise at "
+                f"{t.num_questions}q sample size; rerun with more "
+                f"questions to confirm"
+            )
+        print(f"    {'delta'.ljust(label_w)}:  {delta:+.2f}pt  → {gate}")
+    if summary.generation:
+        g = summary.generation
+        print(f"  Generation ({g.mode}):")
+        print(f"    prompts:               {g.num_prompts} × {g.num_generated_per_prompt} tokens")
+        print(f"    top-1 agreement:       {g.top1_agreement_rate * 100:.2f}%  "
+              f"({g.top1_match_count}/{g.total_positions})")
+        print(f"    top-5 inclusion:       {g.top5_inclusion_rate * 100:.2f}%  "
+              f"({g.top5_inclusion_count}/{g.total_positions})")
+        print(f"    mean KL per step:      {g.mean_kl_divergence:.4f}")
+        print(f"    max KL per step:       {g.max_kl_divergence:.4f}")
+        # Sample-text comparison so a human can eyeball the first prompt
+        # and see if the compressed generation is recognisable.
+        print(f"    sample baseline text:  {g.sample_baseline_text[:150]!r}")
+        print(f"    sample {quant_label} text: {g.sample_compressed_text[:150]!r}")
     print()
     print(f"  Full results: {out_path}")
     return 0

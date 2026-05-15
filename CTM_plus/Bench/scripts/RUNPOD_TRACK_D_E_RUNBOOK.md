@@ -248,6 +248,354 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 
 ---
 
+## 5b. (Algorithm fix attempt) Per-channel scale (KIVI trick) — re-run Track E perplexity
+
+After the initial Track E result showed catastrophic regression at the
+architecture-doc default (§17), per-channel pre-quantisation
+normalisation was added to test whether the K-outlier-channel failure
+mode can be rescued (§17.7 direction 1). CPU smoke test on synthetic
+outlier-channel data showed per-channel minimum cosine rising from
+**−0.36** (sign-flipped channels!) to **+0.93** at 3-bit polar. If
+the same mechanism rescues real-model perplexity, this is the path
+to a partner-shareable combined-stack result.
+
+Re-run cost: ~5 min, ~$0.07 spot per config.
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+git pull origin claude/safety-state-machine-continued-Lr6oT   # picks up --per-channel-scale flag
+
+# 3-bit + per-channel scale (most ambitious — was 3052× baseline)
+mkdir -p /tmp/track_e_perplexity_3bit_pcs
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --angle-bits 3 \
+    --per-channel-scale \
+    --turboquant-backend torch \
+    --output-dir /tmp/track_e_perplexity_3bit_pcs/ 2>&1 | tee /tmp/track_e_perplexity_3bit_pcs/run.log
+
+# 4-bit + per-channel scale (most likely to be partner-shareable — was 301× baseline)
+mkdir -p /tmp/track_e_perplexity_4bit_pcs
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --angle-bits 4 \
+    --per-channel-scale \
+    --turboquant-backend torch \
+    --output-dir /tmp/track_e_perplexity_4bit_pcs/ 2>&1 | tee /tmp/track_e_perplexity_4bit_pcs/run.log
+```
+
+**Interpretation**:
+
+| Result | What it means | Next step |
+|---|---|---|
+| 4-bit + PCS ratio ≤ 1.05 | KIVI mechanism works; 2.69× compression at quality parity is partner-shareable | Run MMLU 200 to harden the number, then plan cache_kv hook |
+| 4-bit + PCS ratio 1.05–1.5 | Mechanism partial; might need sink-token skip on top | Try sink-skip (§17.7 direction 2) next |
+| 4-bit + PCS ratio > 2 | Per-channel alone isn't enough | Investigate mixed-bit-depth or pause |
+| 3-bit + PCS ratio ≤ 1.10 | Bonus win — 3.58× compression at quality parity | Strongest possible result |
+
+Paste the bottom summary block from both runs. We decide next steps from there.
+
+## 5c. INT4 per-channel KV cache (KIVI-style replacement for PolarQuant)
+
+After both TurboQuant algorithm-fix attempts failed on Qwen2.5-7B
+(per-channel scale: 7321× at 4-bit, sink-skip: 220× at 4-bit), the
+forward path is to abandon PolarQuant's rotation-based approach
+entirely and use the literature-validated alternative: INT4 with
+per-channel K + per-token V (KIVI). No rotation. Each channel
+quantized independently with its own scale.
+
+**Expected**: perplexity ratio ≤ 1.05 (partner-shareable) at ~3.8×
+compression vs FP16. Matches published KIVI results on Qwen-family.
+
+Re-run cost: ~5 min, ~$0.07 spot.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --output-dir /tmp/track_e_int4/ 2>&1 | tee /tmp/track_e_int4/run.log
+```
+
+**Decision tree**:
+
+| Ratio | Interpretation | Next step |
+|---|---|---|
+| ≤ 1.05 | ✅ **Partner-shareable.** ~3.8× compression at quality parity. | Run MMLU 200 to harden. |
+| 1.05–1.5 | Helps but not full quality. | Try INT4 + group quantization (see §5d). |
+| > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
+
+## 5h. Static-scale calibration (audit Path #6 — GPTQ/AWQ-style)
+
+Dynamic per-block max-scaling adapts to each forward's K/V
+distribution but doesn't benefit from prior knowledge of "typical"
+K/V magnitudes. Static calibration captures those typical magnitudes
+offline on a small calibration set and uses them at inference. KIVI
+literature suggests this can push perplexity from ~1.02× to ~1.01×
+on well-calibrated configurations.
+
+**Step 1: produce the calibration file** (~3 min, ~$0.05):
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+mkdir -p /tmp/calibration
+
+python -m ctm_bench.scripts.calibrate_int4_scales \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --num-prompts 100 \
+    --asymmetric \
+    --output-path /tmp/calibration/qwen25_7b_int4_asym.pt
+```
+
+Output: a ~few-MB `.pt` file with per-layer (`k_scale`, `k_offset`,
+`v_scale`, `v_offset`) tensors.
+
+**Step 2: re-run Track E using the calibration**:
+
+```bash
+mkdir -p /tmp/track_e_int4_calibrated
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity,mmlu \
+    --mmlu-num-questions 1000 \
+    --quant int4-per-channel \
+    --asymmetric-int4 \
+    --calibration-path /tmp/calibration/qwen25_7b_int4_asym.pt \
+    --output-dir /tmp/track_e_int4_calibrated/ 2>&1 | tee /tmp/track_e_int4_calibrated/run.log
+```
+
+Note: `--k-group-size` and `--v-group-size` are omitted (must be 0
+when calibration is loaded — static scales are per-channel, not
+per-(channel, group)).
+
+**Decision tree**: same as §5e's INT4 ratio table. Compare to the
+dynamic-scale INT4 + group=32 + asymmetric baseline (1.024× perplexity,
+-0.9pt MMLU@1000q). If calibration improves on either, ship the
+calibration. If it matches or regresses, dynamic + group is the better
+config; document and move on.
+
+## 5g. Generation-mode test (audit Path #7 — decode quality direct measurement)
+
+Track E's perplexity + MMLU measure prefill compression quality. They
+don't directly test "does the model produce the same generated text
+with compressed K/V?" This eval does: greedy-decode 50 tokens with
+baseline FP16 cache vs INT4-KIVI cache, report top-1 next-token
+agreement rate + KL divergence of per-step logits.
+
+Output includes a sample text comparison so a human can eyeball the
+first prompt's generation side-by-side.
+
+Re-run cost: ~5 prompts × 50 tokens × 2 generations = 500 decode
+steps. On A100 ~5-10 sec/decode-step batch ≈ ~1-2 min total. Cost
+~$0.03 spot.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4_generation
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval generation \
+    --generation-num-tokens 50 \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --asymmetric-int4 \
+    --output-dir /tmp/track_e_int4_generation/ 2>&1 | tee /tmp/track_e_int4_generation/run.log
+```
+
+### Two modes — pick the one that answers your question
+
+* **`--generation-mode autoregressive`** (default): each cache greedy-
+  decodes its own trajectory. Measures "do they trace the same exact
+  greedy path." Drops fast under exposure bias — one token difference
+  cascades. Less partner-relevant but cheaper conceptually.
+* **`--generation-mode teacher_forced`** (recommended): baseline
+  picks tokens, compressed runs with the same baseline tokens forced
+  as input at each step. Measures "given identical context, does
+  compressed predict the same next token." More partner-relevant for
+  "is the cache faithful."
+
+Use teacher_forced for the partner pitch:
+
+```bash
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval generation --generation-num-tokens 50 \
+    --generation-mode teacher_forced \
+    --quant int4-per-channel \
+    --k-group-size 32 --v-group-size 32 --asymmetric-int4 \
+    --output-dir /tmp/track_e_int4_generation_tf/ 2>&1 | tee /tmp/track_e_int4_generation_tf/run.log
+```
+
+**Decision tree on top-1 agreement rate (teacher_forced mode):**
+
+| Top-1 agreement | Interpretation |
+|---|---|
+| ≥ 95% | ✅ Compressed cache faithfully reproduces baseline next-token picks. |
+| 90-95% | Strong faithful — small per-token disagreements but distributions overlap. |
+| 80-90% | Real divergence in next-token predictions; check KL too. |
+| < 80% | Significant decode-quality damage. |
+
+**Decision tree on top-1 agreement rate (autoregressive mode):**
+
+These numbers will be MUCH lower than teacher_forced because of
+exposure bias — even tiny differences cascade into completely
+different generation trajectories. Coherent text from both caches +
+high mean KL doesn't necessarily mean "broken"; it means "two
+different valid completions of the same prompt."
+
+| Top-1 agreement | Interpretation |
+|---|---|
+| ≥ 90% | ✅ Two caches usually trace the same greedy path. |
+| 60-90% | Caches diverge after a few steps but both produce coherent text. NORMAL for any quantized model — eyeball the sample text to confirm quality. |
+| < 60% | Hard to interpret without checking sample text quality. Run teacher_forced mode for the cleaner number. |
+
+## 5f. INT3 experiment (Path B from post-§18 audit)
+
+After INT4 + group + asymmetric landed GREEN (perplexity 1.02×, MMLU
+0.00pt, real heap 3.2×), the next-cheapest compression-bump experiment
+is INT3: 3 bits/elem instead of 4. Theoretical compression climbs from
+~3.2× to ~4.5× vs FP16.
+
+**Caveat about storage**: at this implementation tier, INT3 quantized
+values are stored in the existing 4-bit-packed slots (INT3 values fit
+in the [-8, +7] INT4 range). Actual heap savings stay at the INT4 level
+until proper sub-4-bit packing is implemented separately. What `--bits 3`
+tests is the **quality effect** of using 8 levels instead of 16; if
+quality holds, proper INT3 packing becomes a worthwhile follow-on.
+
+Re-run cost: ~$0.07, ~5 min.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int3
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --asymmetric-int4 \
+    --bits 3 \
+    --output-dir /tmp/track_e_int3/ 2>&1 | tee /tmp/track_e_int3/run.log
+```
+
+**Decision tree**:
+
+| INT3 ratio | Verdict |
+|---|---|
+| ≤ 1.10 | ✅ Quality holds. Worth implementing proper INT3 packing (~1-2 days) → ~4.5× real heap. |
+| 1.10–1.30 | YELLOW. Run MMLU 200 to see if accuracy drop is partner-acceptable. |
+| > 1.30 | Quality cliff. INT3 is too aggressive for Qwen2.5-7B with current rescue config. Ship INT4. |
+
+## 5e. INT4 + group + asymmetric (full KIVI config)
+
+Symmetric INT4 wastes ~half its 16 bins when the distribution is not
+centred on zero — and real K-after-RoPE typically isn't. KIVI's
+published quality numbers use **asymmetric** (affine) quantization:
+maps [x_min, x_max] → [−8, +7] with all 16 bins effectively used.
+One extra FP16 offset per scale (~6% extra storage).
+
+CPU smoke test on asymmetric synthetic data: asymmetric reduces
+reconstruction error by ≥ 2× vs symmetric at the same bit depth.
+
+Re-run cost: ~5 min, ~$0.07.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4_grp32_asym
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --asymmetric-int4 \
+    --output-dir /tmp/track_e_int4_grp32_asym/ 2>&1 | tee /tmp/track_e_int4_grp32_asym/run.log
+```
+
+**Decision tree**:
+
+| Ratio | Interpretation |
+|---|---|
+| ≤ 1.05 | ✅ **Partner-shareable. Ship.** Full KIVI config working on Qwen2.5-7B. |
+| 1.05–1.15 | YELLOW — run MMLU to see if accuracy is acceptable. |
+| > 1.20 | KIVI config not enough; investigate INT5 or pause. |
+
+## 5d. INT4 per-channel + group quantization (KIVI proper, group_size=32)
+
+Plain `--quant int4-per-channel` uses one scale per (head, head_dim)
+channel covering all S sequence positions. The first 4 positions of
+context have huge K magnitudes (attention sinks) which inflate the
+per-channel scale, hurting reconstruction of the remaining ~280
+non-sink positions. Group quantization splits the seq axis into
+chunks of 32 and gives each chunk its own scale — sinks contained
+in group 0, groups 1+ get appropriate scales for their actual
+magnitudes.
+
+This matches KIVI's published configuration on Qwen-family models.
+
+Re-run cost: ~5 min, ~$0.07.
+
+```bash
+cd /workspace/symbolu
+git pull --ff-only origin claude/safety-state-machine-continued-Lr6oT
+
+cd CTM_plus/Bench
+mkdir -p /tmp/track_e_int4_grp32
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity \
+    --quant int4-per-channel \
+    --k-group-size 32 \
+    --v-group-size 32 \
+    --output-dir /tmp/track_e_int4_grp32/ 2>&1 | tee /tmp/track_e_int4_grp32/run.log
+```
+
+CPU smoke test on synthetic outlier-position data: clean-group cosine
+0.98+ (vs plain per-channel 0.85-0.93). Predicts perplexity ratio
+close to baseline.
+
+**Decision tree**:
+
+| Ratio | Interpretation |
+|---|---|
+| ≤ 1.05 | ✅ **Partner-shareable.** ~3.5× compression at quality parity. Ship. |
+| 1.05–1.20 | YELLOW — meaningful but with an asterisk. Try `--k-group-size 16` for finer scale. |
+| > 1.30 | Group quant alone insufficient. Investigate asymmetric quant or accept INT5. |
+
 ## 6. (Optional) Run sweep — bigger MMLU subset for partner artefact (~30 min, ~$0.60)
 
 If Track E was green and you want a stronger partner-shareable number,

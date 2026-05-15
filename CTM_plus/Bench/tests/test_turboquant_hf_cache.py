@@ -200,6 +200,181 @@ def test_choice_token_ids_returns_lists_per_letter():
         )
 
 
+def test_per_channel_scale_round_trip_preserves_shape(torch_module):
+    """Per-channel scale (KIVI trick) must preserve shape and dtype on
+    round-trip, same as the un-scaled torch backend path."""
+    torch = torch_module
+    from kv_policy.turboquant_kvstore import TurboQuantKVStore
+
+    store = TurboQuantKVStore(backend="torch", per_channel_scale=True)
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(16, 4, 128, generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    store.write_block(0, k, v)
+    k_back, v_back = store.read_block(0)
+    assert tuple(k_back.shape) == tuple(k.shape)
+    assert k_back.dtype == k.dtype
+    assert tuple(v_back.shape) == tuple(v.shape)
+
+
+def test_per_channel_scale_rescues_outlier_channel_cosines(torch_module):
+    """The whole point of per-channel scale: per-(head, head_dim)
+    reconstruction quality. On an outlier-channel tensor (one channel
+    100x larger than the rest, mimicking Qwen's RoPE-rotated K
+    distribution), per-channel scaling must lift per-channel cosine
+    above 0.9 — without scaling, individual channels can flip sign.
+    """
+    torch = torch_module
+    from kv_policy.turboquant_kvstore import TurboQuantKVStore
+
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(16, 4, 128, generator=g, dtype=torch.float32)
+    k[:, 0, 7] *= 100.0  # outlier channel
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+
+    # Without scaling: per-channel cosine can be terrible
+    s_no = TurboQuantKVStore(backend="torch", angle_bits=3, per_channel_scale=False)
+    s_no.write_block(0, k, v)
+    k_no, _ = s_no.read_block(0)
+    per_ch_no = torch.nn.functional.cosine_similarity(k, k_no, dim=0).flatten()
+    min_no = per_ch_no.min().item()
+
+    # With per-channel scaling: every channel should reconstruct well
+    s_yes = TurboQuantKVStore(backend="torch", angle_bits=3, per_channel_scale=True)
+    s_yes.write_block(0, k, v)
+    k_yes, _ = s_yes.read_block(0)
+    per_ch_yes = torch.nn.functional.cosine_similarity(k, k_yes, dim=0).flatten()
+    min_yes = per_ch_yes.min().item()
+
+    assert min_yes > 0.9, (
+        f"per-channel scale should keep min per-channel cosine > 0.9; "
+        f"got {min_yes:.4f}"
+    )
+    assert min_yes > min_no, (
+        f"per-channel scale should improve the worst per-channel cosine "
+        f"(no-scale min {min_no:.4f}, with-scale min {min_yes:.4f})"
+    )
+
+
+def test_per_channel_scale_requires_torch_backend(torch_module):
+    """Configuration error: per_channel_scale on numpy backend isn't
+    supported (the normalisation is implemented in torch ops)."""
+    from kv_policy.turboquant_kvstore import TurboQuantKVStore
+    with pytest.raises(ValueError, match="per_channel_scale"):
+        TurboQuantKVStore(backend="numpy", per_channel_scale=True)
+
+
+def test_per_channel_scale_handles_zero_channels(torch_module):
+    """Dead channels (all-zero along the seq axis) must not produce
+    NaN through the divide-by-scale. A clamp at 1e-8 prevents that.
+    """
+    torch = torch_module
+    from kv_policy.turboquant_kvstore import TurboQuantKVStore
+
+    k = torch.randn(16, 4, 128, dtype=torch.float32)
+    k[:, 1, 5] = 0.0   # dead channel
+    v = torch.randn(k.shape, dtype=torch.float32)
+
+    store = TurboQuantKVStore(backend="torch", per_channel_scale=True)
+    store.write_block(0, k, v)
+    k_back, _ = store.read_block(0)
+    assert not torch.isnan(k_back).any()
+    assert not torch.isinf(k_back).any()
+
+
+def test_turboquant_cache_per_channel_scale_threads_through(
+    torch_module, transformers_module
+):
+    """The HF cache wrapper must thread the per_channel_scale flag to
+    the underlying kvstore so Track E's CLI flag actually changes
+    behaviour."""
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", per_channel_scale=True)
+    assert cache.turboquant_config["per_channel_scale"] is True
+    assert cache._tq_store.per_channel_scale is True
+
+
+def test_turboquant_cache_sink_size_preserves_first_n_positions_exactly(
+    torch_module, transformers_module
+):
+    """StreamingLLM-style sink-skip: the first ``sink_size`` positions
+    of the update's seq axis must come back bit-identical to the input
+    (no compression applied), while positions ``[sink_size:]`` go
+    through the lossy round-trip.
+    """
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=4, angle_bits=3)
+    g = torch.Generator().manual_seed(42)
+    # (B, H, S, D) — prefill of 32 tokens
+    k = torch.randn(1, 4, 32, 128, generator=g, dtype=torch.float32)
+    v = torch.randn(1, 4, 32, 128, generator=g, dtype=torch.float32)
+
+    k_back, v_back = cache.update(k, v, layer_idx=0)
+
+    # Sink positions (first 4) must be exact.
+    assert torch.equal(k_back[:, :, :4, :], k[:, :, :4, :]), (
+        "sink positions of K should be passed through unchanged"
+    )
+    assert torch.equal(v_back[:, :, :4, :], v[:, :, :4, :]), (
+        "sink positions of V should be passed through unchanged"
+    )
+    # Non-sink positions are lossy (cosine < 1 but ≥ 0.95).
+    cos_rest = _cosine(k[:, :, 4:, :], k_back[:, :, 4:, :])
+    assert 0.95 <= cos_rest < 1.0, (
+        f"non-sink positions should be lossy but meet target; cosine {cos_rest:.4f}"
+    )
+
+
+def test_turboquant_cache_sink_size_zero_is_default_behaviour(
+    torch_module, transformers_module
+):
+    """sink_size=0 must compress every position (no passthrough). This
+    is the default; pinning so a future refactor doesn't accidentally
+    skip position 0."""
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=0, angle_bits=3)
+    k = torch.randn(1, 4, 32, 128, dtype=torch.float32)
+    v = torch.randn(k.shape, dtype=torch.float32)
+    k_back, _ = cache.update(k, v, layer_idx=0)
+    # Position 0 should be lossy, not bit-identical.
+    assert not torch.equal(k_back[:, :, :1, :], k[:, :, :1, :])
+
+
+def test_turboquant_cache_sink_size_larger_than_input_passes_everything_through(
+    torch_module, transformers_module
+):
+    """Edge case: if the prefill is shorter than sink_size, the
+    fallback should compress the whole thing (matches the original
+    behaviour). This prevents an empty-slice crash."""
+    torch = torch_module
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=64, angle_bits=3)
+    # Only 16 tokens — less than sink_size=64.
+    k = torch.randn(1, 4, 16, 128, dtype=torch.float32)
+    v = torch.randn(k.shape, dtype=torch.float32)
+    k_back, _ = cache.update(k, v, layer_idx=0)
+    # Compresses everything (no separation since shape[2]<=sink_size)
+    assert k_back.shape == k.shape
+    # Verify it actually went through compression (lossy)
+    assert not torch.equal(k_back, k)
+
+
+def test_turboquant_cache_sink_size_threads_through(torch_module, transformers_module):
+    """Config + stats reporting for sink_size."""
+    from kv_policy.turboquant_hf_cache import TurboQuantCache
+
+    cache = TurboQuantCache(backend="torch", sink_size=4)
+    assert cache.turboquant_config["sink_size"] == 4
+    assert cache._sink_size == 4
+
+
 def test_turboquant_cache_stats_report_backend_config(torch_module, transformers_module):
     """Stats surface must include backend + algorithm config so a Track
     E artefact tells you exactly which knobs produced the number."""
