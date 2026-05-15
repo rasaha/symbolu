@@ -262,13 +262,24 @@ should be able to tell which is which.
 
 | Item | Result |
 |---|---|
-| TurboQuant 3-bit polar quantization on Qwen2.5-7B | Perplexity ratio 3052× — algorithm fails on real K activations |
-| TurboQuant + per-channel scale rescue | Made things 24× worse than baseline TurboQuant |
-| TurboQuant + sink-skip rescue | Modest 27% improvement, still catastrophic at 220× |
-| Static GPTQ-style calibration on INT4 | −6.80pt MMLU @ 1000q — dynamic + group quantization beats it |
+| TurboQuant *baseline* (random rotation, 3-bit, KV-only) on Qwen2.5-7B | Perplexity ratio 3052×. Our config diverges from Google's published TurboQuant on four axes (random vs learned rotation; 3-bit vs the paper's 4-bit headline; KV-only vs W4A4; Qwen2.5 vs Llama-2/Gemma). The negative rules out the baseline as a drop-in KV-only compressor — it does **not** refute Google's published W4A4 result on Llama-2 / Gemma. Reproducing the full method is deferred follow-on. |
+| TurboQuant baseline + per-channel scale rescue | Made things 24× worse than the random-rotation baseline (KIVI's per-channel trick does not transfer to rotation-based designs) |
+| TurboQuant baseline + sink-skip rescue | Modest 27% improvement, still catastrophic at 220× |
+| Static GPTQ-style calibration on INT4 KIVI | −6.80pt MMLU @ 1000q — dynamic + group quantization beats static |
 
-Documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2. Telling negatives
-strengthens partner trust in the positives.
+Documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2. Telling
+negatives strengthens partner trust in the positives — and the §17.8
+clarification explicitly distinguishes "our stripped-down baseline
+failed in our regime" from "Google's published method is wrong" (it
+is not).
+
+**Peer-positioning note (KIVI INT4 vs Google's TurboQuant 4-bit KV).**
+Both methods target the same 4-bit KV regime. Google reports <1% MMLU
+degradation on Llama-2 / Gemma; we measure −0.9 pt MMLU @ 1000q on
+Qwen2.5-7B. KIVI INT4 (KV-cache) and TurboQuant W4A4 (weights+activations)
+operate at different layers of the inference stack and are
+**complementary, not competitive** — they can stack on top of CTM+
+Phase 4 eviction for a three-layer memory-savings stack.
 
 ### Harness-landed, GPU-run-pending (FP8-KV competitive gap closure)
 
@@ -293,7 +304,8 @@ numbers is ~$3.50.
 | Phase-Quad O(n) attention model | Architecture spec; in-house benchmarks; not yet third-party reproduced |
 | PA-VPU / UCP silicon | Architecture spec; pre-silicon |
 | Sentinel agentic framework | Code lands at 421 passing tests; cost-savings claims are from architecture math, not deployment measurement |
-| 8.8× combined-stack capacity from TurboQuant + CTM+ + CTXL | **Architecture-doc projection has been retired.** The TurboQuant-side number that anchored it doesn't survive real-model validation (see negatives table). Current honest combined-stack claim is **~3-3.5× over INT8+LRU baseline** from measured KIVI INT4 × measured CTM+ Phase 4 eviction quality. |
+| 8.8× combined-stack capacity from TurboQuant + CTM+ + CTXL | **Architecture-doc projection has been retired** because it was anchored on a TurboQuant *baseline* configuration that did not survive our Qwen2.5-7B reproduction. The full TurboQuant method (Google's learned-polar W4A4 with <1% MMLU loss on Llama-2/Gemma) was not tested in §17 — reproducing it is filed as deferred follow-on. Current honest combined-stack claim is **~3-3.5× over INT8+LRU baseline** from measured KIVI INT4 × measured CTM+ Phase 4 eviction quality. If a future session reproduces Google's W4A4 on Llama-2, the stack story extends multiplicatively without retraction. |
+| TurboQuant W4A4 reproduction on Llama-2-7B | Not yet attempted. Estimated 2–4 engineer-weeks (learned-polar calibration is the long pole). Would unlock a measured three-layer stack: TurboQuant W4A4 weights+activations × KIVI INT4 KV × CTM+ Phase 4 eviction. |
 | CTXL tiering (HBM → CXL → NVMe) | Independent multi-month work-track; not validated |
 | Multi-model generalization (Llama-3, Mistral, Qwen sizes other than 7B) | Not yet measured; in §19.6 deferred follow-on list |
 | Long-context (≥32k) | Not yet measured; in §19.6 deferred follow-on list |

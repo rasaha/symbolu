@@ -440,17 +440,28 @@ results (all backed by artefact JSONs at
 
 **Tested-negative (documented for partner credibility):**
 
-* **TurboQuant 3-bit polar quantization** on real Qwen2.5-7B KV
-  cache: perplexity ratio 3052×. The architecture-doc cosine target
-  (0.95) holds on synthetic Gaussian and on real activations
-  (Track D: 0.9657), but cosine **does not predict generation
-  quality**. PolarQuant's random-rotation assumption fails on real
-  K outlier channels. See §17 of `PHASE4_GPU_FINDINGS.md`.
-* **Algorithm-fix attempts** to rescue PolarQuant (per-channel
-  scale, sink-skip, GPTQ-style static calibration) all failed.
-  Per-channel scale made things 24× worse (KIVI trick doesn't
-  transfer to PolarQuant's rotation-based design). Static
-  calibration regressed by 6.80pt MMLU @ 1000q.
+* **TurboQuant *baseline configuration*** (random rotation, 3-bit,
+  KV-only) on real Qwen2.5-7B: perplexity ratio 3052×. Important
+  scope note: this baseline diverges from Google's published
+  TurboQuant method (Polar Quantization) on four axes —
+  **random** vs the paper's **learned polar transformation**;
+  **3-bit** vs the paper's **4-bit headline** (the paper itself
+  flags sub-4-bit polar as a cliff regime); **KV-only** vs the
+  paper's **W4A4 weights+activations** primary integration; and
+  **Qwen2.5-7B** vs the paper's **Llama-2 / Gemma / PaLM-2** model
+  coverage. The §17 result therefore rules out the stripped-down
+  baseline as a drop-in KV-only compressor on Qwen2.5-7B; it does
+  **not** refute Google's published W4A4 result on Llama-2 / Gemma,
+  which remains a valid public claim we have not yet reproduced.
+  The architecture-doc cosine target (0.95) holds on synthetic
+  Gaussian and on real activations (Track D: 0.9657), but cosine
+  **does not predict generation quality** in this regime. See §17
+  + the §17.8 post-hoc clarification in `PHASE4_GPU_FINDINGS.md`.
+* **Algorithm-fix attempts** to rescue the random-rotation baseline
+  (per-channel scale, sink-skip, GPTQ-style static calibration) all
+  failed. Per-channel scale made things 24× worse (KIVI trick
+  doesn't transfer to rotation-based designs). Static calibration
+  regressed by 6.80pt MMLU @ 1000q.
 
 **Working configuration on Qwen2.5-7B-Instruct (May 2026 GPU
 validation, all metrics measured end-to-end on the model):**
@@ -475,10 +486,27 @@ now:
 > industry baseline at quality parity.**
 
 **Retired claim:** the architecture-doc 8.8× projection has been
-withdrawn. It anchored on a TurboQuant-side compression number
-that doesn't survive real-model validation. The credible
-measured combined-stack number is now ~3-3.5×, not 8.8×. Down,
-but real. See §17 / §18 / §19 of `PHASE4_GPU_FINDINGS.md`.
+withdrawn. It anchored on a TurboQuant *baseline* compression
+number that didn't survive our Qwen2.5-7B reproduction — not on
+Google's published W4A4 result. The credible measured combined-
+stack number is now ~3-3.5×, not 8.8×. Down, but real, and
+peer-positioned vs Google's published numbers rather than dependent
+on them. If a future session reproduces Google's TurboQuant W4A4
+on Llama-2-7B (estimated 2–4 engineer-weeks; the learned-polar
+calibration is the long pole), the stack story extends
+multiplicatively without retraction. See §17 / §17.8 / §18 / §19
+of `PHASE4_GPU_FINDINGS.md`.
+
+**Peer-positioning note (KIVI INT4 vs Google's TurboQuant 4-bit
+KV).** Both methods target the same 4-bit KV regime. Google reports
+<1% MMLU degradation on Llama-2 / Gemma. We measure −0.9 pt MMLU
+@ 1000q (≈ same regime, within partner-acceptable bounds) on
+Qwen2.5-7B. KIVI INT4 (KV-cache) and TurboQuant W4A4
+(weights+activations) operate at different layers of the inference
+stack and are **complementary, not competitive** — they can stack
+on top of CTM+ Phase 4 eviction for a three-layer memory-savings
+stack. The decision to ship KIVI was driven by reproducibility and
+public reference implementations, not by the §17 negative.
 
 **Status of the §5a roadmap steps after §5b:**
 
@@ -487,8 +515,8 @@ but real. See §17 / §18 / §19 of `PHASE4_GPU_FINDINGS.md`.
 | 1 (Phase 4 on real Llama/Qwen KV cache) | Done — §13.3 |
 | 2 (quality preservation) | Done — INT4 KIVI MMLU @ 1000q only −0.90pt |
 | 3 (multi-model, multi-workload) | Deferred — Qwen2.5-7B only so far |
-| 4 (TurboQuant CUDA v4 kernel) | **Blocked** — TurboQuant negative result on real models, see §17 |
-| 5 (combined CTM+ + TurboQuant + CTXL stack ≥5×) | **Retired** — replaced with the measured ~3-3.5× over INT8+LRU. CTXL tiering remains a separate multi-month work-track. |
+| 4 (TurboQuant CUDA v4 kernel) | **Reframed** — the §17 baseline negative blocks the random-rotation kernel; the real next step is to reproduce Google's published W4A4 method (learned-polar rotation) on Llama-2-7B before committing to silicon. Estimated 2–4 engineer-weeks. |
+| 5 (combined CTM+ + TurboQuant + CTXL stack ≥5×) | **Partially retired** — replaced with the measured ~3-3.5× over INT8+LRU from CTM+ Phase 4 × KIVI INT4. The TurboQuant-W4A4 layer can extend the multiplicative stack once reproduced; CTXL tiering remains a separate multi-month work-track. |
 | 6 (Pareto frontier vs off-the-shelf KV-quant) | Partial — INT4 KIVI reproduced on Qwen2.5-7B at literature-parity. Comparison vs vLLM-FP8 / H2O / KIVI-published still pending. |
 | 7 (partner-validated production case study) | Pending |
 

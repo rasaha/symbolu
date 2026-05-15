@@ -1725,6 +1725,74 @@ enough on this evidence: the trend curve in §17.4 shows the
 compression-ratio crossover with INT4 happens at ~6 bits, where
 PolarQuant gives no advantage.)
 
+### §17.8 Post-hoc clarification — what we tested vs what Google's TurboQuant actually publishes
+
+Added May 2026 after a closer reading of Google Research's TurboQuant
+paper. The §17 result is reframed without retracting any measurement.
+
+The §17 implementation **diverges from Google's published TurboQuant
+method on four axes simultaneously**, and each divergence independently
+predicts a quality regression:
+
+| Axis | Google TurboQuant (paper) | What §17 tested |
+|---|---|---|
+| Rotation | **Learned orthonormal polar transformation** (the paper's core algorithmic contribution; calibrated on 128–256 samples) | **Random orthogonal rotation** (the paper's baseline; no calibration) |
+| Bit-rate headline | 4-bit (W4A4); 3-bit is explicitly flagged as "extreme compression / noticeable PPL increase" | **3-bit** (and 4-bit) — the regime the paper itself flags as cliff-prone |
+| Integration scope | **Weights + activations + KV-cache** (W4A4 is the headline; KV is one application) | KV-cache only |
+| Model coverage | Llama-2 (7B/13B/70B), Gemma (2B/7B), PaLM-2 | Qwen2.5-7B (GQA, not in paper) |
+
+Stacked, a 3052× perplexity ratio on the 3-bit / random-rotation /
+KV-only / Qwen2.5 configuration is consistent with the paper's own
+caveats — it is **not a refutation of TurboQuant**. The §17 measurement
+rules out a stripped-down TurboQuant *baseline* as a drop-in KV-only
+compressor for our deployment; it says nothing about the full method
+in its published regime.
+
+**Corrected partner-shareable framing:**
+
+> "We implemented a TurboQuant baseline (random rotation, 3-bit, KV-only)
+> on Qwen2.5-7B and observed the quality cliff the paper itself flags
+> for sub-4-bit polar without learned rotation. We did not reproduce
+> Google's W4A4 W+A+KV result on Llama-2 / Gemma, which remains a valid
+> published claim. We then evaluated KIVI INT4 — a KV-cache-specific
+> method with public reference implementations — and measured peer-level
+> numbers (3.2× real-heap, 1.024× perplexity, −0.9 pt MMLU @ 1000q on
+> Qwen2.5-7B, INT3 variant at −0.7 pt MMLU @ ~4.5× theoretical
+> compression). KIVI INT4 and Google's TurboQuant operate at the same
+> bit-rate regime (4-bit KV); KIVI was chosen for reproducibility,
+> not because TurboQuant failed in its published configuration."
+
+**What this implies for the architecture stack:**
+
+- KIVI INT4 (our KV-cache layer) and TurboQuant's W4A4 (Google's
+  weights+activations layer) are **complementary**, not competitive:
+  TurboQuant compresses the model itself; KIVI compresses the
+  runtime cache. Both at 4-bit, both ~4× compression on their
+  respective tensors. They can stack on top of CTM+ Phase 4
+  eviction for a three-layer memory-savings stack.
+- The retired 8.8× combined-stack number from earlier drafts of the
+  architecture doc was anchored on a TurboQuant *projection* (the
+  random-rotation 5–7× compression layer that §17 disproved on
+  Qwen2.5). The honest combined claim today, anchored on measured
+  numbers, is **~3-3.5× over an INT8+LRU baseline** from measured
+  KIVI INT4 × measured CTM+ Phase 4 eviction quality. If a future
+  session reproduces Google's W4A4 result on Llama-2 (the paper's
+  primary public model), the multiplicative stack story can extend
+  cleanly without retraction.
+
+**What this changes about §17.7's "if pursuing TurboQuant further":**
+
+The three engineering directions in §17.7 (per-channel scale, sink-
+skip, mixed bit depth) were rescue paths for the stripped-down
+baseline we tested. The honest version of "if pursuing TurboQuant
+further" is now: **implement the learned polar transformation on
+Llama-2-7B and reproduce Google's reported <1% MMLU degradation at
+W4A4.** Estimated cost: 2–4 engineer-weeks (learned-rotation
+calibration is the long pole). Payoff: a measured "we reproduced
+Google's TurboQuant W4A4 on Llama-2" result that stacks on top of
+KIVI INT4 KV and CTM+ Phase 4 eviction. This is currently filed
+under §19.6 deferred follow-on items, not active work.
+
 ## §18. KIVI INT4 with full config — the working KV quant on Qwen2.5-7B
 
 After §17's negative result on PolarQuant (3-bit + QJL: 3052× ppl ratio;
