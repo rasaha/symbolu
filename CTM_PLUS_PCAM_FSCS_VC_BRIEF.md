@@ -250,9 +250,24 @@ codebase, validated end-to-end on the same model:
 KIVI INT4 stacks under CTM+: the KV-cache it compresses is the same
 KV-cache CTM+ evicts from. The current honest combined-stack claim
 is **~3-3.5× over an INT8+LRU baseline** from measured KIVI INT4
-compression × measured Phase 4 eviction quality. (Earlier drafts
-quoted an 8.8× figure anchored on TurboQuant; that figure has been
-retired — see negatives below.)
+compression × measured Phase 4 eviction quality.
+
+**Peer positioning vs Google's TurboQuant.** Google Research's
+TurboQuant (Polar Quantization) targets the same 4-bit regime for
+KV-cache, with a reported <1% MMLU degradation on Llama-2 and Gemma.
+Our KIVI INT4 measurement on Qwen2.5-7B (−0.9 pt MMLU @ 1000q,
+1.024× perplexity, 3.2× real-heap) lands in peer territory. The two
+methods are complementary, not competitive: TurboQuant is primarily
+a W4A4 weights+activations method (KV-cache is one application);
+KIVI is KV-cache-specific. They can stack — TurboQuant W4A4 over
+the model, KIVI INT4 over the cache, CTM+ Phase 4 over the eviction
+decisions. Earlier drafts of this brief quoted an 8.8× combined-
+stack figure anchored on a TurboQuant projection that did not
+survive our Qwen2.5-7B reproduction (see negatives below); the
+retired figure has been replaced with the measured 3-3.5× anchored
+on KIVI INT4 + CTM+ Phase 4. If a future session reproduces
+TurboQuant's published W4A4 result on Llama-2, the multiplicative
+stack story extends cleanly without retraction.
 
 ### FSCS-derived signal integration (separate research thread, real Mistral-7B trace)
 
@@ -299,13 +314,13 @@ so partners can tell which is which.
 
 **Tested-and-failed (documented as negatives — partner-shareable):**
 
-- TurboQuant 3-bit polar quantization on Qwen2.5-7B: perplexity ratio 3052× (algorithm fails on real K activations)
-- TurboQuant + per-channel scale rescue: 24× worse than baseline TurboQuant
-- TurboQuant + sink-skip rescue: modest 27% improvement, still catastrophic at 220×
-- Static GPTQ-style calibration on INT4: −6.80 pt MMLU @ 1000q — dynamic + group quantization beats static
+- TurboQuant *baseline* (random rotation, 3-bit, KV-only) on Qwen2.5-7B: perplexity ratio 3052×. Our implementation diverges from Google's published method on four axes (random vs learned rotation, 3-bit vs the paper's 4-bit headline, KV-only vs W4A4, Qwen2.5 vs Llama-2/Gemma). The negative rules out the baseline configuration as a drop-in KV-only compressor; it does **not** refute Google's published TurboQuant W4A4 result on Llama-2 / Gemma. Reproducing the full method is deferred follow-on work.
+- TurboQuant baseline + per-channel scale rescue: 24× worse than baseline (KIVI's per-channel trick does not transfer to rotation-based designs)
+- TurboQuant baseline + sink-skip rescue: modest 27% improvement, still catastrophic at 220×
+- Static GPTQ-style calibration on INT4 KIVI: −6.80 pt MMLU @ 1000q — dynamic + group quantization beats static
 - Autoregressive generation top-1 (64%) is misleading vs teacher-forced (96.4%) due to exposure bias — we report teacher-forced
 
-Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2.
+Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2.
 
 **Projected (not yet measured):**
 
