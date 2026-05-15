@@ -556,6 +556,192 @@ def test_asymmetric_threads_through_hf_cache(torch_module, transformers_module):
     assert "asymmetric" in cfg["scheme"]
 
 
+# --------------------------------------------------------------------- #
+# Bit-packing (Path A from the post-audit improvements)                 #
+# --------------------------------------------------------------------- #
+
+
+def test_pack_unpack_int4_round_trip_preserves_values(torch_module):
+    """pack_int4 + unpack_int4 must be exact: every int4 value in
+    [-8, +7] round-trips byte-identically."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import pack_int4, unpack_int4
+
+    # All possible int4 values in a contiguous tensor (even length).
+    t = torch.tensor(list(range(-8, 8)), dtype=torch.int8)  # 16 values
+    packed = pack_int4(t)
+    assert packed.dtype == torch.uint8
+    assert packed.shape == (8,)  # 16 values → 8 bytes
+    back = unpack_int4(packed, target_n=16)
+    assert back.dtype == torch.int8
+    assert back.shape == (16,)
+    assert torch.equal(back, t)
+
+
+def test_pack_unpack_int4_odd_length_handles_padding(torch_module):
+    """Odd length on the last dim should pad-then-trim correctly."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import pack_int4, unpack_int4
+
+    t = torch.tensor([3, -7, 0, 5, -2], dtype=torch.int8)  # 5 values (odd)
+    packed = pack_int4(t)
+    assert packed.shape == (3,)  # ceil(5/2) = 3
+    back = unpack_int4(packed, target_n=5)
+    assert back.shape == (5,)
+    assert torch.equal(back, t)
+
+
+def test_pack_unpack_int4_multi_dim_packs_along_last(torch_module):
+    """Multi-dim input: packing happens along the last axis only.
+    Mirrors how the kvstore uses it: ``(S, H, D) → (S, H, D/2)``."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import pack_int4, unpack_int4
+
+    g = torch.Generator().manual_seed(42)
+    t = torch.randint(-8, 8, (4, 3, 16), generator=g, dtype=torch.int8)
+    packed = pack_int4(t)
+    assert packed.shape == (4, 3, 8)
+    back = unpack_int4(packed, target_n=16)
+    assert back.shape == (4, 3, 16)
+    assert torch.equal(back, t)
+
+
+def test_int4_store_actual_compression_ratio_matches_theoretical(torch_module):
+    """After bit-packing landed, actual heap usage should equal
+    theoretical-packed bytes within a small odd-D padding constant.
+    This pins the partner-relevant claim: 3.2× isn't theoretical-only;
+    it's the real number.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float16)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float16)
+    store.write_block(0, k, v)
+    stats = store.get_stats()
+
+    # Theoretical and actual ratios must match closely (≤2% drift
+    # accounting for any odd-D byte-pad rounding).
+    ratio_theo = stats["compression_ratio"]
+    ratio_actual = stats["actual_compression_ratio"]
+    diff_pct = abs(ratio_theo - ratio_actual) / ratio_theo * 100.0
+    assert diff_pct <= 2.0, (
+        f"actual ({ratio_actual:.3f}) vs theoretical ({ratio_theo:.3f}) "
+        f"ratios drift {diff_pct:.1f}% — bit-packing not producing real "
+        f"savings"
+    )
+    # The combined ratio should be in the partner-shareable 3.0–3.5× range
+    # for the full KIVI config (asymmetric + group=32 on Qwen-shape FP16
+    # source).
+    assert 2.8 <= ratio_actual <= 3.6, (
+        f"INT4 + group=32 + asymmetric on FP16 source should give "
+        f"actual compression ratio ~3.0-3.5×; got {ratio_actual:.2f}×"
+    )
+    assert stats["bit_packed_storage"] is True
+
+
+def test_int4_store_round_trip_preserved_after_packing(torch_module):
+    """End-to-end: bit-packing in the kvstore must NOT degrade
+    quality vs the pre-packing implementation. K/V cosine still ≥ 0.99
+    on Qwen-shape Gaussian.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    store.write_block(0, k, v)
+    k_back, v_back = store.read_block(0)
+    cos_k = _cosine(k, k_back)
+    cos_v = _cosine(v, v_back)
+    assert cos_k >= 0.99, f"K cosine {cos_k:.4f} regressed after bit-packing"
+    assert cos_v >= 0.99, f"V cosine {cos_v:.4f} regressed after bit-packing"
+
+
+# --------------------------------------------------------------------- #
+# Audit-pass cheap-fix tests                                            #
+# --------------------------------------------------------------------- #
+
+
+def test_int4_cache_decode_step_s1_round_trip(torch_module, transformers_module):
+    """Audit gap closed: S=1 update path (decode after prefill). The
+    per-channel/per-token scales degenerate to "scale captures the
+    single value", so reconstruction should be essentially exact.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    cache = INT4PerChannelCache(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+    )
+    # First a prefill update so the parent cache has the sink positions.
+    g = torch.Generator().manual_seed(42)
+    prefill_k = torch.randn(1, QWEN_NUM_KV_HEADS, 32, QWEN_HEAD_DIM,
+                            generator=g, dtype=torch.float32)
+    prefill_v = torch.randn(prefill_k.shape, generator=g, dtype=torch.float32)
+    cache.update(prefill_k, prefill_v, layer_idx=0)
+
+    # Now simulate a decode step (S=1).
+    decode_k = torch.randn(1, QWEN_NUM_KV_HEADS, 1, QWEN_HEAD_DIM,
+                           generator=g, dtype=torch.float32)
+    decode_v = torch.randn(decode_k.shape, generator=g, dtype=torch.float32)
+    k_back, v_back = cache.update(decode_k, decode_v, layer_idx=0)
+
+    # The returned tensor includes the prefill plus the new decode step.
+    assert k_back.shape == (1, QWEN_NUM_KV_HEADS, 33, QWEN_HEAD_DIM)
+    # Cosine on the decode-step slice [:, :, -1:, :] should be very
+    # high since per-channel scale on a single token = its value exactly
+    # (any error is just int4 quantization of 1 value to 1 of 16 bins).
+    cos_decode = _cosine(decode_k, k_back[:, :, -1:, :])
+    assert cos_decode >= 0.99, (
+        f"decode-step K cosine {cos_decode:.4f} — INT4 on a single-token "
+        f"update should round-trip near-exactly"
+    )
+
+
+def test_int4_asymmetric_non_divisible_s_round_trip(torch_module):
+    """Audit gap closed: asymmetric + group_size that doesn't evenly
+    divide S. The padded portion must not bias the reconstruction.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    # S=80, group=32 → groups (32, 32, 16); last group has 16 real values
+    # plus 16 zero-padding when quantized.
+    t = torch.randn(80, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    q, scale, offset = quantize_per_channel_int4(
+        t, group_size=32, asymmetric=True,
+    )
+    assert scale.shape == (3, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    assert offset is not None and offset.shape == scale.shape
+
+    back = dequantize_per_channel_int4(
+        q, scale, dtype=torch.float32, group_size=32, offset=offset,
+    )
+    assert back.shape == t.shape
+
+    # Cosine on the real last-group portion (positions 64-79). Padding
+    # zeros may bias the scale slightly but the real values should
+    # still reconstruct well.
+    cos_last_group = _cosine(t[64:], back[64:])
+    assert cos_last_group >= 0.98, (
+        f"asymmetric + non-divisible last-group cosine {cos_last_group:.4f}; "
+        f"padding may be biasing the scale"
+    )
+
+
 def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module):
     """The whole motivation: INT4 per-channel should resolve outlier-
     channel data with min per-channel cosine ≥ 0.99 (much better than

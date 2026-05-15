@@ -60,6 +60,73 @@ except ImportError:  # pragma: no cover - guarded at the caller
 
 
 # --------------------------------------------------------------------------- #
+# Bit packing / unpacking — pack two INT4 values per byte                     #
+# --------------------------------------------------------------------------- #
+
+
+def pack_int4(t_int8: "torch.Tensor") -> "torch.Tensor":
+    """Pack a signed-INT4 tensor (stored as int8 with values in [−8, +7])
+    into half as many uint8 bytes.
+
+    Packs along the *last* dimension. Two consecutive INT4 values share
+    one byte: lower nibble = first, upper nibble = second. Internal
+    representation shifts the signed range [−8, +7] to unsigned [0, 15]
+    so a byte simply holds two 4-bit unsigned ints.
+
+    If the last dimension is odd, the input is zero-padded by one
+    element before packing. ``unpack_int4`` requires knowing the
+    original last-dim size to trim that padding back.
+
+    Args:
+        t_int8: ``(..., N) int8`` tensor with all values in [−8, +7].
+
+    Returns:
+        ``(..., ceil(N / 2)) uint8`` tensor.
+    """
+    if t_int8.dtype != torch.int8:
+        raise TypeError(
+            f"pack_int4 expects int8 input; got dtype {t_int8.dtype}"
+        )
+    n = t_int8.shape[-1]
+    # Pad to even length on the last dim.
+    if n % 2 == 1:
+        pad_shape = t_int8.shape[:-1] + (1,)
+        zeros = torch.zeros(pad_shape, dtype=torch.int8, device=t_int8.device)
+        t_int8 = torch.cat([t_int8, zeros], dim=-1)
+    # Reshape to (..., n_pairs, 2)
+    n_pairs = t_int8.shape[-1] // 2
+    prefix_shape = t_int8.shape[:-1]
+    pairs = t_int8.view(*prefix_shape, n_pairs, 2)
+    # Shift signed [−8, +7] → unsigned [0, 15], pack two per byte.
+    pairs_unsigned = (pairs + 8).to(torch.uint8)
+    packed = pairs_unsigned[..., 0] | (pairs_unsigned[..., 1] << 4)
+    return packed  # (..., n_pairs) uint8
+
+
+def unpack_int4(packed: "torch.Tensor", target_n: int) -> "torch.Tensor":
+    """Inverse of ``pack_int4``.
+
+    Args:
+        packed: ``(..., m) uint8`` where m == ceil(target_n / 2).
+        target_n: original last-dim size before packing. Used to trim
+            the padding byte if the original was odd-length.
+
+    Returns:
+        ``(..., target_n) int8`` with values restored to [−8, +7].
+    """
+    if packed.dtype != torch.uint8:
+        raise TypeError(f"unpack_int4 expects uint8 input; got dtype {packed.dtype}")
+    low = (packed & 0x0F).to(torch.int8) - 8
+    high = ((packed >> 4) & 0x0F).to(torch.int8) - 8
+    # Interleave low/high pairs: out[2i] = low[i], out[2i+1] = high[i].
+    stacked = torch.stack([low, high], dim=-1)
+    prefix_shape = packed.shape[:-1]
+    m = packed.shape[-1]
+    flat = stacked.view(*prefix_shape, m * 2)
+    return flat[..., :target_n].contiguous()
+
+
+# --------------------------------------------------------------------------- #
 # Quantization primitives                                                     #
 # --------------------------------------------------------------------------- #
 
@@ -309,29 +376,46 @@ def dequantize_per_token_int4(
 
 @dataclass
 class INT4Block:
-    """Per-block compressed state. Mirrors the partner-shareable
-    ``theoretical_packed_bytes`` metric used by the TurboQuant kvstore
-    so the same Track E artefact format works for either."""
+    """Per-block compressed state.
 
-    k_quantized: "torch.Tensor"   # (S, H, D) int8
-    k_scale: "torch.Tensor"        # (n_groups_s, H, D) float32
-    v_quantized: "torch.Tensor"   # (S, H, D) int8
-    v_scale: "torch.Tensor"        # (S, H, n_groups_d) float32
+    Storage layout (bit-packed):
+      * K quantized values: ``k_packed`` uint8, two 4-bit values per
+        byte along the head_dim axis. Shape ``(S, H, ceil(D/2)) uint8``
+        when the head_dim is the packing axis (the default).
+      * V quantized values: ``v_packed`` uint8, same packing along
+        head_dim.
+      * Scales / offsets stored as float16 (16 bits each) rather than
+        float32, so the partner-shareable ``compression_ratio`` =
+        ``original_bytes / actual_stored_bytes`` matches the
+        bit-packed theoretical number rather than being 2× off due to
+        int8 + fp32 working storage.
+
+    The ``original_d`` field carries the unpadded head_dim so
+    ``unpack_int4`` can trim the pad byte (if D is odd).
+    """
+
+    k_packed: "torch.Tensor"       # (S, H, ceil(D/2)) uint8 — packed K
+    k_scale: "torch.Tensor"        # (n_groups_s, H, D) float16
+    v_packed: "torch.Tensor"       # (S, H, ceil(D/2)) uint8 — packed V
+    v_scale: "torch.Tensor"        # (S, H, n_groups_d) float16
     original_shape: Tuple[int, ...]
     original_dtype: Any
     k_group_size: int = 0          # 0 means plain per-channel
     v_group_size: int = 0          # 0 means plain per-token
     # Asymmetric quantization offsets (None for symmetric mode).
-    # Same shapes as k_scale / v_scale respectively.
+    # Same shapes as k_scale / v_scale respectively, float16.
     k_offset: Optional["torch.Tensor"] = None
     v_offset: Optional["torch.Tensor"] = None
 
     @property
     def theoretical_packed_bytes(self) -> int:
-        """Theoretical bit-packed storage:
+        """Theoretical bit-packed storage (independent of actual heap):
           * K: 4 bits/elem * S*H*D + 16 bits * n_groups_s * H*D × (2 if asymmetric else 1)
           * V: 4 bits/elem * S*H*D + 16 bits * S*H * n_groups_d × (2 if asymmetric else 1)
         Asymmetric mode adds one FP16 offset per scale.
+
+        After bit-packing landed, this should be ≈ ``actual_stored_bytes``.
+        The ≈ accounts for any padding byte from odd D.
         """
         s, h, d = self.original_shape
         n_groups_s = int(self.k_scale.shape[0])
@@ -341,6 +425,30 @@ class INT4Block:
         k_bits = 4 * s * h * d + 16 * n_groups_s * h * d * k_scale_factor
         v_bits = 4 * s * h * d + 16 * s * h * n_groups_d * v_scale_factor
         return max(1, (k_bits + v_bits + 7) // 8)
+
+    @property
+    def actual_stored_bytes(self) -> int:
+        """Real heap bytes consumed by this block's tensors.
+
+        After bit-packing landed:
+          * ``k_packed`` / ``v_packed`` are uint8 (1 byte per packed pair).
+          * Scales / offsets are float16 (2 bytes each).
+
+        Should match ``theoretical_packed_bytes`` within a small
+        constant (any pad byte from odd D); partner-shareable
+        compression-ratio claims can use either number now.
+        """
+        b = (
+            int(self.k_packed.element_size() * self.k_packed.numel())
+            + int(self.k_scale.element_size() * self.k_scale.numel())
+            + int(self.v_packed.element_size() * self.v_packed.numel())
+            + int(self.v_scale.element_size() * self.v_scale.numel())
+        )
+        if self.k_offset is not None:
+            b += int(self.k_offset.element_size() * self.k_offset.numel())
+        if self.v_offset is not None:
+            b += int(self.v_offset.element_size() * self.v_offset.numel())
+        return b
 
 
 def _is_torch_tensor(obj: Any) -> bool:
@@ -389,6 +497,10 @@ class INT4PerChannelKVStore:
             "removes": 0,
             "bytes_in": 0,
             "bytes_out_theoretical": 0,
+            # bytes_out_actual was added with bit-packing. After
+            # packing, theoretical and actual converge — the partner-
+            # shareable compression ratio is real.
+            "bytes_out_actual": 0,
             "write_us_sum": 0.0,
             "read_us_sum": 0.0,
         }
@@ -422,22 +534,35 @@ class INT4PerChannelKVStore:
             v_in, group_size=self._v_group_size, asymmetric=self._asymmetric,
         )
 
+        # Bit-pack the int8 quantized tensors (two 4-bit values per byte)
+        # and downcast scales/offsets to float16 for storage. This is what
+        # turns the *theoretical* compression ratio into *actual* heap
+        # savings — without packing, int8 storage uses 8 bits/element
+        # while the algorithm only carries 4 bits of information.
+        k_packed = pack_int4(k_q)
+        v_packed = pack_int4(v_q)
+        k_scale_fp16 = k_scale.to(torch.float16)
+        v_scale_fp16 = v_scale.to(torch.float16)
+        k_offset_fp16 = k_offset.to(torch.float16) if k_offset is not None else None
+        v_offset_fp16 = v_offset.to(torch.float16) if v_offset is not None else None
+
         block = INT4Block(
-            k_quantized=k_q,
-            k_scale=k_scale,
-            v_quantized=v_q,
-            v_scale=v_scale,
+            k_packed=k_packed,
+            k_scale=k_scale_fp16,
+            v_packed=v_packed,
+            v_scale=v_scale_fp16,
             original_shape=tuple(int(s) for s in k_array.shape),
             original_dtype=original_dtype,
             k_group_size=self._k_group_size,
             v_group_size=self._v_group_size,
-            k_offset=k_offset,
-            v_offset=v_offset,
+            k_offset=k_offset_fp16,
+            v_offset=v_offset_fp16,
         )
         self._blocks[block_id] = block
         self._stats["writes"] += 1
         self._stats["bytes_in"] += bytes_in
         self._stats["bytes_out_theoretical"] += int(block.theoretical_packed_bytes)
+        self._stats["bytes_out_actual"] += int(block.actual_stored_bytes)
         self._stats["write_us_sum"] += (time.perf_counter() - t0) * 1e6
 
     def read_block(self, block_id: int) -> "Tuple[torch.Tensor, torch.Tensor]":
@@ -445,13 +570,24 @@ class INT4PerChannelKVStore:
             raise KeyError(f"INT4PerChannelKVStore: block {block_id} not held")
         t0 = time.perf_counter()
         b = self._blocks[block_id]
+        # Unpack the int4 storage back to int8 for dequantize. The
+        # scales/offsets are fp16 on disk; the dequantize math runs in
+        # fp32 internally (cast happens inside dequantize) and casts
+        # back to original_dtype at the end.
+        s, h, d = b.original_shape
+        k_int8 = unpack_int4(b.k_packed, target_n=d)
+        v_int8 = unpack_int4(b.v_packed, target_n=d)
+        k_scale_fp32 = b.k_scale.to(torch.float32)
+        v_scale_fp32 = b.v_scale.to(torch.float32)
+        k_offset_fp32 = b.k_offset.to(torch.float32) if b.k_offset is not None else None
+        v_offset_fp32 = b.v_offset.to(torch.float32) if b.v_offset is not None else None
         k = dequantize_per_channel_int4(
-            b.k_quantized, b.k_scale, dtype=b.original_dtype,
-            group_size=b.k_group_size, offset=b.k_offset,
+            k_int8, k_scale_fp32, dtype=b.original_dtype,
+            group_size=b.k_group_size, offset=k_offset_fp32,
         )
         v = dequantize_per_token_int4(
-            b.v_quantized, b.v_scale, dtype=b.original_dtype,
-            group_size=b.v_group_size, offset=b.v_offset,
+            v_int8, v_scale_fp32, dtype=b.original_dtype,
+            group_size=b.v_group_size, offset=v_offset_fp32,
         )
         self._stats["reads"] += 1
         self._stats["read_us_sum"] += (time.perf_counter() - t0) * 1e6
@@ -469,7 +605,21 @@ class INT4PerChannelKVStore:
 
     @property
     def compression_ratio(self) -> float:
+        """Theoretical bit-packed compression ratio (source / bit-packed).
+        With actual bit-packing landed, this matches ``actual_compression_ratio``
+        within rounding."""
         out = self._stats["bytes_out_theoretical"]
+        if out == 0:
+            return 0.0
+        return float(self._stats["bytes_in"]) / float(out)
+
+    @property
+    def actual_compression_ratio(self) -> float:
+        """Actual heap-storage compression ratio (source / real bytes used).
+        Reports the true memory savings after pack_int4 / fp16 scales.
+        Should match ``compression_ratio`` within a tiny constant from
+        any odd-D padding byte."""
+        out = self._stats["bytes_out_actual"]
         if out == 0:
             return 0.0
         return float(self._stats["bytes_in"]) / float(out)
@@ -491,6 +641,7 @@ class INT4PerChannelKVStore:
     def get_stats(self) -> Dict[str, Any]:
         s = dict(self._stats)
         s["compression_ratio"] = self.compression_ratio
+        s["actual_compression_ratio"] = self.actual_compression_ratio
         s["blocks_held"] = len(self._blocks)
         s["avg_write_us"] = self.avg_write_us
         s["avg_read_us"] = self.avg_read_us
@@ -501,4 +652,5 @@ class INT4PerChannelKVStore:
         s["v_group_size"] = self._v_group_size
         s["asymmetric"] = self._asymmetric
         s["bits_per_element"] = 4
+        s["bit_packed_storage"] = True
         return s
