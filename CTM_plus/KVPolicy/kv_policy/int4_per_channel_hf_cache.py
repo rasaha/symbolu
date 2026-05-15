@@ -35,6 +35,10 @@ def _compress_decompress_kv_int4(
     v: "torch.Tensor",
     *,
     store: Any,
+    static_k_scale: "Optional[torch.Tensor]" = None,
+    static_k_offset: "Optional[torch.Tensor]" = None,
+    static_v_scale: "Optional[torch.Tensor]" = None,
+    static_v_offset: "Optional[torch.Tensor]" = None,
 ) -> "Tuple[torch.Tensor, torch.Tensor]":
     """Round-trip ``(B, H, S, D)`` K/V through the INT4 kvstore.
 
@@ -42,6 +46,10 @@ def _compress_decompress_kv_int4(
     The kvstore expects per-block tensors of shape ``(S, H, D)`` (vLLM
     layout); we transpose for the call and transpose back on the way
     out, exactly as the TurboQuant wrapper does.
+
+    Optional ``static_*_scale`` / ``static_*_offset`` tensors come from
+    a calibration file and short-circuit the dynamic max-based scale
+    computation inside the kvstore.
     """
     if k.ndim != 4 or v.ndim != 4:
         raise ValueError(
@@ -57,7 +65,13 @@ def _compress_decompress_kv_int4(
     for batch_idx in range(b):
         k_block = k[batch_idx].transpose(0, 1).contiguous()  # (S, H, D)
         v_block = v[batch_idx].transpose(0, 1).contiguous()
-        store.write_block(0, k_block, v_block)
+        store.write_block(
+            0, k_block, v_block,
+            static_k_scale=static_k_scale,
+            static_k_offset=static_k_offset,
+            static_v_scale=static_v_scale,
+            static_v_offset=static_v_offset,
+        )
         k_back, v_back = store.read_block(0)
         store.remove_block(0)
         k_out[batch_idx] = k_back.transpose(0, 1)
@@ -91,6 +105,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         v_group_size: int = 0,
         asymmetric: bool = False,
         bits: int = 4,
+        calibration_path: Optional[str] = None,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -107,6 +122,45 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             asymmetric=asymmetric,
             bits=bits,
         )
+
+        # Optional GPTQ/AWQ-style static calibration: per-layer scales
+        # pre-computed offline on a calibration set (see
+        # ``Bench/ctm_bench/scripts/calibrate_int4_scales.py``). When
+        # loaded, ``update()`` looks up the calibrated scales by
+        # ``layer_idx`` and skips dynamic max-based scale computation.
+        self._calibration: Optional[dict] = None
+        if calibration_path is not None:
+            self._calibration = torch.load(calibration_path, map_location="cpu")
+            if not isinstance(self._calibration, dict):
+                raise ValueError(
+                    f"calibration file must load to a dict; got {type(self._calibration).__name__}"
+                )
+            # Validate the schema: top-level keys are int layer indices,
+            # each value is a dict with at least 'k_scale' (and 'k_offset'
+            # if the original calibration was asymmetric).
+            for layer_idx, entry in self._calibration.items():
+                if not isinstance(entry, dict) or "k_scale" not in entry:
+                    raise ValueError(
+                        f"calibration entry for layer {layer_idx} must have "
+                        f"'k_scale'; got keys {list(entry.keys()) if isinstance(entry, dict) else 'non-dict'}"
+                    )
+            # Calibration is only supported with group_size <= 0 (no
+            # group quant) — static scales are PER channel, not
+            # per-(channel, group).
+            if k_group_size > 0 or v_group_size > 0:
+                raise ValueError(
+                    f"calibration_path provided but k_group_size={k_group_size}, "
+                    f"v_group_size={v_group_size}; static calibration requires "
+                    f"both group sizes to be 0 (no group quantisation)."
+                )
+            if torch_device is not None:
+                # Move calibration scales to the target device once at
+                # init to avoid repeated host→device transfers in
+                # update().
+                for layer_idx, entry in self._calibration.items():
+                    for key, val in list(entry.items()):
+                        if hasattr(val, "to"):
+                            entry[key] = val.to(torch_device)
         self._cfg = dict(
             torch_device=str(torch_device),
             sink_size=int(sink_size),
@@ -114,7 +168,10 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             v_group_size=int(v_group_size),
             asymmetric=bool(asymmetric),
             bits=int(bits),
-            scheme=f"int{bits}_per_channel_k_per_token_v" + ("_asymmetric" if asymmetric else "_symmetric"),
+            calibration_path=calibration_path,
+            scheme=f"int{bits}_per_channel_k_per_token_v" + (
+                "_asymmetric" if asymmetric else "_symmetric"
+            ) + ("_calibrated" if calibration_path is not None else ""),
         )
         self._sink_size = int(sink_size)
         if self._sink_size < 0:
@@ -122,6 +179,28 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         self._updates = 0
         self._total_kv_elements = 0
         self._sink_elements_passed_through = 0
+
+    def _resolve_static_scales(self, layer_idx: int) -> dict:
+        """Look up the calibration entry for ``layer_idx``. Returns a
+        dict of static_k_scale / static_k_offset / static_v_scale /
+        static_v_offset (each may be None). Empty dict if no calibration
+        is loaded."""
+        if self._calibration is None:
+            return {}
+        # Calibration keys may be int or str (depends on how it was
+        # saved); accept both.
+        entry = self._calibration.get(layer_idx) or self._calibration.get(str(layer_idx))
+        if entry is None:
+            raise KeyError(
+                f"calibration has no entry for layer {layer_idx}; "
+                f"known layers: {sorted(self._calibration.keys())}"
+            )
+        return {
+            "static_k_scale": entry.get("k_scale"),
+            "static_k_offset": entry.get("k_offset"),
+            "static_v_scale": entry.get("v_scale"),
+            "static_v_offset": entry.get("v_offset"),
+        }
 
     def update(
         self,
@@ -131,6 +210,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         *args,
         **kwargs,
     ) -> "Tuple[torch.Tensor, torch.Tensor]":
+        static = self._resolve_static_scales(layer_idx)
         sink = self._sink_size
         if sink > 0 and key_states.shape[2] > sink:
             k_sink = key_states[:, :, :sink, :]
@@ -138,7 +218,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             k_rest = key_states[:, :, sink:, :].contiguous()
             v_rest = value_states[:, :, sink:, :].contiguous()
             k_rest_lossy, v_rest_lossy = _compress_decompress_kv_int4(
-                k_rest, v_rest, store=self._int4_store,
+                k_rest, v_rest, store=self._int4_store, **static,
             )
             k_lossy = torch.cat([k_sink, k_rest_lossy], dim=2)
             v_lossy = torch.cat([v_sink, v_rest_lossy], dim=2)
@@ -147,7 +227,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             )
         else:
             k_lossy, v_lossy = _compress_decompress_kv_int4(
-                key_states, value_states, store=self._int4_store,
+                key_states, value_states, store=self._int4_store, **static,
             )
         self._updates += 1
         self._total_kv_elements += int(key_states.numel() + value_states.numel())

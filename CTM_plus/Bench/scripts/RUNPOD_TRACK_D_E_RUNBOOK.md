@@ -336,6 +336,58 @@ python -m ctm_bench.scripts.track_e_quality_eval \
 | 1.05–1.5 | Helps but not full quality. | Try INT4 + group quantization (see §5d). |
 | > 2 | Unexpected — KIVI's published numbers on Qwen-family are within 1.02×. | Investigate; likely an implementation bug. |
 
+## 5h. Static-scale calibration (audit Path #6 — GPTQ/AWQ-style)
+
+Dynamic per-block max-scaling adapts to each forward's K/V
+distribution but doesn't benefit from prior knowledge of "typical"
+K/V magnitudes. Static calibration captures those typical magnitudes
+offline on a small calibration set and uses them at inference. KIVI
+literature suggests this can push perplexity from ~1.02× to ~1.01×
+on well-calibrated configurations.
+
+**Step 1: produce the calibration file** (~3 min, ~$0.05):
+
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
+mkdir -p /tmp/calibration
+
+python -m ctm_bench.scripts.calibrate_int4_scales \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --num-prompts 100 \
+    --asymmetric \
+    --output-path /tmp/calibration/qwen25_7b_int4_asym.pt
+```
+
+Output: a ~few-MB `.pt` file with per-layer (`k_scale`, `k_offset`,
+`v_scale`, `v_offset`) tensors.
+
+**Step 2: re-run Track E using the calibration**:
+
+```bash
+mkdir -p /tmp/track_e_int4_calibrated
+
+python -m ctm_bench.scripts.track_e_quality_eval \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --dtype float16 --device cuda \
+    --eval perplexity,mmlu \
+    --mmlu-num-questions 1000 \
+    --quant int4-per-channel \
+    --asymmetric-int4 \
+    --calibration-path /tmp/calibration/qwen25_7b_int4_asym.pt \
+    --output-dir /tmp/track_e_int4_calibrated/ 2>&1 | tee /tmp/track_e_int4_calibrated/run.log
+```
+
+Note: `--k-group-size` and `--v-group-size` are omitted (must be 0
+when calibration is loaded — static scales are per-channel, not
+per-(channel, group)).
+
+**Decision tree**: same as §5e's INT4 ratio table. Compare to the
+dynamic-scale INT4 + group=32 + asymmetric baseline (1.024× perplexity,
+-0.9pt MMLU@1000q). If calibration improves on either, ship the
+calibration. If it matches or regresses, dynamic + group is the better
+config; document and move on.
+
 ## 5g. Generation-mode test (audit Path #7 — decode quality direct measurement)
 
 Track E's perplexity + MMLU measure prefill compression quality. They

@@ -856,6 +856,136 @@ def test_bits_param_int3_threads_through_hf_cache(torch_module, transformers_mod
     assert stats["bits_per_element"] == 3
 
 
+# --------------------------------------------------------------------- #
+# Static calibration (Path #6)                                          #
+# --------------------------------------------------------------------- #
+
+
+def test_quantize_with_static_k_scale_uses_provided_scale(torch_module):
+    """When ``static_scale`` is provided, quantize must use it and skip
+    the dynamic max-based computation. Verifies by passing a known
+    scale and checking the returned scale matches."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    custom_scale = torch.full(
+        (1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM), fill_value=0.5, dtype=torch.float32,
+    )
+    q, scale, _ = quantize_per_channel_int4(t, static_scale=custom_scale)
+    # Returned scale should match what was passed in.
+    assert torch.equal(scale, custom_scale)
+
+
+def test_quantize_with_static_scale_rejects_group_size(torch_module):
+    """Static calibration + group quantisation isn't currently
+    supported — should raise."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    t = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    scale = torch.ones(1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    with pytest.raises(ValueError, match="static_scale.*group_size"):
+        quantize_per_channel_int4(t, group_size=32, static_scale=scale)
+
+
+def test_quantize_asymmetric_static_requires_offset(torch_module):
+    """Asymmetric + static_scale without static_offset is a
+    configuration error — should raise."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_channel_int4
+
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    scale = torch.ones(1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    with pytest.raises(ValueError, match="static_offset"):
+        quantize_per_channel_int4(t, asymmetric=True, static_scale=scale)
+
+
+def test_quantize_v_static_scale_must_be_per_head(torch_module):
+    """V static scale shape must be (1, H, 1). (1, H, D) is rejected
+    so the kvstore's per-token storage convention is preserved."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import quantize_per_token_int4
+
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    # Wrong shape: (1, H, D)
+    wrong_scale = torch.ones(1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM)
+    with pytest.raises(ValueError, match=r"\(1, H, 1\)"):
+        quantize_per_token_int4(t, static_scale=wrong_scale)
+
+
+def test_quantize_v_static_scale_per_head_works(torch_module):
+    """V with correct (1, H, 1) static scale shape works."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_token_int4, dequantize_per_token_int4,
+    )
+    g = torch.Generator().manual_seed(42)
+    t = torch.randn(32, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, generator=g)
+    scale = torch.full((1, QWEN_NUM_KV_HEADS, 1), fill_value=0.5, dtype=torch.float32)
+    q, scale_stored, _ = quantize_per_token_int4(t, static_scale=scale)
+    # Stored as (S, H, 1) per-token shape
+    assert scale_stored.shape == (32, QWEN_NUM_KV_HEADS, 1)
+    back = dequantize_per_token_int4(q, scale_stored, dtype=torch.float32)
+    assert back.shape == t.shape
+
+
+def test_int4_cache_loads_calibration(torch_module, transformers_module, tmp_path):
+    """HF cache wrapper loads a calibration file at init and looks up
+    the right layer's scales in update()."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    # Fake calibration: 4 layers, each with K scale shape (1, H, D)
+    # and V scale shape (1, H, 1).
+    calibration = {}
+    for layer_idx in range(4):
+        k_scale = torch.full(
+            (1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM),
+            fill_value=0.1 + 0.01 * layer_idx,
+            dtype=torch.float32,
+        )
+        v_scale = torch.full(
+            (1, QWEN_NUM_KV_HEADS, 1),
+            fill_value=0.2 + 0.01 * layer_idx,
+            dtype=torch.float32,
+        )
+        calibration[layer_idx] = {"k_scale": k_scale, "v_scale": v_scale}
+    calib_path = tmp_path / "calibration.pt"
+    torch.save(calibration, calib_path)
+
+    cache = INT4PerChannelCache(calibration_path=str(calib_path))
+    # Calibration is loaded
+    assert cache._calibration is not None
+    assert sorted(cache._calibration.keys()) == [0, 1, 2, 3]
+
+    # Update for layer 0 should use that layer's scales
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 16, QWEN_HEAD_DIM, dtype=torch.float32)
+    v = torch.randn(k.shape, dtype=torch.float32)
+    k_back, v_back = cache.update(k, v, layer_idx=0)
+    assert k_back.shape == k.shape
+    # Cache wrapper round-trip preserves shape
+
+
+def test_int4_cache_rejects_calibration_with_group_size(torch_module, transformers_module, tmp_path):
+    """Calibration + group quant is unsupported — should fail at
+    INT4PerChannelCache.__init__."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    calibration = {0: {"k_scale": torch.ones(1, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM),
+                        "v_scale": torch.ones(1, QWEN_NUM_KV_HEADS, 1)}}
+    calib_path = tmp_path / "calibration.pt"
+    torch.save(calibration, calib_path)
+
+    with pytest.raises(ValueError, match="group_size"):
+        INT4PerChannelCache(
+            calibration_path=str(calib_path),
+            k_group_size=32,
+        )
+
+
 def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module):
     """The whole motivation: INT4 per-channel should resolve outlier-
     channel data with min per-channel cosine ≥ 0.99 (much better than

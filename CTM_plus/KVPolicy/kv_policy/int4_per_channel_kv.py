@@ -137,6 +137,8 @@ def quantize_per_channel_int4(
     group_size: int = 0,
     asymmetric: bool = False,
     bits: int = 4,
+    static_scale: Optional["torch.Tensor"] = None,
+    static_offset: Optional["torch.Tensor"] = None,
 ) -> "Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]":
     """Per-channel signed-INTb quantization along the seq axis.
 
@@ -152,11 +154,16 @@ def quantize_per_channel_int4(
         asymmetric: if True, use affine quantization (scale + offset
             mapping [x_min, x_max] → signed range).
         bits: bit width per value. Must be 2..8. ``4`` (the default)
-            is the validated KIVI config. ``3`` is an experimental
-            "more aggressive compression" option — quality TBD per
-            model. Note: storage stays in int8 (or packed-int4 form);
-            real-heap savings at <4 bits require additional packing
-            work (separate engineering item).
+            is the validated KIVI config. ``3`` is experimental.
+        static_scale: optional pre-computed scale tensor of shape
+            ``(1, H, D)``. When provided, the dynamic max-based scale
+            computation is SKIPPED and this scale is used directly.
+            Use for GPTQ/AWQ-style static calibration where scales
+            are pre-optimized offline on a calibration set. Currently
+            only supported with ``group_size == 0`` (no group quant).
+        static_offset: optional pre-computed offset tensor, same shape
+            as ``static_scale``. Required for asymmetric mode when
+            ``static_scale`` is provided. Ignored in symmetric mode.
 
     Returns ``(quantized, scale, offset)`` where ``quantized`` is in
     the symmetric signed range ``[-(2**(bits-1)), +(2**(bits-1)-1)]``.
@@ -168,6 +175,15 @@ def quantize_per_channel_int4(
         )
     if not (2 <= bits <= 8):
         raise ValueError(f"bits must be in [2, 8]; got {bits}")
+    if static_scale is not None and (group_size > 0 and group_size < tensor.shape[0]):
+        raise ValueError(
+            f"static_scale only supported with group_size <= 0 (no group "
+            f"quantisation); got group_size={group_size}"
+        )
+    if asymmetric and static_scale is not None and static_offset is None:
+        raise ValueError(
+            "static_scale provided in asymmetric mode requires static_offset"
+        )
     qmin = -(1 << (bits - 1))         # e.g., -8 for INT4, -4 for INT3
     qmax = (1 << (bits - 1)) - 1      # e.g., +7 for INT4, +3 for INT3
     sym_div = float(qmax)             # 7 for INT4, 3 for INT3
@@ -180,6 +196,19 @@ def quantize_per_channel_int4(
     if group_size <= 0 or group_size >= s:
         # Plain per-channel.
         if asymmetric:
+            if static_scale is not None:
+                # GPTQ/AWQ-style static calibration: scales were
+                # pre-computed on a calibration set offline. Just
+                # quantize against them.
+                scale = static_scale.to(t_f32.device)
+                offset = static_offset.to(t_f32.device)
+                # Reverse-engineer x_min from the (scale, offset)
+                # calibration so we can apply the same affine map:
+                # offset = x_min + sym_zero_shift * scale → x_min = offset - sym_zero_shift*scale
+                x_min = offset - sym_zero_shift * scale
+                q_unsigned = ((t_f32 - x_min) / scale).round().clamp(min=0, max=int(asym_div))
+                quantized = (q_unsigned - sym_zero_shift).to(torch.int8)
+                return quantized, scale, offset
             x_max = t_f32.amax(dim=0, keepdim=True)  # (1, H, D)
             x_min = t_f32.amin(dim=0, keepdim=True)
             scale = ((x_max - x_min) / asym_div).clamp(min=1e-8)
@@ -188,6 +217,10 @@ def quantize_per_channel_int4(
             offset = x_min + sym_zero_shift * scale
             return quantized, scale, offset
         else:
+            if static_scale is not None:
+                scale = static_scale.to(t_f32.device)
+                quantized = (t_f32 / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
+                return quantized, scale, None
             max_abs = t_f32.abs().amax(dim=0, keepdim=True)
             scale = (max_abs / sym_div).clamp(min=1e-8)
             quantized = (t_f32 / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
@@ -277,12 +310,20 @@ def quantize_per_token_int4(
     group_size: int = 0,
     asymmetric: bool = False,
     bits: int = 4,
+    static_scale: Optional["torch.Tensor"] = None,
+    static_offset: Optional["torch.Tensor"] = None,
 ) -> "Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]":
     """Per-token signed-INTb quantization along the head_dim axis.
 
-    Mirrors ``quantize_per_channel_int4`` parametrically. ``bits``
-    semantics match — INT3 fits in INT4 storage, real-heap savings at
-    <4 bits require additional packing.
+    Mirrors ``quantize_per_channel_int4`` parametrically including
+    optional static-scale calibration support (see that function's
+    docstring for semantics).
+
+    For V the calibration shape is ``(1, H, D)`` matching the K
+    convention — calibrating per-token-position would require
+    knowing seq length up front, which static calibration doesn't.
+    Static V calibration uses per-(head, head_dim) scales averaged
+    over both the calibration tokens AND the calibration positions.
     """
     if tensor.ndim != 3:
         raise ValueError(
@@ -291,6 +332,15 @@ def quantize_per_token_int4(
         )
     if not (2 <= bits <= 8):
         raise ValueError(f"bits must be in [2, 8]; got {bits}")
+    if static_scale is not None and (group_size > 0 and group_size < tensor.shape[2]):
+        raise ValueError(
+            f"static_scale only supported with group_size <= 0 (no group "
+            f"quantisation); got group_size={group_size}"
+        )
+    if asymmetric and static_scale is not None and static_offset is None:
+        raise ValueError(
+            "static_scale provided in asymmetric mode requires static_offset"
+        )
     qmin = -(1 << (bits - 1))
     qmax = (1 << (bits - 1)) - 1
     sym_div = float(qmax)
@@ -302,6 +352,28 @@ def quantize_per_token_int4(
 
     if group_size <= 0 or group_size >= d:
         if asymmetric:
+            if static_scale is not None:
+                # Static V calibration: expected shape (1, H, 1) — one
+                # scale per head, applied uniformly across (S, D). This
+                # is coarser than the dynamic per-token scale (which is
+                # per-(S, H, 1)) but matches the storage convention
+                # exactly. AWQ-KV style: calibrate K aggressively,
+                # leave V at simpler per-head scaling.
+                if tuple(static_scale.shape) != (1, h, 1):
+                    raise ValueError(
+                        f"V static_scale must have shape (1, H, 1) = (1, {h}, 1); "
+                        f"got {tuple(static_scale.shape)}"
+                    )
+                scale = static_scale.to(t_f32.device)
+                offset = static_offset.to(t_f32.device)
+                x_min = offset - sym_zero_shift * scale
+                q_unsigned = ((t_f32 - x_min) / scale).round().clamp(min=0, max=int(asym_div))
+                quantized = (q_unsigned - sym_zero_shift).to(torch.int8)
+                # Tile the (1, H, 1) scale up to (S, H, 1) for the
+                # per-token storage convention.
+                scale_stored = scale.expand(s, h, 1).contiguous()
+                offset_stored = offset.expand(s, h, 1).contiguous()
+                return quantized, scale_stored, offset_stored
             x_max = t_f32.amax(dim=2, keepdim=True)  # (S, H, 1)
             x_min = t_f32.amin(dim=2, keepdim=True)
             scale = ((x_max - x_min) / asym_div).clamp(min=1e-8)
@@ -309,6 +381,16 @@ def quantize_per_token_int4(
             quantized = (q_unsigned - sym_zero_shift).to(torch.int8)
             offset = x_min + sym_zero_shift * scale
             return quantized, scale, offset
+        if static_scale is not None:
+            if tuple(static_scale.shape) != (1, h, 1):
+                raise ValueError(
+                    f"V static_scale must have shape (1, H, 1) = (1, {h}, 1); "
+                    f"got {tuple(static_scale.shape)}"
+                )
+            scale = static_scale.to(t_f32.device)
+            quantized = (t_f32 / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
+            scale_stored = scale.expand(s, h, 1).contiguous()
+            return quantized, scale_stored, None
         max_abs = t_f32.abs().amax(dim=2, keepdim=True)
         scale = (max_abs / sym_div).clamp(min=1e-8)
         quantized = (t_f32 / scale).round().clamp(min=qmin, max=qmax).to(torch.int8)
@@ -531,7 +613,14 @@ class INT4PerChannelKVStore:
             "read_us_sum": 0.0,
         }
 
-    def write_block(self, block_id: int, k_array, v_array) -> None:
+    def write_block(
+        self, block_id: int, k_array, v_array,
+        *,
+        static_k_scale: "Optional[torch.Tensor]" = None,
+        static_k_offset: "Optional[torch.Tensor]" = None,
+        static_v_scale: "Optional[torch.Tensor]" = None,
+        static_v_offset: "Optional[torch.Tensor]" = None,
+    ) -> None:
         if not _is_torch_tensor(k_array) or not _is_torch_tensor(v_array):
             raise TypeError(
                 "INT4PerChannelKVStore.write_block requires torch.Tensor "
@@ -556,10 +645,12 @@ class INT4PerChannelKVStore:
         k_q, k_scale, k_offset = quantize_per_channel_int4(
             k_in, group_size=self._k_group_size, asymmetric=self._asymmetric,
             bits=self._bits,
+            static_scale=static_k_scale, static_offset=static_k_offset,
         )
         v_q, v_scale, v_offset = quantize_per_token_int4(
             v_in, group_size=self._v_group_size, asymmetric=self._asymmetric,
             bits=self._bits,
+            static_scale=static_v_scale, static_offset=static_v_offset,
         )
 
         # Bit-pack the int8 quantized tensors (two 4-bit values per byte)

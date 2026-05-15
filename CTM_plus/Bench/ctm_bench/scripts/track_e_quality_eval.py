@@ -276,6 +276,7 @@ def _turboquant_cache_factory(
 def _int4_per_channel_cache_factory(
     *, sink_size: int = 0, k_group_size: int = 0, v_group_size: int = 0,
     asymmetric: bool = False, bits: int = 4,
+    calibration_path: Optional[str] = None,
 ) -> Callable[[], Any]:
     from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
 
@@ -286,6 +287,7 @@ def _int4_per_channel_cache_factory(
             v_group_size=v_group_size,
             asymmetric=asymmetric,
             bits=bits,
+            calibration_path=calibration_path,
         )
     return factory
 
@@ -804,6 +806,18 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--calibration-path", type=str, default=None,
+        help=(
+            "Path to a .pt calibration file produced by "
+            "calibrate_int4_scales.py. When provided, INT4 scales are "
+            "static per-layer (loaded from this file) instead of "
+            "dynamic per-block (computed from each forward's max(|x|)). "
+            "Requires --k-group-size 0 --v-group-size 0 (static "
+            "calibration is per-channel, not per-(channel, group)). "
+            "Ignored when --quant is not int4-per-channel."
+        ),
+    )
+    parser.add_argument(
         "--bits", type=int, default=4,
         help=(
             "Bit width per quantized value (per element). 4 (default) "
@@ -942,6 +956,7 @@ def main(argv: Sequence[str]) -> int:
             v_group_size=args.v_group_size,
             asymmetric=args.asymmetric_int4,
             bits=args.bits,
+            calibration_path=args.calibration_path,
         )
         config_dict = dict(
             quant="int4-per-channel",
@@ -950,8 +965,10 @@ def main(argv: Sequence[str]) -> int:
             v_group_size=args.v_group_size,
             asymmetric=args.asymmetric_int4,
             bits=args.bits,
+            calibration_path=args.calibration_path,
             scheme=f"K=per-channel INT{args.bits}, V=per-token INT{args.bits}"
-                   + (", asymmetric" if args.asymmetric_int4 else ", symmetric"),
+                   + (", asymmetric" if args.asymmetric_int4 else ", symmetric")
+                   + (f", calibrated[{args.calibration_path}]" if args.calibration_path else ""),
         )
     else:
         raise SystemExit(f"unknown --quant {args.quant!r}")
