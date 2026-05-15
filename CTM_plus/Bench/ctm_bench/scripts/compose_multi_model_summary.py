@@ -113,9 +113,13 @@ def _verdict_text(cross_verdict: str, n_models: int) -> str:
     if cross_verdict == "GREEN":
         return (
             f"**GREEN.** INT4 KIVI generalizes across all {n_models} "
-            f"tested models. The 'one-model demo' caveat is removed; "
-            f"update the VC brief's 'Measured' table — multi-model "
-            f"generalization is now measured, not projected."
+            f"tested models/architectures. The 'one-model demo' caveat "
+            f"is narrowed to the {n_models}-model set measured here — "
+            f"broader coverage (more architectures / sizes) extends it "
+            f"further. Multi-model generalization is measured, not "
+            f"projected, for this set. NOTE: this is short-context "
+            f"MMLU/perplexity — it does not address the §20.4 "
+            f"long-context decode-degradation finding."
         )
     if cross_verdict == "YELLOW":
         return (

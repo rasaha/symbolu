@@ -2613,6 +2613,46 @@ cross-model numbers (Llama-2 / Gemma family) all land in the same
 −1pt MMLU range; we expect Llama-3 + Mistral to behave similarly on
 the same algorithm (group=32 + asymmetric, no model-specific tuning).
 
+#### §20.3 measured outcomes (GPU run, 2026-05-15) — GREEN, 2-model
+
+Llama-3-8B was **dropped** — Meta's gated access requires an approval
+queue, not a one-click accept. The replication ran on Mistral-7B,
+with Qwen2.5-7B reused from the §19.4 measured artefact. Artefacts:
+`bench_out/track_e_audit_followups/mistral_7b_mmlu_1000.json`,
+`multi_model_summary.json`.
+
+| Model | INT4 MMLU Δ vs FP16 | INT4 perplexity ratio | Per-model verdict |
+|---|---:|---:|---|
+| Qwen2.5-7B (§19.4) | −0.90pt (70.2% → 69.3%) | 1.024× | GREEN |
+| Mistral-7B-v0.3 | −0.60pt (60.1% → 59.5%) | 1.006× | GREEN |
+
+**Cross-model verdict: GREEN.** INT4 KIVI generalises across the two
+architectures tested — both land at a small quality cost
+(−0.6 to −0.9pt MMLU, ~1.01–1.02× perplexity), comfortably inside the
+−1.5pt KIVI-literature band. No model fell off a cliff.
+
+**Honest scoping — three caveats:**
+
+1. **Two models, not three.** Llama-3-8B deferred (gated access).
+   The "one-model demo" caveat is *narrowed* to a 2-model /
+   2-architecture result, not erased. Adding Llama (or a Qwen/Mistral
+   size sweep) extends coverage further.
+2. **Don't over-read the rank.** −0.60pt (Mistral) vs −0.90pt (Qwen)
+   are both inside the ±1.45pt 1000-question binomial CI — the
+   finding is *consistency* ("both small"), not "Mistral beats Qwen".
+3. **Short-context only.** §20.3 is MMLU + 282-token perplexity. It
+   does **not** address §20.4's long-context decode-degradation
+   finding — whether Mistral shares Qwen's §20.4 long-context
+   stuttering is **untested**. §20.3 GREEN must not be read as
+   "Mistral INT4 is safe at long context."
+
+Unlike §20.2's mechanically-stamped (and corrected) GREEN, this
+GREEN is honest: it claims only "no tested model showed a large
+INT4 quality cost," and −0.6 / −0.9pt genuinely are small. The
+partner-shareable line: *INT4 KIVI short-context quality replicates
+across Qwen2.5-7B and Mistral-7B; the long-context caveat (§20.4)
+travels with it.*
+
 ### §20.4 Long-context validation at 32k
 
 **Why this matters:** KV compression's headline value is at long

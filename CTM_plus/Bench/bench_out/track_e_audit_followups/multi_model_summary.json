@@ -1,0 +1,42 @@
+{
+  "schema_version": "\u00a720.3.v1",
+  "n_models": 2,
+  "models": {
+    "Qwen-7B": {
+      "model_id": "Qwen/Qwen2.5-7B-Instruct",
+      "source_path": "bench_out/track_e_audit_followups/int4_mmlu_1000.json",
+      "baseline_mmlu_accuracy": 0.702,
+      "int4_mmlu_accuracy": 0.693,
+      "mmlu_delta_pt": -0.9000000000000008,
+      "baseline_perplexity": null,
+      "int4_perplexity": null,
+      "perplexity_ratio": null,
+      "mmlu_verdict": "GREEN",
+      "perplexity_verdict": "MEASUREMENT MISSING",
+      "combined_verdict": "GREEN",
+      "note": null
+    },
+    "Mistral-7B": {
+      "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+      "source_path": "bench_out/track_e_audit_followups/mistral_7b_mmlu_1000.json",
+      "baseline_mmlu_accuracy": 0.601,
+      "int4_mmlu_accuracy": 0.595,
+      "mmlu_delta_pt": -0.6000000000000005,
+      "baseline_perplexity": 5.765853117540196,
+      "int4_perplexity": 5.799736584178129,
+      "perplexity_ratio": 1.0058765747144784,
+      "mmlu_verdict": "GREEN",
+      "perplexity_verdict": "GREEN",
+      "combined_verdict": "GREEN",
+      "note": null
+    }
+  },
+  "cross_model_verdict": "GREEN",
+  "verdict_text": "**GREEN.** INT4 KIVI generalizes across all 2 tested models/architectures. The 'one-model demo' caveat is narrowed to the 2-model set measured here \u2014 broader coverage (more architectures / sizes) extends it further. Multi-model generalization is measured, not projected, for this set. NOTE: this is short-context MMLU/perplexity \u2014 it does not address the \u00a720.4 long-context decode-degradation finding.",
+  "decision_tree_thresholds": {
+    "mmlu_green_pt": -1.5,
+    "mmlu_yellow_pt": -3.0,
+    "perplexity_green_ratio": 1.05,
+    "perplexity_yellow_ratio": 1.15
+  }
+}

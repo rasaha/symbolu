@@ -313,6 +313,7 @@ so partners can tell which is which.
 - FSCS-derived signals: 100% of eviction rounds make different choices on real Mistral-7B trace
 - **FP8-vs-INT4 throughput (§20.1, four-cell GPU run, Qwen2.5-7B):** vLLM FP8 KV = **1.18× FP16** on the FlashInfer backend (FP8 is a small throughput *gain*, not a cost). Route-B INT4 KIVI = **0.47× FP16 in HF transformers** — the pure-PyTorch quantize/unpack round-trip is a ~2× decode cost. Decomposition: the HF↔vLLM stack gap (25×) is what a route-A `cache_kv` integration removes; the INT4-algorithm gap (2×) travels with it and needs the Marlin-style fused unpack-attend kernel (§20.6). **Honest verdict: route-A is necessary but not sufficient — the kernel is the gating item for FP8-competitive throughput.**
 - **INT4 KV quality is within measurement noise of FP16 (§20.2, sink-FP16 sweep, 1000q):** across sink ∈ {0, 4, 16, 64}, INT4 MMLU spans 68.9–70.2% vs FP16's 70.2% — a 1.3pt spread that sits entirely inside the ±1.45pt binomial CI at 1000 questions. The −0.9pt §19.4 gap is itself within noise of zero.
+- **Multi-model replication (§20.3, Qwen2.5-7B + Mistral-7B):** INT4 KIVI short-context quality generalises across two architectures — Qwen −0.90pt / Mistral −0.60pt MMLU @1000q, both ~1.01–1.02× perplexity, both inside the −1.5pt KIVI-literature band. Honest scope: 2 models (Llama-3-8B deferred — Meta gated access); short-context only — does not cover the §20.4 long-context finding.
 
 **Tested, inconclusive (honest — neither a win nor a failure):**
 
@@ -331,8 +332,6 @@ Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2.
 
 **Harness-landed, GPU-run-pending (FP8-KV competitive gap closure track):**
 
-- Multi-model replication on Llama-3-8B + Mistral-7B — runbook recipe
-  landed; ~$2-3 GPU to remove the "one-model demo" caveat (§20.3)
 - Route-A vLLM `cache_kv` integration plan — engineer-day breakdown in
   `Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`; same hook closes the
   −20% tokens/sec gap (§20.5)

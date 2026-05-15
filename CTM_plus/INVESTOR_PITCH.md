@@ -259,6 +259,7 @@ should be able to tell which is which.
 | INT3 KIVI variant: **−0.7pt MMLU @ 1000q at ~4.5× theoretical compression** (memory-bound option) | `Bench/bench_out/track_e_audit_followups/int3_mmlu_1000.json` |
 | FP8 vs INT4 throughput (§20.1, four-cell): **vLLM FP8 KV = 1.18× FP16** (FlashInfer); **route-B INT4 = 0.47× FP16 in HF** | `Bench/bench_out/track_e_audit_followups/fp8_int4_comparison.json` |
 | INT4 KV quality within measurement noise of FP16 (§20.2, sink-FP16 sweep, 1000q): INT4 MMLU 68.9–70.2% vs FP16 70.2% — 1.3pt spread inside the ±1.45pt CI | `Bench/bench_out/track_e_audit_followups/sink_fp16_sweep.json` |
+| Multi-model replication (§20.3): INT4 KIVI short-context quality holds across Qwen2.5-7B (−0.90pt) + Mistral-7B (−0.60pt MMLU @1000q) — 2 architectures, both within the −1.5pt band | `Bench/bench_out/track_e_audit_followups/multi_model_summary.json` |
 
 The §20.1 four-cell result is the honest answer to "can we close the
 FP8-KV throughput gap": FP8 KV is a small throughput *gain* on its
@@ -302,15 +303,14 @@ Phase 4 eviction for a three-layer memory-savings stack.
 
 ### Harness-landed, GPU-run-pending (FP8-KV competitive gap closure)
 
-The §20 measurement axes in `PHASE4_GPU_FINDINGS.md` land the
-comparison vs vLLM's production FP8 KV path. §20.1 (the four-cell
-throughput comparison) is now **measured** — see the row above. The
-remaining axes are CPU-tested + dry-runnable; total GPU spend to fill
-in measured numbers is ~$3.50.
+The §20 measurement axes in `PHASE4_GPU_FINDINGS.md` are landed:
+§20.1 (throughput), §20.2 (sink-FP16), §20.3 (multi-model) and §20.4
+(long-context) are all **measured** — see the rows above and the
+tested-and-failed table. The two remaining items are engineering
+work, not measurements:
 
-| Item | Status | GPU cost | Reference |
+| Item | Status | Effort | Reference |
 |---|---|---|---|
-| Llama-3-8B + Mistral-7B multi-model replication | Runbook recipe landed; removes the "one-model demo" caveat | ~$2-3 | §20.3 |
 | Route-A vLLM `cache_kv` engineering plan | Day-by-day breakdown; same hook closes the −20% tokens/sec gap | 3-5 engineer-days + ~$0.30 GPU | §20.5 + `ROUTE_A_VLLM_CACHE_KV_PLAN.md` |
 | Marlin-style fused unpack-attend kernel | PyTorch reference + HBM-traffic counter showing 3.56× ceiling speedup | 1-2 weeks GPU-kernel work | §20.6 + `kv_policy/int4_fused_attention_sketch.py` |
 
