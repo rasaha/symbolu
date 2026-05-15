@@ -527,29 +527,29 @@ quantization range to be even more inflated. The §20.2 test
 combines sink-FP16 with the WORKING `group=32 + asymmetric`
 configuration — different mechanism.
 
-Re-run cost: ~$0.50 for the full 4-cell sweep (~30 min wall).
+Re-run cost: ~$0.50 for the full 4-cell sweep (~30 min wall). Uses
+the single-load `sink_fp16_sweep.py` harness (one model load vs four
+for a `for`-loop over `track_e_quality_eval.py`).
 
 ```bash
 cd /workspace/symbolu
 git pull --ff-only origin claude/fp8-kv-competitive-gap-iXKRM
 
 cd CTM_plus/Bench
-mkdir -p /tmp/sink_fp16_sweep
+python -m ctm_bench.scripts.sink_fp16_sweep \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --eval perplexity,mmlu \
+    --mmlu-num-questions 1000 \
+    --sink-values 0,4,16,64 \
+    --output bench_out/track_e_audit_followups/sink_fp16_sweep.json
 
-for SINK in 0 4 16 64; do
-  mkdir -p /tmp/sink_fp16_sweep/sink${SINK}
-  python -m ctm_bench.scripts.track_e_quality_eval \
-      --model Qwen/Qwen2.5-7B-Instruct \
-      --dtype float16 --device cuda \
-      --eval perplexity,mmlu \
-      --mmlu-num-questions 1000 \
-      --quant int4-per-channel \
-      --k-group-size 32 --v-group-size 32 \
-      --asymmetric-int4 \
-      --sink-size ${SINK} \
-      --output-dir /tmp/sink_fp16_sweep/sink${SINK} \
-      2>&1 | tee /tmp/sink_fp16_sweep/sink${SINK}/run.log
-done
+# Compose the §20.2 markdown table + merged §20.2.v1 JSON:
+python -m ctm_bench.scripts.compose_sink_fp16_summary \
+    --input bench_out/track_e_audit_followups/sink_fp16_sweep.json \
+    --json-output bench_out/track_e_audit_followups/sink_fp16_summary.json \
+    > /tmp/section_20_2_table.md
+cat /tmp/section_20_2_table.md
 ```
 
 **Decision tree (best sink_size MMLU delta vs sink_size=0):**

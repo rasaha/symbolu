@@ -24,7 +24,8 @@ on which axes you fill in).
 |---|---|---|
 | `int4_throughput_hf.json` | `python -m ctm_bench.scripts.track_e_throughput --output ...` | §20.1 cells C+D |
 | `fp8_int4_comparison.json` | `python -m ctm_bench.scripts.compose_throughput_comparison --json-output ...` (composed from cells A/B/C/D) | §20.1 |
-| `sink_fp16_sweep_*.json` (one per sink ∈ {0, 4, 16, 64}) | `track_e_quality_eval --sink-size ...` | §20.2 |
+| `sink_fp16_sweep.json` | `python -m ctm_bench.scripts.sink_fp16_sweep --output ...` (single-load sweep over sink ∈ {0, 4, 16, 64}) | §20.2 |
+| `sink_fp16_summary.json` | `python -m ctm_bench.scripts.compose_sink_fp16_summary --json-output ...` (composed `§20.2.v1` artefact with GREEN/YELLOW/RED verdict) | §20.2 |
 | `llama3_8b_mmlu_1000.json` / `mistral_7b_mmlu_1000.json` | `track_e_quality_eval --model ...` | §20.3 |
 | `int4_perplexity_32k.json` | `track_e_quality_eval --perplexity-text-path ...` | §20.4 |
 

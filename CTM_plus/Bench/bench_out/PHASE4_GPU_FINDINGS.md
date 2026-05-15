@@ -2386,35 +2386,56 @@ removes the outlier positions from the quantization input.
 | 16 | If 4 helps, 16 should plateau | Plateau (vs 4 within ±0.2pt) → hypothesis confirmed |
 | 64 | Tests "long-prefix" interpretation (early KV vs sink-only) | If 64 ≫ 16, the issue isn't sinks; it's the first chunk |
 
-**Code (already landed in route-B):** the `INT4PerChannelCache`
-constructor's `sink_size` arg implements this. Positions [0, sink)
-pass through uncompressed; positions [sink:) go through the full
-KIVI INT4 path. Verified by ``test_int4_cache_sink_size_passes_through``
-in ``Bench/tests/test_int4_per_channel.py`` (the first 4 positions
-are bit-identical FP16; the rest at INT4-level cosine ~0.99). The
-``--sink-size`` flag in ``track_e_quality_eval.py`` and
-``track_e_throughput.py`` exposes this for both quality and
-throughput sweeps.
+**Code (landed in route-B + sweep harness):**
 
-**Runbook recipe (drop into a new ``Bench/scripts/RUNPOD_TRACK_D_E_RUNBOOK.md``
-section §5i or run directly):**
+* `INT4PerChannelCache(sink_size=N, k_group_size=32, v_group_size=32, asymmetric=True)`
+  in `kv_policy/int4_per_channel_hf_cache.py` — positions [0, sink) pass
+  through uncompressed FP16; positions [sink:) go through the full KIVI
+  rescue stack. Pinned by three new tests in
+  `Bench/tests/test_int4_per_channel.py`:
+  - `test_sink_fp16_plus_kivi_rescue_threads_through` — sink bit-identity +
+    body cosine ≥ 0.995 on the §18.3 ship config + sink_size=4.
+  - `test_sink_fp16_helps_body_reconstruction_on_outlier_sinks` — on
+    synthetic outlier-sink data (50× magnitude on a few channels),
+    sink-FP16 + body-INT4-rescue produces strictly better body cosine
+    than no-sink + body-INT4-rescue. CPU-side evidence the §20.2
+    hypothesis is sound BEFORE paying for GPU.
+  - `test_sink_fp16_decode_step_only_compresses_new_token` — decode-step
+    tokens are always quantized (sink-FP16 is a prefill-time decision);
+    pins the cache contract against a class of bugs that would silently
+    invalidate the §20.2 quality numbers.
+* `ctm_bench/scripts/sink_fp16_sweep.py` — single-model-load sweep
+  across sink ∈ {0, 4, 16, 64} on the §18.3 ship config. ~10% cheaper
+  than a bash loop of `track_e_quality_eval.py` (one model load instead
+  of four). Writes JSON pinned at `§20.2.v1` schema; reader script
+  `ctm_bench/scripts/compose_sink_fp16_summary.py` maps the deltas to
+  the GREEN/YELLOW/RED bands. Both have CPU regression tests.
+
+**Runbook recipe (~$0.50, single load):**
 
 ```bash
-for SINK in 0 4 16 64; do
-  mkdir -p /tmp/sink_fp16_sweep/sink${SINK}
-  python -m ctm_bench.scripts.track_e_quality_eval \
-      --model Qwen/Qwen2.5-7B-Instruct \
-      --dtype float16 --device cuda \
-      --eval perplexity,mmlu \
-      --mmlu-num-questions 1000 \
-      --quant int4-per-channel \
-      --k-group-size 32 --v-group-size 32 \
-      --asymmetric-int4 \
-      --sink-size ${SINK} \
-      --output-dir /tmp/sink_fp16_sweep/sink${SINK} \
-      2>&1 | tee /tmp/sink_fp16_sweep/sink${SINK}/run.log
-done
+cd CTM_plus/Bench
+python -m ctm_bench.scripts.sink_fp16_sweep \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --eval perplexity,mmlu \
+    --mmlu-num-questions 1000 \
+    --sink-values 0,4,16,64 \
+    --output bench_out/track_e_audit_followups/sink_fp16_sweep.json
+
+# Then compose the §20.2 markdown table + merged JSON:
+python -m ctm_bench.scripts.compose_sink_fp16_summary \
+    --input bench_out/track_e_audit_followups/sink_fp16_sweep.json \
+    --json-output bench_out/track_e_audit_followups/sink_fp16_summary.json \
+    > /tmp/section_20_2_table.md
+cat /tmp/section_20_2_table.md
 ```
+
+Drop `/tmp/section_20_2_table.md` into this §20.2 in place of the
+"Sweep plan (TBD)" table. Like the §20.1 composer, this one prints
+`MEASUREMENT MISSING` for absent fields rather than fabricating numbers,
+and the GREEN/YELLOW/RED thresholds (-0.3pt / -0.5pt) are pinned by
+six regression tests in `Bench/tests/test_sink_fp16_sweep.py`.
 
 **Decision tree (best sink size ε{4, 16, 64} vs sink=0):**
 
