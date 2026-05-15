@@ -1,0 +1,51 @@
+{
+  "schema_version": "§20.4.v1",
+  "source_long_context": "§20.4.v1",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "int4_config": {
+    "quant": "int4-per-channel",
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "bits": 4,
+    "sink_size": 0,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric, k_group=32, v_group=32"
+  },
+  "per_context_length": {
+    "chars=4096": {
+      "context_length_chars": 4096,
+      "perplexity_ratio": 1.006859355852471,
+      "needle_accuracy_delta_pct": -88.88888888888889,
+      "perplexity_verdict": "GREEN",
+      "needle_verdict": "RED",
+      "combined_verdict": "RED"
+    },
+    "chars=16384": {
+      "context_length_chars": 16384,
+      "perplexity_ratio": 1.006859355852471,
+      "needle_accuracy_delta_pct": -77.77777777777779,
+      "perplexity_verdict": "GREEN",
+      "needle_verdict": "RED",
+      "combined_verdict": "RED"
+    },
+    "chars=32768": {
+      "context_length_chars": 32768,
+      "perplexity_ratio": 1.007843097206448,
+      "needle_accuracy_delta_pct": -66.66666666666666,
+      "perplexity_verdict": "GREEN",
+      "needle_verdict": "RED",
+      "combined_verdict": "RED"
+    }
+  },
+  "headline": {
+    "context_length_chars": 32768,
+    "combined_verdict": "RED",
+    "verdict_text": "**RED.** Long-context failure at 32768 chars. The §19.4 short-context result does NOT generalise; this is a major issue. Investigate before further long-context partner conversations."
+  },
+  "decision_tree_thresholds": {
+    "perplexity_ratio_green": 1.05,
+    "perplexity_ratio_yellow": 1.15,
+    "needle_delta_pct_green": -5.0,
+    "needle_delta_pct_yellow": -10.0
+  }
+}

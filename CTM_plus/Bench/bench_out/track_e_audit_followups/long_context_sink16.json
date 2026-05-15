@@ -1,0 +1,217 @@
+{
+  "schema_version": "§20.4.v1",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "dtype": "float16",
+  "int4_config": {
+    "quant": "int4-per-channel",
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "bits": 4,
+    "sink_size": 16,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric, k_group=32, v_group=32"
+  },
+  "context_lengths": [
+    16384
+  ],
+  "needle_depths": [
+    0.1,
+    0.5,
+    0.9
+  ],
+  "perplexity_rows": [],
+  "needle_rows": [
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3855,
+      "depth_percent": 0.1,
+      "sample_idx": 0,
+      "answer_code": "HU66GO",
+      "generated_text": " The secret code is HU66GO.\n\nBased on the provided text, Robert Boulter",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3855,
+      "depth_percent": 0.1,
+      "sample_idx": 0,
+      "answer_code": "HU66GO",
+      "generated_text": " The secret code is H code\nStep = = H secret codee is H H secret code code",
+      "correct": false
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3861,
+      "depth_percent": 0.1,
+      "sample_idx": 1,
+      "answer_code": "90952P",
+      "generated_text": " The password to the vault is 90952P.\n\nBased on the provided text,",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3861,
+      "depth_percent": 0.1,
+      "sample_idx": 1,
+      "answer_code": "90952P",
+      "generated_text": " The password to the vault is 90952P.\n\nBased on the provided information,",
+      "correct": true
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3854,
+      "depth_percent": 0.1,
+      "sample_idx": 2,
+      "answer_code": "AFHSG2",
+      "generated_text": " The magic number is AFHSG2.\n\nBased on the provided text, the magic number associated with",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3854,
+      "depth_percent": 0.1,
+      "sample_idx": 2,
+      "answer_code": "AFHSG2",
+      "generated_text": " The magic number is is AFH number is AFHSG22 2000 B",
+      "correct": true
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3855,
+      "depth_percent": 0.5,
+      "sample_idx": 0,
+      "answer_code": "A5UNZQ",
+      "generated_text": " The secret code is A5UNZQ.\n\nBased on the information provided, Robert Boulter",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3855,
+      "depth_percent": 0.5,
+      "sample_idx": 0,
+      "answer_code": "A5UNZQ",
+      "generated_text": " The secret code is A5 a a a a a a a a a a a a a a",
+      "correct": false
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3858,
+      "depth_percent": 0.5,
+      "sample_idx": 1,
+      "answer_code": "WWY6EV",
+      "generated_text": " The password to the vault is WWY6EV. This information is explicitly stated at the end of",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3858,
+      "depth_percent": 0.5,
+      "sample_idx": 1,
+      "answer_code": "WWY6EV",
+      "generated_text": " The password to the vault is WWY6EV. \n\nThis answer is directly stated in the given",
+      "correct": true
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3855,
+      "depth_percent": 0.5,
+      "sample_idx": 2,
+      "answer_code": "F98SS3",
+      "generated_text": " The magic number is F98SS3. This number appears at the end of the provided text",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3855,
+      "depth_percent": 0.5,
+      "sample_idx": 2,
+      "answer_code": "F98SS3",
+      "generated_text": " The magic number is is F code magic number F user candidate F exact the region\nOops! It",
+      "correct": false
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3854,
+      "depth_percent": 0.9,
+      "sample_idx": 0,
+      "answer_code": "JTBXX3",
+      "generated_text": " The secret code is JTBXX3.\n\nBased on the provided text, what were some of the",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3854,
+      "depth_percent": 0.9,
+      "sample_idx": 0,
+      "answer_code": "JTBXX3",
+      "generated_text": " The secret code is J secret code is J J secret 3 secret code is a secret code secret",
+      "correct": false
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3861,
+      "depth_percent": 0.9,
+      "sample_idx": 1,
+      "answer_code": "1FZ95H",
+      "generated_text": " The password to the vault is 1FZ95H.\n\nJustification: The password is",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3861,
+      "depth_percent": 0.9,
+      "sample_idx": 1,
+      "answer_code": "1FZ95H",
+      "generated_text": " The password to the vault is 1FZ95H. Many of Du 's poems",
+      "correct": true
+    },
+    {
+      "cache_type": "baseline",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3857,
+      "depth_percent": 0.9,
+      "sample_idx": 2,
+      "answer_code": "165Z7Q",
+      "generated_text": " The magic number is 165Z7Q. This number appears to be a placeholder or",
+      "correct": true
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "context_length_chars": 16384,
+      "context_length_tokens": 3857,
+      "depth_percent": 0.9,
+      "sample_idx": 2,
+      "answer_code": "165Z7Q",
+      "generated_text": " The magic number is 165Z7Q. This number is mentioned in the text in",
+      "correct": true
+    }
+  ],
+  "deltas": {
+    "per_context_length": {
+      "chars=16384": {
+        "context_length_chars": 16384,
+        "baseline_needle_accuracy": 1.0,
+        "int4_needle_accuracy": 0.5555555555555556,
+        "needle_accuracy_delta_pct": -44.44444444444444
+      }
+    }
+  },
+  "skipped_context_lengths_over_max_pos": [],
+  "model_max_position_embeddings": 32768
+}
