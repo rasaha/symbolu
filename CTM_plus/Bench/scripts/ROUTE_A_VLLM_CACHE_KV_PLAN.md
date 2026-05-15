@@ -1,6 +1,36 @@
 # Route-A vLLM `cache_kv` hook — engineering plan
 
-**Status:** scoped, not implemented. Owner: TBD. Sized: **3-5 engineer-days CPU + ~$0.30 GPU**.
+**Status:** **Days 1-3 landed (CPU, the attention-forward integration tier); Days 4-5 (GPU verification) pending.** Sized: 3-5 engineer-days CPU + ~$0.30 GPU.
+
+**What landed (CPU dev pod, committed):**
+
+* `kv_policy/int4_cache_kv_route_a.py` — `INT4CacheKVRouteA` (the
+  per-call KIVI INT4 compress→decompress manager, reusing the
+  route-B quantizer ops unchanged) + `install_int4_cache_kv_route_a`
+  (monkey-patches every vLLM `Attention` module's `forward` so the
+  K/V it receives are INT4-round-tripped). 12 CPU regression tests
+  in `Bench/tests/test_int4_cache_kv_route_a.py` validate the
+  install + interception against faked vLLM attention modules (the
+  `test_vllm_protocol_fixture.py` pattern).
+* `run_streaming.py` — `--int4-kv-route-a` flag (+ `--int4-kv-k-group-size`,
+  `--int4-kv-v-group-size`, `--int4-kv-symmetric`, `--int4-kv-bits`,
+  `--int4-kv-sink-size`) wired through `AsyncEngineDriver`.
+* The driver installs route-A after engine construction, composes
+  with `--ctm-plus`, and tears down the wraps on shutdown.
+
+**This is the "attention-forward integration tier"** — the INT4
+algorithm runs inside vLLM's attention path so the per-block-layout
+quality effect (open question 3) becomes measurable on a GPU run. It
+does **not yet realize the 3.2× memory saving** — that needs the
+paged-buffer swap (the secondary patches below). It also has the
+known single-token-decode degeneracy that route-B shares (per-call
+quant of one decode token is near-lossless; the paged-buffer tier's
+per-16/32-token-block quant fixes it).
+
+**What's left (Days 4-5, the GPU pod):** verify the install applies
+to the real vLLM `Attention` class (open question 6), GPU smoke run,
+chat_32k throughput + quality re-validation. Plus the memory-realizing
+paged-buffer swap (a separate follow-up beyond the 5-day estimate).
 
 **Why this plan exists:** Route-B INT4 KIVI lives in HF transformers' `DynamicCache`. It is the **measurement vehicle** (perplexity, MMLU, generation-quality artefacts in §18-§19 are valid because route-B holds the algorithm identical to a production deployment). It is **not the deployment vehicle** — production inference runs on vLLM. The route-A hook is what moves the validated INT4 algorithm into vLLM at the `cache_kv` insertion point.
 
@@ -48,13 +78,13 @@ This plan implements **option 1** (PyTorch dequant fallback). The Marlin-kernel 
 
 ## Engineer-days breakdown
 
-| Day | Work |
-|---|---|
-| **Day 1** | Stand up the install scaffold. CPU-only: patch `FlashAttentionImpl.forward` with a no-op wrapper that logs entry; verify install lands at the right call site (the patch fires on every decode step). CPU-side test (faked attention impl) that the wrapper is reached. Wire `kv_cache_dtype="int4_kivi"` through `arg_utils`. |
-| **Day 2** | Write the GPU compress path. On entry, take K/V; quantize + pack on the K/V's existing device (no host transit); store INT4 bytes in the alternate paged buffer. CPU-side test (faked CUDA tensors via torch.zeros on CPU) verifying shape + dtype + side-channel update. |
-| **Day 3** | Write the GPU decompress path. Hook the read site (slice into the cache tensor right before the FlashAttention kernel call); dequantize via the existing `dequantize_per_channel_int4` + `dequantize_per_token_int4`. CPU-side test that read produces a tensor matching the K/V originally written within INT4 round-trip tolerance (**cosine ≥ 0.99 on Qwen-shape data** — matches the route-B contract pinned by `test_int4_store_roundtrip_meets_cosine_target`). |
-| **Day 4** | GPU smoke run on a small open model (e.g., Qwen2.5-0.5B-Instruct, ~$0.02 wall). Verify the install survives engine startup. Single short prompt, decode 10 tokens. Verify output is coherent. |
-| **Day 5** | Full chat_32k run on Qwen2.5-7B (~$0.07). Measure tokens/sec, swap_out/decode_token, and decode-step latency vs the FP8 baseline cell from `FP8_INT4_THROUGHPUT_RUNBOOK.md`. **Also re-run perplexity + MMLU 200q** to confirm route-A's per-block scales preserve §19.4's measured quality (1.024× ppl, −0.9pt MMLU). Quality is bit-identical to route-B ONLY when `block_size == group_size = 32`; if that alignment slipped during implementation the MMLU number will surface the drift here. Land artefacts; update PHASE4_GPU_FINDINGS §20. |
+| Day | Work | Status |
+|---|---|---|
+| **Day 1** | Stand up the install. Walk the model's `Attention` modules (class-name heuristic, CPU-importable — no `vllm` import), wrap each `forward` so the K/V positional args are rewritten. CPU test (faked attention modules) that the wrapper is reached and rewrites K/V. | ✅ **Landed** — `install_int4_cache_kv_route_a`, `test_int4_cache_kv_route_a.py` |
+| **Day 2** | Write the compress→decompress path. `INT4CacheKVRouteA.round_trip_kv` quantizes + packs K/V on the input tensor's device (no host transit), reusing the route-B quantizer ops. CPU test verifying shape/dtype/faithfulness (cosine ≥ 0.99 on Gaussian data). | ✅ **Landed** — `round_trip_kv` |
+| **Day 3** | The decompress is part of the same round-trip (this tier feeds lossy FP16 K/V into attention rather than storing INT4 in a separate paged buffer — see "secondary patches" for the memory-realizing tier). CPU test that the round-trip meets cosine ≥ 0.99 — matches the route-B contract pinned by `test_int4_store_roundtrip_meets_cosine_target`. | ✅ **Landed** |
+| **Day 4** | GPU smoke run on a small open model (e.g., Qwen2.5-0.5B-Instruct, ~$0.02 wall). Verify `install_int4_cache_kv_route_a` finds the real vLLM `Attention` class and survives engine startup. Single short prompt, decode 10 tokens; verify output is coherent. | ⏳ pending GPU pod |
+| **Day 5** | Full chat_32k run on Qwen2.5-7B (~$0.07) via `run_streaming.py --int4-kv-route-a`. Measure tokens/sec + decode-step latency vs the FP8 baseline cell from `FP8_INT4_THROUGHPUT_RUNBOOK.md`. **Also re-run perplexity + MMLU 200q** to confirm route-A preserves §19.4's measured quality. Land artefacts; update PHASE4_GPU_FINDINGS §20. | ⏳ pending GPU pod |
 
 **Total: 3-5 days CPU + $0.10-0.30 GPU.** The estimate ranges over: (a) whether vLLM's `BlockManager` cleanly exposes a hook for the side-channel scale storage (best case 3 days; if not, +1 day to subclass the allocator) and (b) whether GQA-specific stride math on K/V matches what `pack_int4` expects (best case 3 days; if not, +1 day to add a shape-adapter).
 

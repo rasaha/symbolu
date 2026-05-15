@@ -2629,46 +2629,62 @@ cat /tmp/section_20_4_table.md
 The thresholds are pinned by
 `Bench/tests/test_long_context.py::test_composer_decision_tree_boundaries`.
 
-### §20.5 Route-A vLLM `cache_kv` hook — engineering plan
+### §20.5 Route-A vLLM INT4 KV-cache integration — Days 1-3 landed
 
-**Sized:** 3-5 engineer-days CPU + ~$0.30 GPU. Full plan in
-``Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`` — committed this
-session. Highlights:
+**Status:** the attention-forward integration tier is **implemented
+and CPU-validated**; Days 4-5 (GPU verification) pending. Full plan
++ day-by-day status in ``Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md``.
 
-* **Patch surface:** `vllm/attention/backends/flash_attn.py` —
-  `FlashAttentionImpl.forward`'s `cache_kv` invocation block, wrapped
-  by a monkey-patched compress-on-write / dequant-on-read. Sketch
-  reuses the existing `_extract_model_from_engine` walker the CTM+
-  side-channel installer (`runner_vllm_streaming.py`) already has.
-* **Algorithm code reuse:** `quantize_per_channel_int4` /
-  `quantize_per_token_int4` / `pack_int4` are pure-torch and don't
-  depend on the cache wrapper. Route-A reuses them unchanged. The
-  algorithm path is bit-identical to route-B; only the storage layer
-  changes.
-* **What route-A inherits automatically from route-B:** algorithm
-  correctness (§18.3), all quality numbers (§19.1–§19.4), bit-packed
-  storage (§19.1), group + asymmetric config, and (conditional on
-  §20.2 landing) sink-FP16 mixed precision.
-* **What route-A does NOT inherit:** HF DynamicCache lifecycle
-  semantics (route-A reimplements against vLLM `BlockManager`),
-  decode-step S=1 special case (vLLM writes one block per step; KIVI
-  group_size=32 must align to vLLM block_size — likely move block_size
-  to 32 OR group across two adjacent vLLM blocks). Day-1 verification.
-* **Why this double-counts:** the SAME hook closes the §13.3 CTM+
-  Phase 4 −20% tokens/sec gap (which is structural at the Evictor-ABC
-  patching layer; a deeper integration point at `cache_kv` bypasses
-  it). One implementation closes two validation gaps the VC brief
-  currently flags.
+**What landed (this session, CPU dev pod, committed):**
 
-**Open questions to answer on day 1** (full list in the plan doc):
+* ``kv_policy/int4_cache_kv_route_a.py`` — `INT4CacheKVRouteA` (the
+  per-call KIVI INT4 compress→decompress manager) +
+  `install_int4_cache_kv_route_a` (monkey-patches every vLLM
+  `Attention` module's `forward` so the K/V it receives are INT4-
+  round-tripped). Reuses the route-B `quantize_per_channel_int4` /
+  `quantize_per_token_int4` ops unchanged — route-A and route-B are
+  the same algorithm, differing only in the integration point.
+  vLLM's Attention-layer K/V layout `(num_tokens, num_kv_heads,
+  head_dim)` IS the quantizer's `(S, H, D)` — no transpose (route-B
+  had to transpose `(B,H,S,D)`).
+* ``run_streaming.py`` — `--int4-kv-route-a` flag + KIVI-config flags
+  (`--int4-kv-k-group-size`, `--int4-kv-v-group-size`,
+  `--int4-kv-symmetric`, `--int4-kv-bits`, `--int4-kv-sink-size`),
+  threaded through `AsyncEngineDriver`. The driver installs route-A
+  after engine construction, composes with `--ctm-plus`, and tears
+  down the wraps on shutdown.
+* 12 CPU regression tests (`Bench/tests/test_int4_cache_kv_route_a.py`)
+  validate the install + interception against faked vLLM attention
+  modules — the `test_vllm_protocol_fixture.py` pattern. Plus 2
+  driver-wiring tests in `test_runner_vllm_streaming.py`.
 
-1. Does `BlockManager` expose a clean scale-storage lifecycle hook,
-   or do we subclass?
-2. Does `flash_attn_with_kvcache` need FP16 specifically?
-3. Is vLLM block_size=16 compatible with KIVI group_size=32?
-4. How does prefix caching interact with the per-block scale
-   side-channel? (Probably fine — dynamic scales are deterministic
-   from K/V — but verify.)
+**This tier vs the memory-realizing tier:** what landed runs the
+INT4 *quality path* under vLLM — the compressed K/V flow through
+each `Attention.forward` so the per-block-layout quality effect is
+measurable on a GPU run. It does **not yet realize the 3.2× HBM
+saving**; that needs vLLM's paged KV buffer allocated INT4-width +
+the FlashAttn read path dequant-ing from it (the §20.6 Marlin
+kernel / "alternate paged buffer" follow-up). The current tier also
+shares route-B's single-token-decode degeneracy (per-call quant of
+one decode token is near-lossless — fixed only by per-16/32-token-
+block quant in the paged-buffer tier).
+
+**Why this double-counts:** the route-A install lands on the model's
+`Attention` modules — the same surface CTM+ Phase 4's hooks use. A
+combined `--ctm-plus --int4-kv-route-a` cell is now a single command
+(the orthogonal-composability is pinned by
+`test_int4_route_a_composes_with_ctm_plus`).
+
+**Pending (Days 4-5, GPU pod):**
+
+1. Verify `install_int4_cache_kv_route_a` finds the real vLLM
+   `Attention` class (the `endswith("Attention")` heuristic; vLLM's
+   class in `vllm/attention/layer.py` is exactly `Attention`).
+2. Verify the K/V positional indices in the real `Attention.forward`
+   signature match the install's `key_arg_index=1, value_arg_index=2`
+   defaults (overridable; vLLM minor versions have moved these).
+3. GPU smoke run + chat_32k throughput + quality re-validation.
+4. The memory-realizing paged-buffer swap (separate follow-up).
 
 ### §20.6 Marlin-style fused unpack-attend kernel — sketch landed
 

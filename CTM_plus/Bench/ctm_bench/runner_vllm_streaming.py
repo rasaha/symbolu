@@ -535,6 +535,12 @@ class AsyncEngineDriver:
         max_decode_tokens: int = 128,
         sample_interval_seconds: Optional[float] = None,
         kv_cache_dtype: Optional[str] = None,
+        int4_kv_route_a: bool = False,
+        int4_kv_k_group_size: int = 32,
+        int4_kv_v_group_size: int = 32,
+        int4_kv_asymmetric: bool = True,
+        int4_kv_bits: int = 4,
+        int4_kv_sink_size: int = 0,
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -628,6 +634,20 @@ class AsyncEngineDriver:
                 f"'auto', 'fp8', 'fp8_e4m3', 'fp8_e5m2', 'fp16', 'bf16'"
             )
         self.kv_cache_dtype = kv_cache_dtype
+        # Route-A INT4 KV-cache integration. Orthogonal to
+        # ctm_plus_evictor (INT4 compression and CTM+ eviction compose
+        # — see ROUTE_A_VLLM_CACHE_KV_PLAN.md). When True, the driver
+        # installs `install_int4_cache_kv_route_a` on the model after
+        # engine construction so the KIVI INT4 round-trip runs inside
+        # each Attention.forward. This is the quality-path tier (the
+        # algorithm runs under vLLM); the memory-realizing paged-buffer
+        # swap is the documented follow-up.
+        self.int4_kv_route_a = bool(int4_kv_route_a)
+        self.int4_kv_k_group_size = int(int4_kv_k_group_size)
+        self.int4_kv_v_group_size = int(int4_kv_v_group_size)
+        self.int4_kv_asymmetric = bool(int4_kv_asymmetric)
+        self.int4_kv_bits = int(int4_kv_bits)
+        self.int4_kv_sink_size = int(int4_kv_sink_size)
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -635,6 +655,9 @@ class AsyncEngineDriver:
             else self.DEFAULT_SAMPLE_INTERVAL_SECONDS
         )
         self._vllm_module = vllm_module
+        # Route-A INT4 install handles — set in run(); None until then.
+        self._int4_route_a_manager: Any = None
+        self._int4_route_a_teardown: Any = None
 
     @staticmethod
     def _extract_model_from_engine(inner_engine: Any) -> Any:
@@ -1015,9 +1038,57 @@ class AsyncEngineDriver:
                         continue
                 raise
 
+        # Route-A INT4 KV-cache install. Orthogonal to the CTM+
+        # evictor — if both are on, INT4 compression and CTM+ eviction
+        # compose (the §"What CTM+ Phase 4 gets out of this" point in
+        # ROUTE_A_VLLM_CACHE_KV_PLAN.md). Installed AFTER the evictor
+        # so the attention-forward wrap sits closest to the call.
+        int4_route_a_manager = None
+        int4_route_a_teardown = None
+        if self.int4_kv_route_a:
+            try:
+                from kv_policy.int4_cache_kv_route_a import (  # type: ignore
+                    install_int4_cache_kv_route_a,
+                )
+                inner_engine = getattr(engine, "engine", engine)
+                model = self._extract_model_from_engine(inner_engine)
+                int4_route_a_manager, int4_route_a_teardown = (
+                    install_int4_cache_kv_route_a(
+                        model=model,
+                        k_group_size=self.int4_kv_k_group_size,
+                        v_group_size=self.int4_kv_v_group_size,
+                        asymmetric=self.int4_kv_asymmetric,
+                        bits=self.int4_kv_bits,
+                        sink_size=self.int4_kv_sink_size,
+                    )
+                )
+                logger.info(
+                    "Route-A INT4 KV-cache installed (%s)",
+                    int4_route_a_manager.config["scheme"],
+                )
+            except BaseException:
+                # Same best-effort engine teardown as the ctm_plus
+                # block: a failed install must not leak GPU memory.
+                for shutdown_name in (
+                    "shutdown_background_loop", "shutdown", "stop",
+                ):
+                    shutdown = getattr(engine, shutdown_name, None)
+                    if shutdown is None:
+                        continue
+                    try:
+                        result = shutdown()
+                        if asyncio.iscoroutine(result):
+                            await result
+                        break
+                    except Exception:
+                        continue
+                raise
+
         # Stash so the run loop can flush after each decode batch.
         self._attention_aggregator = attention_aggregator
         self._installed_evictor = installed_evictor
+        self._int4_route_a_manager = int4_route_a_manager
+        self._int4_route_a_teardown = int4_route_a_teardown
         sampling_params = SamplingParams(
             temperature=0.0,
             max_tokens=self.max_decode_tokens,
@@ -1126,6 +1197,15 @@ class AsyncEngineDriver:
                 await sampler_task
             except asyncio.CancelledError:
                 pass
+            # Revert the route-A INT4 attention-forward wraps before
+            # engine shutdown. Best-effort; never crash the run.
+            if self._int4_route_a_teardown is not None:
+                try:
+                    self._int4_route_a_teardown()
+                except Exception as exc:
+                    logger.warning(
+                        "route-A INT4 teardown failed: %s", exc,
+                    )
             if attention_flush_task is not None:
                 attention_flush_task.cancel()
                 try:
