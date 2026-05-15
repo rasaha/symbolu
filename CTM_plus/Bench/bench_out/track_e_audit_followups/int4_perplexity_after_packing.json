@@ -1,0 +1,36 @@
+{
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "dtype": "float16",
+  "eval_kinds": [
+    "perplexity"
+  ],
+  "turboquant_config": {
+    "quant": "int4-per-channel",
+    "sink_size": 0,
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric"
+  },
+  "perplexity": [
+    {
+      "cache_type": "baseline",
+      "text_chars": 1411,
+      "text_tokens": 282,
+      "perplexity": 3.715450737941104,
+      "nll_per_token": 1.3125
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "text_chars": 1411,
+      "text_tokens": 282,
+      "perplexity": 3.8035601130611036,
+      "nll_per_token": 1.3359375
+    }
+  ],
+  "mmlu": [],
+  "deltas": {
+    "perplexity_ratio": 1.023714316602358,
+    "nll_delta": 0.0234375
+  }
+}

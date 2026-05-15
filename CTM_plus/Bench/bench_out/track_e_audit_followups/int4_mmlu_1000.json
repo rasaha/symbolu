@@ -1,0 +1,37 @@
+{
+  "_transfer_note": "Headline-only summary; the full per-subject breakdown was lost in terminal transfer (base64+gzip stream corruption). Numbers below match the GPU pod's run log; per-subject detail not available in this copy.",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "dtype": "float16",
+  "eval_kinds": [
+    "mmlu"
+  ],
+  "turboquant_config": {
+    "quant": "int4-per-channel",
+    "sink_size": 0,
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "bits": 4,
+    "calibration_path": null,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric"
+  },
+  "mmlu": [
+    {
+      "cache_type": "baseline",
+      "num_questions": 1000,
+      "correct": 702,
+      "accuracy": 0.702,
+      "per_subject": {}
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "num_questions": 1000,
+      "correct": 693,
+      "accuracy": 0.693,
+      "per_subject": {}
+    }
+  ],
+  "deltas": {
+    "mmlu_accuracy_delta_pt": -0.9
+  }
+}

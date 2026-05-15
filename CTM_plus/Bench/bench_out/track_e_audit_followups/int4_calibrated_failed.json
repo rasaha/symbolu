@@ -1,0 +1,56 @@
+{
+  "_transfer_note": "Headline-only summary; the full per-subject MMLU breakdown was lost in terminal transfer (base64+gzip stream corruption). Numbers below match the GPU pod's run log; per-subject detail not available in this copy.",
+  "_result_label": "calibration_tested_negative",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "dtype": "float16",
+  "eval_kinds": [
+    "perplexity",
+    "mmlu"
+  ],
+  "turboquant_config": {
+    "quant": "int4-per-channel",
+    "sink_size": 0,
+    "k_group_size": 0,
+    "v_group_size": 0,
+    "asymmetric": true,
+    "bits": 4,
+    "calibration_path": "/tmp/calibration/qwen25_7b_int4_asym.pt",
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric, calibrated[/tmp/calibration/qwen25_7b_int4_asym.pt]"
+  },
+  "perplexity": [
+    {
+      "cache_type": "baseline",
+      "text_chars": 1411,
+      "text_tokens": 282,
+      "perplexity": 3.7155,
+      "nll_per_token": 1.3125
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "text_chars": 1411,
+      "text_tokens": 282,
+      "perplexity": 7.7588,
+      "nll_per_token": 2.0488
+    }
+  ],
+  "mmlu": [
+    {
+      "cache_type": "baseline",
+      "num_questions": 1000,
+      "correct": 702,
+      "accuracy": 0.702,
+      "per_subject": {}
+    },
+    {
+      "cache_type": "int4-per-channel",
+      "num_questions": 1000,
+      "correct": 634,
+      "accuracy": 0.634,
+      "per_subject": {}
+    }
+  ],
+  "deltas": {
+    "perplexity_ratio": 2.0883,
+    "mmlu_accuracy_delta_pt": -6.8
+  }
+}
