@@ -86,11 +86,20 @@ except ImportError:  # pragma: no cover
 #    Each K/V head is shared across H_q/H_kv = 7 query heads. Kernel
 #    broadcasts K/V across the GQA group during attention.
 #
-# 2. Asymmetric INT4: x_dequant = (x_int4 + 8) * scale + offset where
-#    x_int4 ∈ [-8, +7] is the SIGNED 4-bit value stored in the packed
-#    uint8 (low nibble for index 0, high nibble for index 1; see
-#    ``pack_int4`` / ``unpack_int4`` in int4_per_channel_kv.py for the
-#    exact byte layout).
+# 2. Asymmetric INT4: x_dequant = x_int4 * scale + offset where
+#    x_int4 ∈ [-8, +7] is the SIGNED 4-bit value AFTER the unpack
+#    step has subtracted the unsigned-shift (see Invariant 6 for the
+#    byte layout). The pack/unpack codepath does the +8 / -8 shifts
+#    internally; by the time the kernel reads `x_int4`, it is already
+#    in the signed range. The `offset` field absorbs the +8*scale
+#    bias term:
+#      offset = x_min + 8 * scale
+#    so that
+#      x_int4 * scale + offset = (q_unsigned - 8) * scale + x_min + 8*scale
+#                              = q_unsigned * scale + x_min
+#                              ≈ original input.
+#    Must match ``dequantize_per_channel_int4`` /
+#    ``dequantize_per_token_int4`` in ``int4_per_channel_kv.py``.
 #    Symmetric INT4: x_dequant = x_int4 * scale. Kernel branches on
 #    `offset is not None`.
 #
@@ -325,39 +334,59 @@ def _apply_group_scale_headdim(
 def hbm_bytes_for_attention(
     *, B: int, H_kv: int, S_kv: int, D: int,
     int4: bool,
+    group_size_k: int = 32,
+    group_size_v: int = 32,
+    asymmetric: bool = True,
 ) -> int:
     """HBM bytes loaded for K + V in one attention call.
 
     FP16 path: 2 bytes per element × 2 (K and V) × B × H_kv × S_kv × D.
-    INT4 path: 0.5 bytes per element × 2 + per-group scale overhead
-    (typically <5% at group_size=32 on D=128).
+    INT4 path: 0.5 bytes per element × 2 + per-group scale + per-group
+    offset (when asymmetric=True; the §18.3 ship config). Scale-storage
+    overhead at group_size=32 on D=128 is small (~5-10% of the INT4
+    value bytes); the per-group offset doubles it.
 
     The kernel's win is the 4× reduction on the dominant term (the
-    K/V values themselves). Scales are O(D/group_size) per token, so
-    the overhead is small.
+    K/V values themselves). Defaults match the §18.3 ship config so
+    the partner-shareable ceiling speedup is computed honestly.
     """
     elements_kv = B * H_kv * S_kv * D
     if int4:
         # K + V values at 0.5 byte each.
         val_bytes = 2 * elements_kv * 0.5
-        # Scale overhead: ~1 fp16 scale per group along seq (for K)
-        # and per group along D (for V). At group_size=32, D=128:
-        #   K scale: B * H_kv * (S_kv/32) * D * 2 bytes
-        #   V scale: B * H_kv * S_kv * (D/32) * 2 bytes
-        # Each entry is 4 head_dim positions worth of values:
-        k_scale_bytes = B * H_kv * max(1, S_kv // 32) * D * 2
-        v_scale_bytes = B * H_kv * S_kv * max(1, D // 32) * 2
+        # Metadata factor: scale alone (sym) or scale+offset (asym).
+        meta_factor = 2 if asymmetric else 1
+        # K scale: per-(group along seq, head, head_dim)
+        # V scale: per-(token, head, group along head_dim)
+        k_scale_bytes = (
+            B * H_kv * max(1, S_kv // group_size_k) * D * 2 * meta_factor
+        )
+        v_scale_bytes = (
+            B * H_kv * S_kv * max(1, D // group_size_v) * 2 * meta_factor
+        )
         return int(val_bytes + k_scale_bytes + v_scale_bytes)
     else:
         return 2 * elements_kv * 2
 
 
-def speedup_ceiling(*, B: int, H_kv: int, S_kv: int, D: int) -> float:
+def speedup_ceiling(
+    *, B: int, H_kv: int, S_kv: int, D: int,
+    group_size_k: int = 32,
+    group_size_v: int = 32,
+    asymmetric: bool = True,
+) -> float:
     """Upper bound on the fused-kernel speedup, assuming K/V load is
     the bottleneck. Real speedup will be lower (compute also runs).
+
+    Defaults match the §18.3 ship config (group=32, asymmetric=True);
+    explicitly pass `asymmetric=False` for the symmetric-only ceiling.
     """
     fp16 = hbm_bytes_for_attention(B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=False)
-    int4 = hbm_bytes_for_attention(B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=True)
+    int4 = hbm_bytes_for_attention(
+        B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=True,
+        group_size_k=group_size_k, group_size_v=group_size_v,
+        asymmetric=asymmetric,
+    )
     return fp16 / max(int4, 1)
 
 
@@ -395,57 +424,136 @@ def speedup_ceiling(*, B: int, H_kv: int, S_kv: int, D: int) -> float:
 #   should be within 5-10% on Qwen2.5-7B decode at typical context
 #   lengths.
 
-if __name__ == "__main__":
-    if torch is None:
-        raise SystemExit("torch not installed; sketch can't run.")
+def _round_trip_demo() -> dict:
+    """End-to-end round-trip: take real Qwen-shape K/V, quantize through
+    the route-B ops, then run the fused reference and compare to a
+    naive "dequant K, dequant V, attention" baseline.
 
-    # Tiny sanity demo. Build random Qwen-shape INT4-packed K/V,
-    # run the reference, compare its output to a naive "dequant first
-    # then attention" implementation.
+    This is the spec's correctness check — the fused reference must
+    produce numerically equivalent output to the naive pipeline (within
+    FP16 rounding). A kernel author who wrote the docstring's wrong
+    formula (the audit's H1 finding pre-fix) would fail this comparison.
+    """
+    if torch is None:
+        raise ImportError("torch not installed; demo can't run.")
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+        quantize_per_token_int4, dequantize_per_token_int4,
+        pack_int4,
+    )
+
     B, H_q, H_kv, D = 1, 28, 4, 128
     S_q, S_kv = 1, 64
     group_size_k = 32
     group_size_v = 32
-    n_groups_k = S_kv // group_size_k
-    n_groups_v = D // group_size_v
 
     torch.manual_seed(0)
     q = torch.randn(B, H_q, S_q, D, dtype=torch.float16)
-
-    # Build raw FP16 K/V and quantize them with the route-B ops,
-    # then run the reference and compare to the "dequant then attend"
-    # baseline.
     k_fp16 = torch.randn(B, H_kv, S_kv, D, dtype=torch.float16)
     v_fp16 = torch.randn(B, H_kv, S_kv, D, dtype=torch.float16)
 
-    # For the demo we use small synthetic scales; the real path computes
-    # them from K/V's per-group max. This is the spec's shape contract:
-    k_scale = torch.randn(B, n_groups_k, H_kv, D, dtype=torch.float16).abs() * 0.1
-    k_offset = torch.randn(B, n_groups_k, H_kv, D, dtype=torch.float16) * 0.1
-    v_scale = torch.randn(B, S_kv, H_kv, n_groups_v, dtype=torch.float16).abs() * 0.1
-    v_offset = torch.randn(B, S_kv, H_kv, n_groups_v, dtype=torch.float16) * 0.1
+    # Quantize through the actual route-B ops (single-batch). These
+    # produce the scales/offsets the kernel must consume.
+    # K: per-channel along seq with group=32 + asymmetric.
+    k_int4, k_scale, k_offset = quantize_per_channel_int4(
+        k_fp16[0].transpose(0, 1).contiguous(),  # (S, H_kv, D)
+        group_size=group_size_k, asymmetric=True,
+    )
+    # V: per-token along head_dim with group=32 + asymmetric.
+    v_int4, v_scale, v_offset = quantize_per_token_int4(
+        v_fp16[0].transpose(0, 1).contiguous(),  # (S, H_kv, D)
+        group_size=group_size_v, asymmetric=True,
+    )
 
-    # Mock INT4 packed values (random in [0, 255] uint8).
-    k_packed = torch.randint(0, 256, (B, H_kv, S_kv, D // 2), dtype=torch.uint8)
-    v_packed = torch.randint(0, 256, (B, H_kv, S_kv, D // 2), dtype=torch.uint8)
+    # Pack INT4 along head_dim (matches route-B's storage layout).
+    k_packed_sd_kv = pack_int4(k_int4)  # (S, H_kv, D/2) uint8
+    v_packed_sd_kv = pack_int4(v_int4)
+    # Reshape to the spec's expected layout (B, H_kv, S, D/2).
+    k_packed = k_packed_sd_kv.transpose(0, 1).contiguous().unsqueeze(0)
+    v_packed = v_packed_sd_kv.transpose(0, 1).contiguous().unsqueeze(0)
+
+    # Reshape scales/offsets to the spec's expected layout.
+    # K: quantize returned (n_groups, H, D); spec wants (B, n_groups, H, D).
+    k_scale = k_scale.unsqueeze(0).to(torch.float16)
+    k_offset = k_offset.unsqueeze(0).to(torch.float16)
+    # V: quantize returned (S, H, n_groups); spec wants (B, S, H, n_groups).
+    v_scale = v_scale.unsqueeze(0).to(torch.float16)
+    v_offset = v_offset.unsqueeze(0).to(torch.float16)
 
     spec = FusedAttentionSpec(
         B=B, H_q=H_q, H_kv=H_kv, S_q=S_q, S_kv=S_kv, D=D,
         block_size=16, group_size_k=group_size_k, group_size_v=group_size_v,
         asymmetric=True,
     )
-    out = fused_int4_attention_reference(
+    out_fused = fused_int4_attention_reference(
         q=q, k_packed=k_packed, k_scale=k_scale, k_offset=k_offset,
         v_packed=v_packed, v_scale=v_scale, v_offset=v_offset,
         spec=spec,
     )
-    print(f"output shape: {tuple(out.shape)} dtype: {out.dtype}")
 
-    speedup = speedup_ceiling(B=B, H_kv=H_kv, S_kv=S_kv, D=D)
-    print(f"HBM-traffic ceiling speedup vs FP16: {speedup:.2f}x")
+    # Naive baseline: dequant K + V, then standard scaled-dot-product
+    # attention. This is the contract the fused reference must match.
+    k_dequant_sd = dequantize_per_channel_int4(
+        k_int4, k_scale[0].to(k_int4.device), dtype=torch.float16,
+        group_size=group_size_k, offset=k_offset[0].to(k_int4.device),
+    )  # (S, H_kv, D)
+    v_dequant_sd = dequantize_per_token_int4(
+        v_int4, v_scale[0].to(v_int4.device), dtype=torch.float16,
+        group_size=group_size_v, offset=v_offset[0].to(v_int4.device),
+    )
+    k_naive = k_dequant_sd.transpose(0, 1).unsqueeze(0)  # (1, H_kv, S, D)
+    v_naive = v_dequant_sd.transpose(0, 1).unsqueeze(0)
+    # GQA broadcast.
+    G_q = H_q // H_kv
+    k_naive_gqa = k_naive.unsqueeze(2).expand(
+        B, H_kv, G_q, S_kv, D,
+    ).reshape(B, H_q, S_kv, D)
+    v_naive_gqa = v_naive.unsqueeze(2).expand(
+        B, H_kv, G_q, S_kv, D,
+    ).reshape(B, H_q, S_kv, D)
+    softmax_scale = 1.0 / math.sqrt(D)
+    scores = torch.matmul(q, k_naive_gqa.transpose(-1, -2)) * softmax_scale
+    attn = torch.softmax(scores.float(), dim=-1).to(q.dtype)
+    out_naive = torch.matmul(attn, v_naive_gqa)
+
+    max_abs_diff = (out_fused - out_naive).abs().max().item()
+    cos_sim = torch.nn.functional.cosine_similarity(
+        out_fused.flatten().float(), out_naive.flatten().float(), dim=0,
+    ).item()
+
+    return {
+        "output_shape": tuple(out_fused.shape),
+        "output_dtype": str(out_fused.dtype),
+        "max_abs_diff_vs_naive": max_abs_diff,
+        "cosine_similarity_vs_naive": cos_sim,
+    }
+
+
+if __name__ == "__main__":
+    if torch is None:
+        raise SystemExit("torch not installed; sketch can't run.")
+
+    # Real round-trip: quantize Qwen-shape K/V through the route-B
+    # ops, then verify the fused reference matches a naive dequant-
+    # then-attention pipeline.
+    result = _round_trip_demo()
+    print(f"output shape: {result['output_shape']} dtype: {result['output_dtype']}")
+    print(f"vs naive dequant+attention:")
+    print(f"  max abs diff:      {result['max_abs_diff_vs_naive']:.6f}")
+    print(f"  cosine similarity: {result['cosine_similarity_vs_naive']:.6f}")
+
+    # HBM ceiling at the §18.3 ship config (asymmetric=True).
+    speedup = speedup_ceiling(B=1, H_kv=4, S_kv=64, D=128)
+    print()
+    print(f"HBM-traffic ceiling speedup vs FP16 (asymmetric, group=32): {speedup:.2f}x")
     print(
-        f"  FP16 bytes: {hbm_bytes_for_attention(B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=False):,}"
+        f"  FP16 bytes: "
+        f"{hbm_bytes_for_attention(B=1, H_kv=4, S_kv=64, D=128, int4=False):,}"
     )
     print(
-        f"  INT4 bytes: {hbm_bytes_for_attention(B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=True):,}"
+        f"  INT4 bytes: "
+        f"{hbm_bytes_for_attention(B=1, H_kv=4, S_kv=64, D=128, int4=True):,}"
     )
+    # For reference, the symmetric-only ceiling (no offset storage).
+    speedup_sym = speedup_ceiling(B=1, H_kv=4, S_kv=64, D=128, asymmetric=False)
+    print(f"  (symmetric-only ceiling, no offset:  {speedup_sym:.2f}x)")

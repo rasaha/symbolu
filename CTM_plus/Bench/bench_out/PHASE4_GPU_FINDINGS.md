@@ -2682,14 +2682,23 @@ LOC documenting:
 * The group-index computation for K (along seq axis) and V (along
   head_dim axis).
 * GQA broadcasting (each KV head services H_q/H_kv query heads).
-* An HBM-bytes counter that quantifies the bandwidth advantage: at
-  Qwen2.5-7B shape (B=1, H_kv=4, S_kv=64, D=128), INT4 loads
-  **36,864 bytes vs FP16's 131,072 — a 3.56× HBM-traffic ceiling
-  speedup**.
+* An HBM-bytes counter that quantifies the bandwidth advantage at the
+  §18.3 ship config (asymmetric=True, group=32). At Qwen2.5-7B shape
+  (B=1, H_kv=4, S_kv=64, D=128), INT4 loads **40,960 bytes vs FP16's
+  131,072 — a 3.20× HBM-traffic ceiling speedup**. (Symmetric-only
+  variant — no per-group offset storage — yields 3.56×; we ship
+  asymmetric for the quality gain so the 3.20× is the partner-relevant
+  number.)
 
-The reference runs end-to-end on CPU; the test cell at the bottom
-produces a `(1, 28, 1, 128)` FP16 output tensor and prints the HBM
-counter.
+The reference runs end-to-end on CPU. The bottom-of-file demo
+quantizes real Qwen-shape K/V through the route-B ops, runs the
+fused reference, and verifies it matches a naive "dequant-K +
+dequant-V + standard attention" pipeline within FP16 rounding
+(empirically: max abs diff 0.000000, cosine 1.000000). Six
+regression tests in `Bench/tests/test_int4_fused_attention_sketch.py`
+pin the contract, including the asymmetric dequant formula (which
+was wrong in the initial docstring — a kernel author following the
+old spec would land off by +8×scale per element).
 
 **Why this is evidence the gap is closeable, not just a claim:**
 
