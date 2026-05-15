@@ -311,6 +311,7 @@ so partners can tell which is which.
 - KIVI INT4 KV compression: 3.2× real-heap, 1.024× perplexity, −0.9 pt MMLU @ 1000q, 96.4% teacher-forced top-1
 - INT3 memory-bound variant: −0.7 pt MMLU @ 1000q at ~4.5× theoretical compression
 - FSCS-derived signals: 100% of eviction rounds make different choices on real Mistral-7B trace
+- **FP8-vs-INT4 throughput (§20.1, four-cell GPU run, Qwen2.5-7B):** vLLM FP8 KV = **1.18× FP16** on the FlashInfer backend (FP8 is a small throughput *gain*, not a cost). Route-B INT4 KIVI = **0.47× FP16 in HF transformers** — the pure-PyTorch quantize/unpack round-trip is a ~2× decode cost. Decomposition: the HF↔vLLM stack gap (25×) is what a route-A `cache_kv` integration removes; the INT4-algorithm gap (2×) travels with it and needs the Marlin-style fused unpack-attend kernel (§20.6). **Honest verdict: route-A is necessary but not sufficient — the kernel is the gating item for FP8-competitive throughput.**
 
 **Tested-and-failed (documented as negatives — partner-shareable):**
 
@@ -324,11 +325,6 @@ Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2.
 
 **Harness-landed, GPU-run-pending (FP8-KV competitive gap closure track):**
 
-- FP8 (vLLM stock) vs INT4 (KIVI route-B) throughput comparison —
-  four-cell composition documented in
-  `Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md`; runner +
-  `--kv-cache-dtype` flag landed; ~$0.15 GPU spend to fill in numbers
-  (§20.1)
 - Sink-FP16 + body-INT4 mixed precision — sweep recipe landed for
   sink ∈ {0, 4, 16, 64} at the full KIVI rescue stack; ~$0.50 GPU to
   test the StreamingLLM-style quality-recovery hypothesis (§20.2)

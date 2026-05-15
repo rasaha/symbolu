@@ -2309,46 +2309,61 @@ stack cost, and the stack cost is well-known to dominate
   most of the FP8 gap; if `D/C < 0.5`, a Marlin-style fused
   unpack-attend kernel (§20.6) is the actual blocker.
 
-**Expected measured outcomes (placeholders — TBD: GPU run, ~$0.15):**
+#### §20.1 Measured outcomes (GPU run, 2026-05-15)
 
-| Cell | Measured tokens/sec on chat_32k | JSON artefact |
-|------|------:|---|
-| A — vLLM FP16 | TBD | `bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json` |
-| B — vLLM FP8 | TBD | `bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json` |
-| C — HF FP16 (decode-only, prefill=2048) | TBD | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
-| D — HF INT4 KIVI (decode-only, prefill=2048) | TBD | (same JSON) |
+Qwen2.5-7B-Instruct, 1024-token prompts, 256 decode tokens, 80 GB A100.
+Cells A/B: vLLM 0.7.3, 32-prompt batch, `ignore_eos=True`. Cells C/D:
+HF transformers, best-of-5 trials. Artefact:
+`bench_out/track_e_audit_followups/fp8_int4_comparison.json`.
 
-The §13.3 LRU vLLM baseline was 85 tok/s at the same config; Cell A
-should reproduce that. Qwen2.5-7B at FP16 in HF transformers is
-typically 20-40 tok/s decode on A100 40 GB; Cell C will land in that
-range.
+| Cell | Stack | KV layer | Measured tok/s | Source |
+|------|-------|---------|---------------:|---|
+| A | vLLM 0.7.3 | FP16 (FlashInfer) | **1043.5** | `bench_out/fp8_int4_throughput/vllm_fp16_flashinfer/streaming_summary.json` |
+| B | vLLM 0.7.3 | **FP8** (FlashInfer) | **1231.5** | `bench_out/fp8_int4_throughput/vllm_fp8_flashinfer/streaming_summary.json` |
+| C | HF transformers | FP16 (DynamicCache) | **41.5** | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
+| D | HF transformers | **INT4 KIVI** (route-B) | **19.3** | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
 
-**Once the four cells exist on the GPU pod, replace this entire
-"Expected measured outcomes" block with the output of:**
+**Ratios:**
 
-```bash
-cd CTM_plus/Bench
-python -m ctm_bench.scripts.compose_throughput_comparison \
-    --json-output bench_out/track_e_audit_followups/fp8_int4_comparison.json
-```
+| Ratio | Value | Reading |
+|---|---:|---|
+| B / A | **1.18** | FP8 KV is *faster* than FP16 in vLLM on the FlashInfer backend — the brief's "near-zero overhead" was conservative; it is a small speedup (half the KV bytes → less HBM bandwidth on KV reads). |
+| D / C | **0.47** | Route-B INT4 is ~2× slower than FP16 *in HF* — the per-decode-token quantize→pack→unpack→dequantize round-trip in pure PyTorch, × 28 layers. |
+| C / A | **0.040** | HF transformers is ~25× slower than vLLM — the stack tax. |
+| D / A | **0.019** | Headline. Decomposes as `(D/C) × (C/A)` = the algorithm tax × the stack tax. |
 
-The composer reads the four JSONs, computes the B/A and D/C ratios,
-maps them to the runbook's GREEN/YELLOW/RED verdict bands, and emits
-a copy-paste-ready markdown table plus a partner-shareable merged
-JSON. It handles partial-input gracefully (prints
-`MEASUREMENT MISSING` for absent cells; never emits fake numbers).
-Six CPU regression tests in
-`Bench/tests/test_compose_throughput_comparison.py` pin the schema,
-the ratio computation, and the band boundaries (D/C boundary at
-0.80 for GREEN/YELLOW, 0.50 for YELLOW/RED).
+**Verdict — D/C = 0.47 → RED.** Below the pre-decided 0.50 GREEN/YELLOW/RED
+boundary. The route-B INT4 algorithm cost is significant and is **not**
+removed by route-A integration:
 
-**Verdict band (pre-decided here so post-hoc rationalisation is harder):**
+* The **HF↔vLLM stack gap (25×, C/A = 0.04)** is what route-A removes —
+  moving INT4 onto vLLM's PagedAttention + continuous-batching path.
+* The **INT4-algorithm gap (2×, D/C = 0.47)** travels *with* route-A —
+  the pure-PyTorch quantize/unpack ops run on every decode token
+  regardless of which stack hosts them. Route-A alone would land
+  INT4-in-vLLM at ≈ 0.47 × 1043 ≈ **490 tok/s vs FP8's 1231** — ~0.4× the
+  competitor.
+* **Conclusion:** the Marlin-style fused unpack-attend kernel (§20.6,
+  3.20× HBM-traffic ceiling) is the actual throughput blocker. Route-A
+  is necessary (it closes the stack gap) but **not sufficient**; the
+  kernel is the gating work item for FP8-competitive throughput.
 
-| D / C ratio | Verdict | Next step |
-|---|---|---|
-| ≥ 0.80 | Route-B INT4 throughput-competitive in HF. Route-A integration alone closes the FP8 gap. | Implement route-A per §20.5 (3-5 engineer-days). |
-| 0.50–0.80 | Algorithm overhead measurable but fixable with a kernel. | Both route-A and a Marlin-style kernel needed; route-A first. |
-| < 0.50 | Pure-PyTorch unpack dominates. Kernel is the actual blocker. | Reprioritize: kernel work first (§20.6), route-A second. |
+**FP8-on-XFormers deployment gotcha (tested, partner-shareable).**
+A controlled backend sweep found the cell-B number is backend-sensitive:
+
+| Config | tok/s | vs FP16-FlashInfer |
+|---|---:|---:|
+| FP8 / FlashInfer (B) | 1231 | 1.18× |
+| FP8 / XFormers, 1k ctx | 542 | 0.52× |
+| FP8 / XFormers, 8k ctx | 89 | 0.085× |
+
+vLLM 0.7.3 auto-selects XFormers when `--kv-cache-dtype fp8` is set
+(FlashAttention-2 has no FP8 path), and XFormers FP8 is 2-13× slower
+than FP16 — worsening with context. **Naively flipping `--kv-cache-dtype
+fp8` degrades throughput; FP8's speedup requires explicitly forcing the
+FlashInfer backend** (`VLLM_ATTENTION_BACKEND=FLASHINFER`). Supporting
+artefacts: `bench_out/fp8_int4_throughput/vllm_fp8/` (XFormers 1k),
+`vllm_fp8_8k/` (XFormers 8k).
 
 ### §20.2 Sink-FP16 + body-INT4 mixed precision — quality recovery hypothesis
 
