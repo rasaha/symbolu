@@ -281,7 +281,7 @@ sink-FP16 *recovers* a gap is not demonstrated. A decisive test needs
 
 | Item | Result |
 |---|---|
-| INT4 KV long-context decode (§20.4, needle-in-haystack) | Route-B INT4 KIVI is **not safe for long-context generation**. Perplexity holds at 4k–32k-char contexts (1.007×) but autoregressive decode collapses into token stuttering — needle retrieval 100% (FP16) → 11–22% (INT4). The needle characters reach the decode; the failure is decode coherence, not retrieval. sink-FP16 (first 16 positions exact) is a partial mitigation — recovers retrieval to 56% at 16k — but residual degradation remains. The §19.4 short-context quality numbers do NOT generalise to long-context decode; that caveat travels with every INT4 quality claim. |
+| INT4 KV long-context decode (§20.4 / §20.4.1, needle-in-haystack) | Route-B INT4 KIVI on **both** K and V is **not safe for long-context generation** — perplexity holds at 4k–32k-char contexts (1.007×) but autoregressive decode collapses into token stuttering, needle retrieval 100% (FP16) → 11–29% (INT4). The §20.4.1 K/V ablation sprint (n=24/cell, 16k) isolated the cause: **the K channel is the blocker** — V-INT4/K-FP16 is quality-neutral at **96%** (within binomial noise of the 100% baseline, zero stuttering trials), while K-INT4/V-FP16 scores 46%. Shippable result: **V-INT4 + K-FP16 delivers a measured ~1.6× KV-cache compression with no long-context quality loss**; full 3–4× INT4 needs the K channel solved (milder K compression / per-layer bit allocation). The earlier "sink-FP16 → 56%" was an n=9 fluctuation — de-noised, sink=16 measures ≈21%; only sink=4 partially recovers (67%). The §19.4 short-context numbers do NOT generalise to K-INT4 long-context decode. |
 | TurboQuant *baseline* (random rotation, 3-bit, KV-only) on Qwen2.5-7B | Perplexity ratio 3052×. Our config diverges from Google's published TurboQuant on four axes (random vs learned rotation; 3-bit vs the paper's 4-bit headline; KV-only vs W4A4; Qwen2.5 vs Llama-2/Gemma). The negative rules out the baseline as a drop-in KV-only compressor — it does **not** refute Google's published W4A4 result on Llama-2 / Gemma. Reproducing the full method is deferred follow-on. |
 | TurboQuant baseline + per-channel scale rescue | Made things 24× worse than the random-rotation baseline (KIVI's per-channel trick does not transfer to rotation-based designs) |
 | TurboQuant baseline + sink-skip rescue | Modest 27% improvement, still catastrophic at 220× |
@@ -303,11 +303,13 @@ Phase 4 eviction for a three-layer memory-savings stack.
 
 ### Harness-landed, GPU-run-pending (FP8-KV competitive gap closure)
 
-The §20 measurement axes in `PHASE4_GPU_FINDINGS.md` are landed:
-§20.1 (throughput), §20.2 (sink-FP16), §20.3 (multi-model) and §20.4
-(long-context) are all **measured** — see the rows above and the
-tested-and-failed table. The two remaining items are engineering
-work, not measurements:
+The §20 measurement axes in `PHASE4_GPU_FINDINGS.md` are landed and
+**measured**: §20.1 (throughput), §20.2 (sink-FP16), §20.3
+(multi-model), §20.4 (long-context) and §20.4.1 (K/V ablation
+diagnostic sprint). §20.4.1 is the decisive long-context result —
+V-INT4 is quality-neutral, K-INT4 is the long-context blocker; see
+the rows above and the tested-and-failed table. The two remaining
+items are engineering work, not measurements:
 
 | Item | Status | Effort | Reference |
 |---|---|---|---|

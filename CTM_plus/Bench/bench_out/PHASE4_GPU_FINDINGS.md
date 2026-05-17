@@ -2515,14 +2515,18 @@ honest "within-noise" result is sufficient for partner conversations.
 partner-shareable line is the noise-aware one above; the §20.2
 hypothesis stays open.
 
-**Update from §20.4 — sink-FP16 IS a real lever, at long context.**
-This short-context MMLU sweep was the wrong instrument. §20.4's
-long-context needle test found sink-FP16 (sink=16) recovers
-retrieval from 22% → 56% at 16k context — a large effect, far outside
-any noise band. Short-context MMLU prompts simply do not accumulate
+**Update from §20.4 / §20.4.1 — the sink lever, de-noised.** This
+short-context MMLU sweep was the wrong instrument. §20.4's
+long-context needle test first suggested sink-FP16 recovers
+retrieval; the §20.4.1 diagnostic sprint (n=24/cell) refined this:
+`sink=4` is the real lever (29% → 67% at 16k), while `sink=16` does
+not reliably recover — two independent re-runs put it at 21–22%, and
+the single `long_context_sink16.json` 56% is now treated as an n=9
+fluctuation. Short-context MMLU prompts simply do not accumulate
 enough INT4 KV noise for sink protection to register; §20.2 is
 "inconclusive" because the regime, not the lever, was wrong. The
-sink-FP16 mechanism is validated in §20.4.
+deeper §20.4.1 finding is that the **K channel** — not sink coverage
+— is the dominant long-context blocker.
 
 ### §20.3 Multi-model replication — Llama-3-8B + Mistral-7B
 
@@ -2790,7 +2794,10 @@ re-run (`--sink-size 16`, ctx=16384) recovered needle retrieval from
 The attention-sink tokens carry roughly half the damage: quantizing
 the first ~16 positions' K/V is a large part of what degrades decode.
 Sink-FP16 is a **partial mitigation** — 56% still trails the 100%
-baseline, so residual damage beyond the sinks remains.
+baseline, so residual damage beyond the sinks remains. **[Superseded
+in part — see §20.4.1: two higher-n re-runs (n=9, n=24) put sink=16
+at ≈21%, not 56%; the real sink lever is sink=4, and the dominant
+long-context blocker is the K channel, not sink coverage.]**
 
 **This retroactively explains §20.2.** Sink-FP16 looked inconclusive
 on short-context MMLU because short prompts do not accumulate enough
@@ -2808,15 +2815,81 @@ MMLU, 96.4% teacher-forced) **do not generalise to long-context
 autoregressive decode**; that caveat must travel with every INT4
 quality claim.
 
-**What would close it (open work, not 2026-H1):** (a) sink-FP16 as a
-mandatory long-context default — recovers ~half; (b) higher bit-width
-(INT5/INT6) or per-layer bit allocation for the residual; (c) a
-proper long-context KV-quant scheme — KIVI's published long-context
-numbers use INT2/INT4 *with* their own residual/outlier handling that
-our route-B reproduction may not fully capture. The needle harness
-could also add a "lenient" metric (needle chars present in order,
-ignoring stutter) to separate raw-retrieval from clean-output — a
-~1-day follow-on.
+**What would close it — see §20.4.1.** The K/V ablation diagnostic
+sprint resolved the mechanism: **V-INT4 + K-FP16 ships now**
+(quality-neutral at 16k); full INT4 needs the K channel solved —
+milder K compression (INT8), per-layer K bit allocation, or a
+K-specific outlier scheme. INT5/INT6 remains untestable through
+route-B until an int8-storage path lands (the 4-bit packer corrupts
+values wider than 4 bits).
+
+#### §20.4.1 K/V ablation diagnostic sprint (GPU run, 2026-05-17) — K channel isolated
+
+A bounded follow-up sprint ran the §20.4 16k needle setup
+(Qwen2.5-7B-Instruct, ctx=16000 chars, depths 0.1/0.5/0.9,
+**n=24 trials/cell** = 8 samples × 3 depths, 64 decoded tokens)
+across three knobs: a sink sweep, a K-only/V-only precision
+ablation, and an INT5 cell. Harness: `track_e_long_context.py` at
+schema `§20.4.v2` with per-trial decode-stability logging
+(first-stutter position, repeated-token rate, decode entropy).
+Driver: `scripts/diagnostic_sprint_long_context.sh`.
+
+**K/V ablation — the headline.** The `quantize_k` / `quantize_v`
+toggles pass one channel through at FP16:
+
+| Cell | K | V | needle | repeat rate | stutter trials |
+|---|---|---|---:|---:|---:|
+| baseline | FP16 | FP16 | 100% | — | — |
+| V-only INT4 | FP16 | INT4 | **96%** | 0.23 | 0% |
+| K-only INT4 | INT4 | FP16 | **46%** | 0.56 | 100% |
+| both INT4 | INT4 | INT4 | 29% | 0.44 | 100% |
+
+At n=24 this is unambiguous: **V→INT4 is quality-neutral** — 96%
+(23/24) is within binomial noise of the 100% baseline, with zero
+stuttering trials. **K→INT4 is the entire long-context failure** —
+46% on its own, and it drags the full-INT4 config down to 29%.
+KIVI's per-channel INT4 on K is what breaks long-context retrieval;
+per-token INT4 on V costs nothing measurable at 16k. This localizes
+the §20.4 "decode-coherence collapse" to the K channel.
+
+**Sink sweep — revises the §20.4 sink-FP16 claim.** Sink sizes
+{0,4,16,32,64,128}, n=24/cell:
+
+| sink | 0 | 4 | 16 | 32 | 64 | 128 |
+|---|---:|---:|---:|---:|---:|---:|
+| needle | 29% | **67%** | 21% | 33% | 42% | 29% |
+
+Only `sink=4` recovers (67%, replicated — a first n=9 sweep gave
+78%, ≈4σ above the ~30% base rate). `sink=16` measures 21%; two
+independent re-runs (n=9: 22%, n=24: 21%) **did not reproduce the
+single `long_context_sink16.json` 56% result**, now treated as an
+n=9 upward fluctuation. The real sink lever is protecting *exactly
+the ~4 true attention-sink tokens'* K at FP16 — coherent with the
+K-channel finding, since the sink tokens carry the most attention
+mass. Even sink=4 only partially mitigates (67% < 100% baseline).
+
+**INT5 — untestable through route-B.** The `int5.json` cell (0%
+needle, 0.98 repeated-token rate, 100% stutter) is **not a real
+measurement**: the route-B kvstore's `pack_int4` only represents
+4-bit values ([−8,+7]); at `bits=5` the quantizer emits [−16,+15],
+which overflow the nibble packer and corrupt on read. INT5 needs an
+int8 (unpacked) storage path before it can be measured — a small
+follow-on, out of this sprint's scope.
+
+**Revised §20.4 verdict — RED for full INT4, blocker isolated.**
+Long-context INT4 on both channels remains RED (29% needle). But the
+decomposition gives a shippable path: **V-INT4 + K-FP16 is measured
+quality-neutral at 16k** (96% needle, 0% stutter) and yields a real
+~1.6× KV-cache compression with no measured long-context quality
+loss (KV is half K, half V; V at 4× → overall (1 + 0.25)/2 = 0.625×
+→ 1.6×). FP8 does **not** have to become the long-context default.
+Full 3–4× INT4 needs the K channel solved; that is the §20.4 open
+research question, not a shipping blocker.
+
+Artefacts: `bench_out/diag_sprint/{sink_0,sink_4,sink_16,sink_32,
+sink_64,sink_128,k_only,v_only,int5}.json` — generated on the RunPod
+pod, which had no outbound git-push path; aggregate numbers
+transcribed above, raw per-trial JSONs not committed.
 
 ### §20.5 Route-A vLLM INT4 KV-cache integration — Days 1-3 landed
 
