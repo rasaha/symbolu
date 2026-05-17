@@ -120,6 +120,8 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         v_group_size: int = 0,
         asymmetric: bool = False,
         bits: int = 4,
+        k_bits: Optional[int] = None,
+        v_bits: Optional[int] = None,
         calibration_path: Optional[str] = None,
         quantize_k: bool = True,
         quantize_v: bool = True,
@@ -138,7 +140,13 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             v_group_size=v_group_size,
             asymmetric=asymmetric,
             bits=bits,
+            k_bits=k_bits,
+            v_bits=v_bits,
         )
+        # Effective per-channel bit widths: ``bits`` is the shared
+        # default, k_bits / v_bits override it (adaptive precision).
+        eff_k_bits = int(k_bits if k_bits is not None else bits)
+        eff_v_bits = int(v_bits if v_bits is not None else bits)
 
         # Optional GPTQ/AWQ-style static calibration: per-layer scales
         # pre-computed offline on a calibration set (see
@@ -187,10 +195,12 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             v_group_size=int(v_group_size),
             asymmetric=bool(asymmetric),
             bits=int(bits),
+            k_bits=eff_k_bits,
+            v_bits=eff_v_bits,
             calibration_path=calibration_path,
             quantize_k=self._quantize_k,
             quantize_v=self._quantize_v,
-            scheme=f"int{bits}_per_channel_k_per_token_v" + (
+            scheme=f"k_int{eff_k_bits}_per_channel_v_int{eff_v_bits}_per_token" + (
                 "_asymmetric" if asymmetric else "_symmetric"
             ) + ("_calibrated" if calibration_path is not None else "") + (
                 ""

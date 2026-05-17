@@ -892,6 +892,109 @@ def test_bits_param_int3_threads_through_hf_cache(torch_module, transformers_mod
 
 
 # --------------------------------------------------------------------- #
+# §20.4.1 follow-on: >4-bit storage + independent K/V bit width          #
+# --------------------------------------------------------------------- #
+
+
+def test_bits_param_int5_kvstore_round_trip(torch_module):
+    """INT5 round-trips through the kvstore. INT5 values ([-16,+15])
+    exceed the 4-bit nibble range, so the store must fall back to int8
+    (unpacked) storage rather than corrupting them in pack_int4. This
+    is the regression pin for the §20.4.1 INT5 corruption bug."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True, bits=5,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float16)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float16)
+    store.write_block(0, k, v)
+    # INT5 must NOT take the 4-bit nibble-pack path.
+    block = store._blocks[0]
+    assert block.k_bit_packed is False and block.v_bit_packed is False
+    k_back, v_back = store.read_block(0)
+    # INT5 = 32 levels, strictly finer than INT4's 16 — clears the INT4
+    # ≥ 0.99 bar comfortably when storage is correct (not corrupt).
+    assert _cosine(k, k_back) >= 0.99, "INT5 K corrupted"
+    assert _cosine(v, v_back) >= 0.99, "INT5 V corrupted"
+    stats = store.get_stats()
+    assert stats["k_bits"] == 5 and stats["v_bits"] == 5
+
+
+def test_int5_threads_through_hf_cache_without_corruption(
+    torch_module, transformers_module,
+):
+    """INT4PerChannelCache(bits=5) round-trips cleanly. The original
+    §20.4.1 INT5 cell produced 0.98-repeat garbage because the 4-bit
+    packer corrupted 5-bit values; this pins that it is fixed."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    torch = torch_module
+
+    cache = INT4PerChannelCache(bits=5, k_group_size=32, v_group_size=32,
+                                asymmetric=True)
+    g = torch.Generator().manual_seed(7)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 48, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    k_back, v_back = cache.update(k, v, layer_idx=0)
+    assert k_back.shape == k.shape
+    assert _cosine(k, k_back) >= 0.99, "INT5 K via HF cache corrupted"
+    assert _cosine(v, v_back) >= 0.99, "INT5 V via HF cache corrupted"
+    assert cache.int4_config["k_bits"] == 5
+
+
+def test_kv_independent_bit_width(torch_module):
+    """Adaptive precision: k_bits / v_bits set independently. K at INT8
+    reconstructs more accurately than V at INT4, and the INT8 K channel
+    uses int8 (unpacked) storage while the INT4 V channel stays
+    nibble-packed — the §20.4.1 long-context-safe config."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+        k_bits=8, v_bits=4,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float16)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float16)
+    store.write_block(0, k, v)
+    block = store._blocks[0]
+    assert block.k_bit_packed is False, "INT8 K should be stored unpacked"
+    assert block.v_bit_packed is True, "INT4 V should be nibble-packed"
+    k_back, v_back = store.read_block(0)
+    cos_k = _cosine(k, k_back)
+    cos_v = _cosine(v, v_back)
+    assert cos_k > cos_v, (
+        f"INT8 K (cos {cos_k:.5f}) should reconstruct better than "
+        f"INT4 V (cos {cos_v:.5f})"
+    )
+    stats = store.get_stats()
+    assert stats["k_bits"] == 8 and stats["v_bits"] == 4
+    assert stats["bits_per_element"] is None  # mixed width → no single value
+
+
+def test_adaptive_kv_bits_threads_through_hf_cache(
+    torch_module, transformers_module,
+):
+    """K=8 / V=4 adaptive precision plumbs through the HF cache and is
+    recorded in int4_config — the §20.4.1 long-context-safe config."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    cache = INT4PerChannelCache(k_bits=8, v_bits=4, k_group_size=32,
+                                v_group_size=32, asymmetric=True)
+    cfg = cache.int4_config
+    assert cfg["k_bits"] == 8 and cfg["v_bits"] == 4
+    assert "int8" in cfg["scheme"] and "int4" in cfg["scheme"]
+    stats = cache.int4_stats
+    assert stats["k_bits"] == 8 and stats["v_bits"] == 4
+
+
+# --------------------------------------------------------------------- #
 # Static calibration (Path #6)                                          #
 # --------------------------------------------------------------------- #
 

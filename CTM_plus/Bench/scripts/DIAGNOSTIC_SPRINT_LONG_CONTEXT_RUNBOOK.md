@@ -1,30 +1,34 @@
 # §20.4 long-context decode-stability — diagnostic sprint runbook
 
-Status (this session): **harness + driver landed CPU-side, tests green.**
-Waiting for one GPU pod execution. Pairs with `RUNPOD_TRACK_D_E_RUNBOOK.md`
-(quality eval) and reuses the §20.4 `track_e_long_context.py` needle harness.
+Status: **round 1 ran 2026-05-17** — see `PHASE4_GPU_FINDINGS.md` §20.4.1.
+It isolated the failure: the **K channel** is the long-context INT4 blocker;
+V-INT4 is quality-neutral (96% needle at 16k, within noise of baseline). This
+runbook now drives the **extended (round-2) sprint** — the same harness plus
+the §20.4.1 follow-on cells: a fixed INT5 cell and a K-bit adaptive-precision
+ladder. Pairs with `RUNPOD_TRACK_D_E_RUNBOOK.md`; reuses
+`track_e_long_context.py`.
 
-## Why this sprint
+## Why round 2
 
-The §20.4 GPU run found INT4 KV-cache long-context decode degrades — needle
-retrieval collapsed from baseline ~100% to ~11% at 16k, and a sink-FP16 run
-(`sink_size=16`) only partially recovered it (22% → 56%). Throughput (§20.1)
-is a *known* blocker — the fused Marlin kernel — and is **not** the current
-gating risk. The gating risk is whether INT4 long-context is salvageable at
-all.
+Round 1 answered "which channel breaks?" (K). Round 2 answers **"how few bits
+can K take while staying long-context-safe?"** — the path to recovering the
+full 3–4× compression instead of the ~1.6× that V-INT4-only delivers. It also
+re-runs INT5 properly: round 1's INT5 cell was corrupt (the 4-bit packer
+mangled 5-bit values); the store now keeps >4-bit channels in int8, so INT5 is
+a real measurement.
 
-This sprint isolates the failure mode with three bounded experiments, all on
-the **same 16k needle-in-haystack setup** so the only moving part per cell is
-the knob under test:
+All cells use the **same 16k needle-in-haystack setup** — the only moving part
+per cell is the knob under test:
 
 | Cell group | Knob | Cells | Question |
 |------------|------|-------|----------|
-| 1. Sink sweep | `sink_size ∈ {0,4,16,32,64,128}` | 6 | Does protecting more attention-sink tokens at FP16 close the gap? |
-| 2. K/V ablation | `quantize_k` / `quantize_v` | 2 | Is the failure in the K channel, the V channel, or both? |
-| 3. INT5 | `bits=5` | 1 | Does one extra bit of headroom close the gap? |
+| 1. Sink sweep | `--sink-size ∈ {0,4,16,32,64,128}` | 6 | Does protecting attention-sink tokens at FP16 close the gap? |
+| 2. K/V ablation | `--no-quantize-k` / `--no-quantize-v` | 2 | Is the failure in the K channel, the V channel, or both? |
+| 3. INT5 | `--bits 5` (both channels) | 1 | Does one extra bit on both channels close the gap? |
+| 4. K-bit ladder | `--k-bits {8,6,5} --v-bits 4` | 3 | How few bits can K take with V fixed at INT4? |
 
-It is **not** a benchmark expansion: no new models, no new context lengths,
-no route-A, no Marlin kernel. Nine cells, one model, one context length.
+Twelve cells, one model, one context length. No new models, no route-A, no
+Marlin kernel.
 
 ## One command
 
@@ -39,87 +43,72 @@ bash scripts/diagnostic_sprint_long_context.sh
 Overrides via environment variables (all optional):
 
 ```bash
-MODEL=Qwen/Qwen2.5-7B-Instruct \
-DTYPE=float16 DEVICE=auto \
+MODEL=Qwen/Qwen2.5-7B-Instruct DTYPE=float16 DEVICE=auto \
 OUTDIR=bench_out/diag_sprint \
-CTX=16000 DEPTHS=0.1,0.5,0.9 SAMPLES=3 DECODE_TOKENS=64 \
+CTX=16000 DEPTHS=0.1,0.5,0.9 SAMPLES=8 DECODE_TOKENS=64 \
   bash scripts/diagnostic_sprint_long_context.sh
 ```
 
-Wall time ≈ 15–20 min on an A100 40 GB (the model reloads once per cell — nine
-loads; this keeps each cell a clean process and is the simplest correct form).
-Output: nine JSONs in `bench_out/diag_sprint/` —
-`sink_{0,4,16,32,64,128}.json`, `k_only.json`, `v_only.json`, `int5.json`.
+`SAMPLES=8` gives n=24 trials/cell (3 depths × 8) — enough to separate the
+cells at the gap sizes seen in round 1; `SAMPLES=3` (n=9) is too noisy to
+read. Wall time ≈ 25–35 min on an A100 (model reloads once per cell — twelve
+loads; each cell is a clean process). Output: twelve JSONs in
+`bench_out/diag_sprint/` — `sink_{0,4,16,32,64,128}.json`, `k_only.json`,
+`v_only.json`, `int5.json`, `adaptive_k{8,6,5}v4.json`.
 
 ## What each cell runs
 
 Every cell calls `track_e_long_context.py` with the fixed 16k needle setup:
-`--context-lengths 16000 --needle-depths 0.1,0.5,0.9 --needle-samples 3
---needle-decode-tokens 64 --skip-perplexity`. Perplexity is skipped on
-purpose — the §20.4 story is the **perplexity-vs-decode divergence**, and this
-sprint is the decode side. Drop `--skip-perplexity` in the driver's `COMMON`
-array if you also want the 16k perplexity number.
+`--context-lengths 16000 --needle-depths 0.1,0.5,0.9 --needle-samples 8
+--needle-decode-tokens 64 --skip-perplexity`.
 
-* **Cell group 1 — sink sweep.** Adds `--sink-size N` for each N. The first N
-  token positions pass through at FP16; positions `[N:]` are INT4.
-* **Cell group 2 — K/V ablation.** `--no-quantize-v` is K-only INT4 (V passes
-  through at FP16); `--no-quantize-k` is V-only INT4 (K passes through at
-  FP16). Both at the base config (`sink_size=0`) so the channel is the only
-  variable. The toggle is implemented in `INT4PerChannelCache` — the disabled
-  channel's tensor is returned as the FP16 source; the kvstore still
-  round-trips both internally, so the **memory footprint reported for a K-only
-  or V-only cell is the fully-quantized lower bound, not the true half-FP16
-  footprint.** Memory is a secondary signal here; the K/V decision is read off
-  needle success + stutter, not memory.
-* **Cell group 3 — INT5.** `--bits 5`, base config. INT5 quantizes to a wider
-  range; storage stays at the 4-bit pack layout (heap unchanged) so this cell
-  measures the *quality* headroom of one extra bit, not a memory number.
+* **Cell group 1 — sink sweep.** `--sink-size N`: the first N token positions
+  pass through at FP16, positions `[N:]` are INT4.
+* **Cell group 2 — K/V ablation.** `--no-quantize-v` is K-only INT4 (V at
+  FP16); `--no-quantize-k` is V-only INT4 (K at FP16). Base config,
+  `sink_size=0`.
+* **Cell group 3 — INT5.** `--bits 5` on both channels. Now a real
+  measurement: the store stores >4-bit channels as int8 (unpacked) rather
+  than corrupting them in the 4-bit nibble packer.
+* **Cell group 4 — K-bit ladder.** `--k-bits {8,6,5} --v-bits 4`: K quantized
+  at 8/6/5 bits, V fixed at INT4. This is the §20.4.1 adaptive-precision
+  config — V stays at the quality-neutral INT4, K climbs in precision until
+  it is long-context-safe. The lowest K-bits that holds needle accuracy
+  within noise of baseline is the recommended ship config.
 
 ## What is logged
 
-Per needle trial (`needle_rows[]` in each JSON), the §20.4.v2 schema:
-
-* `correct` — needle retrieval success (the answer code appears in the decoded
-  window; whitespace-tolerant substring match — this is the contains-answer
-  score).
-* `first_stutter_position` — token index where the decode first starts to loop
-  (consecutive-token repeat or an immediately repeating bigram); `-1` = no
-  stutter in the decoded window.
-* `repeated_token_rate` — `1 − unique/total` over the decoded tokens; catches
-  AB-AB loops a consecutive-only check misses.
-* `decode_entropy_mean` / `decode_entropy_min` — next-token distribution
-  entropy (nats) across decode steps.
-* `decode_entropy_collapsed` — heuristic flag, `True` when mean entropy <
-  `0.30` nats (degenerate-loop signature; tune the threshold against observed
-  runs — it is `_ENTROPY_COLLAPSE_NATS` in `track_e_long_context.py`).
-* `cache_fp16_bytes` / `cache_compressed_bytes` / `cache_compression_ratio` —
-  memory footprint (see the K/V-ablation caveat above).
-* `decode_tokens_per_s` — secondary throughput/latency signal.
-
-Per context length (`deltas.per_context_length[]`), aggregated for the INT4
-cache: `int4_needle_accuracy`, `int4_first_stutter_earliest`,
-`int4_stutter_trial_rate`, `int4_repeated_token_rate_mean`,
-`int4_decode_entropy_mean`, `int4_entropy_collapse_rate`,
-`int4_decode_tokens_per_s_mean`, `int4_cache_compression_ratio`. The harness
-also prints an `int4 decode:` line under each cell's needle summary.
+Per needle trial (`needle_rows[]`, schema `§20.4.v2`): `correct` (retrieval
+success), `first_stutter_position`, `repeated_token_rate`,
+`decode_entropy_mean`/`min`, `decode_entropy_collapsed`, `cache_*_bytes` +
+`cache_compression_ratio`, `decode_tokens_per_s`. Per context length
+(`deltas.per_context_length[]`): `int4_needle_accuracy`,
+`int4_first_stutter_earliest`, `int4_stutter_trial_rate`,
+`int4_repeated_token_rate_mean`, `int4_decode_entropy_mean`,
+`int4_entropy_collapse_rate`, `int4_cache_compression_ratio`. The harness
+prints an `int4 decode:` line under each cell.
 
 ## Decision rule
 
-Pre-decided so the sprint has a terminal state:
+The ladder finds the **quality floor** for K; actual memory is a separate
+axis because the store has no sub-byte packer above 4 bits — any K in
+{5,6,7,8} is stored as int8 today.
 
-* **Sink sweep or INT5 closes the gap** (INT4 needle accuracy back within
-  noise of baseline, no entropy collapse, no early stutter) → **INT4 is
-  viable** for long context with that config; promote the winning
-  `sink_size` / `bits` into the §18.3 ship config.
-* **K-only / V-only isolates the failure** (one channel's ablation cell is
-  healthy, the other is not) → pursue **adaptive precision** around the
-  failing channel (e.g. K at FP16 / higher bits, V at INT4, or vice versa).
-* **Nothing closes the gap** → **FP8 becomes the long-context default**, and
-  INT4 is scoped to short/medium context only. Update the Honest Validation
-  Status in the VC brief and `PHASE4_GPU_FINDINGS.md` §20.4 accordingly.
+* **A K-bit-ladder cell holds** (needle accuracy within noise of the 100%
+  baseline, no early stutter) → that K-bits is the quality floor, and
+  V-INT4 + K-INT{floor} is the ship config. Memory today: K stored int8 + V
+  4-bit-packed → **actual ~2.67× heap compression**, identical across the
+  whole {5..8} K range. The floor tells you what a future sub-byte K packer
+  should target — K=6 → ~3.2× theoretical, K=5 → ~3.6×.
+* **No ladder cell holds below K=8** → ship V-INT4 + K-FP16 (~1.6×, the
+  §20.4.1 fallback); K-class INT4 compression is unsolved and the next step
+  is a K-specific outlier scheme, not just more bits.
+* **INT5-both holds** → a uniform alternative, but note INT5-both stores
+  *both* channels int8 today → only ~2× actual heap, *worse* than the
+  adaptive K8/V4's 2.67× (which keeps V in the efficient 4-bit-packed path).
+  INT5-both is only competitive once a 5-bit packer exists (~3.2×).
 
-## Out of scope (do not start here)
+## Out of scope
 
-Route-A vLLM `cache_kv` integration and the fused Marlin unpack-attend kernel
-are explicitly **not** part of this sprint. They are the §20.1 throughput
-track; this sprint only resolves the §20.4 long-context stability question.
+Route-A vLLM `cache_kv` integration and the fused Marlin kernel are the §20.1
+throughput track — not part of this sprint.

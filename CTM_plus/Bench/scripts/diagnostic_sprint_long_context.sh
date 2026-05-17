@@ -6,7 +6,8 @@
 #
 #   1. Sink sweep      — sink_size in {0,4,16,32,64,128}     (6 cells)
 #   2. K/V ablation    — K-only INT4, V-only INT4            (2 cells)
-#   3. INT5            — bits=5, base config                 (1 cell)
+#   3. INT5            — bits=5 both channels                (1 cell)
+#   4. K-bit ladder    — K in {8,6,5} / V=INT4 (adaptive)    (3 cells)
 #
 # Every cell uses the SAME 16k needle setup (depths 0.1/0.5/0.9, 3 samples,
 # 64 decoded tokens, perplexity skipped) so the only moving part per cell is
@@ -76,14 +77,26 @@ run_cell "V-only INT4 (K passes through FP16)" \
   --no-quantize-k \
   --output "${OUTDIR}/v_only.json"
 
-# ---- Cell group 3: INT5 (base config, sink=0) ----
-run_cell "INT5 (bits=5)" \
+# ---- Cell group 3: INT5 both channels (base config, sink=0) ----
+# Now a real measurement — the store stores >4-bit channels unpacked
+# rather than corrupting them in the 4-bit packer.
+run_cell "INT5 both channels (bits=5)" \
   --bits 5 \
   --output "${OUTDIR}/int5.json"
 
+# ---- Cell group 4: adaptive precision — K-bit ladder, V fixed at INT4 ----
+# §20.4.1 isolated K as the long-context blocker and V-INT4 as
+# quality-neutral. This ladder asks how few bits K can take while
+# staying long-context-safe: K in {8,6,5}, V fixed at INT4.
+for KBITS in 8 6 5; do
+  run_cell "Adaptive precision: K-INT${KBITS} / V-INT4" \
+    --k-bits "${KBITS}" --v-bits 4 \
+    --output "${OUTDIR}/adaptive_k${KBITS}v4.json"
+done
+
 echo
 echo "================================================================"
-echo "  Diagnostic sprint complete. 9 cell JSONs in ${OUTDIR}/"
+echo "  Diagnostic sprint complete. 12 cell JSONs in ${OUTDIR}/"
 echo "================================================================"
 echo "Read the 'int4 decode:' line printed under each cell's needle row,"
 echo "or grep the aggregates:"

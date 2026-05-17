@@ -666,6 +666,14 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--no-asymmetric-int4", action="store_false",
                         dest="asymmetric_int4")
     parser.add_argument("--bits", type=int, default=4)
+    # §20.4.1 adaptive precision: --k-bits / --v-bits override --bits
+    # per channel. The headline config is --k-bits 8 --v-bits 4 (K at
+    # INT8, V at INT4) — the long-context-safe middle ground between
+    # full INT4 (K-channel breaks) and K-FP16. None = use --bits.
+    parser.add_argument("--k-bits", type=int, default=None,
+                        help="Override bit width for K (default: --bits).")
+    parser.add_argument("--v-bits", type=int, default=None,
+                        help="Override bit width for V (default: --bits).")
     parser.add_argument("--sink-size", type=int, default=0)
     # §20.4 diagnostic-sprint K/V ablation toggles. Default: quantize
     # both (the §18.3 ship config). --no-quantize-k passes K through at
@@ -758,18 +766,22 @@ def main(argv: Sequence[str]) -> int:
         )
         reference_text = _build_haystack(max(context_lengths) + 1000, rng)
 
+    eff_k_bits = args.k_bits if args.k_bits is not None else args.bits
+    eff_v_bits = args.v_bits if args.v_bits is not None else args.bits
     int4_config = {
         "quant": "int4-per-channel",
         "k_group_size": args.k_group_size,
         "v_group_size": args.v_group_size,
         "asymmetric": args.asymmetric_int4,
         "bits": args.bits,
+        "k_bits": eff_k_bits,
+        "v_bits": eff_v_bits,
         "sink_size": args.sink_size,
         "quantize_k": bool(args.quantize_k),
         "quantize_v": bool(args.quantize_v),
         "scheme": (
-            f"K={'per-channel INT' + str(args.bits) if args.quantize_k else 'FP16'}, "
-            f"V={'per-token INT' + str(args.bits) if args.quantize_v else 'FP16'}, "
+            f"K={'per-channel INT' + str(eff_k_bits) if args.quantize_k else 'FP16'}, "
+            f"V={'per-token INT' + str(eff_v_bits) if args.quantize_v else 'FP16'}, "
             f"{'asymmetric' if args.asymmetric_int4 else 'symmetric'}, "
             f"k_group={args.k_group_size}, v_group={args.v_group_size}, "
             f"sink={args.sink_size}"
@@ -827,6 +839,8 @@ def main(argv: Sequence[str]) -> int:
         v_group_size=args.v_group_size,
         asymmetric=args.asymmetric_int4,
         bits=args.bits,
+        k_bits=args.k_bits,
+        v_bits=args.v_bits,
         quantize_k=args.quantize_k,
         quantize_v=args.quantize_v,
     )
