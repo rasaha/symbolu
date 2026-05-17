@@ -90,23 +90,32 @@ prints an `int4 decode:` line under each cell.
 
 ## Decision rule
 
-The ladder finds the **quality floor** for K; actual memory is a separate
-axis because the store has no sub-byte packer above 4 bits — any K in
-{5,6,7,8} is stored as int8 today.
+The ladder finds the **quality floor** for K. Memory is a separate axis: the
+store has no sub-byte packer above 4 bits, so any K in {5,6,7,8} is stored as
+int8 — the *actual heap* is the same regardless of K-bits; only the *quality*
+differs.
+
+Actual-heap compression, anchored on the established full-INT4 number (~3.2×,
+both channels 4-bit, §18.3) and ~5 effective bits/element per channel after
+group + asymmetric scale overhead:
+
+| Config | Actual heap compression |
+|---|---|
+| Full INT4 (K4 / V4) — RED for long context | ~3.2× |
+| V-INT4 + K-INT8 (also K-INT5/6/7 — all int8-stored) | ~2.3× |
+| V-INT4 + K-FP16 (§20.4.1 fallback) | ~1.5× |
+| INT5 both channels (both int8-stored) | ~1.8× |
 
 * **A K-bit-ladder cell holds** (needle accuracy within noise of the 100%
-  baseline, no early stutter) → that K-bits is the quality floor, and
-  V-INT4 + K-INT{floor} is the ship config. Memory today: K stored int8 + V
-  4-bit-packed → **actual ~2.67× heap compression**, identical across the
-  whole {5..8} K range. The floor tells you what a future sub-byte K packer
-  should target — K=6 → ~3.2× theoretical, K=5 → ~3.6×.
-* **No ladder cell holds below K=8** → ship V-INT4 + K-FP16 (~1.6×, the
-  §20.4.1 fallback); K-class INT4 compression is unsolved and the next step
-  is a K-specific outlier scheme, not just more bits.
-* **INT5-both holds** → a uniform alternative, but note INT5-both stores
-  *both* channels int8 today → only ~2× actual heap, *worse* than the
-  adaptive K8/V4's 2.67× (which keeps V in the efficient 4-bit-packed path).
-  INT5-both is only competitive once a 5-bit packer exists (~3.2×).
+  baseline, no early stutter) → V-INT4 + K-INT{that} is the ship config,
+  **~2.3× actual heap today**. A lower quality floor does not reduce today's
+  heap (K stays int8 either way) but it justifies building a sub-byte K
+  packer as a follow-on — that is what would lift ~2.3× toward ~3×.
+* **No ladder cell holds below K=8** → ship V-INT4 + K-FP16 (~1.5×); K-class
+  INT4 compression is unsolved and the next step is a K-specific outlier
+  scheme, not just more bits.
+* **INT5-both holds** → uniform but weaker on memory than adaptive K8/V4
+  (~1.8× vs ~2.3×), because it loses V's efficient 4-bit-packed path.
 
 ## Out of scope
 

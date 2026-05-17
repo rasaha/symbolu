@@ -312,17 +312,22 @@ def _repeated_token_rate(ids: List[int]) -> float:
 
 
 def _cache_memory_stats(cache: Any) -> tuple[int, int, float]:
-    """Return ``(fp16_bytes, compressed_bytes, compression_ratio)``.
+    """Return ``(fp16_bytes, compressed_bytes, actual_compression_ratio)``.
 
     The INT4 route-B cache exposes ``int4_stats`` with measured byte
     counters from the kvstore. The baseline DynamicCache has no such
     counters, so we sum its key/value tensor bytes (ratio 1.0).
+
+    The ratio is the *actual heap* ratio (``actual_compression_ratio``),
+    consistent with ``compressed_bytes`` (= ``bytes_out_actual``). For
+    > 4-bit channels (e.g. K-INT8) this is lower than the theoretical
+    ``compression_ratio`` — int8 storage until a sub-byte packer lands.
     """
     stats = getattr(cache, "int4_stats", None)
     if isinstance(stats, dict) and "bytes_in" in stats:
         fp16 = int(stats.get("bytes_in", 0))
         comp = int(stats.get("bytes_out_actual", 0))
-        ratio = float(stats.get("compression_ratio", 0.0))
+        ratio = float(stats.get("actual_compression_ratio", 0.0))
         return fp16, comp, ratio
     total = 0
     layers = getattr(cache, "layers", None)

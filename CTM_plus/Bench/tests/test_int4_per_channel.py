@@ -922,6 +922,10 @@ def test_bits_param_int5_kvstore_round_trip(torch_module):
     assert _cosine(v, v_back) >= 0.99, "INT5 V corrupted"
     stats = store.get_stats()
     assert stats["k_bits"] == 5 and stats["v_bits"] == 5
+    # INT5 stores int8 (8-bit heap) for a 5-bit theoretical rate, so the
+    # actual-heap ratio must be strictly below the theoretical one —
+    # they are not interchangeable above 4 bits.
+    assert stats["actual_compression_ratio"] < stats["compression_ratio"]
 
 
 def test_int5_threads_through_hf_cache_without_corruption(

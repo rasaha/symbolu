@@ -475,12 +475,13 @@ def dequantize_per_token_int4(
 class INT4Block:
     """Per-block compressed state.
 
-    Storage layout (bit-packed):
-      * K quantized values: ``k_packed`` uint8, two 4-bit values per
-        byte along the head_dim axis. Shape ``(S, H, ceil(D/2)) uint8``
-        when the head_dim is the packing axis (the default).
-      * V quantized values: ``v_packed`` uint8, same packing along
-        head_dim.
+    Storage layout:
+      * K / V quantized values: ``k_packed`` / ``v_packed``. When the
+        channel's bit width is ≤ 4 these are uint8 with two 4-bit
+        values nibble-packed per byte, shape ``(S, H, ceil(D/2))``.
+        When > 4 bits (INT5–INT8) the value range exceeds a nibble so
+        the channel is stored as a raw int8 tensor ``(S, H, D)`` —
+        ``k_bit_packed`` / ``v_bit_packed`` record which path applies.
       * Scales / offsets stored as float16 (16 bits each) rather than
         float32, so the partner-shareable ``compression_ratio`` =
         ``original_bytes / actual_stored_bytes`` matches the
@@ -491,9 +492,9 @@ class INT4Block:
     ``unpack_int4`` can trim the pad byte (if D is odd).
     """
 
-    k_packed: "torch.Tensor"       # (S, H, ceil(D/2)) uint8 — packed K
+    k_packed: "torch.Tensor"       # K quantized: uint8 nibble-packed, or int8 if >4-bit
     k_scale: "torch.Tensor"        # (n_groups_s, H, D) float16
-    v_packed: "torch.Tensor"       # (S, H, ceil(D/2)) uint8 — packed V
+    v_packed: "torch.Tensor"       # V quantized: uint8 nibble-packed, or int8 if >4-bit
     v_scale: "torch.Tensor"        # (S, H, n_groups_d) float16
     original_shape: Tuple[int, ...]
     original_dtype: Any
@@ -518,13 +519,15 @@ class INT4Block:
     @property
     def theoretical_packed_bytes(self) -> int:
         """Theoretical bit-packed storage (independent of actual heap):
-          * K: ``bits`` * S*H*D + 16 * n_groups_s * H*D × (2 if asymmetric else 1)
-          * V: ``bits`` * S*H*D + 16 * S*H * n_groups_d × (2 if asymmetric else 1)
+          * K: ``k_bits`` * S*H*D + 16 * n_groups_s * H*D × (2 if asymmetric else 1)
+          * V: ``v_bits`` * S*H*D + 16 * S*H * n_groups_d × (2 if asymmetric else 1)
 
-        At bits=4 (default KIVI), this is ≈ ``actual_stored_bytes``.
-        At bits=3 (experimental), the theoretical bit-rate is lower
-        but actual heap stays at 4-bit packing until proper INT3
-        packing is implemented.
+        This is the ratio a *fully sub-byte-packed* implementation would
+        reach. At ≤ 4 bits the store actually nibble-packs, so this is
+        ≈ ``actual_stored_bytes``. At > 4 bits the store keeps the
+        channel as int8 (8 bits/elem), so ``actual_stored_bytes`` is
+        larger than this number until a wider sub-byte packer lands —
+        compare ``compression_ratio`` (this) vs ``actual_compression_ratio``.
         """
         s, h, d = self.original_shape
         n_groups_s = int(self.k_scale.shape[0])
@@ -539,13 +542,16 @@ class INT4Block:
     def actual_stored_bytes(self) -> int:
         """Real heap bytes consumed by this block's tensors.
 
-        After bit-packing landed:
-          * ``k_packed`` / ``v_packed`` are uint8 (1 byte per packed pair).
+          * ``k_packed`` / ``v_packed`` are uint8 (1 byte per nibble
+            pair) for ≤ 4-bit channels, or int8 (1 byte per element)
+            for > 4-bit channels.
           * Scales / offsets are float16 (2 bytes each).
 
-        Should match ``theoretical_packed_bytes`` within a small
-        constant (any pad byte from odd D); partner-shareable
-        compression-ratio claims can use either number now.
+        For ≤ 4-bit channels this matches ``theoretical_packed_bytes``
+        within a small odd-D pad constant. For > 4-bit channels it is
+        larger (int8 storage vs the sub-byte theoretical) — the two
+        numbers are reported separately as ``actual_compression_ratio``
+        and ``compression_ratio``.
         """
         b = (
             int(self.k_packed.element_size() * self.k_packed.numel())
@@ -753,9 +759,12 @@ class INT4PerChannelKVStore:
 
     @property
     def compression_ratio(self) -> float:
-        """Theoretical bit-packed compression ratio (source / bit-packed).
-        With actual bit-packing landed, this matches ``actual_compression_ratio``
-        within rounding."""
+        """Theoretical sub-byte-packed compression ratio (source /
+        theoretical bytes). For ≤ 4-bit channels this matches
+        ``actual_compression_ratio`` within rounding; for > 4-bit
+        channels it is *higher* than actual, since the store keeps
+        > 4-bit channels as int8 — this is the target a future
+        sub-byte packer would reach, not today's heap."""
         out = self._stats["bytes_out_theoretical"]
         if out == 0:
             return 0.0
@@ -763,10 +772,10 @@ class INT4PerChannelKVStore:
 
     @property
     def actual_compression_ratio(self) -> float:
-        """Actual heap-storage compression ratio (source / real bytes used).
-        Reports the true memory savings after pack_int4 / fp16 scales.
-        Should match ``compression_ratio`` within a tiny constant from
-        any odd-D padding byte."""
+        """Actual heap-storage compression ratio (source / real bytes
+        used) — the honest memory-savings number. Equals
+        ``compression_ratio`` for ≤ 4-bit channels; lower than it for
+        > 4-bit channels (int8 storage until a sub-byte packer lands)."""
         out = self._stats["bytes_out_actual"]
         if out == 0:
             return 0.0

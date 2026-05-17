@@ -2879,12 +2879,33 @@ follow-on, out of this sprint's scope.
 **Revised §20.4 verdict — RED for full INT4, blocker isolated.**
 Long-context INT4 on both channels remains RED (29% needle). But the
 decomposition gives a shippable path: **V-INT4 + K-FP16 is measured
-quality-neutral at 16k** (96% needle, 0% stutter) and yields a real
-~1.6× KV-cache compression with no measured long-context quality
-loss (KV is half K, half V; V at 4× → overall (1 + 0.25)/2 = 0.625×
-→ 1.6×). FP8 does **not** have to become the long-context default.
-Full 3–4× INT4 needs the K channel solved; that is the §20.4 open
-research question, not a shipping blocker.
+quality-neutral at 16k** (96% needle, 0% stutter) with no measured
+long-context quality loss. Memory consequence: ~1.5× KV-cache
+compression — K stays FP16 (16 bits/elem), V compresses to ~5
+effective bits/elem (4-bit values + group/asymmetric scale overhead;
+V's standalone ratio ~3.2×), so 32 / (16 + 5) ≈ 1.5×. FP8 does
+**not** have to become the long-context default. Full 3–4× INT4
+needs the K channel solved; that is the §20.4 open research
+question, not a shipping blocker.
+
+**Follow-on capability — landed CPU-side, GPU validation pending.**
+The INT5-untestable gap above is now closed: the route-B kvstore
+stores > 4-bit channels as int8 (unpacked) rather than corrupting
+them in the 4-bit packer, and K/V take independent bit widths
+(`k_bits` / `v_bits`). This makes the adaptive-precision
+recommendation directly runnable. Projected actual-heap compression
+(anchored on full-INT4 ~3.2× and ~5 effective bits/elem/channel):
+V-INT4 + K-INT8 ≈ **2.3×**, vs ~1.5× for V-INT4 + K-FP16 and ~3.2×
+for full INT4. Note any K in {5..8} stores as int8 → same ~2.3×
+actual heap; a sub-byte K packer is the lever from there toward ~3×.
+A K-bit ladder (K ∈ {8,6,5}, V=INT4) plus a now-valid INT5 cell are
+wired into `scripts/diagnostic_sprint_long_context.sh`. Whether
+K-INT8 actually restores long-context quality is the open question
+for the round-2 GPU run — see
+`scripts/DIAGNOSTIC_SPRINT_LONG_CONTEXT_RUNBOOK.md`. Status: the
+capability is **measured-correct on CPU** (round-trip + bit-width
+unit tests); adaptive-precision long-context quality is **projected,
+not yet measured**.
 
 Artefacts: `bench_out/diag_sprint/{sink_0,sink_4,sink_16,sink_32,
 sink_64,sink_128,k_only,v_only,int5}.json` — generated on the RunPod
