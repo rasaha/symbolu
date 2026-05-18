@@ -1,0 +1,75 @@
+{
+  "schema_version": "§20.1.v1",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "hf_int4_config": {
+    "quant": "int4-per-channel",
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "bits": 4,
+    "sink_size": 0,
+    "prefill_lengths": [
+      1024
+    ],
+    "decode_tokens": 256,
+    "trials": 5,
+    "warmup": 2,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric, k_group=32, v_group=32"
+  },
+  "hf_prefill_length_for_decode_cells": 1024,
+  "cells": {
+    "A_vllm_fp16": {
+      "label": "A — vLLM FP16",
+      "tokens_per_second": 1043.4637005961401,
+      "source": "bench_out/fp8_int4_throughput/vllm_fp16_flashinfer/streaming_summary.json",
+      "note": null,
+      "n_requests_completed": 0,
+      "n_requests_admitted": 0,
+      "n_decode_tokens": 8192,
+      "swap_out_blocks": 0,
+      "wall_clock_seconds": 7.850776213221252,
+      "workload_name": null,
+      "policy_name": null
+    },
+    "B_vllm_fp8": {
+      "label": "B — vLLM FP8",
+      "tokens_per_second": 1231.5324830873985,
+      "source": "bench_out/fp8_int4_throughput/vllm_fp8_flashinfer/streaming_summary.json",
+      "note": null,
+      "n_requests_completed": 0,
+      "n_requests_admitted": 0,
+      "n_decode_tokens": 8192,
+      "swap_out_blocks": 0,
+      "wall_clock_seconds": 6.6518748896196485,
+      "workload_name": null,
+      "policy_name": null
+    },
+    "C_hf_fp16": {
+      "label": "C — HF FP16 (decode-only, prefill=1024)",
+      "tokens_per_second": 41.52343774792596,
+      "source": "bench_out/track_e_audit_followups/int4_throughput_hf.json",
+      "note": null,
+      "median_decode_tokens_per_sec": 37.79912985517739,
+      "median_prefill_ms": 96.0632860660553,
+      "n_trials": 5
+    },
+    "D_hf_int4": {
+      "label": "D — HF INT4 KIVI (decode-only, prefill=1024)",
+      "tokens_per_second": 19.33545003251938,
+      "source": "bench_out/track_e_audit_followups/int4_throughput_hf.json",
+      "note": null,
+      "median_decode_tokens_per_sec": 18.89759042377465,
+      "median_prefill_ms": 98.06076623499393,
+      "n_trials": 5
+    }
+  },
+  "ratios": {
+    "B_over_A": 1.1802350981484195,
+    "D_over_C": 0.4656514749548924,
+    "D_over_A": 0.018530064842191312
+  },
+  "verdicts": {
+    "fp8_overhead": "FP8 is throughput-free vs FP16 in vLLM (matches the published claim).",
+    "int4_route_b_algorithm_cost": "**RED.** Pure-PyTorch unpack dominates. Marlin-style kernel is the actual blocker (§20.6); route-A second."
+  }
+}

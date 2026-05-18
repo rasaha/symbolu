@@ -36,40 +36,46 @@ python -c "import vllm; print('vllm', vllm.__version__)"
 
 ## 1. Cells A and B — vLLM FP16 baseline + FP8
 
-Both reuse the §13.3 `run_streaming.py` harness with the new `--kv-cache-dtype` flag. No CTM+ flags (we're measuring KV-quantization, not eviction; the §13.3 CTM+ run is a separate axis).
+Use `vllm_throughput_cell.py`. **Do NOT use `run_streaming.py` for
+cells A/B** — that is the §13.3 *swap-event* harness; on the chat_32k
+workload it is prefill-bound and its synthetic prompts trigger early
+EOS, so `decode_tokens` collapses to single digits and the derived
+tokens/sec is noise. `vllm_throughput_cell.py` uses fixed-length
+prompts + `ignore_eos=True` so the decode path is actually measured.
+
+Requires the venv-vllm environment with **vLLM 0.7.3** (`pip install
+'vllm==0.7.3'`) and **transformers 4.x** (`pip install
+'transformers==4.48.3'` — vLLM 0.7.3's tokenizer API breaks on
+transformers 5.x). See §0 Prerequisites.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
-
 mkdir -p bench_out/fp8_int4_throughput/{vllm_fp16,vllm_fp8,hf_fp16,hf_int4}
 
 # Cell A — vLLM with stock FP16 KV (the upper-bound throughput).
-python -m ctm_bench.scripts.run_streaming \
-    --model Qwen/Qwen2.5-7B-Instruct \
-    --workload chat_32k --seed 42 \
-    --gpu-memory-utilization 0.26 --swap-space-gb 16 \
-    --arrival-rate 6.0 --arrival-alpha 1.5 \
-    --max-requests 30 --max-wall-seconds 60 \
-    --max-decode-tokens 2048 \
-    --prompt-length-choices "8000,16000,24000,30000" \
-    --output-dir bench_out/fp8_int4_throughput/vllm_fp16 \
-    2>&1 | tee bench_out/fp8_int4_throughput/vllm_fp16/run.log
+python -m ctm_bench.scripts.vllm_throughput_cell \
+    --kv-cache-dtype auto \
+    --output bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json
 
 # Cell B — vLLM with FP8 KV (the competitor).
-python -m ctm_bench.scripts.run_streaming \
-    --model Qwen/Qwen2.5-7B-Instruct \
-    --workload chat_32k --seed 42 \
-    --gpu-memory-utilization 0.26 --swap-space-gb 16 \
-    --arrival-rate 6.0 --arrival-alpha 1.5 \
-    --max-requests 30 --max-wall-seconds 60 \
-    --max-decode-tokens 2048 \
-    --prompt-length-choices "8000,16000,24000,30000" \
+python -m ctm_bench.scripts.vllm_throughput_cell \
     --kv-cache-dtype fp8 \
-    --output-dir bench_out/fp8_int4_throughput/vllm_fp8 \
-    2>&1 | tee bench_out/fp8_int4_throughput/vllm_fp8/run.log
+    --output bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json
 ```
 
-Read `tokens_per_second` out of each cell's `streaming_summary.json`. Expected: B is within ~5% of A (FP8 runs on tensor cores; overhead is dispatch only).
+Each cell is ~2 min (model load + warmup + a 32-prompt × 256-token
+timed batch). The script writes a `tokens_per_second` field at the
+exact path the composer reads. On an 80 GB A100 raise
+`--gpu-memory-utilization` if you want a bigger KV cache; the default
+0.5 is fine.
+
+Note: with FP8 KV, vLLM 0.7.3 logs `Cannot use FlashAttention-2
+backend for FP8 KV cache` and falls back to XFormers — that is
+expected and fine for the comparison (set `VLLM_ATTENTION_BACKEND=
+FLASHINFER` only if you want FP8's best-case path).
+
+Read `tokens_per_second` out of each cell's JSON. Expected: B is
+within ~5% of A (FP8 runs on tensor cores; overhead is dispatch only).
 
 **Decision tree (B / A ratio):**
 
@@ -141,15 +147,31 @@ The 32768 prefill length is the §20.4 long-context cell (KV memory pressure is 
 
 ## 3. Compose the partner-shareable comparison
 
-After all four cells, run the reader script (to be landed alongside this runbook in a follow-up commit; for now the JSON files contain everything):
-
 ```bash
-# Compose the four numbers manually until the reader script lands.
-echo "Cell A (vLLM FP16):   $(jq .tokens_per_second bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json) tok/s"
-echo "Cell B (vLLM FP8):    $(jq .tokens_per_second bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json) tok/s"
-echo "Cell C (HF FP16):     $(jq '.aggregates."baseline@prefill=2048".best_decode_tokens_per_sec' bench_out/track_e_audit_followups/int4_throughput_hf.json) tok/s (decode-only, prefill=2048)"
-echo "Cell D (HF INT4):     $(jq '.aggregates."int4-per-channel@prefill=2048".best_decode_tokens_per_sec' bench_out/track_e_audit_followups/int4_throughput_hf.json) tok/s (decode-only, prefill=2048)"
+cd /workspace/symbolu/CTM_plus/Bench
+python -m ctm_bench.scripts.compose_throughput_comparison \
+    --json-output bench_out/track_e_audit_followups/fp8_int4_comparison.json \
+    > /tmp/section_20_1_table.md
+cat /tmp/section_20_1_table.md
 ```
+
+The composer reads the four JSONs (cells A and B from vLLM, cells C
+and D from the HF throughput script), computes the B/A and D/C ratios,
+maps them to the runbook's GREEN / YELLOW / RED bands, and writes
+both a markdown table for `PHASE4_GPU_FINDINGS.md` §20.1 and a
+partner-shareable merged JSON (schema version pinned at `§20.1.v1`).
+
+Partial input is handled: if a cell's JSON is missing or malformed,
+the composer prints `MEASUREMENT MISSING — GPU run pending` for that
+row rather than fabricating a number. So an operator who wants to
+land the §20.1 update incrementally (vLLM cells first, HF cells in a
+follow-on session) gets a half-filled table that's still safe to
+commit.
+
+The composer is the operator's last step before pasting numbers into
+`PHASE4_GPU_FINDINGS.md` §20.1. Six CPU regression tests in
+`Bench/tests/test_compose_throughput_comparison.py` pin the schema,
+the ratio computation, and the band-boundary contracts.
 
 Drop the four numbers into `PHASE4_GPU_FINDINGS.md` §20.1 (template populated, awaiting GPU run). Also update the "Honest Validation Status" table in `INVESTOR_PITCH.md` and `CTM_PLUS_PCAM_FSCS_VC_BRIEF.md` — likely the right row reads:
 

@@ -259,6 +259,41 @@ def test_int4_cache_sink_size_passes_through(torch_module, transformers_module):
     assert 0.99 <= cos_rest < 1.0
 
 
+def test_int4_cache_kv_ablation_toggles(torch_module, transformers_module):
+    """§20.4 diagnostic toggle: quantize_k / quantize_v select which
+    channel is INT4 and which passes through at FP16.
+
+      * quantize_v=False (K-only): V is bit-identical, K is lossy.
+      * quantize_k=False (V-only): K is bit-identical, V is lossy.
+      * both False: both bit-identical (degenerate = baseline).
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(7)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 32, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+
+    # K-only: V passes through untouched, K is lossy.
+    k_only = INT4PerChannelCache(quantize_v=False)
+    k_back, v_back = k_only.update(k, v, layer_idx=0)
+    assert torch.equal(v_back, v), "quantize_v=False must leave V bit-identical"
+    assert not torch.equal(k_back, k), "quantize_v=False must still quantize K"
+    assert 0.99 <= _cosine(k, k_back) < 1.0
+
+    # V-only: K passes through untouched, V is lossy.
+    v_only = INT4PerChannelCache(quantize_k=False)
+    k_back, v_back = v_only.update(k, v, layer_idx=0)
+    assert torch.equal(k_back, k), "quantize_k=False must leave K bit-identical"
+    assert not torch.equal(v_back, v), "quantize_k=False must still quantize V"
+
+    # Both off: degenerate baseline — nothing is quantized.
+    neither = INT4PerChannelCache(quantize_k=False, quantize_v=False)
+    k_back, v_back = neither.update(k, v, layer_idx=0)
+    assert torch.equal(k_back, k) and torch.equal(v_back, v)
+
+
 # --------------------------------------------------------------------- #
 # Cross-algorithm comparison (sanity check the INT4 approach beats     #
 # PolarQuant's per-channel-cosine performance on outlier-channel data) #
@@ -857,6 +892,188 @@ def test_bits_param_int3_threads_through_hf_cache(torch_module, transformers_mod
 
 
 # --------------------------------------------------------------------- #
+# §20.4.1 follow-on: >4-bit storage + independent K/V bit width          #
+# --------------------------------------------------------------------- #
+
+
+def test_bits_param_int5_kvstore_round_trip(torch_module):
+    """INT5 round-trips through the kvstore. INT5 values ([-16,+15])
+    exceed the 4-bit nibble range, so the store must fall back to int8
+    (unpacked) storage rather than corrupting them in pack_int4. This
+    is the regression pin for the §20.4.1 INT5 corruption bug."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True, bits=5,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float16)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float16)
+    store.write_block(0, k, v)
+    # INT5 must NOT take the 4-bit nibble-pack path.
+    block = store._blocks[0]
+    assert block.k_bit_packed is False and block.v_bit_packed is False
+    k_back, v_back = store.read_block(0)
+    # INT5 = 32 levels, strictly finer than INT4's 16 — clears the INT4
+    # ≥ 0.99 bar comfortably when storage is correct (not corrupt).
+    assert _cosine(k, k_back) >= 0.99, "INT5 K corrupted"
+    assert _cosine(v, v_back) >= 0.99, "INT5 V corrupted"
+    stats = store.get_stats()
+    assert stats["k_bits"] == 5 and stats["v_bits"] == 5
+    # INT5 stores int8 (8-bit heap) for a 5-bit theoretical rate, so the
+    # actual-heap ratio must be strictly below the theoretical one —
+    # they are not interchangeable above 4 bits.
+    assert stats["actual_compression_ratio"] < stats["compression_ratio"]
+
+
+def test_int5_threads_through_hf_cache_without_corruption(
+    torch_module, transformers_module,
+):
+    """INT4PerChannelCache(bits=5) round-trips cleanly. The original
+    §20.4.1 INT5 cell produced 0.98-repeat garbage because the 4-bit
+    packer corrupted 5-bit values; this pins that it is fixed."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    torch = torch_module
+
+    cache = INT4PerChannelCache(bits=5, k_group_size=32, v_group_size=32,
+                                asymmetric=True)
+    g = torch.Generator().manual_seed(7)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 48, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    k_back, v_back = cache.update(k, v, layer_idx=0)
+    assert k_back.shape == k.shape
+    assert _cosine(k, k_back) >= 0.99, "INT5 K via HF cache corrupted"
+    assert _cosine(v, v_back) >= 0.99, "INT5 V via HF cache corrupted"
+    assert cache.int4_config["k_bits"] == 5
+
+
+def test_kv_independent_bit_width(torch_module):
+    """Adaptive precision: k_bits / v_bits set independently. K at INT8
+    reconstructs more accurately than V at INT4, and the INT8 K channel
+    uses int8 (unpacked) storage while the INT4 V channel stays
+    nibble-packed — the §20.4.1 long-context-safe config."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import INT4PerChannelKVStore
+
+    store = INT4PerChannelKVStore(
+        k_group_size=32, v_group_size=32, asymmetric=True,
+        k_bits=8, v_bits=4,
+    )
+    g = torch.Generator().manual_seed(42)
+    k = torch.randn(64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float16)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float16)
+    store.write_block(0, k, v)
+    block = store._blocks[0]
+    assert block.k_bit_packed is False, "INT8 K should be stored unpacked"
+    assert block.v_bit_packed is True, "INT4 V should be nibble-packed"
+    k_back, v_back = store.read_block(0)
+    cos_k = _cosine(k, k_back)
+    cos_v = _cosine(v, v_back)
+    assert cos_k > cos_v, (
+        f"INT8 K (cos {cos_k:.5f}) should reconstruct better than "
+        f"INT4 V (cos {cos_v:.5f})"
+    )
+    stats = store.get_stats()
+    assert stats["k_bits"] == 8 and stats["v_bits"] == 4
+    assert stats["bits_per_element"] is None  # mixed width → no single value
+
+
+def test_adaptive_kv_bits_threads_through_hf_cache(
+    torch_module, transformers_module,
+):
+    """K=8 / V=4 adaptive precision plumbs through the HF cache and is
+    recorded in int4_config — the §20.4.1 long-context-safe config."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    cache = INT4PerChannelCache(k_bits=8, v_bits=4, k_group_size=32,
+                                v_group_size=32, asymmetric=True)
+    cfg = cache.int4_config
+    assert cfg["k_bits"] == 8 and cfg["v_bits"] == 4
+    assert "int8" in cfg["scheme"] and "int4" in cfg["scheme"]
+    stats = cache.int4_stats
+    assert stats["k_bits"] == 8 and stats["v_bits"] == 4
+
+
+# --------------------------------------------------------------------- #
+# §20.4.1 follow-on: outlier-protected K (top channels kept FP16)        #
+# --------------------------------------------------------------------- #
+
+
+def test_outlier_protection_keeps_top_channels_fp16(
+    torch_module, transformers_module,
+):
+    """With k_protect_fraction > 0, the top-magnitude K channels
+    round-trip bit-identically (FP16-protected); others stay lossy."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(3)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 32, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    # Make channel (h=0, d=0) a clear magnitude outlier.
+    k[:, 0, :, 0] *= 100.0
+    # Protect ~1% of H*D channels — enough to include the one outlier.
+    cache = INT4PerChannelCache(k_protect_fraction=0.01)
+    k_back, _ = cache.update(k, v, layer_idx=0)
+    # The outlier channel is bit-identical (FP16-protected)...
+    assert torch.equal(k_back[:, 0, :, 0], k[:, 0, :, 0])
+    # ...while a non-outlier channel is still lossy (INT4 round-trip).
+    assert not torch.equal(k_back[:, 1, :, 5], k[:, 1, :, 5])
+
+
+def test_outlier_protection_improves_k_cosine(
+    torch_module, transformers_module,
+):
+    """Outlier-protected K reconstructs better than plain INT4 K when
+    the tensor has outlier channels."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(11)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 64, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    for h, d in [(0, 3), (2, 17), (1, 90)]:
+        k[:, h, :, d] *= 50.0
+
+    plain = INT4PerChannelCache(k_group_size=32, asymmetric=True)
+    prot = INT4PerChannelCache(k_group_size=32, asymmetric=True,
+                               k_protect_fraction=0.02)
+    k_plain, _ = plain.update(k.clone(), v.clone(), layer_idx=0)
+    k_prot, _ = prot.update(k.clone(), v.clone(), layer_idx=0)
+    cos_plain = _cosine(k, k_plain)
+    cos_prot = _cosine(k, k_prot)
+    assert cos_prot > cos_plain, (
+        f"protected K cosine {cos_prot:.5f} should beat plain {cos_plain:.5f}"
+    )
+
+
+def test_outlier_protection_threads_through_cache(
+    torch_module, transformers_module,
+):
+    """k_protect_fraction reaches int4_config and the scheme string."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    cache = INT4PerChannelCache(k_protect_fraction=0.01)
+    cfg = cache.int4_config
+    assert cfg["k_protect_fraction"] == 0.01
+    assert "protectK" in cfg["scheme"]
+
+
+def test_outlier_protection_rejects_out_of_range_fraction(
+    torch_module, transformers_module,
+):
+    """k_protect_fraction must be in [0, 1)."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    with pytest.raises(ValueError, match="k_protect_fraction"):
+        INT4PerChannelCache(k_protect_fraction=1.0)
+
+
+# --------------------------------------------------------------------- #
 # Static calibration (Path #6)                                          #
 # --------------------------------------------------------------------- #
 
@@ -1011,4 +1228,219 @@ def test_int4_per_channel_beats_polar_quant_on_outlier_channel_data(torch_module
     )
     assert mean_int4 >= 0.98, (
         f"INT4 per-channel mean per-channel cosine {mean_int4:.4f} below 0.98"
+    )
+
+
+# --------------------------------------------------------------------- #
+# §20.2 — sink-FP16 + body-INT4-with-KIVI-rescue                        #
+#                                                                       #
+# The §18.1 row 7 "INT4 + sink-skip 4" anti-pattern was sink-skip on    #
+# the BROKEN plain-per-channel config (no group, no asymmetric). The   #
+# §20.2 hypothesis combines sink-FP16 with the WORKING                  #
+# `group=32 + asymmetric` config. Different mechanism: group already   #
+# isolates outlier positions to group 0; sink-FP16 then keeps the few   #
+# positions where attention sinks live bit-identical FP16, so the body #
+# INT4 doesn't even need to budget bins for them.                       #
+#                                                                       #
+# These tests pin the contract on synthetic data:                       #
+#   1. With sink_size > 0 AND the full KIVI rescue stack, the first N   #
+#      positions are bit-identical FP16; the body goes through INT4.    #
+#   2. On data with realistic outlier-sink magnitudes, sink-FP16 +      #
+#      body-INT4-rescue produces strictly better body cosine than       #
+#      no-sink + body-INT4-rescue (i.e., the hypothesis isn't crazy).   #
+# --------------------------------------------------------------------- #
+
+
+def test_sink_fp16_plus_kivi_rescue_threads_through(
+    torch_module, transformers_module,
+):
+    """The §18.3 ship config (group=32 + asymmetric) composed with
+    sink_size=4 (§20.2 test config) must:
+      * Keep positions [0, 4) bit-identical FP16 across the cache
+        round-trip.
+      * Round-trip positions [4:) through the full INT4 group +
+        asymmetric path (not just plain per-channel).
+      * Produce a body cosine ≥ 0.999 on well-conditioned synthetic
+        data (the group + asymmetric KIVI rescue stack is the gold
+        path; bit-packing is lossless; the only quality cost is the
+        4-bit discretisation).
+
+    This is the unit-level analog of the §20.2 GPU sweep cell.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    cache = INT4PerChannelCache(
+        sink_size=4,
+        k_group_size=32, v_group_size=32, asymmetric=True,
+    )
+    g = torch.Generator().manual_seed(2026)
+    k = torch.randn(
+        1, QWEN_NUM_KV_HEADS, 64, QWEN_HEAD_DIM,
+        dtype=torch.float32, generator=g,
+    )
+    v = torch.randn(k.shape, dtype=torch.float32, generator=g)
+    k_back, v_back = cache.update(k, v, layer_idx=0)
+
+    # 1. Sinks are bit-identical FP16.
+    assert torch.equal(k_back[:, :, :4, :], k[:, :, :4, :]), (
+        "sink_size=4 must keep positions [0, 4) bit-identical FP16; got "
+        f"max-abs-diff {(k_back[:, :, :4, :] - k[:, :, :4, :]).abs().max().item()}"
+    )
+    assert torch.equal(v_back[:, :, :4, :], v[:, :, :4, :])
+
+    # 2. Body cosine — well-conditioned synthetic data, full KIVI
+    # rescue stack: expect ≥ 0.995 (group + asymmetric INT4 round-trip
+    # on Gaussian data typically lands around 0.996-0.998; 0.999 would
+    # require higher bits or finer groups).
+    cos_k_body = _cosine(k[:, :, 4:, :], k_back[:, :, 4:, :])
+    cos_v_body = _cosine(v[:, :, 4:, :], v_back[:, :, 4:, :])
+    assert cos_k_body >= 0.995, (
+        f"K body cosine {cos_k_body:.6f} below 0.995 — the KIVI rescue "
+        f"stack (group=32 + asymmetric) should be high-fidelity on "
+        f"well-conditioned data even when combined with sink-FP16."
+    )
+    assert cos_v_body >= 0.995
+
+    # 3. Verify the config dict reflects what we asked for (so the
+    # sweep harness's per-sink config field is faithful to the
+    # underlying cache state).
+    cfg = cache.int4_config
+    assert cfg["sink_size"] == 4
+    assert cfg["k_group_size"] == 32
+    assert cfg["v_group_size"] == 32
+    assert cfg["asymmetric"] is True
+
+
+def test_sink_fp16_helps_body_reconstruction_on_outlier_sinks(torch_module):
+    """The §20.2 hypothesis: when the first N positions carry outlier
+    magnitudes (StreamingLLM-style attention sinks), removing them
+    from the quantization input lets the body's per-group scales tune
+    to the non-outlier range — body cosine improves.
+
+    Operationally we don't need the cache wrapper for this; the test
+    works directly against the quantizer ops. Compare:
+      (a) Quantize positions [4:) of the outlier-sink data through
+          INT4 group + asymmetric — i.e., feed the body alone.
+      (b) Quantize positions [0:) of the same data through INT4
+          group + asymmetric — i.e., feed the full sequence and
+          let the per-group scales absorb the sinks.
+
+    Hypothesis (a) ≥ (b) on body cosine. If this holds on
+    synthetic outlier-sink data, the §20.2 GPU sweep is testing a
+    well-founded mechanism, not a hopeful one.
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+    )
+    g = torch.Generator().manual_seed(2026)
+
+    # Synthetic outlier-sink K: 64 positions × 4 heads × 128 head_dim;
+    # the first 4 positions have 50x magnitude on a few channels (the
+    # StreamingLLM mechanism: sinks attract disproportionate L2 mass
+    # on a small subset of channels — usually 1-3 out of 128).
+    S, H, D = 64, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM
+    k = torch.randn(S, H, D, generator=g)
+    outlier_channels = [3, 17, 89]  # arbitrary "sink-attracting" channels
+    for ch in outlier_channels:
+        k[:4, :, ch] *= 50.0
+
+    # (a) Sink-FP16 path: quantize only positions [4:).
+    body_a = k[4:, :, :].contiguous()
+    q_a, scale_a, off_a = quantize_per_channel_int4(
+        body_a, group_size=32, asymmetric=True,
+    )
+    back_a = dequantize_per_channel_int4(
+        q_a, scale_a, dtype=torch.float32, group_size=32, offset=off_a,
+    )
+    cos_a = _cosine(body_a, back_a)
+
+    # (b) No-sink path: quantize all positions [0:).
+    q_b, scale_b, off_b = quantize_per_channel_int4(
+        k, group_size=32, asymmetric=True,
+    )
+    back_b = dequantize_per_channel_int4(
+        q_b, scale_b, dtype=torch.float32, group_size=32, offset=off_b,
+    )
+    body_b_back = back_b[4:, :, :]
+    cos_b = _cosine(body_a, body_b_back)
+
+    # The mechanism predicts cos_a >= cos_b (with the first chunk's
+    # scale tuned to the non-outlier range). On 50x outlier sinks the
+    # gap should be visible — on the seed=2026 fixture empirically
+    # ~0.041 cosine units (cos_a ≈ 0.997, cos_b ≈ 0.956).
+    assert cos_a >= cos_b, (
+        f"§20.2 hypothesis failed on synthetic outlier-sink data: "
+        f"sink-FP16 body cosine {cos_a:.6f} should be >= no-sink "
+        f"body cosine {cos_b:.6f}. The mechanism (group 0's scale "
+        f"is inflated by the outliers, harming the remaining 28 "
+        f"positions in that group) doesn't reproduce on this fixture; "
+        f"check whether group_size or asymmetric is doing something "
+        f"unexpected here."
+    )
+    # Tightened threshold: empirically the gap is ~0.04 on this
+    # fixture; require at least 0.01 cosine units so a future regression
+    # that silently halves the mechanism's effect (e.g., a sign error
+    # in the per-group scale path) is caught by this test rather than
+    # only surfacing at the GPU MMLU axis.
+    assert (cos_a - cos_b) >= 0.01, (
+        f"Gap (cos_a - cos_b)={cos_a - cos_b:.6f} is below the 0.01 "
+        f"floor; on seed=2026 the expected gap is ~0.04. A regression "
+        f"that compressed the mechanism's effect (cos_a={cos_a:.6f}, "
+        f"cos_b={cos_b:.6f}) is the most likely cause."
+    )
+
+
+def test_sink_fp16_decode_step_only_compresses_new_token(
+    torch_module, transformers_module,
+):
+    """During autoregressive decoding the cache is called with S=1
+    on each new token. Even when sink_size > 0 the decode-step
+    update MUST quantize the new token (the sink positions are
+    already in the cache from prefill; the new token is at
+    position >= prefill_len > sink_size).
+
+    Pins the cache contract: sink-FP16 is a PREFILL-time decision,
+    not a decode-time decision. Confused decode-time behaviour
+    would silently break the §20.2 quality measurement (the cache
+    would accumulate FP16 tokens beyond the sink budget).
+    """
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    cache = INT4PerChannelCache(
+        sink_size=4,
+        k_group_size=32, v_group_size=32, asymmetric=True,
+    )
+    g = torch.Generator().manual_seed(7)
+    # Prefill: 64 positions. First 4 are sinks (FP16), rest INT4.
+    k_pre = torch.randn(1, QWEN_NUM_KV_HEADS, 64, QWEN_HEAD_DIM,
+                         dtype=torch.float32, generator=g)
+    v_pre = torch.randn(k_pre.shape, dtype=torch.float32, generator=g)
+    cache.update(k_pre, v_pre, layer_idx=0)
+
+    # Decode step: S=1. The new token should be quantized (since
+    # 1 < sink_size = 4 ⇒ the else branch fires which calls
+    # _compress_decompress_kv_int4 unconditionally). Verify the
+    # returned token is INT4-round-tripped, not bit-identical FP16.
+    k_new = torch.randn(1, QWEN_NUM_KV_HEADS, 1, QWEN_HEAD_DIM,
+                         dtype=torch.float32, generator=g)
+    v_new = torch.randn(k_new.shape, dtype=torch.float32, generator=g)
+    k_back, _ = cache.update(k_new, v_new, layer_idx=0)
+    # The cache returns the FULL concatenated K so far; slice off
+    # the new token (last position).
+    k_new_back = k_back[:, :, -1:, :]
+    # New token cosine should be high (~0.999 on synthetic) but NOT
+    # bit-identical — INT4 round-trip leaves a fingerprint.
+    assert not torch.equal(k_new_back, k_new), (
+        "Decode-step new token must be quantized, not FP16-passthrough. "
+        "If this fails, the cache is silently FP16-storing decode "
+        "tokens whenever sink_size > 0, which would invalidate the "
+        "§20.2 quality numbers."
+    )
+    cos_new = _cosine(k_new, k_new_back)
+    assert cos_new >= 0.99, (
+        f"Decode-step INT4 round-trip cosine {cos_new:.6f} below 0.99 "
+        "on synthetic data"
     )

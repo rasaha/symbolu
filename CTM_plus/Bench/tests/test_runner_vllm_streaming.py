@@ -541,6 +541,51 @@ def test_async_engine_driver_fp8_works_with_ctm_plus():
     assert captured["enable_prefix_caching"] is True
 
 
+def test_async_engine_driver_stores_int4_route_a_config():
+    """The driver constructor accepts and stores the route-A INT4
+    config. Default is off; the KIVI knobs default to the §18.3 ship
+    config (group=32, asymmetric)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    # Default — route-A off.
+    driver = AsyncEngineDriver(model="dummy", ctm_plus_evictor=False)
+    assert driver.int4_kv_route_a is False
+    # Install handles are None until run().
+    assert driver._int4_route_a_manager is None
+    assert driver._int4_route_a_teardown is None
+
+    # Explicitly on, with custom KIVI config.
+    driver2 = AsyncEngineDriver(
+        model="dummy", ctm_plus_evictor=False,
+        int4_kv_route_a=True,
+        int4_kv_k_group_size=32, int4_kv_v_group_size=32,
+        int4_kv_asymmetric=True, int4_kv_bits=4, int4_kv_sink_size=16,
+    )
+    assert driver2.int4_kv_route_a is True
+    assert driver2.int4_kv_k_group_size == 32
+    assert driver2.int4_kv_v_group_size == 32
+    assert driver2.int4_kv_asymmetric is True
+    assert driver2.int4_kv_bits == 4
+    assert driver2.int4_kv_sink_size == 16
+
+
+def test_int4_route_a_composes_with_ctm_plus():
+    """Route-A INT4 and the CTM+ evictor are orthogonal — both can be
+    enabled on the same driver. INT4 compresses KV; CTM+ decides
+    eviction. The route-A plan's "What CTM+ Phase 4 gets out of this"
+    section depends on this composability."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        ctm_plus_evictor=True,
+        enable_prefix_caching=True,
+        int4_kv_route_a=True,
+    )
+    assert driver.ctm_plus_evictor is True
+    assert driver.int4_kv_route_a is True
+
+
 def test_async_engine_driver_run_phase1_requires_vllm():
     """In Phase 1 (LRU) the driver must raise ImportError with a
     message naming vllm and the streaming runner's vLLM target

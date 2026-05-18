@@ -250,9 +250,24 @@ codebase, validated end-to-end on the same model:
 KIVI INT4 stacks under CTM+: the KV-cache it compresses is the same
 KV-cache CTM+ evicts from. The current honest combined-stack claim
 is **~3-3.5× over an INT8+LRU baseline** from measured KIVI INT4
-compression × measured Phase 4 eviction quality. (Earlier drafts
-quoted an 8.8× figure anchored on TurboQuant; that figure has been
-retired — see negatives below.)
+compression × measured Phase 4 eviction quality.
+
+**Peer positioning vs Google's TurboQuant.** Google Research's
+TurboQuant (Polar Quantization) targets the same 4-bit regime for
+KV-cache, with a reported <1% MMLU degradation on Llama-2 and Gemma.
+Our KIVI INT4 measurement on Qwen2.5-7B (−0.9 pt MMLU @ 1000q,
+1.024× perplexity, 3.2× real-heap) lands in peer territory. The two
+methods are complementary, not competitive: TurboQuant is primarily
+a W4A4 weights+activations method (KV-cache is one application);
+KIVI is KV-cache-specific. They can stack — TurboQuant W4A4 over
+the model, KIVI INT4 over the cache, CTM+ Phase 4 over the eviction
+decisions. Earlier drafts of this brief quoted an 8.8× combined-
+stack figure anchored on a TurboQuant projection that did not
+survive our Qwen2.5-7B reproduction (see negatives below); the
+retired figure has been replaced with the measured 3-3.5× anchored
+on KIVI INT4 + CTM+ Phase 4. If a future session reproduces
+TurboQuant's published W4A4 result on Llama-2, the multiplicative
+stack story extends cleanly without retraction.
 
 ### FSCS-derived signal integration (separate research thread, real Mistral-7B trace)
 
@@ -296,32 +311,27 @@ so partners can tell which is which.
 - KIVI INT4 KV compression: 3.2× real-heap, 1.024× perplexity, −0.9 pt MMLU @ 1000q, 96.4% teacher-forced top-1
 - INT3 memory-bound variant: −0.7 pt MMLU @ 1000q at ~4.5× theoretical compression
 - FSCS-derived signals: 100% of eviction rounds make different choices on real Mistral-7B trace
+- **FP8-vs-INT4 throughput (§20.1, four-cell GPU run, Qwen2.5-7B):** vLLM FP8 KV = **1.18× FP16** on the FlashInfer backend (FP8 is a small throughput *gain*, not a cost). Route-B INT4 KIVI = **0.47× FP16 in HF transformers** — the pure-PyTorch quantize/unpack round-trip is a ~2× decode cost. Decomposition: the HF↔vLLM stack gap (25×) is what a route-A `cache_kv` integration removes; the INT4-algorithm gap (2×) travels with it and needs the Marlin-style fused unpack-attend kernel (§20.6). **Honest verdict: route-A is necessary but not sufficient — the kernel is the gating item for FP8-competitive throughput.**
+- **INT4 KV quality is within measurement noise of FP16 (§20.2, sink-FP16 sweep, 1000q):** across sink ∈ {0, 4, 16, 64}, INT4 MMLU spans 68.9–70.2% vs FP16's 70.2% — a 1.3pt spread that sits entirely inside the ±1.45pt binomial CI at 1000 questions. The −0.9pt §19.4 gap is itself within noise of zero.
+- **Multi-model replication (§20.3, Qwen2.5-7B + Mistral-7B):** INT4 KIVI short-context quality generalises across two architectures — Qwen −0.90pt / Mistral −0.60pt MMLU @1000q, both ~1.01–1.02× perplexity, both inside the −1.5pt KIVI-literature band. Honest scope: 2 models (Llama-3-8B deferred — Meta gated access); short-context only — does not cover the §20.4 long-context finding.
+
+**Tested, inconclusive (honest — neither a win nor a failure):**
+
+- Sink-FP16 + body-INT4 mixed precision (§20.2): the hypothesis "the −0.9pt MMLU gap is carried by attention-sink tokens and sink-FP16 recovers it" is **not demonstrated**. The sweep is non-monotonic (sink=4 = −1.30pt, *worse* than the no-sink control) and noise-dominated at 1000q. No sink-FP16 recovery mechanism is resolved; a decisive test needs ~5000 questions. Documented in `PHASE4_GPU_FINDINGS.md` §20.2.
 
 **Tested-and-failed (documented as negatives — partner-shareable):**
 
-- TurboQuant 3-bit polar quantization on Qwen2.5-7B: perplexity ratio 3052× (algorithm fails on real K activations)
-- TurboQuant + per-channel scale rescue: 24× worse than baseline TurboQuant
-- TurboQuant + sink-skip rescue: modest 27% improvement, still catastrophic at 220×
-- Static GPTQ-style calibration on INT4: −6.80 pt MMLU @ 1000q — dynamic + group quantization beats static
+- **INT4 KV long-context decode (§20.4 / §20.4.1, needle-in-haystack):** route-B INT4 KIVI on **both** K and V is **not safe for long-context generation**. At 4k–32k-char contexts, perplexity holds (1.007×) but autoregressive decode collapses into token stuttering — needle retrieval drops from 100% (FP16) to 11–29% (INT4). **The §20.4.1 K/V ablation sprint (n=24/cell, 16k) isolated the cause: the K channel is the blocker.** K-INT4/V-FP16 scores 46%, while **V-INT4/K-FP16 is quality-neutral at 96%** — within binomial noise of the 100% baseline, with zero stuttering trials. **Shippable consequence: V-INT4 + K-FP16 delivers ~1.5× KV-cache compression with no measured long-context quality loss** (K stays FP16, V compresses to ~5 effective bits/elem → 32/(16+5) ≈ 1.5×); full 3–4× INT4 needs the K channel solved (milder K compression / per-channel bit allocation — capability landed, GPU validation pending / K-specific outlier handling). The earlier "sink-FP16 recovers to 56%" was an n=9 fluctuation — de-noised across two re-runs, sink=16 measures ≈21%; only sink=4 partially recovers (67%). Key caveat: the §19.4 short-context quality numbers do **not** generalise to K-INT4 long-context decode. Documented in `PHASE4_GPU_FINDINGS.md` §20.4 / §20.4.1.
+- TurboQuant *baseline* (random rotation, 3-bit, KV-only) on Qwen2.5-7B: perplexity ratio 3052×. Our implementation diverges from Google's published method on four axes (random vs learned rotation, 3-bit vs the paper's 4-bit headline, KV-only vs W4A4, Qwen2.5 vs Llama-2/Gemma). The negative rules out the baseline configuration as a drop-in KV-only compressor; it does **not** refute Google's published TurboQuant W4A4 result on Llama-2 / Gemma. Reproducing the full method is deferred follow-on work.
+- TurboQuant baseline + per-channel scale rescue: 24× worse than baseline (KIVI's per-channel trick does not transfer to rotation-based designs)
+- TurboQuant baseline + sink-skip rescue: modest 27% improvement, still catastrophic at 220×
+- Static GPTQ-style calibration on INT4 KIVI: −6.80 pt MMLU @ 1000q — dynamic + group quantization beats static
 - Autoregressive generation top-1 (64%) is misleading vs teacher-forced (96.4%) due to exposure bias — we report teacher-forced
 
-Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §19.2.
+Negatives are documented in `PHASE4_GPU_FINDINGS.md` §17 + §17.8 + §19.2.
 
 **Harness-landed, GPU-run-pending (FP8-KV competitive gap closure track):**
 
-- FP8 (vLLM stock) vs INT4 (KIVI route-B) throughput comparison —
-  four-cell composition documented in
-  `Bench/scripts/FP8_INT4_THROUGHPUT_RUNBOOK.md`; runner +
-  `--kv-cache-dtype` flag landed; ~$0.15 GPU spend to fill in numbers
-  (§20.1)
-- Sink-FP16 + body-INT4 mixed precision — sweep recipe landed for
-  sink ∈ {0, 4, 16, 64} at the full KIVI rescue stack; ~$0.50 GPU to
-  test the StreamingLLM-style quality-recovery hypothesis (§20.2)
-- Multi-model replication on Llama-3-8B + Mistral-7B — runbook recipe
-  landed; ~$2-3 GPU to remove the "one-model demo" caveat (§20.3)
-- Long-context perplexity sweep at 16k/32k/50k — `--perplexity-text-path`
-  flag landed; ~$0.50 GPU to validate at the context length where KV
-  compression matters most (§20.4)
 - Route-A vLLM `cache_kv` integration plan — engineer-day breakdown in
   `Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`; same hook closes the
   −20% tokens/sec gap (§20.5)

@@ -221,6 +221,59 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--int4-kv-route-a",
+        action="store_true",
+        help=(
+            "Route-A: install the KIVI INT4 KV-cache integration — a "
+            "monkey-patch of the model's Attention modules that runs "
+            "K/V through the INT4 round-trip inside vLLM. This is the "
+            "production-path analog of the route-B HF DynamicCache "
+            "wrapper (which only the §20 measurement harnesses use). "
+            "Orthogonal to --ctm-plus; both compose. See "
+            "ROUTE_A_VLLM_CACHE_KV_PLAN.md. NOTE: this tier runs the "
+            "INT4 quality path under vLLM; the memory-realizing "
+            "paged-buffer swap is the documented follow-up."
+        ),
+    )
+    parser.add_argument(
+        "--int4-kv-k-group-size", type=int, default=32,
+        help="Route-A INT4: K group-quant size (default 32 = §18.3 ship).",
+    )
+    parser.add_argument(
+        "--int4-kv-v-group-size", type=int, default=32,
+        help="Route-A INT4: V group-quant size (default 32 = §18.3 ship).",
+    )
+    parser.add_argument(
+        "--int4-kv-symmetric", action="store_true",
+        help=(
+            "Route-A INT4: use symmetric quant instead of the default "
+            "asymmetric. The §18.3 ship config is asymmetric; this "
+            "flag is for ablation only."
+        ),
+    )
+    parser.add_argument(
+        "--int4-kv-bits", type=int, default=4,
+        help="Route-A INT4: bit width (default 4 = validated KIVI config).",
+    )
+    parser.add_argument(
+        "--int4-kv-sink-size", type=int, default=0,
+        help=(
+            "Route-A INT4: StreamingLLM sink-FP16 passthrough — keep "
+            "the first N positions of each prefill in FP16. The §20.2 "
+            "sink-FP16 path applied at the route-A layer. Default 0."
+        ),
+    )
+    parser.add_argument(
+        "--int4-kv-num-kv-heads", type=int, default=None,
+        help=(
+            "Route-A INT4: KV-head count, needed to reshape vLLM's "
+            "2-D K/V (num_tokens, num_kv_heads*head_dim) to the 3-D "
+            "(S, H, D) the quantizer wants. Default None = auto-detect "
+            "from model.config (num_key_value_heads). Pass explicitly "
+            "if the run-end log shows skipped_unknown_shape > 0."
+        ),
+    )
+    parser.add_argument(
         "--turboquant-kv",
         action="store_true",
         help=(
@@ -304,6 +357,13 @@ def main(argv: Sequence[str]) -> int:
         phase4_use_cython_evictor=args.phase4_cython_evictor,
         phase4_fast_hooks=args.phase4_fast_hooks,
         kv_cache_dtype=args.kv_cache_dtype,
+        int4_kv_route_a=args.int4_kv_route_a,
+        int4_kv_k_group_size=args.int4_kv_k_group_size,
+        int4_kv_v_group_size=args.int4_kv_v_group_size,
+        int4_kv_asymmetric=not args.int4_kv_symmetric,
+        int4_kv_bits=args.int4_kv_bits,
+        int4_kv_sink_size=args.int4_kv_sink_size,
+        int4_kv_num_kv_heads=args.int4_kv_num_kv_heads,
         max_decode_tokens=args.max_decode_tokens,
     )
 

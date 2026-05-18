@@ -1725,6 +1725,74 @@ enough on this evidence: the trend curve in §17.4 shows the
 compression-ratio crossover with INT4 happens at ~6 bits, where
 PolarQuant gives no advantage.)
 
+### §17.8 Post-hoc clarification — what we tested vs what Google's TurboQuant actually publishes
+
+Added May 2026 after a closer reading of Google Research's TurboQuant
+paper. The §17 result is reframed without retracting any measurement.
+
+The §17 implementation **diverges from Google's published TurboQuant
+method on four axes simultaneously**, and each divergence independently
+predicts a quality regression:
+
+| Axis | Google TurboQuant (paper) | What §17 tested |
+|---|---|---|
+| Rotation | **Learned orthonormal polar transformation** (the paper's core algorithmic contribution; calibrated on 128–256 samples) | **Random orthogonal rotation** (the paper's baseline; no calibration) |
+| Bit-rate headline | 4-bit (W4A4); 3-bit is explicitly flagged as "extreme compression / noticeable PPL increase" | **3-bit** (and 4-bit) — the regime the paper itself flags as cliff-prone |
+| Integration scope | **Weights + activations + KV-cache** (W4A4 is the headline; KV is one application) | KV-cache only |
+| Model coverage | Llama-2 (7B/13B/70B), Gemma (2B/7B), PaLM-2 | Qwen2.5-7B (GQA, not in paper) |
+
+Stacked, a 3052× perplexity ratio on the 3-bit / random-rotation /
+KV-only / Qwen2.5 configuration is consistent with the paper's own
+caveats — it is **not a refutation of TurboQuant**. The §17 measurement
+rules out a stripped-down TurboQuant *baseline* as a drop-in KV-only
+compressor for our deployment; it says nothing about the full method
+in its published regime.
+
+**Corrected partner-shareable framing:**
+
+> "We implemented a TurboQuant baseline (random rotation, 3-bit, KV-only)
+> on Qwen2.5-7B and observed the quality cliff the paper itself flags
+> for sub-4-bit polar without learned rotation. We did not reproduce
+> Google's W4A4 W+A+KV result on Llama-2 / Gemma, which remains a valid
+> published claim. We then evaluated KIVI INT4 — a KV-cache-specific
+> method with public reference implementations — and measured peer-level
+> numbers (3.2× real-heap, 1.024× perplexity, −0.9 pt MMLU @ 1000q on
+> Qwen2.5-7B, INT3 variant at −0.7 pt MMLU @ ~4.5× theoretical
+> compression). KIVI INT4 and Google's TurboQuant operate at the same
+> bit-rate regime (4-bit KV); KIVI was chosen for reproducibility,
+> not because TurboQuant failed in its published configuration."
+
+**What this implies for the architecture stack:**
+
+- KIVI INT4 (our KV-cache layer) and TurboQuant's W4A4 (Google's
+  weights+activations layer) are **complementary**, not competitive:
+  TurboQuant compresses the model itself; KIVI compresses the
+  runtime cache. Both at 4-bit, both ~4× compression on their
+  respective tensors. They can stack on top of CTM+ Phase 4
+  eviction for a three-layer memory-savings stack.
+- The retired 8.8× combined-stack number from earlier drafts of the
+  architecture doc was anchored on a TurboQuant *projection* (the
+  random-rotation 5–7× compression layer that §17 disproved on
+  Qwen2.5). The honest combined claim today, anchored on measured
+  numbers, is **~3-3.5× over an INT8+LRU baseline** from measured
+  KIVI INT4 × measured CTM+ Phase 4 eviction quality. If a future
+  session reproduces Google's W4A4 result on Llama-2 (the paper's
+  primary public model), the multiplicative stack story can extend
+  cleanly without retraction.
+
+**What this changes about §17.7's "if pursuing TurboQuant further":**
+
+The three engineering directions in §17.7 (per-channel scale, sink-
+skip, mixed bit depth) were rescue paths for the stripped-down
+baseline we tested. The honest version of "if pursuing TurboQuant
+further" is now: **implement the learned polar transformation on
+Llama-2-7B and reproduce Google's reported <1% MMLU degradation at
+W4A4.** Estimated cost: 2–4 engineer-weeks (learned-rotation
+calibration is the long pole). Payoff: a measured "we reproduced
+Google's TurboQuant W4A4 on Llama-2" result that stacks on top of
+KIVI INT4 KV and CTM+ Phase 4 eviction. This is currently filed
+under §19.6 deferred follow-on items, not active work.
+
 ## §18. KIVI INT4 with full config — the working KV quant on Qwen2.5-7B
 
 After §17's negative result on PolarQuant (3-bit + QJL: 3052× ppl ratio;
@@ -2241,27 +2309,61 @@ stack cost, and the stack cost is well-known to dominate
   most of the FP8 gap; if `D/C < 0.5`, a Marlin-style fused
   unpack-attend kernel (§20.6) is the actual blocker.
 
-**Expected measured outcomes (placeholders — TBD: GPU run, ~$0.15):**
+#### §20.1 Measured outcomes (GPU run, 2026-05-15)
 
-| Cell | Measured tokens/sec on chat_32k | JSON artefact |
-|------|------:|---|
-| A — vLLM FP16 | TBD | `bench_out/fp8_int4_throughput/vllm_fp16/streaming_summary.json` |
-| B — vLLM FP8 | TBD | `bench_out/fp8_int4_throughput/vllm_fp8/streaming_summary.json` |
-| C — HF FP16 (decode-only, prefill=2048) | TBD | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
-| D — HF INT4 KIVI (decode-only, prefill=2048) | TBD | (same JSON) |
+Qwen2.5-7B-Instruct, 1024-token prompts, 256 decode tokens, 80 GB A100.
+Cells A/B: vLLM 0.7.3, 32-prompt batch, `ignore_eos=True`. Cells C/D:
+HF transformers, best-of-5 trials. Artefact:
+`bench_out/track_e_audit_followups/fp8_int4_comparison.json`.
 
-The §13.3 LRU vLLM baseline was 85 tok/s at the same config; Cell A
-should reproduce that. Qwen2.5-7B at FP16 in HF transformers is
-typically 20-40 tok/s decode on A100 40 GB; Cell C will land in that
-range.
+| Cell | Stack | KV layer | Measured tok/s | Source |
+|------|-------|---------|---------------:|---|
+| A | vLLM 0.7.3 | FP16 (FlashInfer) | **1043.5** | `bench_out/fp8_int4_throughput/vllm_fp16_flashinfer/streaming_summary.json` |
+| B | vLLM 0.7.3 | **FP8** (FlashInfer) | **1231.5** | `bench_out/fp8_int4_throughput/vllm_fp8_flashinfer/streaming_summary.json` |
+| C | HF transformers | FP16 (DynamicCache) | **41.5** | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
+| D | HF transformers | **INT4 KIVI** (route-B) | **19.3** | `bench_out/track_e_audit_followups/int4_throughput_hf.json` |
 
-**Verdict band (pre-decided here so post-hoc rationalisation is harder):**
+**Ratios:**
 
-| D / C ratio | Verdict | Next step |
-|---|---|---|
-| ≥ 0.80 | Route-B INT4 throughput-competitive in HF. Route-A integration alone closes the FP8 gap. | Implement route-A per §20.5 (3-5 engineer-days). |
-| 0.50–0.80 | Algorithm overhead measurable but fixable with a kernel. | Both route-A and a Marlin-style kernel needed; route-A first. |
-| < 0.50 | Pure-PyTorch unpack dominates. Kernel is the actual blocker. | Reprioritize: kernel work first (§20.6), route-A second. |
+| Ratio | Value | Reading |
+|---|---:|---|
+| B / A | **1.18** | FP8 KV is *faster* than FP16 in vLLM on the FlashInfer backend — the brief's "near-zero overhead" was conservative; it is a small speedup (half the KV bytes → less HBM bandwidth on KV reads). |
+| D / C | **0.47** | Route-B INT4 is ~2× slower than FP16 *in HF* — the per-decode-token quantize→pack→unpack→dequantize round-trip in pure PyTorch, × 28 layers. |
+| C / A | **0.040** | HF transformers is ~25× slower than vLLM — the stack tax. |
+| D / A | **0.019** | Headline. Decomposes as `(D/C) × (C/A)` = the algorithm tax × the stack tax. |
+
+**Verdict — D/C = 0.47 → RED.** Below the pre-decided 0.50 GREEN/YELLOW/RED
+boundary. The route-B INT4 algorithm cost is significant and is **not**
+removed by route-A integration:
+
+* The **HF↔vLLM stack gap (25×, C/A = 0.04)** is what route-A removes —
+  moving INT4 onto vLLM's PagedAttention + continuous-batching path.
+* The **INT4-algorithm gap (2×, D/C = 0.47)** travels *with* route-A —
+  the pure-PyTorch quantize/unpack ops run on every decode token
+  regardless of which stack hosts them. Route-A alone would land
+  INT4-in-vLLM at ≈ 0.47 × 1043 ≈ **490 tok/s vs FP8's 1231** — ~0.4× the
+  competitor.
+* **Conclusion:** the Marlin-style fused unpack-attend kernel (§20.6,
+  3.20× HBM-traffic ceiling) is the actual throughput blocker. Route-A
+  is necessary (it closes the stack gap) but **not sufficient**; the
+  kernel is the gating work item for FP8-competitive throughput.
+
+**FP8-on-XFormers deployment gotcha (tested, partner-shareable).**
+A controlled backend sweep found the cell-B number is backend-sensitive:
+
+| Config | tok/s | vs FP16-FlashInfer |
+|---|---:|---:|
+| FP8 / FlashInfer (B) | 1231 | 1.18× |
+| FP8 / XFormers, 1k ctx | 542 | 0.52× |
+| FP8 / XFormers, 8k ctx | 89 | 0.085× |
+
+vLLM 0.7.3 auto-selects XFormers when `--kv-cache-dtype fp8` is set
+(FlashAttention-2 has no FP8 path), and XFormers FP8 is 2-13× slower
+than FP16 — worsening with context. **Naively flipping `--kv-cache-dtype
+fp8` degrades throughput; FP8's speedup requires explicitly forcing the
+FlashInfer backend** (`VLLM_ATTENTION_BACKEND=FLASHINFER`). Supporting
+artefacts: `bench_out/fp8_int4_throughput/vllm_fp8/` (XFormers 1k),
+`vllm_fp8_8k/` (XFormers 8k).
 
 ### §20.2 Sink-FP16 + body-INT4 mixed precision — quality recovery hypothesis
 
@@ -2299,35 +2401,56 @@ removes the outlier positions from the quantization input.
 | 16 | If 4 helps, 16 should plateau | Plateau (vs 4 within ±0.2pt) → hypothesis confirmed |
 | 64 | Tests "long-prefix" interpretation (early KV vs sink-only) | If 64 ≫ 16, the issue isn't sinks; it's the first chunk |
 
-**Code (already landed in route-B):** the `INT4PerChannelCache`
-constructor's `sink_size` arg implements this. Positions [0, sink)
-pass through uncompressed; positions [sink:) go through the full
-KIVI INT4 path. Verified by ``test_int4_cache_sink_size_passes_through``
-in ``Bench/tests/test_int4_per_channel.py`` (the first 4 positions
-are bit-identical FP16; the rest at INT4-level cosine ~0.99). The
-``--sink-size`` flag in ``track_e_quality_eval.py`` and
-``track_e_throughput.py`` exposes this for both quality and
-throughput sweeps.
+**Code (landed in route-B + sweep harness):**
 
-**Runbook recipe (drop into a new ``Bench/scripts/RUNPOD_TRACK_D_E_RUNBOOK.md``
-section §5i or run directly):**
+* `INT4PerChannelCache(sink_size=N, k_group_size=32, v_group_size=32, asymmetric=True)`
+  in `kv_policy/int4_per_channel_hf_cache.py` — positions [0, sink) pass
+  through uncompressed FP16; positions [sink:) go through the full KIVI
+  rescue stack. Pinned by three new tests in
+  `Bench/tests/test_int4_per_channel.py`:
+  - `test_sink_fp16_plus_kivi_rescue_threads_through` — sink bit-identity +
+    body cosine ≥ 0.995 on the §18.3 ship config + sink_size=4.
+  - `test_sink_fp16_helps_body_reconstruction_on_outlier_sinks` — on
+    synthetic outlier-sink data (50× magnitude on a few channels),
+    sink-FP16 + body-INT4-rescue produces strictly better body cosine
+    than no-sink + body-INT4-rescue. CPU-side evidence the §20.2
+    hypothesis is sound BEFORE paying for GPU.
+  - `test_sink_fp16_decode_step_only_compresses_new_token` — decode-step
+    tokens are always quantized (sink-FP16 is a prefill-time decision);
+    pins the cache contract against a class of bugs that would silently
+    invalidate the §20.2 quality numbers.
+* `ctm_bench/scripts/sink_fp16_sweep.py` — single-model-load sweep
+  across sink ∈ {0, 4, 16, 64} on the §18.3 ship config. ~10% cheaper
+  than a bash loop of `track_e_quality_eval.py` (one model load instead
+  of four). Writes JSON pinned at `§20.2.v1` schema; reader script
+  `ctm_bench/scripts/compose_sink_fp16_summary.py` maps the deltas to
+  the GREEN/YELLOW/RED bands. Both have CPU regression tests.
+
+**Runbook recipe (~$0.50, single load):**
 
 ```bash
-for SINK in 0 4 16 64; do
-  mkdir -p /tmp/sink_fp16_sweep/sink${SINK}
-  python -m ctm_bench.scripts.track_e_quality_eval \
-      --model Qwen/Qwen2.5-7B-Instruct \
-      --dtype float16 --device cuda \
-      --eval perplexity,mmlu \
-      --mmlu-num-questions 1000 \
-      --quant int4-per-channel \
-      --k-group-size 32 --v-group-size 32 \
-      --asymmetric-int4 \
-      --sink-size ${SINK} \
-      --output-dir /tmp/sink_fp16_sweep/sink${SINK} \
-      2>&1 | tee /tmp/sink_fp16_sweep/sink${SINK}/run.log
-done
+cd CTM_plus/Bench
+python -m ctm_bench.scripts.sink_fp16_sweep \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --eval perplexity,mmlu \
+    --mmlu-num-questions 1000 \
+    --sink-values 0,4,16,64 \
+    --output bench_out/track_e_audit_followups/sink_fp16_sweep.json
+
+# Then compose the §20.2 markdown table + merged JSON:
+python -m ctm_bench.scripts.compose_sink_fp16_summary \
+    --input bench_out/track_e_audit_followups/sink_fp16_sweep.json \
+    --json-output bench_out/track_e_audit_followups/sink_fp16_summary.json \
+    > /tmp/section_20_2_table.md
+cat /tmp/section_20_2_table.md
 ```
+
+Drop `/tmp/section_20_2_table.md` into this §20.2 in place of the
+"Sweep plan (TBD)" table. Like the §20.1 composer, this one prints
+`MEASUREMENT MISSING` for absent fields rather than fabricating numbers,
+and the GREEN/YELLOW/RED thresholds (-0.3pt / -0.5pt) are pinned by
+six regression tests in `Bench/tests/test_sink_fp16_sweep.py`.
 
 **Decision tree (best sink size ε{4, 16, 64} vs sink=0):**
 
@@ -2341,6 +2464,69 @@ done
 −0.5pt MMLU. The StreamingLLM mechanism (sinks attract disproportionate
 attention mass; quantizing them is dangerous) is well-attested and the
 hypothesis is concrete; the test is calibrated to confirm or refute it.
+
+#### §20.2 measured outcomes (GPU run, 2026-05-15) — INCONCLUSIVE
+
+Sweep ran on Qwen2.5-7B-Instruct, 1000-question MMLU, 80 GB A100.
+Artefacts: `bench_out/track_e_audit_followups/sink_fp16_sweep.json`,
+`sink_fp16_summary.json`.
+
+| sink | INT4 MMLU | Δ vs FP16 | INT4 ppl (282-tok) | MMLU correct/1000 |
+|---:|---:|---:|---:|---:|
+| 0 (control) | 69.30% | −0.90pt | 3.8036 | 693 |
+| 4 | 68.90% | −1.30pt | 3.5801 | 689 |
+| 16 | 70.20% | +0.00pt | 3.6329 | 702 |
+| 64 | 69.90% | −0.30pt | 3.7998 | 699 |
+
+**The composer's mechanical verdict is GREEN** (best non-zero sink =
+16 at +0.00pt, clears the −0.3pt threshold). **The honest verdict is
+INCONCLUSIVE** — and the §20.2 hypothesis is *not* demonstrated:
+
+1. **Non-monotonic.** sink=4 (−1.30pt) is *worse* than the no-sink
+   control (−0.90pt). If sink-FP16 genuinely recovered the gap, more
+   sink protection could not make things worse. The sweep has no
+   trend — it is 69.30 → 68.90 → 70.20 → 69.90%.
+2. **Within measurement noise.** At 1000 questions / ~70% accuracy
+   the binomial 1σ is **±1.45pt**. The full spread (689–702 correct
+   = 1.3pt) sits inside 1σ. All four sink configs — and the −0.9pt
+   §19.4 control — are **statistically indistinguishable from each
+   other and from zero**.
+3. **Perplexity confirms the noise.** The 282-token perplexity is
+   non-monotonic and two INT4 variants (sink=4 at 3.58, sink=16 at
+   3.63) score *below* the FP16 baseline (3.72) — INT4 quantization
+   cannot genuinely beat the unquantized model; this is short-text
+   sampling noise.
+
+**Defensible claim (the weaker, noise-aware one):** INT4 KV-cache
+MMLU — with or without sink-FP16, at any sink size tested — is within
+~1.3pt of FP16, and the differences are noise. The §19.4 −0.9pt gap
+is itself within noise of zero at this eval size. So the INT4 quality
+axis is *plausibly* FP8-competitive — but **not because of
+sink-FP16**; no sink-FP16 recovery mechanism is resolved by this run.
+
+**What it would take to resolve it:** the effect being tested
+(−0.9pt → ≤−0.3pt, a ~0.6pt shift) is below the ±1.45pt CI. A
+decisive test needs the CI under ~0.3pt → roughly **4–5× more
+questions (~5000)**, a ~2-3 hour run. Not a 2026-H1 priority; the
+honest "within-noise" result is sufficient for partner conversations.
+
+**Bucket:** tested, **inconclusive** — neither a clean win (would be
+"measured") nor a clean failure ("tested-and-failed"). The
+partner-shareable line is the noise-aware one above; the §20.2
+hypothesis stays open.
+
+**Update from §20.4 / §20.4.1 — the sink lever, de-noised.** This
+short-context MMLU sweep was the wrong instrument. §20.4's
+long-context needle test first suggested sink-FP16 recovers
+retrieval; the §20.4.1 diagnostic sprint (n=24/cell) refined this:
+`sink=4` is the real lever (29% → 67% at 16k), while `sink=16` does
+not reliably recover — two independent re-runs put it at 21–22%, and
+the single `long_context_sink16.json` 56% is now treated as an n=9
+fluctuation. Short-context MMLU prompts simply do not accumulate
+enough INT4 KV noise for sink protection to register; §20.2 is
+"inconclusive" because the regime, not the lever, was wrong. The
+deeper §20.4.1 finding is that the **K channel** — not sink coverage
+— is the dominant long-context blocker.
 
 ### §20.3 Multi-model replication — Llama-3-8B + Mistral-7B
 
@@ -2363,9 +2549,29 @@ scale computation works on any (S, H, D) shape. Group_size=32 along
 the seq axis is also shape-agnostic. There is no Qwen-specific code
 in the INT4 path.
 
-**Runbook recipe (TBD: GPU run, ~$2-3 total for the two models):**
+**Code (landed this session, CPU-side):**
+
+* `ctm_bench/scripts/compose_multi_model_summary.py` — composer.
+  Reads N per-model `track_e_quality_eval` JSONs (one per model from
+  the bash-loop recipe below), extracts each model's MMLU + ppl
+  deltas vs its OWN FP16 baseline, maps each to a per-model
+  GREEN/YELLOW/RED band, and emits a cross-model verdict that is
+  the **worst** of the per-model verdicts (one failing model means
+  INT4 doesn't generalize, even if the others pass). Decision-tree
+  thresholds pre-decided: MMLU GREEN ≥ −1.5pt (matches KIVI literature
+  range), YELLOW ≥ −3.0pt. Output JSON pinned at `§20.3.v1` schema.
+* `tests/test_compose_multi_model_summary.py` — 10 CPU regression
+  tests covering: 3-model happy path, worst-of-models verdict
+  semantics, YELLOW intermediate band, decision-tree boundaries,
+  missing-file graceful handling, MMLU-missing falls back to
+  perplexity-only verdict, label parsing (`label=path`).
+
+**Runbook recipe (TBD: GPU run, ~$2-3 total for the two models, ~45 min
+wall each on A100 40 GB):**
 
 ```bash
+cd /workspace/symbolu/CTM_plus/Bench
+
 for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v0.3; do
   TAG=$(echo $MODEL | tr '/' '_')
   mkdir -p /tmp/multi_model/$TAG
@@ -2380,18 +2586,76 @@ for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v
       --output-dir /tmp/multi_model/$TAG \
       2>&1 | tee /tmp/multi_model/$TAG/run.log
 done
+
+# Compose the §20.3 markdown table + merged §20.3.v1 JSON
+# (Qwen-7B path uses the existing §19.4 measured artefact):
+python -m ctm_bench.scripts.compose_multi_model_summary \
+    --inputs \
+        Qwen-7B=bench_out/track_e_audit_followups/int4_mmlu_1000.json \
+        Llama-3-8B=/tmp/multi_model/meta-llama_Meta-Llama-3-8B-Instruct/results.json \
+        Mistral-7B=/tmp/multi_model/mistralai_Mistral-7B-Instruct-v0.3/results.json \
+    --json-output bench_out/track_e_audit_followups/multi_model_summary.json \
+    > /tmp/section_20_3_table.md
+cat /tmp/section_20_3_table.md
 ```
 
-**Decision tree:**
+Note the Qwen-7B entry reuses the existing §19.4 measured 1000q
+artefact — no need to re-run Qwen.
 
-| Llama-3-8B / Mistral-7B MMLU delta | Verdict |
+**Decision tree (cross-model verdict — the worst of per-model verdicts):**
+
+| Worst per-model MMLU delta | Verdict |
 |---|---|
-| Within ±0.5pt of Qwen's −0.9pt | ✅ Cross-model generalization holds. "Multi-model demo" caveat removed. |
-| Materially worse (e.g., −2.0pt+) on one model | Model-specific failure. Investigate which layers; consider per-model bit allocation. |
-| Materially better (e.g., −0.2pt) on one model | The Qwen result is conservative. Bonus. |
+| ≥ −1.5pt (matches KIVI literature) | ✅ **GREEN.** Cross-model generalization holds. "Multi-model demo" caveat removed. |
+| ≥ −3.0pt (one model trails) | **YELLOW.** Partner-shareable with per-model caveat; investigate the trailing model's per-subject MMLU breakdown. |
+| Worse than −3.0pt | **RED.** Model-specific INT4 failure. Investigate per-layer behavior; consider per-model bit allocation. |
 
-**Expected outcome:** within ±0.5pt of Qwen for both models. KIVI's
-published numbers support this.
+Thresholds pinned by `Bench/tests/test_compose_multi_model_summary.py::test_decision_tree_band_boundaries`.
+
+**Expected outcome:** GREEN across all three models. KIVI's published
+cross-model numbers (Llama-2 / Gemma family) all land in the same
+−1pt MMLU range; we expect Llama-3 + Mistral to behave similarly on
+the same algorithm (group=32 + asymmetric, no model-specific tuning).
+
+#### §20.3 measured outcomes (GPU run, 2026-05-15) — GREEN, 2-model
+
+Llama-3-8B was **dropped** — Meta's gated access requires an approval
+queue, not a one-click accept. The replication ran on Mistral-7B,
+with Qwen2.5-7B reused from the §19.4 measured artefact. Artefacts:
+`bench_out/track_e_audit_followups/mistral_7b_mmlu_1000.json`,
+`multi_model_summary.json`.
+
+| Model | INT4 MMLU Δ vs FP16 | INT4 perplexity ratio | Per-model verdict |
+|---|---:|---:|---|
+| Qwen2.5-7B (§19.4) | −0.90pt (70.2% → 69.3%) | 1.024× | GREEN |
+| Mistral-7B-v0.3 | −0.60pt (60.1% → 59.5%) | 1.006× | GREEN |
+
+**Cross-model verdict: GREEN.** INT4 KIVI generalises across the two
+architectures tested — both land at a small quality cost
+(−0.6 to −0.9pt MMLU, ~1.01–1.02× perplexity), comfortably inside the
+−1.5pt KIVI-literature band. No model fell off a cliff.
+
+**Honest scoping — three caveats:**
+
+1. **Two models, not three.** Llama-3-8B deferred (gated access).
+   The "one-model demo" caveat is *narrowed* to a 2-model /
+   2-architecture result, not erased. Adding Llama (or a Qwen/Mistral
+   size sweep) extends coverage further.
+2. **Don't over-read the rank.** −0.60pt (Mistral) vs −0.90pt (Qwen)
+   are both inside the ±1.45pt 1000-question binomial CI — the
+   finding is *consistency* ("both small"), not "Mistral beats Qwen".
+3. **Short-context only.** §20.3 is MMLU + 282-token perplexity. It
+   does **not** address §20.4's long-context decode-degradation
+   finding — whether Mistral shares Qwen's §20.4 long-context
+   stuttering is **untested**. §20.3 GREEN must not be read as
+   "Mistral INT4 is safe at long context."
+
+Unlike §20.2's mechanically-stamped (and corrected) GREEN, this
+GREEN is honest: it claims only "no tested model showed a large
+INT4 quality cost," and −0.6 / −0.9pt genuinely are small. The
+partner-shareable line: *INT4 KIVI short-context quality replicates
+across Qwen2.5-7B and Mistral-7B; the long-context caveat (§20.4)
+travels with it.*
 
 ### §20.4 Long-context validation at 32k
 
@@ -2404,67 +2668,317 @@ The §18 + §19 results are at 282 prefill tokens. **We have not
 validated at the context length where the compression actually pays
 off.** The VC brief's "Honest Validation Status" flags this.
 
-**Two-axis sweep (TBD: GPU run, ~$0.50):**
+**Two-axis eval (one harness, one model load):**
 
-1. **Perplexity at 32k.** Use a long passage (Wikipedia or arXiv
-   chapter ≥ 35k chars). The `track_e_quality_eval.py` perplexity
-   path already supports a single chunk; extend `PERPLEXITY_TEXT`
-   to load from a file path via a new `--perplexity-text-path` flag
-   (CPU-side patch in the same commit as this section). Run both
-   FP16 baseline and INT4 KIVI; report ratio.
-2. **Throughput at 32k.** Already in §20.1's `track_e_throughput.py`
-   — add `32768` to `--prefill-lengths` (the script accepts it). The
-   prefill takes longer than the decode at 32k, so the prefill-cost
-   axis (where FP8 has a hardware advantage) becomes visible.
+1. **Perplexity sweep** at multiple context lengths. The §19.4
+   result (1.024×) was at 282 tokens; this measures whether quality
+   holds at the context length where compression actually pays off.
+2. **Needle-in-haystack** retrieval at multiple (depth %, context
+   length) pairs. Inserts a unique fact ("the secret code is X")
+   at depth N% of a filler passage and asks the model to retrieve
+   it. Tests **functional capability**, not just average loss — a
+   model can have similar perplexity but fail to retrieve specific
+   information under heavy compression. This is the partner-relevant
+   signal for long-context applications.
 
-**Decision tree (32k perplexity ratio at INT4):**
+The repo's existing needle-haystack harness
+(`/test_needle_haystack.py`) targets the in-house `phase_transformer`
+model and isn't directly reusable. We lift its haystack texts /
+needle templates and reimplement the scoring for HF transformers +
+the route-B INT4PerChannelCache.
 
-| Ratio | Verdict |
-|---|---|
-| ≤ 1.05 | ✅ Long-context quality holds at our shape (KIVI's published claim reproduces). Partner-shareable. |
-| 1.05–1.15 | YELLOW — quality degrades at 32k. Investigate per-layer behaviour; possibly use higher bits on selected layers. |
-| > 1.20 | Long-context-specific failure. The 282-token result is a short-context artifact. **Major issue** — investigate before further partner conversations on long-context use cases. |
+**Code (landed this session, CPU-side):**
 
-### §20.5 Route-A vLLM `cache_kv` hook — engineering plan
+* `ctm_bench/scripts/track_e_long_context.py` — single-load harness.
+  Perplexity at N context lengths × 2 caches; needle at N lengths ×
+  M depths × K samples × 2 caches. Dry-runnable with the fake tiny
+  model. Output JSON pinned at `§20.4.v1` schema.
+* `ctm_bench/scripts/compose_long_context_summary.py` — composer.
+  Maps perplexity ratio + needle delta to GREEN/YELLOW/RED bands at
+  pre-decided thresholds (ppl ratio ≤ 1.05 / ≤ 1.15; needle delta
+  ≥ −5pt / ≥ −10pt). Combined verdict = worst of the two axes:
+  perplexity-holds-but-needle-fails still reads as a long-context
+  failure, which is the whole point of running needle in addition
+  to perplexity.
+* `tests/test_long_context.py` — 11 CPU regression tests covering
+  dry-run schema, perplexity-only / needle-only modes, the
+  context-length-key JOIN invariant (perplexity rows and needle rows
+  share the same `context_length_chars` so they appear under the
+  same composer entry), haystack/needle builders, and the band
+  boundaries.
 
-**Sized:** 3-5 engineer-days CPU + ~$0.30 GPU. Full plan in
-``Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md`` — committed this
-session. Highlights:
+**Runbook recipe (TBD: GPU run, ~$0.50-$1.50, ~30-90 min wall on
+A100 40 GB):** the wide range reflects INT4 prefill at 32k being 2-5×
+slower than FP16 in the pure-PyTorch unpack path (the §20.6 fused
+kernel would close most of that gap). Char-level needle depth — see
+`RUNPOD_TRACK_D_E_RUNBOOK.md` §5k for the literature-comparability note.
 
-* **Patch surface:** `vllm/attention/backends/flash_attn.py` —
-  `FlashAttentionImpl.forward`'s `cache_kv` invocation block, wrapped
-  by a monkey-patched compress-on-write / dequant-on-read. Sketch
-  reuses the existing `_extract_model_from_engine` walker the CTM+
-  side-channel installer (`runner_vllm_streaming.py`) already has.
-* **Algorithm code reuse:** `quantize_per_channel_int4` /
-  `quantize_per_token_int4` / `pack_int4` are pure-torch and don't
-  depend on the cache wrapper. Route-A reuses them unchanged. The
-  algorithm path is bit-identical to route-B; only the storage layer
-  changes.
-* **What route-A inherits automatically from route-B:** algorithm
-  correctness (§18.3), all quality numbers (§19.1–§19.4), bit-packed
-  storage (§19.1), group + asymmetric config, and (conditional on
-  §20.2 landing) sink-FP16 mixed precision.
-* **What route-A does NOT inherit:** HF DynamicCache lifecycle
-  semantics (route-A reimplements against vLLM `BlockManager`),
-  decode-step S=1 special case (vLLM writes one block per step; KIVI
-  group_size=32 must align to vLLM block_size — likely move block_size
-  to 32 OR group across two adjacent vLLM blocks). Day-1 verification.
-* **Why this double-counts:** the SAME hook closes the §13.3 CTM+
-  Phase 4 −20% tokens/sec gap (which is structural at the Evictor-ABC
-  patching layer; a deeper integration point at `cache_kv` bypasses
-  it). One implementation closes two validation gaps the VC brief
-  currently flags.
+```bash
+cd /workspace/symbolu/CTM_plus/Bench
 
-**Open questions to answer on day 1** (full list in the plan doc):
+# Fetch a long reference passage (one-off; reused across the sweep).
+# See RUNPOD_TRACK_D_E_RUNBOOK §5k for the wikitext fetch recipe.
 
-1. Does `BlockManager` expose a clean scale-storage lifecycle hook,
-   or do we subclass?
-2. Does `flash_attn_with_kvcache` need FP16 specifically?
-3. Is vLLM block_size=16 compatible with KIVI group_size=32?
-4. How does prefix caching interact with the per-block scale
-   side-channel? (Probably fine — dynamic scales are deterministic
-   from K/V — but verify.)
+python -m ctm_bench.scripts.track_e_long_context \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --perplexity-text-path /tmp/wikitext_long.txt \
+    --context-lengths 4096,16384,32768 \
+    --needle-depths 0.1,0.5,0.9 \
+    --needle-samples 3 \
+    --output bench_out/track_e_audit_followups/long_context.json
+
+# Compose the §20.4 markdown table + merged §20.4.v1 JSON:
+python -m ctm_bench.scripts.compose_long_context_summary \
+    --input bench_out/track_e_audit_followups/long_context.json \
+    --json-output bench_out/track_e_audit_followups/long_context_summary.json \
+    > /tmp/section_20_4_table.md
+cat /tmp/section_20_4_table.md
+```
+
+**Decision tree (combined verdict at the largest context length):**
+
+| Ppl ratio | Needle Δ | Combined verdict |
+|---|---|---|
+| ≤ 1.05 | ≥ −5pt | ✅ **GREEN.** Long-context quality holds. Partner-shareable. |
+| ≤ 1.15 | ≥ −10pt | **YELLOW.** Quality degrades but materially better than RED. |
+| Either axis worse | — | **RED.** Long-context failure. Major issue; investigate before further long-context partner conversations. |
+
+The thresholds are pinned by
+`Bench/tests/test_long_context.py::test_composer_decision_tree_boundaries`.
+
+#### §20.4 measured outcomes (GPU run, 2026-05-15) — RED, characterized
+
+Qwen2.5-7B-Instruct, wikitext-2 reference text, 80 GB A100. Context
+lengths in CHARS (≈ ¼ that in Qwen tokens). Artefacts:
+`bench_out/track_e_audit_followups/long_context.json`,
+`long_context_summary.json`, `long_context_sink16.json`.
+
+| ctx (chars) | perplexity ratio | baseline needle | INT4 needle | needle Δ |
+|---:|---:|---:|---:|---:|
+| 4096 | 1.007 | 100% | 11% | −89% |
+| 16384 | 1.007 | 100% | 22% | −78% |
+| 32768 | 1.008 | 89% | 22% | −67% |
+
+**Combined verdict: RED.** Perplexity holds (1.007× — GREEN on that
+axis) but INT4 long-context needle retrieval collapses. This is
+precisely the failure the needle eval was built to expose: average
+next-token loss is robust to KV-quant noise; sharp single-token
+retrieval is not.
+
+**The mechanism — characterized from the generated text, not just
+the score.** Dumping the per-trial `generated_text` showed INT4 is
+**not failing to retrieve** — it is failing to *cleanly emit*. The
+needle characters reach the decode but come out garbled by heavy
+**token-level stuttering**:
+
+```
+want 90952P → INT4 emitted "...the vault is vault vault is is 9 9 9 5 2"
+want AFHSG2 → INT4 emitted "...magic number number = AFHHSS2G22"
+want 165Z7Q → INT4 emitted "...magic number number 1166Z7QQ"
+```
+
+Every output shows systematic token doubling ("The The", "number
+number", "is is", "code code code"). The "11–22% retrieval" score
+therefore **understates raw retrieval** — it measures *clean exact
+output*; the real failure is **decode-coherence collapse**. This is
+consistent with §19.3.1's autoregressive 64% top-1 (vs 96.4%
+teacher-forced) — INT4 autoregressive decode was already degraded at
+short context; at long context the degradation compounds into
+stuttering. Perplexity is immune because it is non-autoregressive
+(one teacher-forced pass).
+
+**Confirmation — it is real, not a route-B bug.** A sink-FP16
+re-run (`--sink-size 16`, ctx=16384) recovered needle retrieval from
+**22% → 56%**. A bug would not respond cleanly to sink protection.
+The attention-sink tokens carry roughly half the damage: quantizing
+the first ~16 positions' K/V is a large part of what degrades decode.
+Sink-FP16 is a **partial mitigation** — 56% still trails the 100%
+baseline, so residual damage beyond the sinks remains. **[Superseded
+in part — see §20.4.1: two higher-n re-runs (n=9, n=24) put sink=16
+at ≈21%, not 56%; the real sink lever is sink=4, and the dominant
+long-context blocker is the K channel, not sink coverage.]**
+
+**This retroactively explains §20.2.** Sink-FP16 looked inconclusive
+on short-context MMLU because short prompts do not accumulate enough
+INT4 KV noise for sink protection to matter. §20.4 shows sink-FP16 is
+a **long-context lever** (22→56% is far outside any noise band) — the
+§20.2 instrument (short MMLU) was simply blind to the regime where it
+works. §20.2 and §20.4 are consistent.
+
+**Honest status — RED, partner-shareable negative.** Route-B INT4
+KIVI as configured (group=32, asymmetric, no sink protection) is
+**not safe for long-context generation** — decode degrades into
+repetition. With sink-FP16 the failure is roughly halved but not
+closed. The §19.4 short-context quality numbers (1.024× ppl, −0.9pt
+MMLU, 96.4% teacher-forced) **do not generalise to long-context
+autoregressive decode**; that caveat must travel with every INT4
+quality claim.
+
+**What would close it — see §20.4.1.** The K/V ablation diagnostic
+sprint resolved the mechanism: **V-INT4 + K-FP16 ships now**
+(quality-neutral at 16k); full INT4 needs the K channel solved —
+milder K compression (INT8), per-layer K bit allocation, or a
+K-specific outlier scheme. INT5/INT6 remains untestable through
+route-B until an int8-storage path lands (the 4-bit packer corrupts
+values wider than 4 bits).
+
+#### §20.4.1 K/V ablation diagnostic sprint (GPU run, 2026-05-17) — K channel isolated
+
+A bounded follow-up sprint ran the §20.4 16k needle setup
+(Qwen2.5-7B-Instruct, ctx=16000 chars, depths 0.1/0.5/0.9,
+**n=24 trials/cell** = 8 samples × 3 depths, 64 decoded tokens)
+across three knobs: a sink sweep, a K-only/V-only precision
+ablation, and an INT5 cell. Harness: `track_e_long_context.py` at
+schema `§20.4.v2` with per-trial decode-stability logging
+(first-stutter position, repeated-token rate, decode entropy).
+Driver: `scripts/diagnostic_sprint_long_context.sh`.
+
+**K/V ablation — the headline.** The `quantize_k` / `quantize_v`
+toggles pass one channel through at FP16:
+
+| Cell | K | V | needle | repeat rate | stutter trials |
+|---|---|---|---:|---:|---:|
+| baseline | FP16 | FP16 | 100% | — | — |
+| V-only INT4 | FP16 | INT4 | **96%** | 0.23 | 0% |
+| K-only INT4 | INT4 | FP16 | **46%** | 0.56 | 100% |
+| both INT4 | INT4 | INT4 | 29% | 0.44 | 100% |
+
+At n=24 this is unambiguous: **V→INT4 is quality-neutral** — 96%
+(23/24) is within binomial noise of the 100% baseline, with zero
+stuttering trials. **K→INT4 is the entire long-context failure** —
+46% on its own, and it drags the full-INT4 config down to 29%.
+KIVI's per-channel INT4 on K is what breaks long-context retrieval;
+per-token INT4 on V costs nothing measurable at 16k. This localizes
+the §20.4 "decode-coherence collapse" to the K channel.
+
+**Sink sweep — revises the §20.4 sink-FP16 claim.** Sink sizes
+{0,4,16,32,64,128}, n=24/cell:
+
+| sink | 0 | 4 | 16 | 32 | 64 | 128 |
+|---|---:|---:|---:|---:|---:|---:|
+| needle | 29% | **67%** | 21% | 33% | 42% | 29% |
+
+Only `sink=4` recovers (67%, replicated — a first n=9 sweep gave
+78%, ≈4σ above the ~30% base rate). `sink=16` measures 21%; two
+independent re-runs (n=9: 22%, n=24: 21%) **did not reproduce the
+single `long_context_sink16.json` 56% result**, now treated as an
+n=9 upward fluctuation. The real sink lever is protecting *exactly
+the ~4 true attention-sink tokens'* K at FP16 — coherent with the
+K-channel finding, since the sink tokens carry the most attention
+mass. Even sink=4 only partially mitigates (67% < 100% baseline).
+
+**INT5 — untestable through route-B.** The `int5.json` cell (0%
+needle, 0.98 repeated-token rate, 100% stutter) is **not a real
+measurement**: the route-B kvstore's `pack_int4` only represents
+4-bit values ([−8,+7]); at `bits=5` the quantizer emits [−16,+15],
+which overflow the nibble packer and corrupt on read. INT5 needs an
+int8 (unpacked) storage path before it can be measured — a small
+follow-on, out of this sprint's scope.
+
+**Revised §20.4 verdict — RED for full INT4, blocker isolated.**
+Long-context INT4 on both channels remains RED (29% needle). But the
+decomposition gives a shippable path: **V-INT4 + K-FP16 is measured
+quality-neutral at 16k** (96% needle, 0% stutter) with no measured
+long-context quality loss. Memory consequence: ~1.5× KV-cache
+compression — K stays FP16 (16 bits/elem), V compresses to ~5
+effective bits/elem (4-bit values + group/asymmetric scale overhead;
+V's standalone ratio ~3.2×), so 32 / (16 + 5) ≈ 1.5×. FP8 does
+**not** have to become the long-context default. Full 3–4× INT4
+needs the K channel solved; that is the §20.4 open research
+question, not a shipping blocker.
+
+**Follow-on capability — landed CPU-side, GPU validation pending.**
+The INT5-untestable gap above is now closed: the route-B kvstore
+stores > 4-bit channels as int8 (unpacked) rather than corrupting
+them in the 4-bit packer, and K/V take independent bit widths
+(`k_bits` / `v_bits`). This makes the adaptive-precision
+recommendation directly runnable. Projected actual-heap compression
+(anchored on full-INT4 ~3.2× and ~5 effective bits/elem/channel):
+V-INT4 + K-INT8 ≈ **2.3×**, vs ~1.5× for V-INT4 + K-FP16 and ~3.2×
+for full INT4. Note any K in {5..8} stores as int8 → same ~2.3×
+actual heap; a sub-byte K packer is the lever from there toward ~3×.
+A K-bit ladder (K ∈ {8,6,5}, V=INT4) plus a now-valid INT5 cell are
+wired into `scripts/diagnostic_sprint_long_context.sh`. Whether
+K-INT8 actually restores long-context quality is the open question
+for the round-2 GPU run — see
+`scripts/DIAGNOSTIC_SPRINT_LONG_CONTEXT_RUNBOOK.md`. Status: the
+capability is **measured-correct on CPU** (round-trip + bit-width
+unit tests); adaptive-precision long-context quality is **projected,
+not yet measured**.
+
+Artefacts: `bench_out/diag_sprint/{sink_0,sink_4,sink_16,sink_32,
+sink_64,sink_128,k_only,v_only,int5}.json` — generated on the RunPod
+pod, which had no outbound git-push path; aggregate numbers
+transcribed above, raw per-trial JSONs not committed.
+
+### §20.5 Route-A vLLM INT4 KV-cache integration — Days 1-3 landed
+
+**Status:** the attention-forward integration tier is **implemented
+and CPU-validated**; Days 4-5 (GPU verification) pending. Full plan
++ day-by-day status in ``Bench/scripts/ROUTE_A_VLLM_CACHE_KV_PLAN.md``.
+
+**What landed (this session, CPU dev pod, committed):**
+
+* ``kv_policy/int4_cache_kv_route_a.py`` — `INT4CacheKVRouteA` (the
+  per-call KIVI INT4 compress→decompress manager) +
+  `install_int4_cache_kv_route_a` (monkey-patches every vLLM
+  `Attention` module's `forward` so the K/V it receives are INT4-
+  round-tripped). Reuses the route-B `quantize_per_channel_int4` /
+  `quantize_per_token_int4` ops unchanged — route-A and route-B are
+  the same algorithm, differing only in the integration point.
+  vLLM's Attention-layer K/V layout `(num_tokens, num_kv_heads,
+  head_dim)` IS the quantizer's `(S, H, D)` — no transpose (route-B
+  had to transpose `(B,H,S,D)`).
+* ``run_streaming.py`` — `--int4-kv-route-a` flag + KIVI-config flags
+  (`--int4-kv-k-group-size`, `--int4-kv-v-group-size`,
+  `--int4-kv-symmetric`, `--int4-kv-bits`, `--int4-kv-sink-size`),
+  threaded through `AsyncEngineDriver`. The driver installs route-A
+  after engine construction, composes with `--ctm-plus`, and tears
+  down the wraps on shutdown.
+* 16 CPU regression tests (`Bench/tests/test_int4_cache_kv_route_a.py`)
+  validate the install + interception against faked vLLM attention
+  modules — the `test_vllm_protocol_fixture.py` pattern. Plus 2
+  driver-wiring tests in `test_runner_vllm_streaming.py`.
+
+**Post-implementation audit fix:** the first cut only handled 3-D
+K/V `(num_tokens, num_kv_heads, head_dim)`. vLLM actually hands
+`Attention.forward` flat **2-D** K/V `(num_tokens,
+num_kv_heads*head_dim)` (confirmed by the repo's GPU-validated
+`triattention.py` Phase 4 hook). The 3-D-only version would have
+silently no-op'd on real vLLM. Fixed: `round_trip_kv` handles 2-D
+(reshape→quantize→reshape-back, using `num_kv_heads` auto-detected
+from `model.config` or `--int4-kv-num-kv-heads`); the driver logs
+`forward_calls` at run-end and WARNs if 0. Two new tests pin the
+2-D path end-to-end.
+
+**This tier vs the memory-realizing tier:** what landed runs the
+INT4 *quality path* under vLLM — the compressed K/V flow through
+each `Attention.forward` so the per-block-layout quality effect is
+measurable on a GPU run. It does **not yet realize the 3.2× HBM
+saving**; that needs vLLM's paged KV buffer allocated INT4-width +
+the FlashAttn read path dequant-ing from it (the §20.6 Marlin
+kernel / "alternate paged buffer" follow-up). The current tier also
+shares route-B's single-token-decode degeneracy (per-call quant of
+one decode token is near-lossless — fixed only by per-16/32-token-
+block quant in the paged-buffer tier).
+
+**Why this double-counts:** the route-A install lands on the model's
+`Attention` modules — the same surface CTM+ Phase 4's hooks use. A
+combined `--ctm-plus --int4-kv-route-a` cell is now a single command
+(the orthogonal-composability is pinned by
+`test_int4_route_a_composes_with_ctm_plus`).
+
+**Pending (Days 4-5, GPU pod):**
+
+1. Verify `install_int4_cache_kv_route_a` finds the real vLLM
+   `Attention` class (the `endswith("Attention")` heuristic; vLLM's
+   class in `vllm/attention/layer.py` is exactly `Attention`).
+2. Verify the K/V positional indices in the real `Attention.forward`
+   signature match the install's `key_arg_index=1, value_arg_index=2`
+   defaults (overridable; vLLM minor versions have moved these).
+3. GPU smoke run + chat_32k throughput + quality re-validation.
+4. The memory-realizing paged-buffer swap (separate follow-up).
 
 ### §20.6 Marlin-style fused unpack-attend kernel — sketch landed
 
@@ -2478,14 +2992,23 @@ LOC documenting:
 * The group-index computation for K (along seq axis) and V (along
   head_dim axis).
 * GQA broadcasting (each KV head services H_q/H_kv query heads).
-* An HBM-bytes counter that quantifies the bandwidth advantage: at
-  Qwen2.5-7B shape (B=1, H_kv=4, S_kv=64, D=128), INT4 loads
-  **36,864 bytes vs FP16's 131,072 — a 3.56× HBM-traffic ceiling
-  speedup**.
+* An HBM-bytes counter that quantifies the bandwidth advantage at the
+  §18.3 ship config (asymmetric=True, group=32). At Qwen2.5-7B shape
+  (B=1, H_kv=4, S_kv=64, D=128), INT4 loads **40,960 bytes vs FP16's
+  131,072 — a 3.20× HBM-traffic ceiling speedup**. (Symmetric-only
+  variant — no per-group offset storage — yields 3.56×; we ship
+  asymmetric for the quality gain so the 3.20× is the partner-relevant
+  number.)
 
-The reference runs end-to-end on CPU; the test cell at the bottom
-produces a `(1, 28, 1, 128)` FP16 output tensor and prints the HBM
-counter.
+The reference runs end-to-end on CPU. The bottom-of-file demo
+quantizes real Qwen-shape K/V through the route-B ops, runs the
+fused reference, and verifies it matches a naive "dequant-K +
+dequant-V + standard attention" pipeline within FP16 rounding
+(empirically: max abs diff 0.000000, cosine 1.000000). Six
+regression tests in `Bench/tests/test_int4_fused_attention_sketch.py`
+pin the contract, including the asymmetric dequant formula (which
+was wrong in the initial docstring — a kernel author following the
+old spec would land off by +8×scale per element).
 
 **Why this is evidence the gap is closeable, not just a claim:**
 

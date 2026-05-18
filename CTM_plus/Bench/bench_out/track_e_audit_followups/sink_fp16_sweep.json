@@ -1,0 +1,114 @@
+{
+  "schema_version": "§20.2.v1",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "dtype": "float16",
+  "int4_config": {
+    "quant": "int4-per-channel",
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "bits": 4,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric, k_group=32, v_group=32"
+  },
+  "sink_values": [
+    0,
+    4,
+    16,
+    64
+  ],
+  "rows": [
+    {
+      "sink_size": 0,
+      "cache_type": "baseline",
+      "perplexity": 3.715450737941104,
+      "nll_per_token": 1.3125,
+      "mmlu_correct": 702,
+      "mmlu_total": 1000,
+      "mmlu_accuracy": 0.702,
+      "notes": null
+    },
+    {
+      "sink_size": 0,
+      "cache_type": "int4-per-channel",
+      "perplexity": 3.8035601130611036,
+      "nll_per_token": 1.3359375,
+      "mmlu_correct": 693,
+      "mmlu_total": 1000,
+      "mmlu_accuracy": 0.693,
+      "notes": null
+    },
+    {
+      "sink_size": 4,
+      "cache_type": "int4-per-channel",
+      "perplexity": 3.5800996134087044,
+      "nll_per_token": 1.275390625,
+      "mmlu_correct": 689,
+      "mmlu_total": 1000,
+      "mmlu_accuracy": 0.689,
+      "notes": null
+    },
+    {
+      "sink_size": 16,
+      "cache_type": "int4-per-channel",
+      "perplexity": 3.6329284642492756,
+      "nll_per_token": 1.2900390625,
+      "mmlu_correct": 702,
+      "mmlu_total": 1000,
+      "mmlu_accuracy": 0.702,
+      "notes": null
+    },
+    {
+      "sink_size": 64,
+      "cache_type": "int4-per-channel",
+      "perplexity": 3.7998475119767416,
+      "nll_per_token": 1.3349609375,
+      "mmlu_correct": 699,
+      "mmlu_total": 1000,
+      "mmlu_accuracy": 0.699,
+      "notes": null
+    }
+  ],
+  "deltas": {
+    "anchor": "sink=0 int4-per-channel (§19.4 ship config)",
+    "sink0_mmlu_accuracy": 0.693,
+    "sink0_perplexity": 3.8035601130611036,
+    "per_sink": {
+      "sink=0": {
+        "mmlu_delta_pt": 0.0,
+        "perplexity_ratio": 1.0
+      },
+      "sink=4": {
+        "mmlu_delta_pt": -0.40000000000000036,
+        "perplexity_ratio": 0.941249646907103
+      },
+      "sink=16": {
+        "mmlu_delta_pt": 0.9000000000000008,
+        "perplexity_ratio": 0.9551389635657674
+      },
+      "sink=64": {
+        "mmlu_delta_pt": 0.6000000000000005,
+        "perplexity_ratio": 0.9990239141819757
+      }
+    },
+    "baseline_fp16_mmlu_accuracy": 0.702,
+    "baseline_fp16_perplexity": 3.715450737941104,
+    "per_sink_vs_fp16": {
+      "sink=0": {
+        "mmlu_delta_pt": -0.9000000000000008,
+        "perplexity_ratio": 1.023714316602358
+      },
+      "sink=4": {
+        "mmlu_delta_pt": -1.3000000000000012,
+        "perplexity_ratio": 0.9635707390357156
+      },
+      "sink=16": {
+        "mmlu_delta_pt": 0.0,
+        "perplexity_ratio": 0.977789431347014
+      },
+      "sink=64": {
+        "mmlu_delta_pt": -0.30000000000000027,
+        "perplexity_ratio": 1.022715083576214
+      }
+    }
+  }
+}

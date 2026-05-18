@@ -527,29 +527,29 @@ quantization range to be even more inflated. The §20.2 test
 combines sink-FP16 with the WORKING `group=32 + asymmetric`
 configuration — different mechanism.
 
-Re-run cost: ~$0.50 for the full 4-cell sweep (~30 min wall).
+Re-run cost: ~$0.50 for the full 4-cell sweep (~30 min wall). Uses
+the single-load `sink_fp16_sweep.py` harness (one model load vs four
+for a `for`-loop over `track_e_quality_eval.py`).
 
 ```bash
 cd /workspace/symbolu
 git pull --ff-only origin claude/fp8-kv-competitive-gap-iXKRM
 
 cd CTM_plus/Bench
-mkdir -p /tmp/sink_fp16_sweep
+python -m ctm_bench.scripts.sink_fp16_sweep \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --eval perplexity,mmlu \
+    --mmlu-num-questions 1000 \
+    --sink-values 0,4,16,64 \
+    --output bench_out/track_e_audit_followups/sink_fp16_sweep.json
 
-for SINK in 0 4 16 64; do
-  mkdir -p /tmp/sink_fp16_sweep/sink${SINK}
-  python -m ctm_bench.scripts.track_e_quality_eval \
-      --model Qwen/Qwen2.5-7B-Instruct \
-      --dtype float16 --device cuda \
-      --eval perplexity,mmlu \
-      --mmlu-num-questions 1000 \
-      --quant int4-per-channel \
-      --k-group-size 32 --v-group-size 32 \
-      --asymmetric-int4 \
-      --sink-size ${SINK} \
-      --output-dir /tmp/sink_fp16_sweep/sink${SINK} \
-      2>&1 | tee /tmp/sink_fp16_sweep/sink${SINK}/run.log
-done
+# Compose the §20.2 markdown table + merged §20.2.v1 JSON:
+python -m ctm_bench.scripts.compose_sink_fp16_summary \
+    --input bench_out/track_e_audit_followups/sink_fp16_sweep.json \
+    --json-output bench_out/track_e_audit_followups/sink_fp16_summary.json \
+    > /tmp/section_20_2_table.md
+cat /tmp/section_20_2_table.md
 ```
 
 **Decision tree (best sink_size MMLU delta vs sink_size=0):**
@@ -571,7 +571,8 @@ Removes the "one-model demo" caveat. The route-B cache wrapper is
 model-agnostic: dynamic per-block scales work on any (S, H, D) shape,
 and the group_size=32 along the seq axis is shape-agnostic.
 
-Re-run cost: ~$2-3 (one run per model, ~30-45 min wall each on A100 40GB).
+Re-run cost: ~$2-3 (one run per model, ~30-45 min wall each on A100 40 GB).
+Each model is its own ~14 GB load — no shared-load sweep possible.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
@@ -590,33 +591,70 @@ for MODEL in meta-llama/Meta-Llama-3-8B-Instruct mistralai/Mistral-7B-Instruct-v
       --output-dir /tmp/multi_model/$TAG \
       2>&1 | tee /tmp/multi_model/$TAG/run.log
 done
+
+# Compose the §20.3 markdown + merged §20.3.v1 JSON. Reuses the §19.4
+# measured Qwen artefact so we don't pay GPU spend for the Qwen leg.
+python -m ctm_bench.scripts.compose_multi_model_summary \
+    --inputs \
+        Qwen-7B=bench_out/track_e_audit_followups/int4_mmlu_1000.json \
+        Llama-3-8B=/tmp/multi_model/meta-llama_Meta-Llama-3-8B-Instruct/results.json \
+        Mistral-7B=/tmp/multi_model/mistralai_Mistral-7B-Instruct-v0.3/results.json \
+    --json-output bench_out/track_e_audit_followups/multi_model_summary.json \
+    > /tmp/section_20_3_table.md
+cat /tmp/section_20_3_table.md
 ```
 
-**Decision tree per model:**
+**Decision tree (cross-model verdict = worst per-model verdict):**
 
-| MMLU delta | Verdict |
+| Worst per-model MMLU delta | Verdict |
 |---|---|
-| Within ±0.5pt of Qwen's −0.9pt | ✅ Generalizes. Caveat removed. |
-| −2.0pt+ | Model-specific failure. Investigate per-layer; consider per-model bits config. |
-| −0.2pt or better | Bonus — Qwen result is conservative. |
+| ≥ −1.5pt (matches KIVI literature) | ✅ **GREEN.** Cross-model generalization holds. Caveat removed. |
+| ≥ −3.0pt | **YELLOW.** Partner-shareable with per-model caveat; check the trailing model's per-subject breakdown. |
+| Worse than −3.0pt | **RED.** Model-specific failure. Investigate per-layer; consider per-model bits config. |
 
-## 5k. Long-context perplexity at 32k (§20.4)
+One failing model is enough to flip cross-model to RED — the partner-
+relevant signal is "does INT4 work on every model we tested", not
+"average across models". Pinned by composer regression tests.
+
+## 5k. Long-context validation at 32k (§20.4) — perplexity + needle-in-haystack
 
 KV compression's headline value is long-context. Qwen2.5-7B at 32k:
 weights ~14 GB, KV at FP16 ~16 GB. Compression payoff is here.
 
-Re-run cost: ~$0.50 (~30 min wall). Requires a long passage —
-download a 35k-char Wikipedia chapter on the GPU pod first:
+Uses the single-load `track_e_long_context.py` harness — perplexity
+sweep AND needle-in-haystack retrieval in one model load, one JSON.
+The needle eval is the partner-relevant signal: a model can have
+similar perplexity but fail to retrieve specific information under
+heavy compression. The brief's §20.4 explicitly says RULER /
+Needle-in-Haystack is the preferred pattern if available; this is
+that.
+
+Re-run cost: **~$0.50 - $1.50 (~30 - 90 min wall on A100 40 GB)**.
+The wide range reflects: INT4 prefill at 32k is 2-5× slower than FP16
+in pure-PyTorch unpack mode (the harness's path; a fused kernel —
+§20.6 — would close most of that). Real cost depends on (a) how much
+of the sweep lands at 32k vs 4k/16k cells, (b) how many trials per
+context length the operator chose. Use `--context-lengths 4096,16384`
+on a 40 GB card if 32k baseline OOMs.
+
+**Char-vs-token depth note:** the needle insertion uses char-level
+depth (insert at `int(len(haystack) * depth_percent)` chars). The
+literature (RULER, Anthropic Claude 2 100k post) typically uses
+token-level depth. Our internal baseline-vs-INT4 comparisons are
+apples-to-apples (both caches see the same haystack at the same char
+position), but if a partner runs RULER for direct comparison, expect
+some position drift due to tokenizer compression varying with text
+density.
 
 ```bash
 cd /workspace/symbolu/CTM_plus/Bench
 
-# Fetch a long passage (~50k chars) for the 32k cell. Pick any
-# topic; the script tokenizes it and truncates if needed.
+# Fetch a long passage (~60k chars) for the haystack base text.
+# Pick any topic; the harness truncates to each requested context
+# length.
 python -c "
 from datasets import load_dataset
 ds = load_dataset('wikitext', 'wikitext-103-raw-v1', split='test')
-# Pick a chunk of contiguous articles; aim for >50k chars after join.
 text = ''
 for row in ds:
     text += row['text']
@@ -626,30 +664,38 @@ open('/tmp/wikitext_long.txt', 'w').write(text[:60000])
 print('Wrote', len(text[:60000]), 'chars to /tmp/wikitext_long.txt')
 "
 
-# Run perplexity at three context lengths to map the quality curve.
-for MAX_CHARS in 16000 32000 50000; do
-  mkdir -p /tmp/longctx_${MAX_CHARS}
-  python -m ctm_bench.scripts.track_e_quality_eval \
-      --model Qwen/Qwen2.5-7B-Instruct \
-      --dtype float16 --device cuda \
-      --eval perplexity \
-      --quant int4-per-channel \
-      --k-group-size 32 --v-group-size 32 \
-      --asymmetric-int4 \
-      --perplexity-text-path /tmp/wikitext_long.txt \
-      --perplexity-text-max-chars ${MAX_CHARS} \
-      --output-dir /tmp/longctx_${MAX_CHARS} \
-      2>&1 | tee /tmp/longctx_${MAX_CHARS}/run.log
-done
+# Combined perplexity + needle sweep at 4k/16k/32k chars (4k char
+# ≈ 1k tokens for Qwen; 32k char ≈ 8k tokens; tune per model).
+python -m ctm_bench.scripts.track_e_long_context \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --device cuda --dtype float16 \
+    --perplexity-text-path /tmp/wikitext_long.txt \
+    --context-lengths 4096,16384,32768 \
+    --needle-depths 0.1,0.5,0.9 \
+    --needle-samples 3 \
+    --output bench_out/track_e_audit_followups/long_context.json
+
+# Compose the §20.4 markdown table + merged §20.4.v1 JSON:
+python -m ctm_bench.scripts.compose_long_context_summary \
+    --input bench_out/track_e_audit_followups/long_context.json \
+    --json-output bench_out/track_e_audit_followups/long_context_summary.json \
+    > /tmp/section_20_4_table.md
+cat /tmp/section_20_4_table.md
 ```
 
-**Decision tree (32k INT4 perplexity ratio):**
+**Decision tree (combined verdict at the largest context length):**
 
-| Ratio | Verdict |
-|---|---|
-| ≤ 1.05 | ✅ Long-context quality holds. Partner-shareable. |
-| 1.05–1.15 | YELLOW — degrades at 32k. Consider per-layer bits. |
-| > 1.20 | Long-context failure. Major issue; investigate before further long-context partner conversations. |
+| Ppl ratio | Needle Δ | Combined verdict |
+|---|---|---|
+| ≤ 1.05 AND | ≥ −5pt | ✅ **GREEN.** Long-context quality holds. Partner-shareable. |
+| ≤ 1.15 AND | ≥ −10pt | **YELLOW.** Quality degrades but materially better than RED. |
+| Either axis worse | — | **RED.** Long-context failure. Major issue; investigate before further long-context partner conversations. |
+
+If 32k OOMs at FP16 baseline (~30 GB combined: 14 GB weights + 16 GB
+KV), drop to `--context-lengths 4096,16384` or use bfloat16. INT4
+should still fit at 32k since the KV is 3.2× smaller. The harness
+also supports `--skip-needle` (perplexity-only) and `--skip-perplexity`
+(needle-only) for partial sweeps when GPU memory is tight.
 
 If 32k OOMs at FP16 baseline (~30 GB combined: 14 GB weights + 16 GB
 KV), drop to MAX_CHARS=24000 for the baseline cell. INT4 should still

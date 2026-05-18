@@ -1,0 +1,11 @@
+{
+  "cell": "vllm",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "kv_cache_dtype": "fp8",
+  "num_prompts": 32,
+  "prompt_tokens": 1024,
+  "decode_tokens_per_prompt": 256,
+  "n_decode_tokens": 8192,
+  "wall_clock_seconds": 6.6518748896196485,
+  "tokens_per_second": 1231.5324830873985
+}

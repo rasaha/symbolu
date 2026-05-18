@@ -1,0 +1,49 @@
+{
+  "schema_version": "\u00a720.2.v1",
+  "source_sweep": "\u00a720.2.v1",
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "int4_config": {
+    "quant": "int4-per-channel",
+    "k_group_size": 32,
+    "v_group_size": 32,
+    "asymmetric": true,
+    "bits": 4,
+    "scheme": "K=per-channel INT4, V=per-token INT4, asymmetric, k_group=32, v_group=32"
+  },
+  "fp16_baseline": {
+    "mmlu_accuracy": 0.702,
+    "perplexity": 3.715450737941104
+  },
+  "control_int4_at_sink_0": {
+    "mmlu_accuracy": 0.693,
+    "perplexity": 3.8035601130611036,
+    "mmlu_delta_pt_vs_fp16": -0.9000000000000008
+  },
+  "per_sink_vs_fp16": {
+    "sink=0": {
+      "mmlu_delta_pt": -0.9000000000000008,
+      "perplexity_ratio": 1.023714316602358
+    },
+    "sink=4": {
+      "mmlu_delta_pt": -1.3000000000000012,
+      "perplexity_ratio": 0.9635707390357156
+    },
+    "sink=16": {
+      "mmlu_delta_pt": 0.0,
+      "perplexity_ratio": 0.977789431347014
+    },
+    "sink=64": {
+      "mmlu_delta_pt": -0.30000000000000027,
+      "perplexity_ratio": 1.022715083576214
+    }
+  },
+  "best_non_zero_sink": {
+    "sink_size": 16,
+    "mmlu_delta_pt_vs_fp16": 0.0
+  },
+  "verdict": "**INCONCLUSIVE.** MMLU-delta spread 1.30pt across sinks is within the 2\u03c3 binomial noise band (\u00b14.10pt at 1000 questions) \u2014 the sink configurations are statistically indistinguishable; and the sweep is non-monotonic (a non-zero sink scores worse than the no-sink control), confirming no clean recovery mechanism. The \u00a720.2 hypothesis (sink-FP16 recovers the \u22120.9pt gap) is neither confirmed nor refuted \u2014 INT4 KV quality is within measurement noise of FP16, and no sink-FP16 recovery mechanism is resolved. A decisive test needs ~4-5\u00d7 more questions (~5000) to shrink the CI below the effect size. Report as tested-inconclusive, not as a quality win.",
+  "decision_tree_thresholds_pt": {
+    "green": -0.3,
+    "yellow": -0.5
+  }
+}

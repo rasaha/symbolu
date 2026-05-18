@@ -71,6 +71,12 @@ from typing import Any, Callable, List, Optional, Sequence
 from ctm_bench.policies import _add_kv_policy_to_path
 _add_kv_policy_to_path()
 
+from ctm_bench.sweep_utils import (
+    cleanup_cuda_after_trial,
+    check_context_window,
+    save_partial_json,
+)
+
 
 LOG = logging.getLogger("track_e_throughput")
 
@@ -101,12 +107,15 @@ class ThroughputCell:
 
 @dataclass
 class ThroughputSummary:
-    model_id: str
-    dtype: str
-    device: str
-    config: dict
+    schema_version: str = "§20.1-throughput.v1"
+    model_id: str = ""
+    dtype: str = ""
+    device: str = ""
+    config: dict = field(default_factory=dict)
     cells: List[ThroughputCell] = field(default_factory=list)
     aggregates: dict = field(default_factory=dict)
+    skipped_prefill_lengths_over_max_pos: List[int] = field(default_factory=list)
+    model_max_position_embeddings: Optional[int] = None
 
 
 def _cuda_sync(device_obj: Any) -> None:
@@ -414,6 +423,15 @@ def main(argv: Sequence[str]) -> int:
         bits=args.bits,
     )
 
+    # H3: filter requested prefill lengths against the model's
+    # positional window. Crashing mid-sweep with an opaque CUDA error
+    # because someone passed --prefill-lengths 32768 to a model whose
+    # max_position_embeddings is 8192 wastes GPU spend; warn + skip.
+    allowed_plens, skipped_plens, max_pos = check_context_window(
+        model=model, requested_tokens=prefill_lengths,
+    )
+    prefill_lengths = allowed_plens
+
     config_dict = {
         "quant": "int4-per-channel",
         "k_group_size": args.k_group_size,
@@ -437,7 +455,12 @@ def main(argv: Sequence[str]) -> int:
         dtype=args.dtype,
         device=str(getattr(model, "device", args.device)),
         config=config_dict,
+        skipped_prefill_lengths_over_max_pos=skipped_plens,
+        model_max_position_embeddings=max_pos,
     )
+    # H1: write partial JSON now so even the model-config metadata
+    # survives a crash before the first cell.
+    save_partial_json(summary, args.output)
 
     cells: List[ThroughputCell] = []
     for cache_label, factory in (
@@ -454,6 +477,7 @@ def main(argv: Sequence[str]) -> int:
                     prefill_tokens=plen, decode_tokens=decode_tokens,
                     cache_factory=factory, cache_type=cache_label, trial=-1,
                 )
+                cleanup_cuda_after_trial()
             # Timed trials.
             for t in range(n_trials):
                 cell = _time_prefill_decode(
@@ -466,14 +490,18 @@ def main(argv: Sequence[str]) -> int:
                     "  trial=%d prefill=%.1fms decode=%.1fms decode_tps=%.1f",
                     t, cell.prefill_ms, cell.decode_ms, cell.decode_tokens_per_sec,
                 )
+                cleanup_cuda_after_trial()
+                # H1: persist after each timed trial so a crash later in
+                # the sweep doesn't lose accumulated trials.
+                summary.cells = cells
+                save_partial_json(summary, args.output)
 
     summary.cells = cells
     summary.aggregates = _compute_aggregates(cells)
     summary.aggregates["int4_vs_baseline"] = _compute_ratios(
         summary.aggregates, prefill_lengths,
     )
-
-    args.output.write_text(json.dumps(asdict(summary), indent=2))
+    save_partial_json(summary, args.output)
     print(f"Wrote {args.output}")
 
     # Reader-friendly summary on stdout.

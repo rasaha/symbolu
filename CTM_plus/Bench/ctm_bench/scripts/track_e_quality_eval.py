@@ -290,7 +290,10 @@ def _turboquant_cache_factory(
 def _int4_per_channel_cache_factory(
     *, sink_size: int = 0, k_group_size: int = 0, v_group_size: int = 0,
     asymmetric: bool = False, bits: int = 4,
+    k_bits: Optional[int] = None, v_bits: Optional[int] = None,
     calibration_path: Optional[str] = None,
+    quantize_k: bool = True, quantize_v: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> Callable[[], Any]:
     from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
 
@@ -301,7 +304,12 @@ def _int4_per_channel_cache_factory(
             v_group_size=v_group_size,
             asymmetric=asymmetric,
             bits=bits,
+            k_bits=k_bits,
+            v_bits=v_bits,
             calibration_path=calibration_path,
+            quantize_k=quantize_k,
+            quantize_v=quantize_v,
+            k_protect_fraction=k_protect_fraction,
         )
     return factory
 
