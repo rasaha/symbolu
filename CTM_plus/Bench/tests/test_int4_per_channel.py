@@ -999,6 +999,81 @@ def test_adaptive_kv_bits_threads_through_hf_cache(
 
 
 # --------------------------------------------------------------------- #
+# §20.4.1 follow-on: outlier-protected K (top channels kept FP16)        #
+# --------------------------------------------------------------------- #
+
+
+def test_outlier_protection_keeps_top_channels_fp16(
+    torch_module, transformers_module,
+):
+    """With k_protect_fraction > 0, the top-magnitude K channels
+    round-trip bit-identically (FP16-protected); others stay lossy."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(3)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 32, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    # Make channel (h=0, d=0) a clear magnitude outlier.
+    k[:, 0, :, 0] *= 100.0
+    # Protect ~1% of H*D channels — enough to include the one outlier.
+    cache = INT4PerChannelCache(k_protect_fraction=0.01)
+    k_back, _ = cache.update(k, v, layer_idx=0)
+    # The outlier channel is bit-identical (FP16-protected)...
+    assert torch.equal(k_back[:, 0, :, 0], k[:, 0, :, 0])
+    # ...while a non-outlier channel is still lossy (INT4 round-trip).
+    assert not torch.equal(k_back[:, 1, :, 5], k[:, 1, :, 5])
+
+
+def test_outlier_protection_improves_k_cosine(
+    torch_module, transformers_module,
+):
+    """Outlier-protected K reconstructs better than plain INT4 K when
+    the tensor has outlier channels."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(11)
+    k = torch.randn(1, QWEN_NUM_KV_HEADS, 64, QWEN_HEAD_DIM,
+                    generator=g, dtype=torch.float32)
+    v = torch.randn(k.shape, generator=g, dtype=torch.float32)
+    for h, d in [(0, 3), (2, 17), (1, 90)]:
+        k[:, h, :, d] *= 50.0
+
+    plain = INT4PerChannelCache(k_group_size=32, asymmetric=True)
+    prot = INT4PerChannelCache(k_group_size=32, asymmetric=True,
+                               k_protect_fraction=0.02)
+    k_plain, _ = plain.update(k.clone(), v.clone(), layer_idx=0)
+    k_prot, _ = prot.update(k.clone(), v.clone(), layer_idx=0)
+    cos_plain = _cosine(k, k_plain)
+    cos_prot = _cosine(k, k_prot)
+    assert cos_prot > cos_plain, (
+        f"protected K cosine {cos_prot:.5f} should beat plain {cos_plain:.5f}"
+    )
+
+
+def test_outlier_protection_threads_through_cache(
+    torch_module, transformers_module,
+):
+    """k_protect_fraction reaches int4_config and the scheme string."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    cache = INT4PerChannelCache(k_protect_fraction=0.01)
+    cfg = cache.int4_config
+    assert cfg["k_protect_fraction"] == 0.01
+    assert "protectK" in cfg["scheme"]
+
+
+def test_outlier_protection_rejects_out_of_range_fraction(
+    torch_module, transformers_module,
+):
+    """k_protect_fraction must be in [0, 1)."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    with pytest.raises(ValueError, match="k_protect_fraction"):
+        INT4PerChannelCache(k_protect_fraction=1.0)
+
+
+# --------------------------------------------------------------------- #
 # Static calibration (Path #6)                                          #
 # --------------------------------------------------------------------- #
 

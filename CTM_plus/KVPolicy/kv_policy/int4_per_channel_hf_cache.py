@@ -30,6 +30,44 @@ except ImportError:  # pragma: no cover
     DynamicCache = None  # type: ignore
 
 
+def _restore_outlier_channels(
+    k_orig: "torch.Tensor",
+    k_quant: "torch.Tensor",
+    *,
+    fraction: float,
+) -> "torch.Tensor":
+    """Outlier-protected K: keep the top-``fraction`` of K channels at
+    their original FP16 values, take the INT4 round-trip for the rest.
+
+    A "channel" is an ``(h, d)`` pair — the unit per-channel
+    quantization scales over. K (post-RoPE) carries a few channels
+    with disproportionate magnitude; one INT4 scale per channel still
+    crushes the normal channels to resolve the outlier's range. The
+    §20.4 mechanism analysis attributes the long-context K-INT4
+    failure largely to these outlier channels. Protecting the
+    largest-magnitude channels at FP16 costs almost nothing in memory
+    (e.g. 1% of channels → +~0.1 bit/elem) while removing that error.
+
+    Outlier selection is *dynamic* — recomputed per block from the
+    current K's per-channel max-abs. This is the optimistic upper
+    bound; a shipped version would calibrate a static channel set
+    offline. ``k_orig`` / ``k_quant`` are ``(B, H, S, D)``; returns the
+    merged tensor of the same shape.
+    """
+    h, d = int(k_orig.shape[1]), int(k_orig.shape[3])
+    n_channels = h * d
+    n_protect = min(max(1, round(fraction * n_channels)), n_channels)
+    # Per-(h,d)-channel magnitude: max-abs over batch and sequence.
+    mag = k_orig.abs().amax(dim=2).amax(dim=0)  # (H, D)
+    protect_idx = torch.topk(mag.reshape(-1), k=n_protect).indices
+    mask = torch.zeros(n_channels, dtype=torch.bool, device=k_orig.device)
+    mask[protect_idx] = True
+    mask2d = mask.reshape(h, d)  # (H, D)
+    # Broadcast over (B, ·, S, ·): protected channels take the FP16
+    # original, the rest take the INT4 round-trip.
+    return torch.where(mask2d[None, :, None, :], k_orig, k_quant)
+
+
 def _compress_decompress_kv_int4(
     k: "torch.Tensor",
     v: "torch.Tensor",
@@ -41,6 +79,7 @@ def _compress_decompress_kv_int4(
     static_v_offset: "Optional[torch.Tensor]" = None,
     quantize_k: bool = True,
     quantize_v: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> "Tuple[torch.Tensor, torch.Tensor]":
     """Round-trip ``(B, H, S, D)`` K/V through the INT4 kvstore.
 
@@ -62,6 +101,11 @@ def _compress_decompress_kv_int4(
     the disabled channel is swapped back to the FP16 source. Keeping
     the store call uniform is intentional: it is the minimal patch and
     avoids a second code path through the kvstore.
+
+    ``k_protect_fraction`` > 0 enables outlier-protected K: the
+    top-fraction K channels keep their FP16 values, the rest are INT4
+    (see ``_restore_outlier_channels``). Applied only when
+    ``quantize_k`` is True.
     """
     if k.ndim != 4 or v.ndim != 4:
         raise ValueError(
@@ -88,10 +132,12 @@ def _compress_decompress_kv_int4(
         store.remove_block(0)
         k_out[batch_idx] = k_back.transpose(0, 1)
         v_out[batch_idx] = v_back.transpose(0, 1)
-    return (
-        k_out if quantize_k else k,
-        v_out if quantize_v else v,
-    )
+    k_final = k_out if quantize_k else k
+    if quantize_k and k_protect_fraction > 0.0:
+        k_final = _restore_outlier_channels(
+            k, k_final, fraction=k_protect_fraction,
+        )
+    return k_final, (v_out if quantize_v else v)
 
 
 class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
@@ -125,6 +171,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         calibration_path: Optional[str] = None,
         quantize_k: bool = True,
         quantize_v: bool = True,
+        k_protect_fraction: float = 0.0,
     ) -> None:
         if DynamicCache is None:
             raise ImportError(
@@ -188,6 +235,11 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
                             entry[key] = val.to(torch_device)
         self._quantize_k = bool(quantize_k)
         self._quantize_v = bool(quantize_v)
+        self._k_protect_fraction = float(k_protect_fraction)
+        if not (0.0 <= self._k_protect_fraction < 1.0):
+            raise ValueError(
+                f"k_protect_fraction must be in [0, 1); got {k_protect_fraction}"
+            )
         self._cfg = dict(
             torch_device=str(torch_device),
             sink_size=int(sink_size),
@@ -200,6 +252,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
             calibration_path=calibration_path,
             quantize_k=self._quantize_k,
             quantize_v=self._quantize_v,
+            k_protect_fraction=self._k_protect_fraction,
             scheme=f"k_int{eff_k_bits}_per_channel_v_int{eff_v_bits}_per_token" + (
                 "_asymmetric" if asymmetric else "_symmetric"
             ) + ("_calibrated" if calibration_path is not None else "") + (
@@ -207,6 +260,9 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
                 if (self._quantize_k and self._quantize_v)
                 else f"_ablation(K={'int' if self._quantize_k else 'fp16'},"
                      f"V={'int' if self._quantize_v else 'fp16'})"
+            ) + (
+                f"_protectK{self._k_protect_fraction * 100:g}pct"
+                if self._k_protect_fraction > 0.0 else ""
             ),
         )
         self._sink_size = int(sink_size)
@@ -249,6 +305,7 @@ class INT4PerChannelCache(DynamicCache if DynamicCache is not None else object):
         static = self._resolve_static_scales(layer_idx)
         toggles = dict(
             quantize_k=self._quantize_k, quantize_v=self._quantize_v,
+            k_protect_fraction=self._k_protect_fraction,
         )
         sink = self._sink_size
         if sink > 0 and key_states.shape[2] > sink:

@@ -691,6 +691,13 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--no-quantize-v", action="store_false",
                         dest="quantize_v", default=True,
                         help="Pass V through at FP16 (K-only INT4 ablation).")
+    # §20.4.1 follow-on: outlier-protected K. When > 0, the top-fraction
+    # K channels (by per-channel max-abs) keep their FP16 values and
+    # only the rest are INT4 — the path toward ~3× compression *with*
+    # K-channel quality. Sweep e.g. 0.005 / 0.01 / 0.02 / 0.04.
+    parser.add_argument("--k-protect-fraction", type=float, default=0.0,
+                        help="Fraction of top-magnitude K channels kept "
+                             "at FP16 (outlier protection). 0 = off.")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -784,8 +791,12 @@ def main(argv: Sequence[str]) -> int:
         "sink_size": args.sink_size,
         "quantize_k": bool(args.quantize_k),
         "quantize_v": bool(args.quantize_v),
+        "k_protect_fraction": args.k_protect_fraction,
         "scheme": (
-            f"K={'per-channel INT' + str(eff_k_bits) if args.quantize_k else 'FP16'}, "
+            f"K={'per-channel INT' + str(eff_k_bits) if args.quantize_k else 'FP16'}"
+            + (f" (top {args.k_protect_fraction * 100:g}% channels FP16-protected)"
+               if args.k_protect_fraction > 0 else "")
+            + ", "
             f"V={'per-token INT' + str(eff_v_bits) if args.quantize_v else 'FP16'}, "
             f"{'asymmetric' if args.asymmetric_int4 else 'symmetric'}, "
             f"k_group={args.k_group_size}, v_group={args.v_group_size}, "
@@ -848,6 +859,7 @@ def main(argv: Sequence[str]) -> int:
         v_bits=args.v_bits,
         quantize_k=args.quantize_k,
         quantize_v=args.quantize_v,
+        k_protect_fraction=args.k_protect_fraction,
     )
 
     # H1: write the partial JSON before any trial so the model-config

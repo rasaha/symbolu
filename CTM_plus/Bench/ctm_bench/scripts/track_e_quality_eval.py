@@ -293,6 +293,7 @@ def _int4_per_channel_cache_factory(
     k_bits: Optional[int] = None, v_bits: Optional[int] = None,
     calibration_path: Optional[str] = None,
     quantize_k: bool = True, quantize_v: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> Callable[[], Any]:
     from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
 
@@ -308,6 +309,7 @@ def _int4_per_channel_cache_factory(
             calibration_path=calibration_path,
             quantize_k=quantize_k,
             quantize_v=quantize_v,
+            k_protect_fraction=k_protect_fraction,
         )
     return factory
 
