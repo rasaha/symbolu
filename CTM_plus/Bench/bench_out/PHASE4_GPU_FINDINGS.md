@@ -2959,8 +2959,37 @@ is now the dominant remaining risk, not quality.
 
 Verdict bucket: protected-K + INT4-V is **measured quality-neutral
 at a compression that beats FP8** (dynamic-selection ceiling);
-static-calibrated quality and throughput are the two pending gates
-before it is a shippable claim.
+the static-quality gate is closed by §20.4.3 below, leaving
+throughput (Exp 6) as the sole pending gate before a shippable claim.
+
+#### §20.4.3 Static outlier-protected K — validated (round 3)
+
+The §20.4.2 sweep selected outlier channels **dynamically**
+(recomputed per block from the live K). Round 3 validated a
+**static** set: the protected channel set is frozen per layer on the
+first (prefill) update and reused for every later update
+(`--k-protect-static`). Same 16k needle setup, n=24/cell:
+
+| K protect fraction | dynamic (§20.4.2) | static (round 3) |
+|---|---:|---:|
+| 2% | 96% | 96% |
+| 4% | **100%** | **100%** |
+
+The frozen channel set is **indistinguishable from per-block dynamic
+selection** at both fractions — static 4% holds 100% needle, no
+stutter (`first_stutter` none), collapse 8%. The §20.4.2
+"dynamic-selection = optimistic ceiling" caveat is **closed**:
+protected-K with a fixed channel set is a real, shippable-shape
+config, not a per-block-adaptation artifact.
+
+Scope of the claim: this is *per-sequence* static — the set is
+derived from each sequence's own prefill. A *model-static* set,
+calibrated once offline on a corpus, is Roadmap Exp 5; it is now
+**low-risk**, because K outlier channels are weight-driven and
+largely input-stable, so a per-sequence-static set holding 100%
+strongly predicts a corpus-calibrated one will. **Quality is no
+longer the open question — throughput (Experiment 6) is the sole
+remaining gate.**
 
 
 
