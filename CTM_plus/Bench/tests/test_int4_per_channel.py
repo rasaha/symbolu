@@ -1073,6 +1073,46 @@ def test_outlier_protection_rejects_out_of_range_fraction(
         INT4PerChannelCache(k_protect_fraction=1.0)
 
 
+def test_outlier_protection_static_freezes_channel_set(
+    torch_module, transformers_module,
+):
+    """k_protect_static freezes the protected channel set per layer on
+    the first update; later updates reuse it even if their outliers
+    move to different channels."""
+    torch = torch_module
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+
+    g = torch.Generator().manual_seed(5)
+    k1 = torch.randn(1, QWEN_NUM_KV_HEADS, 16, QWEN_HEAD_DIM,
+                     generator=g, dtype=torch.float32)
+    v1 = torch.randn(k1.shape, generator=g, dtype=torch.float32)
+    k1[:, 0, :, 0] *= 100.0  # outlier at channel (0, 0)
+
+    cache = INT4PerChannelCache(k_protect_fraction=0.02, k_protect_static=True)
+    cache.update(k1, v1, layer_idx=0)
+    frozen = cache._k_protect_masks[0].clone()
+    assert bool(frozen[0, 0]), "update-1 outlier (0,0) should be protected"
+
+    # Update 2: outlier moves to a different channel.
+    k2 = torch.randn(1, QWEN_NUM_KV_HEADS, 16, QWEN_HEAD_DIM,
+                     generator=g, dtype=torch.float32)
+    v2 = torch.randn(k2.shape, generator=g, dtype=torch.float32)
+    k2[:, 1, :, 7] *= 100.0
+    cache.update(k2, v2, layer_idx=0)
+    # The mask must be unchanged — frozen from update 1.
+    assert torch.equal(cache._k_protect_masks[0], frozen)
+
+
+def test_outlier_protection_static_in_config(
+    torch_module, transformers_module,
+):
+    """k_protect_static reaches int4_config and the scheme string."""
+    from kv_policy.int4_per_channel_hf_cache import INT4PerChannelCache
+    cache = INT4PerChannelCache(k_protect_fraction=0.02, k_protect_static=True)
+    assert cache.int4_config["k_protect_static"] is True
+    assert "static" in cache.int4_config["scheme"]
+
+
 # --------------------------------------------------------------------- #
 # Static calibration (Path #6)                                          #
 # --------------------------------------------------------------------- #

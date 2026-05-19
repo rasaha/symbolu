@@ -698,6 +698,10 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--k-protect-fraction", type=float, default=0.0,
                         help="Fraction of top-magnitude K channels kept "
                              "at FP16 (outlier protection). 0 = off.")
+    parser.add_argument("--k-protect-static", action="store_true", default=False,
+                        help="Freeze the protected K channel set per layer "
+                             "from the first (prefill) update instead of "
+                             "recomputing it per block.")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -792,9 +796,11 @@ def main(argv: Sequence[str]) -> int:
         "quantize_k": bool(args.quantize_k),
         "quantize_v": bool(args.quantize_v),
         "k_protect_fraction": args.k_protect_fraction,
+        "k_protect_static": bool(args.k_protect_static),
         "scheme": (
             f"K={'per-channel INT' + str(eff_k_bits) if args.quantize_k else 'FP16'}"
-            + (f" (top {args.k_protect_fraction * 100:g}% channels FP16-protected)"
+            + (f" (top {args.k_protect_fraction * 100:g}% channels FP16-protected, "
+               f"{'static' if args.k_protect_static else 'dynamic'})"
                if args.k_protect_fraction > 0 else "")
             + ", "
             f"V={'per-token INT' + str(eff_v_bits) if args.quantize_v else 'FP16'}, "
@@ -860,6 +866,7 @@ def main(argv: Sequence[str]) -> int:
         quantize_k=args.quantize_k,
         quantize_v=args.quantize_v,
         k_protect_fraction=args.k_protect_fraction,
+        k_protect_static=args.k_protect_static,
     )
 
     # H1: write the partial JSON before any trial so the model-config

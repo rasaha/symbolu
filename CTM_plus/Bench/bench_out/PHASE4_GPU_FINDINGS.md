@@ -2912,7 +2912,57 @@ sink_64,sink_128,k_only,v_only,int5}.json` — generated on the RunPod
 pod, which had no outbound git-push path; aggregate numbers
 transcribed above, raw per-trial JSONs not committed.
 
-### §20.5 Route-A vLLM INT4 KV-cache integration — Days 1-3 landed
+#### §20.4.2 K-INT8 sanity + outlier-protected K sweep (GPU run, round 2) — first config that beats FP8
+
+Round-2 GPU run on Qwen2.5-7B-Instruct, same 16k needle setup
+(n=24/cell = 8 samples × 3 depths, 64 decoded tokens).
+
+**K-INT8 sanity check — passed.** K-INT8 / V-INT4 measured **96%
+needle** (23/24), no stutter (`first_stutter` none), repeat-token
+rate 0.25 — indistinguishable from the K-FP16 / V-INT4 result
+(§20.4.1, 96%). So the long-context K failure is a *bit-depth*
+problem at INT4; 8-bit K is as good as FP16 K. K-INT8 / V-INT4 is a
+measured quality-neutral config at ~2.3× actual heap compression.
+
+**Outlier-protected K sweep — the breakthrough.** Keep V at INT4,
+keep most K channels at INT4, protect the top-`fraction` K channels
+(by per-channel max-abs) at FP16. Sweep, n=24/cell:
+
+| K protect fraction | needle | first stutter | repeat rate |
+|---|---:|---:|---:|
+| 0% (full INT4 — RED anchor) | 29% | token 1 | 0.44 |
+| 0.5% | 58% | token 2 | 0.42 |
+| 1% | 62% | token 2 | 0.38 |
+| 2% | 96% | token 2 | 0.30 |
+| **4%** | **100%** | none | 0.25 |
+
+A clean monotone recovery curve — protecting only the top 4% of K
+channels at FP16 restores needle accuracy to **100%, identical to
+the FP16 baseline**, no stutter. Protecting 4% of channels costs
+≈ 4% × (16 − 5) ≈ +0.44 bit/elem on K, so the config sits at
+**~3.1× actual-heap compression** (computed; K ≈ (0.96·5 + 0.04·16)
++ V ≈ 5 → 32 / 10.4). This is the **first measured config in the
+§20 work that clearly beats shippable FP8** (2.0×) — ~55% more
+KV-cache headroom at *zero* measured long-context quality loss.
+
+**Honest status.** Quality (needle accuracy) is **measured**;
+compression is **computed** from the §18.3 anchor; throughput is
+**not measured**. Critical caveat: outlier selection in this sweep
+was **dynamic** — the protected channel set was recomputed per
+block from the live K. That is the optimistic ceiling. A shippable
+cache needs a **static, calibration-derived** channel set; whether a
+static set holds 100% is the next validation
+(`scripts/STATIC_PROTECTED_K_RUNBOOK.md`, `--k-protect-static`). And
+a mixed FP16-outlier + INT4 layout is *harder* for a fused kernel
+than uniform INT4 — the §20.1 throughput question is wide open and
+is now the dominant remaining risk, not quality.
+
+Verdict bucket: protected-K + INT4-V is **measured quality-neutral
+at a compression that beats FP8** (dynamic-selection ceiling);
+static-calibrated quality and throughput are the two pending gates
+before it is a shippable claim.
+
+
 
 **Status:** the attention-forward integration tier is **implemented
 and CPU-validated**; Days 4-5 (GPU verification) pending. Full plan
