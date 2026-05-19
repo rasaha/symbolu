@@ -2912,7 +2912,132 @@ sink_64,sink_128,k_only,v_only,int5}.json` — generated on the RunPod
 pod, which had no outbound git-push path; aggregate numbers
 transcribed above, raw per-trial JSONs not committed.
 
-### §20.5 Route-A vLLM INT4 KV-cache integration — Days 1-3 landed
+#### §20.4.2 K-INT8 sanity + outlier-protected K sweep (GPU run, round 2) — first config that beats FP8
+
+Round-2 GPU run on Qwen2.5-7B-Instruct, same 16k needle setup
+(n=24/cell = 8 samples × 3 depths, 64 decoded tokens).
+
+**K-INT8 sanity check — passed.** K-INT8 / V-INT4 measured **96%
+needle** (23/24), no stutter (`first_stutter` none), repeat-token
+rate 0.25 — indistinguishable from the K-FP16 / V-INT4 result
+(§20.4.1, 96%). So the long-context K failure is a *bit-depth*
+problem at INT4; 8-bit K is as good as FP16 K. K-INT8 / V-INT4 is a
+measured quality-neutral config at ~2.3× actual heap compression.
+
+**Outlier-protected K sweep — the breakthrough.** Keep V at INT4,
+keep most K channels at INT4, protect the top-`fraction` K channels
+(by per-channel max-abs) at FP16. Sweep, n=24/cell:
+
+| K protect fraction | needle | first stutter | repeat rate |
+|---|---:|---:|---:|
+| 0% (full INT4 — RED anchor) | 29% | token 1 | 0.44 |
+| 0.5% | 58% | token 2 | 0.42 |
+| 1% | 62% | token 2 | 0.38 |
+| 2% | 96% | token 2 | 0.30 |
+| **4%** | **100%** | none | 0.25 |
+
+A clean monotone recovery curve — protecting only the top 4% of K
+channels at FP16 restores needle accuracy to **100%, identical to
+the FP16 baseline**, no stutter. Protecting 4% of channels costs
+≈ 4% × (16 − 5) ≈ +0.44 bit/elem on K, so the config sits at
+**~3.1× actual-heap compression** (computed; K ≈ (0.96·5 + 0.04·16)
++ V ≈ 5 → 32 / 10.4). This is the **first measured config in the
+§20 work that clearly beats shippable FP8** (2.0×) — ~55% more
+KV-cache headroom at *zero* measured long-context quality loss.
+
+**Honest status.** Quality (needle accuracy) is **measured**;
+compression is **computed** from the §18.3 anchor; throughput is
+**not measured**. Critical caveat: outlier selection in this sweep
+was **dynamic** — the protected channel set was recomputed per
+block from the live K. That is the optimistic ceiling. A shippable
+cache needs a **static, calibration-derived** channel set; whether a
+static set holds 100% is the next validation
+(`scripts/STATIC_PROTECTED_K_RUNBOOK.md`, `--k-protect-static`). And
+a mixed FP16-outlier + INT4 layout is *harder* for a fused kernel
+than uniform INT4 — the §20.1 throughput question is wide open and
+is now the dominant remaining risk, not quality.
+
+Verdict bucket: protected-K + INT4-V is **measured quality-neutral
+at a compression that beats FP8** (dynamic-selection ceiling);
+the static-quality gate is closed by §20.4.3 below, leaving
+throughput (Exp 6) as the sole pending gate before a shippable claim.
+
+#### §20.4.3 Static outlier-protected K — validated (round 3)
+
+The §20.4.2 sweep selected outlier channels **dynamically**
+(recomputed per block from the live K). Round 3 validated a
+**static** set: the protected channel set is frozen per layer on the
+first (prefill) update and reused for every later update
+(`--k-protect-static`). Same 16k needle setup, n=24/cell:
+
+| K protect fraction | dynamic (§20.4.2) | static (round 3) |
+|---|---:|---:|
+| 2% | 96% | 96% |
+| 4% | **100%** | **100%** |
+
+The frozen channel set is **indistinguishable from per-block dynamic
+selection** at both fractions — static 4% holds 100% needle, no
+stutter (`first_stutter` none), collapse 8%. The §20.4.2
+"dynamic-selection = optimistic ceiling" caveat is **closed**:
+protected-K with a fixed channel set is a real, shippable-shape
+config, not a per-block-adaptation artifact.
+
+Scope of the claim: this is *per-sequence* static — the set is
+derived from each sequence's own prefill. A *model-static* set,
+calibrated once offline on a corpus, is Roadmap Exp 5; it is now
+**low-risk**, because K outlier channels are weight-driven and
+largely input-stable, so a per-sequence-static set holding 100%
+strongly predicts a corpus-calibrated one will. **Quality is no
+longer the open question — throughput (Experiment 6) is the sole
+remaining gate.**
+
+#### §20.4.4 Quality-breadth — long context + multi-model (round 4)
+
+Two cheap quality-breadth runs on the §20.4.3 ship-shape config
+(protected-K 4%, static, V-INT4), n=24/cell, same needle harness.
+
+**Exp 2 — longer context (Qwen2.5-7B).** The §20.4 sprint measured
+at 16 000 chars; this extends to 32k / 64k chars (~9k / ~18k tokens):
+
+| context | baseline | protected-K 4% static |
+|---|---:|---:|
+| 16 000 chars | 100% | 100% |
+| 32 000 chars | 96% | 100% |
+| 64 000 chars | 100% | 100% |
+
+protected-K stays at 100% needle at both longer lengths — the
+§20.4.2 result generalizes to longer context. (The +4% at 32k is
+binomial noise — 24/24 vs 23/24; protected-K cannot exceed FP16.)
+Scope: validated to ~18k tokens; the 18k–32k-token top of Qwen's
+range is **untested** — an FP16 baseline there exceeds 40 GB, needs
+an 80 GB GPU.
+
+**Exp 4 — second model (Mistral-7B-Instruct-v0.3, 16k).** protected-K
+vs FP16 baseline, every decode metric:
+
+| metric | baseline | protected-K 4% static |
+|---|---:|---:|
+| needle accuracy | 92% | 92% |
+| entropy-collapse rate | 62% | 62% |
+| repeated-token rate | 0.37 | 0.36 |
+| decode entropy (nats) | 0.30 | 0.31 |
+
+protected-K is **identical to the FP16 baseline on every metric** —
+zero quantization degradation. The outlier-protection approach is
+**not Qwen-specific**; it replicates on Mistral. Two model
+properties (not quantization effects — the FP16 baseline shows them
+identically): Mistral's absolute needle (92%) is below Qwen's (100%)
+— Mistral-7B-v0.3 is a weaker long-context retriever — and its 62%
+entropy-collapse rate reflects Mistral's lower-entropy decode plus
+the `_ENTROPY_COLLAPSE_NATS=0.30` heuristic having been loosely
+tuned on Qwen.
+
+**Verdict.** Quality-breadth confirmed: protected-K holds at longer
+context and replicates on a second model, matching the FP16
+baseline in both. The quality side of protected-K is fully
+de-risked. Throughput (Experiment 6) remains the sole gate.
+
+
 
 **Status:** the attention-forward integration tier is **implemented
 and CPU-validated**; Days 4-5 (GPU verification) pending. Full plan

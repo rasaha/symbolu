@@ -127,6 +127,20 @@ except ImportError:  # pragma: no cover
 #    ...] and high_nibble corresponds to odd [1, 3, 5, ...]. **Both
 #    nibbles store the value SHIFTED to unsigned: actual = nibble - 8.**
 #    (See ``pack_int4`` for the shift logic.)
+#
+# 7. Protected-K (§20.4.2 / §20.4.3 ship config). A small STATIC set of
+#    K channels (~4%, fixed per (layer, head) by offline calibration)
+#    is stored as FP16 and bypasses the INT4 dequant entirely. The
+#    kernel reads those channels from a compact FP16 side-tensor and
+#    every other channel from INT4. Numerically:
+#       k_effective = where(protect_mask, k_fp16, dequant(k_int4))
+#    matching ``_restore_outlier_channels`` in
+#    ``int4_per_channel_hf_cache.py`` — the route-B protected-K path
+#    that §20.4.2-4 measured at 100% needle. The mask is STATIC: it is
+#    NEVER recomputed at runtime (§20.4.3 validated a frozen set). V is
+#    uniform INT4 — only K is protected.
+#    ``fused_int4_attention_reference`` models this via the optional
+#    ``k_fp16`` / ``k_protect_mask`` arguments.
 
 
 @dataclass
@@ -168,6 +182,8 @@ def fused_int4_attention_reference(
     *,
     spec: FusedAttentionSpec,
     softmax_scale: float = None,           # 1/sqrt(D) by default
+    k_fp16: "torch.Tensor" = None,         # (B, H_kv, S_kv, D) fp16 — protected-K
+    k_protect_mask: "torch.Tensor" = None, # (H_kv, D) bool — protected-K
 ) -> "torch.Tensor":
     """Reference for the fused INT4 unpack-attend kernel.
 
@@ -175,6 +191,16 @@ def fused_int4_attention_reference(
       attn_out = softmax(Q @ K^T * softmax_scale) @ V
     where K and V are reconstructed inline from INT4 packed values
     plus per-group scales (+ offsets if asymmetric).
+
+    Protected-K (§20.4.2): when ``k_fp16`` and ``k_protect_mask`` are
+    both given, the K channels selected by the mask take their FP16
+    originals instead of the INT4 dequant — ``k_effective =
+    where(mask, k_fp16, dequant(k_int4))``. This mirrors
+    ``_restore_outlier_channels`` in ``int4_per_channel_hf_cache.py``,
+    the route-B protected-K path the kernel must match numerically.
+    In the real kernel the protected channels are a compact static
+    FP16 side-tensor; passing the full ``k_fp16`` + mask here is the
+    equivalent numerical contract. V is never protected.
 
     In production this is one CUDA kernel that streams INT4 bytes from
     HBM, dequantizes in registers, and feeds the dot-products. Here
@@ -207,6 +233,19 @@ def fused_int4_attention_reference(
         group_size=spec.group_size_k,
         asymmetric=spec.asymmetric,
     )                                                     # (B, H_kv, S_kv, D) fp16
+
+    # ---- Protected-K overlay (§20.4.2) ----
+    # The channels in k_protect_mask keep their FP16 originals; every
+    # other channel stays INT4-dequantized. In the kernel the protected
+    # channels are a compact static FP16 side-tensor read directly from
+    # HBM; here the full k_fp16 + mask is the equivalent numerical
+    # contract. Mirrors _restore_outlier_channels (route-B).
+    if k_protect_mask is not None and k_fp16 is not None:
+        k_dequant = torch.where(
+            k_protect_mask.to(torch.bool)[None, :, None, :],
+            k_fp16.to(k_dequant.dtype),
+            k_dequant,
+        )
 
     # ---- Inline V dequant ----
     v_int4 = _unpack_int4_inline(v_packed, target_n=D)   # (B, H_kv, S_kv, D)
@@ -337,6 +376,7 @@ def hbm_bytes_for_attention(
     group_size_k: int = 32,
     group_size_v: int = 32,
     asymmetric: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> int:
     """HBM bytes loaded for K + V in one attention call.
 
@@ -346,27 +386,42 @@ def hbm_bytes_for_attention(
     overhead at group_size=32 on D=128 is small (~5-10% of the INT4
     value bytes); the per-group offset doubles it.
 
-    The kernel's win is the 4× reduction on the dominant term (the
+    ``k_protect_fraction`` > 0 models the §20.4.2 outlier-protected-K
+    config — the winning long-context config. A fraction ``f`` of K
+    channels stay FP16 (2 bytes/elem, no scale); the rest (1−f) are
+    INT4 + scale. V is uniform INT4. The protected-channel index set is
+    a per-layer mask (H_kv·D bits), amortised to ~0 bytes/token —
+    omitted. This answers the Exp-6 go/no-go question: does the mixed
+    FP16+INT4 K layout still leave enough bandwidth headroom for a
+    fused kernel to be worth building.
+
+    The kernel's win is the ~4× reduction on the dominant term (the
     K/V values themselves). Defaults match the §18.3 ship config so
     the partner-shareable ceiling speedup is computed honestly.
     """
     elements_kv = B * H_kv * S_kv * D
-    if int4:
-        # K + V values at 0.5 byte each.
-        val_bytes = 2 * elements_kv * 0.5
-        # Metadata factor: scale alone (sym) or scale+offset (asym).
-        meta_factor = 2 if asymmetric else 1
-        # K scale: per-(group along seq, head, head_dim)
-        # V scale: per-(token, head, group along head_dim)
-        k_scale_bytes = (
-            B * H_kv * max(1, S_kv // group_size_k) * D * 2 * meta_factor
-        )
-        v_scale_bytes = (
-            B * H_kv * S_kv * max(1, D // group_size_v) * 2 * meta_factor
-        )
-        return int(val_bytes + k_scale_bytes + v_scale_bytes)
-    else:
-        return 2 * elements_kv * 2
+    if not int4:
+        return 2 * elements_kv * 2  # K + V, FP16, 2 bytes/elem
+    # Metadata factor: scale alone (sym) or scale+offset (asym).
+    meta_factor = 2 if asymmetric else 1
+    f = max(0.0, min(1.0, k_protect_fraction))
+    # V — uniform INT4 (per-token, group along head_dim).
+    v_val_bytes = elements_kv * 0.5
+    v_scale_bytes = (
+        B * H_kv * S_kv * max(1, D // group_size_v) * 2 * meta_factor
+    )
+    # K — outlier-protected: fraction f of channels FP16, rest INT4.
+    # Only the INT4 channels carry per-group scales.
+    k_int4_val_bytes = (1.0 - f) * elements_kv * 0.5
+    k_fp16_val_bytes = f * elements_kv * 2
+    k_scale_bytes = (
+        (1.0 - f)
+        * B * H_kv * max(1, S_kv // group_size_k) * D * 2 * meta_factor
+    )
+    return int(
+        v_val_bytes + v_scale_bytes
+        + k_int4_val_bytes + k_fp16_val_bytes + k_scale_bytes
+    )
 
 
 def speedup_ceiling(
@@ -374,18 +429,21 @@ def speedup_ceiling(
     group_size_k: int = 32,
     group_size_v: int = 32,
     asymmetric: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> float:
     """Upper bound on the fused-kernel speedup, assuming K/V load is
     the bottleneck. Real speedup will be lower (compute also runs).
 
     Defaults match the §18.3 ship config (group=32, asymmetric=True);
-    explicitly pass `asymmetric=False` for the symmetric-only ceiling.
+    pass `asymmetric=False` for the symmetric-only ceiling, or
+    `k_protect_fraction` > 0 for the §20.4.2 outlier-protected-K
+    ceiling (the winning long-context config).
     """
     fp16 = hbm_bytes_for_attention(B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=False)
     int4 = hbm_bytes_for_attention(
         B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=True,
         group_size_k=group_size_k, group_size_v=group_size_v,
-        asymmetric=asymmetric,
+        asymmetric=asymmetric, k_protect_fraction=k_protect_fraction,
     )
     return fp16 / max(int4, 1)
 
@@ -529,6 +587,109 @@ def _round_trip_demo() -> dict:
     }
 
 
+def _protected_k_round_trip_demo() -> dict:
+    """Protected-K (§20.4.2) variant of ``_round_trip_demo``.
+
+    A static ~4% set of K channels keeps FP16 originals; the rest go
+    through INT4. Verifies ``fused_int4_attention_reference`` with the
+    ``k_fp16`` / ``k_protect_mask`` arguments matches a naive "dequant
+    K → overlay protected channels → attention" pipeline, and that
+    protection brings the output *closer* to the true FP16 attention
+    than uniform INT4 does. This is the numerical spec the 6c kernel's
+    layer-1 correctness test is written against.
+    """
+    if torch is None:
+        raise ImportError("torch not installed; demo can't run.")
+    from kv_policy.int4_per_channel_kv import (
+        quantize_per_channel_int4, dequantize_per_channel_int4,
+        quantize_per_token_int4, dequantize_per_token_int4, pack_int4,
+    )
+
+    B, H_q, H_kv, D = 1, 28, 4, 128
+    S_q, S_kv = 1, 64
+    gk = gv = 32
+    torch.manual_seed(0)
+    q = torch.randn(B, H_q, S_q, D, dtype=torch.float16)
+    k_fp16 = torch.randn(B, H_kv, S_kv, D, dtype=torch.float16)
+    v_fp16 = torch.randn(B, H_kv, S_kv, D, dtype=torch.float16)
+    # Inject outlier channels so protection visibly matters.
+    for h, d in [(0, 0), (2, 64), (1, 100)]:
+        k_fp16[:, h, :, d] *= 40.0
+
+    # Static protected mask: top 4% of (H_kv, D) channels by max-abs.
+    mag = k_fp16.abs().amax(dim=2).amax(dim=0)            # (H_kv, D)
+    n_protect = max(1, round(0.04 * H_kv * D))
+    idx = torch.topk(mag.reshape(-1), n_protect).indices
+    mask = torch.zeros(H_kv * D, dtype=torch.bool)
+    mask[idx] = True
+    mask = mask.reshape(H_kv, D)
+
+    # Quantize K/V through the route-B ops (single-batch).
+    k_int4, k_scale, k_offset = quantize_per_channel_int4(
+        k_fp16[0].transpose(0, 1).contiguous(), group_size=gk, asymmetric=True,
+    )
+    v_int4, v_scale, v_offset = quantize_per_token_int4(
+        v_fp16[0].transpose(0, 1).contiguous(), group_size=gv, asymmetric=True,
+    )
+    k_packed = pack_int4(k_int4).transpose(0, 1).contiguous().unsqueeze(0)
+    v_packed = pack_int4(v_int4).transpose(0, 1).contiguous().unsqueeze(0)
+    k_scale = k_scale.unsqueeze(0).to(torch.float16)
+    k_offset = k_offset.unsqueeze(0).to(torch.float16)
+    v_scale = v_scale.unsqueeze(0).to(torch.float16)
+    v_offset = v_offset.unsqueeze(0).to(torch.float16)
+
+    spec = FusedAttentionSpec(
+        B=B, H_q=H_q, H_kv=H_kv, S_q=S_q, S_kv=S_kv, D=D,
+        block_size=16, group_size_k=gk, group_size_v=gv, asymmetric=True,
+    )
+    out_protected = fused_int4_attention_reference(
+        q=q, k_packed=k_packed, k_scale=k_scale, k_offset=k_offset,
+        v_packed=v_packed, v_scale=v_scale, v_offset=v_offset, spec=spec,
+        k_fp16=k_fp16, k_protect_mask=mask,
+    )
+    out_uniform = fused_int4_attention_reference(
+        q=q, k_packed=k_packed, k_scale=k_scale, k_offset=k_offset,
+        v_packed=v_packed, v_scale=v_scale, v_offset=v_offset, spec=spec,
+    )
+
+    # Naive contract: dequant K, overlay the protected channels, attend.
+    k_dq = dequantize_per_channel_int4(
+        k_int4, k_scale[0], dtype=torch.float16, group_size=gk,
+        offset=k_offset[0],
+    ).transpose(0, 1).unsqueeze(0)                         # (1, H_kv, S, D)
+    k_dq = torch.where(mask[None, :, None, :], k_fp16, k_dq)
+    v_dq = dequantize_per_token_int4(
+        v_int4, v_scale[0], dtype=torch.float16, group_size=gv,
+        offset=v_offset[0],
+    ).transpose(0, 1).unsqueeze(0)
+    G_q = H_q // H_kv
+    sc = 1.0 / math.sqrt(D)
+
+    def _attn(k_kv, v_kv):
+        k = k_kv.unsqueeze(2).expand(B, H_kv, G_q, S_kv, D).reshape(B, H_q, S_kv, D)
+        v = v_kv.unsqueeze(2).expand(B, H_kv, G_q, S_kv, D).reshape(B, H_q, S_kv, D)
+        s = torch.matmul(q, k.transpose(-1, -2)) * sc
+        a = torch.softmax(s.float(), dim=-1).to(q.dtype)
+        return torch.matmul(a, v)
+
+    out_naive = _attn(k_dq, v_dq)
+    # True FP16 attention (V still FP16 here — measures the K effect).
+    out_true = _attn(k_fp16, v_fp16)
+
+    def _cos(a, b):
+        return torch.nn.functional.cosine_similarity(
+            a.flatten().float(), b.flatten().float(), dim=0,
+        ).item()
+
+    return {
+        "n_protected_channels": int(n_protect),
+        "max_abs_diff_vs_naive": (out_protected - out_naive).abs().max().item(),
+        "cosine_vs_naive": _cos(out_protected, out_naive),
+        "cosine_protected_vs_true_fp16": _cos(out_protected, out_true),
+        "cosine_uniform_vs_true_fp16": _cos(out_uniform, out_true),
+    }
+
+
 if __name__ == "__main__":
     if torch is None:
         raise SystemExit("torch not installed; sketch can't run.")
@@ -557,3 +718,23 @@ if __name__ == "__main__":
     # For reference, the symmetric-only ceiling (no offset storage).
     speedup_sym = speedup_ceiling(B=1, H_kv=4, S_kv=64, D=128, asymmetric=False)
     print(f"  (symmetric-only ceiling, no offset:  {speedup_sym:.2f}x)")
+    # §20.4.2 outlier-protected-K ceiling — the winning long-context
+    # config (top 4% of K channels FP16, rest INT4, V INT4).
+    speedup_prot = speedup_ceiling(
+        B=1, H_kv=4, S_kv=64, D=128, k_protect_fraction=0.04,
+    )
+    print(
+        f"  (protected-K 4% ceiling — §20.4.2 config:  {speedup_prot:.2f}x)"
+    )
+
+    # Protected-K reference round-trip — the 6c kernel's layer-1 spec.
+    pk = _protected_k_round_trip_demo()
+    print()
+    print(f"protected-K reference ({pk['n_protected_channels']} channels FP16):")
+    print(f"  vs naive dequant+overlay+attention:")
+    print(f"    max abs diff:      {pk['max_abs_diff_vs_naive']:.6f}")
+    print(f"    cosine similarity: {pk['cosine_vs_naive']:.6f}")
+    print(f"  cosine vs true FP16 attention:")
+    print(f"    protected-K: {pk['cosine_protected_vs_true_fp16']:.6f}")
+    print(f"    uniform INT4: {pk['cosine_uniform_vs_true_fp16']:.6f}  "
+          f"(protected should be >= uniform)")
