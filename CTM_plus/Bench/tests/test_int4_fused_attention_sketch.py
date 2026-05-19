@@ -226,6 +226,33 @@ def test_speedup_ceiling_protected_k_4pct_near_uniform():
     assert (uniform - protected) < 0.25
 
 
+def test_protected_k_reference_matches_naive_and_helps():
+    """The protected-K path of fused_int4_attention_reference
+    (k_fp16 / k_protect_mask args) matches a naive
+    dequant + outlier-overlay + attention pipeline, and protecting the
+    outlier channels brings the output closer to true FP16 attention
+    than uniform INT4 does. This is the §20.4.2 protected-K numerical
+    contract — the 6c kernel's layer-1 correctness spec.
+    """
+    from kv_policy.int4_fused_attention_sketch import (
+        _protected_k_round_trip_demo,
+    )
+    r = _protected_k_round_trip_demo()
+    # Contract: the reference's protected-K path == the naive
+    # dequant + overlay + attention pipeline (within FP16 rounding).
+    assert r["cosine_vs_naive"] >= 0.999, (
+        f"protected-K reference diverges from naive: "
+        f"cosine={r['cosine_vs_naive']:.6f}"
+    )
+    assert r["max_abs_diff_vs_naive"] < 1e-2
+    # Protection helps: closer to true FP16 attention than uniform INT4.
+    assert (
+        r["cosine_protected_vs_true_fp16"]
+        >= r["cosine_uniform_vs_true_fp16"]
+    ), "protecting outlier channels should not worsen fidelity"
+    assert r["n_protected_channels"] > 0
+
+
 def test_fused_reference_handles_symmetric_no_offset():
     """The reference must work with `asymmetric=False` (offsets None).
     Pins that the symmetric branch isn't accidentally broken when the
