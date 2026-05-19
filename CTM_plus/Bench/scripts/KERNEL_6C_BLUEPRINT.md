@@ -333,3 +333,36 @@ meaning. Route-B's protected-K *result* is the kernel's **numerical
 oracle** (the reference function); the **throughput** baselines are
 route-A's naive dequant fallback, FP16, and FP8. This blueprint uses that
 corrected framing throughout.
+
+---
+
+## 15. Format-agnosticism & NVFP4 (forward-looking)
+
+The protected-K *finding* (§20.4.1) is about **4-bit precision on the K
+channels** breaking long-context addressability — it is **not specific to
+INT4**. Any 4-bit KV format (INT4, FP4/NVFP4) must reckon with it. The
+durable framing of this work is *"protected-key low-bit KV serving"* — the
+key-addressability fix rides whichever low-bit format the hardware favours.
+
+The kernel structure already isolates this: the **INT4 unpack + dequant**
+(§4) is the *only* format-specific stage. The protected-channel overlay
+(§5), online-softmax attention (§6), GQA, and the static-mask machinery
+are all format-independent. A future NVFP4 variant swaps **only** the
+unpack stage.
+
+**Scope — 6c.1–6c.3 target INT4** and stay INT4. INT4 is the format with
+no hardware-native KV path on Hopper/Ampere, so it is the one that needs a
+custom kernel. Do **not** re-architect 6c.1 into a multi-backend kernel —
+get one format correct first. An NVFP4-backend variant is a **post-6c
+item, deferred pending Blackwell GPU access.**
+
+**Competitive baselines, honestly stated:** FP8 is the production baseline
+on Hopper-class GPUs; NVFP4 becomes the hardware-native competitor on
+Blackwell (Tensor Core support). Two honest caveats: (1) NVFP4 as a *KV
+cache* format — as opposed to NVFP4 for weights/GEMM, which is mature — is
+itself an emerging area, not a turnkey competitor. (2) Whether protected-K
+is *needed* for FP4 — i.e. whether FP4-K breaks addressability the way
+INT4-K does — is **unmeasured**: FP4's E2M1 exponent handles outlier
+channels differently from INT4's per-channel scale, so FP4-K could be more
+*or* less fragile. That is a hypothesis to test once Blackwell hardware is
+available, not a current finding.
