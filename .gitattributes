@@ -1,0 +1,5 @@
+# Force LF line endings on shell scripts regardless of the client's
+# core.autocrlf setting. Some container images (RunPod) ship git with
+# autocrlf enabled, which rewrites *.sh to CRLF on checkout and makes
+# bash choke ($'\r': command not found).
+*.sh text eol=lf
