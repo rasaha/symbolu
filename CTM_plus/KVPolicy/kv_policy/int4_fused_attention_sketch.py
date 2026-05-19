@@ -337,6 +337,7 @@ def hbm_bytes_for_attention(
     group_size_k: int = 32,
     group_size_v: int = 32,
     asymmetric: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> int:
     """HBM bytes loaded for K + V in one attention call.
 
@@ -346,27 +347,42 @@ def hbm_bytes_for_attention(
     overhead at group_size=32 on D=128 is small (~5-10% of the INT4
     value bytes); the per-group offset doubles it.
 
-    The kernel's win is the 4× reduction on the dominant term (the
+    ``k_protect_fraction`` > 0 models the §20.4.2 outlier-protected-K
+    config — the winning long-context config. A fraction ``f`` of K
+    channels stay FP16 (2 bytes/elem, no scale); the rest (1−f) are
+    INT4 + scale. V is uniform INT4. The protected-channel index set is
+    a per-layer mask (H_kv·D bits), amortised to ~0 bytes/token —
+    omitted. This answers the Exp-6 go/no-go question: does the mixed
+    FP16+INT4 K layout still leave enough bandwidth headroom for a
+    fused kernel to be worth building.
+
+    The kernel's win is the ~4× reduction on the dominant term (the
     K/V values themselves). Defaults match the §18.3 ship config so
     the partner-shareable ceiling speedup is computed honestly.
     """
     elements_kv = B * H_kv * S_kv * D
-    if int4:
-        # K + V values at 0.5 byte each.
-        val_bytes = 2 * elements_kv * 0.5
-        # Metadata factor: scale alone (sym) or scale+offset (asym).
-        meta_factor = 2 if asymmetric else 1
-        # K scale: per-(group along seq, head, head_dim)
-        # V scale: per-(token, head, group along head_dim)
-        k_scale_bytes = (
-            B * H_kv * max(1, S_kv // group_size_k) * D * 2 * meta_factor
-        )
-        v_scale_bytes = (
-            B * H_kv * S_kv * max(1, D // group_size_v) * 2 * meta_factor
-        )
-        return int(val_bytes + k_scale_bytes + v_scale_bytes)
-    else:
-        return 2 * elements_kv * 2
+    if not int4:
+        return 2 * elements_kv * 2  # K + V, FP16, 2 bytes/elem
+    # Metadata factor: scale alone (sym) or scale+offset (asym).
+    meta_factor = 2 if asymmetric else 1
+    f = max(0.0, min(1.0, k_protect_fraction))
+    # V — uniform INT4 (per-token, group along head_dim).
+    v_val_bytes = elements_kv * 0.5
+    v_scale_bytes = (
+        B * H_kv * S_kv * max(1, D // group_size_v) * 2 * meta_factor
+    )
+    # K — outlier-protected: fraction f of channels FP16, rest INT4.
+    # Only the INT4 channels carry per-group scales.
+    k_int4_val_bytes = (1.0 - f) * elements_kv * 0.5
+    k_fp16_val_bytes = f * elements_kv * 2
+    k_scale_bytes = (
+        (1.0 - f)
+        * B * H_kv * max(1, S_kv // group_size_k) * D * 2 * meta_factor
+    )
+    return int(
+        v_val_bytes + v_scale_bytes
+        + k_int4_val_bytes + k_fp16_val_bytes + k_scale_bytes
+    )
 
 
 def speedup_ceiling(
@@ -374,18 +390,21 @@ def speedup_ceiling(
     group_size_k: int = 32,
     group_size_v: int = 32,
     asymmetric: bool = True,
+    k_protect_fraction: float = 0.0,
 ) -> float:
     """Upper bound on the fused-kernel speedup, assuming K/V load is
     the bottleneck. Real speedup will be lower (compute also runs).
 
     Defaults match the §18.3 ship config (group=32, asymmetric=True);
-    explicitly pass `asymmetric=False` for the symmetric-only ceiling.
+    pass `asymmetric=False` for the symmetric-only ceiling, or
+    `k_protect_fraction` > 0 for the §20.4.2 outlier-protected-K
+    ceiling (the winning long-context config).
     """
     fp16 = hbm_bytes_for_attention(B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=False)
     int4 = hbm_bytes_for_attention(
         B=B, H_kv=H_kv, S_kv=S_kv, D=D, int4=True,
         group_size_k=group_size_k, group_size_v=group_size_v,
-        asymmetric=asymmetric,
+        asymmetric=asymmetric, k_protect_fraction=k_protect_fraction,
     )
     return fp16 / max(int4, 1)
 
@@ -557,3 +576,11 @@ if __name__ == "__main__":
     # For reference, the symmetric-only ceiling (no offset storage).
     speedup_sym = speedup_ceiling(B=1, H_kv=4, S_kv=64, D=128, asymmetric=False)
     print(f"  (symmetric-only ceiling, no offset:  {speedup_sym:.2f}x)")
+    # §20.4.2 outlier-protected-K ceiling — the winning long-context
+    # config (top 4% of K channels FP16, rest INT4, V INT4).
+    speedup_prot = speedup_ceiling(
+        B=1, H_kv=4, S_kv=64, D=128, k_protect_fraction=0.04,
+    )
+    print(
+        f"  (protected-K 4% ceiling — §20.4.2 config:  {speedup_prot:.2f}x)"
+    )

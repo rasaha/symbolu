@@ -204,6 +204,28 @@ def test_speedup_ceiling_default_is_318_to_322():
     assert 3.55 <= sym_ceiling <= 3.58
 
 
+def test_speedup_ceiling_protected_k_4pct_near_uniform():
+    """§20.4.2 outlier-protected-K (top 4% of K channels FP16) keeps a
+    HBM-traffic ceiling close to uniform INT4 — the mixed FP16+INT4 K
+    layout does not kill the fused kernel's bandwidth advantage. This
+    is the Exp-6 go/no-go input: a kernel for protected-K is worth
+    building, ~as much as for uniform INT4.
+    """
+    from kv_policy.int4_fused_attention_sketch import speedup_ceiling
+    uniform = speedup_ceiling(B=1, H_kv=4, S_kv=64, D=128)
+    protected = speedup_ceiling(
+        B=1, H_kv=4, S_kv=64, D=128, k_protect_fraction=0.04,
+    )
+    # Protecting 4% of K channels at FP16 costs only a little ceiling.
+    assert protected < uniform, "protection must cost some bandwidth"
+    assert 2.9 <= protected <= 3.15, (
+        f"protected-K 4% ceiling = {protected:.4f}; expected ~3.07. "
+        f"If this drifts, update the §20.4.2 / Exp-6 throughput claim."
+    )
+    # The gap vs uniform must be small — that is the whole point.
+    assert (uniform - protected) < 0.25
+
+
 def test_fused_reference_handles_symmetric_no_offset():
     """The reference must work with `asymmetric=False` (offsets None).
     Pins that the symmetric branch isn't accidentally broken when the
