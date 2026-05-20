@@ -117,7 +117,7 @@ kernel.
 
 | Step | Action | Done when |
 |---|---|---|
-| 4.1 | Decide §7.Q2 (compact vs dense). Default LOCK: **dense `(num_blocks, page_block_size, H_kv, D)` BF16 sidecar** + `protect_mask: (H_kv, D) int8`. Dense wastes ~96% of the sidecar but reads are trivial; phase-4 doesn't need gather. v2 may revisit if HBM is tight | choice recorded in cloned .cu header |
+| 4.1 | §7.Q2 (compact vs dense) is LOCKED to **compact** in `KERNEL_6C3C_PROTECT_MASK_DESIGN.md` §3.6 — dense costs ~917 MB per 32k sequence (28 layers × full FP16 K size), compact ~44 MB. Layout: `protect_mask: (B, H_kv, D) int8`, `protect_indices: (B, H_kv, n_protect) int32`, `k_fp16_protect: (B, S_padded, H_kv, n_protect) bf16`. Per-head padding to `n_protect_per_head` keeps loads coalesced | layout headered in cloned .cu; `Flash_fwd_params` extension lands these pointers (Phase 1.5) |
 | 4.2 | Plumb `k_fp16_protect_ptr` (BF16 dense sidecar) and `protect_mask_ptr` ((H_kv, D) int8) through `Flash_fwd_params` and the C++ entry | NULL still works (no-protect path); non-NULL routes to the sidecar read |
 | 4.3 | In the K read: parallel load of `k_fp16_protect` for the same block. After dequant of INT4 K, blend with sidecar via `protect_mask`: `K[h, d] = mask[h, d] ? k_fp16_protect[h, d] : dequant(int4_K[h, d])`. Blend happens in registers before the qK dot | output identical to a host-side reference that does the same blend |
 | 4.4 | Correctness vs §20.4.3 reference: run the full grid in `kernel_6c_gpu_test.py::CASES` with `protect_fraction=0.04` (the §20.4.3 ship config) | cosine ≥ 0.999 |

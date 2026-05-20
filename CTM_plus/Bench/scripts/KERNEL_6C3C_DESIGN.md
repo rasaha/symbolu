@@ -209,19 +209,21 @@ note in triage.
 
 Default: **inherit the swap**.
 
-### 5.5 Protected-K layout
+### 5.5 Protected-K layout — LOCKED: compact
 
-- **Dense `(B, H_kv, S, D)` FP16 + mask:** Simple, FA already reads
-  full K tensor; the mask gates which channels merge with the
-  dequant'd INT4. Wastes HBM on unprotected channels (stored zero or
-  whatever).
-- **Compact `(B, H_kv, S, n_protect)` + index list `(H_kv,
-  n_protect)`:** Memory-efficient (only ~4% × D = ~5 channels per
-  head stored). Indexed gather in the kernel — extra indirection.
+- ~~Dense `(num_blocks, page_block_size, H_kv, D)` FP16:~~ RULED
+  OUT — at S=32k, 28 layers, Qwen2.5 shapes the dense allocation
+  is ~917 MB **per sequence**, wasting 96% of it on unprotected
+  channels. Not viable for any usable concurrency.
+- **Compact `(batch, S_padded, H_kv, n_protect)` BF16 sidecar +
+  index list `(batch, H_kv, n_protect) int32` + mask `(batch,
+  H_kv, D) int8` (LOCKED).** At Qwen2.5 shapes the per-sequence
+  cost is ~44 MB at S=32k. Per-head padding to the per-batch
+  maximum `n_protect_per_head` keeps the layout rectangular for
+  coalesced FA loads.
 
-Tradeoff: dense is simple but loses some of the memory savings INT4
-buys back; compact is what's worth doing if HBM is the constraint.
-Default: **compact**, but defer to PR.
+See `KERNEL_6C3C_PROTECT_MASK_DESIGN.md` §3.6 for the memory math
+and §3.5 for the resulting `Flash_fwd_params` extension.
 
 ### 5.6 Dispatch entry point — LOCKED: new function
 
@@ -261,18 +263,17 @@ What 6c.3C must NOT claim:
 Triage-resolved questions are removed; what remains is design work
 the runbook (`KERNEL_6C3C_RUNBOOK.md`) must close:
 
-1. **Protect-mask provenance at decode time** — computed in vLLM at
-   prefill end (per-sequence, frozen, threaded into the attention
-   backend) or precomputed offline and loaded as a model attribute?
-   §20.4.3 is per-sequence-static, so per-prefill computation is
-   correct; the open part is *where* it's stored once computed.
-2. **Compact vs dense protected-K layout (§5.5)** — at ~4% protect,
-   dense `(B, H_kv, S, D)` FP16 wastes ~25% of an FP16 KV pool's
-   per-channel allocation but is trivial to read; compact `(B,
-   H_kv, S, n_protect)` + index list saves the memory but adds
-   gather indirection inside the kernel's inner loop. Decide based
-   on a quick microbench: dense-read vs gather-read overhead at
-   our shapes.
+1. ~~Protect-mask provenance at decode time~~ — **RESOLVED** in
+   `KERNEL_6C3C_PROTECT_MASK_DESIGN.md`: per-sequence × per-layer,
+   computed once at prefill-end (before the FP16→INT4 quantize hook
+   so the staging buffer is still FP16), owned by the new
+   `Int4ProtectedKVAttentionBackend` in a per-sequence state dict,
+   freed on sequence completion via vLLM's
+   `Scheduler.free_finished_seq_groups` hook.
+2. ~~Compact vs dense protected-K layout (§5.5)~~ — **RESOLVED**
+   compact in `KERNEL_6C3C_PROTECT_MASK_DESIGN.md` §3.6. Dense
+   costs ~917 MB per 32k sequence at Qwen shapes (28 layers ×
+   full FP16 K); compact ~44 MB. §5.5 above LOCKED.
 3. **Scale/offset side-channel keying (§5.2) — physical block_id
    vs logical position** — physical is the correct answer for vLLM
    compatibility, but the implementation effort is non-trivial. v1
