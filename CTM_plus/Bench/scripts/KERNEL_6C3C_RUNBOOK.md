@@ -27,6 +27,36 @@ the stock wheel cleanly and the existing microbench still measures
 | 0.5 | Smoke: rerun `kernel_int4_vs_fa_microbench.py` and confirm FA p50 at S=16k matches the 2026-05-20 baseline (67 μs) within ±10% | matches |
 | 0.6 | Smoke: rerun `kernel_6c3a_throughput.py --cell A --prompt-tokens 32000` and confirm cell A tok/s matches the 2026-05-20 baseline (28.4 tok/s) within ±5% | matches |
 
+### Phase 0 result (2026-05-20, GPU pod, A100-80GB, CUDA 12.8, torch 2.5.1+cu124)
+
+**GREEN.** Built SHA `720c948` with `TORCH_CUDA_ARCH_LIST=8.0,
+MAX_JOBS=16, NVCC_THREADS=2`. Wall-clock: ~48 minutes (198 build
+steps). Wheel: `vllm_flash_attn-2.7.2.post1+cu128-cp312-cp312-linux_x86_64.whl`,
+200 MB. Installed via `install_dev_vllm_flash_attn.sh` (overwriting
+the vendored copy in venv-vllm; backup preserved at
+`/workspace/dev/build-logs/vllm_flash_attn_vendored_backup`).
+
+Smoke test result vs §20.6.3 baselines:
+
+| Check | Baseline | Post-build | Drift | Threshold | Result |
+|---|---|---|---|---|---|
+| FA p50 @ S=16k | 67.3 μs | 69.6 μs | +3.4% | ±10% | PASS |
+| Cell A @ S=32k | 28.40 tok/s | 28.59 tok/s | +0.7% | ±5% | PASS |
+
+Observation worth recording: the dev build's `.so` sizes differ
+materially from the vendored:
+
+| File | Vendored | Dev build | Δ |
+|---|---:|---:|---:|
+| `_vllm_fa2_C.abi3.so` | 221 MB | 137 MB | −38% |
+| `_vllm_fa3_C.abi3.so` | 276 MB | 648 MB | +135% |
+
+FA2 smaller is expected (sm_80-only restriction vs vendored
+multi-arch). FA3 larger at identical sm_80 restriction is unexpected
+— likely `RelWithDebInfo` default vs vendored stripped `Release`,
+and/or CUDA 12.8 vs older toolkit code-gen differences. Doesn't
+affect correctness or perf (smoke confirms); record only.
+
 **Risk:** different CUDA toolkit / cuBLAS versions between our dev
 checkout and what shipped with vLLM 0.7.3 → ABI mismatch on the
 modified wheel. Mitigation: pin the toolkit to whatever vLLM 0.7.3
