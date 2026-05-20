@@ -3169,6 +3169,123 @@ lengths.
 3. **If D/C < 0.50:** kernel first (1-2 weeks); route-A integration
    sees no benefit until the kernel exists.
 
+#### §20.6.1 Kernel 6c.1 — Triton fused protected-K decode kernel: correct but speed-uncompetitive (GPU, round 5)
+
+The §20.6 sketch became a real Triton kernel — see
+``CTM_plus/KVPolicy/kv_policy/int4_fused_attention_kernel.py`` and the
+implementation blueprint ``Bench/scripts/KERNEL_6C_BLUEPRINT.md``.
+
+**Correctness — layer-1 + layer-2 green.** A100-SXM-80GB, all 8
+shape-matrix cases (``scripts/kernel_6c_gpu_test.py``) pass with
+cosine ≥ 0.999999 vs the reference (``fused_int4_attention_reference``
+with ``k_fp16`` / ``k_protect_mask``): Qwen + Mistral GQA, asymmetric
++ symmetric, S_kv ∈ {16, 64, 200}, batch ∈ {1, 2}, protect ∈
+{0%, 4%, 100%}. The kernel reproduces the §20.4.x protected-K result.
+
+**Throughput — layer-4 micro-benchmark on a single attention layer**
+(``scripts/kernel_6c_throughput.py``: Qwen2.5-7B shape, B=1, decode
+step, protected-K 4% static, asymmetric, group=32, BLOCK_N=64;
+median μs over 30 iters):
+
+| S_kv | FP16 SDPA | naive route-A | kernel 6c.1 | kernel / FP16 | kernel / naive |
+|---:|---:|---:|---:|---:|---:|
+| 1 024 | 110.6 | 790.7 | 376.8 | 3.41× | 0.48× (kernel wins) |
+| 4 096 | 207.9 | 882.8 | 1 297.9 | 6.24× | 1.47× |
+| 16 384 | 640.9 | 1 967.9 | 5 078.2 | **7.92×** | 2.58× |
+| 32 768 | 1 282.7 | 3 449.8 | 8 348.0 | 6.51× | 2.42× |
+| 65 536 | 2 867.2 | 6 670.0 | 16 599.6 | 5.79× | 2.49× |
+
+**Honest read: v1 is correct but speed-uncompetitive.** The kernel
+is ~5–8× *slower* than the FP16 FlashAttention/SDPA baseline and
+slower than even the naive route-A dequant-fallback at S_kv ≥ 4k.
+It only beats naive at very short context (S=1k). The analytic
+ceiling (§20.4.2 6b) is ~3.07× *faster* than FP16; v1 is ~6×
+*slower* — i.e. ~18× short of the ceiling.
+
+This is the **expected state** for a correctness-first Triton kernel
+competing with production FlashAttention. The gap is the
+optimisation distance:
+
+* QKᵀ and PV use ``tl.sum`` / elementwise multiply — **no tensor
+  cores**. FlashAttention uses ``tl.dot`` to light up the A100
+  tensor cores. The dominant gap.
+* One program per (b, hq) → 28 programs on a 108-SM A100, ~26% SM
+  occupancy. FlashDecoding-style split-K (KV-sequence partitioning,
+  grouped by GQA) raises occupancy to near saturation.
+* INT4 unpack loads each byte twice (two dims per byte) — wastes
+  bandwidth.
+
+**Conclusion.** Kernel 6c.1 closes the **correctness** half of
+Experiment 6. The **throughput** half is now *measured* (~6× FP16,
+worse than the naive fallback) and *quantified as not yet solved*.
+6c.2 — ``tl.dot`` (tensor cores) + split-K (GQA-grouped) — is the
+bounded next iteration; success gate is reaching within ~2× of FP16
+SDPA. Until then, *"protected-K beats FP8 end-to-end"* remains an
+unproven claim — the work has a measured kernel that *runs*, not yet
+one that's *fast*.
+
+#### §20.6.2 Kernel 6c.2 — split-K + tl.dot + GQA-grouped rewrite: GREEN for kernel viability (GPU, round 6)
+
+A single bounded optimisation iteration on §20.6.1's v1, addressing
+exactly the two measured bottlenecks (no tensor cores, ~26% SM
+occupancy) and nothing else: ``tl.dot`` for the QKᵀ and PV matmuls,
+FlashDecoding-style split-K (KV-sequence partitioning with a tiny
+combine kernel), and GQA grouping (one program per (b, KV head,
+split); the G query heads sharing the KV head become the M dim of the
+matmuls with ``M_PAD ≥ 16`` for tensor-core engagement). **No
+algorithmic features added** — same protected-K logic, same static
+mask, same dynamic outlier selection (no decode-stability calibration,
+no pre-RoPE, no rotation, no QJL).
+
+Correctness re-verified on the same 8-case matrix
+(``scripts/kernel_6c_gpu_test.py``) — **ALL PASS, cosine ≥ 0.999999**.
+The rewrite did not regress correctness.
+
+Throughput micro-benchmark on the same Qwen2.5-7B attention shape
+(``scripts/kernel_6c_throughput.py``), A100-SXM-80GB, median μs over
+30 iters:
+
+| S_kv | FP16 SDPA | naive route-A | kernel 6c.2 | kernel / FP16 | v1 → v2 |
+|---:|---:|---:|---:|---:|---:|
+| 1 024 | 108.9 | 780.0 | 414.3 | 3.81× slower | 0.91× (similar) |
+| 4 096 | 208.2 | 883.8 | 416.3 | 2.00× slower | **3.12× faster** |
+| 16 384 | 641.9 | 1 961.0 | 650.8 | **1.01× ≈ parity** | **7.80× faster** |
+| 32 768 | 1 280.2 | 3 413.2 | 985.3 | **0.77× — kernel wins by 1.30×** | **8.47× faster** |
+| 65 536 | 2 863.9 | 6 670.0 | 1 710.3 | **0.60× — kernel wins by 1.67×** | **9.70× faster** |
+
+**GREEN for kernel viability — NOT yet a final product claim:**
+
+* **Correctness PASS** — all 8 cases, cosine ≥ 0.999, same matrix.
+* **Route-A naive fallback beaten at all context sizes** — kernel/naive
+  is 0.53× → 0.26× across the sweep (kernel is 2–4× faster than the
+  no-kernel dequant path).
+* **FP16 SDPA parity at S_kv = 16 384** — kernel/FP16 = 1.01×.
+* **FP16 SDPA win at S_kv = 32 768 and 65 536** in the one-layer
+  microbenchmark — kernel is 1.30× and 1.67× *faster* than FP16
+  FlashAttention/SDPA in the bandwidth-bound regime the design targets.
+* **FP8 and end-to-end remain OPEN** — see §20.6.3 / Kernel 6c.3.
+
+**Honest scope — what 6c.2 does NOT claim:**
+
+* This is a **single-attention-layer microbenchmark**, not end-to-end
+  model decode tokens/sec.
+* The comparison baseline is **FP16 FlashAttention/SDPA**, not FP8.
+  §20.1 measured FP8 at ~1.18× FP16 on A100, so the kernel *plausibly*
+  beats FP8 at long context — but this is **extrapolation, not
+  measurement**.
+* **End-to-end vLLM tokens/sec, actual GPU memory, and long-context
+  needle quality on the real model with the kernel installed** are
+  Kernel 6c.3 work.
+* Short context (S_kv ≤ 4 096) is still slower than FP16. Not the
+  regime KV compression targets, but recorded.
+
+**At ~54% of the §20.4.2 §6b analytic ceiling** (3.07× HBM-traffic
+ratio → 1.67× measured at S=64k). Daylight remains. Further kernel
+tuning is **not** the immediate priority — the next step is 6c.3
+(vLLM integration + end-to-end measurement) to confirm the one-layer
+result translates to real serving. Per user instruction at §20.6.2
+close: **no algorithm changes until 6c.3 lands.**
+
 ### §20.7 Where this lands in the VC brief's "Honest Validation Status"
 
 Updates to ``CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`` and
