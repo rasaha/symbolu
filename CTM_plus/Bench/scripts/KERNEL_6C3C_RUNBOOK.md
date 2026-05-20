@@ -20,7 +20,7 @@ the stock wheel cleanly and the existing microbench still measures
 
 | Step | Action | Done when |
 |---|---|---|
-| 0.1 | `git clone https://github.com/vllm-project/flash-attention` to a workspace (separate from /workspace/symbolu) at the tag matching what vLLM 0.7.3 ships | `git log` shows the matching SHA |
+| 0.1 | `git clone https://github.com/vllm-project/flash-attention` to a workspace (separate from /workspace/symbolu) at the SHA matching what vLLM 0.7.3 ships — **`720c94869cf2e0ff5a706e9c7f1dce0939686ade`** (2025-02-06, "fix illegal memory access #42"), pinned at vllm/CMakeLists.txt:602 at the v0.7.3 tag | `git log -1 --oneline` shows `720c948` |
 | 0.2 | Confirm dev deps: CUDA toolkit (matching the venv-vllm install), `ninja`, `pybind11`, `cmake` | `python setup.py build_ext --inplace --dry-run` succeeds |
 | 0.3 | Build the stock wheel (warm-cache; full build takes ~25–40 min on first cold build due to ~40 kernel instantiations) | `python setup.py bdist_wheel` produces a `.whl` |
 | 0.4 | `pip install --force-reinstall <wheel>` into venv-vllm — REPLACES the bundled `vllm_flash_attn` | `python -c "import vllm.vllm_flash_attn as m; print(m.__file__)"` shows the dev install path |
