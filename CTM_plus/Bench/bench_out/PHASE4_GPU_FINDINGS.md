@@ -3224,6 +3224,68 @@ SDPA. Until then, *"protected-K beats FP8 end-to-end"* remains an
 unproven claim — the work has a measured kernel that *runs*, not yet
 one that's *fast*.
 
+#### §20.6.2 Kernel 6c.2 — split-K + tl.dot + GQA-grouped rewrite: GREEN for kernel viability (GPU, round 6)
+
+A single bounded optimisation iteration on §20.6.1's v1, addressing
+exactly the two measured bottlenecks (no tensor cores, ~26% SM
+occupancy) and nothing else: ``tl.dot`` for the QKᵀ and PV matmuls,
+FlashDecoding-style split-K (KV-sequence partitioning with a tiny
+combine kernel), and GQA grouping (one program per (b, KV head,
+split); the G query heads sharing the KV head become the M dim of the
+matmuls with ``M_PAD ≥ 16`` for tensor-core engagement). **No
+algorithmic features added** — same protected-K logic, same static
+mask, same dynamic outlier selection (no decode-stability calibration,
+no pre-RoPE, no rotation, no QJL).
+
+Correctness re-verified on the same 8-case matrix
+(``scripts/kernel_6c_gpu_test.py``) — **ALL PASS, cosine ≥ 0.999999**.
+The rewrite did not regress correctness.
+
+Throughput micro-benchmark on the same Qwen2.5-7B attention shape
+(``scripts/kernel_6c_throughput.py``), A100-SXM-80GB, median μs over
+30 iters:
+
+| S_kv | FP16 SDPA | naive route-A | kernel 6c.2 | kernel / FP16 | v1 → v2 |
+|---:|---:|---:|---:|---:|---:|
+| 1 024 | 108.9 | 780.0 | 414.3 | 3.81× slower | 0.91× (similar) |
+| 4 096 | 208.2 | 883.8 | 416.3 | 2.00× slower | **3.12× faster** |
+| 16 384 | 641.9 | 1 961.0 | 650.8 | **1.01× ≈ parity** | **7.80× faster** |
+| 32 768 | 1 280.2 | 3 413.2 | 985.3 | **0.77× — kernel wins by 1.30×** | **8.47× faster** |
+| 65 536 | 2 863.9 | 6 670.0 | 1 710.3 | **0.60× — kernel wins by 1.67×** | **9.70× faster** |
+
+**GREEN for kernel viability — NOT yet a final product claim:**
+
+* **Correctness PASS** — all 8 cases, cosine ≥ 0.999, same matrix.
+* **Route-A naive fallback beaten at all context sizes** — kernel/naive
+  is 0.53× → 0.26× across the sweep (kernel is 2–4× faster than the
+  no-kernel dequant path).
+* **FP16 SDPA parity at S_kv = 16 384** — kernel/FP16 = 1.01×.
+* **FP16 SDPA win at S_kv = 32 768 and 65 536** in the one-layer
+  microbenchmark — kernel is 1.30× and 1.67× *faster* than FP16
+  FlashAttention/SDPA in the bandwidth-bound regime the design targets.
+* **FP8 and end-to-end remain OPEN** — see §20.6.3 / Kernel 6c.3.
+
+**Honest scope — what 6c.2 does NOT claim:**
+
+* This is a **single-attention-layer microbenchmark**, not end-to-end
+  model decode tokens/sec.
+* The comparison baseline is **FP16 FlashAttention/SDPA**, not FP8.
+  §20.1 measured FP8 at ~1.18× FP16 on A100, so the kernel *plausibly*
+  beats FP8 at long context — but this is **extrapolation, not
+  measurement**.
+* **End-to-end vLLM tokens/sec, actual GPU memory, and long-context
+  needle quality on the real model with the kernel installed** are
+  Kernel 6c.3 work.
+* Short context (S_kv ≤ 4 096) is still slower than FP16. Not the
+  regime KV compression targets, but recorded.
+
+**At ~54% of the §20.4.2 §6b analytic ceiling** (3.07× HBM-traffic
+ratio → 1.67× measured at S=64k). Daylight remains. Further kernel
+tuning is **not** the immediate priority — the next step is 6c.3
+(vLLM integration + end-to-end measurement) to confirm the one-layer
+result translates to real serving. Per user instruction at §20.6.2
+close: **no algorithm changes until 6c.3 lands.**
+
 ### §20.7 Where this lands in the VC brief's "Honest Validation Status"
 
 Updates to ``CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`` and
