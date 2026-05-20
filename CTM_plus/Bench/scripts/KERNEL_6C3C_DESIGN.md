@@ -110,9 +110,12 @@ Concrete plan (per the source map in track-E research, 2026-05-20):
 2. `csrc/flash_attn/src/flash.h` — extend `Flash_fwd_params` with
    `k_scale`, `k_offset`, `k_fp16_protect`, `protect_mask`, `v_scale`,
    `v_offset`, `group_size_k`, `group_size_v`. Add `kIsInt4KV` trait.
-3. `csrc/flash_attn/src/flash_fwd_splitkv_launch_template.h` — new
-   `_int4kv` dispatch arm in `run_mha_fwd_splitkv_dispatch`; add
-   `static_switch.h` flag.
+3. `csrc/flash_attn/src/flash_fwd_launch_template.h` — at SHA
+   720c948 the splitkv dispatch lives in the main launch template,
+   not in a separate `_splitkv_launch_template.h` (which appears
+   later on upstream main). Add the new `_int4kv` dispatch arm in
+   `run_mha_fwd_splitkv_dispatch` here, plus a `static_switch.h`
+   flag.
 4. `csrc/flash_attn/flash_api.cpp` — INT4 dtype detection on
    `k_cache` / `v_cache`; plumb the new params into `Flash_fwd_params`;
    route to the `_int4kv` dispatch arm in `mha_fwd_kvcache`.
