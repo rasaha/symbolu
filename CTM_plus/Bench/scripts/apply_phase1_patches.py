@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """apply_phase1_patches.py — 6c.3C Phase 1 additive scaffolding.
 
-Modifies 5 files in /workspace/dev/vllm-flash-attn-dev:
+Modifies 4 files in /workspace/dev/vllm-flash-attn-dev:
 
-  * flash_attn/flash_attn_interface.py — new flash_attn_with_int4_kvcache
+  * vllm_flash_attn/flash_attn_interface.py — new flash_attn_with_int4_kvcache
     Python wrapper (Phase 1: no-op delegate to flash_attn_with_kvcache).
-  * vllm_flash_attn/__init__.py (the dev tree's wheel-staging copy)
-    — re-export the new wrapper.
+    NOTE: this is the SLIM (~24KB) vllm-specific file, NOT the
+    ~63KB standalone flash_attn/flash_attn_interface.py — only the
+    vllm one ships in the wheel that lands in venv-vllm.
+  * vllm_flash_attn/__init__.py — re-export the new wrapper via
+    RELATIVE import (`from .flash_attn_interface import ...`).
+    Absolute `from flash_attn.flash_attn_interface import ...` would
+    pull in the standalone flash_attn package which tries to import
+    flash_attn_2_cuda (not installed) and crashes.
   * csrc/flash_attn/src/flash.h — extend Flash_fwd_params with
     INT4 KV pointer/stride fields. ALL NULL/0 default.
   * csrc/flash_attn/flash_api.cpp — new mha_fwd_kvcache_int4 C++ entry
@@ -15,6 +21,8 @@ Modifies 5 files in /workspace/dev/vllm-flash-attn-dev:
     schema + ops.impl for mha_fwd_kvcache_int4.
 
 All edits are additive and idempotent (re-running is a no-op).
+The script also REPAIRS the previously-buggy absolute import in
+__init__.py if encountered.
 
 Acceptance criterion (verify_phase1.py):
   flash_attn_with_int4_kvcache(q, k_bf16, v_bf16, cache_seqlens=csl)
@@ -120,8 +128,19 @@ def patch_python(path: Path):
 # ============================================================
 # Patch 2: vllm_flash_attn/__init__.py — re-export the new wrapper
 # ============================================================
+#
+# IMPORTANT: must use RELATIVE import. Absolute
+# `from flash_attn.flash_attn_interface import ...` resolves to the
+# standalone flash_attn package (not what vllm uses), which then
+# tries to `import flash_attn_2_cuda` and crashes since that wheel
+# isn't installed in venv-vllm.
 
-INIT_EXPORT = (
+FIXED_INIT_LINE = (
+    "from .flash_attn_interface import flash_attn_with_int4_kvcache  "
+    "# 6c.3C Phase 1\n"
+)
+
+BROKEN_INIT_LINE = (
     "from flash_attn.flash_attn_interface import "
     "flash_attn_with_int4_kvcache  # 6c.3C Phase 1\n"
 )
@@ -129,11 +148,20 @@ INIT_EXPORT = (
 
 def patch_init_py(path: Path):
     src = path.read_text()
-    if "flash_attn_with_int4_kvcache" in src:
-        print(f"  SKIP (already patched): {path}")
+    if FIXED_INIT_LINE.strip() in src:
+        print(f"  SKIP (already correctly patched): {path}")
         return
-    # Append at end — vendoring + flash_attn re-imports already resolved.
-    path.write_text(src.rstrip() + "\n" + INIT_EXPORT)
+    if BROKEN_INIT_LINE.strip() in src:
+        # Repair the previous (buggy) absolute import.
+        new_src = src.replace(BROKEN_INIT_LINE, FIXED_INIT_LINE)
+        # Also handle the case where the broken line lacks a trailing
+        # newline (older variant of this script).
+        new_src = new_src.replace(BROKEN_INIT_LINE.rstrip(), FIXED_INIT_LINE.rstrip())
+        path.write_text(new_src)
+        print(f"  REPAIRED (relative import): {path}")
+        return
+    # Fresh apply.
+    path.write_text(src.rstrip() + "\n" + FIXED_INIT_LINE)
     print(f"  PATCHED: {path}")
 
 
@@ -355,7 +383,12 @@ def main():
         return 1
 
     targets = [
-        (DEV_ROOT / "flash_attn/flash_attn_interface.py", patch_python),
+        # The vllm-specific slim flash_attn_interface.py is the one
+        # that ships in the wheel. The ~63KB standalone
+        # flash_attn/flash_attn_interface.py is dormant for vllm
+        # purposes (kept untouched if it was patched by a previous
+        # buggy run — harmless).
+        (DEV_ROOT / "vllm_flash_attn/flash_attn_interface.py", patch_python),
         (DEV_ROOT / "vllm_flash_attn/__init__.py", patch_init_py),
         (DEV_ROOT / "csrc/flash_attn/src/flash.h", patch_flash_h),
         (DEV_ROOT / "csrc/flash_attn/flash_api.cpp", patch_api_cpp),
