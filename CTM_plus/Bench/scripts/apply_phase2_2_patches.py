@@ -50,6 +50,43 @@ DEV_ROOT = Path("/workspace/dev/vllm-flash-attn-dev")
 
 
 # ============================================================
+# Patch 0: flash.h — forward-declare run_mha_fwd_splitkv_dispatch_int4kv
+# ============================================================
+#
+# flash.h has forward decls at lines 211-212 for run_mha_fwd_* and
+# run_mha_fwd_splitkv_dispatch (the .h doesn't include the heavy
+# flash_fwd_launch_template.h; .cu files do). flash_api.cpp sees
+# the templates via these forward decls and the linker resolves
+# from .cu instantiations. We need a parallel forward decl for
+# the _int4kv variant or flash_api.cpp's use of the template name
+# fails to parse (`<` interpreted as operator).
+
+FLASH_H_FWD_DECL_OLD = (
+    "template<typename T, int Headdim, bool Is_causal> void "
+    "run_mha_fwd_splitkv_dispatch(Flash_fwd_params &params, cudaStream_t stream);"
+)
+FLASH_H_FWD_DECL_NEW = (
+    FLASH_H_FWD_DECL_OLD
+    + "\ntemplate<typename T, int Headdim, bool Is_causal> void "
+    "run_mha_fwd_splitkv_dispatch_int4kv(Flash_fwd_params &params, cudaStream_t stream);  // 6c.3C Phase 2.2"
+)
+
+
+def patch_flash_h_forward_decl(path: Path):
+    src = path.read_text()
+    if "run_mha_fwd_splitkv_dispatch_int4kv" in src:
+        print(f"  SKIP (already patched): {path}")
+        return
+    if FLASH_H_FWD_DECL_OLD not in src:
+        raise RuntimeError(
+            f"can't find run_mha_fwd_splitkv_dispatch forward decl in {path}"
+        )
+    src = src.replace(FLASH_H_FWD_DECL_OLD, FLASH_H_FWD_DECL_NEW, 1)
+    path.write_text(src)
+    print(f"  PATCHED: {path}")
+
+
+# ============================================================
 # Patch 1A: flash_api.cpp — add the Int4KvDispatchGuard helper
 # ============================================================
 
@@ -308,6 +345,7 @@ def main():
         return 1
 
     targets = [
+        (DEV_ROOT / "csrc/flash_attn/src/flash.h", patch_flash_h_forward_decl),
         (DEV_ROOT / "csrc/flash_attn/flash_api.cpp", patch_flash_api_cpp),
         (DEV_ROOT / "vllm_flash_attn/flash_attn_interface.py", patch_python),
     ]
