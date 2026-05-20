@@ -679,6 +679,12 @@ def _wrap_attention_forward_with_fused_v2(
             query = args[query_arg_index]
             if not isinstance(query, torch.Tensor):
                 raise ValueError("query arg is not a tensor")
+            # Remember the query's dtype so we can cast the kernel's
+            # FP16 output back to it on return. vLLM may load the model
+            # in BF16 (Qwen2.5 / Llama-3 default); o_proj weights will
+            # match the model dtype and a dtype mismatch on the next
+            # matmul will error.
+            out_dtype = query.dtype
 
             # Quantize-append T=1 into the cache.
             cache.append(key_3d, value_3d)
@@ -738,6 +744,11 @@ def _wrap_attention_forward_with_fused_v2(
                 asymmetric=cache.asymmetric,
             )  # (1, H_q, D) fp16
             manager._fused_v2_decodes += 1
+
+            # Cast back to the query's dtype (BF16 for Qwen2.5, etc.)
+            # so o_proj sees the dtype it expects.
+            if out.dtype != out_dtype:
+                out = out.to(out_dtype)
 
             # Match the original forward's output layout. vLLM passes
             # query as (num_tokens, H_q * D) and expects the same out

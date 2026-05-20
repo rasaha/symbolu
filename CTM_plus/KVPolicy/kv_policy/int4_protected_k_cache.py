@@ -249,10 +249,16 @@ class ProtectedKINT4Cache:
     ) -> None:
         if self._allocated:
             return
+        # Buffers are always FP16 internally regardless of the input
+        # dtype. ``append`` casts BF16 / FP32 / FP16 inputs to FP16
+        # before calling ``_allocate`` (see ``append``). This keeps the
+        # kernel's input contract pure FP16 — the kernel was validated
+        # against FP16 inputs by ``kernel_6c_gpu_test.py``.
         if dtype != torch.float16:
             raise ValueError(
-                f"ProtectedKINT4Cache v1 requires FP16 K/V inputs; got "
-                f"{dtype}. Cast at the caller (route-A wrapper does this)."
+                f"ProtectedKINT4Cache buffer dtype must be FP16; got "
+                f"{dtype}. (append() should have cast before calling "
+                "_allocate — this is a bug in append.)"
             )
         if head_dim % 2 != 0:
             raise ValueError(
@@ -334,10 +340,31 @@ class ProtectedKINT4Cache:
         if T < 1:
             return
 
+        # Accept FP16 / BF16 / FP32 inputs — cast to FP16 BEFORE alloc
+        # so the buffer dtype contract (FP16, kernel-compatible) holds
+        # regardless of how the model loaded. Most vLLM models load in
+        # BF16 by default (Qwen2.5, Llama-3); FP16 is rarer.
+        if key.dtype not in (torch.float16, torch.bfloat16, torch.float32):
+            raise ValueError(
+                f"append expects FP16 / BF16 / FP32 K/V; got K dtype "
+                f"{key.dtype}. (Quantize ops handle any float dtype "
+                "internally; we restrict to these three for safety.)"
+            )
+        if key.dtype != value.dtype:
+            raise ValueError(
+                f"K and V dtypes must match; got K {key.dtype}, "
+                f"V {value.dtype}"
+            )
+        if key.dtype != torch.float16:
+            key = key.to(torch.float16)
+            value = value.to(torch.float16)
+        key = key.contiguous()
+        value = value.contiguous()
+
         if not self._allocated:
             self._allocate(
                 num_kv_heads=H, head_dim=D,
-                device=key.device, dtype=key.dtype,
+                device=key.device, dtype=key.dtype,  # always FP16 now
             )
         else:
             if (H, D) != (self._num_kv_heads, self._head_dim):
@@ -360,14 +387,6 @@ class ProtectedKINT4Cache:
                 "Pre-allocate a larger cache or use a paged 6c.3.2 / "
                 "6c.3C variant."
             )
-
-        # Ensure FP16 + contiguous before quantize (the quant ops accept
-        # any dtype but cache stores FP16).
-        if key.dtype != torch.float16:
-            key = key.to(torch.float16)
-            value = value.to(torch.float16)
-        key = key.contiguous()
-        value = value.contiguous()
 
         # K: per-channel along seq with group=1.
         kq, ks, ko = quantize_per_channel_int4(

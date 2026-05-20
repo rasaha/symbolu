@@ -73,6 +73,57 @@ def test_cache_lazy_alloc_on_first_append():
     assert tuple(c.v_offset_buf.shape) == (64, QWEN_NUM_KV_HEADS, 4)
 
 
+def test_cache_accepts_bf16_inputs_casts_to_fp16_internally():
+    """Models loaded in BF16 (Qwen2.5, Llama-3) hand K/V in BF16 at
+    the attention boundary. The cache must accept BF16 (and FP32) and
+    cast to FP16 internally so the kernel's input contract stays pure
+    FP16. Regression test for the cell-D BF16 bug surfaced on the pod.
+    """
+    import torch
+    from kv_policy.int4_protected_k_cache import ProtectedKINT4Cache
+
+    c = ProtectedKINT4Cache(
+        max_seq_len=32, k_group_size=1, v_group_size=32, asymmetric=True,
+    )
+    # BF16 K/V — the Qwen2.5 case.
+    k_bf16 = torch.randn(8, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.bfloat16)
+    v_bf16 = torch.randn_like(k_bf16)
+    c.append(k_bf16, v_bf16)
+    assert c.seq_len == 8
+    # Buffers are always FP16 regardless of input.
+    assert c.k_fp16_buf.dtype == torch.float16
+    assert c.k_scale_buf.dtype == torch.float16
+
+    # kernel_inputs returns FP16 across the board (k_packed/v_packed
+    # are uint8; protect_mask is int8).
+    inputs = c.kernel_inputs()
+    assert inputs["k_fp16"].dtype == torch.float16
+    assert inputs["k_scale"].dtype == torch.float16
+    assert inputs["v_scale"].dtype == torch.float16
+
+    # FP32 also accepted.
+    c2 = ProtectedKINT4Cache(
+        max_seq_len=16, k_group_size=1, v_group_size=32, asymmetric=True,
+    )
+    k_fp32 = torch.randn(4, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.float32)
+    c2.append(k_fp32, k_fp32.clone())
+    assert c2.k_fp16_buf.dtype == torch.float16
+
+
+def test_cache_rejects_unsupported_dtype():
+    """Float8 / int8 K/V are rejected with a clear error (not silently
+    cast — those dtypes signal something is wrong at the caller)."""
+    import torch
+    from kv_policy.int4_protected_k_cache import ProtectedKINT4Cache
+
+    c = ProtectedKINT4Cache(
+        max_seq_len=16, k_group_size=1, v_group_size=32, asymmetric=True,
+    )
+    k_i8 = torch.zeros(4, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.int8)
+    with pytest.raises(ValueError, match=r"FP16 / BF16 / FP32"):
+        c.append(k_i8, k_i8.clone())
+
+
 def test_cache_symmetric_omits_offset_buffers():
     """Symmetric mode allocates no offset buffers; kernel_inputs returns
     None for k_offset / v_offset."""
