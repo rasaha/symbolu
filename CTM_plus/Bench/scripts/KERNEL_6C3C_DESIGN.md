@@ -70,62 +70,103 @@ The PR triage in §4 scores each candidate against these.
 
 Each item above is a deliberate non-goal; do not creep.
 
-## 4. Base implementation — TBD pending PR triage
+## 4. Base implementation — LOCKED: A (fork `vllm.vllm_flash_attn`)
 
-Two candidate bases:
+### 4.1 PR triage outcome
 
-* **A. Fork `vllm.vllm_flash_attn`.** Clone one existing decode-kernel
-  instantiation (`flash_fwd_split_hdim128_bf16_sm80.cu`) into an
-  `_int4kv` variant. Replace the two `FLASH_NAMESPACE::copy(...,
-  tKgK/tVgV, ...)` sites in `compute_attn_1rowblock_splitkv` with an
-  INT4 + dequant + protected-K-sidecar read. Plumb scale/offset/mask
-  pointers through `Flash_fwd_params`. Add an `_int4kv` dispatch arm
-  in `flash_api.cpp::mha_fwd_kvcache`. Auto-picked up by the
-  `flash_fwd_*.cu` glob in `CMakeLists.txt`.
-* **D. Extend an open vLLM INT4 KV PR.** Four candidates exist in
-  vLLM's PR queue (per §20.6.3 research): #39074, #39668, #40633,
-  #40835 — all draft / needs-rebase as of May 2026. If any is ≥60%
-  aligned with the required architecture in §2 and the v1 scope in
-  §3, extending it is shorter than starting from A.
+Triaged 4 candidate vLLM PRs (research run 2026-05-20) against the
+9-axis rubric in §4.2 below. **No PR clears the gate** (≥27/45 AND
+scores ≥4 on Paged KV + FA integration + GQA). All four are
+**Triton-only**; FA integration is 0–1 across the board. #39668
+even has an explicit `test_flash_attn_rejects_int4_kv_cache` guard
+that *registers* INT4 as a rejected dtype in FA. None provides what
+6c.3C needs: dequant *inside* the FA kernel against a paged
+block_table.
 
-**Triage rubric.** Each PR scored 0–5 against:
+| PR | Author | State | License | Paged | **FA** | GQA | INT4 layout | Scale layout | Protect-K | Invasive | Runnable | **Total** |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| #39074 | JartX | open, stale | 5 | 4 | **0** | 4 | 4 (per-tok-head) | 3 | 2 | 3 | 3 | **28/45** |
+| #39668 | lesj0610 | draft, needs-rebase | 5 | 4 | **1** | 3 | 5 (g=32 seq) | 4 | 3 | 3 | 1 | **29/45** |
+| #40633 | JartX | open, needs-rebase | 5 | 4 | **0** | 4 | 4 (per-tok-head) | 3 | 3 | 3 | 2 | **28/45** |
+| #40835 | JartX | open, stale | 5 | 4 | **1** | 5 | 4 (per-tok-head) | 3 | 3 | 2 | 2 | **29/45** |
 
-| Axis | What it tests |
-|---|---|
-| License | Compatible with vLLM's redistribution (Apache 2.0 / BSD) |
-| Paged KV support | Block-table-aware read; integrates with vLLM's block manager |
-| FA integration | Built on `vllm_flash_attn` / FA-fork or FlashInfer / custom |
-| GQA / MQA | Handles H_q > H_kv natively or via swap |
-| INT4 K/V layout | Asymmetric vs symmetric; group_size; alignment with §20.4 |
-| Scale/offset layout | Per-block vs per-token; key into paged blocks vs sequence |
-| Protected-K extensibility | How invasive is adding the FP16 sidecar? |
-| Invasiveness | How big is the diff against vLLM main? Affects rebase pain |
-| Local runnability | Does the PR actually build + pass smoke tests today? |
+(Full per-axis notes in the triage transcript; this table is the
+audit summary.)
 
-**Decision rule.** Each PR scored ≥60% (≥27 / 45) of the maximum on
-the rubric is a candidate base. If any candidate scores higher than
-A on integration cost and license combined, pick that PR. Otherwise,
-commit to A.
+### 4.2 Verdict and base lock
 
-The triage outcome (with per-PR scores and one-paragraph rationale)
-lands in §4 of this document and replaces this paragraph.
+**Pick: A — fork `vllm.vllm_flash_attn`, clone one decode-kernel
+instantiation into an `_int4kv` variant, add INT4 dequant in the K/V
+read sites, add protected-K FP16 sidecar.**
+
+Concrete plan (per the source map in track-E research, 2026-05-20):
+
+1. New file: `csrc/flash_attn/src/flash_fwd_split_hdim128_bf16_int4kv_sm80.cu`
+   — cloned from the existing `flash_fwd_split_hdim128_bf16_sm80.cu`,
+   with the two `FLASH_NAMESPACE::copy(..., tKgK/tVgV, ...)` sites
+   replaced by an INT4 + dequant + protected-K read path. Auto-picked
+   up by the `flash_fwd_*.cu` glob in `CMakeLists.txt` — no CMake
+   edit needed for the instantiation.
+2. `csrc/flash_attn/src/flash.h` — extend `Flash_fwd_params` with
+   `k_scale`, `k_offset`, `k_fp16_protect`, `protect_mask`, `v_scale`,
+   `v_offset`, `group_size_k`, `group_size_v`. Add `kIsInt4KV` trait.
+3. `csrc/flash_attn/src/flash_fwd_splitkv_launch_template.h` — new
+   `_int4kv` dispatch arm in `run_mha_fwd_splitkv_dispatch`; add
+   `static_switch.h` flag.
+4. `csrc/flash_attn/flash_api.cpp` — INT4 dtype detection on
+   `k_cache` / `v_cache`; plumb the new params into `Flash_fwd_params`;
+   route to the `_int4kv` dispatch arm in `mha_fwd_kvcache`.
+5. New Python entry point: `flash_attn/flash_attn_interface.py` —
+   `flash_attn_with_int4_kvcache(...)` accepts INT4 K/V tensors plus
+   scales/offsets/protect_mask. Cleaner diff than overloading
+   `flash_attn_with_kvcache`.
+
+### 4.3 Crumbs to mine from the rejected PRs
+
+Each PR is rejected as a base, but specific patterns are worth
+borrowing:
+
+* **#39668 (lesj0610) — INT4 storage layout.** Closest to our §20.4
+  config. Asymmetric INT4, 2 vals/byte packed `uint8`, FP16 grouped
+  scales with **group_size = 32 along seq axis**. Use this layout
+  verbatim. Look at the storage struct + alignment / padding logic.
+* **#40835 (JartX) — GQA Triton reference.** Dedicated
+  `_pth_attn_stage1_packed_gqa` kernel restores WMMA/MFMA for
+  H_q > H_kv. We're going CUTLASS, not Triton, so the kernel itself
+  doesn't port — but the dispatch pattern (grouped vs ungrouped
+  decode) is a useful design reference.
+* **#39668 — paged scale alignment.** "scale bytes included in the
+  page/block sizing path"; padding logic for odd packed sizes. Mirror
+  this for our per-block scale side-channel.
+* **None — protected-K.** None of the 4 PRs has a protected-K /
+  outlier-channel concept. This is our novel contribution on top of
+  the existing INT4 literature.
+
+### 4.4 Decision rule recap (for future readers)
+
+The original rubric (axes + scoring) lives in §4.2 above. Decision
+rule: PR scored ≥27/45 AND ≥4 on (Paged KV, FA integration, GQA) is
+viable. **None passed FA integration**, so the rule selected A
+unanimously.
 
 ## 5. Architectural decisions deferred until base is chosen
 
 These are the choices the base implementation forces. Listed
 unresolved so the PR triage can score each candidate's stance.
 
-### 5.1 Cache write-time vs lazy quantization
+### 5.1 Cache write-time vs lazy quantization — LOCKED: write-time
 
-- **Write-time:** Prefill output quantized to INT4 at block boundary.
-  Decode is then pure read. Matches `ROUTE_A_VLLM_CACHE_KV_PLAN.md`.
-- **Lazy:** K/V written FP16/BF16, quantized just before decode
-  attention reads. Costs per-decode quantize work but simplifies
-  cache layout.
+- **Write-time (LOCKED):** Prefill writes FP16/BF16 into a staging
+  buffer; at prefill→decode boundary, a single bulk quantize op
+  converts the entire prefill tail into INT4 blocks + per-block
+  scales/offsets, drops the FP16 staging buffer, and freezes the
+  protect mask. Decode then writes one INT4 token per step (T=1
+  group of size 32 fills every 32 steps).
+- ~~Lazy:~~ ruled out — quantize-on-decode is exactly what 6c.3A v1
+  paid and lost on.
 
-Tradeoff: write-time is what KIVI / KVQuant / Atom do; lazy is
-simpler but quantize-on-decode cost is exactly what 6c.3A v1 paid.
-Default: **write-time**, but the PR may dictate.
+Matches `ROUTE_A_VLLM_CACHE_KV_PLAN.md`. The v1 scope (decode-only
+kernel) requires this: prefill is unmodified FA on FP16/BF16.
 
 ### 5.2 Scale / offset side-channel keying
 
@@ -179,15 +220,16 @@ Tradeoff: dense is simple but loses some of the memory savings INT4
 buys back; compact is what's worth doing if HBM is the constraint.
 Default: **compact**, but defer to PR.
 
-### 5.6 Dispatch entry point
+### 5.6 Dispatch entry point — LOCKED: new function
 
-- **Extend `flash_attn_with_kvcache` with optional INT4 args:** One
-  Python entry point; INT4 path triggered when scale/offset/mask are
-  passed.
-- **New function `flash_attn_with_int4_kvcache`:** Separate entry
-  point. Cleaner diff; less risk of breaking existing FA callers.
-
-Default: **new function**, to minimise diff against upstream.
+- ~~Extend `flash_attn_with_kvcache`:~~ ruled out — overloading
+  risks breaking existing FA callers; INT4 detection on FP16/BF16
+  tensors is fragile.
+- **New function `flash_attn_with_int4_kvcache` (LOCKED).** Separate
+  Python entry point in `flash_attn/flash_attn_interface.py`, separate
+  C++ entry `mha_fwd_kvcache_int4` in `flash_api.cpp`, separate
+  dispatch arm. Diff against upstream stays bounded to additions —
+  no modifications to existing entry points.
 
 ## 6. Honest measurement claims
 
@@ -211,24 +253,48 @@ What 6c.3C must NOT claim:
 * "1.x× faster than FP8" — only claim if measured, against the same
   vLLM serving stack.
 
-## 7. Open questions for design — fill during PR triage
+## 7. Open questions for design — for runbook to resolve
 
-1. Which of the 4 vLLM INT4 KV PRs (#39074, #39668, #40633, #40835)
-   is closest to the required architecture in §2?
-2. If a PR is chosen, what design choices in §5 does it already
-   force? Which remain to decide?
-3. If A is chosen, do we name the new entry point
-   `flash_attn_with_int4_kvcache` or fold it into
-   `flash_attn_with_kvcache`?
-4. Where does the static protect-mask come from at decode time —
-   computed in vLLM at prefill end and threaded into the attention
-   backend, or precomputed offline and loaded as a model attribute?
-5. What's the cost-benefit threshold for compact vs dense protected-K
-   layout? At ~4% protect, dense wastes ~25% of FP16 KV's
-   per-channel allocation; compact saves it but adds gather cost.
-6. Bench harness reuse: does `kernel_6c3a_throughput.py` extend to
-   6c.3C, or do we need a new harness that lets vLLM own the cache
-   end-to-end?
+Triage-resolved questions are removed; what remains is design work
+the runbook (`KERNEL_6C3C_RUNBOOK.md`) must close:
+
+1. **Protect-mask provenance at decode time** — computed in vLLM at
+   prefill end (per-sequence, frozen, threaded into the attention
+   backend) or precomputed offline and loaded as a model attribute?
+   §20.4.3 is per-sequence-static, so per-prefill computation is
+   correct; the open part is *where* it's stored once computed.
+2. **Compact vs dense protected-K layout (§5.5)** — at ~4% protect,
+   dense `(B, H_kv, S, D)` FP16 wastes ~25% of an FP16 KV pool's
+   per-channel allocation but is trivial to read; compact `(B,
+   H_kv, S, n_protect)` + index list saves the memory but adds
+   gather indirection inside the kernel's inner loop. Decide based
+   on a quick microbench: dense-read vs gather-read overhead at
+   our shapes.
+3. **Scale/offset side-channel keying (§5.2) — physical block_id
+   vs logical position** — physical is the correct answer for vLLM
+   compatibility, but the implementation effort is non-trivial. v1
+   may accept logical-keyed and add a `prefix_cache_supported=False`
+   flag; v2 lifts the restriction.
+4. **Block_size vs group_size (§5.3)** — `block_size=32,
+   group_size=32` is the clean answer that matches §20.4 bit-for-bit.
+   vLLM's default `block_size=16` would require either setting it to
+   32 for this attention backend, or doing intra-block sub-grouping.
+   Choose 32 for v1 unless there's a vLLM constraint we hit.
+5. **Bench harness** — `kernel_6c3a_throughput.py` is the 6c.3A
+   bypass harness (manager.install_into_model). 6c.3C needs vLLM to
+   own the cache end-to-end, so the harness becomes a stock vLLM
+   `LLM(...)` invocation with `kv_cache_dtype="int4"` (or whatever
+   the new flag is called). A new `kernel_6c3c_throughput.py` script
+   is cleaner than extending the bypass harness.
+6. **Build / dev loop** — modified `vllm_flash_attn` wheel must be
+   installed locally into the GPU pod's venv-vllm. Cycle time per
+   kernel change ≈ build time (~5-10 min for one new instantiation
+   on sm80). Optimise: build only the new `_int4kv` .cu file in
+   development by setting the FA2_GEN_SRCS glob narrowly.
+7. **Protect-K data type alignment with model dtype** — Qwen2.5 is
+   BF16; the FP16 sidecar in §5.5 must actually be BF16 to match.
+   "FP16 sidecar" in the design shell is shorthand for "model
+   dtype sidecar".
 
 ## 8. Files this design will produce (next step)
 
