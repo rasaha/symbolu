@@ -146,6 +146,24 @@ def _summary(times_ms):
     }
 
 
+def _resolve_fa_kvcache():
+    """Find an installed flash_attn_with_kvcache implementation. vLLM
+    ships a bundled FA at one of several paths depending on version.
+    Returns (callable, kind_name) or (None, None)."""
+    for mod_name, attr in [
+        ("vllm.vllm_flash_attn", "flash_attn_with_kvcache"),
+        ("vllm_flash_attn", "flash_attn_with_kvcache"),
+        ("flash_attn", "flash_attn_with_kvcache"),
+    ]:
+        try:
+            mod = __import__(mod_name, fromlist=[attr])
+            fn = getattr(mod, attr)
+            return fn, f"{mod_name}.{attr}"
+        except Exception:  # noqa: BLE001
+            continue
+    return None, None
+
+
 def _bench_one(S, args):
     import torch
     from kv_policy.int4_fused_attention_kernel import (
@@ -175,67 +193,90 @@ def _bench_one(S, args):
     ours = _summary(ours_ms)
 
     # --- FlashAttention baseline ---
-    # Try flash_attn_with_kvcache first (what vLLM actually calls);
-    # fall back to F.scaled_dot_product_attention on the FA backend.
+    # Try, in order: vllm-bundled flash_attn_with_kvcache, standalone
+    # flash_attn, then F.scaled_dot_product_attention with the FA
+    # backend (constructing the context manager INSIDE the timed call
+    # — generator-based CMs are single-use and reusing one raises
+    # ``'_GeneratorContextManager' object has no attribute 'args'``).
     fa_kind = None
     fa_summary = None
-    fa_error = None
+    fa_error_chain = []
 
     # Reshape K/V from (B, H_kv, S, D) -> (B, S, H_kv, D) for FA.
     k_for_fa = inputs["k_fp16_full"].permute(0, 2, 1, 3).contiguous()
     v_for_fa = inputs["v_fp16_full"].permute(0, 2, 1, 3).contiguous()
-    # Reshape Q from (B, H_q, D) -> (B, 1, H_q, D).
-    q_for_fa = q.unsqueeze(1).contiguous()
+    q_for_fa = q.unsqueeze(1).contiguous()  # (B, 1, H_q, D)
 
-    try:
-        from flash_attn import flash_attn_with_kvcache  # type: ignore
-        cache_seqlens = torch.full(
-            (1,), S, device="cuda", dtype=torch.int32,
-        )
-        def call_fa_kvcache():
-            return flash_attn_with_kvcache(
-                q=q_for_fa, k_cache=k_for_fa, v_cache=v_for_fa,
-                cache_seqlens=cache_seqlens, causal=False,
+    fa_kvcache_fn, fa_kvcache_kind = _resolve_fa_kvcache()
+    if fa_kvcache_fn is not None:
+        try:
+            cache_seqlens = torch.full(
+                (1,), S, device="cuda", dtype=torch.int32,
             )
-        fa_ms = _time_iters(call_fa_kvcache, args.warmup, args.iters)
-        fa_summary = _summary(fa_ms)
-        fa_kind = "flash_attn_with_kvcache"
-    except Exception as e:  # noqa: BLE001
-        fa_error = f"flash_attn_with_kvcache unavailable: {e!r}"
+            def call_fa_kvcache():
+                return fa_kvcache_fn(
+                    q=q_for_fa, k_cache=k_for_fa, v_cache=v_for_fa,
+                    cache_seqlens=cache_seqlens, causal=False,
+                )
+            # Validate with one untimed call before timing — FA APIs
+            # vary subtly between versions and a bad call here would
+            # otherwise show up as a flat near-zero timing.
+            _ = call_fa_kvcache()
+            torch.cuda.synchronize()
+            fa_ms = _time_iters(call_fa_kvcache, args.warmup, args.iters)
+            fa_summary = _summary(fa_ms)
+            fa_kind = fa_kvcache_kind
+        except Exception as e:  # noqa: BLE001
+            fa_error_chain.append(f"{fa_kvcache_kind} call failed: {e!r}")
 
     if fa_summary is None:
-        # Fallback: SDPA with the FA backend.
+        # SDPA FA backend fallback. Crucial: build the context manager
+        # INSIDE the timed function so a fresh one is created per call.
         try:
             import torch
             import torch.nn.functional as F
-            # SDPA expects (B, H, L, D). Our Q is (1, H_q, D) -> (1, H_q, 1, D).
-            q_sdpa = q.unsqueeze(2).contiguous()
-            # SDPA k/v are (B, H, S, D); we already have that layout.
-            k_sdpa = inputs["k_fp16_full"]
+            q_sdpa = q.unsqueeze(2).contiguous()                    # (1,H_q,1,D)
+            k_sdpa = inputs["k_fp16_full"]                          # (1,H_kv,S,D)
             v_sdpa = inputs["v_fp16_full"]
             if args.h_q != args.h_kv:
                 rep = args.h_q // args.h_kv
                 k_sdpa = k_sdpa.repeat_interleave(rep, dim=1)
                 v_sdpa = v_sdpa.repeat_interleave(rep, dim=1)
-            backends = getattr(torch.nn.attention, "sdpa_kernel", None)
-            ctx = None
-            if backends is not None:
-                from torch.nn.attention import SDPBackend
-                ctx = backends([SDPBackend.FLASH_ATTENTION])
-            def call_fa_sdpa():
-                if ctx is not None:
-                    with ctx:
+
+            # Pick the best available sdpa-backend selector.
+            sdpa_kernel = None
+            SDPBackend = None
+            try:
+                from torch.nn.attention import SDPBackend as _SDPB, sdpa_kernel as _sk
+                SDPBackend = _SDPB
+                sdpa_kernel = _sk
+            except Exception:
+                sdpa_kernel = None
+
+            if sdpa_kernel is not None:
+                def call_fa_sdpa():
+                    with sdpa_kernel([SDPBackend.FLASH_ATTENTION]):
                         return F.scaled_dot_product_attention(
                             q_sdpa, k_sdpa, v_sdpa, is_causal=False,
                         )
-                return F.scaled_dot_product_attention(
-                    q_sdpa, k_sdpa, v_sdpa, is_causal=False,
-                )
+            else:
+                # Old torch path
+                def call_fa_sdpa():
+                    with torch.backends.cuda.sdp_kernel(
+                        enable_flash=True, enable_mem_efficient=False,
+                        enable_math=False,
+                    ):
+                        return F.scaled_dot_product_attention(
+                            q_sdpa, k_sdpa, v_sdpa, is_causal=False,
+                        )
+
+            _ = call_fa_sdpa()
+            torch.cuda.synchronize()
             fa_ms = _time_iters(call_fa_sdpa, args.warmup, args.iters)
             fa_summary = _summary(fa_ms)
             fa_kind = "sdpa_flash_attention"
         except Exception as e:  # noqa: BLE001
-            fa_error = (fa_error or "") + f" ; sdpa fallback failed: {e!r}"
+            fa_error_chain.append(f"sdpa fallback failed: {e!r}")
 
     return {
         "S": S,
@@ -244,7 +285,7 @@ def _bench_one(S, args):
         "ours": ours,
         "fa": fa_summary,
         "fa_kind": fa_kind,
-        "fa_error": fa_error,
+        "fa_error": " ; ".join(fa_error_chain) if fa_error_chain else None,
     }
 
 
@@ -276,6 +317,19 @@ def main(argv=None):
     print(f"Bench: H_q={args.h_q} H_kv={args.h_kv} D={args.d} "
           f"gk={args.gk} gv={args.gv} protect={args.protect_fraction} "
           f"warmup={args.warmup} iters={args.iters}", flush=True)
+    fa_fn, fa_kind = _resolve_fa_kvcache()
+    if fa_fn is not None:
+        print(f"FA backend: {fa_kind}", flush=True)
+    else:
+        try:
+            from torch.nn.attention import SDPBackend, sdpa_kernel  # noqa: F401
+            print("FA backend: sdpa_flash_attention (torch.nn.attention)", flush=True)
+        except Exception:
+            try:
+                import torch.backends.cuda  # noqa: F401
+                print("FA backend: sdpa_flash_attention (torch.backends.cuda)", flush=True)
+            except Exception:
+                print("FA backend: NONE FOUND", flush=True)
     print(f"  {'S':>8} {'ours_p50':>10} {'fa_p50':>10} {'ratio':>8} "
           f"{'ours_p99':>10} {'fa_p99':>10}  fa_kind", flush=True)
     rows = []
