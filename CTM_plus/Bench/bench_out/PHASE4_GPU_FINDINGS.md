@@ -3286,6 +3286,105 @@ tuning is **not** the immediate priority — the next step is 6c.3
 result translates to real serving. Per user instruction at §20.6.2
 close: **no algorithm changes until 6c.3 lands.**
 
+#### §20.6.3 Kernel 6c.3A — end-to-end cell D measured, route-A bypass uncompetitive vs vLLM-bundled FA (GPU, round 7)
+
+The §20.6.2 one-layer microbench claimed the kernel was 1.30× *faster*
+than FP16 FlashAttention/SDPA at S=32k. 6c.3A built the model-level
+fused decode bypass (`KERNEL_6C3A_DESIGN.md`) to translate that
+microbench advantage into end-to-end vLLM tokens/sec. The cell-D
+result reverses the §20.6.2 claim.
+
+**(a) Cell-D end-to-end throughput (4-cell composition, Qwen2.5-7B, B=1,
+decode=128 tokens; cells A/B = FP16/FP8 vLLM baseline, cell C = INT4
+naive dequant, cell D = INT4 + fused kernel decode bypass).** At
+S=32k context: cell A (FP16 FA) = **28.4 tok/s**, cell D = **15.1
+tok/s** → **D/A = 0.55×**. Cell D *loses* to the FP16 baseline at
+every measured S; the ratio is 0.38× at S=2k, 0.49× at S=16k, 0.55×
+at S=32k. Direction expected, magnitude opposite of §20.6.2's
+prediction.
+
+**(b) Per-component CUDA-event profile of the decode bypass at S=32k
+(median per-call ms; 3556 calls = 28 layers × 128 decode tokens ×
+1 prompt + one round of warmup):**
+
+| Section | ms/call | % of bypass |
+|---|---:|---:|
+| `cache_append` (quantize per-channel K + per-token V + pack INT4) | 0.154 | 15% |
+| `kernel_inputs` (3× `.contiguous()` for k_packed / k_fp16 / v_packed) | 0.150 | 14% |
+| `reshape_kv` + `cast_back` (BF16↔FP16) | 0.019 | 2% |
+| **`kernel_call` (fused_protected_k_decode_attention)** | **0.715** | **68%** |
+| **total_bypass** | **1.06** | **100%** |
+
+The kernel itself is 68% of per-call cost. Even with the wrapper
+overhead driven to zero (0.32 ms/call savings → +15% tok/s) cell D
+would still lose to cell A by ~1.6×.
+
+**(c) Head-to-head microbench against vLLM's bundled FlashAttention
+(`vllm.vllm_flash_attn.flash_attn_with_kvcache`) on identical (Q, K, V)
+shapes, no vLLM wrapper, no model — isolates the kernels:**
+
+| S_kv | ours_p50 (ms) | FA_p50 (ms) | ours/FA |
+|---:|---:|---:|---:|
+| 2 048 | 0.230 | 0.132 | **1.75×** slower |
+| 8 192 | 0.236 | 0.062 | **3.78×** slower |
+| 16 384 | 0.567 | 0.067 | **8.41×** slower |
+
+Our kernel's microbench p50 at S=16k (0.567 ms) matches the cell-D
+profile's `kernel_call` median at S=16k almost exactly — confirming
+the cell-D number is the kernel's real cost, not inflated by vLLM
+context.
+
+**(d) Reconciliation with §20.6.2.** §20.6.2 compared against
+`torch.nn.functional.scaled_dot_product_attention` ("FP16
+FlashAttention/SDPA"). For GQA shapes (H_q=28, H_kv=4 in Qwen2.5),
+SDPA's FA backend doesn't always engage automatically — depending on
+torch version and configuration, SDPA falls back to the math /
+memory-efficient backends, which are *substantially slower* than the
+`flash_attn_with_kvcache` kernel vLLM actually calls at decode.
+**§20.6.2's "1.30× faster" was vs a weaker FP16 reference than
+production.** Vs the production FA kernel, the same INT4 kernel is
+**8.41× slower at S=16k**.
+
+**(e) Architectural lesson — route-A bypass is wrong-shaped.**
+Competitive INT4 KV in modern serving systems (KIVI, KVQuant, ATOM,
+vLLM's `kv_cache_dtype="fp8"`) doesn't **replace** the attention
+kernel; it **modifies the attention kernel to read quantized KV
+natively**, dequantizing inline at register level. The route-A
+"intercept Attention.forward, run our kernel instead of FA"
+architecture pays an irrecoverable per-call cost: our Triton kernel
+at ~70× memory-bandwidth-bound minimum vs FA at ~8× — the gap is
+algorithmic (split-K decoding, softmax fusion, tensor-core layout)
+plus implementation (hand-tuned CUTLASS vs Triton), not something
+local kernel tuning closes.
+
+**Decision (track-E close):**
+- **Stop** model-level bypass work. v1 cell D (D/A = 0.55× at S=32k)
+  is the honest end-to-end measurement; no further tuning of the
+  bypass.
+- **Pivot to 6c.3C: native FA-integrated INT4.** Two viable
+  sub-paths, scoped under `KERNEL_6C3C_DESIGN.md` (to land):
+  - (i) **Port KIVI/KVQuant FA-fork** — take an existing FA fork
+    that already does INT4-KV dequant inline, and add the §20.4.3
+    static protected-K channel mask on top of it. Lowest engineering
+    risk; depends on the chosen fork's licence + maintenance posture.
+  - (ii) **Custom FA modification** — fork vLLM's bundled
+    `vllm_flash_attn` and add INT4 unpack at the K/V read path.
+    Highest control, highest engineering effort (~weeks).
+- The §20.4.2 / §20.4.3 quality result (static protected-K + INT4 KV
+  recovers FP16 quality at 32k) is **unchanged** by this pivot — it
+  is an algorithm result, not a kernel result. 6c.3C is purely the
+  *delivery vehicle* for the already-validated algorithm.
+
+**Files of record for 6c.3A close:**
+- `CTM_plus/Bench/bench_out/6c3a_throughput/cell_D_s32k_profiled.json`
+  — per-component CUDA-event profile.
+- `CTM_plus/Bench/bench_out/kernel_int4_vs_fa.json` — head-to-head
+  microbench vs `flash_attn_with_kvcache`.
+- `CTM_plus/Bench/scripts/kernel_6c3a_throughput.py` — the cell-D
+  harness with `--profile`.
+- `CTM_plus/Bench/scripts/kernel_int4_vs_fa_microbench.py` — the
+  head-to-head.
+
 ### §20.7 Where this lands in the VC brief's "Honest Validation Status"
 
 Updates to ``CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`` and

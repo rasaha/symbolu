@@ -1,9 +1,23 @@
 # Kernel 6c.3A — model-level fused protected-K decode bypass (design note)
 
-Status: **design, pre-code.** Supersedes ``KERNEL_6C3_RUNBOOK.md``'s
-"backend flag inside route-A" sketch — that approach was wrong because
-the route-A interception point sees only the **current-step K/V**, not
-the accumulated cache the fused kernel needs to read.
+> **Status (track-E close, §20.6.3): CLOSED, architecture not
+> competitive.** v1 implemented, cell D measured: D/A = 0.55× at
+> S=32k against FP16 FA. Head-to-head microbench (no vLLM context)
+> shows our INT4 kernel is **8.41× slower** than
+> `vllm.vllm_flash_attn.flash_attn_with_kvcache` at S=16k — the
+> §20.6.2 "1.30× faster than FP16" claim was vs SDPA fallback
+> backends, not vs the FA kernel vLLM actually calls. Bypass
+> architecture (replace FA with our kernel) cannot win even with
+> zero wrapper overhead. **Path forward is `KERNEL_6C3C_DESIGN.md`
+> — FA-integrated INT4, dequant inside the FA kernel itself.** This
+> design note is preserved as the audit trail of the bypass
+> approach. Do not extend; reference for context only.
+
+Status (original, retained for audit): **design, pre-code.**
+Supersedes ``KERNEL_6C3_RUNBOOK.md``'s "backend flag inside route-A"
+sketch — that approach was wrong because the route-A interception
+point sees only the **current-step K/V**, not the accumulated cache
+the fused kernel needs to read.
 
 This note pins the v1 contract before code lands; the runbook gets a
 follow-up edit once the code is in.
