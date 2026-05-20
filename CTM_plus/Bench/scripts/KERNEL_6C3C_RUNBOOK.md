@@ -167,6 +167,55 @@ keep Phase 2.1 as pure dead-code scaffolding (compiles clean,
 parity test still passes). Phase 2.2 is the first phase that
 exercises the new path at runtime — and combines the body clone
 with the routing change in one commit.
+
+### Phase 2.2 result (2026-05-20)
+
+**GREEN** after one iteration (forward declaration in flash.h
+was missing — see commit `549b942`). New active code path:
+
+```
+Python flash_attn_with_int4_kvcache
+  → torch.ops._vllm_fa2_C.fwd_kvcache_int4
+  → mha_fwd_kvcache_int4 + Int4KvDispatchGuard (sets thread-local)
+  → mha_fwd_kvcache (full stock param setup, ~280 lines untouched)
+  → run_mha_fwd reads the thread-local → params.is_int4kv = true
+  → if constexpr (bf16 && hdim==128 && !causal): route to _int4kv
+  → run_mha_fwd_splitkv_dispatch_int4kv<bf16_t, 128, false>
+  → run_flash_splitkv_fwd<Flash_fwd_kernel_traits<128, 64, 128,
+      4, false, false, bf16_t>, false>  // SAME instantiation as stock
+  → identical kernel binary
+```
+
+The new dispatch + cloned .cu instantiation point at the SAME
+underlying `run_flash_splitkv_fwd<...>` template, so output is
+bit-identical to the stock path. `verify_phase1.py` PASS.
+
+Wheel diff vs Phase 2.1:
+- `_vllm_fa2_C.abi3.so`: 142 MB → 142 MB (+3 KB — routing code only)
+- `flash_attn_interface.py`: 26177 → 26946 bytes (+770 — new Python
+  wrapper body that calls torch.ops._vllm_fa2_C.fwd_kvcache_int4
+  with the right preprocessing)
+
+**Architectural choice — thread-local routing flag.** The body of
+`mha_fwd_kvcache` is ~280 lines of param setup; cloning it into
+`mha_fwd_kvcache_int4` for a one-line flag flip would be a huge
+diff. Instead `Int4KvDispatchGuard` is an RAII helper that sets a
+file-scope `thread_local bool _int4kv_dispatch` flag, read by
+`run_mha_fwd` on entry to set `params.is_int4kv`. ~15 lines of C++
+added total (the helper + the read + the conditional dispatch in
+`run_mha_fwd`). Future refactor: factor `mha_fwd_kvcache_impl`
+out of `mha_fwd_kvcache` with a templated dispatch flag once we
+have the time to cleanly restructure.
+
+**Build-fail iteration that informed the runbook:** Phase 2.2's
+first attempt died at flash_api.cpp:277 with "not declared in
+this scope" for `run_mha_fwd_splitkv_dispatch_int4kv`. The
+parser saw `name<...>` as `operator<` because the template name
+wasn't visible. Root cause: `flash.h` provides forward
+declarations for `run_mha_fwd_` and `run_mha_fwd_splitkv_dispatch`
+at lines 211-212 (flash_api.cpp doesn't include the heavy
+launch-template header, only flash.h). I forgot to add the
+parallel forward decl for `_int4kv`. One-line fix in `549b942`.
 | 2.2 | In the cloned kernel, locate the K read site: `tKgK.data() = gK.data() + flash::resolve_thread_kv_page_slice_offset<Kernel_traits>(...)` followed by `FLASH_NAMESPACE::copy(gmem_tiled_copy_KV, tKgK, tKsK, ...)` at `flash_fwd_kernel.h:~499` (and 3 other copy sites: masked K, masked V, subsequent V). Phase 2 code-read (`KERNEL_6C3C_PHASE12_CODEREAD.md`) confirms CUTLASS copy-atom **cannot** be reused for INT4 — bypass with manual `__ldg(reinterpret_cast<uint4*>)` loads + in-register unpack + dequant + scalar stores to `tKsK` | the 4 copy sites have parallel INT4 read paths gated on `params.is_int4kv` |
 | 2.3 | INT4 K layout (LOCK from §5.3 + §4.3 crumbs): `(num_blocks, page_block_size, H_kv, D/2)` uint8 packed, asymmetric, with per-block `(num_blocks, H_kv, n_groups_per_block, D)` BF16 scale + BF16 offset. `group_size_k = 32` along seq, `page_block_size = 32`. Resolves §7.Q4 (`block_size = group_size = 32`) and §7.Q3 (physical block_id keying — defer prefix-cache support to v2; v1 ignores prefix-cache) | layout documented in code header of the cloned .cu |
 | 2.4 | NO-OP transform proof: load FP16 K from HBM (same as stock), then in registers quantize→pack→unpack→dequantize using the same group_size_k math, before scalar stores to `tKsK`. Output must match stock FA to BF16 precision. **Use route-B's exact int4-rounding convention from `kv_policy/int4_per_channel_kv.py` — a ±1 LSB drift silently tanks the Phase 2.6 cosine** | cosine ≥ 0.9999 vs stock FA on Qwen shapes (B=1, H_q=28, H_kv=4, D=128, S=16384) |
