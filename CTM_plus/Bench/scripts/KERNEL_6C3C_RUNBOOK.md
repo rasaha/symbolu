@@ -83,6 +83,38 @@ with kernel-correctness bugs.
 | 1.6 | Pybind registration in `csrc/flash_attn/flash_api_torch_lib.cpp` for the new entry | `fwd_kvcache_int4` callable from Python |
 | 1.7 | Rebuild + reinstall wheel (incremental build of the touched TUs only — no kernel .cu changes) | smoke test from runbook Phase 0 still passes; the new Phase-1 parity test `flash_attn_with_int4_kvcache(...) == flash_attn_with_kvcache(...)` passes bit-for-bit |
 
+### Phase 1 result (2026-05-20, GPU pod)
+
+**GREEN** after one iteration. First apply had two bugs (patched the
+~63KB standalone `flash_attn/flash_attn_interface.py` instead of the
+~24KB vllm-specific `vllm_flash_attn/flash_attn_interface.py` which
+is the one that ships in the wheel; and used absolute
+`from flash_attn.flash_attn_interface import ...` in `__init__.py`
+which crashed because the standalone `flash_attn` package's own
+`__init__.py` imports `flash_attn_2_cuda`, not installed in
+venv-vllm). Fix in `2dd93f2`: patch target → slim file; `__init__.py`
+patch → relative `from .flash_attn_interface import ...`; idempotent
+script now repairs the broken import line on re-run.
+
+Second apply result:
+
+```
+PASS: flash_attn_with_int4_kvcache == flash_attn_with_kvcache (bit-equal)
+  shapes: B=1 S_q=1 H_q=28 H_kv=4 D=128 S_kv=16384, dtype=bf16
+Phase 1: GREEN. Safe to proceed to Phase 2.
+```
+
+Wheel size diff:
+- `flash_attn_interface.py`: 24016 → 26177 bytes (+2161 — new wrapper)
+- `__init__.py`: 309 → 390 bytes (+81 — re-export line)
+- `_vllm_fa2_C.abi3.so`: unchanged (no kernel code modified yet)
+- `_vllm_fa3_C.abi3.so`: unchanged
+
+Phase 1 verified: additive scaffolding works without breaking
+behavior. Safe to start Phase 2 — clone the kernel, add the
+dispatch arm, route the Python wrapper through it, then start
+modifying the kernel body.
+
 **Acceptance criterion for phase 1:** new entry point name, new
 dispatch arm, new .cu file all in place; behaviour bit-identical to
 stock FA when called with NULL quant args.
