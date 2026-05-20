@@ -190,6 +190,13 @@ def main(argv: Sequence[str]) -> int:
              "parallel cache's preallocation.",
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--profile", action="store_true",
+        help="Cell D only — enable per-component CUDA-event timing for "
+             "the fused decode bypass (cache append / kernel inputs / "
+             "kernel call / cast back / total). Diagnostic; adds ~6 "
+             "event allocations per call.",
+    )
     args = parser.parse_args(argv)
 
     cell = args.cell
@@ -285,7 +292,8 @@ def main(argv: Sequence[str]) -> int:
         seed=args.seed,
     )
 
-    # Warmup (untimed).
+    # Warmup (untimed). Profiling disabled — we don't want warmup
+    # latency polluting the per-component breakdown.
     print("Warmup...", flush=True)
     if manager is not None:
         manager.reset()
@@ -294,6 +302,10 @@ def main(argv: Sequence[str]) -> int:
     # Timed run.
     if manager is not None:
         manager.reset()
+        if args.profile and cell == "D":
+            manager.clear_profile()
+            manager.set_profiling(True)
+            print("Profiling ENABLED for the timed run (cell D).", flush=True)
     torch.cuda.reset_peak_memory_stats()
     print(f"Timed run: {args.num_prompts} prompts × {args.decode_tokens} "
           f"decode tokens...", flush=True)
@@ -301,6 +313,12 @@ def main(argv: Sequence[str]) -> int:
     outs = llm.generate(prompts, sp, use_tqdm=False)
     elapsed = time.perf_counter() - t0
     peak_during_run = torch.cuda.max_memory_allocated() / (1024 ** 3)
+
+    # Collect profile stats if enabled, then disable.
+    profile_stats = {}
+    if manager is not None and args.profile and cell == "D":
+        profile_stats = manager.get_profile_stats()
+        manager.set_profiling(False)
 
     n_decode = sum(len(o.outputs[0].token_ids) for o in outs)
     tps = n_decode / elapsed if elapsed > 0 else 0.0
@@ -337,6 +355,8 @@ def main(argv: Sequence[str]) -> int:
             first = next(iter(manager.caches.values()))
             extras["cache_seq_len_after_run"] = first.seq_len
             extras["cache_is_frozen"] = first.is_frozen
+        if profile_stats:
+            extras["profile_stats"] = profile_stats
 
     result = {
         "cell": cell,

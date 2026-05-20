@@ -223,6 +223,21 @@ class INT4CacheKVRouteA:
         self._fused_v2_decodes = 0
         self._fused_v2_prefills_sidecar = 0
         self._fused_v2_fallbacks: Dict[str, int] = {}
+        # Profiling state (fused_v2 only). When ``_profile_enabled`` is
+        # True, the decode branch records CUDA events per section; the
+        # events are aggregated by ``get_profile_stats``. Off by default
+        # — adds ~6 event allocations per call, plus a cuda.synchronize
+        # on stats read.
+        self._profile_enabled = False
+        # section -> list[(start_event, end_event)]
+        self._profile_events: Dict[str, list] = {
+            "reshape_kv": [],
+            "cache_append": [],
+            "kernel_inputs": [],
+            "kernel_call": [],
+            "cast_back": [],
+            "total_bypass": [],
+        }
 
     @property
     def kernel_backend(self) -> str:
@@ -327,6 +342,48 @@ class INT4CacheKVRouteA:
         self._fused_v2_fallbacks[reason] = (
             self._fused_v2_fallbacks.get(reason, 0) + 1
         )
+
+    # ------------------------------------------------------------------ #
+    # Profiling (fused_v2 only)                                          #
+    # ------------------------------------------------------------------ #
+
+    def set_profiling(self, enabled: bool) -> None:
+        """Enable / disable per-component CUDA-event timing on the
+        fused_v2 decode bypass. Off by default. When enabling on a
+        previously-profiled run, call ``clear_profile`` first.
+        """
+        self._profile_enabled = bool(enabled)
+
+    def clear_profile(self) -> None:
+        """Drop all recorded profiling events. Call before re-arming
+        ``set_profiling(True)`` for a fresh measurement."""
+        for events in self._profile_events.values():
+            events.clear()
+
+    def get_profile_stats(self) -> dict:
+        """Read the recorded per-section CUDA-event timings. Forces
+        ``torch.cuda.synchronize`` so the events have fired. Returns
+        a dict ``{section: {n_calls, mean_ms, p50_ms, p99_ms, total_ms}}``.
+        """
+        if torch is None:
+            return {}
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+        stats: Dict[str, dict] = {}
+        for section, events in self._profile_events.items():
+            if not events:
+                continue
+            times_ms = [start.elapsed_time(end) for start, end in events]
+            times_ms.sort()
+            n = len(times_ms)
+            stats[section] = {
+                "n_calls": n,
+                "mean_ms": sum(times_ms) / n,
+                "p50_ms": times_ms[n // 2],
+                "p99_ms": times_ms[min(n - 1, int(0.99 * n))],
+                "total_ms": sum(times_ms),
+            }
+        return stats
 
     def round_trip_kv(
         self,
@@ -679,20 +736,45 @@ def _wrap_attention_forward_with_fused_v2(
             query = args[query_arg_index]
             if not isinstance(query, torch.Tensor):
                 raise ValueError("query arg is not a tensor")
-            # Remember the query's dtype so we can cast the kernel's
-            # FP16 output back to it on return. vLLM may load the model
-            # in BF16 (Qwen2.5 / Llama-3 default); o_proj weights will
-            # match the model dtype and a dtype mismatch on the next
-            # matmul will error.
             out_dtype = query.dtype
 
-            # Quantize-append T=1 into the cache.
+            # Profiling: record per-section CUDA events. Off by default;
+            # enabled via manager.set_profiling(True) for diagnostic runs.
+            prof = manager._profile_enabled and torch.cuda.is_available()
+
+            def _new_event_pair():
+                if not prof:
+                    return None, None
+                start = torch.cuda.Event(enable_timing=True)
+                end = torch.cuda.Event(enable_timing=True)
+                return start, end
+
+            tot_s, tot_e = _new_event_pair()
+            if prof:
+                tot_s.record()
+
+            # ---- Section: cache append ----
+            sec_s, sec_e = _new_event_pair()
+            if prof:
+                sec_s.record()
             cache.append(key_3d, value_3d)
+            if prof:
+                sec_e.record()
+                manager._profile_events["cache_append"].append((sec_s, sec_e))
 
-            # Build kernel inputs (auto-freezes mask on first call).
+            # ---- Section: kernel inputs (3 contiguous copies) ----
+            sec_s, sec_e = _new_event_pair()
+            if prof:
+                sec_s.record()
             inputs = cache.kernel_inputs()
+            if prof:
+                sec_e.record()
+                manager._profile_events["kernel_inputs"].append((sec_s, sec_e))
 
-            # Reshape query to (B=1, H_q, D).
+            # ---- Section: query reshape / cast ----
+            sec_s, sec_e = _new_event_pair()
+            if prof:
+                sec_s.record()
             query_was_2d = (query.ndim == 2)
             if cache.head_dim is None:
                 raise ValueError(
@@ -713,7 +795,6 @@ def _wrap_attention_forward_with_fused_v2(
                     )
                 q_kernel = query.reshape(1, H_q, D)
             else:
-                # 3-D: (num_tokens, H_q, D). For decode num_tokens=1.
                 if query.shape[0] != 1:
                     raise ValueError(
                         f"decode bypass requires query num_tokens==1; "
@@ -725,7 +806,14 @@ def _wrap_attention_forward_with_fused_v2(
             if q_kernel.dtype != torch.float16:
                 q_kernel = q_kernel.to(torch.float16)
             q_kernel = q_kernel.contiguous()
+            if prof:
+                sec_e.record()
+                manager._profile_events["reshape_kv"].append((sec_s, sec_e))
 
+            # ---- Section: fused kernel ----
+            sec_s, sec_e = _new_event_pair()
+            if prof:
+                sec_s.record()
             from kv_policy.int4_fused_attention_kernel import (
                 fused_protected_k_decode_attention,
             )
@@ -743,18 +831,24 @@ def _wrap_attention_forward_with_fused_v2(
                 group_size_v=cache.v_group_size,
                 asymmetric=cache.asymmetric,
             )  # (1, H_q, D) fp16
+            if prof:
+                sec_e.record()
+                manager._profile_events["kernel_call"].append((sec_s, sec_e))
             manager._fused_v2_decodes += 1
 
-            # Cast back to the query's dtype (BF16 for Qwen2.5, etc.)
-            # so o_proj sees the dtype it expects.
+            # ---- Section: cast back + reshape ----
+            sec_s, sec_e = _new_event_pair()
+            if prof:
+                sec_s.record()
             if out.dtype != out_dtype:
                 out = out.to(out_dtype)
-
-            # Match the original forward's output layout. vLLM passes
-            # query as (num_tokens, H_q * D) and expects the same out
-            # of forward — return 2-D in that case.
             if query_was_2d:
-                return out.reshape(1, H_q * D)
+                out = out.reshape(1, H_q * D)
+            if prof:
+                sec_e.record()
+                manager._profile_events["cast_back"].append((sec_s, sec_e))
+                tot_e.record()
+                manager._profile_events["total_bypass"].append((tot_s, tot_e))
             return out
         except Exception:  # noqa: BLE001 — fail-open per fail-safe posture
             logger.exception(
