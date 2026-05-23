@@ -54,6 +54,7 @@ for FRACTION in "${FRACTIONS[@]}"; do
         --needle-samples 8 \
         --needle-decode-tokens 64 \
         --skip-perplexity \
+        --skip-version-check \
         --k-bits 4 --v-bits 4 \
         --k-protect-fraction "$FRACTION" --k-protect-static \
         --output "$OUT"
