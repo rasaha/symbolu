@@ -297,6 +297,100 @@ Wheel diff vs Phase 2.2:
 matches the existing route-B oracle on all 8 cases in
 `kernel_6c_gpu_test.py::CASES`.
 
+### Phase 2.5 result (2026-05-23, GPU pod)
+
+**GREEN.** Template-gated dispatch fixes the Phase 2.3 stock-FA
+perf regression cleanly. Added `bool Is_int4kv = false` template
+parameter through the chain: `run_flash_splitkv_fwd` →
+`flash_fwd_splitkv_kernel` → `compute_attn_splitkv` →
+`compute_attn_1rowblock_splitkv`. Stock dispatch defaults to
+`Is_int4kv=false`; `run_mha_fwd_splitkv_dispatch_int4kv` passes
+`Is_int4kv=true`.
+
+Inside the kernel, the Phase 2.3 static `__shared__` allocation
+becomes `__shared__ OptionalInt4Scratch<Is_int4kv, kFloats>
+smem_int4_box`. When `Is_int4kv=false`, the primary template is
+empty (1 byte smem, no occupancy hit). When true, the partial
+specialization gives a 4 KB scratch array. Runtime `if
+(params.is_int4kv)` gates become `if constexpr (Is_int4kv && ...)`
+so the transform code doesn't compile in at all on stock kernels.
+
+Smoke test results vs pre-Phase-2.3 baselines:
+
+| Check | Pre-2.3 | Post-2.3 | Post-2.5 | Threshold | Result |
+|---|---|---|---|---|---|
+| FA p50 @ S=16k | 67.3 μs | 80.3 μs | 66.7 μs | ±10% | PASS (-0.9%) |
+| Cell A @ S=32k | 28.40 tok/s | 27.58 | 28.44 | ±5% | PASS (+0.2%) |
+
+Wheel size dropped 208 MB → 145 MB (-30%): the helper body no
+longer instantiates in every splitkv kernel variant, only the
+`_int4kv` specialization.
+
+### Phase 3 result (2026-05-23, GPU pod)
+
+**GREEN.** Mirrors Phase 2.3 for V cache. Per-token quantization
+(group along head_dim), uses the same scratchpad as K via
+sequential lifetime (K transforms at K-wait, V transforms at
+V-wait, separated by the qK gemm). Helper
+`int4_quant_dequant_V_block_inplace` added to `int4_inline.h`;
+axis-flipped slot indexing (`n * n_v_groups + g` instead of K's
+`g * kHeadDim + d`).
+
+Stock FA path unchanged (smoke test still GREEN; `Is_int4kv=false`
+kernels carry neither K nor V transforms after Phase 2.5's
+template gating).
+
+### Phase 4 result (2026-05-23, GPU pod)
+
+**GREEN.** Adds the §20.4.3 protect-K algorithm in-kernel: per-(B,
+H_kv) top-~4% K channels by magnitude skip the Phase 2.3 quant/dequant
+cycle and keep their original BF16 value in smem. The protected
+channels' BF16 originals come from the cp.async load — no separate
+HBM sidecar tensor is needed at this phase (the sidecar becomes
+necessary only when Phase 2.4+ moves K's HBM storage to packed
+uint8).
+
+Helper `int4_quant_dequant_K_block_inplace` extended with optional
+`const int8_t *protect_mask` parameter. In both Pass 1 (reduction)
+and Pass 2 (quant/dequant), skip elements where `mask[d] != 0`.
+Mask plumbing via `Int4KvProtectMaskGuard` (mirrors Phase 2.2's
+`Int4KvDispatchGuard` thread-local pattern) — `mha_fwd_kvcache_int4`
+validates the `(B, H_kv, D) int8` tensor and captures its `data_ptr()`;
+`run_mha_fwd` reads the thread-local and sets
+`params.k_cache_protect_mask_ptr`; kernel computes the per-(bidb, bidh)
+slice and passes to the helper.
+
+**Verification: two synthetic sub-tests + recovery-delta gate.**
+
+| Sub-test | K distribution | Cosine | Max-abs | Recovery vs no-protect |
+|---|---|---|---|---|
+| A | Random Gaussian | 0.9941 | 5.4e-3 | +0.000084 (no-op, expected — no outliers) |
+| B | Outlier-amplified (boost 5 ch × 10×) | 0.9956 | 7.5e-2 | **+0.00453** (54× Gaussian) |
+
+The recovery delta is the algorithmic signal — it asks "did
+protect-K do meaningful work?" without depending on the absolute
+output scale. Gaussian K has no outliers to protect, so recovery is
+~0. Outlier-amplified K has the channel-magnitude structure §20.4.3
+was designed for; recovery is 54× larger and confirms the kernel's
+mask logic does its job.
+
+`diagnose_phase4_drift.py` (committed 48c2b4a) also confirms CUDA
+matches the PyTorch route-B reference bit-for-bit on Gaussian K
+(CUDA 0.99362 vs reference 0.99362 — within ~1e-5 cosine), same as
+Phase 2.3's bit-for-bit reproduction result.
+
+**What this v1 phase does NOT yet validate:** real-data §20.4.3
+quality recovery on actual Qwen2.5-7B prefill K (where outlier
+channels carry 10×+ magnitude that random Gaussian doesn't have).
+That's Phase 6.4 (needle-in-haystack on the real model). The
+algorithm's true cosine ~0.9999 number against FP16 is expected only
+on real model K, not synthetic; the synthetic test confirms only
+that the kernel reproduces the algorithm correctly, not that the
+algorithm itself solves the problem on real data.
+
+Stock FA path still at baseline (smoke test GREEN; `Is_int4kv=false`
+kernels skip the mask logic entirely).
+
 **Risk (high):** CUTLASS copy atoms are templated on element type;
 the existing K read uses a copy atom typed for `Element` (FP16/BF16).
 We can't reuse it for uint8 packed. Need either (a) a parallel

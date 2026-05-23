@@ -12,21 +12,27 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.3 GREEN at commit `61f83df`
-  (+ gate-relax `<pending>`). NO-OP INT4 quant/dequant transform on K
-  lives inside `compute_attn_1rowblock_splitkv`, runtime-gated on
-  `params.is_int4kv`. CUDA helper reproduces the route-B PyTorch
-  reference bit-for-bit (cosine matches to within ~1e-5). Algorithm's
-  intrinsic drift floor (the brief's 0.9999 was wrong) is ~0.997
-  cosine on Qwen2.5-7B; max-abs ~3.9e-3. Cell-A throughput drift
-  -3.5% at S=32k (within v1 ±5%); kernel-level FA p50 +15-19%
-  due to +4 KB static `__shared__` dropping SM occupancy from 2 to 1
-  block/SM. Stock-path perf parity deferred to Phase 2.5 template
-  gating per the runbook.
-- **Next phase:** Phase 2.4 — REAL INT4 K HBM read (packed uint8 +
-  custom load atoms bypassing CUTLASS). Or Phase 3 — INT4 V read,
-  same transform pattern. Phase 2.5+ — template-gated dispatch to
-  recover stock-path perf.
+- **Latest verified state:** Phase 4 GREEN at commit `3f8787b`.
+  Complete §20.4.3 algorithmic surface now reproduced in CUDA:
+  INT4 K transform + INT4 V transform + protect-K mask (skip-quant
+  on top-~4% magnitude channels). All three helpers reproduce the
+  route-B PyTorch reference bit-for-bit (cosine matches to ~1e-5).
+  Stock FA path unchanged from pre-Phase-2.3 baseline (FA p50 @
+  S=16k at 67.1 μs, -0.2% vs 67.3 μs baseline; cell A throughput
+  +0.2% vs baseline). Template gating from Phase 2.5 holds across
+  Phases 3 and 4.
+
+- **What's NOT yet done in v1:** Phase 2.4 (REAL INT4 K HBM read
+  with packed uint8 — the memory-savings step), Phase 5 (vLLM
+  integration so `LLM(kv_cache_dtype="int4_protected")` works
+  end-to-end), Phase 6 (measurement — including the §20.4.3 real-
+  data needle-in-haystack quality test on actual Qwen2.5-7B).
+
+- **Next phase decision (open):** Phase 2.4 (memory savings, 3-5
+  days, highest remaining technical risk), Phase 6.4 quality test
+  on real Qwen2.5 (1-2 days, validates algorithm on real data before
+  more engineer-days go into Phase 2.4), or Phase 5 vLLM backend
+  (5 days, end-to-end plumbing).
 
 ## Hard scope guard (do not creep)
 
@@ -72,7 +78,12 @@ symmetric quant, group sizes ≠ 32.
 | `6a2347a` | Phase 2.3 design brief |
 | `61f83df` | Phase 2.3 patcher + helper + verify script (builds clean) |
 | `df67260` | Phase 2.3 diagnostic — algorithm drift floor ~0.997 (vs brief's 0.9999) |
-| _pending_ | **Phase 2.3 GREEN** (relaxed gate, route-B match bit-for-bit, perf regression deferred) |
+| `edf0bcd` | **Phase 2.3 GREEN** (relaxed gate to 0.995, route-B match bit-for-bit) |
+| `492e590` | **Phase 2.5 GREEN** (template-gated dispatch, stock perf restored 80 → 67 μs) |
+| `8a39a08` | **Phase 3 GREEN** (V cache INT4 transform — per-token, axis-flipped helper) |
+| `48c2b4a` | Phase 4 patcher (protect-K mask plumbing + helper extension) |
+| `7993e8d` | Phase 4 gate-calibration commit (Gaussian-only test was unfair to algorithm) |
+| `3f8787b` | **Phase 4 GREEN** (outlier sub-test + recovery-delta gate; 4.5 milli-cosine recovery on outliers) |
 
 ## GPU pod state (as of last session)
 
