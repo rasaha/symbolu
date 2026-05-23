@@ -218,9 +218,80 @@ launch-template header, only flash.h). I forgot to add the
 parallel forward decl for `_int4kv`. One-line fix in `549b942`.
 | 2.2 | In the cloned kernel, locate the K read site: `tKgK.data() = gK.data() + flash::resolve_thread_kv_page_slice_offset<Kernel_traits>(...)` followed by `FLASH_NAMESPACE::copy(gmem_tiled_copy_KV, tKgK, tKsK, ...)` at `flash_fwd_kernel.h:~499` (and 3 other copy sites: masked K, masked V, subsequent V). Phase 2 code-read (`KERNEL_6C3C_PHASE12_CODEREAD.md`) confirms CUTLASS copy-atom **cannot** be reused for INT4 — bypass with manual `__ldg(reinterpret_cast<uint4*>)` loads + in-register unpack + dequant + scalar stores to `tKsK` | the 4 copy sites have parallel INT4 read paths gated on `params.is_int4kv` |
 | 2.3 | INT4 K layout (LOCK from §5.3 + §4.3 crumbs): `(num_blocks, page_block_size, H_kv, D/2)` uint8 packed, asymmetric, with per-block `(num_blocks, H_kv, n_groups_per_block, D)` BF16 scale + BF16 offset. `group_size_k = 32` along seq, `page_block_size = 32`. Resolves §7.Q4 (`block_size = group_size = 32`) and §7.Q3 (physical block_id keying — defer prefix-cache support to v2; v1 ignores prefix-cache) | layout documented in code header of the cloned .cu |
-| 2.4 | NO-OP transform proof: load FP16 K from HBM (same as stock), then in registers quantize→pack→unpack→dequantize using the same group_size_k math, before scalar stores to `tKsK`. Output must match stock FA to BF16 precision. **Use route-B's exact int4-rounding convention from `kv_policy/int4_per_channel_kv.py` — a ±1 LSB drift silently tanks the Phase 2.6 cosine** | cosine ≥ 0.9999 vs stock FA on Qwen shapes (B=1, H_q=28, H_kv=4, D=128, S=16384) |
+| 2.4 | NO-OP transform proof: load FP16 K from HBM (same as stock), then in registers quantize→pack→unpack→dequantize using the same group_size_k math, before scalar stores to `tKsK`. Output must match stock FA to within the route-B algorithm's intrinsic drift floor (~0.997, not 0.9999 — see Phase 2.3 result below). **Use route-B's exact int4-rounding convention from `kv_policy/int4_per_channel_kv.py`** | cosine ≥ 0.995 vs stock FA on Qwen shapes (B=1, H_q=28, H_kv=4, D=128, S=16384) — see Phase 2.3 result for why 0.995 not 0.9999 |
 | 2.5 | REAL INT4 read: change K HBM layout to packed uint8 (storage allocated by the test harness, not vLLM yet). Manual `__ldg(reinterpret_cast<uint4*>)` load with scaled page strides (D/2 packed), unpack to int4 in registers, dequant via scale/offset (smem miniset), scalar store to `tKsK`. NO CUTLASS copy atom — see Phase 2 risk brief | smoke test on B=1, H_q=28, H_kv=4, D=128, S=16384 returns reasonable values (finite, magnitudes within ±5σ of stock) |
 | 2.6 | Correctness vs oracle: write a host-side test that quantizes a known FP16 K to INT4 with the §20.4 algorithm (asymmetric, group=32), runs both stock FA on the FP16 K and our new kernel on the INT4 K, compares to `fused_int4_attention_reference` from `int4_fused_attention_sketch.py` | both ours and oracle agree, cosine ≥ 0.999, max-abs ≤ 1e-2 across the Qwen shape grid in `kernel_6c_gpu_test.py::CASES` |
+
+### Phase 2.3 result (2026-05-23, GPU pod)
+
+**GREEN** after one iteration (gate threshold corrected post-first-run;
+see "Drift floor" below). New active code path:
+
+```
+Python flash_attn_with_int4_kvcache
+  → ... (Phase 2.2 chain) ...
+  → compute_attn_1rowblock_splitkv with two new insertions:
+    a) static __shared__ float smem_int4_scratch[4 KB] alloc after prologue
+    b) at top of masking loop, after cp_async_wait<0>() + __syncthreads():
+         if (params.is_int4kv):
+           int4_quant_dequant_K_block_inplace<Kernel_traits, 32>(tKsK, tKVcKV, smem_int4_scratch)
+           __syncthreads()
+    c) same insertion at top of non-masking loop
+```
+
+Helper `int4_quant_dequant_K_block_inplace` lives in new file
+`csrc/flash_attn/src/int4_inline.h`. Smem-scratchpad reduction with
+float-CAS atomics for per-(group, d) max/min; quant/dequant in FP32
+with `__float2int_rn` (round-half-to-even == PyTorch's `.round()`).
+
+**Drift floor — the brief's 0.9999 was empirically WRONG.**
+`diagnose_phase2_3_drift.py` (committed df67260) runs route-B's
+PyTorch reference `quantize_per_channel_int4` +
+`dequantize_per_channel_int4` on the same seeded K and feeds it
+through stock FA. Result: cosine 0.99682 vs raw K. The CUDA helper
+gives cosine 0.99684 — bit-for-bit matching the PyTorch reference to
+within ~1e-5. Per-element K drift is ~0.065 mean (~0.27 INT4 LSB at
+Gaussian scale); softmax + V-dot averages it down to ~8e-4 mean on
+output. The protect-K sidecar in Phase 4 closes the remaining ~0.003.
+Gate adjusted to **cosine ≥ 0.995** (margin below the algorithm
+floor) and **max-abs ≤ 1e-2** (algorithm hits ~3.9e-3).
+
+**Stock FA perf regression — known, deferred to Phase 2.5.**
+Post-Phase-2.3 `smoke_test_fa_install.sh`:
+
+| Check | Pre-2.3 | Post-2.3 | Drift | Threshold | Result |
+|---|---|---|---|---|---|
+| FA p50 @ S=16k | 69.6 μs | 80.3 μs | +15.4% | ±10% | FAIL |
+| Cell A @ S=32k | 28.59 tok/s | 27.58 tok/s | -3.5% | ±5% | PASS |
+
+Kernel-level latency on the STOCK FA path (called via
+`flash_attn_with_kvcache`, `params.is_int4kv=false`) regressed by
+~+15-19%. Root cause: the static `__shared__ float
+smem_int4_scratch[1024]` (4 KB) gets allocated on every kernel
+launch regardless of the `if (params.is_int4kv)` runtime gate
+because static smem is committed at launch time, not at the
+branch. Per-block smem went 80 KB → 84 KB on Qwen2.5-7B shapes
+(sQ=16 KB + sK=32 KB + sV=32 KB + scratch=4 KB). On A100 (164 KB
+smem/SM, 96 KB max per-block default), this crosses the 2-blocks-
+per-SM boundary at 82 KB → SM occupancy drops from 2 blocks/SM to
+1 block/SM = ~50% occupancy hit on every kernel call. Kernel
+latency goes up by ~15-20%; cell-A end-to-end dilutes it because
+vLLM scheduling + CPU overhead dominate at S=32k decode.
+
+The fix is **template gating** (Phase 2.5+ work): split the kernel
+instantiation so only the `_int4kv` variant carries the
+scratchpad. Phase 2.3 picks the deliberately-shared instantiation
+to keep the diff bounded for the NO-OP transform proof — the
+correctness milestone is what matters here, not perf parity with
+stock. Cell-A throughput within ±5% is the v1-acceptable bar
+through Phase 2.4 / Phase 3; Phase 2.5+ closes the FA p50 gap.
+
+Wheel diff vs Phase 2.2:
+- `_vllm_fa2_C.abi3.so`: 142 MB → 208 MB (+46% — the runtime-gated
+  helper body instantiates across ALL splitkv kernel variants
+  (28 of them, hdim {32,64,96,128,160,192,256} × dtype {bf16,fp16}
+  × causal {0,1}). Phase 2.5+'s template gating drops the
+  instantiation back to just the `_int4kv` variant; expect ~145 MB.
 
 **Acceptance criterion for phase 2:** INT4 K + FP16 V + no protect
 matches the existing route-B oracle on all 8 cases in

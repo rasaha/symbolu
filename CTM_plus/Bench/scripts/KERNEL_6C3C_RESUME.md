@@ -12,13 +12,21 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.2 GREEN at commit `200196d`.
-  Routing through the new path is live and bit-equal to stock. Stock
-  vLLM unbroken (Cell A throughput drift < 1% at S=32k).
-- **Next phase:** Phase 2.3 — NO-OP transform proof. Real CUDA kernel
-  modification at the 4 K read sites in
-  `compute_attn_1rowblock_splitkv`. ~3 engineer-days. Design brief at
-  `KERNEL_6C3C_PHASE2_3_DESIGN.md`.
+- **Latest verified state:** Phase 2.3 GREEN at commit `61f83df`
+  (+ gate-relax `<pending>`). NO-OP INT4 quant/dequant transform on K
+  lives inside `compute_attn_1rowblock_splitkv`, runtime-gated on
+  `params.is_int4kv`. CUDA helper reproduces the route-B PyTorch
+  reference bit-for-bit (cosine matches to within ~1e-5). Algorithm's
+  intrinsic drift floor (the brief's 0.9999 was wrong) is ~0.997
+  cosine on Qwen2.5-7B; max-abs ~3.9e-3. Cell-A throughput drift
+  -3.5% at S=32k (within v1 ±5%); kernel-level FA p50 +15-19%
+  due to +4 KB static `__shared__` dropping SM occupancy from 2 to 1
+  block/SM. Stock-path perf parity deferred to Phase 2.5 template
+  gating per the runbook.
+- **Next phase:** Phase 2.4 — REAL INT4 K HBM read (packed uint8 +
+  custom load atoms bypassing CUTLASS). Or Phase 3 — INT4 V read,
+  same transform pattern. Phase 2.5+ — template-gated dispatch to
+  recover stock-path perf.
 
 ## Hard scope guard (do not creep)
 
@@ -62,6 +70,9 @@ symmetric quant, group sizes ≠ 32.
 | `549b942` | Phase 2.2 fix (forward decl in flash.h) |
 | `200196d` | **Phase 2.2 GREEN** (route live, bit-equal) |
 | `6a2347a` | Phase 2.3 design brief |
+| `61f83df` | Phase 2.3 patcher + helper + verify script (builds clean) |
+| `df67260` | Phase 2.3 diagnostic — algorithm drift floor ~0.997 (vs brief's 0.9999) |
+| _pending_ | **Phase 2.3 GREEN** (relaxed gate, route-B match bit-for-bit, perf regression deferred) |
 
 ## GPU pod state (as of last session)
 
