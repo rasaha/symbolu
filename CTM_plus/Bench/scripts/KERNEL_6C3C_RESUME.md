@@ -12,26 +12,31 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 4 GREEN at commit `3f8787b`.
-  Complete §20.4.3 algorithmic surface now reproduced in CUDA:
-  INT4 K transform + INT4 V transform + protect-K mask (skip-quant
-  on top-~4% magnitude channels). All three helpers reproduce the
-  route-B PyTorch reference bit-for-bit (cosine matches to ~1e-5).
-  Stock FA path unchanged from pre-Phase-2.3 baseline (FA p50 @
-  S=16k at 67.1 μs, -0.2% vs 67.3 μs baseline; cell A throughput
-  +0.2% vs baseline). Template gating from Phase 2.5 holds across
-  Phases 3 and 4.
+- **Latest verified state:** Phase 4 GREEN at commit `3f8787b` plus
+  Phase 6.4 (algorithm-level quality on real Qwen at ~30k tokens) GREEN
+  at commit `1e4dfb5`. Phase 5A code lands here (this commit) —
+  pending pod smoke. §20.4.3 algorithmic surface reproduced in CUDA
+  AND validated on real model data: 4% protect = 100% needle vs FP16
+  baseline. Decision: Phase 5A default protect_fraction = 0.04, 0.08
+  safe-mode. Stock FA path is bit-identical to pre-Phase-2.3 baseline
+  (smoke test PASS, FA p50 @ S=16k = 67.1 μs vs 67.3 μs baseline).
 
-- **What's NOT yet done in v1:** Phase 2.4 (REAL INT4 K HBM read
-  with packed uint8 — the memory-savings step), Phase 5 (vLLM
-  integration so `LLM(kv_cache_dtype="int4_protected")` works
-  end-to-end), Phase 6 (measurement — including the §20.4.3 real-
-  data needle-in-haystack quality test on actual Qwen2.5-7B).
+- **In progress: Phase 5A — native-kernel-routed vLLM decode with
+  BF16-backed KV cache.** Python installer that monkey-patches vLLM
+  Attention.forward to route decode through
+  `flash_attn_with_int4_kvcache`. Parallel FP16 K/V sidecar per layer
+  (~2× KV memory at v1 — measurement-time cost, NOT a ship claim).
+  Batch=1 only. PROVES native kernel dispatch + quality; DOES NOT
+  realize HBM INT4 memory savings (that's Phase 2.4).
 
-- **Next phase decision (open):** Phase 2.4 (memory savings, 3-5
-  days, highest remaining technical risk), Phase 6.4 quality test
-  on real Qwen2.5 (1-2 days, validates algorithm on real data before
-  more engineer-days go into Phase 2.4), or Phase 5 vLLM backend
+- **What's NOT yet done:** Phase 2.4 (REAL INT4 K HBM read — the
+  memory-savings step), Phase 5B/5C (batch > 1, kv_cache_dtype
+  first-class registration), Phase 6 measurement (throughput, KV
+  memory, real-data needle on full ship config).
+
+- **Next phase after Phase 5A GREEN:** Phase 6.4-native (re-run the
+  protect-fraction sweep through the native kernel path), or Phase
+  2.4 (HBM INT4 storage — the biggest remaining technical risk), or Phase 5 vLLM backend
   (5 days, end-to-end plumbing).
 
 ## Hard scope guard (do not creep)
@@ -84,6 +89,14 @@ symmetric quant, group sizes ≠ 32.
 | `48c2b4a` | Phase 4 patcher (protect-K mask plumbing + helper extension) |
 | `7993e8d` | Phase 4 gate-calibration commit (Gaussian-only test was unfair to algorithm) |
 | `3f8787b` | **Phase 4 GREEN** (outlier sub-test + recovery-delta gate; 4.5 milli-cosine recovery on outliers) |
+| `9c54f6b` | Docs — Phase 2.5/3/4 GREEN results recorded |
+| `028cffe` | Phase 2.3 insertion-point retrospective audit |
+| `095961e` | Phase 6.4 sweep (algorithm path) + decision-rule aggregator |
+| `e9e48a5` | Phase 6.4 — transformers >=5.0 prophylactic check bypass |
+| `e8eecbf` | Phase 6.4 long-context sweep at ~30k Qwen tokens |
+| `0b80770` | Phase 6.4 aggregator — fix to match track_e JSON schema |
+| `1e4dfb5` | **Phase 6.4 GREEN** — delta-gates vs FP16 baseline; 4% protect = 100% needle on real Qwen |
+| _pending_ | **Phase 5A** — native-kernel-routed vLLM decode (BF16-backed KV cache) |
 
 ## GPU pod state (as of last session)
 
