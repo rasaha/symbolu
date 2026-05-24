@@ -168,6 +168,7 @@ symmetric quant, group sizes ≠ 32.
 | `8767cd3` | Phase 5B.4 prep — probe FlashAttentionImpl.forward source + sub-sub-phase design (5B.4a/b/c split with independent gates) |
 | `bbc32a3` | **Phase 5B.4a GREEN** — full forward replication in our subclass. Bit-equal to stock, marker confirms new path. Sets up surface for 5B.4b shape shrink + 5B.4c read/write replacement. |
 | `13066c3` | **Phase 5B.4b GREEN** — STR_DTYPE map uint8 → num_blocks doubles (9401→19054, 2.03×). Per-block bytes halved. Total kv_cache bytes ~unchanged (vLLM fills the budget). Generation INTENTIONALLY broken at this step; 5B.4c restores it. |
+| `<pending>` | Phase 5B.4c plan — surface V-lossiness blocker (vLLM single-shape forces K and V to share per-slot bytes; uint8 D=128 fits INT4 K but only half of bf16 V). Four options analyzed; recommend Option D (merge Phase 2.6 V-packing into 5B.4c). Total 5B.4c estimate: 5-8 engineer-days. |
 
 ## GPU pod state (as of last session)
 
