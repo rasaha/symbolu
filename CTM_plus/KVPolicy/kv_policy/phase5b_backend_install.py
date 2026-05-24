@@ -58,21 +58,68 @@ logger = logging.getLogger(__name__)
 
 if _VLLM_FA_AVAILABLE:
 
+    # 5B.4c.1: import PagedKVWriter lazily inside forward — keeps the
+    # backend installable in environments where kv_policy is on PYTHONPATH
+    # but the writer module has issues unrelated to the backend skeleton.
+
     class Int4ProtectedAttentionImpl(FlashAttentionImpl):
         """Phase 5B.2 skeleton subclass of FlashAttentionImpl.
 
-        v0 forward: pure delegate. Phase 5B.4 will replace the delegate
-        with a packed-K kernel call (using PartialGroupQuantizer for
-        cache writes and the Phase 2.4.1b packed kernel for reads).
+        Phase 5B.4a-b: forward replication + uint8 storage shape.
+        Phase 5B.4c.1: quantizing write path via PagedKVWriter (replaces
+                       reshape_and_cache_flash). Read path still stock
+                       FA → generation BROKEN. 5B.4c.2 restores it.
 
         We do NOT override __init__ — that lets the install function
         do an in-place class swap on existing FA-impl instances, which
         preserves all the state (head_size, num_heads, scale, etc.)
         that the engine wired up at init time.
+
+        Per-instance attributes set by the installer:
+          _phase5b_layer_idx: int — sequential index used to slice the
+            per-model protect mask artifact.
+        Per-instance attributes set lazily on first forward():
+          _phase5b_paged_writer: PagedKVWriter — owns external sidecars
+            and the K staging buffer for this layer.
         """
 
         # Sentinel for verify scripts to check. Bumped each sub-sub-phase.
-        _phase5b_backend_marker = "5B.4b"
+        _phase5b_backend_marker = "5B.4c.1"
+
+        def _get_paged_writer(self, layer=None):
+            """Lazy-construct the PagedKVWriter for this layer. The writer
+            doesn't allocate sidecars at construction — that happens on
+            its first write() call when kv_cache shape is known.
+
+            layer_idx resolution order (first wins):
+              1. _phase5b_layer_idx already set on this instance
+                 (assigned by install_int4_protected_backend at post-init swap).
+              2. Parsed from layer.prefix (vLLM 0.7+ Attention layers carry
+                 a 'prefix' string like 'model.layers.<N>.self_attn.attn').
+              3. RuntimeError — no way to slice the per-model protect mask.
+            """
+            existing = getattr(self, "_phase5b_paged_writer", None)
+            if existing is not None:
+                return existing
+            from kv_policy.phase5b_4c_paged_writer import PagedKVWriter
+            layer_idx = getattr(self, "_phase5b_layer_idx", None)
+            if layer_idx is None and layer is not None:
+                prefix = getattr(layer, "prefix", None) or getattr(layer, "layer_name", None)
+                if isinstance(prefix, str):
+                    layer_idx = _parse_layer_idx_from_name(prefix)
+                    if layer_idx is not None:
+                        # Cache on the impl so subsequent calls skip the parse.
+                        self._phase5b_layer_idx = layer_idx
+            if layer_idx is None:
+                raise RuntimeError(
+                    "Cannot determine _phase5b_layer_idx for this impl instance. "
+                    "Either run install_int4_protected_backend(model) AFTER LLM(...) "
+                    "to assign indices via named_modules walk, or set the "
+                    "layer's .prefix attribute to a name containing 'layers.<N>'."
+                )
+            writer = PagedKVWriter(layer_idx=layer_idx)
+            self._phase5b_paged_writer = writer
+            return writer
 
         def forward(
             self,
@@ -150,15 +197,20 @@ if _VLLM_FA_AVAILABLE:
             alibi_slopes = self.alibi_slopes
             logits_soft_cap = self.logits_soft_cap
 
-            # 5B.4a: swap "int4_protected" -> "auto" before
-            # reshape_and_cache_flash, which is a compiled C++ op that
-            # rejects unknown dtype strings. The cache LAYOUT is still
-            # stock bf16 in this sub-sub-phase, so "auto" is correct.
-            # Phase 5B.4c will REPLACE this call entirely, not swap.
-            if kv_cache_dtype == "int4_protected":
-                kv_cache_dtype = "auto"
+            # 5B.4c.1: the kv_cache layout is now uint8 D=128 (from 5B.4b)
+            # and reshape_and_cache_flash would treat its bytes as bf16 →
+            # corrupted writes. Replace the call with PagedKVWriter which
+            # quantizes K + V before writing the right slot regions.
+            # The legacy "auto" swap below is still kept for the FALLBACK
+            # path (e.g., when kv_policy isn't importable).
+            use_paged_writer = (kv_cache_dtype == "int4_protected")
+            if not use_paged_writer:
+                # Defensive: if a stock dtype somehow reached here, fall
+                # back to the legacy behavior.
+                if kv_cache_dtype == "int4_protected":
+                    kv_cache_dtype = "auto"
 
-            # ---- Cache write (5B.4c will replace this with PartialGroupQuantizer) ----
+            # ---- Cache write ----
             if kv_cache.numel() > 0:
                 key_cache = kv_cache[0]
                 value_cache = kv_cache[1]
@@ -168,12 +220,21 @@ if _VLLM_FA_AVAILABLE:
                         updated_slot_mapping = attn_metadata.cross_slot_mapping
                     else:
                         updated_slot_mapping = attn_metadata.slot_mapping
-                    torch.ops._C_cache_ops.reshape_and_cache_flash(
-                        key, value, kv_cache[0], kv_cache[1],
-                        updated_slot_mapping.flatten(),
-                        kv_cache_dtype,
-                        layer._k_scale, layer._v_scale,
-                    )
+                    if use_paged_writer:
+                        writer = self._get_paged_writer(layer=layer)
+                        writer.write(
+                            key=key,
+                            value=value,
+                            kv_cache=kv_cache,
+                            slot_mapping=updated_slot_mapping.flatten(),
+                        )
+                    else:
+                        torch.ops._C_cache_ops.reshape_and_cache_flash(
+                            key, value, kv_cache[0], kv_cache[1],
+                            updated_slot_mapping.flatten(),
+                            kv_cache_dtype,
+                            layer._k_scale, layer._v_scale,
+                        )
 
             # ---- Token routing ----
             (num_prefill_query_tokens, num_prefill_kv_tokens,
@@ -363,6 +424,19 @@ class Int4ProtectedBackendManager:
 # Attention layer detection (same heuristic as Phase 5A).
 # ----------------------------------------------------------------------
 
+def _parse_layer_idx_from_name(name: str) -> Optional[int]:
+    """Parse the integer N out of 'model.layers.<N>.self_attn' style names.
+    Returns None if the name doesn't match — caller falls back to walk-order."""
+    parts = name.split(".")
+    for i, part in enumerate(parts):
+        if part == "layers" and i + 1 < len(parts):
+            try:
+                return int(parts[i + 1])
+            except ValueError:
+                return None
+    return None
+
+
 def _looks_like_attention(module: Any) -> bool:
     cls_name = type(module).__name__
     if not cls_name.endswith("Attention"):
@@ -418,6 +492,11 @@ def install_int4_protected_backend(
     # Track forward-fallback swaps separately (for teardown).
     forward_swaps: List[Tuple[Any, Callable]] = []
 
+    # Phase 5B.4c.1: track sequential layer index for protect-mask slicing.
+    # Walk-order matches model.named_modules() iteration, which for vLLM
+    # 0.7.3's Qwen impl matches model.layers.0..N self_attn order.
+    _next_layer_idx = 0
+
     for name, sub in model.named_modules():
         if not _looks_like_attention(sub):
             continue
@@ -437,6 +516,14 @@ def install_int4_protected_backend(
         original_class = impl.__class__
         try:
             impl.__class__ = Int4ProtectedAttentionImpl
+            # Phase 5B.4c.1: prefer the integer parsed out of a name like
+            # 'model.layers.<N>.self_attn' (matches Phase 5B.0 calibrator
+            # ordering). Fall back to walk-order if the name doesn't fit.
+            layer_idx = _parse_layer_idx_from_name(name)
+            if layer_idx is None:
+                layer_idx = _next_layer_idx
+            impl._phase5b_layer_idx = layer_idx
+            _next_layer_idx += 1
             manager.swapped.append((impl, original_class))
             manager._stats["swapped_impls"] += 1
         except TypeError as e:
