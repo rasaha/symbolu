@@ -72,28 +72,206 @@ if _VLLM_FA_AVAILABLE:
         """
 
         # Sentinel for verify scripts to check.
-        _phase5b_backend_marker = "5B.2"
+        _phase5b_backend_marker = "5B.4a"
 
-        def forward(self, *args, **kwargs):
-            # Phase 5B.3a: vLLM's compiled CUDA kernel reshape_and_cache_flash
-            # validates self.kv_cache_dtype against a hard-coded list (auto / fp8
-            # variants). It rejects "int4_protected" with
-            #   RuntimeError: Unsupported data type of kv cache: int4_protected
-            # Temporarily swap to "auto" for the duration of the parent call so
-            # the C++ kernel sees a recognized value. Memory layout is still
-            # bf16 at this phase (STR_DTYPE map sent int4_protected -> bf16),
-            # so the bf16 path is correct.
-            #
-            # Phase 5B.4 will replace this entire forward with our own
-            # packed-K logic and this swap will go away.
-            saved = getattr(self, "kv_cache_dtype", None)
-            if saved == "int4_protected":
-                self.kv_cache_dtype = "auto"
-                try:
-                    return super().forward(*args, **kwargs)
-                finally:
-                    self.kv_cache_dtype = saved
-            return super().forward(*args, **kwargs)
+        def forward(
+            self,
+            layer,
+            query,
+            key,
+            value,
+            kv_cache,
+            attn_metadata,
+            output=None,
+        ):
+            """Phase 5B.4a: REPLICATE FlashAttentionImpl.forward in our
+            subclass. Same code paths, same output, but we control every
+            call site. This sets up the surface for Phase 5B.4b (shape
+            shrink) and 5B.4c (read/write path replacement).
+
+            The replication MUST stay bit-equivalent to FlashAttentionImpl.
+            Verified by verify_phase5b_4a_forward.py (output == stock
+            generation, char-for-char on greedy decode).
+
+            We import the helper functions from FA at call time to avoid
+            ImportError at module-load time if vLLM is missing.
+            """
+            # Lazy imports — these are private to vllm.attention.backends.flash_attn
+            # and may not exist in all vLLM versions. ImportError here means
+            # we should fall back to super().forward(), which will hit the
+            # 5B.3a-style kv_cache_dtype swap path.
+            try:
+                from vllm.attention.backends.flash_attn import (
+                    AttentionType,
+                    flash_attn_varlen_func,
+                    flash_attn_with_kvcache,
+                    get_num_prefill_decode_query_kv_tokens,
+                    get_seq_len_block_table_args,
+                    _get_query_key_seq_metadata,
+                    _get_causal_option,
+                )
+            except ImportError:
+                # Fallback: delegate with dtype swap (5B.3a behavior).
+                saved = getattr(self, "kv_cache_dtype", None)
+                if saved == "int4_protected":
+                    self.kv_cache_dtype = "auto"
+                    try:
+                        return super().forward(
+                            layer, query, key, value, kv_cache,
+                            attn_metadata, output,
+                        )
+                    finally:
+                        self.kv_cache_dtype = saved
+                return super().forward(
+                    layer, query, key, value, kv_cache,
+                    attn_metadata, output,
+                )
+
+            # ---- Header validations (copied verbatim from FA forward) ----
+            assert layer._k_scale_float == 1.0 and layer._v_scale_float == 1.0, (
+                "key/v_scale is not supported in FlashAttention.")
+            assert output is not None, "Output tensor must be provided."
+
+            attn_type = self.attn_type
+            if (attn_type == AttentionType.ENCODER
+                    and (not attn_metadata.is_all_encoder_attn_metadata_set)):
+                raise AttributeError("Encoder attention requires setting "
+                                     "encoder metadata attributes.")
+            elif (attn_type == AttentionType.ENCODER_DECODER
+                  and (not attn_metadata.is_all_cross_attn_metadata_set)):
+                raise AttributeError("Encoder/decoder cross-attention "
+                                     "requires setting cross-attention "
+                                     "metadata attributes.")
+
+            # ---- Extract per-impl params ----
+            kv_cache_dtype: str = self.kv_cache_dtype
+            softmax_scale: float = self.scale
+            window_size = self.sliding_window
+            alibi_slopes = self.alibi_slopes
+            logits_soft_cap = self.logits_soft_cap
+
+            # 5B.4a: swap "int4_protected" -> "auto" before
+            # reshape_and_cache_flash, which is a compiled C++ op that
+            # rejects unknown dtype strings. The cache LAYOUT is still
+            # stock bf16 in this sub-sub-phase, so "auto" is correct.
+            # Phase 5B.4c will REPLACE this call entirely, not swap.
+            if kv_cache_dtype == "int4_protected":
+                kv_cache_dtype = "auto"
+
+            # ---- Cache write (5B.4c will replace this with PartialGroupQuantizer) ----
+            if kv_cache.numel() > 0:
+                key_cache = kv_cache[0]
+                value_cache = kv_cache[1]
+                if (attn_type != AttentionType.ENCODER) and (key is not None) and (
+                        value is not None):
+                    if attn_type == AttentionType.ENCODER_DECODER:
+                        updated_slot_mapping = attn_metadata.cross_slot_mapping
+                    else:
+                        updated_slot_mapping = attn_metadata.slot_mapping
+                    torch.ops._C_cache_ops.reshape_and_cache_flash(
+                        key, value, kv_cache[0], kv_cache[1],
+                        updated_slot_mapping.flatten(),
+                        kv_cache_dtype,
+                        layer._k_scale, layer._v_scale,
+                    )
+
+            # ---- Token routing ----
+            (num_prefill_query_tokens, num_prefill_kv_tokens,
+             num_decode_query_tokens) = \
+                get_num_prefill_decode_query_kv_tokens(attn_metadata, attn_type)
+            decode_query = query[num_prefill_query_tokens:]
+            decode_output = output[num_prefill_query_tokens:]
+            query = query[:num_prefill_query_tokens]
+            prefill_output = output[:num_prefill_query_tokens]
+            assert query.shape[0] == num_prefill_query_tokens
+            assert decode_query.shape[0] == num_decode_query_tokens
+
+            # ---- Prefill attention (5B.4c will replace inner kernel call) ----
+            if prefill_meta := attn_metadata.prefill_metadata:
+                if (kv_cache.numel() == 0 or prefill_meta.block_tables is None
+                        or prefill_meta.block_tables.numel() == 0):
+                    # Normal varlen attention (no paged cache yet).
+                    q_seq_start_loc, q_seq_len, k_seq_start_loc, k_seq_len = \
+                        _get_query_key_seq_metadata(prefill_meta, True, attn_type)
+                    key = key[:num_prefill_kv_tokens]
+                    value = value[:num_prefill_kv_tokens]
+                    flash_attn_varlen_func(
+                        q=query, k=key, v=value,
+                        cu_seqlens_q=q_seq_start_loc,
+                        cu_seqlens_k=k_seq_start_loc,
+                        max_seqlen_q=q_seq_len,
+                        max_seqlen_k=k_seq_len,
+                        softmax_scale=softmax_scale,
+                        causal=_get_causal_option(attn_type),
+                        window_size=window_size,
+                        alibi_slopes=alibi_slopes,
+                        softcap=logits_soft_cap,
+                        out=prefill_output,
+                        fa_version=self.vllm_flash_attn_version,
+                    )
+                else:
+                    # Prefix-enabled attention (Q current, K/V from cache).
+                    assert attn_type == AttentionType.DECODER, (
+                        "Only decoder-only models support prefix caching")
+                    assert prefill_meta.seq_lens is not None
+                    max_seq_len = max(prefill_meta.seq_lens)
+                    flash_attn_varlen_func(
+                        q=query, k=key_cache, v=value_cache,
+                        cu_seqlens_q=prefill_meta.query_start_loc,
+                        max_seqlen_q=prefill_meta.max_query_len,
+                        seqused_k=prefill_meta.seq_lens_tensor,
+                        max_seqlen_k=max_seq_len,
+                        softmax_scale=softmax_scale,
+                        causal=True,
+                        window_size=window_size,
+                        alibi_slopes=alibi_slopes,
+                        block_table=prefill_meta.block_tables,
+                        softcap=logits_soft_cap,
+                        out=prefill_output,
+                        fa_version=self.vllm_flash_attn_version,
+                    )
+
+            # ---- Decode attention (5B.4c will replace inner kernel call) ----
+            if decode_meta := attn_metadata.decode_metadata:
+                assert decode_meta.max_decode_query_len is not None
+                if decode_meta.max_decode_query_len > 1:
+                    # Speculative-decode-style varlen path.
+                    assert attn_type == AttentionType.DECODER, (
+                        "Only decoder-only models support max_decode_query_len > 1")
+                    flash_attn_varlen_func(
+                        q=decode_query, k=key_cache, v=value_cache,
+                        cu_seqlens_q=decode_meta.query_start_loc,
+                        max_seqlen_q=decode_meta.max_decode_query_len,
+                        seqused_k=decode_meta.seq_lens_tensor,
+                        max_seqlen_k=decode_meta.max_decode_seq_len,
+                        softmax_scale=softmax_scale,
+                        causal=True,
+                        window_size=window_size,
+                        alibi_slopes=alibi_slopes,
+                        softcap=logits_soft_cap,
+                        block_table=decode_meta.block_tables,
+                        out=decode_output,
+                        fa_version=self.vllm_flash_attn_version,
+                    )
+                else:
+                    # Standard decode path (the common case).
+                    seq_lens_arg, _, block_tables_arg = (
+                        get_seq_len_block_table_args(decode_meta, False, attn_type)
+                    )
+                    flash_attn_with_kvcache(
+                        q=decode_query.unsqueeze(1),
+                        k_cache=key_cache, v_cache=value_cache,
+                        block_table=block_tables_arg,
+                        cache_seqlens=seq_lens_arg,
+                        softmax_scale=softmax_scale,
+                        causal=True,
+                        window_size=window_size,
+                        alibi_slopes=alibi_slopes,
+                        softcap=logits_soft_cap,
+                        out=decode_output.unsqueeze(1),
+                        fa_version=self.vllm_flash_attn_version,
+                    )
+            return output
 
 else:
 
