@@ -12,31 +12,70 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.4.1a GREEN at commit `3211008`.
-  Packed-K side channel data plumbing landed: Python wrapper accepts
-  `k_packed_int4`, `k_packed_scale`, `k_packed_xmin`,
-  `k_packed_protect_bf16`, `k_packed_protect_slot`, `packed_group_size`,
-  `packed_n_protect` kwargs. `Int4KvPackedGuard` thread-local captures
-  the pointers; `run_mha_fwd` sets `params.is_int4kv_packed = true`
-  when all five tensors are supplied. The kernel does NOT read these
-  yet — that's Phase 2.4.1b (the actual custom CUDA HBM-load helper).
-  Phase 2.4.0 round-trip test GREEN: pack→unpack preserves protected
-  channels bit-equal, unprotected per-element error ≤ ~LSB, sidecar
-  compression 2.84× vs FP16.
-  Phase 5A still GREEN (the data plumbing flows around the existing
-  path without disturbing it): 28 prefills, 868 decodes, 0 fallbacks,
-  needle correctly retrieved.
-- **What's NOT yet done:** Phase 2.4.1b (kernel-side packed-K HBM
-  read — the load-bearing CUDA work, ~400-500 LOC), Phase 2.4.1c
-  (Python install integration), Phase 2.4.b (free vLLM paged K cache
-  for real HBM savings vs stock), Phase 2.6 (V pack), Phase 5B/5C
-  (batch > 1, `kv_cache_dtype` first-class registration), Phase 6
-  measurement (throughput, KV memory, real-data needle on full ship
-  config).
-- **Next phase:** Phase 2.4.1b. Design + open questions locked in
-  `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md`. Estimated 1.5-2.5
-  hours of focused session time including ~15-20 min rebuilds and
-  1-2 iteration rounds.
+- **Latest verified state:** Phase 2.4.1d GREEN at commit `f19e7a8`.
+  Incremental per-group repack eliminates the O(S) repack overhead
+  that 2.4.1c v0 carried:
+    - `verify_phase2_4_1d.py` PASS:
+        - Test 1 (equivalence): repack_incremental == full repack
+          bit-exact for k_int4, protect_slot; cosine ≥ 0.99999 and
+          max-abs 0 for the bf16 sidecars.
+        - Test 2 (timing): decode_repack 0.281 ms (**2.9× faster
+          than v0**), per-decode total 0.837 ms vs Phase 5A 0.954 ms
+          (**+12.3% faster end-to-end**).
+    - Throughput on the smoke prompt: **28.6 tok/s** vs Phase 5A
+      22.8 tok/s, stock 82 tok/s.
+    - 0 fallbacks, needle retrieved.
+  Previously verified:
+    - Phase 2.4.1c v0 GREEN at commit `bd2c313`. Same end-to-end smoke
+      but with O(S) full repack → 1.347 ms/decode total.
+    - measurement-informed reclassification of 2.4.b at `8ee4be3`.
+  Previously verified:
+    - `verify_phase2_4_1b.py` cosine 0.9999792 vs Phase 5A reference.
+    - `verify_phase4.py` GREEN (non-packed path unchanged).
+    - Phase 5A smoke GREEN.
+- **Measurement findings (commit `8ee4be3`):** See
+  `KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md` for full numbers.
+  Headlines:
+    1. **Packed kernel is FASTER than Phase 5A's kernel** —
+       0.434 ms vs 0.801 ms per call (~46% faster). Once Phase 2.4.1d
+       kills the repack overhead, Phase 2.4.1c will be faster than
+       Phase 5A end-to-end.
+    2. **`decode_repack` dominates Phase 2.4.1c's per-decode time**
+       at 0.804 ms (60% share). Phase 2.4.1d is the speed priority.
+    3. **vLLM preallocates ~23.98 GiB KV reserve** at engine init
+       regardless of usage. There's no fillable-and-freeable cache
+       to release post-prefill.
+    4. **Phase 2.4.b (original) is a dead end.** Merged into
+       Phase 5B/5C — real memory savings require registering
+       `kv_cache_dtype="int4_protected"` in vLLM's CacheEngine.
+- **What's NOT yet done:**
+    - Phase 2.4.1e (optional perf polish — Triton-fuse the repack ops
+      to break below the ~250 μs eager-mode floor; would give ~150 μs
+      total repack and approach the kernel+append floor of ~0.54 ms).
+    - Phase 2.6 (V pack — completes KV memory story).
+    - Phase 5B/5C (`kv_cache_dtype` first-class registration — THE
+      real memory-savings step + multi-batch).
+    - Phase 6 measurement (throughput, KV memory, real-data needle
+      on full ship config).
+- **Next phase:** Phase 5B/5C — native vLLM integration. Design
+  locked in `KERNEL_6C3C_PHASE5B5C_DESIGN.md`. Architecture
+  decision: NATIVE attention backend (`Int4ProtectedAttentionBackend`),
+  NOT monkey-patch — required for BlockManager integration to land
+  the memory-savings claim. Five open design questions answered:
+    - Q1: per-MODEL static protect mask (computed via calibration,
+      Phase 5B.0). Required for prefix caching block sharing.
+    - Q2: group_size = block_size = 16 (matches vLLM block alignment).
+    - Q3: partial-group staging buffer for cache writes
+      (quantize-on-fill, 448 KB total per model).
+    - Q4: native backend confirmed (only way to get savings).
+    - Q5: pin to vLLM 0.7.3 for v1.
+  Sub-phases: 5B.0 (calibration) → 5B.1 (staging buffer test) →
+  5B.2 (backend skeleton) → 5B.3 (CacheEngine integration) →
+  5B.4 (block-aware r/w) → 5B.5 (quality acceptance) → 5C (config
+  surface). 10-15 engineer-days; 2-3 calendar weeks with iteration.
+  Per-token byte cost target: 362 bytes (30% savings vs stock 512)
+  with V still BF16; drops to ~202 bytes (60% savings) once 2.6
+  packs V.
 
 ## Hard scope guard (do not creep)
 
@@ -60,6 +99,8 @@ symmetric quant, group sizes ≠ 32.
 | `KERNEL_6C3C_PHASE5A_DESIGN.md` | Phase 5A — native-kernel-routed vLLM decode (BF16-backed reference path) |
 | `KERNEL_6C3C_PHASE2_4_DESIGN.md` | Phase 2.4 — REAL INT4 K HBM read; locked architecture + sub-phase breakdown |
 | `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md` | Phase 2.4.1b open design questions + locked answers (read before writing the patcher) |
+| `KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md` | Post-2.4.1c measurement (packed kernel faster than Phase 5A; 2.4.b reclassified into 5B) |
+| `KERNEL_6C3C_PHASE5B5C_DESIGN.md` | Phase 5B/5C native vLLM integration — architecture lock + 5 design questions + sub-phase breakdown (10-15 day estimate) |
 
 ## Audit trail — branch `claude/fp8-kv-competitive-gap-zpSjg`
 
@@ -109,6 +150,23 @@ symmetric quant, group sizes ≠ 32.
 | `07511fe` | Phase 2.4 design note — REAL INT4 K HBM read; sidecar layout + sub-phase breakdown locked |
 | `1c4d80b` | Phase 2.4.0 — Python pack/unpack helpers + round-trip test (GREEN; 2.84× compression) |
 | `3211008` | **Phase 2.4.1a GREEN** — packed-K data plumbing (no kernel changes); Phase 5A + Phase 4 verifies still pass |
+| `62c8478` | Phase 2.4.1b design-questions checkpoint (Q1/Q2/Q3 locks for the patcher) |
+| `97bc861` | Phase 2.4.1b patcher + helper (int4_packed_load.h) + verify script + orchestrator |
+| `fe92a6c` | Phase 2.4.1b fix — flash.h fwd-decl anchor (single-line format vs my split-line guess) |
+| `23a08cc` | **Phase 2.4.1b GREEN** — OptionalInt4Scratch gate fix (V transform needs it on packed path too); cosine 0.9999792 vs Phase 5A |
+| `bd2c313` | **Phase 2.4.1c v0 GREEN** — packed-K vLLM install (Phase2_4PackedCache + install_phase2_4_packed); end-to-end Qwen2.5-7B decode through packed kernel, 0 fallbacks, ~22% slower than Phase 5A |
+| `8ee4be3` | Phase 2.4.b reclassified into Phase 5B (measurement showed vLLM's KV cache is a preallocated reserve, not freeable) |
+| `1872520` | Phase 2.4 measurement findings + design docs updated |
+| `f19e7a8` | **Phase 2.4.1d GREEN** — incremental per-group repack; decode_repack 2.9× faster than v0; end-to-end +12.3% faster than Phase 5A |
+| `2de1615` | Phase 5B/5C design — architecture lock (native attention backend) + 5 design questions + sub-phase breakdown |
+| `aab8d0b` | **Phase 5B.0 GREEN** — per-model protect mask calibrated on Qwen2.5-7B; artifact (28, 4, 128) int8 saved; layer-0/1 IoU 11.1% confirms layer-specific channel selection |
+| `a49a3f3` | **Phase 5B.1 GREEN** — PartialGroupQuantizer (streaming K → packed) bit-equivalent to pack_k_for_phase2_4 across token-by-token, batched chunks, and partial-group flush |
+| `946dcd5` | Phase 5B.2 prep — probe vLLM 0.7.3 attention backend internals; identified FlashAttentionImpl as the subclass target |
+| `7c38ea3` | **Phase 5B.2 GREEN** — Int4ProtectedAttentionImpl subclass + install via in-place __class__ swap; 28/28 layers swapped, bit-equal generation, clean teardown |
+| `306bffd` | Phase 5B.3 prep — probe CacheConfig validation + CacheEngine.get_cache_block_size + get_attn_backend selector |
+| `094f91a` | **Phase 5B.3a GREEN** — init-time backend install via CacheConfig+selector hooks; `LLM(kv_cache_dtype="int4_protected")` is now first-class; 5 gates pass including bit-equal generation. STR_DTYPE_TO_TORCH_DTYPE extended + forward swaps to "auto" for C++ kernel compat. Memory layout still bf16 (savings come in 5B.4). |
+| `8767cd3` | Phase 5B.4 prep — probe FlashAttentionImpl.forward source + sub-sub-phase design (5B.4a/b/c split with independent gates) |
+| `bbc32a3` | **Phase 5B.4a GREEN** — full forward replication in our subclass. Bit-equal to stock, marker confirms new path. Sets up surface for 5B.4b shape shrink + 5B.4c read/write replacement. |
 
 ## GPU pod state (as of last session)
 

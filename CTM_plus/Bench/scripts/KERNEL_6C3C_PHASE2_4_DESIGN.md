@@ -277,13 +277,21 @@ scope above (you can override the design doc's recommendations there).
 - **V cache packed.** Phase 2.6 — mirrors Phase 2.4 for V (per-token
   quant, group along head_dim). Roughly the same effort. Decoupled
   so K can ship/measure on its own.
-- **Free vLLM paged K cache.** Phase 2.4.b — adds the actual HBM
-  memory win vs stock. Currently outscoped because it touches vLLM
-  block manager. Could go in Phase 2.4 if user accepts.
-- **vLLM block manager integration.** Phase 5B — first-class
+- **~~Free vLLM paged K cache.~~ Phase 2.4.b — DEFERRED / merged into
+  Phase 5B.** Post-2.4.1c measurement
+  (`KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md`) revealed that
+  vLLM's "paged K cache" is a preallocated reserve sized at engine
+  init via `gpu_memory_utilization`, not a fillable buffer holding
+  active K data. There's nothing to free after prefill. To actually
+  shrink HBM we must register a custom `kv_cache_dtype` in vLLM's
+  CacheEngine so per-block byte cost reflects INT4 sizing — that's
+  Phase 5B/5C scope.
+- **vLLM CacheEngine integration.** Phase 5B/5C — first-class
   `kv_cache_dtype="int4_protected"`, multi-sequence, prefix caching.
-- **Throughput parity with FP16.** Phase 6.1 — requires Phase 2.4
-  packed + Phase 2.4.b paged-cache freed + Phase 2.6 packed V.
+  **THE real memory-savings step.** Multi-week.
+- **Throughput parity with FP16.** Phase 6.1 — requires Phase 5B
+  (kills the Python wrapper + dual storage overhead) + Phase 2.4.1d
+  (incremental repack) + Phase 2.6 (packed V).
 
 ## Acceptance — what must be GREEN to call Phase 2.4 done
 
@@ -301,8 +309,9 @@ scope above (you can override the design doc's recommendations there).
 
 | Phase | Adds |
 |---|---|
-| **Phase 2.4.b** | Free vLLM paged K cache; net K-only savings vs stock |
-| **Phase 2.6** | Pack V cache → full sidecar memory shrunk to ~1 GB at S=32k |
-| **Phase 6.1-6.3** | Throughput + memory measurement at the full ship config — the headline v1 numbers |
-| **Phase 5B** | Multi-sequence vLLM serving (batch > 1, `kv_cache_dtype` flag) |
+| **Phase 2.4.1d** | Incremental per-group repack → kills the 0.804 ms/step dominant overhead. Phase 2.4.1c becomes faster than Phase 5A end-to-end. ~1 day. |
+| ~~Phase 2.4.b~~ | **Deferred → merged into Phase 5B.** See findings doc. |
+| **Phase 2.6** | Pack V cache → completes the KV memory story |
+| **Phase 5B/5C** | `kv_cache_dtype="int4_protected"` in vLLM's CacheEngine. **THE real memory-savings step + multi-batch + prefix caching.** Multi-week. |
+| **Phase 6.1-6.3** | Throughput + memory measurement at the full ship config (gated on Phase 5B) |
 | **Phase 6.4-native** | Run protect-fraction sweep through the packed path (transitive equivalence proof for the v1 claim) |
