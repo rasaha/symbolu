@@ -75,7 +75,24 @@ if _VLLM_FA_AVAILABLE:
         _phase5b_backend_marker = "5B.2"
 
         def forward(self, *args, **kwargs):
-            # Pure delegate. Phase 5B.4 inserts real packed-K behavior here.
+            # Phase 5B.3a: vLLM's compiled CUDA kernel reshape_and_cache_flash
+            # validates self.kv_cache_dtype against a hard-coded list (auto / fp8
+            # variants). It rejects "int4_protected" with
+            #   RuntimeError: Unsupported data type of kv cache: int4_protected
+            # Temporarily swap to "auto" for the duration of the parent call so
+            # the C++ kernel sees a recognized value. Memory layout is still
+            # bf16 at this phase (STR_DTYPE map sent int4_protected -> bf16),
+            # so the bf16 path is correct.
+            #
+            # Phase 5B.4 will replace this entire forward with our own
+            # packed-K logic and this swap will go away.
+            saved = getattr(self, "kv_cache_dtype", None)
+            if saved == "int4_protected":
+                self.kv_cache_dtype = "auto"
+                try:
+                    return super().forward(*args, **kwargs)
+                finally:
+                    self.kv_cache_dtype = saved
             return super().forward(*args, **kwargs)
 
 else:
