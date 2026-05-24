@@ -705,6 +705,19 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--skip-version-check", action="store_true",
+        help=(
+            "Bypass the transformers >= 5.0 prophylactic check. The "
+            "harness's INT4PerChannelCache + cache byte counter have "
+            "explicit 4.x fallback paths (line 341), and the cache "
+            "itself inherits from DynamicCache without using the 5.x "
+            "layers[i].keys API. Used for the Phase 6.4 protect-"
+            "fraction sweep which runs on venv-vllm (pinned to "
+            "transformers 4.48 by vllm 0.7.3). Set only when you know "
+            "the specific path you run doesn't hit 5.x-only APIs."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -734,7 +747,8 @@ def main(argv: Sequence[str]) -> int:
     # ---- Model load ----
     if args.dry_run:
         LOG.info("DRY RUN: building fake tiny model (no HF download)")
-        qe._check_transformers_version()
+        if not args.skip_version_check:
+            qe._check_transformers_version()
         model, tokenizer = qe._build_fake_model()
         model_id_for_summary = "fake-tiny-model (DRY-RUN)"
         # Cap dry-run context lengths so the fake model handles them.
@@ -742,7 +756,8 @@ def main(argv: Sequence[str]) -> int:
         n_samples = min(args.needle_samples, 2)
         decode_tokens = min(args.needle_decode_tokens, 4)
     else:
-        qe._check_transformers_version()
+        if not args.skip_version_check:
+            qe._check_transformers_version()
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
         LOG.info("Loading %s (dtype=%s, device=%s)",

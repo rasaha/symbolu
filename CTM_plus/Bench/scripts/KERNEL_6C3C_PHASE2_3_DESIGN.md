@@ -122,17 +122,42 @@ specific kernel. Patterns to adapt:
 
 ## Acceptance and validation
 
-Phase 2.3 acceptance is `verify_phase1.py` still PASS bit-equal (or
-cosine ≥ 0.9999, max-abs ≤ 1e-2) for the new path. The transform is
-NUMERICALLY a no-op to BF16 precision because INT4 quantization with
-group_size=32 over Gaussian data has small enough roundoff that the
-final attention output (after softmax + V dot) drifts by far less than
-BF16 precision.
+> **Corrected after first verify run (commit df67260).** The original
+> claim — "drift is far less than BF16 precision, expect cosine ≥
+> 0.9999" — was empirically WRONG. The route-B asymmetric INT4
+> quant/dequant algorithm with group_size=32 has an *intrinsic* drift
+> floor of ~0.9968 cosine on attention output (Qwen2.5-7B shapes, B=1,
+> H_q=28, H_kv=4, D=128, S=16k). `diagnose_phase2_3_drift.py` proves
+> this by running PyTorch's `quantize_per_channel_int4` +
+> `dequantize_per_channel_int4` on the same K and feeding it through
+> stock FA — the resulting cosine vs raw K is 0.99682, essentially
+> identical to what the CUDA helper produces (0.99684, matching to
+> within ~1e-5).
+>
+> Per-element K drift is ~0.065 mean (real, ~0.27 INT4 LSB at the
+> Gaussian scale); softmax + V-dot averages it down to ~8e-4 mean on
+> the attention output. **The protect-K sidecar in Phase 4 is what
+> closes the remaining ~0.003 gap** — bare INT4 K (no protect) does
+> not get to FP16 quality, consistent with the §20.4.3 algorithm
+> needing the top-~4% magnitude channels in higher precision.
 
-If verify drifts beyond threshold, the diagnosis is one of:
+Phase 2.3 acceptance is `verify_phase2_3.py` PASS:
+- **cosine ≥ 0.995** (was 0.9999 — see above for why the original
+  threshold was wrong)
+- **max-abs ≤ 1e-2** (unchanged; algorithm hits ~3.9e-3)
+
+`verify_phase1.py` stays pinned at strict bit-equality and is EXPECTED
+to fail post-2.3 (the int4 path now does real numerical work). To
+regression-check the stock FA path, run `smoke_test_fa_install.sh`.
+
+If verify_phase2_3.py drifts beyond the new threshold, the diagnosis is
+one of:
 - Rounding convention mismatch (must mirror route-B's exact op)
 - Per-group reduction is wrong (reading wrong group's scale)
 - Smem write/read race (need an extra sync we didn't notice)
+- CUDA drift bigger than the algorithm floor — run
+  `diagnose_phase2_3_drift.py` to confirm the algorithm baseline and
+  isolate.
 
 ## Effort estimate for Phase 2.3
 
