@@ -12,35 +12,31 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 5A GREEN at commit `b821ace`.
-  Native-kernel-routed vLLM decode now proven end-to-end on real
-  Qwen2.5-7B inference:
-    - All 28 attention layers wrapped at install time (leaf-Attention
-      heuristic distinguishes vllm.attention.layer.Attention from
-      model-level wrappers like Qwen2Attention)
-    - 0 fallback calls during the smoke test (full kernel coverage)
-    - Decode output correctly retrieves the needle ("XYZ123XYZ123")
-    - 24-char common prefix with stock vLLM before INT4 drift causes
-      divergence — matches the ~0.997 algorithm cosine floor we
-      measured in Phase 2.3/6.4
-  Decode throughput: 28.8 tok/s vs stock 80.3 tok/s. The 2.8× slowdown
-  is the parallel FP16 sidecar's Python-managed cache.append() cost
-  per token (the documented Phase 5A overhead — measurement-time cost,
-  goes away in Phase 2.4 when HBM INT4 storage drops the sidecar).
-- **What's NOT yet done:** Phase 2.4 (REAL INT4 K HBM read — the
-  memory-savings step), Phase 5B/5C (batch > 1, kv_cache_dtype
-  first-class registration), Phase 6 measurement (throughput, KV
-  memory, real-data needle on full ship config).
-- **Next phase decision (open):**
-    - Phase 6.4-native — rerun protect-fraction sweep through the
-      Phase 5A install (proves the transitive equivalence argument
-      directly, ~1-2 days)
-    - Phase 2.4 — HBM INT4 storage with packed uint8 + custom CUTLASS
-      load atoms (the memory-savings step, ~3-5 days, highest
-      remaining technical risk)
-    - Phase 5B — batch > 1 multi-sequence support (vLLM serving v1,
-      ~3-5 days)
-  (5 days, end-to-end plumbing).
+- **Latest verified state:** Phase 2.4.1a GREEN at commit `3211008`.
+  Packed-K side channel data plumbing landed: Python wrapper accepts
+  `k_packed_int4`, `k_packed_scale`, `k_packed_xmin`,
+  `k_packed_protect_bf16`, `k_packed_protect_slot`, `packed_group_size`,
+  `packed_n_protect` kwargs. `Int4KvPackedGuard` thread-local captures
+  the pointers; `run_mha_fwd` sets `params.is_int4kv_packed = true`
+  when all five tensors are supplied. The kernel does NOT read these
+  yet — that's Phase 2.4.1b (the actual custom CUDA HBM-load helper).
+  Phase 2.4.0 round-trip test GREEN: pack→unpack preserves protected
+  channels bit-equal, unprotected per-element error ≤ ~LSB, sidecar
+  compression 2.84× vs FP16.
+  Phase 5A still GREEN (the data plumbing flows around the existing
+  path without disturbing it): 28 prefills, 868 decodes, 0 fallbacks,
+  needle correctly retrieved.
+- **What's NOT yet done:** Phase 2.4.1b (kernel-side packed-K HBM
+  read — the load-bearing CUDA work, ~400-500 LOC), Phase 2.4.1c
+  (Python install integration), Phase 2.4.b (free vLLM paged K cache
+  for real HBM savings vs stock), Phase 2.6 (V pack), Phase 5B/5C
+  (batch > 1, `kv_cache_dtype` first-class registration), Phase 6
+  measurement (throughput, KV memory, real-data needle on full ship
+  config).
+- **Next phase:** Phase 2.4.1b. Design + open questions locked in
+  `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md`. Estimated 1.5-2.5
+  hours of focused session time including ~15-20 min rebuilds and
+  1-2 iteration rounds.
 
 ## Hard scope guard (do not creep)
 
@@ -61,6 +57,9 @@ symmetric quant, group sizes ≠ 32.
 | `KERNEL_6C3C_PHASE12_CODEREAD.md` | Source map at SHA 720c948 + Phase 1/2 surface |
 | `KERNEL_6C3C_PROTECT_MASK_DESIGN.md` | §7.Q1 resolution — protect mask provenance + storage layout |
 | `KERNEL_6C3C_PHASE2_3_DESIGN.md` | Phase 2.3 surface (the K read sites, insertion point, gating, effort) |
+| `KERNEL_6C3C_PHASE5A_DESIGN.md` | Phase 5A — native-kernel-routed vLLM decode (BF16-backed reference path) |
+| `KERNEL_6C3C_PHASE2_4_DESIGN.md` | Phase 2.4 — REAL INT4 K HBM read; locked architecture + sub-phase breakdown |
+| `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md` | Phase 2.4.1b open design questions + locked answers (read before writing the patcher) |
 
 ## Audit trail — branch `claude/fp8-kv-competitive-gap-zpSjg`
 
@@ -101,22 +100,32 @@ symmetric quant, group sizes ≠ 32.
 | `1e4dfb5` | **Phase 6.4 GREEN** — delta-gates vs FP16 baseline; 4% protect = 100% needle on real Qwen |
 | `4b07f97` | Phase 5A code lands — native-kernel-routed vLLM decode installer + smoke test + design doc |
 | `b821ace` | **Phase 5A GREEN** — leaf-attention fix; 0 fallbacks, 28+868 wrapped calls, needle correctly retrieved |
+| `b9daf9f` | Phase 5A GREEN milestone recorded in RESUME |
+
+## Audit trail — branch `claude/fp8-kv-competitive-gap-MNj74`
+
+| Commit | Closes |
+|---|---|
+| `07511fe` | Phase 2.4 design note — REAL INT4 K HBM read; sidecar layout + sub-phase breakdown locked |
+| `1c4d80b` | Phase 2.4.0 — Python pack/unpack helpers + round-trip test (GREEN; 2.84× compression) |
+| `3211008` | **Phase 2.4.1a GREEN** — packed-K data plumbing (no kernel changes); Phase 5A + Phase 4 verifies still pass |
 
 ## GPU pod state (as of last session)
 
 - **Dev tree:** `/workspace/dev/vllm-flash-attn-dev` at SHA `720c948`
-  with patches applied through Phase 2.2 (idempotent via the apply
+  with patches applied through Phase 2.4.1a (idempotent via the apply
   scripts; re-running is a no-op).
 - **Backup of original vendored .so:**
   `/workspace/dev/build-logs/vllm_flash_attn_vendored_backup` — restore
   via `bash CTM_plus/Bench/scripts/restore_vendored_vllm_flash_attn.sh`
   if anything breaks.
-- **Installed in venv-vllm:** the Phase 2.2 wheel
+- **Installed in venv-vllm:** the Phase 2.4.1a wheel
   (`vllm_flash_attn-2.7.2.post1+cu128`) overwrites
   `/workspace/venv-vllm/lib/python3.12/site-packages/vllm/vllm_flash_attn/`
-  with the dev build. `flash_attn_with_int4_kvcache` is importable.
+  with the dev build. `flash_attn_with_int4_kvcache` is importable
+  and accepts the new packed-K kwargs.
 
-## Active code path (Phase 2.2)
+## Active code path (Phase 5A + 2.4.1a plumbing)
 
 ```
 Python flash_attn_with_int4_kvcache (vllm_flash_attn/flash_attn_interface.py)
@@ -159,52 +168,71 @@ bash /workspace/symbolu/CTM_plus/Bench/scripts/restore_vendored_vllm_flash_attn.
 …then re-run the patch+build cycle:
 
 ```bash
-bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase1.sh   # idempotent
-bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_1.sh # idempotent
-bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_2.sh # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase1.sh        # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_1.sh      # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_2.sh      # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_3.sh      # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_5.sh      # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase3.sh        # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase4.sh        # idempotent
+bash /workspace/symbolu/CTM_plus/Bench/scripts/apply_phase2_4_1a.sh   # idempotent
+# Phase 2.4.1b apply script not yet written — see DESIGN_QUESTIONS doc.
 ```
 
-(All three apply scripts skip already-applied patches via sentinel-
-string detection. The cold rebuild takes ~10-15 min if any C++ files
-were touched.)
+(All apply scripts skip already-applied patches via sentinel-string
+detection. The cold rebuild takes ~10-15 min if any C++ files were
+touched. Re-running through 2.4.1a end-to-end is a no-op once the
+dev tree is at that state.)
 
-## Where Phase 2.3 picks up
+## Where Phase 2.4.1b picks up
 
-Phase 2.3 inserts a runtime-gated quantize→dequant transform at the
-4 K read sites in `compute_attn_1rowblock_splitkv`
-(`flash_fwd_kernel.h` lines 267, 851, 929, 990). The transform:
+Phase 2.4.1a put packed-K pointers + `is_int4kv_packed` flag into
+`Flash_fwd_params`. The kernel does not read them yet. Phase 2.4.1b
+adds the kernel-side consumer:
 
-1. Reads K from smem (already loaded by the existing cp.async).
-2. Computes per-group max-abs scale (4 groups × kBlockN=128 rows /
-   32 per group = 4 scales per K block).
-3. Quantizes to INT4 with route-B's rounding convention (must match
-   `kv_policy/int4_per_channel_kv.py::quantize_per_channel_int4`
-   exactly or cosine drifts at ±1 LSB).
-4. Dequantizes back to BF16.
-5. Writes back to the same smem locations.
-6. Gated on `params.is_int4kv` (runtime check; nvcc CSEs the branch
-   since the condition is uniform across the threadblock).
+1. New helper `csrc/flash_attn/src/int4_packed_load.h`
+   (`int4_packed_load_K_block`) — cooperatively `__ldg`-loads
+   packed K + scale + xmin + protect-bf16 from HBM into per-block
+   smem scratchpads, then per-thread iterates the CUTLASS K-tile
+   fragment doing unpack + dequant + protect blend, writing BF16
+   to `sK`.
+2. New `bool Is_int4kv_packed = false` template parameter threaded
+   through `compute_attn_1rowblock_splitkv` → `compute_attn_splitkv`
+   → `flash_fwd_splitkv_kernel` → `run_flash_splitkv_fwd` (mirrors
+   Phase 2.5's `Is_int4kv` propagation).
+3. New `run_mha_fwd_splitkv_dispatch_int4kv_packed` + new `.cu`
+   instantiation file `flash_fwd_split_hdim128_bf16_int4kv_packed_sm80.cu`
+   (mirrors Phase 2.1's pattern).
+4. `flash_api.cpp` `run_mha_fwd` gains `if (params.is_int4kv_packed)`
+   branch ahead of the existing `_int4kv` arm.
 
-The cooperative max-abs reduction is the hard part — borrow FA's
-existing `Softmax::reduce_max` pattern (warp-shuffle + smem
-scratchpad) and adapt max → max-abs.
+**Open design questions locked in
+`KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md`:**
 
-**Acceptance:** `verify_phase1.py` still PASS bit-equal (or cosine
-≥ 0.9999 / max-abs ≤ 1e-2) on Qwen2.5-7B shapes. Stock path
-unchanged.
+- Q1: `kPackedNProtectMax = 16` (smem alignment + safe-mode headroom)
+- Q2: Pad `k_protect_bf16` in Python at `PHASE2_4_N_PROTECT_MAX = 16`
+- Q3: BF16 scale/xmin storage default; FP32 fallback flagged as
+  one-line patcher flip if cosine misses 0.9995
 
-**Effort estimate:** ~3 engineer-days (1 day reduction + 1 day
-quant/dequant + 1 day integration + drift iteration).
+**Acceptance:** `verify_phase2_4_1b.py` cosine ≥ 0.9995 vs Phase 5A
+reference on Qwen2.5-7B-shaped K at S=16k. Phase 4 + Phase 5A smoke
+tests still pass (template gating isolates the packed path).
 
-**File to modify:** `csrc/flash_attn/src/flash_fwd_kernel.h`.
-Possibly a new helper header in `csrc/common/` to avoid 4× code
-duplication across the K read sites.
+**Effort estimate:** 1.5-2.5 hours of focused session time including
+rebuilds (~15-20 min each) and 1-2 iteration rounds for cosine
+fixup or BF16→FP32 fallback.
 
-## What NOT to do in Phase 2.3
+**Files to modify:** see the file list in
+`KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md`.
 
-- Don't change the HBM K layout (still BF16). That's Phase 2.5.
-- Don't add the protect-K BF16 sidecar. That's Phase 4.
-- Don't touch V (Phase 3).
+## What NOT to do in Phase 2.4.1b
+
+- Don't pack V. That's Phase 2.6 (mirror of Phase 2.4 for V).
+- Don't free vLLM's paged K cache. That's Phase 2.4.b.
+- Don't add `cp.async` for the HBM load — `__ldg` first; `cp.async`
+  is a perf optimization for 2.4.1c+.
+- Don't extend to batch > 1. That's Phase 5B.
 - Don't add prefill kernel modifications.
-- Don't add more `if constexpr` template gating — Phase 2.5+ needs
-  it for the real INT4 read; Phase 2.3 stays runtime-gated.
+- Don't widen instantiation beyond bf16/hdim=128/non-causal —
+  template explosion is real (3 splitkv specializations already:
+  stock, `_int4kv`, `_int4kv_packed`).
