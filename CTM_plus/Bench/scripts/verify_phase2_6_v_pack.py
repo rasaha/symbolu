@@ -148,14 +148,19 @@ def test_sidecar_bytes() -> bool:
             print(f"    {k:18s} {val}")
 
     ok = True
-    # Design doc: per-token V cost = 64 (int4) + 8 (scale) + 8 (xmin) = 80 bytes.
-    expected_per_token = 80
-    if info["per_token_bytes"] != expected_per_token:
-        print(f"  FAIL: per_token_bytes {info['per_token_bytes']} != "
-              f"expected {expected_per_token}")
+    # Design doc: per-(token, head) V cost = 64 (int4) + 8 (scale) + 8 (xmin)
+    # = 80 bytes. The H-independent figure. Across H_kv=4 heads, per-token
+    # total = 320 bytes.
+    expected_per_token_per_head = 80
+    if info["per_token_per_head_bytes"] != expected_per_token_per_head:
+        print(f"  FAIL: per_token_per_head_bytes {info['per_token_per_head_bytes']}"
+              f" != expected {expected_per_token_per_head}")
         ok = False
+    else:
+        print(f"  per_token_per_head_bytes = {info['per_token_per_head_bytes']}"
+              f"  (= 64 int4 + 4*2 scale + 4*2 xmin)  PASS")
 
-    # Compression vs bf16: 256 / 80 = 3.2×.
+    # Compression vs bf16: 256 / 80 = 3.2× (also H-independent).
     expected_compression = 256 / 80
     if not (3.0 <= info["compression"] <= 3.4):
         print(f"  FAIL: compression {info['compression']:.2f}x outside expected"

@@ -229,5 +229,10 @@ def v_sidecar_byte_size(
         "bf16_baseline": S * H * D * dtype_bytes,
         "compression":  (S * H * D * dtype_bytes) / total,
         "n_groups":     n_groups,
-        "per_token_bytes": total // S,
+        # per_token_bytes: total bytes for one token across ALL H kv-heads.
+        "per_token_bytes":          total // S,
+        # per_token_per_head_bytes: H-independent per-(token, head) cost.
+        # This is the design-doc canonical "80 bytes" figure at D=128,
+        # v_group_size=32 (= 64 nibbles + 4*2 scale + 4*2 xmin).
+        "per_token_per_head_bytes": total // (S * H),
     }
