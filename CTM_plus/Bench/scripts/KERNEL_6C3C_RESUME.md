@@ -12,36 +12,41 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.4.1c v0 GREEN at commit `bd2c313`.
-  End-to-end vLLM decode through the packed-K HBM kernel:
+- **Latest verified state:** Phase 2.4.1c v0 GREEN at commit `bd2c313`,
+  measurement-informed reclassification at `8ee4be3`. End-to-end vLLM
+  decode through the packed-K HBM kernel works:
     - `verify_phase2_4_1c.py` PASS — 28 prefills, 868 decodes,
       **0 fallbacks**, needle retrieved (`XYZ123XYZ123`).
-    - Decode throughput 21.3 tok/s vs Phase 5A 27.3 tok/s
-      (**~22% slower**, much better than the napkin O(S²) prediction —
-      the per-decode repack is GPU-parallelizable).
-    - Kernel cosine vs Phase 5A reference still 0.9999792 at the
-      verify_phase2_4_1b.py level. The slightly different decoded text
-      vs Phase 5A is the same ~2e-5 drift landing on a different
-      greedy-decode trajectory; both retrieve the needle.
+    - Decode throughput 19.5 tok/s vs Phase 5A 22.8 tok/s vs stock 82 tok/s.
   Previously verified:
     - `verify_phase2_4_1b.py` cosine 0.9999792 vs Phase 5A reference.
     - `verify_phase4.py` GREEN (non-packed path unchanged).
     - Phase 5A smoke GREEN.
-- **What's NOT yet done:** Phase 2.4.1d (incremental per-group repack —
-  O(1) decode vs v0's O(S); restores throughput parity with Phase 5A),
-  Phase 2.4.b (free vLLM paged K cache for actual HBM savings vs stock),
-  Phase 2.6 (V pack), Phase 5B/5C (batch > 1, `kv_cache_dtype`
-  first-class), Phase 6 measurement (throughput, KV memory, real-data
-  needle on full ship config).
-- **Next phase:** Phase 2.4.1d OR Phase 2.4.b OR Phase 2.6 — depends
-  on what blocker matters most:
-    - **2.4.1d** if perf is the headline gap (closes 22% slowdown).
-    - **2.4.b** if "actual memory savings vs stock vLLM" is the
-      headline — Phase 2.4 currently doesn't save HBM (we have BOTH
-      the packed sidecar AND vLLM's BF16 paged cache; 2.4.b frees
-      the latter).
-    - **2.6** if V packing is the missing piece (closes V's BF16
-      sidecar footprint).
+- **Measurement findings (commit `8ee4be3`):** See
+  `KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md` for full numbers.
+  Headlines:
+    1. **Packed kernel is FASTER than Phase 5A's kernel** —
+       0.434 ms vs 0.801 ms per call (~46% faster). Once Phase 2.4.1d
+       kills the repack overhead, Phase 2.4.1c will be faster than
+       Phase 5A end-to-end.
+    2. **`decode_repack` dominates Phase 2.4.1c's per-decode time**
+       at 0.804 ms (60% share). Phase 2.4.1d is the speed priority.
+    3. **vLLM preallocates ~23.98 GiB KV reserve** at engine init
+       regardless of usage. There's no fillable-and-freeable cache
+       to release post-prefill.
+    4. **Phase 2.4.b (original) is a dead end.** Merged into
+       Phase 5B/5C — real memory savings require registering
+       `kv_cache_dtype="int4_protected"` in vLLM's CacheEngine.
+- **What's NOT yet done:** Phase 2.4.1d (incremental repack — speed
+  priority), Phase 2.6 (V pack — completes KV memory story), Phase
+  5B/5C (`kv_cache_dtype` first-class registration — THE real memory
+  savings step + multi-batch). Phase 6 measurement (throughput, KV
+  memory, real-data needle on full ship config).
+- **Next phase:** Phase 2.4.1d — incremental per-group repack.
+  Replace `pack_k_for_phase2_4(full K)` at every decode with
+  `repack_group(g)` for just the group containing the new token.
+  Expected: ~0.05 ms/step instead of 0.804 ms/step → Phase 2.4.1c
+  becomes ~43% FASTER than Phase 5A. ~1 day, pure Python.
 
 ## Hard scope guard (do not creep)
 
@@ -65,6 +70,7 @@ symmetric quant, group sizes ≠ 32.
 | `KERNEL_6C3C_PHASE5A_DESIGN.md` | Phase 5A — native-kernel-routed vLLM decode (BF16-backed reference path) |
 | `KERNEL_6C3C_PHASE2_4_DESIGN.md` | Phase 2.4 — REAL INT4 K HBM read; locked architecture + sub-phase breakdown |
 | `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md` | Phase 2.4.1b open design questions + locked answers (read before writing the patcher) |
+| `KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md` | Post-2.4.1c measurement (packed kernel faster than Phase 5A; 2.4.b reclassified into 5B) |
 
 ## Audit trail — branch `claude/fp8-kv-competitive-gap-zpSjg`
 
