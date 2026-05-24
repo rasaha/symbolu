@@ -432,13 +432,13 @@ def patch_new_cu(path: Path) -> None:
 # ============================================================
 
 FLASH_H_FWD_DECL_OLD = (
-    "template<typename T, int Headdim, bool Is_causal>\n"
-    "void run_mha_fwd_splitkv_dispatch_int4kv(Flash_fwd_params &params, cudaStream_t stream);  // 6c.3C Phase 2.2"
+    "template<typename T, int Headdim, bool Is_causal> void "
+    "run_mha_fwd_splitkv_dispatch_int4kv(Flash_fwd_params &params, cudaStream_t stream);  // 6c.3C Phase 2.2"
 )
 FLASH_H_FWD_DECL_NEW = (
     FLASH_H_FWD_DECL_OLD
-    + "\ntemplate<typename T, int Headdim, bool Is_causal>\n"
-    "void run_mha_fwd_splitkv_dispatch_int4kv_packed(Flash_fwd_params &params, cudaStream_t stream);  // 6c.3C Phase 2.4.1b"
+    + "\ntemplate<typename T, int Headdim, bool Is_causal> void "
+    "run_mha_fwd_splitkv_dispatch_int4kv_packed(Flash_fwd_params &params, cudaStream_t stream);  // 6c.3C Phase 2.4.1b"
 )
 
 
