@@ -12,12 +12,23 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.4.1c v0 GREEN at commit `bd2c313`,
-  measurement-informed reclassification at `8ee4be3`. End-to-end vLLM
-  decode through the packed-K HBM kernel works:
-    - `verify_phase2_4_1c.py` PASS — 28 prefills, 868 decodes,
-      **0 fallbacks**, needle retrieved (`XYZ123XYZ123`).
-    - Decode throughput 19.5 tok/s vs Phase 5A 22.8 tok/s vs stock 82 tok/s.
+- **Latest verified state:** Phase 2.4.1d GREEN at commit `f19e7a8`.
+  Incremental per-group repack eliminates the O(S) repack overhead
+  that 2.4.1c v0 carried:
+    - `verify_phase2_4_1d.py` PASS:
+        - Test 1 (equivalence): repack_incremental == full repack
+          bit-exact for k_int4, protect_slot; cosine ≥ 0.99999 and
+          max-abs 0 for the bf16 sidecars.
+        - Test 2 (timing): decode_repack 0.281 ms (**2.9× faster
+          than v0**), per-decode total 0.837 ms vs Phase 5A 0.954 ms
+          (**+12.3% faster end-to-end**).
+    - Throughput on the smoke prompt: **28.6 tok/s** vs Phase 5A
+      22.8 tok/s, stock 82 tok/s.
+    - 0 fallbacks, needle retrieved.
+  Previously verified:
+    - Phase 2.4.1c v0 GREEN at commit `bd2c313`. Same end-to-end smoke
+      but with O(S) full repack → 1.347 ms/decode total.
+    - measurement-informed reclassification of 2.4.b at `8ee4be3`.
   Previously verified:
     - `verify_phase2_4_1b.py` cosine 0.9999792 vs Phase 5A reference.
     - `verify_phase4.py` GREEN (non-packed path unchanged).
@@ -37,16 +48,25 @@
     4. **Phase 2.4.b (original) is a dead end.** Merged into
        Phase 5B/5C — real memory savings require registering
        `kv_cache_dtype="int4_protected"` in vLLM's CacheEngine.
-- **What's NOT yet done:** Phase 2.4.1d (incremental repack — speed
-  priority), Phase 2.6 (V pack — completes KV memory story), Phase
-  5B/5C (`kv_cache_dtype` first-class registration — THE real memory
-  savings step + multi-batch). Phase 6 measurement (throughput, KV
-  memory, real-data needle on full ship config).
-- **Next phase:** Phase 2.4.1d — incremental per-group repack.
-  Replace `pack_k_for_phase2_4(full K)` at every decode with
-  `repack_group(g)` for just the group containing the new token.
-  Expected: ~0.05 ms/step instead of 0.804 ms/step → Phase 2.4.1c
-  becomes ~43% FASTER than Phase 5A. ~1 day, pure Python.
+- **What's NOT yet done:**
+    - Phase 2.4.1e (optional perf polish — Triton-fuse the repack ops
+      to break below the ~250 μs eager-mode floor; would give ~150 μs
+      total repack and approach the kernel+append floor of ~0.54 ms).
+    - Phase 2.6 (V pack — completes KV memory story).
+    - Phase 5B/5C (`kv_cache_dtype` first-class registration — THE
+      real memory-savings step + multi-batch).
+    - Phase 6 measurement (throughput, KV memory, real-data needle
+      on full ship config).
+- **Next phase:** decision point. Three reasonable next moves:
+    - **Phase 2.6** — pack V (mirror of 2.4.x for V), closes the KV
+      memory story algorithmically. ~2-3 days.
+    - **Phase 5B/5C** — real HBM savings via `kv_cache_dtype` in
+      vLLM's CacheEngine. Multi-week, the actual v1 ship blocker.
+    - **Phase 2.4.1e** — Triton-fuse the repack for the last ~130 μs
+      of decode latency. Pure polish; ~5-10 hours.
+  Memory-savings work (5B) dominates schedule; perf polish (2.4.1e)
+  is optional. Recommend Phase 2.6 next if continuing the algorithm
+  work, else 5B.
 
 ## Hard scope guard (do not creep)
 
@@ -125,6 +145,9 @@ symmetric quant, group sizes ≠ 32.
 | `fe92a6c` | Phase 2.4.1b fix — flash.h fwd-decl anchor (single-line format vs my split-line guess) |
 | `23a08cc` | **Phase 2.4.1b GREEN** — OptionalInt4Scratch gate fix (V transform needs it on packed path too); cosine 0.9999792 vs Phase 5A |
 | `bd2c313` | **Phase 2.4.1c v0 GREEN** — packed-K vLLM install (Phase2_4PackedCache + install_phase2_4_packed); end-to-end Qwen2.5-7B decode through packed kernel, 0 fallbacks, ~22% slower than Phase 5A |
+| `8ee4be3` | Phase 2.4.b reclassified into Phase 5B (measurement showed vLLM's KV cache is a preallocated reserve, not freeable) |
+| `1872520` | Phase 2.4 measurement findings + design docs updated |
+| `f19e7a8` | **Phase 2.4.1d GREEN** — incremental per-group repack; decode_repack 2.9× faster than v0; end-to-end +12.3% faster than Phase 5A |
 
 ## GPU pod state (as of last session)
 
