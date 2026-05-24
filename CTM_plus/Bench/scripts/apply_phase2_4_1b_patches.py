@@ -700,13 +700,15 @@ SMEM_ALLOC_OLD = """    // 6c.3C Phase 2.5: template-gated INT4 scratchpad. When
         }
     }"""
 
-SMEM_ALLOC_NEW = """    // 6c.3C Phase 2.5: template-gated INT4 scratchpad. Empty struct
-    // when Is_int4kv=false OR Is_int4kv_packed=true (mutually exclusive
-    // with the packed-K path).
+SMEM_ALLOC_NEW = """    // 6c.3C Phase 2.5: template-gated INT4 scratchpad. Stays allocated
+    // when Is_int4kv=true regardless of Is_int4kv_packed because the
+    // V transform (Phase 3 in-register quant) uses it on BOTH paths
+    // (V is NOT packed in Phase 2.4; packing V is Phase 2.6). On the
+    // packed K path the K transform doesn't use it but V does.
     constexpr int kInt4GroupSize = 32;
     constexpr int kInt4ScratchFloats =
         2 * (Kernel_traits::kBlockN / kInt4GroupSize) * Kernel_traits::kHeadDim;
-    __shared__ FLASH_NAMESPACE::OptionalInt4Scratch<(Is_int4kv && !Is_int4kv_packed), kInt4ScratchFloats> smem_int4_box;
+    __shared__ FLASH_NAMESPACE::OptionalInt4Scratch<Is_int4kv, kInt4ScratchFloats> smem_int4_box;
 
     // 6c.3C Phase 2.4.1b: template-gated packed-K scratchpad. Empty struct
     // when Is_int4kv_packed=false. When true, ~12 KB at Qwen2.5-7B target.
@@ -719,6 +721,8 @@ SMEM_ALLOC_NEW = """    // 6c.3C Phase 2.5: template-gated INT4 scratchpad. Empt
 
     // 6c.3C Phase 4: per-(bidb, bidh) slice of the (B, H_kv, D) int8 protect
     // mask. NULL when no mask is supplied (Phase 2.3/3 unprotected behavior).
+    // Only the K transform consumes this; on the packed K path the K transform
+    // is replaced and this variable stays nullptr (harmless).
     const int8_t *k_protect_mask_local = nullptr;
     if constexpr (Is_int4kv && !Is_int4kv_packed) {
         if (params.k_cache_protect_mask_ptr != nullptr) {
