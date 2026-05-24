@@ -401,6 +401,31 @@ def enable_int4_protected_backend() -> None:
     if cached is not None and hasattr(cached, "cache_clear"):
         cached.cache_clear()
 
+    # --- 4. Extend STR_DTYPE_TO_TORCH_DTYPE to accept "int4_protected" ---
+    # CacheEngine.get_cache_block_size does
+    #   STR_DTYPE_TO_TORCH_DTYPE[cache_config.cache_dtype]
+    # which KeyErrors on "int4_protected" without this patch.
+    # Phase 5B.3a treats "int4_protected" as bf16 storage for compatibility
+    # with stock CacheEngine sizing logic. Phase 5B.4 will override the
+    # byte-cost calculation directly for actual memory savings.
+    import sys as _sys
+    patched_dict_ids: set = set()
+    patched_dicts: list = []
+    for mod_name, mod in list(_sys.modules.items()):
+        if mod is None or not isinstance(mod_name, str) or not mod_name.startswith("vllm"):
+            continue
+        d = getattr(mod, "STR_DTYPE_TO_TORCH_DTYPE", None)
+        if isinstance(d, dict) and id(d) not in patched_dict_ids:
+            if "int4_protected" not in d:
+                d["int4_protected"] = torch.bfloat16
+                logger.info(
+                    "Patched STR_DTYPE_TO_TORCH_DTYPE in %s: "
+                    "'int4_protected' -> torch.bfloat16", mod_name
+                )
+                patched_dicts.append((d, "int4_protected"))
+            patched_dict_ids.add(id(d))
+    _INSTALLED_PATCHES["str_dtype_dicts"] = patched_dicts
+
     _INSTALLED_PATCHES["phase5b_3a"] = True
     logger.info(
         "Phase 5B.3a installed: kv_cache_dtype='int4_protected' accepted; "
@@ -429,6 +454,10 @@ def disable_int4_protected_backend() -> None:
     cached = getattr(sel_mod, "_cached_get_attn_backend", None)
     if cached is not None and hasattr(cached, "cache_clear"):
         cached.cache_clear()
+
+    # Undo STR_DTYPE_TO_TORCH_DTYPE extensions.
+    for d, key in _INSTALLED_PATCHES.get("str_dtype_dicts", []):
+        d.pop(key, None)
 
     _INSTALLED_PATCHES.clear()
     logger.info("Phase 5B.3a patches removed.")
