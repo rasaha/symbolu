@@ -124,12 +124,21 @@ def _packed_via_writer(
     kv_cache: torch.Tensor,
     q: torch.Tensor,
     cache_seqlens: torch.Tensor,
+    *,
+    bf16_backing_k: "torch.Tensor",       # (1, S, H, D) bf16 — see comment
+    bf16_backing_v: "torch.Tensor",
     do_splice_tail: bool,
 ) -> torch.Tensor:
     """Same logic as Int4ProtectedAttentionImpl._read_decode_packed.
 
     Gather the full sequence's blocks from kv_cache, optionally splice
     the partial K tail from writer.k_stage, and call the packed kernel.
+
+    NOTE: the kernel still consumes bf16 K/V positional args even on
+    the packed path (apply_phase2_4_1b: "pre-existing cp.async of BF16 K
+    still fires when Is_int4kv_packed=true"). Caller must supply
+    bf16_backing_{k,v}. Whether their CONTENT matters for correctness
+    is what this verify is establishing.
     """
     from kv_policy.phase5b_backend_install import _splice_k_partial_tail
 
@@ -144,11 +153,14 @@ def _packed_via_writer(
     if do_splice_tail and (seqlen % BS) != 0:
         _splice_k_partial_tail(view, writer, last_block_idx=n_blocks_used - 1)
 
-    dummy = torch.empty((1, S, writer.H, writer.D), dtype=DTYPE_BF, device=DEVICE)
+    # Per writer.protect_mask -> Phase 5A in-register protect kwargs.
+    protect_mask_bhd = writer.protect_mask.unsqueeze(0).to(DEVICE)
 
     return flash_attn_with_int4_kvcache(
-        q, dummy, dummy,
+        q, bf16_backing_k, bf16_backing_v,
         cache_seqlens=cache_seqlens.to(torch.int32),
+        protect_mask=protect_mask_bhd,
+        n_protect=writer.n_protect,
         softmax_scale=None,                       # default = D^-0.5
         causal=False,
         k_packed_int4=view["k_int4"].contiguous(),
@@ -170,35 +182,88 @@ def _packed_via_writer(
 # ----------------------------------------------------------------------
 
 def test_full_groups(writer: PagedKVWriter, kv_cache: torch.Tensor) -> None:
-    print("T1: gather equivalence (no partial tail) — S = 4 * BS = 128")
+    print("T1: gather equivalence (no partial tail) — S = 16 * BS = 512")
     writer.reset_sequence()
     kv_cache.zero_()
 
-    S = 4 * BS
+    # Use S = 16 * BS = 512 to match the regime Phase 2.4.1b/2.6.2 tested.
+    # Small S (1 kBlockN tile) might hit edge-case kernel paths.
+    S = 16 * BS
     torch.manual_seed(42)
     k_bf = torch.randn((1, S, QWEN_H_KV, QWEN_D), dtype=DTYPE_BF, device=DEVICE) * 0.5
     v_bf = torch.randn((1, S, QWEN_H_KV, QWEN_D), dtype=DTYPE_BF, device=DEVICE) * 0.5
     q    = torch.randn((1, 1, QWEN_H_Q, QWEN_D),  dtype=DTYPE_BF, device=DEVICE)
 
-    # Write through PagedKVWriter, sequentially.
     slot_mapping = torch.arange(S, dtype=torch.long, device=DEVICE)
     writer.write(k_bf[0], v_bf[0], kv_cache, slot_mapping)
 
-    # Reference: Phase 5A on original bf16 K/V.
     cache_seqlens = torch.tensor([S], dtype=torch.int32, device=DEVICE)
-    # Phase 5A wants (B, H_kv, D) int8 protect_mask.
-    protect_mask_bhd = writer.protect_mask.unsqueeze(0).to(DEVICE)  # (1, H, D)
+    protect_mask_bhd = writer.protect_mask.unsqueeze(0).to(DEVICE)
     ref = _ref_phase5a(q, k_bf, v_bf, cache_seqlens, protect_mask_bhd)
 
-    # Packed path through our gather.
-    packed = _packed_via_writer(writer, kv_cache, q, cache_seqlens, do_splice_tail=False)
+    # Variant A: pass REAL bf16 K/V (defeats memory savings; baseline for
+    # the gather correctness only). If this PASSES, we know the gather +
+    # sidecars are right; if also passes with zero backing → kernel
+    # ignores bf16 content on packed path.
+    print("  [A] real bf16 backing K/V:")
+    packed_A = _packed_via_writer(
+        writer, kv_cache, q, cache_seqlens,
+        bf16_backing_k=k_bf, bf16_backing_v=v_bf,
+        do_splice_tail=False,
+    )
+    cos_A = cosine(ref, packed_A)
+    diff_A = (ref.float() - packed_A.float()).abs()
+    print(f"     cosine={cos_A:.7f}  max_abs={diff_A.max().item():.4e}")
 
-    cos = cosine(ref, packed)
-    diff = (ref.float() - packed.float()).abs()
-    print(f"  ref shape={tuple(ref.shape)}, packed shape={tuple(packed.shape)}")
-    print(f"  cosine={cos:.7f}  max_abs={diff.max().item():.4e}  mean_abs={diff.mean().item():.4e}")
-    assert cos >= COSINE_GATE, f"T1 cosine {cos:.6f} < {COSINE_GATE}"
-    print(f"  PASS (cosine {cos:.6f} >= {COSINE_GATE})")
+    # Variant B: ZERO bf16 backing K/V (preserves memory savings). If this
+    # passes too, we ship — kernel's packed-path helper overrides cp.async'd
+    # bf16 in smem completely.
+    print("  [B] zero bf16 backing K/V:")
+    zero_k = torch.zeros((1, S, QWEN_H_KV, QWEN_D), dtype=DTYPE_BF, device=DEVICE)
+    zero_v = torch.zeros((1, S, QWEN_H_KV, QWEN_D), dtype=DTYPE_BF, device=DEVICE)
+    packed_B = _packed_via_writer(
+        writer, kv_cache, q, cache_seqlens,
+        bf16_backing_k=zero_k, bf16_backing_v=zero_v,
+        do_splice_tail=False,
+    )
+    cos_B = cosine(ref, packed_B)
+    diff_B = (ref.float() - packed_B.float()).abs()
+    print(f"     cosine={cos_B:.7f}  max_abs={diff_B.max().item():.4e}")
+
+    # Variant C: GARBAGE (random) bf16 backing K/V — stronger test that
+    # the kernel ignores bf16 content. If A passes but B/C fail, the
+    # kernel uses bf16 K/V somewhere beyond the K-tile load.
+    print("  [C] random bf16 backing K/V:")
+    torch.manual_seed(99)
+    rand_k = torch.randn((1, S, QWEN_H_KV, QWEN_D), dtype=DTYPE_BF, device=DEVICE)
+    rand_v = torch.randn((1, S, QWEN_H_KV, QWEN_D), dtype=DTYPE_BF, device=DEVICE)
+    packed_C = _packed_via_writer(
+        writer, kv_cache, q, cache_seqlens,
+        bf16_backing_k=rand_k, bf16_backing_v=rand_v,
+        do_splice_tail=False,
+    )
+    cos_C = cosine(ref, packed_C)
+    diff_C = (ref.float() - packed_C.float()).abs()
+    print(f"     cosine={cos_C:.7f}  max_abs={diff_C.max().item():.4e}")
+
+    print()
+    print("  Diagnosis:")
+    if cos_A >= COSINE_GATE and cos_B >= COSINE_GATE and cos_C >= COSINE_GATE:
+        print("  -> All variants PASS. Kernel ignores bf16 content on packed path.")
+        print("     5B.4c.2 can use zero/garbage backing (no extra bf16 cache needed).")
+    elif cos_A >= COSINE_GATE and cos_B < COSINE_GATE:
+        print("  -> Real bf16 PASSES; zero bf16 FAILS. Kernel reads bf16 somewhere.")
+        print("     v1 ship requires either (a) keep real bf16 K/V cache alongside")
+        print("     packed, or (b) kernel patch to skip bf16 reads on packed path.")
+    elif cos_A < COSINE_GATE:
+        print("  -> Real bf16 FAILS. Gather/sidecar logic itself is wrong.")
+        print("     Debug: writer.get_packed_view output shapes vs pack_k_for_phase2_4.")
+    else:
+        print(f"  -> Mixed: A={cos_A:.4f} B={cos_B:.4f} C={cos_C:.4f}.")
+
+    # Gate on Variant A — strictest correctness check.
+    assert cos_A >= COSINE_GATE, f"T1[A] cosine {cos_A:.6f} < {COSINE_GATE}"
+    print(f"  PASS (cosine[A] {cos_A:.6f} >= {COSINE_GATE})")
 
 
 def test_partial_tail(writer: PagedKVWriter, kv_cache: torch.Tensor) -> None:
@@ -225,7 +290,13 @@ def test_partial_tail(writer: PagedKVWriter, kv_cache: torch.Tensor) -> None:
     protect_mask_bhd = writer.protect_mask.unsqueeze(0).to(DEVICE)
     ref = _ref_phase5a(q, k_bf, v_bf, cache_seqlens, protect_mask_bhd)
 
-    packed = _packed_via_writer(writer, kv_cache, q, cache_seqlens, do_splice_tail=True)
+    # Use real bf16 backing for the partial-tail test (T1 already isolated
+    # the backing requirement; T2 focuses on splice correctness).
+    packed = _packed_via_writer(
+        writer, kv_cache, q, cache_seqlens,
+        bf16_backing_k=k_bf, bf16_backing_v=v_bf,
+        do_splice_tail=True,
+    )
 
     cos = cosine(ref, packed)
     diff = (ref.float() - packed.float()).abs()
@@ -263,7 +334,7 @@ def main() -> int:
 
     artifact = _make_protect_artifact()
     try:
-        NB = 4  # enough for the largest test (S=128 -> 4 blocks at BS=32)
+        NB = 16  # enough for S=512 -> 16 blocks at BS=32
         kv_cache = torch.zeros(
             (2, NB, BS, QWEN_H_KV, QWEN_D), dtype=torch.uint8, device=DEVICE,
         )
