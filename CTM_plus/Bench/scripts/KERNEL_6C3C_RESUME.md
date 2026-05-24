@@ -172,6 +172,7 @@ symmetric quant, group sizes ≠ 32.
 | `3b631d9` | Phase 2.6 design — V INT4 packing required to resolve 5B.4c blocker. Group axis = head_dim, v_group_size=32, no protect-V sidecar. Per-(token,head) cost 80 bytes vs bf16's 256 (3.2× savings). |
 | `cad215d` | **Phase 2.6.0 GREEN** — pack_v_for_phase2_6 / unpack_v_from_phase2_6. Round-trip on Gaussian V max_abs 0.28 (within scale LSB), streaming==batch bit-equal, sidecar bytes match design (80/token-head, 3.2× compression). |
 | `a392996` | **Phase 2.6.1 GREEN** — ValueGroupQuantizer streaming class. Three gates all bit-equal: token-by-token, batched chunks, S=1 edge case. Lazy-alloc on first append's device. |
+| `444bbae` | **Phase 2.6.2 GREEN** — kernel-side packed-V HBM read. First-try pass: cosine 0.9999595 vs Phase 5A reference (gate 0.9995). Phase 2.4.1b regression bit-equal (1.0000000). Phase 5A smoke best-ever 24-char common prefix vs stock. V-lossiness blocker for 5B.4c resolved. |
 
 ## GPU pod state (as of last session)
 
