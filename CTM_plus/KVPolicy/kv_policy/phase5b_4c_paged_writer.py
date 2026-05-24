@@ -85,7 +85,7 @@ def load_protect_mask_for_layer(layer_idx: int) -> "torch.Tensor":
             f"Protect mask artifact not found at '{path}'. Set ${_PROTECT_MASK_ENV} "
             f"or run Phase 5B.0 calibration."
         )
-    mask = torch.load(path, map_location="cpu")
+    mask = torch.load(path, map_location="cpu", weights_only=True)
     if not isinstance(mask, torch.Tensor):
         raise TypeError(
             f"Protect mask artifact at '{path}' is {type(mask).__name__}, expected Tensor"

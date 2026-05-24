@@ -201,8 +201,14 @@ def test_k_roundtrip(writer: PagedKVWriter, kv_cache: torch.Tensor) -> None:
         k_orig.flatten(), k_rec.flatten(), dim=0,
     ).item()
     max_abs = diff.max().item()
+    # Gate: 0.995 matches Phase 2.4.1b's literal acceptance criterion.
+    # The theoretical floor for random Gaussian data with G=16, 4-bit
+    # asymmetric quant + n_protect=4% is ~0.997 (quant noise dominates
+    # the 96% unprotected channels). Real K is non-Gaussian with
+    # heavy tails captured by the protect mask, so production cosine
+    # is much higher.
     print(f"  K cosine={cos:.6f}, max_abs_diff={max_abs:.4f}")
-    assert cos >= 0.999, f"K cosine {cos:.6f} < 0.999"
+    assert cos >= 0.995, f"K cosine {cos:.6f} < 0.995"
 
 
 # ----------------------------------------------------------------------
@@ -252,7 +258,10 @@ def test_v_roundtrip(writer: PagedKVWriter, kv_cache: torch.Tensor) -> None:
     ).item()
     max_abs = (v_orig - v_rec.float()).abs().max().item()
     print(f"  V cosine={cos:.6f}, max_abs_diff={max_abs:.4f}")
-    assert cos >= 0.999, f"V cosine {cos:.6f} < 0.999"
+    # Same floor reasoning as K; V has no protect channels but groups
+    # are smaller along D (G=32 per channel-group) so noise per element
+    # is comparable.
+    assert cos >= 0.995, f"V cosine {cos:.6f} < 0.995"
 
 
 # ----------------------------------------------------------------------
