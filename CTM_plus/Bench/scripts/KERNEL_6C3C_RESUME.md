@@ -12,31 +12,34 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 4 GREEN at commit `3f8787b` plus
-  Phase 6.4 (algorithm-level quality on real Qwen at ~30k tokens) GREEN
-  at commit `1e4dfb5`. Phase 5A code lands here (this commit) —
-  pending pod smoke. §20.4.3 algorithmic surface reproduced in CUDA
-  AND validated on real model data: 4% protect = 100% needle vs FP16
-  baseline. Decision: Phase 5A default protect_fraction = 0.04, 0.08
-  safe-mode. Stock FA path is bit-identical to pre-Phase-2.3 baseline
-  (smoke test PASS, FA p50 @ S=16k = 67.1 μs vs 67.3 μs baseline).
-
-- **In progress: Phase 5A — native-kernel-routed vLLM decode with
-  BF16-backed KV cache.** Python installer that monkey-patches vLLM
-  Attention.forward to route decode through
-  `flash_attn_with_int4_kvcache`. Parallel FP16 K/V sidecar per layer
-  (~2× KV memory at v1 — measurement-time cost, NOT a ship claim).
-  Batch=1 only. PROVES native kernel dispatch + quality; DOES NOT
-  realize HBM INT4 memory savings (that's Phase 2.4).
-
+- **Latest verified state:** Phase 5A GREEN at commit `b821ace`.
+  Native-kernel-routed vLLM decode now proven end-to-end on real
+  Qwen2.5-7B inference:
+    - All 28 attention layers wrapped at install time (leaf-Attention
+      heuristic distinguishes vllm.attention.layer.Attention from
+      model-level wrappers like Qwen2Attention)
+    - 0 fallback calls during the smoke test (full kernel coverage)
+    - Decode output correctly retrieves the needle ("XYZ123XYZ123")
+    - 24-char common prefix with stock vLLM before INT4 drift causes
+      divergence — matches the ~0.997 algorithm cosine floor we
+      measured in Phase 2.3/6.4
+  Decode throughput: 28.8 tok/s vs stock 80.3 tok/s. The 2.8× slowdown
+  is the parallel FP16 sidecar's Python-managed cache.append() cost
+  per token (the documented Phase 5A overhead — measurement-time cost,
+  goes away in Phase 2.4 when HBM INT4 storage drops the sidecar).
 - **What's NOT yet done:** Phase 2.4 (REAL INT4 K HBM read — the
   memory-savings step), Phase 5B/5C (batch > 1, kv_cache_dtype
   first-class registration), Phase 6 measurement (throughput, KV
   memory, real-data needle on full ship config).
-
-- **Next phase after Phase 5A GREEN:** Phase 6.4-native (re-run the
-  protect-fraction sweep through the native kernel path), or Phase
-  2.4 (HBM INT4 storage — the biggest remaining technical risk), or Phase 5 vLLM backend
+- **Next phase decision (open):**
+    - Phase 6.4-native — rerun protect-fraction sweep through the
+      Phase 5A install (proves the transitive equivalence argument
+      directly, ~1-2 days)
+    - Phase 2.4 — HBM INT4 storage with packed uint8 + custom CUTLASS
+      load atoms (the memory-savings step, ~3-5 days, highest
+      remaining technical risk)
+    - Phase 5B — batch > 1 multi-sequence support (vLLM serving v1,
+      ~3-5 days)
   (5 days, end-to-end plumbing).
 
 ## Hard scope guard (do not creep)
@@ -96,7 +99,8 @@ symmetric quant, group sizes ≠ 32.
 | `e8eecbf` | Phase 6.4 long-context sweep at ~30k Qwen tokens |
 | `0b80770` | Phase 6.4 aggregator — fix to match track_e JSON schema |
 | `1e4dfb5` | **Phase 6.4 GREEN** — delta-gates vs FP16 baseline; 4% protect = 100% needle on real Qwen |
-| _pending_ | **Phase 5A** — native-kernel-routed vLLM decode (BF16-backed KV cache) |
+| `4b07f97` | Phase 5A code lands — native-kernel-routed vLLM decode installer + smoke test + design doc |
+| `b821ace` | **Phase 5A GREEN** — leaf-attention fix; 0 fallbacks, 28+868 wrapped calls, needle correctly retrieved |
 
 ## GPU pod state (as of last session)
 
