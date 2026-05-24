@@ -38,6 +38,14 @@ _SCALE_CLAMP = 1e-8
 # Default v_group_size from Phase 2.6 design.
 _DEFAULT_V_GROUP_SIZE = 32
 
+# Debug flag to bypass V packing (write V as bf16 into the cache instead).
+# Set via PHASE5B_4C_BF16_V=1 to isolate packed-V correctness issues.
+_BF16_V_ENV = "PHASE5B_4C_BF16_V"
+
+
+def _bf16_v_mode() -> bool:
+    return os.environ.get(_BF16_V_ENV, "").strip() in ("1", "true", "True", "yes")
+
 # Env var for the per-model protect mask artifact (calibration output
 # from Phase 5B.0). Override via PROTECT_MASK_PATH=...
 _PROTECT_MASK_ENV = "PROTECT_MASK_PATH"
@@ -354,19 +362,31 @@ class PagedKVWriter:
 
             # =============== V (per-token) ===============
             v_tok = value[t]   # (H, D)
-            v_grouped = v_tok.float().view(self.H, self.v_n_groups, self.v_group_size)
-            v_max = v_grouped.amax(dim=-1)                          # (H, n_g)
-            v_min = v_grouped.amin(dim=-1)
-            v_scale_tok = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
-            q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale_tok.unsqueeze(-1)) \
-                .round().clamp(0, 15).to(torch.uint8)               # (H, n_g, G)
-            q_v_flat = q_v.view(self.H, D)
-            v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
-            # v_packed: (H, D/2) uint8
+            if _bf16_v_mode():
+                # Debug mode: stash bf16 V in an external sidecar instead
+                # of packing. Read path will gather from this sidecar and
+                # pass directly to the kernel (skipping v_packed_*).
+                # Allocate v_bf16_ext lazily on first use.
+                if getattr(self, "_v_bf16_ext", None) is None:
+                    self._v_bf16_ext = torch.zeros(
+                        (self.NB, self.BS, self.H, self.D),
+                        dtype=dtype, device=kv_cache.device,
+                    )
+                self._v_bf16_ext[block_id, pos] = v_tok
+            else:
+                v_grouped = v_tok.float().view(self.H, self.v_n_groups, self.v_group_size)
+                v_max = v_grouped.amax(dim=-1)                          # (H, n_g)
+                v_min = v_grouped.amin(dim=-1)
+                v_scale_tok = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+                q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale_tok.unsqueeze(-1)) \
+                    .round().clamp(0, 15).to(torch.uint8)               # (H, n_g, G)
+                q_v_flat = q_v.view(self.H, D)
+                v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
+                # v_packed: (H, D/2) uint8
 
-            kv_cache[1, block_id, pos, :, :half_D] = v_packed
-            self.v_scale_ext[block_id, pos] = v_scale_tok.to(dtype)
-            self.v_xmin_ext [block_id, pos] = v_min.to(dtype)
+                kv_cache[1, block_id, pos, :, :half_D] = v_packed
+                self.v_scale_ext[block_id, pos] = v_scale_tok.to(dtype)
+                self.v_xmin_ext [block_id, pos] = v_min.to(dtype)
 
             # =============== K (staged) ===============
             k_tok = key[t]    # (H, D)
@@ -486,7 +506,7 @@ class PagedKVWriter:
         v_scale = self.v_scale_ext[block_ids].view(1, S, self.H, self.v_n_groups)
         v_xmin  = self.v_xmin_ext [block_ids].view(1, S, self.H, self.v_n_groups)
 
-        return {
+        result: Dict[str, Any] = {
             "k_int4":         k_nibbles,
             "k_scale":        k_scale,
             "k_xmin":         k_xmin,
@@ -501,3 +521,8 @@ class PagedKVWriter:
             "n_blocks":       n_blocks,
             "S":              S,
         }
+        # Debug bf16-V mode: surface the gathered bf16 V too. The read path
+        # uses it instead of v_int4/v_scale/v_xmin when this is set.
+        if _bf16_v_mode() and getattr(self, "_v_bf16_ext", None) is not None:
+            result["v_bf16"] = self._v_bf16_ext[block_ids].view(1, S, self.H, self.D)
+        return result

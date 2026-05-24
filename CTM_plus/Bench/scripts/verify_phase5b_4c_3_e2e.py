@@ -114,6 +114,24 @@ def _run_int4_protected(prompt, sampling, args):
     n_ours, n_total = count_int4_protected_impls(model)
     print(f"  layer impls: {n_ours}/{n_total} use Int4ProtectedAttentionImpl")
 
+    # Diagnostic: dump (name, _phase5b_layer_idx) for each layer to verify
+    # the per-layer protect-mask slice will be correct.
+    assigned: list = []
+    for name, sub in model.named_modules():
+        impl = getattr(sub, "impl", None)
+        if impl is None:
+            continue
+        if not isinstance(impl, Int4ProtectedAttentionImpl):
+            continue
+        idx = getattr(impl, "_phase5b_layer_idx", None)
+        assigned.append((name, idx))
+    print(f"  layer index assignment (first 4 and last 4 of {len(assigned)}):")
+    for name, idx in assigned[:4] + assigned[-4:]:
+        print(f"    {name}: layer_idx={idx}")
+    idxs = [i for _, i in assigned if isinstance(i, int)]
+    if idxs:
+        print(f"    span: min={min(idxs)} max={max(idxs)} unique={len(set(idxs))}")
+
     out = llm.generate([prompt], sampling)
     text = out[0].outputs[0].text
     call_stats = Int4ProtectedAttentionImpl.get_call_stats()

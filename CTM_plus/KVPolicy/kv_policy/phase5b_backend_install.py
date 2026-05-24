@@ -200,9 +200,24 @@ if _VLLM_FA_AVAILABLE:
             # causal=False produce identical results numerically. But the
             # kernel's dispatch routes packed only under !Is_causal — pass
             # False so the packed dispatch fires.
+            # V handling: packed by default; bf16 fallback when env var
+            # PHASE5B_4C_BF16_V=1 isolates packed-V correctness.
+            v_bf16 = view.get("v_bf16")
+            if v_bf16 is not None:
+                v_for_kernel = v_bf16.contiguous()
+                packed_v_kwargs = {}
+            else:
+                v_for_kernel = dummy
+                packed_v_kwargs = dict(
+                    v_packed_int4=view["v_int4"].contiguous(),
+                    v_packed_scale=view["v_scale"].contiguous(),
+                    v_packed_xmin=view["v_xmin"].contiguous(),
+                    v_packed_group_size=writer.v_group_size,
+                )
+
             out = flash_attn_with_int4_kvcache(
                 query_q,
-                dummy, dummy,
+                dummy, v_for_kernel,
                 cache_seqlens=cache_seqlens_i32,
                 protect_mask=protect_mask_bhd,
                 n_protect=writer.n_protect,
@@ -219,11 +234,7 @@ if _VLLM_FA_AVAILABLE:
                 k_packed_protect_slot=view["protect_slot"].contiguous(),
                 packed_group_size=BS,                # = kernel kInt4GroupSize = 32
                 packed_n_protect=writer.n_protect,
-                # Phase 2.6.2 packed V kwargs.
-                v_packed_int4=view["v_int4"].contiguous(),
-                v_packed_scale=view["v_scale"].contiguous(),
-                v_packed_xmin=view["v_xmin"].contiguous(),
-                v_packed_group_size=writer.v_group_size,
+                **packed_v_kwargs,
             )
             return out
 
