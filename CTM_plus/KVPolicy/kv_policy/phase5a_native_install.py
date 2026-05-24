@@ -216,10 +216,43 @@ class Phase5ANativeManager:
 # ----------------------------------------------------------------------
 
 def _looks_like_attention(module: Any) -> bool:
+    """LEAF attention check for Phase 5A.
+
+    vLLM's Qwen2 (and most model implementations) have TWO levels of
+    attention class:
+
+      - `Qwen2Attention` (outer, model-specific) — forward signature
+        (positions, hidden_states, kv_cache, attn_metadata). Holds the
+        Q/K/V projections + RoPE; calls `self.attn(...)` internally.
+
+      - `Attention` (inner, vllm.attention.layer.Attention) — forward
+        signature (query, key, value, kv_cache, attn_metadata). The
+        leaf — actually dispatches to the attention backend kernel.
+
+    Both class names end in "Attention". The 6c.3A install wrapped
+    BOTH on purpose (it replaced the entire attention pipeline with a
+    Triton kernel). Phase 5A only wants to swap the KERNEL CALL inside
+    the leaf — wrapping the outer module would mis-interpret the
+    (positions, hidden_states, ...) args as (query, key, value, ...)
+    and bail out cleanly via the shape guard, but each bail-out counts
+    as a fallback and inflates the gate.
+
+    This function returns True ONLY for leaf attention modules — those
+    with NO sub-attention descendants.
+    """
     cls_name = type(module).__name__
     if not cls_name.endswith("Attention"):
         return False
-    return callable(getattr(module, "forward", None))
+    if not callable(getattr(module, "forward", None)):
+        return False
+    # Check for any descendant Attention module.
+    for sub in module.modules():
+        if sub is module:
+            continue
+        sub_cls = type(sub).__name__
+        if sub_cls.endswith("Attention") and callable(getattr(sub, "forward", None)):
+            return False  # has a child Attention => NOT a leaf
+    return True
 
 
 def _reshape_kv_2d_to_3d(
