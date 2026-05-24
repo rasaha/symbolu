@@ -61,7 +61,10 @@ def test_equivalence() -> bool:
     cache.append(k_prefill, k_prefill, max_seqlen=S)
     cache.compute_protect_mask(PF)
     cache.repack(PF, group_size=GROUP)
-    snapshot_init = {k: v.clone() for k, v in cache.packed.items()}
+    snapshot_init = {
+        k: (v.clone() if isinstance(v, torch.Tensor) else v)
+        for k, v in cache.packed.items()
+    }
 
     # Add a single decode token; full-repack the same state for ground truth.
     k_new = torch.randn(1, H, D, device=device, dtype=torch.bfloat16)
@@ -69,7 +72,10 @@ def test_equivalence() -> bool:
     # Two paths from this state:
     #   (a) full repack of self.k_fp16 -> ground truth `gt`.
     #   (b) incremental on top of the initial snapshot -> candidate.
-    cache.packed = {k: v.clone() for k, v in snapshot_init.items()}
+    cache.packed = {
+        k: (v.clone() if isinstance(v, torch.Tensor) else v)
+        for k, v in snapshot_init.items()
+    }
     cache.repack_incremental(group_size=GROUP)
     candidate = cache.packed
 
