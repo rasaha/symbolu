@@ -167,6 +167,12 @@ symmetric quant, group sizes ≠ 32.
 | `094f91a` | **Phase 5B.3a GREEN** — init-time backend install via CacheConfig+selector hooks; `LLM(kv_cache_dtype="int4_protected")` is now first-class; 5 gates pass including bit-equal generation. STR_DTYPE_TO_TORCH_DTYPE extended + forward swaps to "auto" for C++ kernel compat. Memory layout still bf16 (savings come in 5B.4). |
 | `8767cd3` | Phase 5B.4 prep — probe FlashAttentionImpl.forward source + sub-sub-phase design (5B.4a/b/c split with independent gates) |
 | `bbc32a3` | **Phase 5B.4a GREEN** — full forward replication in our subclass. Bit-equal to stock, marker confirms new path. Sets up surface for 5B.4b shape shrink + 5B.4c read/write replacement. |
+| `13066c3` | **Phase 5B.4b GREEN** — STR_DTYPE map uint8 → num_blocks doubles (9401→19054, 2.03×). Per-block bytes halved. Total kv_cache bytes ~unchanged (vLLM fills the budget). Generation INTENTIONALLY broken at this step; 5B.4c restores it. |
+| `<pending>` | Phase 5B.4c plan — surface V-lossiness blocker (vLLM single-shape forces K and V to share per-slot bytes; uint8 D=128 fits INT4 K but only half of bf16 V). Four options analyzed; recommend Option D (merge Phase 2.6 V-packing into 5B.4c). Total 5B.4c estimate: 5-8 engineer-days. |
+| `3b631d9` | Phase 2.6 design — V INT4 packing required to resolve 5B.4c blocker. Group axis = head_dim, v_group_size=32, no protect-V sidecar. Per-(token,head) cost 80 bytes vs bf16's 256 (3.2× savings). |
+| `cad215d` | **Phase 2.6.0 GREEN** — pack_v_for_phase2_6 / unpack_v_from_phase2_6. Round-trip on Gaussian V max_abs 0.28 (within scale LSB), streaming==batch bit-equal, sidecar bytes match design (80/token-head, 3.2× compression). |
+| `a392996` | **Phase 2.6.1 GREEN** — ValueGroupQuantizer streaming class. Three gates all bit-equal: token-by-token, batched chunks, S=1 edge case. Lazy-alloc on first append's device. |
+| `444bbae` | **Phase 2.6.2 GREEN** — kernel-side packed-V HBM read. First-try pass: cosine 0.9999595 vs Phase 5A reference (gate 0.9995). Phase 2.4.1b regression bit-equal (1.0000000). Phase 5A smoke best-ever 24-char common prefix vs stock. V-lossiness blocker for 5B.4c resolved. |
 
 ## GPU pod state (as of last session)
 
