@@ -161,6 +161,8 @@ symmetric quant, group sizes ≠ 32.
 | `2de1615` | Phase 5B/5C design — architecture lock (native attention backend) + 5 design questions + sub-phase breakdown |
 | `aab8d0b` | **Phase 5B.0 GREEN** — per-model protect mask calibrated on Qwen2.5-7B; artifact (28, 4, 128) int8 saved; layer-0/1 IoU 11.1% confirms layer-specific channel selection |
 | `a49a3f3` | **Phase 5B.1 GREEN** — PartialGroupQuantizer (streaming K → packed) bit-equivalent to pack_k_for_phase2_4 across token-by-token, batched chunks, and partial-group flush |
+| `946dcd5` | Phase 5B.2 prep — probe vLLM 0.7.3 attention backend internals; identified FlashAttentionImpl as the subclass target |
+| `7c38ea3` | **Phase 5B.2 GREEN** — Int4ProtectedAttentionImpl subclass + install via in-place __class__ swap; 28/28 layers swapped, bit-equal generation, clean teardown |
 
 ## GPU pod state (as of last session)
 
