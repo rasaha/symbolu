@@ -71,8 +71,8 @@ if _VLLM_FA_AVAILABLE:
         that the engine wired up at init time.
         """
 
-        # Sentinel for verify scripts to check.
-        _phase5b_backend_marker = "5B.4a"
+        # Sentinel for verify scripts to check. Bumped each sub-sub-phase.
+        _phase5b_backend_marker = "5B.4b"
 
         def forward(
             self,
@@ -600,9 +600,14 @@ def enable_int4_protected_backend() -> None:
     # CacheEngine.get_cache_block_size does
     #   STR_DTYPE_TO_TORCH_DTYPE[cache_config.cache_dtype]
     # which KeyErrors on "int4_protected" without this patch.
-    # Phase 5B.3a treats "int4_protected" as bf16 storage for compatibility
-    # with stock CacheEngine sizing logic. Phase 5B.4 will override the
-    # byte-cost calculation directly for actual memory savings.
+    #
+    # Phase 5B.4b: map "int4_protected" -> torch.uint8 (1 byte/elem),
+    # down from bf16 (2 bytes/elem). This halves per-block bytes, which
+    # doubles num_blocks at the same gpu_memory_utilization budget.
+    # The reserve-line bytes don't shrink (vLLM fills the budget either
+    # way), but the per-block sizing is now INT4-aware. Phase 5B.4c
+    # adds the matching write/read paths so the smaller storage isn't
+    # just garbage.
     import sys as _sys
     patched_dict_ids: set = set()
     patched_dicts: list = []
@@ -611,13 +616,15 @@ def enable_int4_protected_backend() -> None:
             continue
         d = getattr(mod, "STR_DTYPE_TO_TORCH_DTYPE", None)
         if isinstance(d, dict) and id(d) not in patched_dict_ids:
-            if "int4_protected" not in d:
-                d["int4_protected"] = torch.bfloat16
-                logger.info(
-                    "Patched STR_DTYPE_TO_TORCH_DTYPE in %s: "
-                    "'int4_protected' -> torch.bfloat16", mod_name
-                )
-                patched_dicts.append((d, "int4_protected"))
+            # Always overwrite (in case we changed the mapping between
+            # 5B.3a's bf16 and 5B.4b's uint8 across script reloads).
+            d["int4_protected"] = torch.uint8
+            logger.info(
+                "Patched STR_DTYPE_TO_TORCH_DTYPE in %s: "
+                "'int4_protected' -> torch.uint8 (5B.4b: half bytes/elem)",
+                mod_name,
+            )
+            patched_dicts.append((d, "int4_protected"))
             patched_dict_ids.add(id(d))
     _INSTALLED_PATCHES["str_dtype_dicts"] = patched_dicts
 
