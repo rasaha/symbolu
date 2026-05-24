@@ -163,6 +163,8 @@ symmetric quant, group sizes ≠ 32.
 | `a49a3f3` | **Phase 5B.1 GREEN** — PartialGroupQuantizer (streaming K → packed) bit-equivalent to pack_k_for_phase2_4 across token-by-token, batched chunks, and partial-group flush |
 | `946dcd5` | Phase 5B.2 prep — probe vLLM 0.7.3 attention backend internals; identified FlashAttentionImpl as the subclass target |
 | `7c38ea3` | **Phase 5B.2 GREEN** — Int4ProtectedAttentionImpl subclass + install via in-place __class__ swap; 28/28 layers swapped, bit-equal generation, clean teardown |
+| `306bffd` | Phase 5B.3 prep — probe CacheConfig validation + CacheEngine.get_cache_block_size + get_attn_backend selector |
+| `094f91a` | **Phase 5B.3a GREEN** — init-time backend install via CacheConfig+selector hooks; `LLM(kv_cache_dtype="int4_protected")` is now first-class; 5 gates pass including bit-equal generation. STR_DTYPE_TO_TORCH_DTYPE extended + forward swaps to "auto" for C++ kernel compat. Memory layout still bf16 (savings come in 5B.4). |
 
 ## GPU pod state (as of last session)
 
