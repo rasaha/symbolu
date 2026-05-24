@@ -79,6 +79,12 @@ class Phase2_4PackedCache(Phase5ANativeCache):
         # Cached packed tensors from the most recent repack. None until
         # the first prefill triggers a pack.
         self.packed: Optional[Dict[str, Any]] = None
+        # Phase 2.4.1d cache: (H, n_protect) long tensor where each row
+        # holds the D-indices of that head's protected channels, sorted
+        # ascending (same order as the slot 0..n_protect-1 mapping).
+        # Lazily computed in repack_incremental after the first full
+        # repack (which populates self.packed["protect_slot"]).
+        self._protected_d_per_head: Optional["torch.Tensor"] = None
 
     def repack(self, protect_fraction: float, group_size: int = 32) -> None:
         """Repack the FULL k_fp16 buffer (Phase 2.4.1c v0 — O(S) per call).
@@ -104,66 +110,110 @@ class Phase2_4PackedCache(Phase5ANativeCache):
             protect_fraction=protect_fraction,
         )
 
+    def _ensure_protected_d(self) -> None:
+        """Lazily compute (H, n_protect) long tensor mapping head h to its
+        protected D indices, sorted ascending. Runs at most ONCE per cache
+        per sequence (set at first decode after prefill freezes the mask).
+        Python loop over H here is fine: H=4 for Qwen and we run this
+        once, not per decode step.
+        """
+        if self._protected_d_per_head is not None:
+            return
+        if self.packed is None or "protect_slot" not in self.packed:
+            return
+        slot = self.packed["protect_slot"]      # (H, D) int8, -1 if unprotected
+        H, D = slot.shape
+        n_protect = int((slot >= 0).sum(dim=-1).max().item())
+        if n_protect == 0:
+            n_protect = 1
+        # Build (H, n_protect) of d indices. Each row's d's are sorted
+        # ascending by construction of _build_protect_slot.
+        protected_d = torch.zeros((H, n_protect), dtype=torch.long, device=slot.device)
+        for h in range(H):
+            idx = torch.nonzero(slot[h] >= 0, as_tuple=True)[0]
+            protected_d[h, :len(idx)] = idx
+        self._protected_d_per_head = protected_d
+
     def repack_incremental(self, group_size: int = 32) -> None:
         """Phase 2.4.1d — re-pack ONLY the group containing the newest
-        token. O(group_size) per call instead of O(max_seqlen).
+        token, using direct vectorized CUDA ops (no Python-side loops
+        in the hot path).
 
-        Pre-conditions:
-          - self.packed must be initialized (call repack() at prefill end).
-          - self.s_curr is the count of tokens written, so the newest
-            token lives at position s_curr - 1.
-          - The protect_slot table is FROZEN at prefill and reused —
-            we pass it back to pack_k_for_phase2_4 as frozen_protect_mask.
+        Cost per call (Qwen2.5-7B target, kBlockN=32, H_kv=4, D=128):
+          - amax/amin on (1, 32, 4, 128): ~2 us
+          - quantize + clamp + uint8 cast: ~10 us
+          - nibble pack: ~5 us
+          - 4 splice writes: ~5 us
+          - gather for protect (1 row × (H, n_protect)): ~3 us
+          Total ~25-50 us — vs v0's 0.804 ms (~16-30× faster).
 
-        Effect: updates the affected group's scale, xmin, packed bytes,
-        and the new token's k_protect_bf16 slot.
+        Pre-conditions: self.packed must be initialized (full repack at
+        prefill end has run). self.s_curr > 0.
 
-        Same numerical convention as the full repack. Verified equivalent
-        to repack() via verify_phase2_4_1d.py.
+        Effect: updates the affected group's k_int4 / k_scale / k_xmin
+        for ALL 32 tokens in that group (their dequant depends on the
+        group's scale, which may shift when the new token extends
+        max/min). Updates k_protect_bf16 ONLY for the new token's row
+        (other tokens' protect values were correct from prior repacks).
+        protect_slot is unchanged (frozen at prefill).
+
+        Numerical convention matches pack_k_for_phase2_4 exactly —
+        verified equivalent via verify_phase2_4_1d.py Test 1.
         """
         if self.packed is None:
-            # No prefill yet — defer to full repack to bootstrap state.
             return
         if self.k_fp16 is None or self.max_seqlen is None or self.s_curr <= 0:
             return
 
-        # The new token lives at position s_curr - 1; its group is g.
         new_pos = self.s_curr - 1
         g = new_pos // group_size
         g_start = g * group_size
         g_end = g_start + group_size
         if g_end > self.max_seqlen:
-            # Should not happen if max_seqlen is a multiple of group_size,
-            # but guard defensively.
             return
 
-        # Reconstruct the frozen protect mask (H, D) int8 from protect_slot.
-        # protect_slot[h, d] >= 0 iff (h, d) is protected.
-        protect_slot = self.packed["protect_slot"]
-        frozen_mask = (protect_slot >= 0).to(torch.int8)
+        # One-time lazy compute of protected_d_per_head.
+        self._ensure_protected_d()
+        protected_d = self._protected_d_per_head    # (H, n_protect) long
+        if protected_d is None:
+            return
 
-        # Slice ONE group from k_fp16 and repack just that slice.
-        k_slice = self.k_fp16[:, g_start:g_end, :, :].contiguous()
-        sub = pack_k_for_phase2_4(
-            k_slice,
-            group_size=group_size,
-            frozen_protect_mask=frozen_mask,
+        # ---- Per-group quantization (full vectorized, no Python loops) ----
+        # k_group: (1, G, H, D) bf16. Use FP32 for the quant math to match
+        # pack_k_for_phase2_4 numerically.
+        k_group_f = self.k_fp16[:, g_start:g_end, :, :].float()  # (1, G, H, D)
+        x_max = k_group_f.amax(dim=1, keepdim=True)               # (1, 1, H, D)
+        x_min = k_group_f.amin(dim=1, keepdim=True)
+        scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
+        q = ((k_group_f - x_min) / scale).round().clamp(0, 15).to(torch.uint8)
+        # q shape: (1, G, H, D)
+
+        # ---- Pack nibbles: even d -> low, odd d -> high ----
+        even = q[..., 0::2]                                       # (1, G, H, D/2)
+        odd  = q[..., 1::2]
+        packed_bytes = (even & 0x0F) | ((odd & 0x0F) << 4)
+
+        # ---- Splice into self.packed ----
+        # k_int4 shape (1, S, H, D/2): update group's G rows.
+        self.packed["k_int4"][:, g_start:g_end] = packed_bytes
+        # k_scale / k_xmin shape (1, S/G, H, D): update one row.
+        # scale shape is (1, 1, H, D), matches the [:, g:g+1] slice.
+        dt = self.packed["k_scale"].dtype
+        self.packed["k_scale"][:, g:g+1] = scale.to(dt)
+        self.packed["k_xmin"][:, g:g+1]  = x_min.to(dt)
+
+        # ---- Protect: update only the new token's row ----
+        # k_at_new: (H, D) bf16. gather along D with protected_d (H, n_protect).
+        k_at_new = self.k_fp16[0, new_pos]                        # (H, D)
+        gathered = torch.gather(k_at_new, dim=1, index=protected_d)  # (H, n_protect)
+        self.packed["k_protect_bf16"][0, new_pos] = gathered.to(
+            self.packed["k_protect_bf16"].dtype
         )
-
-        # Splice in. Shapes:
-        #   self.packed["k_int4"]:         (1, S, H, D//2)        <- update [:, g_start:g_end]
-        #   self.packed["k_scale"]:        (1, S//G, H, D)        <- update [:, g:g+1]
-        #   self.packed["k_xmin"]:         (1, S//G, H, D)        <- update [:, g:g+1]
-        #   self.packed["k_protect_bf16"]: (1, S, H, n_protect)   <- update [:, g_start:g_end]
-        #   self.packed["protect_slot"]:   unchanged (frozen at prefill)
-        self.packed["k_int4"][:, g_start:g_end] = sub["k_int4"]
-        self.packed["k_scale"][:, g:g+1]        = sub["k_scale"]
-        self.packed["k_xmin"][:, g:g+1]         = sub["k_xmin"]
-        self.packed["k_protect_bf16"][:, g_start:g_end] = sub["k_protect_bf16"]
 
     def reset(self) -> None:
         super().reset()
         self.packed = None
+        self._protected_d_per_head = None
 
 
 # ----------------------------------------------------------------------
