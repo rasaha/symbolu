@@ -1,9 +1,12 @@
-"""Phase 5B.2 — Int4ProtectedAttentionImpl skeleton + post-init install.
+"""Phase 5B.2/5B.3 — Int4Protected attention backend + impl.
 
-Sets up the impl-layer surface where Phase 5B.4 will insert real
-packed-K kernel calls. v0 here is a thin DELEGATING subclass — behavior
-is unchanged vs stock vLLM/FlashAttention. The goal of 5B.2 is to prove
-we can swap in a custom impl class without breaking generation.
+5B.2 v0: post-init class-swap install (KEPT as fallback).
+5B.3a v0: init-time selection via CacheConfig + get_attn_backend hooks.
+
+Behavior is still pure DELEGATE at this phase — Phase 5B.4 will insert
+real packed-K kernel calls. The goal of 5B.2/5B.3a is to prove we can
+plug into vLLM's attention pipeline at the right places (impl class +
+backend class + config validation) without breaking generation.
 
 Scope clarification vs the design doc:
   - Design doc Phase 5B.2 envisioned "register a new attention backend
@@ -82,6 +85,48 @@ else:
         def __init__(self, *args, **kwargs) -> None:
             raise RuntimeError(
                 "Int4ProtectedAttentionImpl requires vllm.attention.backends.flash_attn"
+            )
+
+
+# ----------------------------------------------------------------------
+# Int4ProtectedAttentionBackend — subclass of FlashAttentionBackend
+# for Phase 5B.3a init-time selection.
+# ----------------------------------------------------------------------
+
+if _VLLM_FA_AVAILABLE:
+
+    class Int4ProtectedAttentionBackend(FlashAttentionBackend):
+        """Phase 5B.3a backend class. Returned by our patched
+        get_attn_backend_cls when kv_cache_dtype="int4_protected".
+
+        Inherits all of FlashAttentionBackend's methods (kv_cache_shape,
+        copy_blocks, swap_blocks, etc.), but overrides get_impl_cls()
+        to return Int4ProtectedAttentionImpl so each attention layer
+        constructs with our impl from the start (no post-init swap
+        needed).
+
+        Phase 5B.4 will additionally override get_kv_cache_shape AND
+        the byte-cost calculation for actual memory savings. v0 here
+        keeps stock memory layout — only the dispatch class changes.
+        """
+
+        _phase5b_backend_marker = "5B.3a"
+
+        @staticmethod
+        def get_name() -> str:
+            return "INT4_PROTECTED"
+
+        @staticmethod
+        def get_impl_cls():
+            return Int4ProtectedAttentionImpl
+
+else:
+
+    class Int4ProtectedAttentionBackend:  # type: ignore[no-redef]
+        """Placeholder when vLLM unavailable."""
+        def __init__(self, *args, **kwargs) -> None:
+            raise RuntimeError(
+                "Int4ProtectedAttentionBackend requires vllm.attention.backends.flash_attn"
             )
 
 
@@ -268,3 +313,128 @@ def count_int4_protected_impls(model: Any) -> Tuple[int, int]:
             if isinstance(impl, Int4ProtectedAttentionImpl):
                 n_ours += 1
     return (n_ours, n_total)
+
+
+# ----------------------------------------------------------------------
+# Phase 5B.3a — init-time install via CacheConfig + backend selector
+# monkey-patches. Call BEFORE LLM(...) construction.
+# ----------------------------------------------------------------------
+
+# Module-level state so enable/disable is idempotent across calls.
+_INSTALLED_PATCHES: Dict[str, Any] = {}
+
+
+def enable_int4_protected_backend() -> None:
+    """Patch vLLM at the module level so kv_cache_dtype="int4_protected"
+    is accepted by CacheConfig validation AND routed to our backend
+    class at engine init. Idempotent — safe to call multiple times.
+
+    Patches applied:
+      1. CacheConfig._verify_cache_dtype: add "int4_protected" to the
+         accepted list (alongside "auto" and the fp8 variants).
+      2. current_platform.get_attn_backend_cls: when kv_cache_dtype
+         == "int4_protected", return our backend's qualname instead
+         of vLLM's default FA qualname. resolve_obj_by_qualname then
+         imports our class via kv_policy.phase5b_backend_install.
+      3. _cached_get_attn_backend.cache_clear() to invalidate any
+         stale cache hits from before patching.
+
+    Call BEFORE LLM(...) construction. Once patches are in place, you
+    can construct an LLM with kv_cache_dtype="int4_protected" and the
+    engine init will route through Int4ProtectedAttentionBackend →
+    Int4ProtectedAttentionImpl per attention layer.
+
+    See disable_int4_protected_backend() for teardown (process-level —
+    rarely needed since process exit clears the patches).
+    """
+    if not _VLLM_FA_AVAILABLE:
+        raise RuntimeError(
+            "enable_int4_protected_backend requires vllm.attention.backends.flash_attn"
+        )
+    if _INSTALLED_PATCHES.get("phase5b_3a", False):
+        return
+
+    # --- 1. CacheConfig._verify_cache_dtype patch ---
+    import vllm.config as vllm_config
+    original_verify = vllm_config.CacheConfig._verify_cache_dtype
+    _INSTALLED_PATCHES["original_verify_cache_dtype"] = original_verify
+
+    def _patched_verify(self):
+        # Accept "int4_protected" as a valid dtype. Falls through to the
+        # original method for all other values (auto, fp8 variants, etc.).
+        if getattr(self, "cache_dtype", None) == "int4_protected":
+            logger.info(
+                "Using int4_protected kv cache dtype (Phase 5B.3a). "
+                "Routes through Int4ProtectedAttentionBackend at init."
+            )
+            return
+        return original_verify(self)
+
+    vllm_config.CacheConfig._verify_cache_dtype = _patched_verify
+
+    # --- 2. current_platform.get_attn_backend_cls patch ---
+    from vllm.platforms import current_platform
+    original_get_cls = current_platform.get_attn_backend_cls
+    _INSTALLED_PATCHES["original_get_attn_backend_cls"] = original_get_cls
+    _INSTALLED_PATCHES["platform"] = current_platform
+
+    def _patched_get_cls(*args, **kwargs):
+        # The signature is (selected_backend, head_size, dtype,
+        # kv_cache_dtype, block_size, use_v1, use_mla) but we accept
+        # *args/**kwargs to be robust to minor signature drift.
+        # kv_cache_dtype is the 4th positional arg or "kv_cache_dtype" kwarg.
+        kv_dtype = kwargs.get("kv_cache_dtype")
+        if kv_dtype is None and len(args) >= 4:
+            kv_dtype = args[3]
+        if kv_dtype == "int4_protected":
+            return (
+                "kv_policy.phase5b_backend_install."
+                "Int4ProtectedAttentionBackend"
+            )
+        return original_get_cls(*args, **kwargs)
+
+    current_platform.get_attn_backend_cls = _patched_get_cls
+
+    # --- 3. Clear the @cache on _cached_get_attn_backend ---
+    from vllm.attention import selector as sel_mod
+    cached = getattr(sel_mod, "_cached_get_attn_backend", None)
+    if cached is not None and hasattr(cached, "cache_clear"):
+        cached.cache_clear()
+
+    _INSTALLED_PATCHES["phase5b_3a"] = True
+    logger.info(
+        "Phase 5B.3a installed: kv_cache_dtype='int4_protected' accepted; "
+        "backend selection patched to return Int4ProtectedAttentionBackend."
+    )
+
+
+def disable_int4_protected_backend() -> None:
+    """Undo the patches installed by enable_int4_protected_backend().
+    Process-level — clears the module-level state. Mainly useful for
+    test cleanup; normal use just relies on process exit."""
+    if not _INSTALLED_PATCHES.get("phase5b_3a", False):
+        return
+
+    import vllm.config as vllm_config
+    vllm_config.CacheConfig._verify_cache_dtype = (
+        _INSTALLED_PATCHES["original_verify_cache_dtype"]
+    )
+
+    platform = _INSTALLED_PATCHES["platform"]
+    platform.get_attn_backend_cls = (
+        _INSTALLED_PATCHES["original_get_attn_backend_cls"]
+    )
+
+    from vllm.attention import selector as sel_mod
+    cached = getattr(sel_mod, "_cached_get_attn_backend", None)
+    if cached is not None and hasattr(cached, "cache_clear"):
+        cached.cache_clear()
+
+    _INSTALLED_PATCHES.clear()
+    logger.info("Phase 5B.3a patches removed.")
+
+
+def is_int4_protected_enabled() -> bool:
+    """True iff enable_int4_protected_backend() has been called and
+    not since disabled. Mainly for tests."""
+    return _INSTALLED_PATCHES.get("phase5b_3a", False)
