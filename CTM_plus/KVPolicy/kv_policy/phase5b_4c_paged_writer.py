@@ -38,8 +38,9 @@ _SCALE_CLAMP = 1e-8
 # Default v_group_size from Phase 2.6 design.
 _DEFAULT_V_GROUP_SIZE = 32
 
-# Debug flag to bypass V packing (write V as bf16 into the cache instead).
-# Set via PHASE5B_4C_BF16_V=1 to isolate packed-V correctness issues.
+# Debug flag to bypass V packing (writer stashes bf16 V in a parallel
+# sidecar; read path passes it as v_cache positional). Used to isolate
+# V packed-path correctness vs K packed-path correctness.
 _BF16_V_ENV = "PHASE5B_4C_BF16_V"
 
 
