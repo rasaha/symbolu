@@ -129,6 +129,7 @@ def pack_k_for_phase2_4(
     *,
     group_size: int = 32,
     protect_fraction: float = 0.04,
+    frozen_protect_mask: Optional["torch.Tensor"] = None,  # (H, D) int8, 1=protected
 ) -> Dict[str, "torch.Tensor"]:
     """Pack a single layer's K into the Phase 2.4 sidecar format.
 
@@ -137,8 +138,14 @@ def pack_k_for_phase2_4(
             from Phase 5A's `cache.k_fp16[:, :S_curr]` slice).
         group_size: along-seq quant group size. v1 locked to 32.
         protect_fraction: fraction of channels per (h) to keep at full
-            BF16. v1 default 0.04 per Phase 6.4 GREEN. Use 0.08 for the
-            safe-mode config.
+            BF16. v1 default 0.04 per Phase 6.4 GREEN. Ignored when
+            frozen_protect_mask is provided.
+        frozen_protect_mask: optional (H, D) int8 mask (1=protected,
+            0=quantize). When provided, skip the magnitude-based
+            channel selection and use this mask. Phase 2.4.1d uses this
+            to keep the prefill-frozen mask consistent across
+            incremental per-group repacks. n_protect is derived from
+            the mask (max row sum) rather than from protect_fraction.
 
     Returns dict with keys:
         k_int4         : (1, S, H, D//2) uint8           — packed nibbles
@@ -174,9 +181,23 @@ def pack_k_for_phase2_4(
     n_groups = S // group_size
 
     # ---- Protect mask + slot ----
-    protect_mask = _select_protect_mask(k_bf16, protect_fraction)  # (H, D)
+    if frozen_protect_mask is not None:
+        # Use the caller-supplied mask (Phase 2.4.1d incremental repack).
+        if frozen_protect_mask.shape != (H, D):
+            raise ValueError(
+                f"frozen_protect_mask shape {tuple(frozen_protect_mask.shape)} "
+                f"!= (H={H}, D={D})"
+            )
+        protect_mask = frozen_protect_mask.to(device=device, dtype=torch.int8)
+        # n_protect = uniform row count (assumed equal across heads, since
+        # selection was top-k per head). Take max as a defensive upper bound.
+        n_protect = int(protect_mask.sum(dim=-1).max().item())
+        if n_protect == 0:
+            n_protect = 1  # match the max(1, ...) convention below
+    else:
+        protect_mask = _select_protect_mask(k_bf16, protect_fraction)  # (H, D)
+        n_protect = max(1, int(round(D * protect_fraction)))
     protect_slot = _build_protect_slot(protect_mask)
-    n_protect = max(1, int(round(D * protect_fraction)))
 
     # ---- Compact protect tensor ----
     # k_protect_bf16[token, h, slot] = k_bf16[0, token, h, d] where

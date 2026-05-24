@@ -81,29 +81,85 @@ class Phase2_4PackedCache(Phase5ANativeCache):
         self.packed: Optional[Dict[str, Any]] = None
 
     def repack(self, protect_fraction: float, group_size: int = 32) -> None:
-        """Repack the FULL k_fp16 buffer (zeros included past s_curr).
+        """Repack the FULL k_fp16 buffer (Phase 2.4.1c v0 — O(S) per call).
 
-        Trimming to s_curr would require padding to a multiple of
-        group_size; zero-padded positions past s_curr are within the
-        typical K range so don't significantly bias per-group scale.
-        The kernel's cache_seqlens arg ensures attention only reads
-        valid positions.
+        Zero-padded positions past s_curr are within the typical K range
+        so don't significantly bias per-group scale. The kernel's
+        cache_seqlens arg ensures attention only reads valid positions.
 
         max_seqlen MUST be a multiple of group_size (validated at install).
+
+        Use this AT PREFILL END to initialize self.packed. For decode-time
+        updates, use repack_incremental which is O(group_size).
         """
         if self.k_fp16 is None or self.max_seqlen is None:
             return
         if self.max_seqlen % group_size != 0:
             raise RuntimeError(
                 f"max_seqlen={self.max_seqlen} must be a multiple of "
-                f"group_size={group_size} for Phase 2.4.1c v0"
+                f"group_size={group_size}"
             )
-        # Pack the entire pre-allocated buffer. The pack function
-        # handles (1, S, H, D) shape.
         self.packed = pack_k_for_phase2_4(
             self.k_fp16, group_size=group_size,
             protect_fraction=protect_fraction,
         )
+
+    def repack_incremental(self, group_size: int = 32) -> None:
+        """Phase 2.4.1d — re-pack ONLY the group containing the newest
+        token. O(group_size) per call instead of O(max_seqlen).
+
+        Pre-conditions:
+          - self.packed must be initialized (call repack() at prefill end).
+          - self.s_curr is the count of tokens written, so the newest
+            token lives at position s_curr - 1.
+          - The protect_slot table is FROZEN at prefill and reused —
+            we pass it back to pack_k_for_phase2_4 as frozen_protect_mask.
+
+        Effect: updates the affected group's scale, xmin, packed bytes,
+        and the new token's k_protect_bf16 slot.
+
+        Same numerical convention as the full repack. Verified equivalent
+        to repack() via verify_phase2_4_1d.py.
+        """
+        if self.packed is None:
+            # No prefill yet — defer to full repack to bootstrap state.
+            return
+        if self.k_fp16 is None or self.max_seqlen is None or self.s_curr <= 0:
+            return
+
+        # The new token lives at position s_curr - 1; its group is g.
+        new_pos = self.s_curr - 1
+        g = new_pos // group_size
+        g_start = g * group_size
+        g_end = g_start + group_size
+        if g_end > self.max_seqlen:
+            # Should not happen if max_seqlen is a multiple of group_size,
+            # but guard defensively.
+            return
+
+        # Reconstruct the frozen protect mask (H, D) int8 from protect_slot.
+        # protect_slot[h, d] >= 0 iff (h, d) is protected.
+        protect_slot = self.packed["protect_slot"]
+        frozen_mask = (protect_slot >= 0).to(torch.int8)
+
+        # Slice ONE group from k_fp16 and repack just that slice.
+        k_slice = self.k_fp16[:, g_start:g_end, :, :].contiguous()
+        sub = pack_k_for_phase2_4(
+            k_slice,
+            group_size=group_size,
+            frozen_protect_mask=frozen_mask,
+        )
+
+        # Splice in. Shapes:
+        #   self.packed["k_int4"]:         (1, S, H, D//2)        <- update [:, g_start:g_end]
+        #   self.packed["k_scale"]:        (1, S//G, H, D)        <- update [:, g:g+1]
+        #   self.packed["k_xmin"]:         (1, S//G, H, D)        <- update [:, g:g+1]
+        #   self.packed["k_protect_bf16"]: (1, S, H, n_protect)   <- update [:, g_start:g_end]
+        #   self.packed["protect_slot"]:   unchanged (frozen at prefill)
+        self.packed["k_int4"][:, g_start:g_end] = sub["k_int4"]
+        self.packed["k_scale"][:, g:g+1]        = sub["k_scale"]
+        self.packed["k_xmin"][:, g:g+1]         = sub["k_xmin"]
+        self.packed["k_protect_bf16"][:, g_start:g_end] = sub["k_protect_bf16"]
 
     def reset(self) -> None:
         super().reset()
@@ -223,9 +279,11 @@ def _wrap_attention_forward_packed(
                 )
                 manager._stats["fallback_calls"] += 1
                 return original_forward(*args, **kwargs)
-            # V0: repack the full K buffer (O(S) per step).
+            # Phase 2.4.1d: incremental per-group repack (O(group_size)).
+            # Falls back to full repack if self.packed is None (defensive;
+            # prefill should have initialized it).
             with manager.time_block("decode_repack"):
-                cache.repack(manager.protect_fraction)
+                cache.repack_incremental()
             if cache.packed is None:
                 manager._stats["fallback_calls"] += 1
                 return original_forward(*args, **kwargs)
