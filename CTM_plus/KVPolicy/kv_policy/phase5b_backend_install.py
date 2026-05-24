@@ -84,7 +84,27 @@ if _VLLM_FA_AVAILABLE:
         """
 
         # Sentinel for verify scripts to check. Bumped each sub-sub-phase.
-        _phase5b_backend_marker = "5B.4c.2"
+        _phase5b_backend_marker = "5B.4c.3"
+
+        # Class-level call counters (aggregate across all layer instances).
+        # Reset via Int4ProtectedAttentionImpl.reset_call_stats().
+        _call_stats: Dict[str, int] = {
+            "prefill_calls":         0,
+            "decode_calls_packed":   0,
+            "decode_calls_fallback": 0,
+            "write_path_calls":      0,
+            "write_path_fallback":   0,
+            "spec_decode_calls":     0,
+        }
+
+        @classmethod
+        def reset_call_stats(cls) -> None:
+            for k in cls._call_stats:
+                cls._call_stats[k] = 0
+
+        @classmethod
+        def get_call_stats(cls) -> Dict[str, int]:
+            return dict(cls._call_stats)
 
         def _get_paged_writer(self, layer=None):
             """Lazy-construct the PagedKVWriter for this layer. The writer
@@ -335,7 +355,9 @@ if _VLLM_FA_AVAILABLE:
                             kv_cache=kv_cache,
                             slot_mapping=updated_slot_mapping.flatten(),
                         )
+                        Int4ProtectedAttentionImpl._call_stats["write_path_calls"] += 1
                     else:
+                        Int4ProtectedAttentionImpl._call_stats["write_path_fallback"] += 1
                         torch.ops._C_cache_ops.reshape_and_cache_flash(
                             key, value, kv_cache[0], kv_cache[1],
                             updated_slot_mapping.flatten(),
@@ -356,6 +378,7 @@ if _VLLM_FA_AVAILABLE:
 
             # ---- Prefill attention (5B.4c will replace inner kernel call) ----
             if prefill_meta := attn_metadata.prefill_metadata:
+                Int4ProtectedAttentionImpl._call_stats["prefill_calls"] += 1
                 if (kv_cache.numel() == 0 or prefill_meta.block_tables is None
                         or prefill_meta.block_tables.numel() == 0):
                     # Normal varlen attention (no paged cache yet).
@@ -406,6 +429,7 @@ if _VLLM_FA_AVAILABLE:
                     # Speculative-decode-style varlen path.
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support max_decode_query_len > 1")
+                    Int4ProtectedAttentionImpl._call_stats["spec_decode_calls"] += 1
                     flash_attn_varlen_func(
                         q=decode_query, k=key_cache, v=value_cache,
                         cu_seqlens_q=decode_meta.query_start_loc,
@@ -425,6 +449,7 @@ if _VLLM_FA_AVAILABLE:
                     # Standard decode path (the common case).
                     if use_paged_writer:
                         # 5B.4c.2: packed read via gather + packed kernel.
+                        Int4ProtectedAttentionImpl._call_stats["decode_calls_packed"] += 1
                         out_packed = self._read_decode_packed(
                             query_q=decode_query.unsqueeze(1),
                             kv_cache=kv_cache,
@@ -433,6 +458,7 @@ if _VLLM_FA_AVAILABLE:
                         )
                         decode_output.copy_(out_packed.squeeze(1))
                     else:
+                        Int4ProtectedAttentionImpl._call_stats["decode_calls_fallback"] += 1
                         seq_lens_arg, _, block_tables_arg = (
                             get_seq_len_block_table_args(decode_meta, False, attn_type)
                         )
