@@ -171,12 +171,23 @@ if _VLLM_FA_AVAILABLE:
 
             cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
 
+            # protect_mask + n_protect must be passed alongside the packed
+            # kwargs — the kernel uses them for some bookkeeping even on
+            # the packed path (mirrors verify_phase2_6_2's call shape).
+            protect_mask_bhd = writer.protect_mask.unsqueeze(0)  # (1, H_kv, D) int8
+
+            # Causal flag: for single-token decode (S_q=1), causal=True and
+            # causal=False produce identical results numerically. But the
+            # kernel's dispatch routes packed only under !Is_causal — pass
+            # False so the packed dispatch fires.
             out = flash_attn_with_int4_kvcache(
                 query_q,
                 dummy, dummy,
                 cache_seqlens=cache_seqlens_i32,
+                protect_mask=protect_mask_bhd,
+                n_protect=writer.n_protect,
                 softmax_scale=self.scale,
-                causal=True,
+                causal=False,
                 window_size=self.sliding_window,
                 alibi_slopes=self.alibi_slopes,
                 softcap=self.logits_soft_cap,
@@ -199,7 +210,13 @@ if _VLLM_FA_AVAILABLE:
         def _ensure_dummy_kv(self, S, H, D, device):
             """Allocate or grow the dummy bf16 K/V buffer for the kernel's
             shape contract. Only seqlen matters; content is unused on
-            the packed path."""
+            the packed path — verify_phase5b_4c_2_read confirmed cosine
+            is identical with zero, random, or real bf16 content.
+
+            We use zeros (not empty) because the alloc happens once per
+            impl lifetime; the cost of memset is amortized to zero across
+            all decode steps that reuse the buffer.
+            """
             existing = getattr(self, "_phase5b_dummy_kv", None)
             if (existing is not None
                     and existing.shape[1] >= S
@@ -207,7 +224,7 @@ if _VLLM_FA_AVAILABLE:
                     and existing.shape[3] == D
                     and existing.device == device):
                 return
-            self._phase5b_dummy_kv = torch.empty(
+            self._phase5b_dummy_kv = torch.zeros(
                 (1, S, H, D), dtype=torch.bfloat16, device=device,
             )
 
