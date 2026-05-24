@@ -77,17 +77,33 @@ class ValueGroupQuantizer:
         self.n_groups = head_dim // v_group_size
         self.max_seqlen = max_seqlen
         self.dtype = dtype
-        self.device = device
+        self.device = device  # may be None → lazy-alloc on first append
 
-        S = max_seqlen
-        H = num_kv_heads
-        D = head_dim
-        n_groups = self.n_groups
-        self.v_int4  = torch.zeros((1, S, H, D // 2),   dtype=torch.uint8, device=device)
-        self.v_scale = torch.zeros((1, S, H, n_groups), dtype=dtype,        device=device)
-        self.v_xmin  = torch.zeros((1, S, H, n_groups), dtype=dtype,        device=device)
+        # Lazy allocation: defer device-bound tensor creation until the
+        # first append() if device wasn't supplied. K's PartialGroupQuantizer
+        # infers device from protect_mask; V has no mask, so we defer.
+        if device is not None:
+            self._allocate_outputs(device)
+        else:
+            self.v_int4 = None      # type: ignore[assignment]
+            self.v_scale = None     # type: ignore[assignment]
+            self.v_xmin = None      # type: ignore[assignment]
 
         self.s_curr = 0
+
+    def _allocate_outputs(self, device) -> None:
+        """Allocate the preallocated output tensors on `device`. Idempotent
+        — only allocates if not already done."""
+        if self.v_int4 is not None:
+            return
+        S = self.max_seqlen
+        H = self.H
+        D = self.D
+        n_groups = self.n_groups
+        self.v_int4  = torch.zeros((1, S, H, D // 2),   dtype=torch.uint8,  device=device)
+        self.v_scale = torch.zeros((1, S, H, n_groups), dtype=self.dtype,   device=device)
+        self.v_xmin  = torch.zeros((1, S, H, n_groups), dtype=self.dtype,   device=device)
+        self.device = device
 
     # ------------------------------------------------------------------
     # Streaming API.
@@ -114,6 +130,10 @@ class ValueGroupQuantizer:
             )
         if v_new.dtype != self.dtype:
             v_new = v_new.to(self.dtype)
+
+        # Lazy-alloc output tensors on the input's device on first append.
+        if self.v_int4 is None:
+            self._allocate_outputs(v_new.device)
 
         n_groups = self.n_groups
         G = self.G
