@@ -190,12 +190,16 @@ class PagedKVWriter:
                 f"head_dim D={D} must be divisible by v_group_size={self.v_group_size}"
             )
 
-        # group_size = block_size (per locked design decision Q2).
-        # Currently locked at BS=16; warn if mismatched.
-        if BS != 16:
-            logger.warning(
-                "PagedKVWriter: block_size=%d != 16; design expected 16. "
-                "Proceeding but quality not validated.", BS,
+        # group_size = block_size = kInt4GroupSize = 32. The kernel's
+        # kInt4GroupSize is a compile-time constexpr (not runtime), so
+        # block_size MUST be 32 to match. PHASE5B4C_DESIGN.md has the
+        # full constraint trace. Caller must pass block_size=32 to
+        # vLLM at LLM(...) construction.
+        if BS != 32:
+            raise RuntimeError(
+                f"PagedKVWriter requires block_size=32 (kernel kInt4GroupSize "
+                f"constexpr); got block_size={BS}. Pass block_size=32 to "
+                f"LLM(...) at construction."
             )
 
         # Load + slice protect mask for this layer.

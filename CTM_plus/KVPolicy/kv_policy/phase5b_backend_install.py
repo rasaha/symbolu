@@ -84,7 +84,7 @@ if _VLLM_FA_AVAILABLE:
         """
 
         # Sentinel for verify scripts to check. Bumped each sub-sub-phase.
-        _phase5b_backend_marker = "5B.4c.1"
+        _phase5b_backend_marker = "5B.4c.2"
 
         def _get_paged_writer(self, layer=None):
             """Lazy-construct the PagedKVWriter for this layer. The writer
@@ -120,6 +120,96 @@ if _VLLM_FA_AVAILABLE:
             writer = PagedKVWriter(layer_idx=layer_idx)
             self._phase5b_paged_writer = writer
             return writer
+
+        def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer):
+            """Phase 5B.4c.2: replace flash_attn_with_kvcache decode call.
+
+            query_q     : (B, S_q=1, H_q, D) bf16
+            kv_cache    : (2, NB, BS, H_kv, D) uint8
+            decode_meta : attn_metadata.decode_metadata (vLLM)
+            layer       : the Attention layer module (for layer_idx fallback)
+
+            Returns: (B, S_q=1, H_q, D) bf16
+
+            batch=1 v1: asserts decode_meta has exactly one sequence.
+            Hybrid splice: rewrites the last block of the gathered view
+            with bf16 staging buffer quantized on the fly for the
+            partial tail.
+            """
+            from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache
+            writer = self._get_paged_writer(layer=layer)
+
+            block_table = decode_meta.block_tables           # (B, max_blocks) int
+            cache_seqlens_orig = decode_meta.seq_lens_tensor # (B,) int
+            B = block_table.shape[0]
+            if B != 1:
+                raise NotImplementedError(
+                    f"Int4Protected batch=1 v1; got batch={B}"
+                )
+            bt = block_table[0]                              # (max_blocks,)
+            seqlen = int(cache_seqlens_orig[0].item())
+            BS = writer.BS
+            n_blocks_used = (seqlen + BS - 1) // BS
+            block_ids = bt[:n_blocks_used].long()
+            S = n_blocks_used * BS
+
+            # Gather + view (paged → contiguous).
+            view = writer.get_packed_view(block_ids, kv_cache)
+
+            # Hybrid partial-tail splice: rewrite the last block with the
+            # in-RAM staging buffer's bf16 K, quantized on the fly with the
+            # same numerical convention as _finalize_k_group.
+            tail_len = seqlen % BS
+            if tail_len != 0:
+                _splice_k_partial_tail(view, writer, last_block_idx=n_blocks_used - 1)
+
+            # Dummy bf16 K/V tensor to satisfy the wrapper's shape contract.
+            # Kernel doesn't read content on the packed path; only shape
+            # (specifically seqlen_k) is consumed.
+            self._ensure_dummy_kv(S, writer.H, writer.D, kv_cache.device)
+            dummy = self._phase5b_dummy_kv[:, :S]
+
+            cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
+
+            out = flash_attn_with_int4_kvcache(
+                query_q,
+                dummy, dummy,
+                cache_seqlens=cache_seqlens_i32,
+                softmax_scale=self.scale,
+                causal=True,
+                window_size=self.sliding_window,
+                alibi_slopes=self.alibi_slopes,
+                softcap=self.logits_soft_cap,
+                # Phase 2.4.1b packed K kwargs.
+                k_packed_int4=view["k_int4"].contiguous(),
+                k_packed_scale=view["k_scale"].contiguous(),
+                k_packed_xmin=view["k_xmin"].contiguous(),
+                k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                k_packed_protect_slot=view["protect_slot"].contiguous(),
+                packed_group_size=BS,                # = kernel kInt4GroupSize = 32
+                packed_n_protect=writer.n_protect,
+                # Phase 2.6.2 packed V kwargs.
+                v_packed_int4=view["v_int4"].contiguous(),
+                v_packed_scale=view["v_scale"].contiguous(),
+                v_packed_xmin=view["v_xmin"].contiguous(),
+                v_packed_group_size=writer.v_group_size,
+            )
+            return out
+
+        def _ensure_dummy_kv(self, S, H, D, device):
+            """Allocate or grow the dummy bf16 K/V buffer for the kernel's
+            shape contract. Only seqlen matters; content is unused on
+            the packed path."""
+            existing = getattr(self, "_phase5b_dummy_kv", None)
+            if (existing is not None
+                    and existing.shape[1] >= S
+                    and existing.shape[2] == H
+                    and existing.shape[3] == D
+                    and existing.device == device):
+                return
+            self._phase5b_dummy_kv = torch.empty(
+                (1, S, H, D), dtype=torch.bfloat16, device=device,
+            )
 
         def forward(
             self,
@@ -316,22 +406,32 @@ if _VLLM_FA_AVAILABLE:
                     )
                 else:
                     # Standard decode path (the common case).
-                    seq_lens_arg, _, block_tables_arg = (
-                        get_seq_len_block_table_args(decode_meta, False, attn_type)
-                    )
-                    flash_attn_with_kvcache(
-                        q=decode_query.unsqueeze(1),
-                        k_cache=key_cache, v_cache=value_cache,
-                        block_table=block_tables_arg,
-                        cache_seqlens=seq_lens_arg,
-                        softmax_scale=softmax_scale,
-                        causal=True,
-                        window_size=window_size,
-                        alibi_slopes=alibi_slopes,
-                        softcap=logits_soft_cap,
-                        out=decode_output.unsqueeze(1),
-                        fa_version=self.vllm_flash_attn_version,
-                    )
+                    if use_paged_writer:
+                        # 5B.4c.2: packed read via gather + packed kernel.
+                        out_packed = self._read_decode_packed(
+                            query_q=decode_query.unsqueeze(1),
+                            kv_cache=kv_cache,
+                            decode_meta=decode_meta,
+                            layer=layer,
+                        )
+                        decode_output.copy_(out_packed.squeeze(1))
+                    else:
+                        seq_lens_arg, _, block_tables_arg = (
+                            get_seq_len_block_table_args(decode_meta, False, attn_type)
+                        )
+                        flash_attn_with_kvcache(
+                            q=decode_query.unsqueeze(1),
+                            k_cache=key_cache, v_cache=value_cache,
+                            block_table=block_tables_arg,
+                            cache_seqlens=seq_lens_arg,
+                            softmax_scale=softmax_scale,
+                            causal=True,
+                            window_size=window_size,
+                            alibi_slopes=alibi_slopes,
+                            softcap=logits_soft_cap,
+                            out=decode_output.unsqueeze(1),
+                            fa_version=self.vllm_flash_attn_version,
+                        )
             return output
 
 else:
@@ -423,6 +523,40 @@ class Int4ProtectedBackendManager:
 # ----------------------------------------------------------------------
 # Attention layer detection (same heuristic as Phase 5A).
 # ----------------------------------------------------------------------
+
+def _splice_k_partial_tail(view: Dict[str, Any], writer: Any, last_block_idx: int) -> None:
+    """Phase 5B.4c.2 hybrid splice. Rewrites the last block of the
+    gathered packed-K view with on-the-fly quantization of the in-RAM
+    staging buffer.
+
+    Mirrors PagedKVWriter._finalize_k_group's math so the kernel sees
+    a self-consistent (scale, xmin, nibbles) triple. Positions in the
+    staging buffer beyond k_stage_count are zero-padded (they wouldn't
+    be attended because cache_seqlens cuts off there).
+
+    view modified in-place at:
+      k_int4[0, last_block_idx*BS : (last_block_idx+1)*BS]
+      k_scale[0, last_block_idx]
+      k_xmin [0, last_block_idx]
+    """
+    BS = writer.BS
+    D  = writer.D
+    half_D = D // 2
+
+    buf_f = writer.k_stage.float()                 # (BS, H, D)
+    x_max = buf_f.amax(dim=0)                       # (H, D)
+    x_min = buf_f.amin(dim=0)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
+
+    q = ((buf_f - x_min.unsqueeze(0)) / scale.unsqueeze(0)) \
+        .round().clamp(0, 15).to(torch.uint8)       # (BS, H, D)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (BS, H, D/2)
+
+    bstart = last_block_idx * BS
+    view["k_int4"][0, bstart:bstart + BS] = packed
+    view["k_scale"][0, last_block_idx]    = scale.to(writer.sidecar_dtype)
+    view["k_xmin"] [0, last_block_idx]    = x_min.to(writer.sidecar_dtype)
+
 
 def _parse_layer_idx_from_name(name: str) -> Optional[int]:
     """Parse the integer N out of 'model.layers.<N>.self_attn' style names.

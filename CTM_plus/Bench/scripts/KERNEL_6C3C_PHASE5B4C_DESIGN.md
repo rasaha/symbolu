@@ -8,6 +8,27 @@
 > `KERNEL_6C3C_PHASE2_6_V_PACK_DESIGN.md` (which locked the V pack
 > shape).
 
+## Late-binding constraint (discovered during 5B.4c.2 read-path design)
+
+**Kernel `kInt4GroupSize = 32` is a compile-time constexpr** — not a
+runtime parameter. The Phase 2.4.1b kernel was only instantiated at
+G=32. The kernel reads `k_scale` at stride `S / 32`; passing a
+`packed_group_size=16` tensor (with stride `S / 16`) silently produces
+wrong results.
+
+Mitigation: require **vLLM `block_size=32`** at LLM construction so
+`block_size == kernel kInt4GroupSize == 32`. PHASE5B5C_DESIGN.md Q2's
+"G=16=block_size" lock was incorrect (it didn't check the kernel
+constraint). Real lock: **G = block_size = kInt4GroupSize = 32**.
+
+Cost: one user-visible config requirement (`block_size=32` instead of
+the typical default 16). num_blocks halves at the same memory budget,
+but block_table indirection halves too — net wash.
+
+Alternative (deferred): rebuild the kernel with G=16 by editing the
+constexpr + reinstantiating. ~1-2 hours of CUDA work + recompile.
+Not required for v1.
+
 ## TL;DR — four locks
 
 1. **K sidecars external, parallel to block_table.** K_scale, K_xmin,

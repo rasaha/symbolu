@@ -49,7 +49,7 @@ from kv_policy.phase5b_4c_paged_writer import (
 QWEN_NUM_LAYERS = 28
 QWEN_H_KV       = 4
 QWEN_D          = 128
-BS              = 16          # block_size = group_size
+BS              = 32          # block_size = group_size = kernel kInt4GroupSize
 V_GROUP_SIZE    = 32
 N_PROTECT       = 5
 DEVICE          = "cuda" if torch.cuda.is_available() else "cpu"
