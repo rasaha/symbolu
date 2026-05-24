@@ -57,16 +57,25 @@
       real memory-savings step + multi-batch).
     - Phase 6 measurement (throughput, KV memory, real-data needle
       on full ship config).
-- **Next phase:** decision point. Three reasonable next moves:
-    - **Phase 2.6** — pack V (mirror of 2.4.x for V), closes the KV
-      memory story algorithmically. ~2-3 days.
-    - **Phase 5B/5C** — real HBM savings via `kv_cache_dtype` in
-      vLLM's CacheEngine. Multi-week, the actual v1 ship blocker.
-    - **Phase 2.4.1e** — Triton-fuse the repack for the last ~130 μs
-      of decode latency. Pure polish; ~5-10 hours.
-  Memory-savings work (5B) dominates schedule; perf polish (2.4.1e)
-  is optional. Recommend Phase 2.6 next if continuing the algorithm
-  work, else 5B.
+- **Next phase:** Phase 5B/5C — native vLLM integration. Design
+  locked in `KERNEL_6C3C_PHASE5B5C_DESIGN.md`. Architecture
+  decision: NATIVE attention backend (`Int4ProtectedAttentionBackend`),
+  NOT monkey-patch — required for BlockManager integration to land
+  the memory-savings claim. Five open design questions answered:
+    - Q1: per-MODEL static protect mask (computed via calibration,
+      Phase 5B.0). Required for prefix caching block sharing.
+    - Q2: group_size = block_size = 16 (matches vLLM block alignment).
+    - Q3: partial-group staging buffer for cache writes
+      (quantize-on-fill, 448 KB total per model).
+    - Q4: native backend confirmed (only way to get savings).
+    - Q5: pin to vLLM 0.7.3 for v1.
+  Sub-phases: 5B.0 (calibration) → 5B.1 (staging buffer test) →
+  5B.2 (backend skeleton) → 5B.3 (CacheEngine integration) →
+  5B.4 (block-aware r/w) → 5B.5 (quality acceptance) → 5C (config
+  surface). 10-15 engineer-days; 2-3 calendar weeks with iteration.
+  Per-token byte cost target: 362 bytes (30% savings vs stock 512)
+  with V still BF16; drops to ~202 bytes (60% savings) once 2.6
+  packs V.
 
 ## Hard scope guard (do not creep)
 
@@ -91,6 +100,7 @@ symmetric quant, group sizes ≠ 32.
 | `KERNEL_6C3C_PHASE2_4_DESIGN.md` | Phase 2.4 — REAL INT4 K HBM read; locked architecture + sub-phase breakdown |
 | `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md` | Phase 2.4.1b open design questions + locked answers (read before writing the patcher) |
 | `KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md` | Post-2.4.1c measurement (packed kernel faster than Phase 5A; 2.4.b reclassified into 5B) |
+| `KERNEL_6C3C_PHASE5B5C_DESIGN.md` | Phase 5B/5C native vLLM integration — architecture lock + 5 design questions + sub-phase breakdown (10-15 day estimate) |
 
 ## Audit trail — branch `claude/fp8-kv-competitive-gap-zpSjg`
 
