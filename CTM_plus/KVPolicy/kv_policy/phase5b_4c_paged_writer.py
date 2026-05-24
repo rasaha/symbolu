@@ -74,8 +74,13 @@ def _build_protect_tables(
 
 def load_protect_mask_for_layer(layer_idx: int) -> "torch.Tensor":
     """Load the frozen per-model protect-mask artifact and return the
-    slice for `layer_idx`. The artifact is a tensor of shape
-    (num_layers, H_kv, D) int8 saved by Phase 5B.0's calibrator.
+    slice for `layer_idx`. The artifact is shape (num_layers, H_kv, D) int8.
+
+    Supported on-disk formats (Phase 5B.0 calibrator + variants):
+      - bare Tensor of shape (num_layers, H_kv, D)
+      - dict with key "mask" (Phase 5B.0 default) or "protect_mask"
+        holding the same tensor
+      - dict keyed by layer index (int or str) → (H_kv, D) tensor each
 
     Path is taken from $PROTECT_MASK_PATH (default Qwen2.5-7B path).
     """
@@ -85,14 +90,47 @@ def load_protect_mask_for_layer(layer_idx: int) -> "torch.Tensor":
             f"Protect mask artifact not found at '{path}'. Set ${_PROTECT_MASK_ENV} "
             f"or run Phase 5B.0 calibration."
         )
-    mask = torch.load(path, map_location="cpu", weights_only=True)
-    if not isinstance(mask, torch.Tensor):
+    # weights_only=False because the Phase 5B.0 artifact is a dict with
+    # plain Python types (str, int, list) alongside the mask tensor.
+    # The file is local + trusted (we wrote it ourselves).
+    raw = torch.load(path, map_location="cpu", weights_only=False)
+
+    # Case A: bare tensor (num_layers, H, D).
+    if isinstance(raw, torch.Tensor):
+        return _slice_mask_for_layer(raw, layer_idx, path)
+
+    # Case B: dict format.
+    if isinstance(raw, dict):
+        # B1: dict with a 'mask' or 'protect_mask' key.
+        for key in ("mask", "protect_mask"):
+            v = raw.get(key)
+            if isinstance(v, torch.Tensor):
+                return _slice_mask_for_layer(v, layer_idx, path)
+        # B2: dict keyed by layer index (int or str).
+        for k in (layer_idx, str(layer_idx)):
+            v = raw.get(k)
+            if isinstance(v, torch.Tensor):
+                if v.ndim != 2:
+                    raise ValueError(
+                        f"Per-layer mask at '{path}'[{k!r}] has shape "
+                        f"{tuple(v.shape)}; expected (H_kv, D)"
+                    )
+                return v.to(torch.int8)
         raise TypeError(
-            f"Protect mask artifact at '{path}' is {type(mask).__name__}, expected Tensor"
+            f"Protect mask dict at '{path}' has no 'mask'/'protect_mask' key "
+            f"and no entry at {layer_idx}. Keys present: {sorted(raw.keys())[:8]}"
         )
+
+    raise TypeError(
+        f"Protect mask artifact at '{path}' is {type(raw).__name__}; expected "
+        f"Tensor or dict"
+    )
+
+
+def _slice_mask_for_layer(mask: "torch.Tensor", layer_idx: int, path: str) -> "torch.Tensor":
     if mask.ndim != 3:
         raise ValueError(
-            f"Protect mask shape {tuple(mask.shape)} != (num_layers, H_kv, D)"
+            f"Protect mask shape {tuple(mask.shape)} at '{path}' != (num_layers, H_kv, D)"
         )
     num_layers = mask.shape[0]
     if layer_idx < 0 or layer_idx >= num_layers:
