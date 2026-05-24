@@ -12,31 +12,37 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.4.1a GREEN at commit `3211008`.
-  Packed-K side channel data plumbing landed: Python wrapper accepts
-  `k_packed_int4`, `k_packed_scale`, `k_packed_xmin`,
-  `k_packed_protect_bf16`, `k_packed_protect_slot`, `packed_group_size`,
-  `packed_n_protect` kwargs. `Int4KvPackedGuard` thread-local captures
-  the pointers; `run_mha_fwd` sets `params.is_int4kv_packed = true`
-  when all five tensors are supplied. The kernel does NOT read these
-  yet — that's Phase 2.4.1b (the actual custom CUDA HBM-load helper).
-  Phase 2.4.0 round-trip test GREEN: pack→unpack preserves protected
-  channels bit-equal, unprotected per-element error ≤ ~LSB, sidecar
-  compression 2.84× vs FP16.
-  Phase 5A still GREEN (the data plumbing flows around the existing
-  path without disturbing it): 28 prefills, 868 decodes, 0 fallbacks,
-  needle correctly retrieved.
-- **What's NOT yet done:** Phase 2.4.1b (kernel-side packed-K HBM
-  read — the load-bearing CUDA work, ~400-500 LOC), Phase 2.4.1c
-  (Python install integration), Phase 2.4.b (free vLLM paged K cache
-  for real HBM savings vs stock), Phase 2.6 (V pack), Phase 5B/5C
-  (batch > 1, `kv_cache_dtype` first-class registration), Phase 6
-  measurement (throughput, KV memory, real-data needle on full ship
-  config).
-- **Next phase:** Phase 2.4.1b. Design + open questions locked in
-  `KERNEL_6C3C_PHASE2_4_1B_DESIGN_QUESTIONS.md`. Estimated 1.5-2.5
-  hours of focused session time including ~15-20 min rebuilds and
-  1-2 iteration rounds.
+- **Latest verified state:** Phase 2.4.1b GREEN at commit `23a08cc`
+  (+ orchestrator/verify scripts at `97bc861`, anchor fixes at `fe92a6c`
+  + `23a08cc`). Kernel-side packed-K HBM read works end-to-end:
+    - `verify_phase2_4_1b.py` cosine **0.9999792** vs Phase 5A
+      reference (gate 0.9995). Max-abs diff 3.66e-04, mean-abs
+      6.19e-05. BF16 scale precision held — no FP32 fallback needed.
+    - `verify_phase4.py` still GREEN (non-packed in-register quant
+      path unchanged; cosine 0.994 Gaussian, 0.996 outlier,
+      protect-K recovery 4.5 milli-cosine).
+    - Phase 5A smoke still GREEN (28 prefills, 868 decodes,
+      0 fallbacks, needle "XYZ123" retrieved). Template gating
+      isolates packed path; non-packed callers unaffected.
+  The new kernel template instantiation
+  `flash_fwd_split_hdim128_bf16_int4kv_packed_sm80.cu` builds and the
+  three-way dispatch (`packed > int4kv > stock`) routes correctly.
+  Packed-K path uses synchronous `__ldg(uint4*)` loads + per-thread
+  fragment unpack/dequant/protect-blend. `cp.async` is a Phase 2.4.1c+
+  perf optimization.
+- **What's NOT yet done:** Phase 2.4.1c (Python install integration —
+  `Phase2_4PackedCache` drops the FP16 sidecar and feeds packed kwargs
+  from `phase5a_native_install.py`), Phase 2.4.2 (memory measurement —
+  K sidecar bytes drop from 1.84 GB → 0.65 GB at S=32k), Phase 2.4.b
+  (free vLLM paged K cache — actual HBM savings vs stock), Phase 2.6
+  (V pack), Phase 5B/5C (batch > 1, `kv_cache_dtype` first-class),
+  Phase 6 measurement (throughput, KV memory, real-data needle on full
+  ship config).
+- **Next phase:** Phase 2.4.1c — wire the packed-K path through the
+  vLLM install. Replace `Phase5ANativeCache`'s FP16 K sidecar with
+  `Phase2_4PackedCache` that calls `pack_k_for_phase2_4` at prefill
+  end and feeds packed kwargs into `flash_attn_with_int4_kvcache` at
+  decode. No CUDA work; ~0.5-1 day of Python.
 
 ## Hard scope guard (do not creep)
 
@@ -109,6 +115,10 @@ symmetric quant, group sizes ≠ 32.
 | `07511fe` | Phase 2.4 design note — REAL INT4 K HBM read; sidecar layout + sub-phase breakdown locked |
 | `1c4d80b` | Phase 2.4.0 — Python pack/unpack helpers + round-trip test (GREEN; 2.84× compression) |
 | `3211008` | **Phase 2.4.1a GREEN** — packed-K data plumbing (no kernel changes); Phase 5A + Phase 4 verifies still pass |
+| `62c8478` | Phase 2.4.1b design-questions checkpoint (Q1/Q2/Q3 locks for the patcher) |
+| `97bc861` | Phase 2.4.1b patcher + helper (int4_packed_load.h) + verify script + orchestrator |
+| `fe92a6c` | Phase 2.4.1b fix — flash.h fwd-decl anchor (single-line format vs my split-line guess) |
+| `23a08cc` | **Phase 2.4.1b GREEN** — OptionalInt4Scratch gate fix (V transform needs it on packed path too); cosine 0.9999792 vs Phase 5A |
 
 ## GPU pod state (as of last session)
 
