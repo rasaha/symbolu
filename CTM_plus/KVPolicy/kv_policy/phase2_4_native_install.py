@@ -214,7 +214,8 @@ def _wrap_attention_forward_packed(
 
         # Decode (T == 1): packed-K bypass.
         try:
-            cache.append(k_3d, v_3d, manager.max_seqlen)
+            with manager.time_block("decode_append"):
+                cache.append(k_3d, v_3d, manager.max_seqlen)
             if not cache.mask_frozen:
                 logger.warning(
                     "Phase 2.4.1c decode without frozen mask on %s; "
@@ -223,7 +224,8 @@ def _wrap_attention_forward_packed(
                 manager._stats["fallback_calls"] += 1
                 return original_forward(*args, **kwargs)
             # V0: repack the full K buffer (O(S) per step).
-            cache.repack(manager.protect_fraction)
+            with manager.time_block("decode_repack"):
+                cache.repack(manager.protect_fraction)
             if cache.packed is None:
                 manager._stats["fallback_calls"] += 1
                 return original_forward(*args, **kwargs)
@@ -260,26 +262,27 @@ def _wrap_attention_forward_packed(
             )
 
             packed = cache.packed
-            out = flash_attn_with_int4_kvcache(
-                q_kernel,
-                cache.k_fp16,
-                cache.v_fp16,
-                cache_seqlens=cache_seqlens,
-                # Phase 4 args kept for Phase 5A reference compatibility
-                # (kernel ignores on the packed path):
-                protect_mask=cache.protect_mask,
-                n_protect=cache.n_protect,
-                # Phase 2.4.1c packed kwargs (Phase 2.4.1a plumbing,
-                # consumed by Phase 2.4.1b kernel):
-                k_packed_int4=packed["k_int4"].contiguous(),
-                k_packed_scale=packed["k_scale"].contiguous(),
-                k_packed_xmin=packed["k_xmin"].contiguous(),
-                k_packed_protect_bf16=packed["k_protect_bf16"].contiguous(),
-                k_packed_protect_slot=packed["protect_slot"].contiguous(),
-                packed_group_size=packed["group_size"],
-                packed_n_protect=packed["n_protect"],
-                causal=False,
-            )
+            with manager.time_block("decode_kernel"):
+                out = flash_attn_with_int4_kvcache(
+                    q_kernel,
+                    cache.k_fp16,
+                    cache.v_fp16,
+                    cache_seqlens=cache_seqlens,
+                    # Phase 4 args kept for Phase 5A reference compatibility
+                    # (kernel ignores on the packed path):
+                    protect_mask=cache.protect_mask,
+                    n_protect=cache.n_protect,
+                    # Phase 2.4.1c packed kwargs (Phase 2.4.1a plumbing,
+                    # consumed by Phase 2.4.1b kernel):
+                    k_packed_int4=packed["k_int4"].contiguous(),
+                    k_packed_scale=packed["k_scale"].contiguous(),
+                    k_packed_xmin=packed["k_xmin"].contiguous(),
+                    k_packed_protect_bf16=packed["k_protect_bf16"].contiguous(),
+                    k_packed_protect_slot=packed["protect_slot"].contiguous(),
+                    packed_group_size=packed["group_size"],
+                    packed_n_protect=packed["n_protect"],
+                    causal=False,
+                )
             out = out.squeeze(1)
             if out.dtype != out_dtype:
                 out = out.to(out_dtype)
@@ -313,6 +316,7 @@ def install_phase2_4_packed(
     query_arg_index: int = 0,
     key_arg_index:   int = 1,
     value_arg_index: int = 2,
+    enable_timing: bool = False,
 ) -> Tuple[Phase2_4PackedManager, Callable[[], None]]:
     """Install Phase 2.4.1c packed-K kernel routing on every attention
     module in `model`.
@@ -336,6 +340,7 @@ def install_phase2_4_packed(
     manager = Phase2_4PackedManager(
         protect_fraction=protect_fraction,
         max_seqlen=max_seqlen,
+        enable_timing=enable_timing,
     )
     teardown_list: List[Callable[[], None]] = []
 

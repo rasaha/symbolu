@@ -175,6 +175,7 @@ class Phase5ANativeManager:
         *,
         protect_fraction: float = 0.04,
         max_seqlen: int = 32768,
+        enable_timing: bool = False,
     ) -> None:
         if not (0.0 <= protect_fraction < 1.0):
             raise ValueError(
@@ -182,12 +183,17 @@ class Phase5ANativeManager:
             )
         self.protect_fraction = float(protect_fraction)
         self.max_seqlen = int(max_seqlen)
+        self.enable_timing = bool(enable_timing)
         self._caches: Dict[int, Phase5ANativeCache] = {}
         self._stats: Dict[str, int] = {
             "prefill_calls": 0,
             "decode_calls":  0,
             "fallback_calls": 0,
         }
+        # Per-block wall-clock timings (only populated when enable_timing).
+        # event_name -> list of elapsed seconds. Use manager.timing_summary()
+        # for aggregates.
+        self._timings: Dict[str, list] = {}
 
     def get_or_create(self, module_id: int) -> Phase5ANativeCache:
         cache = self._caches.get(module_id)
@@ -209,6 +215,45 @@ class Phase5ANativeManager:
             "protect_fraction":   self.protect_fraction,
             "max_seqlen":         self.max_seqlen,
         }
+
+    def time_block(self, name: str):
+        """Context manager that records elapsed time for a named block.
+        No-op when enable_timing=False. Forces torch.cuda.synchronize()
+        at end so GPU work is included in the measurement (~1ms overhead
+        per call, only enabled in measurement runs)."""
+        import contextlib, time
+        if not self.enable_timing:
+            return contextlib.nullcontext()
+        @contextlib.contextmanager
+        def _cm():
+            t0 = time.perf_counter()
+            yield
+            try:
+                import torch
+                torch.cuda.synchronize()
+            except Exception:
+                pass
+            self._timings.setdefault(name, []).append(time.perf_counter() - t0)
+        return _cm()
+
+    def timing_summary(self) -> Dict[str, Any]:
+        """Aggregate per-block timings. Returns dict per event with
+        count, total_s, mean_ms, median_ms."""
+        out: Dict[str, Any] = {}
+        for name, times in self._timings.items():
+            if not times:
+                continue
+            sorted_t = sorted(times)
+            n = len(sorted_t)
+            total = sum(sorted_t)
+            median = sorted_t[n // 2]
+            out[name] = {
+                "count":     n,
+                "total_s":   total,
+                "mean_ms":   1000.0 * total / n,
+                "median_ms": 1000.0 * median,
+            }
+        return out
 
 
 # ----------------------------------------------------------------------
@@ -359,7 +404,8 @@ def _wrap_attention_forward(
 
         # ---- Decode (T == 1): native kernel bypass ----
         try:
-            cache.append(k_3d, v_3d, manager.max_seqlen)
+            with manager.time_block("decode_append"):
+                cache.append(k_3d, v_3d, manager.max_seqlen)
             if not cache.mask_frozen:
                 # No prefill seen for this cache — fall back. Shouldn't
                 # happen in normal usage but the guard is cheap.
@@ -405,15 +451,16 @@ def _wrap_attention_forward(
                 [cache.s_curr], dtype=torch.int32, device=q_kernel.device,
             )
 
-            out = flash_attn_with_int4_kvcache(
-                q_kernel,
-                cache.k_fp16,
-                cache.v_fp16,
-                cache_seqlens=cache_seqlens,
-                protect_mask=cache.protect_mask,
-                n_protect=cache.n_protect,
-                causal=False,  # single-token decode; causal is moot
-            )
+            with manager.time_block("decode_kernel"):
+                out = flash_attn_with_int4_kvcache(
+                    q_kernel,
+                    cache.k_fp16,
+                    cache.v_fp16,
+                    cache_seqlens=cache_seqlens,
+                    protect_mask=cache.protect_mask,
+                    n_protect=cache.n_protect,
+                    causal=False,  # single-token decode; causal is moot
+                )
             # out shape: (1, 1, H_q, D)
             out = out.squeeze(1)  # (1, H_q, D)
             if out.dtype != out_dtype:
@@ -468,6 +515,7 @@ def install_phase5a_native(
     query_arg_index: int = 0,
     key_arg_index:   int = 1,
     value_arg_index: int = 2,
+    enable_timing: bool = False,
 ) -> Tuple[Phase5ANativeManager, Callable[[], None]]:
     """Install Phase 5A native-kernel routing on every attention module
     in `model`.
@@ -497,6 +545,7 @@ def install_phase5a_native(
     manager = Phase5ANativeManager(
         protect_fraction=protect_fraction,
         max_seqlen=max_seqlen,
+        enable_timing=enable_timing,
     )
     teardown_list: List[Callable[[], None]] = []
 
