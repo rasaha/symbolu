@@ -158,6 +158,8 @@ symmetric quant, group sizes ≠ 32.
 | `8ee4be3` | Phase 2.4.b reclassified into Phase 5B (measurement showed vLLM's KV cache is a preallocated reserve, not freeable) |
 | `1872520` | Phase 2.4 measurement findings + design docs updated |
 | `f19e7a8` | **Phase 2.4.1d GREEN** — incremental per-group repack; decode_repack 2.9× faster than v0; end-to-end +12.3% faster than Phase 5A |
+| `2de1615` | Phase 5B/5C design — architecture lock (native attention backend) + 5 design questions + sub-phase breakdown |
+| `aab8d0b` | **Phase 5B.0 GREEN** — per-model protect mask calibrated on Qwen2.5-7B; artifact (28, 4, 128) int8 saved; layer-0/1 IoU 11.1% confirms layer-specific channel selection |
 
 ## GPU pod state (as of last session)
 
