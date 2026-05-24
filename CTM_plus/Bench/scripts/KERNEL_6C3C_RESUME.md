@@ -12,37 +12,36 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.4.1b GREEN at commit `23a08cc`
-  (+ orchestrator/verify scripts at `97bc861`, anchor fixes at `fe92a6c`
-  + `23a08cc`). Kernel-side packed-K HBM read works end-to-end:
-    - `verify_phase2_4_1b.py` cosine **0.9999792** vs Phase 5A
-      reference (gate 0.9995). Max-abs diff 3.66e-04, mean-abs
-      6.19e-05. BF16 scale precision held — no FP32 fallback needed.
-    - `verify_phase4.py` still GREEN (non-packed in-register quant
-      path unchanged; cosine 0.994 Gaussian, 0.996 outlier,
-      protect-K recovery 4.5 milli-cosine).
-    - Phase 5A smoke still GREEN (28 prefills, 868 decodes,
-      0 fallbacks, needle "XYZ123" retrieved). Template gating
-      isolates packed path; non-packed callers unaffected.
-  The new kernel template instantiation
-  `flash_fwd_split_hdim128_bf16_int4kv_packed_sm80.cu` builds and the
-  three-way dispatch (`packed > int4kv > stock`) routes correctly.
-  Packed-K path uses synchronous `__ldg(uint4*)` loads + per-thread
-  fragment unpack/dequant/protect-blend. `cp.async` is a Phase 2.4.1c+
-  perf optimization.
-- **What's NOT yet done:** Phase 2.4.1c (Python install integration —
-  `Phase2_4PackedCache` drops the FP16 sidecar and feeds packed kwargs
-  from `phase5a_native_install.py`), Phase 2.4.2 (memory measurement —
-  K sidecar bytes drop from 1.84 GB → 0.65 GB at S=32k), Phase 2.4.b
-  (free vLLM paged K cache — actual HBM savings vs stock), Phase 2.6
-  (V pack), Phase 5B/5C (batch > 1, `kv_cache_dtype` first-class),
-  Phase 6 measurement (throughput, KV memory, real-data needle on full
-  ship config).
-- **Next phase:** Phase 2.4.1c — wire the packed-K path through the
-  vLLM install. Replace `Phase5ANativeCache`'s FP16 K sidecar with
-  `Phase2_4PackedCache` that calls `pack_k_for_phase2_4` at prefill
-  end and feeds packed kwargs into `flash_attn_with_int4_kvcache` at
-  decode. No CUDA work; ~0.5-1 day of Python.
+- **Latest verified state:** Phase 2.4.1c v0 GREEN at commit `bd2c313`.
+  End-to-end vLLM decode through the packed-K HBM kernel:
+    - `verify_phase2_4_1c.py` PASS — 28 prefills, 868 decodes,
+      **0 fallbacks**, needle retrieved (`XYZ123XYZ123`).
+    - Decode throughput 21.3 tok/s vs Phase 5A 27.3 tok/s
+      (**~22% slower**, much better than the napkin O(S²) prediction —
+      the per-decode repack is GPU-parallelizable).
+    - Kernel cosine vs Phase 5A reference still 0.9999792 at the
+      verify_phase2_4_1b.py level. The slightly different decoded text
+      vs Phase 5A is the same ~2e-5 drift landing on a different
+      greedy-decode trajectory; both retrieve the needle.
+  Previously verified:
+    - `verify_phase2_4_1b.py` cosine 0.9999792 vs Phase 5A reference.
+    - `verify_phase4.py` GREEN (non-packed path unchanged).
+    - Phase 5A smoke GREEN.
+- **What's NOT yet done:** Phase 2.4.1d (incremental per-group repack —
+  O(1) decode vs v0's O(S); restores throughput parity with Phase 5A),
+  Phase 2.4.b (free vLLM paged K cache for actual HBM savings vs stock),
+  Phase 2.6 (V pack), Phase 5B/5C (batch > 1, `kv_cache_dtype`
+  first-class), Phase 6 measurement (throughput, KV memory, real-data
+  needle on full ship config).
+- **Next phase:** Phase 2.4.1d OR Phase 2.4.b OR Phase 2.6 — depends
+  on what blocker matters most:
+    - **2.4.1d** if perf is the headline gap (closes 22% slowdown).
+    - **2.4.b** if "actual memory savings vs stock vLLM" is the
+      headline — Phase 2.4 currently doesn't save HBM (we have BOTH
+      the packed sidecar AND vLLM's BF16 paged cache; 2.4.b frees
+      the latter).
+    - **2.6** if V packing is the missing piece (closes V's BF16
+      sidecar footprint).
 
 ## Hard scope guard (do not creep)
 
@@ -119,6 +118,7 @@ symmetric quant, group sizes ≠ 32.
 | `97bc861` | Phase 2.4.1b patcher + helper (int4_packed_load.h) + verify script + orchestrator |
 | `fe92a6c` | Phase 2.4.1b fix — flash.h fwd-decl anchor (single-line format vs my split-line guess) |
 | `23a08cc` | **Phase 2.4.1b GREEN** — OptionalInt4Scratch gate fix (V transform needs it on packed path too); cosine 0.9999792 vs Phase 5A |
+| `bd2c313` | **Phase 2.4.1c v0 GREEN** — packed-K vLLM install (Phase2_4PackedCache + install_phase2_4_packed); end-to-end Qwen2.5-7B decode through packed kernel, 0 fallbacks, ~22% slower than Phase 5A |
 
 ## GPU pod state (as of last session)
 
