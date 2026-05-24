@@ -268,6 +268,18 @@ def _packed_v_only(
     raise NotImplementedError("can't run packed-V-only at the kernel level")
 
 
+def _build_data_derived_protect_mask(k_bf: torch.Tensor) -> torch.Tensor:
+    """Build (1, H, D) int8 mask via top-N_PROTECT magnitudes per head.
+    This mirrors verify_phase2_6_2 / verify_phase5b_4c_2 exactly so
+    we can isolate any 'mask-shape sensitivity' the kernel might have.
+    """
+    ch_mag = k_bf.float().abs().amax(dim=1)             # (1, H, D)
+    _, topk_idx = ch_mag.topk(N_PROTECT, dim=-1)        # (1, H, N_PROTECT)
+    mask = torch.zeros((1, H_KV, D), dtype=torch.int8, device=k_bf.device)
+    mask.scatter_(-1, topk_idx, 1)
+    return mask
+
+
 def test_v_only_kernel_with_writer(writer: PagedKVWriter, kv_cache: torch.Tensor) -> None:
     """T4/T5 combined: full packed path (both K and V packed via writer).
     Compare to Phase 5A reference. Same as verify_phase5b_4c_2's T1 but
