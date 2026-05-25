@@ -169,7 +169,17 @@ def _gen_int4(prompts: List[str], args) -> Tuple[List[str], Dict[str, int]]:
                 if isinstance(impl, Int4ProtectedAttentionImpl):
                     w = getattr(impl, "_phase5b_paged_writer", None)
                     if w is not None:
-                        w.reset_sequence()
+                        # Phase 7 fix: reset ALL seqs (not just default) so
+                        # stale SeqStates from prior prompts don't carry
+                        # accumulated seq_pos into a new prompt. vLLM
+                        # recycles block_ids across generate calls; on
+                        # models with tight KV-cache budgets (e.g.
+                        # Qwen2.5-14B with ~3.6K blocks) collisions happen
+                        # within 5-10 prompts and cause bf16-backing
+                        # overflow. `reset_sequence("all")` evicts every
+                        # SeqState (per B-pre-1 fix `1f04819`); next write
+                        # to any seq_id lazily allocates a fresh slot.
+                        w.reset_sequence("all")
         out = llm.generate([p], sampling)
         texts.append(out[0].outputs[0].text)
 
