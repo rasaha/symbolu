@@ -67,29 +67,29 @@ def build_uniform_mask():
     return mask
 
 
-def run_cell(name, S, mask, num_splits=0):
-    """Run one (S, mask) cell. Returns (cosine, output_sum_abs, ref_sum_abs)."""
+def run_cell(name, S, mask, num_splits=0, backing="real"):
+    """Run one (S, mask, backing) cell.
+    backing in {"real", "zero", "random"} controls the K/V positional args
+    of the packed kernel call. The ref call always uses real K/V.
+    """
     torch.manual_seed(42)
     k = torch.randn(B, S, H_KV, D, device=DEVICE, dtype=DTYPE)
     v = torch.randn(B, S, H_KV, D, device=DEVICE, dtype=DTYPE)
     q = torch.randn(B, 1, H_Q, D, device=DEVICE, dtype=DTYPE)
     cache_seqlens = torch.tensor([S], dtype=torch.int32, device=DEVICE)
 
-    # If mask is callable, build from k. Else use as-is.
     if callable(mask):
         protect_mask = mask(k)
     else:
         protect_mask = mask
-    mask_for_pack = protect_mask[0].to(torch.int8)    # (H, D)
+    mask_for_pack = protect_mask[0].to(torch.int8)
 
-    # Reference (Phase 5A): bf16 K + V + in-register quant via protect_mask.
     ref = flash_attn_with_int4_kvcache(
         q, k, v, cache_seqlens=cache_seqlens,
         protect_mask=protect_mask, n_protect=N_PROTECT,
         causal=False,
     )
 
-    # Packed: pack K + V, call kernel.
     k_packed = pack_k_for_phase2_4(
         k, group_size=GROUP_SIZE_K,
         protect_fraction=N_PROTECT / D,
@@ -97,8 +97,20 @@ def run_cell(name, S, mask, num_splits=0):
     )
     v_packed = pack_v_for_phase2_6(v, v_group_size=GROUP_SIZE_V)
 
+    if backing == "real":
+        k_arg, v_arg = k, v
+    elif backing == "zero":
+        k_arg = torch.zeros_like(k)
+        v_arg = torch.zeros_like(v)
+    elif backing == "random":
+        torch.manual_seed(999)
+        k_arg = torch.randn_like(k)
+        v_arg = torch.randn_like(v)
+    else:
+        raise ValueError(backing)
+
     packed = flash_attn_with_int4_kvcache(
-        q, k, v, cache_seqlens=cache_seqlens,
+        q, k_arg, v_arg, cache_seqlens=cache_seqlens,
         protect_mask=protect_mask, n_protect=N_PROTECT,
         causal=False,
         k_packed_int4=k_packed["k_int4"].contiguous(),
@@ -156,31 +168,57 @@ def main() -> int:
     print("Cell D': S=128, mask=uniform, num_splits=1:")
     cos_Dp = run_cell("D'", 128, build_uniform_mask(), num_splits=1)
 
+    # ---- Backing-content sensitivity ----
+    print()
+    print("--- BACKING-CONTENT sensitivity at small S ---")
+    print()
+    print("Cell E_real: S=128, uniform mask, REAL bf16 backing:")
+    cos_Er = run_cell("E_real",   128, build_uniform_mask(), backing="real")
+    print("Cell E_zero: S=128, uniform mask, ZERO bf16 backing:")
+    cos_Ez = run_cell("E_zero",   128, build_uniform_mask(), backing="zero")
+    print("Cell E_rand: S=128, uniform mask, RANDOM bf16 backing:")
+    cos_Erd = run_cell("E_rand",  128, build_uniform_mask(), backing="random")
+    print()
+    print("Cell F_real: S=512, uniform mask, REAL bf16 backing:")
+    cos_Fr = run_cell("F_real",   512, build_uniform_mask(), backing="real")
+    print("Cell F_zero: S=512, uniform mask, ZERO bf16 backing:")
+    cos_Fz = run_cell("F_zero",   512, build_uniform_mask(), backing="zero")
+
     print()
     print("======================================================")
     print("Bisection summary")
     print("======================================================")
     rows = [
-        ("A   (S=16384, data-derived mask, num_splits=auto)", cos_A),
-        ("B   (S=16384, uniform mask,      num_splits=auto)", cos_B),
-        ("C   (S=128,   data-derived mask, num_splits=auto)", cos_C),
-        ("D   (S=128,   uniform mask,      num_splits=auto)", cos_D),
-        ("C'  (S=128,   data-derived mask, num_splits=1   )", cos_Cp),
-        ("D'  (S=128,   uniform mask,      num_splits=1   )", cos_Dp),
+        ("A     (S=16384, data-derived mask, num_splits=auto, real)",  cos_A),
+        ("B     (S=16384, uniform mask,      num_splits=auto, real)",  cos_B),
+        ("C     (S=128,   data-derived mask, num_splits=auto, real)",  cos_C),
+        ("D     (S=128,   uniform mask,      num_splits=auto, real)",  cos_D),
+        ("C'    (S=128,   data-derived mask, num_splits=1,    real)",  cos_Cp),
+        ("D'    (S=128,   uniform mask,      num_splits=1,    real)",  cos_Dp),
+        ("E_real (S=128,  uniform mask,      backing=real)            ", cos_Er),
+        ("E_zero (S=128,  uniform mask,      backing=zero)            ", cos_Ez),
+        ("E_rand (S=128,  uniform mask,      backing=random)          ", cos_Erd),
+        ("F_real (S=512,  uniform mask,      backing=real)            ", cos_Fr),
+        ("F_zero (S=512,  uniform mask,      backing=zero)            ", cos_Fz),
     ]
     for label, c in rows:
         verdict = "PASS" if c >= 0.995 else "FAIL"
         print(f"  {label}: cosine={c:.7f}  [{verdict}]")
 
     print()
-    if cos_B < 0.995:
-        print("  Verdict: uniform mask FAILS at large S too — protect_mask path bug.")
-    elif cos_C < 0.995:
-        print("  Verdict: small S FAILS at data-derived mask too — small-S kernel bug.")
-    elif cos_D < 0.995:
-        print("  Verdict: BOTH small S and uniform mask are needed to trigger.")
-    else:
-        print("  Verdict: nothing broken — original 5B.4c.3 T5 was a different bug.")
+    if cos_Ez < 0.995 and cos_Er >= 0.995:
+        print("  >>> CONFIRMED: at small S=128, packed kernel reads bf16 backing.")
+        print("      With REAL backing: PASS. With ZERO backing: FAIL.")
+        if cos_Fz >= 0.995:
+            print("      At S=512 the kernel does NOT depend on backing.")
+            print("      => Bug specifically at small S: packed helper doesn't fully")
+            print("         override smem before consumption. The fix path is either")
+            print("         (a) keep parallel bf16 K/V cache for the impl, or")
+            print("         (b) patch the kernel's K/V load site to skip the cp.async")
+            print("             when Is_int4kv_packed=true.")
+    elif cos_Ez >= 0.995:
+        print("  Backing-content independence holds at small S too. The original")
+        print("  5B.4c.3 T5 failure must be due to some other fixture quirk.")
     return 0
 
 
