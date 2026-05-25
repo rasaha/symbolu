@@ -76,12 +76,19 @@ Calibrated + end-to-end verified through the int4_protected backend:
 |---|---|---|---|
 | `Qwen/Qwen2.5-7B-Instruct` | 28 layers × H_kv=4 × D=128 | `qwen2_5_7b_protect_mask_4pct.pt` | v1.x ship: 5B.6 GREEN, needle 15/15 |
 | `mistralai/Mistral-7B-Instruct-v0.3` | 32 layers × H_kv=8 × D=128 | `mistral_7b_instruct_v0_3_protect_mask_4pct.pt` | Phase 7 GREEN: smoke 4/4, **needle 15/15 == stock** |
+| `NousResearch/Meta-Llama-3.1-8B-Instruct` *(ungated mirror)* | 32 layers × H_kv=8 × D=128 | `meta_llama_3_1_8b_instruct_protect_mask_4pct.pt` | Phase 7 GREEN: **needle 15/15 == stock**, 0 fallbacks in 30240 decodes + 30720 writes |
 | `Qwen/Qwen2.5-14B-Instruct` | 48 layers × H_kv=8 × D=128 | `qwen2_5_14b_instruct_protect_mask_4pct.pt` | Phase 7 GREEN: **needle 15/15 == stock**, 0 fallbacks in 45360 decodes + 46080 writes |
 
-All three hit 100% needle retrieval at the 4% protect_fraction with
+All four hit 100% needle retrieval at the 4% protect_fraction with
 zero packed-decode fallbacks — int4_protected is quality-equivalent
-to stock bf16 vLLM on the needle-in-haystack benchmark across two
-model families (Qwen + Mistral) and two scales (7B + 14B).
+to stock bf16 vLLM on the needle-in-haystack benchmark across
+**three model families** (Qwen + Mistral + Llama) and **two
+scales** (7-8B + 14B).
+
+The gated `meta-llama/Llama-3.1-8B-Instruct` weights are
+bit-equivalent to the ungated mirror; either works. The mask is
+agnostic to mirror choice (calibrated from architecture + weights,
+both of which are identical between the gated and ungated repos).
 
 Adding a new model (any D=128 architecture):
 
