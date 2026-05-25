@@ -240,6 +240,20 @@ symmetric quant, group sizes ≠ 32.
 - **3/5 diverse prompts produce bit-identical greedy output** vs stock vLLM
 - **0 fallbacks** across all 5 verify phases (50000+ packed decodes total)
 
+### Three-way benchmark (bf16 / fp8 / int4_protected) — `e5a75a4`
+
+Full numbers in `Bench/scripts/PHASE5C_SHIP_REPORT.md`. Headlines:
+
+| Backend | Max concurrency | Decode tok/s/seq | Quality vs bf16 |
+|---|---|---|---|
+| bf16 | 109.12× | 83.8 | (baseline) |
+| fp8  | 219.22× (**2.0×**) | 64.7 (77%) | 12% prefix overlap, **0/6 IDENTICAL** |
+| int4_protected | 219.22× (**2.0×**) | 17.0 (20%) | **82% prefix overlap, 3/6 IDENTICAL** |
+
+**Critical finding:** int4_protected matches FP8's memory efficiency but with **dramatically better output fidelity** — half the prompts produce bit-identical greedy output vs bf16, while FP8 diverges from bf16 within the first 10-30 characters on every prompt. The protect-K mechanism (4% of channels stored at bf16 precision) recovers more attention quality than uniform 8-bit FP8 quantization.
+
+v1 cost: ~5× slower per-sequence decode latency. Entirely Python-side overhead in `PagedKVWriter.write` (per-token loop) + small-S kernel cp.async workaround. Phase 6 perf polish (vectorized writer + kernel patch) closes most of this. Multi-batch (Phase 5B.6) unlocks the aggregate-throughput win from 2× concurrency.
+
 ## Phase 5B.5 GREEN milestone — v1 quality acceptance complete
 
 **Char-diff results (5 diverse prompts, max_tokens=64):**
