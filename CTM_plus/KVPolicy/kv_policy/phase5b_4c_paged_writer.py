@@ -348,19 +348,23 @@ class PagedKVWriter:
         kv_cache: "torch.Tensor",       # (2, NB, BS, H_kv, D) uint8
         slot_mapping: "torch.Tensor",   # (T,) long
     ) -> None:
-        """Quantize T new K/V tokens and write them into the paged cache
-        + external sidecars at the slots given by slot_mapping.
+        """Phase 6 vectorized write: quantize T new K/V tokens and write
+        into paged cache + external sidecars at the slots in slot_mapping.
 
-        For each token:
-          * V: quantize per-(h, group) along D, write nibbles into the
-               V slot's first D/2 bytes, write scale/xmin into the V
-               externals at (block_id, pos).
-          * K: extract protected channels (write to k_protect_ext at
-               (block_id, pos)), stage in k_stage. When the staging
-               buffer fills a block, finalize the K group: quantize
-               all 16 tokens with shared per-(h, d) scale, write nibbles
-               into kv_cache[0]'s K slot, write scale/xmin into the K
-               externals at block_id.
+        Pipeline:
+          1. Filter -1 padding slots (vLLM uses -1 for "do not write").
+          2. BF16 K/V backing append at [seq_pos : seq_pos+n_real].
+          3. V quantization VECTORIZED over n_real (one set of CUDA ops).
+          4. V scatter into kv_cache[1] + v_scale_ext + v_xmin_ext via
+             advanced indexing — one op each instead of T per-token writes.
+          5. K protect gather VECTORIZED -> scatter into k_protect_ext.
+          6. K staging: split unique blocks into FULL (count==BS, batch-
+             finalize all at once) vs PARTIAL (count<BS, through staging
+             buffer). At most ~2 partial blocks per call in practice
+             (one continuing from prior, one new tail).
+
+        Bit-equivalent to the prior per-token implementation; verified
+        by verify_phase5b_4c_1_write.py + verify_phase5b_4c_2_read.py.
         """
         if not self._allocated:
             self._lazy_alloc(kv_cache)
@@ -378,116 +382,243 @@ class PagedKVWriter:
                 f"slot_mapping shape {tuple(slot_mapping.shape)} != ({key.shape[0]},)"
             )
 
-        # Move slot_mapping to CPU once for the per-token Python loop.
-        # (For v1 we accept the per-token cost; vectorize in v2.)
-        slot_map_cpu = slot_mapping.to("cpu", dtype=torch.long, non_blocking=False)
         T = key.shape[0]
         dtype = self.sidecar_dtype
         BS = self.BS
         D = self.D
+        H = self.H
         half_D = D // 2
 
-        # Cast K/V to sidecar dtype if needed (typically already bf16).
         if key.dtype != dtype:
             key = key.to(dtype)
         if value.dtype != dtype:
             value = value.to(dtype)
 
-        # Phase 5B.4c.3 fix (a): copy bf16 K/V into the parallel backing
-        # buffer at [seq_pos : seq_pos+T]. The read path passes this to
-        # the kernel as positional K/V args so the small-S override-gap
-        # is harmless. This is independent of the paged layout — pure
-        # seq-major bf16 stash. Counts only NON-PADDING tokens to keep
-        # seq_pos aligned with cache_seqlens semantics.
+        # Move slot_mapping to the same device as key (it's typically GPU
+        # already but be defensive). Filter -1 padding.
+        if slot_mapping.device != key.device:
+            slot_mapping = slot_mapping.to(key.device)
+        slot_mapping = slot_mapping.long()
+        non_padding_gpu = (slot_mapping >= 0)
+        # Single CPU sync to learn how many real tokens we have. This is
+        # also implicitly needed to size downstream tensors.
+        n_real = int(non_padding_gpu.sum().item())
+        if n_real == 0:
+            return
+
+        if n_real == T:
+            real_key = key
+            real_value = value
+            real_slots = slot_mapping
+        else:
+            real_key   = key[non_padding_gpu]            # (n_real, H, D)
+            real_value = value[non_padding_gpu]
+            real_slots = slot_mapping[non_padding_gpu]
+
+        # ===== BF16 K/V backing (Phase 5B.4c.3 fix-a; already batched) =====
         if self.bf16_k_backing is not None:
-            non_padding = (slot_map_cpu >= 0)
-            n_real = int(non_padding.sum().item())
-            if n_real > 0:
-                if self.seq_pos + n_real > self.bf16_k_backing.shape[1]:
-                    raise RuntimeError(
-                        f"bf16 backing overflow: seq_pos={self.seq_pos} + "
-                        f"n_real={n_real} > max_seqlen="
-                        f"{self.bf16_k_backing.shape[1]}. Set "
-                        f"{_BF16_BACKING_MAX_SEQLEN_ENV} to a larger value."
-                    )
-                # Slice key/value to drop -1 padding rows then stash.
-                real_mask_gpu = non_padding.to(key.device)
-                k_real = key[real_mask_gpu]              # (n_real, H, D)
-                v_real = value[real_mask_gpu]
-                self.bf16_k_backing[0, self.seq_pos:self.seq_pos + n_real] = k_real
-                self.bf16_v_backing[0, self.seq_pos:self.seq_pos + n_real] = v_real
-                self.seq_pos += n_real
+            if self.seq_pos + n_real > self.bf16_k_backing.shape[1]:
+                raise RuntimeError(
+                    f"bf16 backing overflow: seq_pos={self.seq_pos} + "
+                    f"n_real={n_real} > max_seqlen="
+                    f"{self.bf16_k_backing.shape[1]}. Set "
+                    f"{_BF16_BACKING_MAX_SEQLEN_ENV} to a larger value."
+                )
+            self.bf16_k_backing[0, self.seq_pos:self.seq_pos + n_real] = real_key
+            self.bf16_v_backing[0, self.seq_pos:self.seq_pos + n_real] = real_value
+            self.seq_pos += n_real
 
-        for t in range(T):
-            slot = int(slot_map_cpu[t].item())
-            if slot < 0:
-                # vLLM uses -1 for "do not write" padding slots.
+        block_ids = real_slots // BS                     # (n_real,) long
+        positions = real_slots %  BS
+
+        # ===== V quantization, fully vectorized over n_real =====
+        if _bf16_v_mode():
+            # Debug bf16-V mode (used in 5B.4c.3 V isolation).
+            if getattr(self, "_v_bf16_ext", None) is None:
+                self._v_bf16_ext = torch.zeros(
+                    (self.NB, self.BS, H, D),
+                    dtype=dtype, device=kv_cache.device,
+                )
+            self._v_bf16_ext[block_ids, positions] = real_value
+        else:
+            v_grouped = real_value.float().view(
+                n_real, H, self.v_n_groups, self.v_group_size,
+            )
+            v_max = v_grouped.amax(dim=-1)                              # (n_real, H, n_g)
+            v_min = v_grouped.amin(dim=-1)
+            v_scale = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+            q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale.unsqueeze(-1)) \
+                .round().clamp(0, 15).to(torch.uint8)                   # (n_real, H, n_g, G)
+            q_v_flat = q_v.view(n_real, H, D)
+            v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
+            # v_packed: (n_real, H, D/2)
+
+            kv_cache[1, block_ids, positions, :, :half_D] = v_packed
+            self.v_scale_ext[block_ids, positions] = v_scale.to(dtype)
+            self.v_xmin_ext [block_ids, positions] = v_min.to(dtype)
+
+        # ===== K protect gather, vectorized =====
+        protect_idx = self.protected_d_per_head.unsqueeze(0).expand(n_real, -1, -1)
+        # (n_real, H, n_protect) long
+        k_protect = torch.gather(real_key, dim=-1, index=protect_idx)
+        self.k_protect_ext[block_ids, positions] = k_protect
+
+        # ===== K staging + finalize =====
+        # Identify unique blocks and which are FULL (count == BS) vs PARTIAL.
+        # FULL blocks bypass the staging buffer (we have all BS tokens for
+        # them already in real_key, so finalize directly in one batched op).
+        # PARTIAL blocks go through the staging buffer (state carries
+        # across write() calls).
+        unique_blocks, inverse, counts = torch.unique(
+            block_ids, return_inverse=True, return_counts=True,
+        )
+        full_mask = (counts == BS)
+        n_full_blocks = int(full_mask.sum().item())
+
+        if n_full_blocks > 0:
+            self._finalize_k_full_blocks_batched(
+                kv_cache=kv_cache,
+                real_key=real_key,
+                block_ids=block_ids,
+                positions=positions,
+                inverse=inverse,
+                unique_blocks=unique_blocks,
+                full_mask=full_mask,
+                n_full_blocks=n_full_blocks,
+            )
+
+        if n_full_blocks < unique_blocks.shape[0]:
+            # At least one PARTIAL block; route those through the staging
+            # buffer. Process in SEQUENCE ORDER (appearance order) so the
+            # k_stage_block_id state ends pointing at the sequence's last
+            # block (where the next decode write will continue).
+            self._stage_k_partial_blocks(
+                kv_cache=kv_cache,
+                real_key=real_key,
+                block_ids=block_ids,
+                positions=positions,
+                unique_blocks=unique_blocks,
+                full_mask=full_mask,
+            )
+
+    def _finalize_k_full_blocks_batched(
+        self,
+        *,
+        kv_cache,
+        real_key,
+        block_ids,
+        positions,
+        inverse,
+        unique_blocks,
+        full_mask,
+        n_full_blocks,
+    ):
+        """Batch-finalize all blocks for which this write() supplied
+        the full BS tokens. Equivalent to running _finalize_k_group N
+        times but in one set of CUDA ops.
+        """
+        BS = self.BS
+        H = self.H
+        D = self.D
+        half_D = D // 2
+        dtype = self.sidecar_dtype
+
+        full_block_ids = unique_blocks[full_mask]                    # (n_full,) sorted ascending
+        in_full_mask = full_mask[inverse]                            # (n_real,) bool
+        keys_for_full = real_key[in_full_mask]                       # (n_full * BS, H, D)
+        block_ids_for_full = block_ids[in_full_mask]
+        positions_for_full = positions[in_full_mask]
+
+        # Sort by (block_id, position) so the BS tokens of each full
+        # block end up contiguous and slot-ordered.
+        # combined_key = block_id * BS + position
+        combined = block_ids_for_full * BS + positions_for_full
+        sort_idx = combined.argsort()
+        keys_sorted = keys_for_full[sort_idx]                        # (n_full * BS, H, D)
+        keys_grouped = keys_sorted.view(n_full_blocks, BS, H, D)
+
+        # Quantization math, vectorized across all full blocks.
+        buf_f = keys_grouped.float()
+        x_max = buf_f.amax(dim=1)                                    # (n_full, H, D)
+        x_min = buf_f.amin(dim=1)
+        scale = ((x_max - x_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+        q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+            .round().clamp(0, 15).to(torch.uint8)                    # (n_full, BS, H, D)
+        packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)
+        # packed: (n_full, BS, H, D/2)
+
+        kv_cache[0, full_block_ids, :, :, :half_D] = packed
+        self.k_scale_ext[full_block_ids] = scale.to(dtype)
+        self.k_xmin_ext [full_block_ids] = x_min.to(dtype)
+
+        # If the staging buffer was tracking one of these now-finalized
+        # blocks, mark its count as 0 (block is done; next partial fills
+        # k_stage afresh).
+        # We do this check on CPU because k_stage_block_id is a Python int.
+        if self.k_stage_block_id in full_block_ids.cpu().tolist():
+            self.k_stage_count = 0
+
+    def _stage_k_partial_blocks(
+        self,
+        *,
+        kv_cache,
+        real_key,
+        block_ids,
+        positions,
+        unique_blocks,
+        full_mask,
+    ):
+        """Place tokens belonging to partial (count < BS) blocks into the
+        staging buffer. Process partial blocks in sequence (first-appearance)
+        order so k_stage_block_id ends at the sequence's true last block.
+
+        In practice the partial-block count per write() is small:
+          - 1 (the sequence's current trailing partial)
+          - sometimes 2 (one continuing from prior staging + one new tail)
+        So this small Python loop is not the bottleneck.
+        """
+        BS = self.BS
+        partial_set = set(unique_blocks[~full_mask].cpu().tolist())
+        if not partial_set:
+            return
+
+        # Walk block_ids in appearance order to find unique partials.
+        block_ids_cpu = block_ids.cpu().tolist()
+        positions_cpu = positions.cpu()
+
+        seen: set = set()
+        ordered_partials: list = []
+        for b in block_ids_cpu:
+            if b in seen:
                 continue
-            block_id = slot // BS
-            pos = slot % BS
+            seen.add(b)
+            if b in partial_set:
+                ordered_partials.append(b)
 
-            # =============== V (per-token) ===============
-            v_tok = value[t]   # (H, D)
-            if _bf16_v_mode():
-                # Debug mode: stash bf16 V in an external sidecar instead
-                # of packing. Read path will gather from this sidecar and
-                # pass directly to the kernel (skipping v_packed_*).
-                # Allocate v_bf16_ext lazily on first use.
-                if getattr(self, "_v_bf16_ext", None) is None:
-                    self._v_bf16_ext = torch.zeros(
-                        (self.NB, self.BS, self.H, self.D),
-                        dtype=dtype, device=kv_cache.device,
-                    )
-                self._v_bf16_ext[block_id, pos] = v_tok
-            else:
-                v_grouped = v_tok.float().view(self.H, self.v_n_groups, self.v_group_size)
-                v_max = v_grouped.amax(dim=-1)                          # (H, n_g)
-                v_min = v_grouped.amin(dim=-1)
-                v_scale_tok = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
-                q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale_tok.unsqueeze(-1)) \
-                    .round().clamp(0, 15).to(torch.uint8)               # (H, n_g, G)
-                q_v_flat = q_v.view(self.H, D)
-                v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
-                # v_packed: (H, D/2) uint8
+        for pb in ordered_partials:
+            # Mask within real_key for this partial block.
+            pb_mask = (block_ids == pb)
+            keys_for_pb = real_key[pb_mask]                          # (cnt, H, D)
+            positions_for_pb = positions[pb_mask]                    # (cnt,) long
 
-                kv_cache[1, block_id, pos, :, :half_D] = v_packed
-                self.v_scale_ext[block_id, pos] = v_scale_tok.to(dtype)
-                self.v_xmin_ext [block_id, pos] = v_min.to(dtype)
-
-            # =============== K (staged) ===============
-            k_tok = key[t]    # (H, D)
-
-            # Protected-channel extraction to external sidecar.
-            gathered = torch.gather(k_tok, dim=1, index=self.protected_d_per_head)
-            # gathered: (H, n_protect) bf16
-            self.k_protect_ext[block_id, pos] = gathered
-
-            # Detect block boundary crossing. If block_id changes mid-write,
-            # we're starting a new group. Reset stage state.
-            if block_id != self.k_stage_block_id:
-                self.k_stage_block_id = block_id
-                # If the previous group had a partial tail, it lives only
-                # in our staging buffer at that point — and we just lost it
-                # because k_stage is reused. For batch=1 v1 this means:
-                # a new sequence (after reset_sequence) or a perfectly
-                # block-aligned sequence boundary. Anything else implies a
-                # multi-batch race, which v1 explicitly disallows.
+            # Block-boundary detection: if staging is on a different block,
+            # reset. (vLLM may allocate the same block to a new sequence;
+            # _phase5b reset_sequence handles the cross-sequence case.)
+            if pb != self.k_stage_block_id:
+                self.k_stage_block_id = pb
                 self.k_stage.zero_()
                 self.k_stage_count = 0
 
-            # Stage at the slot's intra-block position.
-            self.k_stage[pos] = k_tok
-            # Track count by max(seen pos) + 1 to be robust to non-monotone
-            # writes (shouldn't happen in practice, but safer).
-            if pos + 1 > self.k_stage_count:
-                self.k_stage_count = pos + 1
+            # Place these tokens at their intra-block positions.
+            self.k_stage[positions_for_pb] = keys_for_pb
+            max_pos = int(positions_for_pb.max().item()) + 1
+            if max_pos > self.k_stage_count:
+                self.k_stage_count = max_pos
 
-            # Finalize on block boundary.
+            # If now full, finalize.
             if self.k_stage_count == BS:
-                self._finalize_k_group(kv_cache, block_id)
+                self._finalize_k_group(kv_cache, pb)
                 self.k_stage_count = 0
-                # k_stage_block_id stays so the next token's check is correct;
-                # k_stage values are stale until overwritten in the next group.
 
     def _finalize_k_group(
         self,
