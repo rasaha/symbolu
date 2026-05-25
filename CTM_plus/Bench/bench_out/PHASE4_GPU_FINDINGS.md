@@ -3387,7 +3387,7 @@ local kernel tuning closes.
 
 ### §20.7 Where this lands in the VC brief's "Honest Validation Status"
 
-Updates to ``CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`` and
+Updates to ``INT4_PROTECTED_VC_BRIEF.md`` and
 ``CTM_plus/INVESTOR_PITCH.md`` after the GPU run lands:
 
 **"Measured on real GPUs" — net new rows expected after §20.1 GPU run:**
@@ -3446,7 +3446,7 @@ buckets.
 * §20.3 multi-model run on Llama-3-8B + Mistral-7B (~$2-3, 1 hour)
 * §20.4 long-context perplexity + throughput at 32k (~$0.50)
 * Update §20.1–§20.4 with measured numbers; rewrite in-place.
-* Update `INVESTOR_PITCH.md` and `CTM_PLUS_PCAM_FSCS_VC_BRIEF.md`
+* Update `INVESTOR_PITCH.md` and `INT4_PROTECTED_VC_BRIEF.md`
   "Honest Validation Status" tables.
 
 All measurement axes have a pre-decided decision criterion written

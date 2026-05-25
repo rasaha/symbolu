@@ -173,7 +173,7 @@ The composer is the operator's last step before pasting numbers into
 `Bench/tests/test_compose_throughput_comparison.py` pin the schema,
 the ratio computation, and the band-boundary contracts.
 
-Drop the four numbers into `PHASE4_GPU_FINDINGS.md` §20.1 (template populated, awaiting GPU run). Also update the "Honest Validation Status" table in `INVESTOR_PITCH.md` and `CTM_PLUS_PCAM_FSCS_VC_BRIEF.md` — likely the right row reads:
+Drop the four numbers into `PHASE4_GPU_FINDINGS.md` §20.1 (template populated, awaiting GPU run). Also update the "Honest Validation Status" table in `INVESTOR_PITCH.md` and `INT4_PROTECTED_VC_BRIEF.md` — likely the right row reads:
 
 > **Route-B INT4 KIVI: D/C tokens/sec ratio vs FP16 HF baseline. vLLM FP8 KV: B/A ratio (the production competitor). Route-A integration will close the stack gap; a fused unpack-attend kernel closes the remaining algorithmic overhead.**
 
@@ -222,7 +222,7 @@ This validates the FP8 path doesn't break the CTM+ install; we then have one cel
 1. Copy `streaming_summary.json` files to `bench_out/track_e_audit_followups/` with descriptive names (`vllm_fp16_throughput.json`, `vllm_fp8_throughput.json`).
 2. The HF cell already lands its JSON at `bench_out/track_e_audit_followups/int4_throughput_hf.json`.
 3. Fill in `PHASE4_GPU_FINDINGS.md` §20.1 — the template has placeholder values; replace with measured.
-4. Update the "Honest Validation Status" tables in `INVESTOR_PITCH.md` + `CTM_PLUS_PCAM_FSCS_VC_BRIEF.md` per the framing options above.
+4. Update the "Honest Validation Status" tables in `INVESTOR_PITCH.md` + `INT4_PROTECTED_VC_BRIEF.md` per the framing options above.
 5. Commit and push.
 
 ## Troubleshooting
