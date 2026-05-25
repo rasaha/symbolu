@@ -306,6 +306,32 @@ Scope to unblock graph capture (~3-5 days):
 Steps 1-3 are the read-path refactor. Step 4 is the actual graph enable.
 See `OPTION_B_PREFLIGHT.md` for the implementation plan.
 
+### Failed micro: sync coalesce (`629386e`)
+
+Hypothesis: each of the two `.cpu().tolist()` calls in
+`_read_decode_packed_batched` paid a separate GPU queue-drain wait,
+costing ~70 µs each (most of the seqids_blockids phase's 140 µs).
+Coalescing into one `torch.stack(...).cpu()` should halve it.
+
+Measured: NULL. `batched.seqids_blockids` post-coalesce at B=8 was
+146 µs vs 140 µs pre — within noise. Total read path budget at B=8
+unchanged (~19.9 ms / step).
+
+Why: PyTorch's CUDA stream serialization means two sequential
+`.cpu()` calls effectively share one drain wait — the second call
+sees the queue already drained by the first. The added `torch.stack`
++ `.long()` cast op cancels any savings.
+
+Lesson: micro-optimizations inside the read path now hit a noise
+floor. Further single-digit-µs wins per phase don't move the
+agg_tps needle — the read path's contribution to per-step time is
+already near its compute floor. Confirms the recommendation: stop
+optimizing the read path; the next real perf lever is Option B.
+
+The coalesced code is still committed (it's not WORSE, just not
+better), and it does set up the structural pattern for the full
+device-side metadata refactor in B-pre-2.
+
 ### Why not test B > 8
 
 We have headroom (218× max concurrency on the int4 cache), but at B=8
