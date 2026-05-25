@@ -300,37 +300,41 @@ if _VLLM_FA_AVAILABLE:
 
             B = block_table.shape[0]
             BS = writer.BS
+            device = block_table.device
 
             with _maybe_region("batched.seqids_blockids"):
-                # Phase 6 v2 Option D step 3 (Option B pre-flight): coalesce
-                # the two host syncs (seqlens + seq_ids) into ONE memcpyDtoH.
-                # Each `.cpu()` blocks until the GPU queue drains; doing them
-                # serially pays the drain cost twice. Stacking into one tensor
-                # + one `.cpu()` pays it once. Profile shows seqids_blockids
-                # was 140 µs/call at B=8 — most of that was the second sync's
-                # drain wait, since the python work is sub-microsecond.
-                #
-                # n_blocks_per_seq stays as a device tensor; we only need the
-                # int list on host for the splice / bf16_backing dict lookups
-                # downstream, and those need to coexist with the captured
-                # graph via the Python-side seq_id → slot map (see
-                # OPTION_B_PREFLIGHT.md §B-pre-1).
-                _seqlens_and_seqids = torch.stack([
-                    cache_seqlens_orig.long(),
-                    block_table[:, 0].long(),
-                ], dim=0).cpu().tolist()                 # one sync, two rows
-                seqlens_cpu = _seqlens_and_seqids[0]
-                seq_ids     = _seqlens_and_seqids[1]
-                n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
-                n_blocks_max = max(n_blocks_per_seq)
+                # Phase 6 v2 Option B pre-flight (B-pre-2): metadata that
+                # used to come back from cache_seqlens_orig.cpu().tolist()
+                # is now computed on device. Two unavoidable host trips
+                # remain:
+                #   (a) ONE sync for seq_id -> slot dict resolution
+                #       (Python-side; outside any captured region).
+                #   (b) ONE sync for n_blocks_max to size the gather
+                #       (vLLM multi-shape graph capture will handle this
+                #       by maintaining a captured graph per discrete
+                #       n_blocks_max bucket).
+                # All other metadata (n_blocks_per_seq, last_block_indices,
+                # active_mask) now lives in device tensors — captured-graph
+                # friendly.
+                n_blocks_per_seq_t   = (cache_seqlens_orig + (BS - 1)) // BS   # (B,)
+                last_block_indices_t = n_blocks_per_seq_t - 1                  # (B,)
+                active_mask_t        = (cache_seqlens_orig % BS) != 0          # (B,) bool
+
+                # (a) seq_id resolution — small host trip for dict lookup.
+                seq_ids = block_table[:, 0].cpu().tolist()
+                slot_idx_list = writer.slot_indices_for(seq_ids)
+                slot_idx_t = torch.tensor(
+                    slot_idx_list, dtype=torch.long, device=device,
+                )
+
+                # (b) gather sizing — small host trip for an int.
+                n_blocks_max = int(n_blocks_per_seq_t.max().item())
                 S_padded = n_blocks_max * BS
 
-                # Build (B, n_blocks_max) block_ids via slice + mask.
+                # Build (B, n_blocks_max) block_ids via slice + mask, both
+                # device-side.
                 block_ids_batched = block_table[:, :n_blocks_max].long().contiguous()
-                n_blocks_per_seq_t = torch.tensor(
-                    n_blocks_per_seq, dtype=torch.long, device=block_table.device,
-                )
-                pos = torch.arange(n_blocks_max, device=block_table.device).unsqueeze(0)
+                pos = torch.arange(n_blocks_max, device=device).unsqueeze(0)
                 pad_mask = pos >= n_blocks_per_seq_t.unsqueeze(1)
                 block_ids_batched.masked_fill_(pad_mask, 0)
 
@@ -338,39 +342,16 @@ if _VLLM_FA_AVAILABLE:
                 # ONE batched gather covering all B seqs.
                 view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
 
-            # Phase 6 v2 Option B pre-flight (B-pre-1): resolve seq_ids
-            # to slot indices ONCE, here. The resolved slot tensor is
-            # what downstream getters consume — they no longer take
-            # Python seq_id lists, so the splice + bf16_backing phases
-            # have no Python dict lookups left.
-            slot_idx_list = writer.slot_indices_for(seq_ids)
-            slot_idx_t = torch.tensor(
-                slot_idx_list, dtype=torch.long,
-                device=block_table.device,
-            )
-
             with _maybe_region("batched.splice"):
-                # Phase 6 v2 Option D step 1 (vectorized) + B-pre-1
-                # (slot-pool gather): build the active subset on host
-                # (cheap — just list comprehensions over already-resolved
-                # seqlens/n_blocks lists), then call the splice helper
-                # with device-tensor active_slot_idx_t + active_batch_idx_t
-                # + active_last_block_t. The helper does ONE
-                # writer.get_k_stage_by_slots(slot_t) gather instead of
-                # torch.stack-ing B per-state views.
-                active_pos_b = [
-                    i for i in range(B) if seqlens_cpu[i] % BS != 0
-                ]
-                if active_pos_b:
-                    device = block_table.device
-                    active_batch_idx_t = torch.tensor(
-                        active_pos_b, dtype=torch.long, device=device,
-                    )
-                    active_last_block_t = torch.tensor(
-                        [n_blocks_per_seq[i] - 1 for i in active_pos_b],
-                        dtype=torch.long, device=device,
-                    )
-                    active_slot_idx_t = slot_idx_t[active_batch_idx_t]
+                # B-pre-2: filter active subset via DEVICE-side bool mask
+                # instead of Python list comprehension on a CPU-side seqlens
+                # list. The mask indexing produces variable-size tensors
+                # (data-dependent), which is still a brief sync until
+                # B-pre-3 makes splice unconditional.
+                active_batch_idx_t  = torch.arange(B, device=device)[active_mask_t]
+                active_last_block_t = last_block_indices_t[active_mask_t]
+                active_slot_idx_t   = slot_idx_t[active_mask_t]
+                if active_slot_idx_t.numel() > 0:
                     _splice_k_partial_tail_batched_vectorized(
                         view, writer,
                         active_slot_idx_t=active_slot_idx_t,

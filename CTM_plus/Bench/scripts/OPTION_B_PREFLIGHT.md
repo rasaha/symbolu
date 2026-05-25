@@ -148,7 +148,43 @@ Memory cost at default `_max_active_slots=8`:
   the current per-seq-lazy-alloc footprint at peak B=8 usage — net
   zero memory change vs pre-B-pre-1.
 
-#### B-pre-2: Move metadata to device (~0.5 day)
+#### B-pre-2: Move metadata to device — **LANDED**
+
+In `_read_decode_packed_batched`:
+
+- `cache_seqlens_orig.cpu().tolist()` — REMOVED. Derived metadata
+  (n_blocks_per_seq, last_block_indices, active_mask) now lives in
+  device tensors:
+  ```python
+  n_blocks_per_seq_t   = (cache_seqlens_orig + (BS - 1)) // BS   # (B,)
+  last_block_indices_t = n_blocks_per_seq_t - 1                  # (B,)
+  active_mask_t        = (cache_seqlens_orig % BS) != 0          # (B,) bool
+  ```
+- Splice path active subset is now computed via device-side bool
+  mask indexing (`slot_idx_t[active_mask_t]`) instead of a Python
+  list comprehension over `seqlens_cpu`.
+- `block_table[:, 0].cpu().tolist()` — KEPT. Resolves seq_ids →
+  slot indices via the writer's Python-side `_slot_map`. This sync
+  happens in the pre-capture region; the captured region only sees
+  the resulting `slot_idx_t` device tensor.
+- `n_blocks_max = int(n_blocks_per_seq_t.max().item())` — KEPT. One
+  sync to size the gather. vLLM's multi-shape graph capture handles
+  this by maintaining a captured graph per discrete `n_blocks_max`
+  bucket.
+
+After B-pre-2, the host trips in the read path are:
+  1. One small DtoH copy for `seq_ids` (B int64 values).
+  2. One small DtoH copy for `n_blocks_max` (1 int64 value).
+  3. One implicit sync inside the splice path from data-dependent
+     boolean indexing (`active_mask_t`'s True-count determines the
+     output tensor's shape). B-pre-3 eliminates this by making
+     splice unconditional.
+
+The remaining host syncs are unavoidable for non-graph use; for
+graph capture, (1) is pre-capture, (2) is per-shape-bucket, and (3)
+disappears with B-pre-3.
+
+#### B-pre-2 (orig spec, kept as design reference)
 
 In `_read_decode_packed_batched`:
 
@@ -268,20 +304,21 @@ latency, ahead on aggregate.
 - Phase 5B.6 multi-batch + correctness gates: all GREEN, locked.
 - Current ship narrative (pre-Option-B): "42 tok/s agg at B=8".
 
-## Remaining preflight blockers (post-B-pre-1)
+## Remaining preflight blockers (post-B-pre-2)
 
-| Violation | Where | Status after B-pre-1 |
+| Violation | Where | Status after B-pre-2 |
 |-----------|-------|----------------------|
-| Host sync | `cache_seqlens_orig.cpu().tolist()` | still present — B-pre-2 |
-| Host sync | `block_table[:, 0].cpu().tolist()` | still present — B-pre-2 |
-| Data branch | `if any(active_mask):` in batched splice path | still present — B-pre-3 (make splice unconditional) |
-| Data branch | `if seqlens[i] % BS != 0` (per-seq, used to build active_pos_b) | still present — B-pre-3 |
+| Host sync | `cache_seqlens_orig.cpu().tolist()` | **resolved** — metadata moved to device |
+| Host sync | `block_table[:, 0].cpu().tolist()` | KEPT (pre-capture; resolves seq_id → slot for the dict lookup; OK) |
+| Host sync | `n_blocks_max = int(...max().item())` | KEPT (sizes the gather; handled by multi-shape graph capture later) |
+| Data branch | `if active_slot_idx_t.numel() > 0:` (splice skip when empty) | still present — B-pre-3 (make splice unconditional with masked writes) |
+| Implicit sync | `slot_idx_t[active_mask_t]` (data-dependent output shape) | still present — B-pre-3 (compute fixed-size active subset OR unconditional splice) |
 | Dict lookup | `writer._slot_map[seq_id]` per call | **moved out of read path**, runs once Python-side; OK for graph capture if invoked pre-capture |
 | Pointer churn | `state.k_stage` per call | **resolved** — now a stable pool view |
 | Pointer churn | `state.bf16_k_backing` per call | **resolved** — pool view |
 | Pointer churn | `bf16_k_batch` from torch.stack | **resolved** — single device gather, output addr = stable pool advanced-index |
 
-After B-pre-2 the only remaining host trip will be `n_blocks_max =
-int(...max().item())` for sizing the gather — handled at capture
-time by vLLM's multi-shape capture (one captured graph per discrete
-n_blocks_max bucket).
+After B-pre-3 the read path should be host-sync-free and
+branch-free EXCEPT for the two unavoidable pre-capture trips
+(seq_id resolution + n_blocks_max). Then B-pre-4 audits pointer
+stability one more time and B-1 enables graph capture.
