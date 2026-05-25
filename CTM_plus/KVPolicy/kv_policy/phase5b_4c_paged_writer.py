@@ -1064,35 +1064,39 @@ class PagedKVWriter:
         """Phase 6 v2: stack per-seq bf16 K/V backings into batched tensors.
 
         Each seq's backing is a (1, max_seqlen, H, D) tensor allocated in
-        its SeqState. We slice each to (1, S_padded, H, D) and stack on the
+        its SeqState. We slice each to (S_padded, H, D) and stack on a new
         batch axis → (B, S_padded, H, D). Positions [seq_pos_i .. S_padded)
         of each row are zeros (initialized; never written by writes for
         that seq); cache_seqlens masks them in the kernel.
+
+        Phase 6 v2 Option D step 2: implementation now uses `torch.stack`
+        — collapses the per-seq `empty + copy_` loop (B+1 CUDA ops) into
+        a single `cat`-under-the-hood call (1 CUDA op). Output is
+        bit-identical to the prior path; this is purely an orchestration
+        change.
         """
         if not self._allocated:
             raise RuntimeError("get_bf16_backing_batched before _lazy_alloc")
         B = len(seq_ids)
         if B == 0:
             raise ValueError("get_bf16_backing_batched needs B >= 1 seq_ids")
-        # Validate all seqs have backing of sufficient size.
-        any_state = self._seq_states.get(seq_ids[0])
-        if any_state is None or any_state.bf16_k_backing is None:
-            raise RuntimeError(f"bf16 backing missing for seq_id={seq_ids[0]!r}")
-        max_S = any_state.bf16_k_backing.shape[1]
+
+        # Resolve all states up-front (one dict lookup per seq, host-only).
+        states = []
+        for sid in seq_ids:
+            s = self._seq_states.get(sid)
+            if s is None or s.bf16_k_backing is None:
+                raise RuntimeError(f"bf16 backing missing for seq_id={sid!r}")
+            states.append(s)
+        max_S = states[0].bf16_k_backing.shape[1]
         if S_padded > max_S:
             raise RuntimeError(f"S_padded={S_padded} > max_seqlen={max_S}")
 
-        H = self.H
-        D = self.D
-        device = any_state.bf16_k_backing.device
-
-        # Pre-allocate batched buffers and copy each seq's slice in.
-        bf16_k = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
-        bf16_v = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
-        for i, sid in enumerate(seq_ids):
-            state = self._seq_states.get(sid)
-            if state is None or state.bf16_k_backing is None:
-                raise RuntimeError(f"bf16 backing missing for seq_id={sid!r}")
-            bf16_k[i].copy_(state.bf16_k_backing[0, :S_padded])
-            bf16_v[i].copy_(state.bf16_v_backing[0, :S_padded])
+        # One CUDA op per K/V — torch.stack lowers to a single cat call.
+        bf16_k = torch.stack(
+            [s.bf16_k_backing[0, :S_padded] for s in states], dim=0,
+        )
+        bf16_v = torch.stack(
+            [s.bf16_v_backing[0, :S_padded] for s in states], dim=0,
+        )
         return bf16_k, bf16_v

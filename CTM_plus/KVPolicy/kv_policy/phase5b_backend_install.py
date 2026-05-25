@@ -192,28 +192,33 @@ if _VLLM_FA_AVAILABLE:
             B = block_table.shape[0]
             BS = writer.BS
 
-            # Per-seq seqlen + n_blocks_used.
+            # Phase 6 v2 Option D step 2: fuse three CPU/host-sync flows that
+            # previously ran serially per-seq into a single sync round-trip.
+            #   * cache_seqlens_orig.cpu() : 1 sync (was already here)
+            #   * block_table[:, 0].cpu()  : 1 sync (replaces B `.item()` calls)
+            # Both happen before any GPU work that depends on them, so we
+            # batch them into one sync wave.
             seqlens_cpu = cache_seqlens_orig.cpu().tolist()
+            seq_ids = block_table[:, 0].cpu().tolist()       # one sync for all B
             n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
             n_blocks_max = max(n_blocks_per_seq)
             S_padded = n_blocks_max * BS
 
-            # Build (B, n_blocks_max) block_ids tensor with padding.
-            # Padded entries use block 0 (or any valid block) — masked
-            # by cache_seqlens in the kernel.
-            block_ids_batched = torch.zeros(
-                (B, n_blocks_max), dtype=torch.long, device=block_table.device,
+            # Build (B, n_blocks_max) block_ids tensor via slice + mask.
+            # vLLM allocates block_table as zeros and fills in real block
+            # ids on alloc; unused entries are 0 (a valid block masked by
+            # cache_seqlens in the kernel). Explicit mask ensures any
+            # garbage at positions >= n_blocks_per_seq[i] is zeroed.
+            block_ids_batched = block_table[:, :n_blocks_max].long().contiguous()
+            n_blocks_per_seq_t = torch.tensor(
+                n_blocks_per_seq, dtype=torch.long, device=block_table.device,
             )
-            for i in range(B):
-                n_i = n_blocks_per_seq[i]
-                block_ids_batched[i, :n_i] = block_table[i, :n_i].long()
-                # Fill padding with block 0 (kernel masks these positions).
+            pos = torch.arange(n_blocks_max, device=block_table.device).unsqueeze(0)
+            pad_mask = pos >= n_blocks_per_seq_t.unsqueeze(1)
+            block_ids_batched.masked_fill_(pad_mask, 0)
 
             # ONE batched gather covering all B seqs.
             view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
-
-            # Resolve seq_ids once (reused by splice + bf16_backing).
-            seq_ids = [_seq_id_from_block_table_row(block_table[i]) for i in range(B)]
 
             # Phase 6 v2 Option D step 1: vectorized K partial-tail splice.
             # Collapses the per-seq Python loop (~18 tensor ops × B) into one

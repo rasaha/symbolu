@@ -144,6 +144,61 @@ Reproducibility: two consecutive runs of the bench produced agg_tps within
 - **The capacity story still holds** (4× concurrent sequences at same
   GPU), but the per-seq latency story is what it is.
 
+## Phase 6 v2 Option D step 1 — vectorized splice (measured)
+
+Landed in `88be156`. Replaces the per-seq Python loop that called
+`_splice_k_partial_tail_batched_row` with a single batched op chain
+(`_splice_k_partial_tail_batched_vectorized`) — stacks active seqs'
+`k_stage` into one (A, BS, H, D) tensor and runs the quantize+pack
+math element-wise across the new A axis. Bit-equivalence verified by
+`verify_phase6_d_step1_splice_equiv.py` across 4 seqs with edge-case
+tail lengths {1, 7, BS-1, BS//2}. Multi-batch e2e gate
+(verify_phase5b_6_batch) stays GREEN.
+
+Re-ran the throughput bench with step 1 in place (same fixture):
+
+| B | agg_tps post-A | agg_tps post-D1 | Δ      | per_seq_tps | speedup vs B=1 | per-step ms |
+|---|----------------|------------------|--------|-------------|----------------|-------------|
+| 1 |  20.8          |  20.6            | noise  |  20.6       | 1.00×          | 48          |
+| 2 |  26.1          |  27.2            | +4%    |  13.6       | 1.32×          | 73          |
+| 4 |  32.1          |  35.2            | +10%   |   8.8       | 1.71×          | 113         |
+| 8 |  36.3          | **41.7**         | **+15%** | 5.2       | **2.02×**      | 192         |
+
+(B=1 is noise as expected — single-seq dispatches to `_read_decode_packed_one`,
+not the batched path.)
+
+Per-step at B=8 went 221 → 192 ms (-29 ms = -13% of per-step time). That
+matches splice being one of several per-(layer, seq) ops, not the whole
+~25-30 ms/seq budget. Remaining residual maps to: the bf16_backing copy
+loop, the seq_id resolution syncs, and the block_ids_batched build loop —
+all the same vectorization pattern.
+
+## Phase 6 v2 Option D step 2 (next) — remaining per-seq Python
+
+After step 1, what's left in `_read_decode_packed_batched`'s per-(layer, B)
+Python overhead:
+
+1. **`get_bf16_backing_batched` copy loop** — `B × 2 × .copy_()` per
+   layer. Collapsible via `torch.stack` (one CUDA op vs B+1). Est. ~2 ms
+   shaved per step at B=8.
+2. **seq_id resolution** — `_seq_id_from_block_table_row` calls
+   `int(bt[0].item())` B times, each a separate host sync. Collapsible
+   to ONE sync via `block_table[:, 0].cpu().tolist()`. Est. ~1 ms shaved
+   per step at B=8.
+3. **block_ids_batched build loop** — `for i in range(B):
+   block_ids_batched[i, :n_i] = ...`. Collapsible to a slice +
+   masked_fill. Est. ~1 ms shaved.
+
+Total expected: ~4-5 ms more per step at B=8 → another ~5-10% on
+agg_tps. The combined splice-vectorized + step-2-vectorized read path
+should land int4_protected near ~45-50 tok/s agg at B=8.
+
+After step 2, the next ceiling becomes either:
+- the gather/contiguous() chain in `get_packed_view_batched` (Triton
+  could collapse 7 advanced-index gathers into one custom kernel), or
+- the bf16_backing existence itself (cp.async-skip Option C — kill
+  the bf16_K backing entirely if the rebuild env will cooperate).
+
 ### Why not test B > 8
 
 We have headroom (218× max concurrency on the int4 cache), but at B=8
