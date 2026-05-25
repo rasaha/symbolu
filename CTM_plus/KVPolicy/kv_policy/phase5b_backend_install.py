@@ -212,22 +212,25 @@ if _VLLM_FA_AVAILABLE:
             # ONE batched gather covering all B seqs.
             view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
 
-            # Splice K partial-tail for each seq with a trailing partial.
-            # Each seq's splice writes to view's [i, last_block_i] slot.
-            for i in range(B):
-                tail_len = seqlens_cpu[i] % BS
-                if tail_len == 0:
-                    continue
-                seq_id = _seq_id_from_block_table_row(block_table[i])
-                seq_state = writer.get_seq_state(seq_id)
-                last_block_i = n_blocks_per_seq[i] - 1
-                _splice_k_partial_tail_batched_row(
-                    view, writer, batch_idx=i, last_block_idx=last_block_i,
-                    state=seq_state,
+            # Resolve seq_ids once (reused by splice + bf16_backing).
+            seq_ids = [_seq_id_from_block_table_row(block_table[i]) for i in range(B)]
+
+            # Phase 6 v2 Option D step 1: vectorized K partial-tail splice.
+            # Collapses the per-seq Python loop (~18 tensor ops × B) into one
+            # batched op chain. Bit-equivalent to the per-row path; verified
+            # by verify_phase6_d_step1_splice_equiv.py.
+            last_block_indices = [n_blocks_per_seq[i] - 1 for i in range(B)]
+            active_mask = [seqlens_cpu[i] % BS != 0 for i in range(B)]
+            if any(active_mask):
+                seq_states_list = [writer.get_seq_state(seq_ids[i]) for i in range(B)]
+                _splice_k_partial_tail_batched_vectorized(
+                    view, writer,
+                    seq_states_list=seq_states_list,
+                    last_block_indices=last_block_indices,
+                    active_mask=active_mask,
                 )
 
             # Stack per-seq bf16 backings into (B, S_padded, H, D).
-            seq_ids = [_seq_id_from_block_table_row(block_table[i]) for i in range(B)]
             bf16_k_batch, bf16_v_batch = writer.get_bf16_backing_batched(
                 seq_ids, S_padded,
             )
@@ -830,6 +833,81 @@ def _splice_k_partial_tail_batched_row(
     view["k_int4"][batch_idx, bstart:bstart + BS] = packed
     view["k_scale"][batch_idx, last_block_idx]    = scale.to(writer.sidecar_dtype)
     view["k_xmin"] [batch_idx, last_block_idx]    = x_min.to(writer.sidecar_dtype)
+
+
+def _splice_k_partial_tail_batched_vectorized(
+    view: Dict[str, Any], writer: Any, *,
+    seq_states_list: list, last_block_indices: list, active_mask: list,
+) -> None:
+    """Phase 6 v2 Option D step 1: vectorized batched K-tail splice.
+
+    Collapses the per-sequence Python loop in `_read_decode_packed_batched`
+    (which called `_splice_k_partial_tail_batched_row` once per active
+    seq, ~18 tensor ops per call) into one batched op chain that processes
+    all active sequences in parallel.
+
+    Inputs:
+      seq_states_list    : list[SeqState], length B (one per batch position)
+      last_block_indices : list[int],      length B (per-seq last_block_idx)
+      active_mask        : list[bool],     length B (True if tail_len != 0)
+
+    Bit-equivalence to `_splice_k_partial_tail_batched_row`: every
+    per-element operation (float cast, amax/amin per (h,d), scale=(max-min)/15
+    clamped, quantize=round+clamp+to(uint8), pack via low|high<<4) is
+    element-wise across (h, d, bs), so batching across the new B axis
+    leaves the per-element results identical. Verified by
+    `verify_phase6_d_step1_splice_equiv.py`.
+
+    Caller must ensure active_mask has at least one True before calling.
+    """
+    if not any(active_mask):
+        return
+
+    BS = writer.BS
+    D  = writer.D
+    H  = writer.H
+    half_D = D // 2
+
+    # Build the active subset.
+    active_idx = [i for i, m in enumerate(active_mask) if m]
+
+    # Stack each active seq's k_stage into one (A, BS, H, D) tensor.
+    # Per-state k_stage is (BS, H, D) sidecar_dtype on the same device.
+    k_stage_stack = torch.stack(
+        [seq_states_list[i].k_stage for i in active_idx], dim=0,
+    )
+    device = k_stage_stack.device
+
+    # Quantize in one batched op chain. Math identical to the per-row
+    # version; the leading B axis just adds broadcast.
+    buf_f = k_stage_stack.float()                                  # (A, BS, H, D)
+    x_max = buf_f.amax(dim=1)                                      # (A, H, D)
+    x_min = buf_f.amin(dim=1)                                      # (A, H, D)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)               # (A, H, D)
+
+    q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+        .round().clamp(0, 15).to(torch.uint8)                      # (A, BS, H, D)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (A, BS, H, half_D)
+
+    # Scatter into view tensors at (batch_idx, last_block_idx) positions.
+    # k_int4 is (B, n_blocks_max*BS, H, half_D) contiguous — reshape to
+    # (B, n_blocks_max, BS, H, half_D) so we can index by (b, block).
+    n_blocks_max = view["k_int4"].shape[1] // BS
+    k_int4_blocked = view["k_int4"].view(-1, n_blocks_max, BS, H, half_D)
+
+    batch_idx_t = torch.tensor(active_idx, dtype=torch.long, device=device)
+    last_block_t = torch.tensor(
+        [last_block_indices[i] for i in active_idx],
+        dtype=torch.long, device=device,
+    )
+
+    # Indexed assignment: writes packed[k] to k_int4_blocked[batch_idx[k], last_block[k]].
+    # Each (batch_idx[k], last_block[k]) pair is unique across k (different
+    # seqs have different batch indices), so no scatter race.
+    k_int4_blocked[batch_idx_t, last_block_t] = packed
+    sidecar_dtype = writer.sidecar_dtype
+    view["k_scale"][batch_idx_t, last_block_t] = scale.to(sidecar_dtype)
+    view["k_xmin"] [batch_idx_t, last_block_t] = x_min.to(sidecar_dtype)
 
 
 def _splice_k_partial_tail(
