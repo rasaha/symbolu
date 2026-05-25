@@ -73,10 +73,10 @@
       batch=1 (per-layer PagedKVWriter has one staging buffer +
       seq_pos counter; concurrent sequences would race). Needs
       per-(layer, sequence) state keyed by attn_metadata.
-    - Phase 5C — first-class `LLM(kv_cache_dtype="int4_protected",
-      block_size=32)` API. Current pattern needs the two-step
-      `enable_int4_protected_backend()` + `install_int4_protected_backend()`
-      post-construction for layer-idx assignment.
+    - Phase 5C — **LANDED.** Clean API: `import kv_policy.int4_protected`
+      auto-registers the backend; `Int4ProtectedLLM(...)` convenience
+      factory enforces v1 defaults. See `PHASE5C_USAGE.md` for the
+      ship recipe.
     - Phase 6 (perf polish) — kernel patch to skip cp.async when
       `Is_int4kv_packed=true`. Would reclaim the 224 MB bf16 backing
       overhead. ~1-2 hrs CUDA work + recompile; deferred because the
@@ -219,7 +219,8 @@ symmetric quant, group sizes ≠ 32.
 | `7ba1131` | char-diff fix — serialize int4 prompts (batch=1 v1 invariant). |
 | `3a0b2ff` | char-diff fix — wrap reset_sequence in torch.inference_mode (inference tensors). |
 | `ea5884e` | Phase 5B.5 needle-in-haystack quality acceptance scaffolding (15 trials: 5 needles × 3 length buckets × middle-position planting). |
-| `<pending-5B.5-GREEN>` | **Phase 5B.5 GREEN** — char-diff 3/5 IDENTICAL (factual_recall, code, creative) at mean 67% prefix overlap. Needle test **15/15 stock + 15/15 int4 = 100% retrieval at all length buckets** (200, 600, 1200 filler tokens). **Lock protect_fraction=4% as the v1 ship value** — the smallest tested value with full quality. |
+| `dc3cc43` | **Phase 5B.5 GREEN** — char-diff 3/5 IDENTICAL (factual_recall, code, creative) at mean 67% prefix overlap. Needle test **15/15 stock + 15/15 int4 = 100% retrieval at all length buckets** (200, 600, 1200 filler tokens). **Lock protect_fraction=4% as the v1 ship value** — the smallest tested value with full quality. |
+| `<pending-5C>` | **Phase 5C — clean API + docs.** New `kv_policy.int4_protected` submodule registers the backend on import and exposes `Int4ProtectedLLM(...)` factory + `get_backend_info(llm)` diagnostic. Drops the required post-construction `install_int4_protected_backend()` call — layer indices auto-resolve from `layer.layer_name`. Documentation: `Bench/scripts/PHASE5C_USAGE.md`. Verify: `verify_phase5c_api.py` (T1-T6 acceptance). |
 
 ## Phase 5B.5 GREEN milestone — v1 quality acceptance complete
 
