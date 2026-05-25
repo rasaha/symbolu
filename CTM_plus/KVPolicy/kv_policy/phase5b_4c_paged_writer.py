@@ -174,6 +174,62 @@ def _slice_mask_for_layer(mask: "torch.Tensor", layer_idx: int, path: str) -> "t
 
 
 # ----------------------------------------------------------------------
+# Phase 5B.6 step 1: per-sequence state container.
+# ----------------------------------------------------------------------
+
+class SeqState:
+    """Per-sequence streaming state for a PagedKVWriter.
+
+    Holds the K staging buffer + bf16 K/V backing + seq_pos counter for
+    ONE sequence. PagedKVWriter holds a dict of these, keyed by
+    seq_id. For batch=1 / v1 callers there's a single SeqState at
+    seq_id=PagedKVWriter.DEFAULT_SEQ_ID (= 0) and the writer's legacy
+    attributes (self.k_stage etc.) alias / proxy to it.
+
+    Per-LAYER state (k_scale_ext, k_xmin_ext, k_protect_ext,
+    v_scale_ext, v_xmin_ext) is NOT here — those are shared across
+    sequences (keyed by global block_id) and live on the PagedKVWriter.
+    """
+
+    __slots__ = (
+        "k_stage",            # (BS, H, D) bf16
+        "k_stage_count",      # int 0..BS
+        "k_stage_block_id",   # int — block being filled
+        "bf16_k_backing",     # (1, max_S, H, D) bf16 — kernel positional arg
+        "bf16_v_backing",     # (1, max_S, H, D) bf16
+        "seq_pos",            # int — non-padding tokens written so far in this seq
+    )
+
+    def __init__(self, writer: "PagedKVWriter", device: "torch.device") -> None:
+        if torch is None:
+            raise RuntimeError("SeqState requires torch")
+        BS = writer.BS
+        H  = writer.H
+        D  = writer.D
+        dtype = writer.sidecar_dtype
+        max_S = writer._bf16_backing_max_seqlen
+
+        self.k_stage = torch.zeros((BS, H, D), dtype=dtype, device=device)
+        self.k_stage_count = 0
+        self.k_stage_block_id = -1
+        self.bf16_k_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
+        self.bf16_v_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
+        self.seq_pos = 0
+
+    def reset(self) -> None:
+        """Clear streaming state for a fresh sequence. Keeps the
+        allocated tensors — next write() will overwrite their relevant
+        slices. Positions [seq_pos, max_S) of the backing tensors are
+        unread (cache_seqlens masks them in the kernel), so we don't
+        zero them.
+        """
+        self.k_stage.zero_()
+        self.k_stage_count = 0
+        self.k_stage_block_id = -1
+        self.seq_pos = 0
+
+
+# ----------------------------------------------------------------------
 # PagedKVWriter — per-layer quantizing writer.
 # ----------------------------------------------------------------------
 
@@ -182,11 +238,28 @@ class PagedKVWriter:
     uint8 cache + external sidecar tensors.
 
     Lazy-allocates sidecars on first `write()` (needs kv_cache shape).
-    batch=1 v1: one staging buffer per layer.
+
+    Phase 5B.6 step 1: per-sequence state lives in `_seq_states` dict
+    keyed by an opaque seq_id. v1 batch=1 callers always use
+    `DEFAULT_SEQ_ID = 0`; multi-batch callers pass real seq_ids per
+    sequence via `write_for_seq` / `read_for_seq` (lands in step 2/3).
+
+    For backward compatibility, the legacy attributes (`self.k_stage`,
+    `self.k_stage_count`, `self.k_stage_block_id`, `self.bf16_k_backing`,
+    `self.bf16_v_backing`, `self.seq_pos`) PROXY to the default
+    SeqState. Tensors are shared by reference (no copies); ints go
+    through Python @property.
+
+    Per-LAYER state (k_scale_ext, k_xmin_ext, k_protect_ext, v_scale_ext,
+    v_xmin_ext) remains on `self` — shared across sequences via global
+    block_id indexing.
 
     Construction is cheap — no device-bound state. The expensive
     allocations happen in `_lazy_alloc()` on first write.
     """
+
+    # Default sequence id used by single-seq callers (v1 batch=1).
+    DEFAULT_SEQ_ID = 0
 
     def __init__(
         self,
@@ -219,23 +292,117 @@ class PagedKVWriter:
         self.protect_slot: Optional[torch.Tensor] = None       # (H, D) int8
         self.protected_d_per_head: Optional[torch.Tensor] = None  # (H, n_protect) long
 
+        # Per-LAYER (shared across sequences via block_id indexing).
         self.k_scale_ext: Optional[torch.Tensor] = None   # (NB, H, D) bf16
         self.k_xmin_ext:  Optional[torch.Tensor] = None   # (NB, H, D) bf16
         self.k_protect_ext: Optional[torch.Tensor] = None # (NB, BS, H, n_protect) bf16
         self.v_scale_ext: Optional[torch.Tensor] = None   # (NB, BS, H, v_n_groups) bf16
         self.v_xmin_ext:  Optional[torch.Tensor] = None   # (NB, BS, H, v_n_groups) bf16
 
-        self.k_stage: Optional[torch.Tensor] = None       # (BS, H, D) bf16
-        self.k_stage_count: int = 0                       # 0..BS-1
-        self.k_stage_block_id: int = -1                   # block we're filling
+        # Per-SEQUENCE state container. seq_id -> SeqState. Created
+        # lazily on first write to each sequence. The default seq
+        # (DEFAULT_SEQ_ID = 0) is allocated by _lazy_alloc so legacy
+        # single-seq access works immediately.
+        self._seq_states: Dict[Any, SeqState] = {}
 
-        # Phase 5B.4c.3 fix (a): parallel BF16 K/V backing for the kernel
-        # call. seq_pos advances monotonically as writer.write fills tokens
-        # in seq order; reset_sequence() zeroes the counter.
+        # Phase 5B.4c.3 fix (a) backing-tensor sizing — pulled from env.
         self._bf16_backing_max_seqlen = _bf16_backing_max_seqlen()
-        self.bf16_k_backing: Optional[torch.Tensor] = None   # (1, max_S, H, D) bf16
-        self.bf16_v_backing: Optional[torch.Tensor] = None   # (1, max_S, H, D) bf16
-        self.seq_pos: int = 0                                # tokens written in current sequence
+
+    # ------------------------------------------------------------------
+    # Phase 5B.6 step 1: per-sequence state lookups + lifecycle.
+    # ------------------------------------------------------------------
+
+    def get_seq_state(self, seq_id: Any) -> "SeqState":
+        """Return the SeqState for `seq_id`, raising KeyError if not yet
+        created. Use `ensure_seq_state` to allocate on demand."""
+        s = self._seq_states.get(seq_id)
+        if s is None:
+            raise KeyError(
+                f"no SeqState for seq_id={seq_id!r}. Call write_for_seq "
+                f"(which allocates lazily) before reading state."
+            )
+        return s
+
+    def ensure_seq_state(self, seq_id: Any, device: "torch.device") -> "SeqState":
+        """Return the SeqState for `seq_id`, allocating it if needed.
+        Cost ~ 8 MB per new sequence at max_seqlen=4096.
+        """
+        s = self._seq_states.get(seq_id)
+        if s is None:
+            if not self._allocated:
+                raise RuntimeError(
+                    "PagedKVWriter not yet _lazy_alloc'd; can't create SeqState."
+                )
+            s = SeqState(self, device)
+            self._seq_states[seq_id] = s
+        return s
+
+    def evict_sequence(self, seq_id: Any) -> None:
+        """Drop a sequence's state, freeing its bf16 backing + staging
+        memory. Called when a sequence finishes generation."""
+        self._seq_states.pop(seq_id, None)
+
+    @property
+    def _default_state(self) -> Optional["SeqState"]:
+        """The SeqState bound to DEFAULT_SEQ_ID. None before _lazy_alloc."""
+        return self._seq_states.get(self.DEFAULT_SEQ_ID)
+
+    # ------------------------------------------------------------------
+    # Backward-compat properties — proxy legacy `self.x` attribute access
+    # to the default SeqState. New code should pass an explicit SeqState
+    # via write_for_seq / get_seq_state.
+    # ------------------------------------------------------------------
+
+    @property
+    def k_stage(self) -> Optional["torch.Tensor"]:
+        s = self._default_state
+        return s.k_stage if s is not None else None
+
+    @property
+    def k_stage_count(self) -> int:
+        s = self._default_state
+        return s.k_stage_count if s is not None else 0
+
+    @k_stage_count.setter
+    def k_stage_count(self, value: int) -> None:
+        s = self._default_state
+        if s is None:
+            return  # pre-alloc; ignore (matches old field-default behavior)
+        s.k_stage_count = value
+
+    @property
+    def k_stage_block_id(self) -> int:
+        s = self._default_state
+        return s.k_stage_block_id if s is not None else -1
+
+    @k_stage_block_id.setter
+    def k_stage_block_id(self, value: int) -> None:
+        s = self._default_state
+        if s is None:
+            return
+        s.k_stage_block_id = value
+
+    @property
+    def bf16_k_backing(self) -> Optional["torch.Tensor"]:
+        s = self._default_state
+        return s.bf16_k_backing if s is not None else None
+
+    @property
+    def bf16_v_backing(self) -> Optional["torch.Tensor"]:
+        s = self._default_state
+        return s.bf16_v_backing if s is not None else None
+
+    @property
+    def seq_pos(self) -> int:
+        s = self._default_state
+        return s.seq_pos if s is not None else 0
+
+    @seq_pos.setter
+    def seq_pos(self, value: int) -> None:
+        s = self._default_state
+        if s is None:
+            return
+        s.seq_pos = value
 
     # ------------------------------------------------------------------
     # Lazy allocation.
@@ -305,21 +472,18 @@ class PagedKVWriter:
         self.v_scale_ext   = torch.zeros((NB, BS, H, v_n_groups),    dtype=dtype, device=device)
         self.v_xmin_ext    = torch.zeros((NB, BS, H, v_n_groups),    dtype=dtype, device=device)
 
-        # K staging buffer.
-        self.k_stage = torch.zeros((BS, H, D), dtype=dtype, device=device)
-        self.k_stage_count = 0
-        self.k_stage_block_id = -1
-
-        # Phase 5B.4c.3 fix (a): BF16 K/V backing for the kernel call.
-        max_S = self._bf16_backing_max_seqlen
-        self.bf16_k_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
-        self.bf16_v_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
-        self.seq_pos = 0
-
         self.NB, self.BS, self.H, self.D = NB, BS, H, D
         self.n_protect = n_protect
         self.v_n_groups = v_n_groups
         self._allocated = True
+
+        # Phase 5B.6 step 1: per-sequence state container. Allocate the
+        # default seq right away so legacy single-seq attribute access
+        # (self.k_stage, self.bf16_k_backing, etc.) returns a valid
+        # tensor immediately. Multi-seq callers call ensure_seq_state
+        # on demand for additional seqs.
+        default = SeqState(self, device)
+        self._seq_states[self.DEFAULT_SEQ_ID] = default
 
         logger.info(
             "PagedKVWriter layer=%d allocated: NB=%d BS=%d H=%d D=%d "
@@ -327,15 +491,22 @@ class PagedKVWriter:
             n_protect, v_n_groups,
         )
 
-    def reset_sequence(self) -> None:
-        """Clear K staging state for a new sequence. Sidecar tensors
-        and protect tables are kept (they're large + reusable)."""
-        self.k_stage_count = 0
-        self.k_stage_block_id = -1
-        if self.k_stage is not None:
-            self.k_stage.zero_()
-        # Phase 5B.4c.3 fix (a): reset bf16-backing seq counter.
-        self.seq_pos = 0
+    def reset_sequence(self, seq_id: Any = None) -> None:
+        """Reset streaming state for one sequence (default seq if None)
+        or ALL sequences (seq_id='all').
+
+        Per-LAYER sidecar tensors (k_scale_ext etc.) are kept — they're
+        large and reusable; positions of dropped sequences will be
+        overwritten by future writes.
+        """
+        if seq_id == "all":
+            for s in self._seq_states.values():
+                s.reset()
+            return
+        target = self.DEFAULT_SEQ_ID if seq_id is None else seq_id
+        s = self._seq_states.get(target)
+        if s is not None:
+            s.reset()
 
     # ------------------------------------------------------------------
     # Write path.
@@ -347,24 +518,55 @@ class PagedKVWriter:
         value: "torch.Tensor",          # (T, H_kv, D) bf16
         kv_cache: "torch.Tensor",       # (2, NB, BS, H_kv, D) uint8
         slot_mapping: "torch.Tensor",   # (T,) long
+        *,
+        seq_id: Any = None,
     ) -> None:
-        """Quantize T new K/V tokens and write them into the paged cache
-        + external sidecars at the slots given by slot_mapping.
+        """Phase 6 vectorized write into paged cache + external sidecars.
 
-        For each token:
-          * V: quantize per-(h, group) along D, write nibbles into the
-               V slot's first D/2 bytes, write scale/xmin into the V
-               externals at (block_id, pos).
-          * K: extract protected channels (write to k_protect_ext at
-               (block_id, pos)), stage in k_stage. When the staging
-               buffer fills a block, finalize the K group: quantize
-               all 16 tokens with shared per-(h, d) scale, write nibbles
-               into kv_cache[0]'s K slot, write scale/xmin into the K
-               externals at block_id.
+        Phase 5B.6 step 2: now accepts an explicit `seq_id`. If omitted,
+        routes through DEFAULT_SEQ_ID (= 0) for v1 batch=1 callers — no
+        behavior change from the prior single-seq write.
+
+        For multi-batch (Phase 5B.6): the caller partitions slot_mapping
+        by sequence and calls write() once per sequence with that seq's
+        id. Each seq's K staging + bf16 backing live in its own
+        SeqState (allocated on first write).
+
+        Pipeline (unchanged):
+          1. Filter -1 padding slots (vLLM uses -1 for "do not write").
+          2. BF16 K/V backing append at [state.seq_pos : ...+n_real].
+          3. V quantization VECTORIZED over n_real (one set of CUDA ops).
+          4. V scatter into kv_cache[1] + v_scale_ext + v_xmin_ext via
+             advanced indexing — one op each instead of T per-token writes.
+          5. K protect gather VECTORIZED -> scatter into k_protect_ext.
+          6. K staging: split unique blocks into FULL (count==BS, batch-
+             finalize all at once) vs PARTIAL (count<BS, through this
+             SeqState's staging buffer).
+
+        Bit-equivalent to the prior per-token implementation; verified
+        by verify_phase5b_4c_1_write.py + verify_phase5b_4c_2_read.py.
         """
         if not self._allocated:
             self._lazy_alloc(kv_cache)
 
+        if seq_id is None:
+            seq_id = self.DEFAULT_SEQ_ID
+        state = self.ensure_seq_state(seq_id, kv_cache.device)
+        self._write_into_state(state, key, value, kv_cache, slot_mapping)
+
+    def _write_into_state(
+        self,
+        state: "SeqState",
+        key: "torch.Tensor",
+        value: "torch.Tensor",
+        kv_cache: "torch.Tensor",
+        slot_mapping: "torch.Tensor",
+    ) -> None:
+        """Internal: same vectorized write as before, but operating on
+        an explicit SeqState (`state`) for per-seq fields instead of
+        the legacy `self.*` proxies. Per-LAYER state (k_scale_ext etc.)
+        remains on `self`.
+        """
         if key.shape != value.shape:
             raise ValueError(
                 f"key shape {tuple(key.shape)} != value shape {tuple(value.shape)}"
@@ -378,129 +580,279 @@ class PagedKVWriter:
                 f"slot_mapping shape {tuple(slot_mapping.shape)} != ({key.shape[0]},)"
             )
 
-        # Move slot_mapping to CPU once for the per-token Python loop.
-        # (For v1 we accept the per-token cost; vectorize in v2.)
-        slot_map_cpu = slot_mapping.to("cpu", dtype=torch.long, non_blocking=False)
         T = key.shape[0]
         dtype = self.sidecar_dtype
         BS = self.BS
         D = self.D
+        H = self.H
         half_D = D // 2
 
-        # Cast K/V to sidecar dtype if needed (typically already bf16).
         if key.dtype != dtype:
             key = key.to(dtype)
         if value.dtype != dtype:
             value = value.to(dtype)
 
-        # Phase 5B.4c.3 fix (a): copy bf16 K/V into the parallel backing
-        # buffer at [seq_pos : seq_pos+T]. The read path passes this to
-        # the kernel as positional K/V args so the small-S override-gap
-        # is harmless. This is independent of the paged layout — pure
-        # seq-major bf16 stash. Counts only NON-PADDING tokens to keep
-        # seq_pos aligned with cache_seqlens semantics.
-        if self.bf16_k_backing is not None:
-            non_padding = (slot_map_cpu >= 0)
-            n_real = int(non_padding.sum().item())
-            if n_real > 0:
-                if self.seq_pos + n_real > self.bf16_k_backing.shape[1]:
-                    raise RuntimeError(
-                        f"bf16 backing overflow: seq_pos={self.seq_pos} + "
-                        f"n_real={n_real} > max_seqlen="
-                        f"{self.bf16_k_backing.shape[1]}. Set "
-                        f"{_BF16_BACKING_MAX_SEQLEN_ENV} to a larger value."
-                    )
-                # Slice key/value to drop -1 padding rows then stash.
-                real_mask_gpu = non_padding.to(key.device)
-                k_real = key[real_mask_gpu]              # (n_real, H, D)
-                v_real = value[real_mask_gpu]
-                self.bf16_k_backing[0, self.seq_pos:self.seq_pos + n_real] = k_real
-                self.bf16_v_backing[0, self.seq_pos:self.seq_pos + n_real] = v_real
-                self.seq_pos += n_real
+        # Move slot_mapping to the same device as key (it's typically GPU
+        # already but be defensive). Filter -1 padding.
+        if slot_mapping.device != key.device:
+            slot_mapping = slot_mapping.to(key.device)
+        slot_mapping = slot_mapping.long()
+        non_padding_gpu = (slot_mapping >= 0)
+        # Single CPU sync to learn how many real tokens we have. This is
+        # also implicitly needed to size downstream tensors.
+        n_real = int(non_padding_gpu.sum().item())
+        if n_real == 0:
+            return
 
-        for t in range(T):
-            slot = int(slot_map_cpu[t].item())
-            if slot < 0:
-                # vLLM uses -1 for "do not write" padding slots.
+        if n_real == T:
+            real_key = key
+            real_value = value
+            real_slots = slot_mapping
+        else:
+            real_key   = key[non_padding_gpu]            # (n_real, H, D)
+            real_value = value[non_padding_gpu]
+            real_slots = slot_mapping[non_padding_gpu]
+
+        # ===== BF16 K/V backing (Phase 5B.4c.3 fix-a; per-seq) =====
+        # `state` is THIS sequence's SeqState; bf16 backing is per-seq.
+        if state.bf16_k_backing is not None:
+            if state.seq_pos + n_real > state.bf16_k_backing.shape[1]:
+                raise RuntimeError(
+                    f"bf16 backing overflow: seq_pos={state.seq_pos} + "
+                    f"n_real={n_real} > max_seqlen="
+                    f"{state.bf16_k_backing.shape[1]}. Set "
+                    f"{_BF16_BACKING_MAX_SEQLEN_ENV} to a larger value."
+                )
+            state.bf16_k_backing[0, state.seq_pos:state.seq_pos + n_real] = real_key
+            state.bf16_v_backing[0, state.seq_pos:state.seq_pos + n_real] = real_value
+            state.seq_pos += n_real
+
+        block_ids = real_slots // BS                     # (n_real,) long
+        positions = real_slots %  BS
+
+        # ===== V quantization, fully vectorized over n_real =====
+        if _bf16_v_mode():
+            # Debug bf16-V mode (used in 5B.4c.3 V isolation).
+            if getattr(self, "_v_bf16_ext", None) is None:
+                self._v_bf16_ext = torch.zeros(
+                    (self.NB, self.BS, H, D),
+                    dtype=dtype, device=kv_cache.device,
+                )
+            self._v_bf16_ext[block_ids, positions] = real_value
+        else:
+            v_grouped = real_value.float().view(
+                n_real, H, self.v_n_groups, self.v_group_size,
+            )
+            v_max = v_grouped.amax(dim=-1)                              # (n_real, H, n_g)
+            v_min = v_grouped.amin(dim=-1)
+            v_scale = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+            q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale.unsqueeze(-1)) \
+                .round().clamp(0, 15).to(torch.uint8)                   # (n_real, H, n_g, G)
+            q_v_flat = q_v.view(n_real, H, D)
+            v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
+            # v_packed: (n_real, H, D/2)
+
+            kv_cache[1, block_ids, positions, :, :half_D] = v_packed
+            self.v_scale_ext[block_ids, positions] = v_scale.to(dtype)
+            self.v_xmin_ext [block_ids, positions] = v_min.to(dtype)
+
+        # ===== K protect gather, vectorized =====
+        protect_idx = self.protected_d_per_head.unsqueeze(0).expand(n_real, -1, -1)
+        # (n_real, H, n_protect) long
+        k_protect = torch.gather(real_key, dim=-1, index=protect_idx)
+        self.k_protect_ext[block_ids, positions] = k_protect
+
+        # ===== K staging + finalize =====
+        # Identify unique blocks and which are FULL (count == BS) vs PARTIAL.
+        # FULL blocks bypass the staging buffer (we have all BS tokens for
+        # them already in real_key, so finalize directly in one batched op).
+        # PARTIAL blocks go through the staging buffer (state carries
+        # across write() calls).
+        unique_blocks, inverse, counts = torch.unique(
+            block_ids, return_inverse=True, return_counts=True,
+        )
+        full_mask = (counts == BS)
+        n_full_blocks = int(full_mask.sum().item())
+
+        if n_full_blocks > 0:
+            self._finalize_k_full_blocks_batched(
+                state=state,
+                kv_cache=kv_cache,
+                real_key=real_key,
+                block_ids=block_ids,
+                positions=positions,
+                inverse=inverse,
+                unique_blocks=unique_blocks,
+                full_mask=full_mask,
+                n_full_blocks=n_full_blocks,
+            )
+
+        if n_full_blocks < unique_blocks.shape[0]:
+            # At least one PARTIAL block; route those through THIS seq's
+            # staging buffer. Process in SEQUENCE ORDER (appearance order)
+            # so state.k_stage_block_id ends pointing at the seq's last
+            # block (where the next decode write will continue).
+            self._stage_k_partial_blocks(
+                state=state,
+                kv_cache=kv_cache,
+                real_key=real_key,
+                block_ids=block_ids,
+                positions=positions,
+                unique_blocks=unique_blocks,
+                full_mask=full_mask,
+            )
+
+    def _finalize_k_full_blocks_batched(
+        self,
+        *,
+        state: "SeqState",
+        kv_cache,
+        real_key,
+        block_ids,
+        positions,
+        inverse,
+        unique_blocks,
+        full_mask,
+        n_full_blocks,
+    ):
+        """Batch-finalize all blocks for which this write() supplied
+        the full BS tokens. Equivalent to running _finalize_k_group N
+        times but in one set of CUDA ops.
+
+        `state` is THIS seq's SeqState — used only to detect if any
+        of the just-finalized blocks was the staging block for this seq
+        (in which case the staging count is reset to 0).
+        """
+        BS = self.BS
+        H = self.H
+        D = self.D
+        half_D = D // 2
+        dtype = self.sidecar_dtype
+
+        full_block_ids = unique_blocks[full_mask]                    # (n_full,) sorted ascending
+        in_full_mask = full_mask[inverse]                            # (n_real,) bool
+        keys_for_full = real_key[in_full_mask]                       # (n_full * BS, H, D)
+        block_ids_for_full = block_ids[in_full_mask]
+        positions_for_full = positions[in_full_mask]
+
+        # Sort by (block_id, position) so the BS tokens of each full
+        # block end up contiguous and slot-ordered.
+        # combined_key = block_id * BS + position
+        combined = block_ids_for_full * BS + positions_for_full
+        sort_idx = combined.argsort()
+        keys_sorted = keys_for_full[sort_idx]                        # (n_full * BS, H, D)
+        keys_grouped = keys_sorted.view(n_full_blocks, BS, H, D)
+
+        # Quantization math, vectorized across all full blocks.
+        buf_f = keys_grouped.float()
+        x_max = buf_f.amax(dim=1)                                    # (n_full, H, D)
+        x_min = buf_f.amin(dim=1)
+        scale = ((x_max - x_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+        q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+            .round().clamp(0, 15).to(torch.uint8)                    # (n_full, BS, H, D)
+        packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)
+        # packed: (n_full, BS, H, D/2)
+
+        kv_cache[0, full_block_ids, :, :, :half_D] = packed
+        self.k_scale_ext[full_block_ids] = scale.to(dtype)
+        self.k_xmin_ext [full_block_ids] = x_min.to(dtype)
+
+        # If THIS seq's staging buffer was tracking one of these now-
+        # finalized blocks, mark its count as 0 (block is done; next
+        # partial fills state.k_stage afresh). Done on CPU because
+        # state.k_stage_block_id is a Python int.
+        if state.k_stage_block_id in full_block_ids.cpu().tolist():
+            state.k_stage_count = 0
+
+    def _stage_k_partial_blocks(
+        self,
+        *,
+        state: "SeqState",
+        kv_cache,
+        real_key,
+        block_ids,
+        positions,
+        unique_blocks,
+        full_mask,
+    ):
+        """Place tokens belonging to partial (count < BS) blocks into THIS
+        seq's staging buffer (`state.k_stage`). Process partial blocks in
+        sequence (first-appearance) order so state.k_stage_block_id ends
+        at the seq's true last block.
+
+        In practice the partial-block count per write() is small:
+          - 1 (the sequence's current trailing partial)
+          - sometimes 2 (one continuing from prior staging + one new tail)
+        So this small Python loop is not the bottleneck.
+        """
+        BS = self.BS
+        partial_set = set(unique_blocks[~full_mask].cpu().tolist())
+        if not partial_set:
+            return
+
+        # Walk block_ids in appearance order to find unique partials.
+        block_ids_cpu = block_ids.cpu().tolist()
+        positions_cpu = positions.cpu()
+
+        seen: set = set()
+        ordered_partials: list = []
+        for b in block_ids_cpu:
+            if b in seen:
                 continue
-            block_id = slot // BS
-            pos = slot % BS
+            seen.add(b)
+            if b in partial_set:
+                ordered_partials.append(b)
 
-            # =============== V (per-token) ===============
-            v_tok = value[t]   # (H, D)
-            if _bf16_v_mode():
-                # Debug mode: stash bf16 V in an external sidecar instead
-                # of packing. Read path will gather from this sidecar and
-                # pass directly to the kernel (skipping v_packed_*).
-                # Allocate v_bf16_ext lazily on first use.
-                if getattr(self, "_v_bf16_ext", None) is None:
-                    self._v_bf16_ext = torch.zeros(
-                        (self.NB, self.BS, self.H, self.D),
-                        dtype=dtype, device=kv_cache.device,
-                    )
-                self._v_bf16_ext[block_id, pos] = v_tok
-            else:
-                v_grouped = v_tok.float().view(self.H, self.v_n_groups, self.v_group_size)
-                v_max = v_grouped.amax(dim=-1)                          # (H, n_g)
-                v_min = v_grouped.amin(dim=-1)
-                v_scale_tok = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
-                q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale_tok.unsqueeze(-1)) \
-                    .round().clamp(0, 15).to(torch.uint8)               # (H, n_g, G)
-                q_v_flat = q_v.view(self.H, D)
-                v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
-                # v_packed: (H, D/2) uint8
+        for pb in ordered_partials:
+            # Mask within real_key for this partial block.
+            pb_mask = (block_ids == pb)
+            keys_for_pb = real_key[pb_mask]                          # (cnt, H, D)
+            positions_for_pb = positions[pb_mask]                    # (cnt,) long
 
-                kv_cache[1, block_id, pos, :, :half_D] = v_packed
-                self.v_scale_ext[block_id, pos] = v_scale_tok.to(dtype)
-                self.v_xmin_ext [block_id, pos] = v_min.to(dtype)
+            # Block-boundary detection in THIS seq's staging.
+            if pb != state.k_stage_block_id:
+                state.k_stage_block_id = pb
+                state.k_stage.zero_()
+                state.k_stage_count = 0
 
-            # =============== K (staged) ===============
-            k_tok = key[t]    # (H, D)
+            # Place these tokens at their intra-block positions.
+            state.k_stage[positions_for_pb] = keys_for_pb
+            max_pos = int(positions_for_pb.max().item()) + 1
+            if max_pos > state.k_stage_count:
+                state.k_stage_count = max_pos
 
-            # Protected-channel extraction to external sidecar.
-            gathered = torch.gather(k_tok, dim=1, index=self.protected_d_per_head)
-            # gathered: (H, n_protect) bf16
-            self.k_protect_ext[block_id, pos] = gathered
-
-            # Detect block boundary crossing. If block_id changes mid-write,
-            # we're starting a new group. Reset stage state.
-            if block_id != self.k_stage_block_id:
-                self.k_stage_block_id = block_id
-                # If the previous group had a partial tail, it lives only
-                # in our staging buffer at that point — and we just lost it
-                # because k_stage is reused. For batch=1 v1 this means:
-                # a new sequence (after reset_sequence) or a perfectly
-                # block-aligned sequence boundary. Anything else implies a
-                # multi-batch race, which v1 explicitly disallows.
-                self.k_stage.zero_()
-                self.k_stage_count = 0
-
-            # Stage at the slot's intra-block position.
-            self.k_stage[pos] = k_tok
-            # Track count by max(seen pos) + 1 to be robust to non-monotone
-            # writes (shouldn't happen in practice, but safer).
-            if pos + 1 > self.k_stage_count:
-                self.k_stage_count = pos + 1
-
-            # Finalize on block boundary.
-            if self.k_stage_count == BS:
-                self._finalize_k_group(kv_cache, block_id)
-                self.k_stage_count = 0
-                # k_stage_block_id stays so the next token's check is correct;
-                # k_stage values are stale until overwritten in the next group.
+            # If now full, finalize from this seq's staging buffer.
+            if state.k_stage_count == BS:
+                self._finalize_k_group_from_state(state, kv_cache, pb)
+                state.k_stage_count = 0
 
     def _finalize_k_group(
         self,
         kv_cache: "torch.Tensor",
         block_id: int,
     ) -> None:
-        """Quantize the full staging buffer (BS, H, D) and write packed
-        nibbles + scale + xmin to the cache + externals for this block."""
-        BS = self.BS
+        """Legacy single-seq finalizer. Routes through the default
+        SeqState's k_stage. Kept for backward compat with any external
+        callers; internal helpers now use _finalize_k_group_from_state.
+        """
+        s = self._seq_states.get(self.DEFAULT_SEQ_ID)
+        if s is None:
+            raise RuntimeError("_finalize_k_group called before _lazy_alloc")
+        self._finalize_k_group_from_state(s, kv_cache, block_id)
+
+    def _finalize_k_group_from_state(
+        self,
+        state: "SeqState",
+        kv_cache: "torch.Tensor",
+        block_id: int,
+    ) -> None:
+        """Quantize the full staging buffer (BS, H, D) on `state.k_stage`
+        and write packed nibbles + scale + xmin to the cache + externals
+        for `block_id`."""
         D = self.D
         half_D = D // 2
 
-        buf_f = self.k_stage.float()                    # (BS, H, D)
+        buf_f = state.k_stage.float()                   # (BS, H, D)
         x_max = buf_f.amax(dim=0)                       # (H, D)
         x_min = buf_f.amin(dim=0)
         scale = ((x_max - x_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
@@ -511,7 +863,7 @@ class PagedKVWriter:
 
         # Write nibbles to all BS slots of this block.
         kv_cache[0, block_id, :, :, :half_D] = packed
-        # Write per-(h, d) scale + xmin to externals.
+        # Write per-(h, d) scale + xmin to externals (per-layer, shared).
         self.k_scale_ext[block_id] = scale.to(self.sidecar_dtype)
         self.k_xmin_ext [block_id] = x_min.to(self.sidecar_dtype)
 
@@ -519,21 +871,30 @@ class PagedKVWriter:
     # Introspection helpers (for verify scripts).
     # ------------------------------------------------------------------
 
-    def get_bf16_backing_slice(self, S: int):
+    def get_bf16_backing_slice(self, S: int, *, seq_id: Any = None):
         """Phase 5B.4c.3 fix (a): return (bf16_K, bf16_V) of shape
         (1, S, H, D) for the kernel's positional K/V args.
+
+        Phase 5B.6 step 2: optional `seq_id` selects which sequence's
+        backing to slice. Default = DEFAULT_SEQ_ID (legacy single-seq).
 
         Positions [0..seq_pos-1] hold the real bf16 K/V values written
         so far in this sequence. Positions [seq_pos..S-1] are zeros
         (initialized) and unattended (cache_seqlens masks them).
         """
-        if self.bf16_k_backing is None:
-            raise RuntimeError("bf16 backing not allocated yet — call lazy_alloc first.")
-        if S > self.bf16_k_backing.shape[1]:
+        if seq_id is None:
+            seq_id = self.DEFAULT_SEQ_ID
+        state = self._seq_states.get(seq_id)
+        if state is None or state.bf16_k_backing is None:
             raise RuntimeError(
-                f"requested backing slice S={S} > allocated {self.bf16_k_backing.shape[1]}"
+                f"bf16 backing not allocated for seq_id={seq_id!r}. "
+                f"Call write() first."
             )
-        return self.bf16_k_backing[:, :S], self.bf16_v_backing[:, :S]
+        if S > state.bf16_k_backing.shape[1]:
+            raise RuntimeError(
+                f"requested backing slice S={S} > allocated {state.bf16_k_backing.shape[1]}"
+            )
+        return state.bf16_k_backing[:, :S], state.bf16_v_backing[:, :S]
 
     def get_state(self) -> Dict[str, Any]:
         """Snapshot of allocator + streaming state. Used by 5B.4c.1
@@ -609,3 +970,129 @@ class PagedKVWriter:
         if _bf16_v_mode() and getattr(self, "_v_bf16_ext", None) is not None:
             result["v_bf16"] = self._v_bf16_ext[block_ids].view(1, S, self.H, self.D)
         return result
+
+    def get_packed_view_batched(
+        self,
+        block_ids_batched: "torch.Tensor",   # (B, n_blocks_max) long; padded slots = 0
+        kv_cache: "torch.Tensor",            # (2, NB, BS, H, D) uint8
+    ) -> Dict[str, Any]:
+        """Phase 6 v2 (Option A): batched-gather for multi-seq decode.
+
+        Replaces B separate `get_packed_view` calls with ONE set of CUDA
+        advanced-index ops that gathers ALL B sequences' paged blocks +
+        sidecars simultaneously.
+
+        Per-seq sequences may have different `n_blocks_used`. The caller
+        pads `block_ids_batched[i]` to a common `n_blocks_max` length —
+        unused trailing slots should point at block 0 (or any valid
+        block) since `cache_seqlens` masks the padded positions in the
+        kernel anyway.
+
+        Returns:
+          dict with batched tensors of shapes:
+            k_int4:         (B, S, H, D/2)             uint8
+            k_scale:        (B, n_blocks_max, H, D)    bf16
+            k_xmin:         (B, n_blocks_max, H, D)    bf16
+            k_protect_bf16: (B, S, H, n_protect)       bf16
+            protect_slot:   (H, D)                     int8 (shared)
+            v_int4:         (B, S, H, D/2)             uint8
+            v_scale:        (B, S, H, v_n_groups)      bf16
+            v_xmin:         (B, S, H, v_n_groups)      bf16
+          where S = n_blocks_max * BS.
+
+        The caller still applies the K partial-tail splice per-seq
+        (one per sequence with a trailing partial group) on this
+        batched view, writing into the corresponding slice.
+        """
+        if not self._allocated:
+            raise RuntimeError("get_packed_view_batched before _lazy_alloc")
+        if block_ids_batched.ndim != 2:
+            raise ValueError(
+                f"block_ids_batched shape {tuple(block_ids_batched.shape)} != (B, n_blocks_max)"
+            )
+        B, n_blocks_max = block_ids_batched.shape
+        BS = self.BS
+        D = self.D
+        half_D = D // 2
+        H = self.H
+        S = n_blocks_max * BS
+
+        block_ids_long = block_ids_batched.long()
+
+        # Gather paged blocks in ONE shot.
+        # kv_cache[0]: (NB, BS, H, D). Indexed with (B, n_blocks_max) →
+        # (B, n_blocks_max, BS, H, D).
+        k_blocks = kv_cache[0][block_ids_long]
+        v_blocks = kv_cache[1][block_ids_long]
+
+        # Slice nibbles (first D/2 bytes per slot) and flatten block+slot
+        # dims to S.
+        k_nibbles = k_blocks[..., :half_D].contiguous().view(B, S, H, half_D)
+        v_nibbles = v_blocks[..., :half_D].contiguous().view(B, S, H, half_D)
+
+        # Gather sidecars in ONE shot too.
+        k_scale = self.k_scale_ext[block_ids_long]                              # (B, n_blocks_max, H, D)
+        k_xmin  = self.k_xmin_ext [block_ids_long]                              # (B, n_blocks_max, H, D)
+        k_prot  = self.k_protect_ext[block_ids_long].view(B, S, H, self.n_protect)
+        v_scale = self.v_scale_ext[block_ids_long].view(B, S, H, self.v_n_groups)
+        v_xmin  = self.v_xmin_ext [block_ids_long].view(B, S, H, self.v_n_groups)
+
+        result: Dict[str, Any] = {
+            "k_int4":         k_nibbles,
+            "k_scale":        k_scale,
+            "k_xmin":         k_xmin,
+            "k_protect_bf16": k_prot,
+            "protect_slot":   self.protect_slot,
+            "n_protect":      self.n_protect,
+            "group_size":     BS,
+            "v_int4":         v_nibbles,
+            "v_scale":        v_scale,
+            "v_xmin":         v_xmin,
+            "v_group_size":   self.v_group_size,
+            "n_blocks_max":   n_blocks_max,
+            "S":              S,
+        }
+        if _bf16_v_mode() and getattr(self, "_v_bf16_ext", None) is not None:
+            result["v_bf16"] = self._v_bf16_ext[block_ids_long].view(B, S, H, D)
+        return result
+
+    def get_bf16_backing_batched(
+        self,
+        seq_ids: "list",     # list of seq_id, length B
+        S_padded: int,
+    ):
+        """Phase 6 v2: stack per-seq bf16 K/V backings into batched tensors.
+
+        Each seq's backing is a (1, max_seqlen, H, D) tensor allocated in
+        its SeqState. We slice each to (1, S_padded, H, D) and stack on the
+        batch axis → (B, S_padded, H, D). Positions [seq_pos_i .. S_padded)
+        of each row are zeros (initialized; never written by writes for
+        that seq); cache_seqlens masks them in the kernel.
+        """
+        if not self._allocated:
+            raise RuntimeError("get_bf16_backing_batched before _lazy_alloc")
+        B = len(seq_ids)
+        if B == 0:
+            raise ValueError("get_bf16_backing_batched needs B >= 1 seq_ids")
+        # Validate all seqs have backing of sufficient size.
+        any_state = self._seq_states.get(seq_ids[0])
+        if any_state is None or any_state.bf16_k_backing is None:
+            raise RuntimeError(f"bf16 backing missing for seq_id={seq_ids[0]!r}")
+        max_S = any_state.bf16_k_backing.shape[1]
+        if S_padded > max_S:
+            raise RuntimeError(f"S_padded={S_padded} > max_seqlen={max_S}")
+
+        H = self.H
+        D = self.D
+        device = any_state.bf16_k_backing.device
+
+        # Pre-allocate batched buffers and copy each seq's slice in.
+        bf16_k = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
+        bf16_v = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
+        for i, sid in enumerate(seq_ids):
+            state = self._seq_states.get(sid)
+            if state is None or state.bf16_k_backing is None:
+                raise RuntimeError(f"bf16 backing missing for seq_id={sid!r}")
+            bf16_k[i].copy_(state.bf16_k_backing[0, :S_padded])
+            bf16_v[i].copy_(state.bf16_v_backing[0, :S_padded])
+        return bf16_k, bf16_v

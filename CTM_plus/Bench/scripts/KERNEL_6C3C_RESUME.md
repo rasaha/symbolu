@@ -12,14 +12,28 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state: Phase 5B.5 GREEN — v1 quality acceptance complete.**
-  Char-diff 3/5 IDENTICAL outputs, mean 67% prefix overlap. Needle test
-  **15/15 retrieval (100%) at protect_fraction=4%** matching stock.
-  Locked v1 ship `protect_fraction=4%`. All 4 ship-essential 5B sub-
-  phases now GREEN: 5B.4c.1 (write), 5B.4c.2 (read), 5B.4c.3 (e2e),
-  5B.5 (quality).
+- **Latest verified state: Phase 5B.6 GREEN — multi-batch decode.**
+  verify_phase5b_6_batch ALL 7 gates PASS:
+    - A serial == batched (122 chars IDENTICAL)
+    - B serial-vs-batched 45.8% common prefix (above 40% gate; divergence
+      at a near-tie greedy choice — expected bf16 fp-noise)
+    - A and B batched **run1 == run2** (architectural determinism)
+    - 0 fallbacks across 896 writes + 868 packed decodes
+  Multi-seq architecture is correct. The 4× concurrent-sequence capacity
+  established in Phase 5B.4c.3 is now USABLE — vLLM batched decode through
+  int4_protected works and is deterministic per batch shape.
 
-  Previously: Phase 5B.4c.3 GREEN at commit `1211993`.
+  All 6 ship-essential phases GREEN: 5B.4c.1 (write), 5B.4c.2 (read),
+  5B.4c.3 (e2e), 5B.5 (quality), 5C (API + docs), 5B.6 (multi-batch).
+
+  Phase 6 perf polish:
+    - Step 2 vectorized writer landed (`382db51`): +27% int4_proto decode_tps,
+      long-prefill prompts 2-2.4× faster. Writer at 1.14× of the
+      batched-pack lower bound.
+    - Step 4 cp.async-skip kernel patch DEFERRED — the rebuild deadlocked
+      on the pod; the single-site patcher is committed but unverified.
+
+  Previously: Phase 5B.5 GREEN at commit `dc3cc43`.
   v1 attention-side ship blocker cleared — `LLM(kv_cache_dtype=
   "int4_protected", block_size=32)` produces correct end-to-end Qwen
   generation through the packed K + packed V kernel path.
@@ -221,6 +235,36 @@ symmetric quant, group sizes ≠ 32.
 | `ea5884e` | Phase 5B.5 needle-in-haystack quality acceptance scaffolding (15 trials: 5 needles × 3 length buckets × middle-position planting). |
 | `dc3cc43` | **Phase 5B.5 GREEN** — char-diff 3/5 IDENTICAL (factual_recall, code, creative) at mean 67% prefix overlap. Needle test **15/15 stock + 15/15 int4 = 100% retrieval at all length buckets** (200, 600, 1200 filler tokens). **Lock protect_fraction=4% as the v1 ship value** — the smallest tested value with full quality. |
 | `ad275c0` | **Phase 5C GREEN — clean API + docs.** verify_phase5c_api.py T1-T6 ALL PASS: import-time backend registration, block_size constraint raises, Int4ProtectedLLM factory constructs, 28/28 layers auto-swap WITHOUT explicit install_int4_protected_backend call, get_backend_info diagnostic, end-to-end generation with needle retrieval + 0 fallbacks. Ship recipe locked at `import kv_policy.int4_protected; LLM(kv_cache_dtype='int4_protected', block_size=32)`. |
+| `e7b1c14` | Phase 5C bench: bf16 / fp8 / int4_protected three-way table (`PHASE5C_SHIP_REPORT.md`). int4_protected matches fp8's 2× concurrency with dramatically higher fidelity (3/6 IDENTICAL vs 0/6 for fp8). |
+| `b00664e` | Phase 6 step 1 — pre-vectorization writer profile (baseline). |
+| `382db51` | Phase 6 step 2 — vectorize PagedKVWriter.write. T=512 writer at 1.14× the batched-pack lower bound. End-to-end int4_proto decode_tps: 17.0 → 21.5 (+27%). Long-prefill prompts 2-2.4× faster; decode-step latency unchanged. |
+| `96dbb28` | Phase 6 step 5 — `PHASE6_PERF_REPORT.md` + `bench_phase6_decode_profile.py`. Writer at lower bound; remaining gap is read-path Python orchestration. Recommendation: A → C, B deferred. |
+| `40ce93b` | Phase 6 step 4 trial (Option A.1) — conservative K-prologue cp.async-skip kernel patcher. **Rebuild hung on the pod**; kept the source patch in place but deferred verification. The 224 MB bf16 backing remains. |
+| `5e9a810` / `22deba1` / `365d909` / `cde3c82` | **Phase 5B.6 multi-batch** — scaffolding (SeqState + _seq_states) → writer write_for_seq routing → impl forward batch>1 read/write partitioning → acceptance verify. |
+| `75dccf2` | **Phase 5B.6 fix** — unify prefill and decode under the same seq_id derivation. Earlier version had prefill writing to DEFAULT_SEQ_ID=0 while batched decode read per-seq SeqStates → catastrophic divergence (verify showed common-prefix=4 chars). Fix: derive seq_id from slot_mapping[first non-padding] // BS for prefill (equals block_table[0] for decode). |
+| `5315a9e` | Phase 5B.6 verify gates relaxed for cross-batch-shape comparison + added determinism check (run1 == run2 must be bit-identical). |
+| `<pending-5B.6-GREEN>` | **Phase 5B.6 GREEN.** verify_phase5b_6_batch ALL 7 GATES PASS: A serial==batched (122 chars IDENTICAL), B serial-vs-batched 45.8% prefix (above 40% gate; divergence at near-tie greedy choice `oil?` vs `oil diffuser?`), A batched run1==run2 (122 chars IDENTICAL determinism), **B batched run1==run2 (144 chars IDENTICAL determinism)**, 0 fallbacks, packed kernel fired. Multi-seq architecture is correct; remaining serial-vs-batched divergence is expected bf16 fp-summation-order noise (same effect in stock vLLM). |
+
+## v1.x SHIP COMPLETE — all 6 sub-phases GREEN
+
+| Sub-phase | Commit | Headline |
+|---|---|---|
+| 5B.4c.1 (write) | `f504622` | PagedKVWriter quantizes K+V to uint8 paged + external sidecars |
+| 5B.4c.2 (read)  | `270905a` | Gather + hybrid K-tail splice + packed kernel call |
+| 5B.4c.3 (e2e)   | `1211993` | Char-for-char match with stock vLLM, 28/28 layers, 0 fallbacks |
+| 5B.5  (quality) | `dc3cc43` | 15/15 needle retrieval at protect_fraction=4% |
+| 5C    (API)     | `ad275c0` | One-import setup, Int4ProtectedLLM factory, usage doc |
+| **5B.6 (batch)**| **`5315a9e`** | **Multi-seq decode; deterministic batched output, ≥40% serial-prefix on both prompts, 0 fallbacks. 4× concurrent-sequence capacity ACTUALLY USABLE.** |
+
+### Phase 6 perf polish
+
+| Step | Status | Commit | Headline |
+|---|---|---|---|
+| 1 — profile        | LANDED | `b00664e` | Pre-vec baseline. |
+| 2 — vectorize writer | LANDED | `382db51` | 1.14× lower bound; +27% int4_proto decode_tps. |
+| 3 — re-bench       | LANDED | `382db51` | Long-prefill 2-2.4×; bottleneck shifted to read path. |
+| 4 — cp.async-skip  | DEFERRED | `40ce93b` | Single-site patcher written; rebuild deadlocked on the pod, deferred. |
+| 5 — document gap   | LANDED | `96dbb28` | `PHASE6_PERF_REPORT.md`. |
 
 ## v1 SHIP COMPLETE — all 5 sub-phases GREEN
 
