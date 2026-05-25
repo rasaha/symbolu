@@ -178,19 +178,25 @@ def _gen_int4(prompts: List[str], args) -> List[str]:
 
     # batch=1 v1 invariant: serialize prompts (one generate call each).
     # PagedKVWriter holds per-layer staging that doesn't support
-    # concurrent sequences yet (Phase 5B.5+). Each iteration reuses
-    # the same per-layer sidecars + bf16 backing (overwritten by
-    # writer.reset_sequence implicitly via the new seq_pos counter).
+    # concurrent sequences yet (Phase 5B.5+). Reset writer state per
+    # sequence so the bf16 backing's seq_pos counter restarts at 0
+    # (otherwise prompt 2's reads would get prompt 1's data at
+    # positions [0..cache_seqlens-1]).
+    #
+    # The reset must run inside inference_mode: the writer's tensors
+    # were lazy-allocated during the first forward (inside vLLM's
+    # generate inference_mode), so in-place ops on them outside that
+    # mode raise "Inplace update to inference tensor".
     texts: List[str] = []
     for i, p in enumerate(prompts, 1):
         print(f"  int4 prompt {i}/{len(prompts)}...")
-        # Reset writer state per sequence (seq_pos counter + staging).
-        for _, sub in model.named_modules():
-            impl = getattr(sub, "impl", None)
-            if isinstance(impl, Int4ProtectedAttentionImpl):
-                w = getattr(impl, "_phase5b_paged_writer", None)
-                if w is not None:
-                    w.reset_sequence()
+        with torch.inference_mode():
+            for _, sub in model.named_modules():
+                impl = getattr(sub, "impl", None)
+                if isinstance(impl, Int4ProtectedAttentionImpl):
+                    w = getattr(impl, "_phase5b_paged_writer", None)
+                    if w is not None:
+                        w.reset_sequence()
         out = llm.generate([p], sampling)
         texts.append(out[0].outputs[0].text)
 
