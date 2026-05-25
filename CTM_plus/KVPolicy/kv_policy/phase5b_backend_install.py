@@ -142,32 +142,56 @@ if _VLLM_FA_AVAILABLE:
             return writer
 
         def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer):
-            """Phase 5B.4c.2: replace flash_attn_with_kvcache decode call.
+            """Phase 5B.4c.2 / 5B.6 step 3: packed decode read path.
+            Now handles batch>=1 by looping over sequences.
 
             query_q     : (B, S_q=1, H_q, D) bf16
             kv_cache    : (2, NB, BS, H_kv, D) uint8
             decode_meta : attn_metadata.decode_metadata (vLLM)
-            layer       : the Attention layer module (for layer_idx fallback)
+            layer       : the Attention layer module
 
             Returns: (B, S_q=1, H_q, D) bf16
-
-            batch=1 v1: asserts decode_meta has exactly one sequence.
-            Hybrid splice: rewrites the last block of the gathered view
-            with bf16 staging buffer quantized on the fly for the
-            partial tail.
             """
-            from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache
             writer = self._get_paged_writer(layer=layer)
-
             block_table = decode_meta.block_tables           # (B, max_blocks) int
             cache_seqlens_orig = decode_meta.seq_lens_tensor # (B,) int
             B = block_table.shape[0]
-            if B != 1:
-                raise NotImplementedError(
-                    f"Int4Protected batch=1 v1; got batch={B}"
+
+            if B == 1:
+                return self._read_decode_packed_one(
+                    query_q, kv_cache, layer, writer,
+                    bt=block_table[0],
+                    seqlen=int(cache_seqlens_orig[0].item()),
+                    seq_id=_seq_id_from_block_table_row(block_table[0]),
                 )
-            bt = block_table[0]                              # (max_blocks,)
-            seqlen = int(cache_seqlens_orig[0].item())
+
+            # Multi-batch path: per-seq gather + kernel call, stack outputs.
+            out = torch.empty_like(query_q)
+            for i in range(B):
+                seq_id = _seq_id_from_block_table_row(block_table[i])
+                out_i = self._read_decode_packed_one(
+                    query_q[i:i+1], kv_cache, layer, writer,
+                    bt=block_table[i],
+                    seqlen=int(cache_seqlens_orig[i].item()),
+                    seq_id=seq_id,
+                )
+                out[i:i+1] = out_i
+            return out
+
+        def _read_decode_packed_one(
+            self, query_q, kv_cache, layer, writer, *, bt, seqlen, seq_id,
+        ):
+            """Single-sequence packed decode read. Caller passes the
+            per-seq block_table row and cache seqlen explicitly.
+
+            query_q: (1, S_q=1, H_q, D) bf16
+            bt:      (max_blocks,) int — the row of decode_meta.block_tables
+                     for this sequence
+            seqlen:  int — this sequence's cached token count
+            seq_id:  identifier into writer._seq_states
+            """
+            from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache
+
             BS = writer.BS
             n_blocks_used = (seqlen + BS - 1) // BS
             block_ids = bt[:n_blocks_used].long()
@@ -176,23 +200,26 @@ if _VLLM_FA_AVAILABLE:
             # Gather + view (paged → contiguous).
             view = writer.get_packed_view(block_ids, kv_cache)
 
-            # Hybrid partial-tail splice: rewrite the last block with the
-            # in-RAM staging buffer's bf16 K, quantized on the fly with the
-            # same numerical convention as _finalize_k_group.
+            # Hybrid partial-tail splice using THIS seq's staging.
             tail_len = seqlen % BS
             if tail_len != 0:
-                _splice_k_partial_tail(view, writer, last_block_idx=n_blocks_used - 1)
+                seq_state = writer.get_seq_state(seq_id)
+                _splice_k_partial_tail(
+                    view, writer, last_block_idx=n_blocks_used - 1,
+                    state=seq_state,
+                )
 
-            # Phase 5B.4c.3 fix (a): the kernel reads bf16 K/V backing
-            # at small S (n_block_max=1). Use the writer's seq-major bf16
-            # backing rather than a zero dummy. Bisection (E_zero vs
-            # E_real at S=128) proved this is required for correctness.
-            bf16_k_backing, bf16_v_backing = writer.get_bf16_backing_slice(S)
-            # The "dummy" name is preserved for kwarg-binding clarity but
-            # the tensor now carries the real backing content.
-            dummy = bf16_k_backing  # only used as K positional below
+            # Phase 5B.4c.3 fix (a): bf16 K/V backing for the kernel —
+            # per-seq slice now.
+            bf16_k_backing, bf16_v_backing = writer.get_bf16_backing_slice(
+                S, seq_id=seq_id,
+            )
+            dummy = bf16_k_backing
 
-            cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
+            # cache_seqlens for THIS seq only (B=1 in the kernel call).
+            cache_seqlens_i32 = torch.tensor(
+                [seqlen], dtype=torch.int32, device=query_q.device,
+            )
 
             # protect_mask + n_protect must be passed alongside the packed
             # kwargs — the kernel uses them for some bookkeeping even on
@@ -365,12 +392,40 @@ if _VLLM_FA_AVAILABLE:
                         updated_slot_mapping = attn_metadata.slot_mapping
                     if use_paged_writer:
                         writer = self._get_paged_writer(layer=layer)
-                        writer.write(
-                            key=key,
-                            value=value,
-                            kv_cache=kv_cache,
-                            slot_mapping=updated_slot_mapping.flatten(),
-                        )
+                        slot_mapping_flat = updated_slot_mapping.flatten()
+
+                        # Phase 5B.6 step 3: for batched decode (B > 1),
+                        # partition writes by sequence so each seq's
+                        # SeqState (staging buffer, bf16 backing) is
+                        # updated independently. Prefill stays single-call
+                        # (slot_mapping is per-token and prefill is
+                        # typically single-seq per forward).
+                        dec_meta = attn_metadata.decode_metadata
+                        if (dec_meta is not None
+                                and dec_meta.block_tables is not None
+                                and dec_meta.block_tables.shape[0] > 1
+                                and key.shape[0] == dec_meta.block_tables.shape[0]):
+                            B = dec_meta.block_tables.shape[0]
+                            for i in range(B):
+                                seq_id = _seq_id_from_block_table_row(
+                                    dec_meta.block_tables[i],
+                                )
+                                writer.write(
+                                    key=key[i:i+1],
+                                    value=value[i:i+1],
+                                    kv_cache=kv_cache,
+                                    slot_mapping=slot_mapping_flat[i:i+1],
+                                    seq_id=seq_id,
+                                )
+                        else:
+                            # Single-seq fast path (batch=1 decode or
+                            # any prefill case).
+                            writer.write(
+                                key=key,
+                                value=value,
+                                kv_cache=kv_cache,
+                                slot_mapping=slot_mapping_flat,
+                            )
                         Int4ProtectedAttentionImpl._call_stats["write_path_calls"] += 1
                     else:
                         Int4ProtectedAttentionImpl._call_stats["write_path_fallback"] += 1
@@ -583,26 +638,45 @@ class Int4ProtectedBackendManager:
 # Attention layer detection (same heuristic as Phase 5A).
 # ----------------------------------------------------------------------
 
-def _splice_k_partial_tail(view: Dict[str, Any], writer: Any, last_block_idx: int) -> None:
+def _seq_id_from_block_table_row(bt_row: "torch.Tensor") -> int:
+    """Phase 5B.6 step 3: per-sequence identifier derived from the
+    first block in this sequence's block_table row.
+
+    vLLM 0.7.3's BlockManager doesn't reallocate a sequence's first
+    block across its lifetime (only adds new blocks as the sequence
+    grows). So block_table[i, 0] is a stable fingerprint across decode
+    steps of the same sequence — suitable as the seq_id key into
+    PagedKVWriter._seq_states.
+
+    Caveat: when a sequence finishes and its blocks return to the pool,
+    a future sequence MAY get the same first block. Callers should
+    `writer.evict_sequence(seq_id)` on completion to drop stale state.
+    """
+    return int(bt_row[0].item())
+
+
+def _splice_k_partial_tail(
+    view: Dict[str, Any], writer: Any, last_block_idx: int,
+    *, state: Any = None,
+) -> None:
     """Phase 5B.4c.2 hybrid splice. Rewrites the last block of the
     gathered packed-K view with on-the-fly quantization of the in-RAM
     staging buffer.
 
-    Mirrors PagedKVWriter._finalize_k_group's math so the kernel sees
-    a self-consistent (scale, xmin, nibbles) triple. Positions in the
-    staging buffer beyond k_stage_count are zero-padded (they wouldn't
-    be attended because cache_seqlens cuts off there).
+    Phase 5B.6 step 3: optional `state` parameter selects which sequence's
+    staging buffer to splice from. Default (state=None) uses the writer's
+    default-seq state (legacy single-seq behavior).
 
-    view modified in-place at:
-      k_int4[0, last_block_idx*BS : (last_block_idx+1)*BS]
-      k_scale[0, last_block_idx]
-      k_xmin [0, last_block_idx]
+    Mirrors PagedKVWriter._finalize_k_group_from_state's math so the
+    kernel sees a self-consistent (scale, xmin, nibbles) triple.
     """
+    if state is None:
+        state = writer._default_state
     BS = writer.BS
     D  = writer.D
     half_D = D // 2
 
-    buf_f = writer.k_stage.float()                 # (BS, H, D)
+    buf_f = state.k_stage.float()                  # (BS, H, D)
     x_max = buf_f.amax(dim=0)                       # (H, D)
     x_min = buf_f.amin(dim=0)
     scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
