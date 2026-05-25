@@ -183,11 +183,14 @@ if _VLLM_FA_AVAILABLE:
             if tail_len != 0:
                 _splice_k_partial_tail(view, writer, last_block_idx=n_blocks_used - 1)
 
-            # Dummy bf16 K/V tensor to satisfy the wrapper's shape contract.
-            # Kernel doesn't read content on the packed path; only shape
-            # (specifically seqlen_k) is consumed.
-            self._ensure_dummy_kv(S, writer.H, writer.D, kv_cache.device)
-            dummy = self._phase5b_dummy_kv[:, :S]
+            # Phase 5B.4c.3 fix (a): the kernel reads bf16 K/V backing
+            # at small S (n_block_max=1). Use the writer's seq-major bf16
+            # backing rather than a zero dummy. Bisection (E_zero vs
+            # E_real at S=128) proved this is required for correctness.
+            bf16_k_backing, bf16_v_backing = writer.get_bf16_backing_slice(S)
+            # The "dummy" name is preserved for kwarg-binding clarity but
+            # the tensor now carries the real backing content.
+            dummy = bf16_k_backing  # only used as K positional below
 
             cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
 
@@ -207,7 +210,9 @@ if _VLLM_FA_AVAILABLE:
                 v_for_kernel = v_bf16.contiguous()
                 packed_v_kwargs = {}
             else:
-                v_for_kernel = dummy
+                # Use the writer's seq-major bf16 V backing (same
+                # small-S workaround as for K).
+                v_for_kernel = bf16_v_backing
                 packed_v_kwargs = dict(
                     v_packed_int4=view["v_int4"].contiguous(),
                     v_packed_scale=view["v_scale"].contiguous(),

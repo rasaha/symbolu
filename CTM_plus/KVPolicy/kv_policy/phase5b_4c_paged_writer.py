@@ -38,6 +38,20 @@ _SCALE_CLAMP = 1e-8
 # Default v_group_size from Phase 2.6 design.
 _DEFAULT_V_GROUP_SIZE = 32
 
+# Phase 5B.4c.3 fix (a): parallel BF16 K/V backing.
+# The packed kernel at small S=128 (n_block_max=1) does not fully
+# override the cp.async'd bf16 K/V in smem before the GEMMs consume.
+# Bisection cells E_zero (cos=0), E_rand (cos=0.04) vs E_real (cos=1.0)
+# proved bf16 backing CONTENT matters at small S. F_zero (S=512) PASSES,
+# so the dependence vanishes at larger S — but our Qwen decode runs at
+# S ~25-60, exclusively in the broken regime.
+# Workaround: writer maintains a per-layer bf16 K/V cache and the impl
+# passes the relevant slice to the kernel as positional args. Defeats
+# part of the per-token memory savings (~224 MB / model at max_seqlen=
+# 4096) but unblocks v1 end-to-end without a kernel rebuild.
+_BF16_BACKING_MAX_SEQLEN_ENV = "PHASE5B_4C_BF16_BACKING_MAX_SEQLEN"
+_DEFAULT_BF16_BACKING_MAX_SEQLEN = 4096
+
 # Debug flag to bypass V packing (writer stashes bf16 V in a parallel
 # sidecar; read path passes it as v_cache positional). Used to isolate
 # V packed-path correctness vs K packed-path correctness.
@@ -46,6 +60,16 @@ _BF16_V_ENV = "PHASE5B_4C_BF16_V"
 
 def _bf16_v_mode() -> bool:
     return os.environ.get(_BF16_V_ENV, "").strip() in ("1", "true", "True", "yes")
+
+
+def _bf16_backing_max_seqlen() -> int:
+    raw = os.environ.get(_BF16_BACKING_MAX_SEQLEN_ENV, "").strip()
+    if not raw:
+        return _DEFAULT_BF16_BACKING_MAX_SEQLEN
+    try:
+        return int(raw)
+    except ValueError:
+        return _DEFAULT_BF16_BACKING_MAX_SEQLEN
 
 # Env var for the per-model protect mask artifact (calibration output
 # from Phase 5B.0). Override via PROTECT_MASK_PATH=...
@@ -205,6 +229,14 @@ class PagedKVWriter:
         self.k_stage_count: int = 0                       # 0..BS-1
         self.k_stage_block_id: int = -1                   # block we're filling
 
+        # Phase 5B.4c.3 fix (a): parallel BF16 K/V backing for the kernel
+        # call. seq_pos advances monotonically as writer.write fills tokens
+        # in seq order; reset_sequence() zeroes the counter.
+        self._bf16_backing_max_seqlen = _bf16_backing_max_seqlen()
+        self.bf16_k_backing: Optional[torch.Tensor] = None   # (1, max_S, H, D) bf16
+        self.bf16_v_backing: Optional[torch.Tensor] = None   # (1, max_S, H, D) bf16
+        self.seq_pos: int = 0                                # tokens written in current sequence
+
     # ------------------------------------------------------------------
     # Lazy allocation.
     # ------------------------------------------------------------------
@@ -278,6 +310,12 @@ class PagedKVWriter:
         self.k_stage_count = 0
         self.k_stage_block_id = -1
 
+        # Phase 5B.4c.3 fix (a): BF16 K/V backing for the kernel call.
+        max_S = self._bf16_backing_max_seqlen
+        self.bf16_k_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
+        self.bf16_v_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
+        self.seq_pos = 0
+
         self.NB, self.BS, self.H, self.D = NB, BS, H, D
         self.n_protect = n_protect
         self.v_n_groups = v_n_groups
@@ -296,6 +334,8 @@ class PagedKVWriter:
         self.k_stage_block_id = -1
         if self.k_stage is not None:
             self.k_stage.zero_()
+        # Phase 5B.4c.3 fix (a): reset bf16-backing seq counter.
+        self.seq_pos = 0
 
     # ------------------------------------------------------------------
     # Write path.
@@ -352,6 +392,31 @@ class PagedKVWriter:
             key = key.to(dtype)
         if value.dtype != dtype:
             value = value.to(dtype)
+
+        # Phase 5B.4c.3 fix (a): copy bf16 K/V into the parallel backing
+        # buffer at [seq_pos : seq_pos+T]. The read path passes this to
+        # the kernel as positional K/V args so the small-S override-gap
+        # is harmless. This is independent of the paged layout — pure
+        # seq-major bf16 stash. Counts only NON-PADDING tokens to keep
+        # seq_pos aligned with cache_seqlens semantics.
+        if self.bf16_k_backing is not None:
+            non_padding = (slot_map_cpu >= 0)
+            n_real = int(non_padding.sum().item())
+            if n_real > 0:
+                if self.seq_pos + n_real > self.bf16_k_backing.shape[1]:
+                    raise RuntimeError(
+                        f"bf16 backing overflow: seq_pos={self.seq_pos} + "
+                        f"n_real={n_real} > max_seqlen="
+                        f"{self.bf16_k_backing.shape[1]}. Set "
+                        f"{_BF16_BACKING_MAX_SEQLEN_ENV} to a larger value."
+                    )
+                # Slice key/value to drop -1 padding rows then stash.
+                real_mask_gpu = non_padding.to(key.device)
+                k_real = key[real_mask_gpu]              # (n_real, H, D)
+                v_real = value[real_mask_gpu]
+                self.bf16_k_backing[0, self.seq_pos:self.seq_pos + n_real] = k_real
+                self.bf16_v_backing[0, self.seq_pos:self.seq_pos + n_real] = v_real
+                self.seq_pos += n_real
 
         for t in range(T):
             slot = int(slot_map_cpu[t].item())
@@ -454,6 +519,22 @@ class PagedKVWriter:
     # Introspection helpers (for verify scripts).
     # ------------------------------------------------------------------
 
+    def get_bf16_backing_slice(self, S: int):
+        """Phase 5B.4c.3 fix (a): return (bf16_K, bf16_V) of shape
+        (1, S, H, D) for the kernel's positional K/V args.
+
+        Positions [0..seq_pos-1] hold the real bf16 K/V values written
+        so far in this sequence. Positions [seq_pos..S-1] are zeros
+        (initialized) and unattended (cache_seqlens masks them).
+        """
+        if self.bf16_k_backing is None:
+            raise RuntimeError("bf16 backing not allocated yet — call lazy_alloc first.")
+        if S > self.bf16_k_backing.shape[1]:
+            raise RuntimeError(
+                f"requested backing slice S={S} > allocated {self.bf16_k_backing.shape[1]}"
+            )
+        return self.bf16_k_backing[:, :S], self.bf16_v_backing[:, :S]
+
     def get_state(self) -> Dict[str, Any]:
         """Snapshot of allocator + streaming state. Used by 5B.4c.1
         verify to assert correct sidecar population without running the
@@ -470,6 +551,7 @@ class PagedKVWriter:
             "v_n_groups":        self.v_n_groups,
             "k_stage_count":     self.k_stage_count,
             "k_stage_block_id":  self.k_stage_block_id,
+            "seq_pos":           self.seq_pos,
         }
 
     def get_packed_view(
