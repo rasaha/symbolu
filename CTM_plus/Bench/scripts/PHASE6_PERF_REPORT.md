@@ -430,6 +430,56 @@ the resolved values (seq_ids → slots, n_blocks_max bucket) need to be
 hoisted to a pre-capture step that vLLM calls before graph replay.
 That's a vLLM integration concern beyond the read-path refactor.
 
+### B-pre-2 + B-pre-3 bundled (`7f1a168`)
+
+Re-do of B-pre-2 paired with B-pre-3 (unconditional splice) in one
+commit, per the lesson above. Splice now processes all B seqs
+uniformly with `torch.where(active_mask_t, ...)` masking inactive
+writes. No Python branches, no bool indexing, no data-dependent
+shapes in the splice region.
+
+Measured at B=8:
+
+| Phase | B-pre-1 | B-pre-2 alone | B-pre-2+3 bundled |
+|-------|---------|----------------|--------------------|
+| `seqids_blockids` cpu_us | 147 | 200 | **178** |
+| `splice` cpu_us | 274 | 377 | **308** |
+| TOTAL cpu_us per call | 455 | 567 | **502** |
+| **agg_tps @ B=8** | **43.1** | 42.2 | **42.6** |
+
+Net result: +0.4 tok/s recovery over isolated B-pre-2, but still
+-1.2% vs B-pre-1.
+
+Why splice cpu_us didn't drop to ~30-80 µs as predicted:
+
+The earlier hypothesis (cpu_us ≈ gpu_us means CPU is waiting on
+GPU-side syncs from bool indexing) was WRONG. The cpu_us was
+actually measuring **dispatch overhead** — ~5-20 µs per op
+multiplied by N ops in the region.
+
+The unconditional path has MORE ops than the conditional path:
+  - Read-modify-write pattern for each of k_int4, k_scale, k_xmin
+    adds 6 extra ops (gather + where + scatter × 3) vs the prior
+    3-op direct scatter pattern.
+  - Each adds ~5-10 µs of dispatch overhead → ~30-60 µs more cpu_us.
+
+This price is paid in EAGER mode. Under CUDA graph capture (the
+whole point of this refactor):
+  - All dispatches happen ONCE at capture time, not per call.
+  - Graph replay runs the recorded GPU work with ~5 µs of CPU
+    overhead total per replay.
+  - The +47 µs cpu_us/call we paid in eager should drop to ~0
+    under capture.
+
+So the structural goal is met (read path is now graph-capturable in
+the splice region) at the cost of a small eager regression that
+disappears under capture.
+
+Eager perf delta is the acceptable price of admission for the
+structural change — the actual perf win (2-3× from killing the
+model-forward launch overhead) comes from B-1 (capture enable), not
+from B-pre-* in isolation.
+
 ### Why not test B > 8
 
 We have headroom (218× max concurrency on the int4 cache), but at B=8

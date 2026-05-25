@@ -279,18 +279,28 @@ latency, ahead on aggregate.
 - **B-pre-1: COMPLETE.** Landed in `78e19c2` + sized via `2b98f0a`
   (lazy default slot) + `1f04819` (reset_sequence("all") evicts
   default too). Pool tensors + slot map + device-indexed read API.
-  All gates GREEN on pod:
-    - verify_phase6_b_pre1_splice_slots_equiv.py: PASS
-    - verify_phase5b_6_batch.py: GREEN (7/7 gates)
-    - verify_phase6_d_step1_splice_equiv.py: PASS
-    - bench_phase6_batched_throughput.py at B in {1,2,4,8}: clean
-      run, agg_tps 20.6/27.2/35.8/43.1
-    - bench_phase6_decode_phase_profile.py: clean run, profiler
-      still functional, all phases reported
-  Measured win: `bf16_backing` cpu_us went linear-with-B (38/50/72)
-  → flat-with-B (24/24/24) → -67% at B=8. Splice picked up -7%.
-  Read-path total -9%. Modest agg_tps gain (+1% at B=8) because the
-  real perf lever is graph capture, not the structural refactor.
+  Measured at B=8: bf16_backing cpu_us went linear-with-B → flat,
+  agg_tps 36.3 → 43.1 (1.19× since session start).
+- **B-pre-2 + B-pre-3: COMPLETE (bundled).** Landed in `7f1a168`
+  after a failed isolated attempt at B-pre-2 (`ec7253b`, reverted in
+  `4868f3d`). Device-side metadata + unconditional splice with
+  torch.where-masked writes. All gates GREEN on pod:
+    - verify_phase6_b_pre23_unconditional_splice_equiv.py: PASS
+      (mixed active/inactive seqs; inactive slots byte-preserved)
+    - verify_phase5b_6_batch.py: GREEN (7/7)
+    - verify_phase6_d_step1_splice_equiv.py: PASS (legacy path
+      kept for back-compat)
+    - bench_phase6_batched_throughput.py at B in {1,2,4,8}: clean,
+      agg_tps 20.5/26.4/35.0/42.6
+  Measured eager-mode cost: -1.2% on agg_tps at B=8 (43.1 → 42.6).
+  This is the price of admission for graph capture — the +47 µs
+  cpu_us/call comes from extra dispatch ops in the unconditional
+  RMW pattern. Under graph capture, those dispatches happen ONCE
+  at capture time and replay is dispatch-free, so the cost should
+  vanish.
+  Structural goal achieved: splice region has no Python branches,
+  no bool indexing, no data-dependent shapes, all metadata on
+  device. Read path is now graph-capturable.
 - **B-pre-2..4: not started.** Remaining preflight blockers (host
   syncs in seqids_blockids, data-dependent splice branch, fully
   stable pointer story).
