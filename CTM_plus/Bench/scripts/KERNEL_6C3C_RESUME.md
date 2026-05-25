@@ -220,7 +220,25 @@ symmetric quant, group sizes ≠ 32.
 | `3a0b2ff` | char-diff fix — wrap reset_sequence in torch.inference_mode (inference tensors). |
 | `ea5884e` | Phase 5B.5 needle-in-haystack quality acceptance scaffolding (15 trials: 5 needles × 3 length buckets × middle-position planting). |
 | `dc3cc43` | **Phase 5B.5 GREEN** — char-diff 3/5 IDENTICAL (factual_recall, code, creative) at mean 67% prefix overlap. Needle test **15/15 stock + 15/15 int4 = 100% retrieval at all length buckets** (200, 600, 1200 filler tokens). **Lock protect_fraction=4% as the v1 ship value** — the smallest tested value with full quality. |
-| `<pending-5C>` | **Phase 5C — clean API + docs.** New `kv_policy.int4_protected` submodule registers the backend on import and exposes `Int4ProtectedLLM(...)` factory + `get_backend_info(llm)` diagnostic. Drops the required post-construction `install_int4_protected_backend()` call — layer indices auto-resolve from `layer.layer_name`. Documentation: `Bench/scripts/PHASE5C_USAGE.md`. Verify: `verify_phase5c_api.py` (T1-T6 acceptance). |
+| `ad275c0` | **Phase 5C GREEN — clean API + docs.** verify_phase5c_api.py T1-T6 ALL PASS: import-time backend registration, block_size constraint raises, Int4ProtectedLLM factory constructs, 28/28 layers auto-swap WITHOUT explicit install_int4_protected_backend call, get_backend_info diagnostic, end-to-end generation with needle retrieval + 0 fallbacks. Ship recipe locked at `import kv_policy.int4_protected; LLM(kv_cache_dtype='int4_protected', block_size=32)`. |
+
+## v1 SHIP COMPLETE — all 5 sub-phases GREEN
+
+| Sub-phase | Commit | Headline |
+|---|---|---|
+| 5B.4c.1 (write) | `f504622` | PagedKVWriter quantizes K+V to uint8 paged + external sidecars |
+| 5B.4c.2 (read) | `270905a` | Gather + hybrid K-tail splice + packed kernel call |
+| 5B.4c.3 (e2e) | `1211993` | Char-for-char match with stock vLLM, 28/28 layers, 0 fallbacks |
+| 5B.5 (quality) | `dc3cc43` | 15/15 needle retrieval at protect_fraction=4% |
+| **5C (API polish)** | **`ad275c0`** | **One-import setup, Int4ProtectedLLM factory, full usage doc** |
+
+### v1 ship claims (all measured)
+
+- **4× KV cache capacity:** 28060 blocks vs stock 13967 at same memory budget
+- **+18% total memory cost:** ~28.4 GB total to hold ~898K slots vs stock 24 GB / 223K
+- **100% needle retrieval** matching stock across 3 context-length buckets
+- **3/5 diverse prompts produce bit-identical greedy output** vs stock vLLM
+- **0 fallbacks** across all 5 verify phases (50000+ packed decodes total)
 
 ## Phase 5B.5 GREEN milestone — v1 quality acceptance complete
 
