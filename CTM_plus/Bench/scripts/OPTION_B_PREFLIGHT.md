@@ -148,29 +148,62 @@ Memory cost at default `_max_active_slots=8`:
   the current per-seq-lazy-alloc footprint at peak B=8 usage — net
   zero memory change vs pre-B-pre-1.
 
-#### B-pre-2: Move metadata to device (~0.5 day)
+#### B-pre-2 + B-pre-3: device metadata + unconditional splice — **LANDED (bundled)**
 
-In `_read_decode_packed_batched`:
+Originally scoped as two separate steps. The first attempt at B-pre-2
+in isolation (`ec7253b`, reverted in `4868f3d`) caused a -2% agg_tps
+regression at B=8 because moving metadata to device tensors introduced
+3 implicit syncs from boolean indexing in the splice path
+(`slot_idx_t[active_mask_t]` etc.) plus a separate `n_blocks_max
+.item()` sync that couldn't pipeline with `block_table[:, 0].cpu()`.
 
-- `seqlens` already on device as `cache_seqlens_orig`.
-- `n_blocks_per_seq_t = (cache_seqlens_orig + (BS - 1)) // BS` — device.
-- `n_blocks_max = int(n_blocks_per_seq_t.max())` — ONE unavoidable
-  sync per call to size the gather. vLLM's multi-shape capture
-  handles this by maintaining graphs for multiple discrete sizes.
-- `last_block_indices_t = n_blocks_per_seq_t - 1` — device.
-- `active_mask_t = (cache_seqlens_orig % BS) != 0` — device.
-- `slot_idx_t = torch.tensor([slot_map[bid] for bid in block_table[:, 0].cpu().tolist()])`
-  — ONE host sync to resolve, then device tensor. Resolution is
-  done in the pre-capture region (Python orchestration), graph
-  captures the device tensor reads.
+Lesson: B-pre-2 and B-pre-3 are tightly coupled. Device-side metadata
+only pays off when splice is also unconditional (no bool-indexing).
+Re-landed together in this commit.
 
-#### B-pre-3: Unconditional splice (~0.5 day)
+What's in `_read_decode_packed_batched`:
+- KEPT the working coalesced CPU sync for seqlens + seq_ids (one
+  stacked `.cpu().tolist()` of both rows). `n_blocks_max` stays a
+  Python int from `max(seqlens_cpu_derived)`. This is the cheapest
+  way to get both the gather size and the slot-resolution input.
+- ADDED device-side metadata (cheap fused ops, no extra sync):
+  - `n_blocks_per_seq_t   = (cache_seqlens_orig + (BS - 1)) // BS`
+  - `last_block_indices_t = n_blocks_per_seq_t - 1`
+  - `active_mask_t        = (cache_seqlens_orig % BS) != 0`
+- REPLACED the conditional splice path with a NEW helper
+  `_splice_k_partial_tail_batched_unconditional` that processes ALL
+  B seqs uniformly. The path:
+  - Single device gather of all B k_stages from the slot pool.
+  - Quantize + pack on all B (extra work for inactive seqs is
+    negligible — typical steady-state decode has A ≈ B).
+  - Read-modify-write under `active_mask_t` via `torch.where(mask,
+    new, old)` — inactive positions self-write their original
+    value, preserving the previously-finalized block contents.
+- REMOVED Python branches (`if any_active:`) and bool indexing
+  (`slot_idx_t[active_mask_t]` etc.) from the splice path.
 
-Make `_splice_k_partial_tail_batched_vectorized` always execute
-(no `if any(active_mask):` branch). Inside the kernel, use the
-active_mask_t to NO-OP positions where mask is False (multiply
-the write by mask, or use `where`). Cost when all-False is
-unconditional work but on small tensors — negligible.
+Net structural effect: the splice region inside
+`_read_decode_packed_batched` is now data-dependent-branch-free,
+sync-free (the mask, slot_idx_t, batch_idx_t, last_block_indices_t
+are all pre-existing device tensors), and shape-stable across calls
+of a given B. Ready for graph capture except for the two unavoidable
+pre-capture trips (seq_id → slot lookup and n_blocks_max sizing).
+
+Correctness gates:
+- `verify_phase6_b_pre23_unconditional_splice_equiv.py` (NEW) —
+  asserts unconditional splice produces tensor-equal mutations to
+  the active-only legacy path across mixed active/inactive seqs,
+  and confirms inactive slots are byte-preserved.
+- `verify_phase5b_6_batch.py` — main regression gate.
+- `verify_phase6_d_step1_splice_equiv.py` — legacy per-row splice
+  equivalence (unchanged, still PASS).
+- `verify_phase6_b_pre1_splice_slots_equiv.py` — preflight
+  active-only path equivalence (still PASS; helper kept).
+
+The legacy `_splice_k_partial_tail_batched_vectorized` is RETAINED
+unchanged for the existing equivalence verifies and for any callers
+that prefer the conditional path. New code should call the
+unconditional variant.
 
 #### B-pre-4: Pointer stability (~0.5 day)
 
@@ -268,20 +301,32 @@ latency, ahead on aggregate.
 - Phase 5B.6 multi-batch + correctness gates: all GREEN, locked.
 - Current ship narrative (pre-Option-B): "42 tok/s agg at B=8".
 
-## Remaining preflight blockers (post-B-pre-1)
+## Remaining preflight blockers (post-B-pre-1, post-B-pre-2+3)
 
-| Violation | Where | Status after B-pre-1 |
-|-----------|-------|----------------------|
-| Host sync | `cache_seqlens_orig.cpu().tolist()` | still present — B-pre-2 |
-| Host sync | `block_table[:, 0].cpu().tolist()` | still present — B-pre-2 |
-| Data branch | `if any(active_mask):` in batched splice path | still present — B-pre-3 (make splice unconditional) |
-| Data branch | `if seqlens[i] % BS != 0` (per-seq, used to build active_pos_b) | still present — B-pre-3 |
+| Violation | Where | Status |
+|-----------|-------|--------|
+| Host sync | coalesced `.cpu().tolist()` of seqlens + seq_ids | KEPT (pre-capture-hoistable; one coalesced trip serves both gather-sizing and slot-dict-lookup needs) |
+| Data branch | `if any(active_mask):` in batched splice | **resolved** — splice is unconditional, uses `torch.where(active_mask_t, ...)` |
+| Data branch | `if seqlens[i] % BS != 0` per-seq | **resolved** — `active_mask_t` is now a device bool tensor |
+| Bool indexing | `slot_idx_t[active_mask_t]` etc. (3×) | **resolved** — splice consumes the full B-sized slot/batch/last_block tensors and masks writes |
 | Dict lookup | `writer._slot_map[seq_id]` per call | **moved out of read path**, runs once Python-side; OK for graph capture if invoked pre-capture |
 | Pointer churn | `state.k_stage` per call | **resolved** — now a stable pool view |
 | Pointer churn | `state.bf16_k_backing` per call | **resolved** — pool view |
 | Pointer churn | `bf16_k_batch` from torch.stack | **resolved** — single device gather, output addr = stable pool advanced-index |
 
-After B-pre-2 the only remaining host trip will be `n_blocks_max =
-int(...max().item())` for sizing the gather — handled at capture
-time by vLLM's multi-shape capture (one captured graph per discrete
-n_blocks_max bucket).
+What remains for graph capture:
+
+1. The coalesced `.cpu().tolist()` and the Python int derivations
+   (`n_blocks_per_seq`, `n_blocks_max`, `S_padded`) need to be
+   HOISTED OUT of the captured region. This is a vLLM integration
+   point — vLLM's prepare-inputs phase would resolve these on the
+   host and the captured graph would consume the resulting device
+   tensors. (B-pre-4 territory, but really vLLM-integration work.)
+2. The captured graph captures at a discrete `n_blocks_max` size;
+   vLLM's multi-shape capture dispatches to the right captured
+   graph based on the current shape bucket.
+
+Once these are addressed in vLLM integration (B-1), the read path
+itself is structurally ready. The Python remaining in this region
+after capture would be just the resolution + dispatch boilerplate,
+which runs once per shape change rather than per layer per step.

@@ -300,21 +300,23 @@ if _VLLM_FA_AVAILABLE:
 
             B = block_table.shape[0]
             BS = writer.BS
+            device = block_table.device
 
             with _maybe_region("batched.seqids_blockids"):
-                # Phase 6 v2 Option D step 3 (Option B pre-flight): coalesce
-                # the two host syncs (seqlens + seq_ids) into ONE memcpyDtoH.
-                # Each `.cpu()` blocks until the GPU queue drains; doing them
-                # serially pays the drain cost twice. Stacking into one tensor
-                # + one `.cpu()` pays it once. Profile shows seqids_blockids
-                # was 140 µs/call at B=8 — most of that was the second sync's
-                # drain wait, since the python work is sub-microsecond.
+                # Phase 6 v2 Option B pre-flight (B-pre-2 + B-pre-3
+                # bundled): keep the working coalesced CPU sync for
+                # seqlens + seq_ids (n_blocks_max stays a Python int
+                # for the slice; n_blocks_per_seq stays a Python list
+                # for the n_blocks_max derivation). The lesson from
+                # the reverted B-pre-2 attempt: splitting these into
+                # separate .item() / .tolist() calls costs ~50 µs
+                # per layer at B=8 because PyTorch can't pipeline them.
                 #
-                # n_blocks_per_seq stays as a device tensor; we only need the
-                # int list on host for the splice / bf16_backing dict lookups
-                # downstream, and those need to coexist with the captured
-                # graph via the Python-side seq_id → slot map (see
-                # OPTION_B_PREFLIGHT.md §B-pre-1).
+                # In addition, compute device-side metadata
+                # (last_block_indices_t, active_mask_t) — these are
+                # cheap fused ops that don't add a sync, and they're
+                # what the unconditional splice path (below) consumes
+                # without any data-dependent indexing.
                 _seqlens_and_seqids = torch.stack([
                     cache_seqlens_orig.long(),
                     block_table[:, 0].long(),
@@ -325,12 +327,17 @@ if _VLLM_FA_AVAILABLE:
                 n_blocks_max = max(n_blocks_per_seq)
                 S_padded = n_blocks_max * BS
 
+                # Device-side metadata for the unconditional splice. No
+                # extra sync — these are fused element-wise ops on the
+                # already-on-device cache_seqlens_orig.
+                cache_seqlens_long_t = cache_seqlens_orig.long()
+                n_blocks_per_seq_t   = (cache_seqlens_long_t + (BS - 1)) // BS  # (B,)
+                last_block_indices_t = n_blocks_per_seq_t - 1                   # (B,)
+                active_mask_t        = (cache_seqlens_long_t % BS) != 0         # (B,) bool
+
                 # Build (B, n_blocks_max) block_ids via slice + mask.
                 block_ids_batched = block_table[:, :n_blocks_max].long().contiguous()
-                n_blocks_per_seq_t = torch.tensor(
-                    n_blocks_per_seq, dtype=torch.long, device=block_table.device,
-                )
-                pos = torch.arange(n_blocks_max, device=block_table.device).unsqueeze(0)
+                pos = torch.arange(n_blocks_max, device=device).unsqueeze(0)
                 pad_mask = pos >= n_blocks_per_seq_t.unsqueeze(1)
                 block_ids_batched.masked_fill_(pad_mask, 0)
 
@@ -345,38 +352,29 @@ if _VLLM_FA_AVAILABLE:
             # have no Python dict lookups left.
             slot_idx_list = writer.slot_indices_for(seq_ids)
             slot_idx_t = torch.tensor(
-                slot_idx_list, dtype=torch.long,
-                device=block_table.device,
+                slot_idx_list, dtype=torch.long, device=device,
             )
 
             with _maybe_region("batched.splice"):
-                # Phase 6 v2 Option D step 1 (vectorized) + B-pre-1
-                # (slot-pool gather): build the active subset on host
-                # (cheap — just list comprehensions over already-resolved
-                # seqlens/n_blocks lists), then call the splice helper
-                # with device-tensor active_slot_idx_t + active_batch_idx_t
-                # + active_last_block_t. The helper does ONE
-                # writer.get_k_stage_by_slots(slot_t) gather instead of
-                # torch.stack-ing B per-state views.
-                active_pos_b = [
-                    i for i in range(B) if seqlens_cpu[i] % BS != 0
-                ]
-                if active_pos_b:
-                    device = block_table.device
-                    active_batch_idx_t = torch.tensor(
-                        active_pos_b, dtype=torch.long, device=device,
-                    )
-                    active_last_block_t = torch.tensor(
-                        [n_blocks_per_seq[i] - 1 for i in active_pos_b],
-                        dtype=torch.long, device=device,
-                    )
-                    active_slot_idx_t = slot_idx_t[active_batch_idx_t]
-                    _splice_k_partial_tail_batched_vectorized(
-                        view, writer,
-                        active_slot_idx_t=active_slot_idx_t,
-                        active_batch_idx_t=active_batch_idx_t,
-                        active_last_block_t=active_last_block_t,
-                    )
+                # Phase 6 v2 Option B pre-flight (B-pre-3): unconditional
+                # splice — always processes all B seqs uniformly. Inactive
+                # positions (full last block, no partial tail) read-modify-
+                # write to themselves under the active_mask_t, preserving
+                # their previously-finalized block contents.
+                #
+                # Eliminates the prior path's data-dependent control flow
+                # (`if any_active:`) and the 3 bool-indexing implicit syncs
+                # (slot_idx_t[mask], last_block_indices_t[mask], arange[mask]).
+                # Captured-graph friendly: same op chain runs regardless of
+                # how many seqs are active.
+                batch_idx_t = torch.arange(B, device=device, dtype=torch.long)
+                _splice_k_partial_tail_batched_unconditional(
+                    view, writer,
+                    slot_idx_t=slot_idx_t,
+                    batch_idx_t=batch_idx_t,
+                    last_block_indices_t=last_block_indices_t,
+                    active_mask_t=active_mask_t,
+                )
 
             with _maybe_region("batched.bf16_backing"):
                 # Phase 6 v2 (B-pre-1): single device gather from the
@@ -1062,6 +1060,85 @@ def _splice_k_partial_tail_batched_vectorized(
     sidecar_dtype = writer.sidecar_dtype
     view["k_scale"][batch_idx_t, last_block_t] = scale.to(sidecar_dtype)
     view["k_xmin"] [batch_idx_t, last_block_t] = x_min.to(sidecar_dtype)
+
+
+def _splice_k_partial_tail_batched_unconditional(
+    view: Dict[str, Any], writer: Any, *,
+    slot_idx_t: "torch.Tensor",            # (B,) long — slot per batch position
+    batch_idx_t: "torch.Tensor",           # (B,) long — typically arange(B)
+    last_block_indices_t: "torch.Tensor",  # (B,) long — per-seq last block
+    active_mask_t: "torch.Tensor",         # (B,) bool — True iff seq has partial tail
+) -> None:
+    """Phase 6 v2 Option B pre-flight (B-pre-2 + B-pre-3 bundled):
+    unconditional splice that processes ALL B sequences uniformly,
+    masking inactive writes via torch.where.
+
+    Replaces the prior conditional path that:
+      - Filtered to active subset via boolean indexing (3 implicit
+        sync points to resolve data-dependent output shapes).
+      - Wrapped the entire call in a Python `if any_active:` branch.
+
+    The unconditional version is captured-graph-friendly:
+      - Same op chain runs regardless of how many seqs are active.
+      - No data-dependent shapes (all tensors stay (B, ...)).
+      - No host syncs in the splice region (mask is a device tensor).
+
+    For inactive seqs (no partial tail), the helper READS their current
+    k_int4 / k_scale / k_xmin at last_block_indices_t and WRITES IT BACK
+    via where(False, new, old) — a deterministic self-write that
+    preserves the previously-finalized block contents.
+
+    Cost vs the active-only path: B-A extra seqs go through the
+    quantize+pack work (negligible at typical steady-state decode where
+    A ≈ B). The win is removing the implicit-sync penalty of the
+    bool-indexing path — splice cpu_us drops to pure-dispatch overhead.
+
+    Verified by `verify_phase6_b_pre23_unconditional_splice_equiv.py`.
+    """
+    BS = writer.BS
+    D  = writer.D
+    H  = writer.H
+    half_D = D // 2
+
+    # Single device gather of all B k_stages from the slot pool.
+    k_stage_stack = writer.get_k_stage_by_slots(slot_idx_t)             # (B, BS, H, D)
+    B_dim = k_stage_stack.shape[0]
+
+    # Quantize + pack — math identical per-element to the active-only path.
+    buf_f = k_stage_stack.float()                                       # (B, BS, H, D)
+    x_max = buf_f.amax(dim=1)                                           # (B, H, D)
+    x_min = buf_f.amin(dim=1)                                           # (B, H, D)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)                    # (B, H, D)
+
+    q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+        .round().clamp(0, 15).to(torch.uint8)                           # (B, BS, H, D)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)       # (B, BS, H, half_D)
+
+    n_blocks_max = view["k_int4"].shape[1] // BS
+    k_int4_blocked = view["k_int4"].view(-1, n_blocks_max, BS, H, half_D)
+
+    sidecar_dtype = writer.sidecar_dtype
+    # Mask broadcasts: keep batch dim aligned with the target shapes.
+    mask_packed = active_mask_t.view(B_dim, 1, 1, 1)                    # vs (B, BS, H, half_D)
+    mask_meta   = active_mask_t.view(B_dim, 1, 1)                       # vs (B, H, D)
+
+    # Read-modify-write under mask. Each (batch_idx_t[k], last_block_indices_t[k])
+    # pair is unique (distinct batch positions per seq), so no scatter race.
+    # For inactive seqs the new value equals the old value, so the write is a
+    # deterministic no-op preserving the previously-finalized block contents.
+    old_k_int4 = k_int4_blocked[batch_idx_t, last_block_indices_t]      # (B, BS, H, half_D)
+    new_k_int4 = torch.where(mask_packed, packed, old_k_int4)
+    k_int4_blocked[batch_idx_t, last_block_indices_t] = new_k_int4
+
+    scale_sc = scale.to(sidecar_dtype)
+    old_k_scale = view["k_scale"][batch_idx_t, last_block_indices_t]    # (B, H, D)
+    new_k_scale = torch.where(mask_meta, scale_sc, old_k_scale)
+    view["k_scale"][batch_idx_t, last_block_indices_t] = new_k_scale
+
+    xmin_sc = x_min.to(sidecar_dtype)
+    old_k_xmin = view["k_xmin"][batch_idx_t, last_block_indices_t]
+    new_k_xmin = torch.where(mask_meta, xmin_sc, old_k_xmin)
+    view["k_xmin"][batch_idx_t, last_block_indices_t] = new_k_xmin
 
 
 def _splice_k_partial_tail(
