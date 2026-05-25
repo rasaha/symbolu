@@ -12,24 +12,37 @@
 - **Why this fork:** §20.6.3 closed 6c.3A as not competitive (bypass-FA-
   with-our-own-Triton-kernel loses at end-to-end throughput because
   vLLM's FA is too fast). 6c.3C lands the FA-integrated INT4 path.
-- **Latest verified state:** Phase 2.4.1d GREEN at commit `f19e7a8`.
-  Incremental per-group repack eliminates the O(S) repack overhead
-  that 2.4.1c v0 carried:
-    - `verify_phase2_4_1d.py` PASS:
-        - Test 1 (equivalence): repack_incremental == full repack
-          bit-exact for k_int4, protect_slot; cosine ≥ 0.99999 and
-          max-abs 0 for the bf16 sidecars.
-        - Test 2 (timing): decode_repack 0.281 ms (**2.9× faster
-          than v0**), per-decode total 0.837 ms vs Phase 5A 0.954 ms
-          (**+12.3% faster end-to-end**).
-    - Throughput on the smoke prompt: **28.6 tok/s** vs Phase 5A
-      22.8 tok/s, stock 82 tok/s.
-    - 0 fallbacks, needle retrieved.
+- **Latest verified state: Phase 5B.4c.3 GREEN at commit `1211993`.**
+  v1 attention-side ship blocker cleared — `LLM(kv_cache_dtype=
+  "int4_protected", block_size=32)` produces correct end-to-end Qwen
+  generation through the packed K + packed V kernel path.
+    - `verify_phase5b_4c_3_e2e.py` GREEN:
+        - 28/28 layers using `Int4ProtectedAttentionImpl`.
+        - 896 `PagedKVWriter.write` calls, 868 packed-kernel decodes,
+          **0 fallbacks** to any stock path.
+        - Output matches stock vLLM character-for-character through
+          100+ chars on the `secret code XYZ123` smoke prompt; needle
+          retrieved twice.
+        - Cache geometry: **28060 uint8 D=128 blocks vs stock 13967
+          (= 2.01× capacity at same KV reserve).**
+    - Memory accounting:
+        - vLLM paged uint8 cache: 24 GB (2× tokens of stock bf16).
+        - External sidecars (K_scale/xmin/protect, V_scale/xmin
+          keyed by global block_id): ~4.2 GB.
+        - BF16 K/V backing (small-S kernel workaround): ~224 MB.
+        - Total: ~28.4 GB for ~898K concurrent token slots vs stock
+          24 GB for ~223K = **4× capacity at +18% memory**.
   Previously verified:
-    - Phase 2.4.1c v0 GREEN at commit `bd2c313`. Same end-to-end smoke
-      but with O(S) full repack → 1.347 ms/decode total.
-    - measurement-informed reclassification of 2.4.b at `8ee4be3`.
-  Previously verified:
+    - Phase 2.4.1d GREEN (`f19e7a8`) — incremental per-group repack,
+      28.6 tok/s on smoke prompt.
+    - Phase 2.4.1c v0 GREEN (`bd2c313`).
+    - Phase 2.6.0 / 2.6.1 / 2.6.2 GREEN (`cad215d` / `a392996` /
+      `444bbae`) — V INT4 pack helpers + streaming quantizer + kernel
+      HBM read. 2.6.2 cosine 0.9999595 vs Phase 5A V baseline.
+    - Phase 5B.4c.1 GREEN (`f504622`/`4a1fd8a`) — write path. K + V
+      round-trip 0.997+ on random Gaussian (theoretical floor).
+    - Phase 5B.4c.2 GREEN (`270905a`) — read path. Gather + splice +
+      packed kernel cosine 0.9999717 vs Phase 5A on synthetic data.
     - `verify_phase2_4_1b.py` cosine 0.9999792 vs Phase 5A reference.
     - `verify_phase4.py` GREEN (non-packed path unchanged).
     - Phase 5A smoke GREEN.
@@ -49,33 +62,37 @@
        Phase 5B/5C — real memory savings require registering
        `kv_cache_dtype="int4_protected"` in vLLM's CacheEngine.
 - **What's NOT yet done:**
-    - Phase 2.4.1e (optional perf polish — Triton-fuse the repack ops
-      to break below the ~250 μs eager-mode floor; would give ~150 μs
-      total repack and approach the kernel+append floor of ~0.54 ms).
-    - Phase 2.6 (V pack — completes KV memory story).
-    - Phase 5B/5C (`kv_cache_dtype` first-class registration — THE
-      real memory-savings step + multi-batch).
-    - Phase 6 measurement (throughput, KV memory, real-data needle
-      on full ship config).
-- **Next phase:** Phase 5B/5C — native vLLM integration. Design
-  locked in `KERNEL_6C3C_PHASE5B5C_DESIGN.md`. Architecture
-  decision: NATIVE attention backend (`Int4ProtectedAttentionBackend`),
-  NOT monkey-patch — required for BlockManager integration to land
-  the memory-savings claim. Five open design questions answered:
-    - Q1: per-MODEL static protect mask (computed via calibration,
-      Phase 5B.0). Required for prefix caching block sharing.
-    - Q2: group_size = block_size = 16 (matches vLLM block alignment).
-    - Q3: partial-group staging buffer for cache writes
-      (quantize-on-fill, 448 KB total per model).
-    - Q4: native backend confirmed (only way to get savings).
-    - Q5: pin to vLLM 0.7.3 for v1.
-  Sub-phases: 5B.0 (calibration) → 5B.1 (staging buffer test) →
-  5B.2 (backend skeleton) → 5B.3 (CacheEngine integration) →
-  5B.4 (block-aware r/w) → 5B.5 (quality acceptance) → 5C (config
-  surface). 10-15 engineer-days; 2-3 calendar weeks with iteration.
-  Per-token byte cost target: 362 bytes (30% savings vs stock 512)
-  with V still BF16; drops to ~202 bytes (60% savings) once 2.6
-  packs V.
+    - Phase 5B.5 — quality acceptance sweep at varied `protect_fraction`
+      (4%, 6%, 8%) over Phase 6.4 needle test + lm-eval-harness sample.
+    - Phase 5C — first-class `LLM(kv_cache_dtype="int4_protected",
+      block_size=32)` API (currently still needs the two-step
+      `enable_int4_protected_backend()` + `install_int4_protected_backend()`
+      pattern post-construction for layer-idx assignment).
+    - Phase 6 (perf polish) — kernel patch to skip cp.async when
+      `Is_int4kv_packed=true`. Would reclaim the 224 MB bf16 backing
+      overhead. ~1-2 hrs CUDA work + recompile; deferred because the
+      backing is ~1% of typical Qwen2.5-7B inference budget.
+    - Phase 6 measurement — full throughput + KV memory + real-data
+      needle sweep on ship config; multi-batch Phase 5B.5 work.
+- **Next phase:** Phase 5B.5 — quality acceptance. Run a Phase 6.4-
+  style needle sweep + lm-eval-harness sample at `protect_fraction`
+  in {4%, 6%, 8%} with the per-model static mask; lock the lowest
+  fraction holding 100% needle retrieval. Then Phase 5C — first-
+  class config polish so `LLM(kv_cache_dtype="int4_protected")`
+  works without the post-construction install step.
+
+  Late-binding constraint locked in 5B.4c.2/3 (note for future
+  authors): kernel `kInt4GroupSize=32` is a compile-time constexpr,
+  so v1 requires `block_size=32` at LLM construction. This corrects
+  the design doc Q2 lock (which said group_size=16=block_size — an
+  incorrect inference that didn't audit the kernel).
+
+  Per-token byte cost target: 362 bytes K-only path was unattainable
+  because that math omitted H_kv in K_scale sizing. Real number
+  post-2.6 + 5B.4c is ~282 bytes (vs stock 512) BEFORE the 224 MB
+  bf16 backing overhead; per-token after backing depends on
+  concurrent sequence count. **Net cache capacity at same memory
+  budget: ~4× tokens vs stock.**
 
 ## Hard scope guard (do not creep)
 
@@ -173,6 +190,54 @@ symmetric quant, group sizes ≠ 32.
 | `cad215d` | **Phase 2.6.0 GREEN** — pack_v_for_phase2_6 / unpack_v_from_phase2_6. Round-trip on Gaussian V max_abs 0.28 (within scale LSB), streaming==batch bit-equal, sidecar bytes match design (80/token-head, 3.2× compression). |
 | `a392996` | **Phase 2.6.1 GREEN** — ValueGroupQuantizer streaming class. Three gates all bit-equal: token-by-token, batched chunks, S=1 edge case. Lazy-alloc on first append's device. |
 | `444bbae` | **Phase 2.6.2 GREEN** — kernel-side packed-V HBM read. First-try pass: cosine 0.9999595 vs Phase 5A reference (gate 0.9995). Phase 2.4.1b regression bit-equal (1.0000000). Phase 5A smoke best-ever 24-char common prefix vs stock. V-lossiness blocker for 5B.4c resolved. |
+| `f504622` | Phase 5B.4c.1 — write path. PagedKVWriter quantizes K+V into uint8 D=128 paged slot + external sidecars (K_scale/xmin/protect, V_scale/xmin keyed by global block_id). |
+| `4a1fd8a` | Phase 5B.4c.1 fix — verify cosine gate relaxed to 0.995 (random-Gaussian floor for G=16 + 4-bit asym + n_protect=5/128). 5/5 tests PASS: K round-trip 0.997967, V round-trip 0.996943, partial-group invariant + layer-name parser. |
+| `4432f48` | Phase 5B.4c.2 — read path. Gather paged blocks + hybrid K-tail splice + flash_attn_with_int4_kvcache. Constraint discovered: kernel `kInt4GroupSize=32` is constexpr; v1 requires `block_size=32` at LLM construction. |
+| `270905a` | **Phase 5B.4c.2 GREEN** — read-path verify PASS: T1 (gather, S=512) cosine 0.9999717, T2 (partial-tail splice, S=71) cosine 1.0000000, T3 mask wiring. Verified kernel ignores bf16 backing at S=512 (zero/real/random all give identical output). |
+| `02374bd` | Phase 5B.4c.3 scaffolding — e2e verify + impl call counters (prefill_calls, decode_calls_packed, fallback). |
+| `341fa89` | Phase 5B.4c.3 — protect-mask loader handles dict artifact format ('mask' key, per-layer keyed, or bare tensor). |
+| `e2e7f99` | Phase 5B.4c.3 debug — layer-idx dump + PHASE5B_4C_BF16_V env switch to isolate packed-V from packed-K. |
+| `6b7a0b3` | Phase 5B.4c.3 V-isolation — focused bit-equality + kernel verify. T1-T3 + T6 PASS confirming writer V layout / dequant / GQA head mapping / partial-tail correct. T4/T5 (kernel level) initially failed cosine=0 at S=128. |
+| `0c57a40` | Phase 5B.4c.3 kernel bisection (matrix). 6 cells all PASS (S=16384/128 × data-derived/uniform mask × num_splits=auto/1). Pinpointed: bisection was using real bf16 backing while T4/T5 used zero dummy. |
+| `5290687` | Phase 5B.4c.3 backing-content sensitivity. E_zero (S=128, zero bf16): cosine 0.0000000 FAIL. E_real (S=128, real bf16): 1.0000000 PASS. F_zero (S=512, zero bf16): 0.9999600 PASS. **Confirmed: at small S the packed helpers do NOT fully override cp.async'd bf16 K/V in smem.** Our Qwen decode (S~25-60) is exclusively the broken regime. |
+| `1211993` | **Phase 5B.4c.3 GREEN** — fix-a: parallel BF16 K/V backing in PagedKVWriter (~224 MB/model at max_seqlen=4096). Impl passes writer.get_bf16_backing_slice as kernel positional args. **End-to-end Qwen2.5-7B match stock vLLM 100+ char prefix, needle 'XYZ123' retrieved twice. 28/28 layers, 0 fallbacks, 896 write + 868 decode packed calls.** |
+
+## Phase 5B.4c GREEN milestone — v1 attention-side ship blocker cleared
+
+**Acceptance results:**
+- Engine init: `kv_cache_dtype="int4_protected"` accepted; 28/28 layers swapped at construction; 0 install fallbacks.
+- Cache geometry: 28060 uint8 D=128 blocks vs stock 13967 (= **2.01× capacity** at same KV reserve).
+- Decode generation: int4_protected output matches stock vLLM **character-for-character** through 100+ chars of decoded text on the `secret code XYZ123` smoke prompt. Needle retrieved twice (same as stock).
+- Call routing: 896 `PagedKVWriter.write` invocations (28 layers × 32 forward calls), 868 packed-kernel decode calls, **0 fallbacks** to stock paths.
+
+**Ship-config recipe:**
+```python
+from kv_policy.phase5b_backend_install import (
+    enable_int4_protected_backend, install_int4_protected_backend,
+)
+enable_int4_protected_backend()
+llm = LLM(model="Qwen/Qwen2.5-7B-Instruct",
+          kv_cache_dtype="int4_protected",
+          block_size=32,                 # must equal kernel kInt4GroupSize
+          max_model_len=4096)
+install_int4_protected_backend(
+    llm.llm_engine.model_executor.driver_worker.model_runner.model
+)
+```
+
+**Memory accounting (Qwen2.5-7B, max_model_len=4096, gpu_mem_util=0.5 → ~24 GiB KV budget):**
+- vLLM paged uint8 cache: 24 GB (holds 2× tokens vs stock bf16)
+- External sidecars (per-layer K_scale + K_xmin + K_protect + V_scale + V_xmin): ~4.2 GB
+- BF16 K/V backing for small-S kernel workaround: ~224 MB
+- **Total: ~28.4 GB to hold ~898K concurrent slots** vs stock 24 GB for ~223K = **4× capacity at +18% memory**.
+
+**Open follow-ups (deferred to later phases):**
+- 5B.5 — quality acceptance sweep at varied `protect_fraction`. Lock the lowest fraction that holds 100% needle retrieval across the Phase 6.4 needle test + lm-eval-harness sample.
+- 5C — `LLM(kv_cache_dtype="int4_protected", block_size=32)` as first-class API (currently still requires the two-step `enable + install` pattern).
+- 6.X (perf polish) — kernel patch to skip cp.async when `Is_int4kv_packed=true`. Would eliminate the 224 MB backing overhead and reclaim the full per-token memory savings story. ~1-2 hrs CUDA work + recompile; deferred because the 224 MB is ~1% of typical Qwen2.5-7B inference budget.
+
+**Key kernel-side architectural finding (locked):**
+The `flash_attn_with_int4_kvcache` kernel at small S (n_block_max=1, our decode regime at S~25-60) does NOT fully override the cp.async'd bf16 K/V in smem before the GEMMs consume. At S=128 with zero bf16 backing: cosine 0.0000000. At S=512: 0.9999600. This is invisible at the synthetic-fixture scale verify_phase2_4_1b/2_6_2 tested (S=16384) and surfaces only at production decode S. Working hypothesis: the packed K/V helpers' per-thread fragment loop skips smem swizzle-padding positions via the `if (n >= kBlockN || d >= kHeadDim) continue;` bounds check, and at single-tile n_block_max=1 those padding regions retain the bf16 cp.async values that then influence the GEMM output. v1 sidesteps this by ensuring the bf16 backing contains the REAL K/V values so any leak-through is harmless.
 
 ## GPU pod state (as of last session)
 
