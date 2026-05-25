@@ -383,6 +383,53 @@ The coalesced code is still committed (it's not WORSE, just not
 better), and it does set up the structural pattern for the full
 device-side metadata refactor in B-pre-2.
 
+### Failed step: B-pre-2 in isolation (`ec7253b`, reverted in `4868f3d`)
+
+Hypothesis: move per-seq metadata (n_blocks_per_seq, last_block_indices,
+active_mask) from CPU Python lists to device tensors. Should be neutral
+in eager mode and structurally graph-friendlier.
+
+Measured: REGRESSION. At B=8:
+
+| Phase | post-B-pre-1 | post-B-pre-2 | Δ |
+|-------|--------------|---------------|---|
+| `seqids_blockids` | 147 | 200 | +53 µs |
+| `splice` | 274 | 377 | +103 µs |
+| TOTAL cpu_us | 455 | 567 | +112 µs |
+
+agg_tps at B=8: 43.1 → 42.2 (-2%).
+
+Why: B-pre-2 in isolation introduced THREE new sync points that the
+prior coalesced-cpu path didn't have:
+
+1. `n_blocks_max = int(n_blocks_per_seq_t.max().item())` is a separate
+   sync from `block_table[:, 0].cpu()`. PyTorch can't pipeline them
+   because the .max() reduction must complete before .item() returns.
+   Each sync drains the GPU queue independently.
+2. `slot_idx_t[active_mask_t]` is boolean indexing with a
+   data-dependent output shape — forces an implicit sync to resolve.
+3. Same for `last_block_indices_t[active_mask_t]` and
+   `torch.arange(B)[active_mask_t]`. Three bool-indexing syncs in the
+   splice path.
+
+Total: 4 syncs vs the prior 1 stacked-coalesced sync. Each ~30-70 µs of
+queue-drain wait at B=8.
+
+Lesson: B-pre-2 only pays off when bundled with B-pre-3 (unconditional
+splice — eliminates the bool-indexing syncs by always processing all B
+seqs with a torch.where-based mask). The two are tightly coupled; the
+preflight roadmap should treat them as ONE step ("device metadata +
+unconditional splice"). Reverted B-pre-2 to keep eager perf at the
+B-pre-1 high water mark (43.1 at B=8); next session lands the bundled
+B-pre-2+3 together.
+
+The change's value is also lower than initially scoped: the syncs
+remain INSIDE _read_decode_packed_batched, which means they're inside
+the would-be-captured region. For graph capture to actually benefit,
+the resolved values (seq_ids → slots, n_blocks_max bucket) need to be
+hoisted to a pre-capture step that vLLM calls before graph replay.
+That's a vLLM integration concern beyond the read-path refactor.
+
 ### Why not test B > 8
 
 We have headroom (218× max concurrency on the int4 cache), but at B=8
