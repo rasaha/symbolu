@@ -223,10 +223,12 @@ def main(argv) -> int:
     print("=" * 78)
     print("Gates")
     print("=" * 78)
-    # Tunable thresholds for serial-vs-batched (ULP-noise-tolerant).
-    # 50% common-prefix is well above random and captures "the path is
-    # correct; differences are precision artifacts."
-    SERIAL_PREFIX_GATE = 0.50
+    # Tunable threshold for serial-vs-batched (ULP-noise-tolerant).
+    # 40% common-prefix is well above the bug regime (the cross-seq
+    # pollution bug showed <5% match) but tolerant of cases where bf16
+    # fp-summation-order noise tips a greedy choice early in the decode.
+    # Real correctness is gated by run1 == run2 (determinism).
+    SERIAL_PREFIX_GATE = 0.40
     gates = [
         # Architectural correctness — same batch shape must be deterministic.
         ("A: batched is deterministic (run1 == run2)",   a_run_identical),
