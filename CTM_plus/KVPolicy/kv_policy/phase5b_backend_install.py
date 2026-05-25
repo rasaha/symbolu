@@ -394,37 +394,31 @@ if _VLLM_FA_AVAILABLE:
                         writer = self._get_paged_writer(layer=layer)
                         slot_mapping_flat = updated_slot_mapping.flatten()
 
-                        # Phase 5B.6 step 3: for batched decode (B > 1),
-                        # partition writes by sequence so each seq's
-                        # SeqState (staging buffer, bf16 backing) is
-                        # updated independently. Prefill stays single-call
-                        # (slot_mapping is per-token and prefill is
-                        # typically single-seq per forward).
-                        dec_meta = attn_metadata.decode_metadata
-                        if (dec_meta is not None
-                                and dec_meta.block_tables is not None
-                                and dec_meta.block_tables.shape[0] > 1
-                                and key.shape[0] == dec_meta.block_tables.shape[0]):
-                            B = dec_meta.block_tables.shape[0]
-                            for i in range(B):
-                                seq_id = _seq_id_from_block_table_row(
-                                    dec_meta.block_tables[i],
-                                )
-                                writer.write(
-                                    key=key[i:i+1],
-                                    value=value[i:i+1],
-                                    kv_cache=kv_cache,
-                                    slot_mapping=slot_mapping_flat[i:i+1],
-                                    seq_id=seq_id,
-                                )
-                        else:
-                            # Single-seq fast path (batch=1 decode or
-                            # any prefill case).
+                        # Phase 5B.6 step 3 (fixed): partition ALL writes
+                        # by sequence — prefill AND decode — so each
+                        # seq's SeqState (bf16 backing, K staging) is
+                        # populated under the SAME seq_id that the read
+                        # path will later use.
+                        #
+                        # Earlier version had a bug: prefill wrote with
+                        # DEFAULT_SEQ_ID=0 and decode read from
+                        # block_tables[i, 0]; the prefill bf16 backing
+                        # ended up in the wrong SeqState and decode read
+                        # zeros for the prompt's K/V (triggering the
+                        # small-S kernel zero-output behavior). 5B.6
+                        # batch verify hit common-prefix=4 chars on both
+                        # prompts because of this.
+                        BS = int(kv_cache.shape[2]) if kv_cache.numel() > 0 else 32
+                        partitions = _derive_write_partitions(
+                            attn_metadata, slot_mapping_flat, BS,
+                        )
+                        for seq_id, sl in partitions:
                             writer.write(
-                                key=key,
-                                value=value,
+                                key=key[sl],
+                                value=value[sl],
                                 kv_cache=kv_cache,
-                                slot_mapping=slot_mapping_flat,
+                                slot_mapping=slot_mapping_flat[sl],
+                                seq_id=seq_id,
                             )
                         Int4ProtectedAttentionImpl._call_stats["write_path_calls"] += 1
                     else:
@@ -637,6 +631,66 @@ class Int4ProtectedBackendManager:
 # ----------------------------------------------------------------------
 # Attention layer detection (same heuristic as Phase 5A).
 # ----------------------------------------------------------------------
+
+def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tensor", BS: int):
+    """Phase 5B.6 step 3 fix: partition a multi-token write call across
+    sequences so each seq's SeqState (bf16 backing, K staging) receives
+    its own data.
+
+    Returns: list of (seq_id, slice) tuples. The seq_id derivation
+    matches how _read_decode_packed_one identifies sequences:
+      - PREFILL:  seq_id = slot_mapping[seq_start] // BS
+                  (= the seq's FIRST BLOCK, which equals what decode
+                  later sees as block_tables[i, 0])
+      - DECODE:   seq_id = decode_meta.block_tables[i, 0]
+
+    Both forms collapse to `block_table[0]` for any given sequence —
+    stable across that sequence's lifetime in vLLM 0.7.3 V0.
+    """
+    dec_meta = getattr(attn_metadata, "decode_metadata", None)
+    pre_meta = getattr(attn_metadata, "prefill_metadata", None)
+
+    if (dec_meta is not None
+            and getattr(dec_meta, "block_tables", None) is not None
+            and dec_meta.block_tables.numel() > 0):
+        B = dec_meta.block_tables.shape[0]
+        return [
+            (_seq_id_from_block_table_row(dec_meta.block_tables[i]), slice(i, i + 1))
+            for i in range(B)
+        ]
+
+    if pre_meta is not None:
+        # Multi-seq prefill (rare in V0 default; happens with batched
+        # prefill / chunked prefill). Partition via query_start_loc.
+        qsl = getattr(pre_meta, "query_start_loc", None)
+        if qsl is not None and qsl.shape[0] > 2:
+            qsl_cpu = qsl.cpu().tolist()
+            partitions = []
+            for i in range(len(qsl_cpu) - 1):
+                start, end = qsl_cpu[i], qsl_cpu[i + 1]
+                if end <= start:
+                    continue
+                first_slot = int(slot_mapping_flat[start].item())
+                if first_slot < 0:
+                    # All padding for this seg; skip.
+                    continue
+                partitions.append((first_slot // BS, slice(start, end)))
+            if partitions:
+                return partitions
+        # Single-seq prefill. Derive from the first non-padding slot.
+        first_slot = -1
+        n = int(slot_mapping_flat.shape[0])
+        for j in range(n):
+            v = int(slot_mapping_flat[j].item())
+            if v >= 0:
+                first_slot = v
+                break
+        if first_slot >= 0:
+            return [(first_slot // BS, slice(0, n))]
+
+    # Fallback: no metadata, no valid slots. Use the default seq.
+    return [(0, slice(0, int(slot_mapping_flat.shape[0])))]
+
 
 def _seq_id_from_block_table_row(bt_row: "torch.Tensor") -> int:
     """Phase 5B.6 step 3: per-sequence identifier derived from the
