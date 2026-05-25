@@ -664,29 +664,24 @@ class PagedKVWriter:
         large and reusable; positions of dropped sequences will be
         overwritten by future writes.
 
-        Phase 6 v2 Option B pre-flight (B-pre-1): `seq_id='all'` now ALSO
-        evicts all non-default sequences (frees their slots back to the
-        pool). The DEFAULT_SEQ_ID slot is retained — legacy single-seq
-        callers expect the writer.k_stage / .bf16_k_backing proxy
-        properties to keep returning valid tensors after reset.
+        Phase 6 v2 Option B pre-flight (B-pre-1): `seq_id='all'` now
+        evicts EVERY sequence (including DEFAULT_SEQ_ID if it was
+        lazy-allocated). The intent of "all" is a hard reset between
+        workloads — the writer's slot pool returns to fully free, ready
+        for whatever seq_ids the next workload brings.
 
-        This change is required to keep the slot pool (default size 8)
-        from filling up across long-lived workloads that cycle through
-        many seq_ids (e.g., benches that run B=1, 2, 4, 8 back-to-back
-        without an explicit evict_sequence pass).
+        Without this, a workload that ran a sequence with seq_id=0
+        (block_id 0 as first block) would leave the default slot
+        occupied across resets, eating one slot of pool capacity and
+        causing exhaustion at high-B on subsequent runs.
+
+        Legacy single-seq callers use `reset_sequence()` (no args) which
+        resets the default's streaming state in place — slot retained.
         """
         if seq_id == "all":
-            # Evict non-default seqs FIRST so their slots return to the
-            # free pool; iterate over a snapshot of keys to avoid mutating
-            # during iteration.
+            # Evict EVERY seq — restores pool to fully free.
             for sid in list(self._seq_states.keys()):
-                if sid == self.DEFAULT_SEQ_ID:
-                    continue
                 self.evict_sequence(sid)
-            # Then reset the default seq's streaming state in place.
-            default = self._seq_states.get(self.DEFAULT_SEQ_ID)
-            if default is not None:
-                default.reset()
             return
         target = self.DEFAULT_SEQ_ID if seq_id is None else seq_id
         s = self._seq_states.get(target)

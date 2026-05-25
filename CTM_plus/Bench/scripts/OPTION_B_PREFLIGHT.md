@@ -92,9 +92,14 @@ What changed:
   surfaced as exhaustion at the B=8 ship target when none of vLLM's
   8 fresh seq_ids equaled 0. Fixed in the same B-pre-1 commit.
 - `evict_sequence(seq_id)` returns the slot to the pool.
-- `reset_sequence("all")` evicts all non-default seqs and resets the
-  default — keeps the pool from filling up across long workloads
-  that cycle through many seq_ids.
+- `reset_sequence("all")` evicts EVERY seq (including the lazy
+  default if it was allocated) — restores pool to fully free for
+  the next workload. Earlier iteration KEPT the default, but if a
+  prior B=8 workload happened to allocate id=0 (block_id 0 as first
+  block for one of its 8 seqs), that "kept" default would eat a
+  slot of pool capacity across resets and cause exhaustion in the
+  next B=8 workload. Legacy single-seq callers use
+  `reset_sequence()` no-args which preserves the default slot.
 - New device-indexed read API on the writer:
   - `slot_indices_for(seq_ids) -> list[int]` — Python-side resolution
     (the one host operation per call before captured region).
