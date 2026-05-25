@@ -518,21 +518,30 @@ class PagedKVWriter:
         value: "torch.Tensor",          # (T, H_kv, D) bf16
         kv_cache: "torch.Tensor",       # (2, NB, BS, H_kv, D) uint8
         slot_mapping: "torch.Tensor",   # (T,) long
+        *,
+        seq_id: Any = None,
     ) -> None:
-        """Phase 6 vectorized write: quantize T new K/V tokens and write
-        into paged cache + external sidecars at the slots in slot_mapping.
+        """Phase 6 vectorized write into paged cache + external sidecars.
 
-        Pipeline:
+        Phase 5B.6 step 2: now accepts an explicit `seq_id`. If omitted,
+        routes through DEFAULT_SEQ_ID (= 0) for v1 batch=1 callers — no
+        behavior change from the prior single-seq write.
+
+        For multi-batch (Phase 5B.6): the caller partitions slot_mapping
+        by sequence and calls write() once per sequence with that seq's
+        id. Each seq's K staging + bf16 backing live in its own
+        SeqState (allocated on first write).
+
+        Pipeline (unchanged):
           1. Filter -1 padding slots (vLLM uses -1 for "do not write").
-          2. BF16 K/V backing append at [seq_pos : seq_pos+n_real].
+          2. BF16 K/V backing append at [state.seq_pos : ...+n_real].
           3. V quantization VECTORIZED over n_real (one set of CUDA ops).
           4. V scatter into kv_cache[1] + v_scale_ext + v_xmin_ext via
              advanced indexing — one op each instead of T per-token writes.
           5. K protect gather VECTORIZED -> scatter into k_protect_ext.
           6. K staging: split unique blocks into FULL (count==BS, batch-
-             finalize all at once) vs PARTIAL (count<BS, through staging
-             buffer). At most ~2 partial blocks per call in practice
-             (one continuing from prior, one new tail).
+             finalize all at once) vs PARTIAL (count<BS, through this
+             SeqState's staging buffer).
 
         Bit-equivalent to the prior per-token implementation; verified
         by verify_phase5b_4c_1_write.py + verify_phase5b_4c_2_read.py.
@@ -540,6 +549,24 @@ class PagedKVWriter:
         if not self._allocated:
             self._lazy_alloc(kv_cache)
 
+        if seq_id is None:
+            seq_id = self.DEFAULT_SEQ_ID
+        state = self.ensure_seq_state(seq_id, kv_cache.device)
+        self._write_into_state(state, key, value, kv_cache, slot_mapping)
+
+    def _write_into_state(
+        self,
+        state: "SeqState",
+        key: "torch.Tensor",
+        value: "torch.Tensor",
+        kv_cache: "torch.Tensor",
+        slot_mapping: "torch.Tensor",
+    ) -> None:
+        """Internal: same vectorized write as before, but operating on
+        an explicit SeqState (`state`) for per-seq fields instead of
+        the legacy `self.*` proxies. Per-LAYER state (k_scale_ext etc.)
+        remains on `self`.
+        """
         if key.shape != value.shape:
             raise ValueError(
                 f"key shape {tuple(key.shape)} != value shape {tuple(value.shape)}"
@@ -586,18 +613,19 @@ class PagedKVWriter:
             real_value = value[non_padding_gpu]
             real_slots = slot_mapping[non_padding_gpu]
 
-        # ===== BF16 K/V backing (Phase 5B.4c.3 fix-a; already batched) =====
-        if self.bf16_k_backing is not None:
-            if self.seq_pos + n_real > self.bf16_k_backing.shape[1]:
+        # ===== BF16 K/V backing (Phase 5B.4c.3 fix-a; per-seq) =====
+        # `state` is THIS sequence's SeqState; bf16 backing is per-seq.
+        if state.bf16_k_backing is not None:
+            if state.seq_pos + n_real > state.bf16_k_backing.shape[1]:
                 raise RuntimeError(
-                    f"bf16 backing overflow: seq_pos={self.seq_pos} + "
+                    f"bf16 backing overflow: seq_pos={state.seq_pos} + "
                     f"n_real={n_real} > max_seqlen="
-                    f"{self.bf16_k_backing.shape[1]}. Set "
+                    f"{state.bf16_k_backing.shape[1]}. Set "
                     f"{_BF16_BACKING_MAX_SEQLEN_ENV} to a larger value."
                 )
-            self.bf16_k_backing[0, self.seq_pos:self.seq_pos + n_real] = real_key
-            self.bf16_v_backing[0, self.seq_pos:self.seq_pos + n_real] = real_value
-            self.seq_pos += n_real
+            state.bf16_k_backing[0, state.seq_pos:state.seq_pos + n_real] = real_key
+            state.bf16_v_backing[0, state.seq_pos:state.seq_pos + n_real] = real_value
+            state.seq_pos += n_real
 
         block_ids = real_slots // BS                     # (n_real,) long
         positions = real_slots %  BS
@@ -648,6 +676,7 @@ class PagedKVWriter:
 
         if n_full_blocks > 0:
             self._finalize_k_full_blocks_batched(
+                state=state,
                 kv_cache=kv_cache,
                 real_key=real_key,
                 block_ids=block_ids,
@@ -659,11 +688,12 @@ class PagedKVWriter:
             )
 
         if n_full_blocks < unique_blocks.shape[0]:
-            # At least one PARTIAL block; route those through the staging
-            # buffer. Process in SEQUENCE ORDER (appearance order) so the
-            # k_stage_block_id state ends pointing at the sequence's last
+            # At least one PARTIAL block; route those through THIS seq's
+            # staging buffer. Process in SEQUENCE ORDER (appearance order)
+            # so state.k_stage_block_id ends pointing at the seq's last
             # block (where the next decode write will continue).
             self._stage_k_partial_blocks(
+                state=state,
                 kv_cache=kv_cache,
                 real_key=real_key,
                 block_ids=block_ids,
@@ -675,6 +705,7 @@ class PagedKVWriter:
     def _finalize_k_full_blocks_batched(
         self,
         *,
+        state: "SeqState",
         kv_cache,
         real_key,
         block_ids,
@@ -687,6 +718,10 @@ class PagedKVWriter:
         """Batch-finalize all blocks for which this write() supplied
         the full BS tokens. Equivalent to running _finalize_k_group N
         times but in one set of CUDA ops.
+
+        `state` is THIS seq's SeqState — used only to detect if any
+        of the just-finalized blocks was the staging block for this seq
+        (in which case the staging count is reset to 0).
         """
         BS = self.BS
         H = self.H
@@ -722,16 +757,17 @@ class PagedKVWriter:
         self.k_scale_ext[full_block_ids] = scale.to(dtype)
         self.k_xmin_ext [full_block_ids] = x_min.to(dtype)
 
-        # If the staging buffer was tracking one of these now-finalized
-        # blocks, mark its count as 0 (block is done; next partial fills
-        # k_stage afresh).
-        # We do this check on CPU because k_stage_block_id is a Python int.
-        if self.k_stage_block_id in full_block_ids.cpu().tolist():
-            self.k_stage_count = 0
+        # If THIS seq's staging buffer was tracking one of these now-
+        # finalized blocks, mark its count as 0 (block is done; next
+        # partial fills state.k_stage afresh). Done on CPU because
+        # state.k_stage_block_id is a Python int.
+        if state.k_stage_block_id in full_block_ids.cpu().tolist():
+            state.k_stage_count = 0
 
     def _stage_k_partial_blocks(
         self,
         *,
+        state: "SeqState",
         kv_cache,
         real_key,
         block_ids,
@@ -739,9 +775,10 @@ class PagedKVWriter:
         unique_blocks,
         full_mask,
     ):
-        """Place tokens belonging to partial (count < BS) blocks into the
-        staging buffer. Process partial blocks in sequence (first-appearance)
-        order so k_stage_block_id ends at the sequence's true last block.
+        """Place tokens belonging to partial (count < BS) blocks into THIS
+        seq's staging buffer (`state.k_stage`). Process partial blocks in
+        sequence (first-appearance) order so state.k_stage_block_id ends
+        at the seq's true last block.
 
         In practice the partial-block count per write() is small:
           - 1 (the sequence's current trailing partial)
@@ -772,37 +809,50 @@ class PagedKVWriter:
             keys_for_pb = real_key[pb_mask]                          # (cnt, H, D)
             positions_for_pb = positions[pb_mask]                    # (cnt,) long
 
-            # Block-boundary detection: if staging is on a different block,
-            # reset. (vLLM may allocate the same block to a new sequence;
-            # _phase5b reset_sequence handles the cross-sequence case.)
-            if pb != self.k_stage_block_id:
-                self.k_stage_block_id = pb
-                self.k_stage.zero_()
-                self.k_stage_count = 0
+            # Block-boundary detection in THIS seq's staging.
+            if pb != state.k_stage_block_id:
+                state.k_stage_block_id = pb
+                state.k_stage.zero_()
+                state.k_stage_count = 0
 
             # Place these tokens at their intra-block positions.
-            self.k_stage[positions_for_pb] = keys_for_pb
+            state.k_stage[positions_for_pb] = keys_for_pb
             max_pos = int(positions_for_pb.max().item()) + 1
-            if max_pos > self.k_stage_count:
-                self.k_stage_count = max_pos
+            if max_pos > state.k_stage_count:
+                state.k_stage_count = max_pos
 
-            # If now full, finalize.
-            if self.k_stage_count == BS:
-                self._finalize_k_group(kv_cache, pb)
-                self.k_stage_count = 0
+            # If now full, finalize from this seq's staging buffer.
+            if state.k_stage_count == BS:
+                self._finalize_k_group_from_state(state, kv_cache, pb)
+                state.k_stage_count = 0
 
     def _finalize_k_group(
         self,
         kv_cache: "torch.Tensor",
         block_id: int,
     ) -> None:
-        """Quantize the full staging buffer (BS, H, D) and write packed
-        nibbles + scale + xmin to the cache + externals for this block."""
-        BS = self.BS
+        """Legacy single-seq finalizer. Routes through the default
+        SeqState's k_stage. Kept for backward compat with any external
+        callers; internal helpers now use _finalize_k_group_from_state.
+        """
+        s = self._seq_states.get(self.DEFAULT_SEQ_ID)
+        if s is None:
+            raise RuntimeError("_finalize_k_group called before _lazy_alloc")
+        self._finalize_k_group_from_state(s, kv_cache, block_id)
+
+    def _finalize_k_group_from_state(
+        self,
+        state: "SeqState",
+        kv_cache: "torch.Tensor",
+        block_id: int,
+    ) -> None:
+        """Quantize the full staging buffer (BS, H, D) on `state.k_stage`
+        and write packed nibbles + scale + xmin to the cache + externals
+        for `block_id`."""
         D = self.D
         half_D = D // 2
 
-        buf_f = self.k_stage.float()                    # (BS, H, D)
+        buf_f = state.k_stage.float()                   # (BS, H, D)
         x_max = buf_f.amax(dim=0)                       # (H, D)
         x_min = buf_f.amin(dim=0)
         scale = ((x_max - x_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
@@ -813,7 +863,7 @@ class PagedKVWriter:
 
         # Write nibbles to all BS slots of this block.
         kv_cache[0, block_id, :, :, :half_D] = packed
-        # Write per-(h, d) scale + xmin to externals.
+        # Write per-(h, d) scale + xmin to externals (per-layer, shared).
         self.k_scale_ext[block_id] = scale.to(self.sidecar_dtype)
         self.k_xmin_ext [block_id] = x_min.to(self.sidecar_dtype)
 
@@ -821,21 +871,30 @@ class PagedKVWriter:
     # Introspection helpers (for verify scripts).
     # ------------------------------------------------------------------
 
-    def get_bf16_backing_slice(self, S: int):
+    def get_bf16_backing_slice(self, S: int, *, seq_id: Any = None):
         """Phase 5B.4c.3 fix (a): return (bf16_K, bf16_V) of shape
         (1, S, H, D) for the kernel's positional K/V args.
+
+        Phase 5B.6 step 2: optional `seq_id` selects which sequence's
+        backing to slice. Default = DEFAULT_SEQ_ID (legacy single-seq).
 
         Positions [0..seq_pos-1] hold the real bf16 K/V values written
         so far in this sequence. Positions [seq_pos..S-1] are zeros
         (initialized) and unattended (cache_seqlens masks them).
         """
-        if self.bf16_k_backing is None:
-            raise RuntimeError("bf16 backing not allocated yet — call lazy_alloc first.")
-        if S > self.bf16_k_backing.shape[1]:
+        if seq_id is None:
+            seq_id = self.DEFAULT_SEQ_ID
+        state = self._seq_states.get(seq_id)
+        if state is None or state.bf16_k_backing is None:
             raise RuntimeError(
-                f"requested backing slice S={S} > allocated {self.bf16_k_backing.shape[1]}"
+                f"bf16 backing not allocated for seq_id={seq_id!r}. "
+                f"Call write() first."
             )
-        return self.bf16_k_backing[:, :S], self.bf16_v_backing[:, :S]
+        if S > state.bf16_k_backing.shape[1]:
+            raise RuntimeError(
+                f"requested backing slice S={S} > allocated {state.bf16_k_backing.shape[1]}"
+            )
+        return state.bf16_k_backing[:, :S], state.bf16_v_backing[:, :S]
 
     def get_state(self) -> Dict[str, Any]:
         """Snapshot of allocator + streaming state. Used by 5B.4c.1
