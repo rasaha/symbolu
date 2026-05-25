@@ -192,6 +192,10 @@ def main(argv) -> int:
     parser.add_argument("--seed",                   type=int,   default=42)
     parser.add_argument("--protect-mask-path",      default=None,
                         help="override $PROTECT_MASK_PATH")
+    parser.add_argument("--protect-fraction",       type=float, default=0.04,
+                        help="protect_fraction encoded in the mask filename "
+                             "(only affects auto-derivation of the default "
+                             "mask path when --protect-mask-path is not set)")
     parser.add_argument("--abs-pass-threshold",     type=float, default=0.80,
                         help="absolute retrieval-rate gate for int4")
     parser.add_argument("--rel-pass-margin",        type=float, default=0.10,
@@ -209,12 +213,24 @@ def main(argv) -> int:
 
     if args.protect_mask_path:
         os.environ["PROTECT_MASK_PATH"] = args.protect_mask_path
-    mask_path = os.environ.get(
-        "PROTECT_MASK_PATH",
-        "/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt",
-    )
+    # Phase 7: derive default mask path from --model id (slug match with
+    # calibrate_phase5b_protect_mask.py auto-derivation), so this verify
+    # works on any calibrated model without manually setting the env var.
+    if "PROTECT_MASK_PATH" not in os.environ:
+        slug = args.model.split("/")[-1].lower()
+        for ch in (".", "-"):
+            slug = slug.replace(ch, "_")
+        pct = int(round(args.protect_fraction * 100))
+        os.environ["PROTECT_MASK_PATH"] = (
+            f"/workspace/dev/build-logs/{slug}_protect_mask_{pct}pct.pt"
+        )
+    mask_path = os.environ["PROTECT_MASK_PATH"]
     if not os.path.exists(mask_path):
         print(f"FAIL: protect_mask not found at '{mask_path}'.")
+        print(f"      Run calibration first:")
+        print(f"        /workspace/venv-vllm/bin/python3 \\")
+        print(f"            /workspace/symbolu/CTM_plus/Bench/scripts/calibrate_phase5b_protect_mask.py \\")
+        print(f"            --model {args.model} --protect-fraction {args.protect_fraction}")
         return 1
 
     print("=" * 78)
