@@ -366,6 +366,47 @@ latency, ahead on aggregate.
   depends on PyTorch's caching allocator behavior — they should be
   tame inside vLLM's torch.cuda.graph() memory pool, empirically
   determined by B-1. agg_tps @ B=8 = 42.5 (flat vs B-pre-2+3).
+
+- **B-1 smoke test FAILED at capture (commit `c2be606`).** Smoke
+  script set `enforce_eager=False` on Int4ProtectedLLM. vLLM 0.7.3 V0
+  attempted to capture decode forwards at 35 batch sizes; capture
+  crashed with:
+
+      RuntimeError: CUDA error: operation not permitted when stream is capturing
+      at int(bt_row[0].item())  in _seq_id_from_block_table_row,
+      called from _derive_write_partitions (line 728) in forward().
+
+  Root cause: the WRITE path (which runs before the read path in
+  forward()) has the same `.item()` / Python-dict pattern that the
+  preflight only fixed in the READ path. Specifically:
+
+    1. `_derive_write_partitions(attn_metadata, ...)` calls
+       `_seq_id_from_block_table_row(bt_row)` = `int(bt_row[0].item())`
+       per seq to get seq_ids. The `.item()` crashes under capture.
+    2. Even if (1) is fixed, the `for seq_id, sl in partitions:
+       writer.write(...)` Python loop with dict-based slot resolution
+       would bake at capture time — broken on replay with different
+       seq_ids (same slot-baking issue as the read path's preflight
+       solved).
+    3. `writer.write(seq_id=...)` calls `ensure_seq_state(seq_id, ...)`
+       which is a Python dict lookup. Same issue as (2).
+
+  The preflight made the read path graph-friendly but the write path
+  is still graph-hostile. Enabling capture surfaces this immediately
+  because vLLM captures the ENTIRE forward (write + read).
+
+  Required to unblock B-1:
+    1. Write-path equivalents of B-pre-1..4 — pool-based slot
+       routing, device-side seq_id resolution, unconditional
+       partitioning. ~1-2 days.
+    2. Pre-capture seq_id resolution hook — vLLM integration to
+       resolve seq_id → slot OUTSIDE the captured region (so the
+       resolved values can change per call). Requires monkey-patching
+       vLLM's prepare_model_input or worker forward. ~2-3 days.
+    3. Empirical debugging — capture often surfaces additional
+       issues once the first error is fixed. ~1-2 days.
+
+  Realistic total to actually enable graph capture: **4-7 days**.
 - **B-1..3 (capture enable + verify + bench): not started.** Will
   resume after the rest of the preflight is in.
 - Profile data justifying the project: `PHASE6_PERF_REPORT.md`
