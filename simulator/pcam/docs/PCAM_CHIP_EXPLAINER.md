@@ -248,6 +248,41 @@ in v2.**
 
 ---
 
+## Relationship to int4_protected (shipped software baseline)
+
+The Cognade Labs stack also ships a **software KV-cache quantization**
+backend through vLLM called `int4_protected` (see
+[`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)).
+int4_protected and PCAM operate at **different layers** and compound.
+
+| Layer | Decides | Status |
+|---|---|---|
+| **int4_protected** (software, ships today) | *How to encode* each retained KV block (4-bit nibbles + ~4% bf16 protected channels) | Validated: 4 models, 15/15 needle == bf16, 2× max concurrency |
+| **PCAM** (hardware, this doc) | *Which* KV blocks to retain, *and* which subset to attend to sparsely | Chip spec + RTL draft |
+
+```
+                Stock vLLM   + int4_protected   + PCAM eviction   + PCAM sparse-attn
+KV memory       100%         50%               50%               50%
+Attention compute 100%       100%              100%              12.5–25%
+Quality         100%         100% (15/15)      100% (15/15)      ≥95%
+ATTEND latency  n/a          n/a               n/a               <100ns (on-chip)
+```
+
+int4_protected solves the **storage format** problem at 4-bit
+quality parity. It does not address eviction quality, attention
+compute, or hardware acceleration of the ATTEND decision — which are
+exactly the three things PCAM provides. Each contribution is
+uncorrelated with the others, so the savings compound multiplicatively.
+
+The complementary positioning means int4_protected being shipped is
+**evidence in PCAM's favor**, not competition: PCAM accelerates the
+sparse-attention + eviction layer on top of a measured-not-projected
+software memory baseline. Customers who deploy int4_protected today
+get the per-token storage win; PCAM extends that to per-step compute
+and per-decode latency wins.
+
+---
+
 ## CTM+ Integration
 
 PCAM includes minimal **CTM+ Lite** on-chip (~8K gates, <1% area) that
@@ -262,7 +297,10 @@ classifies each returned candidate into a tier hint:
 
 The external memory controller uses these hints for KV cache placement.
 Full CTM+ (shadow caches, mode switching, Markov prediction) stays
-off-chip.
+off-chip. The retained KV blocks themselves can be stored in any
+format — including int4_protected — without PCAM needing to know the
+encoding: PCAM operates on block-level attention metadata, not on the
+per-element bits inside the blocks.
 
 **Scoring behavior (ADR-0001).** Per-block importance is computed by
 the four-signal phase-aware model locked in
@@ -298,7 +336,11 @@ candidates by the policy.
 - Perfect multi-tenant fairness with complete sequence isolation
 - 31,000x compression of full attention state
 
-**What PCAM doesn't solve:**
+**What PCAM does NOT solve (addressed by other layers of the stack):**
+- **Per-block KV storage format** — that's int4_protected's job
+  (4-bit + protected channels; 2× memory savings at quality parity,
+  validated on 4 models, shipped through vLLM today). PCAM stores
+  attention *relationships*, not the K/V bits themselves.
 - RAG workloads (~30% coverage — semantic unpredictability)
 - Short context (<1K tokens — no benefit, overhead only)
 - The <100ns target requires on-package integration (CXL alone is 149ns)
