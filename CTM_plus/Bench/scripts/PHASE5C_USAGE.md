@@ -76,11 +76,12 @@ Calibrated + end-to-end verified through the int4_protected backend:
 |---|---|---|---|
 | `Qwen/Qwen2.5-7B-Instruct` | 28 layers × H_kv=4 × D=128 | `qwen2_5_7b_protect_mask_4pct.pt` | v1.x ship: 5B.6 GREEN, needle 15/15 |
 | `mistralai/Mistral-7B-Instruct-v0.3` | 32 layers × H_kv=8 × D=128 | `mistral_7b_instruct_v0_3_protect_mask_4pct.pt` | Phase 7 GREEN: smoke 4/4, **needle 15/15 == stock** |
+| `Qwen/Qwen2.5-14B-Instruct` | 48 layers × H_kv=8 × D=128 | `qwen2_5_14b_instruct_protect_mask_4pct.pt` | Phase 7 GREEN: **needle 15/15 == stock**, 0 fallbacks in 45360 decodes + 46080 writes |
 
-Both models hit 100% needle retrieval at the 4% protect_fraction with
-zero packed-decode fallbacks — int4_protected is quality-equivalent to
-stock bf16 vLLM on the needle-in-haystack benchmark for both model
-families.
+All three hit 100% needle retrieval at the 4% protect_fraction with
+zero packed-decode fallbacks — int4_protected is quality-equivalent
+to stock bf16 vLLM on the needle-in-haystack benchmark across two
+model families (Qwen + Mistral) and two scales (7B + 14B).
 
 Adding a new model (any D=128 architecture):
 
