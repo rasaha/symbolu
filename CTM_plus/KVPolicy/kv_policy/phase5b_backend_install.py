@@ -215,6 +215,67 @@ if _VLLM_FA_AVAILABLE:
         def get_call_stats(cls) -> Dict[str, int]:
             return dict(cls._call_stats)
 
+        # Phase 6 v2 Option B pre-flight (B-pre-4): persistent index/scratch
+        # buffers for the read path. Pre-allocated once per impl instance,
+        # grown lazily if a larger B comes through. Pre-allocation makes
+        # these tensors live at stable addresses across decode calls —
+        # captured graphs can record those addresses once and replay.
+        #
+        # The buffers are populated each call via .copy_() (small DtoD copy
+        # from a fresh fancy-indexed tensor) so the underlying memory is
+        # the same; the values change per call but the address doesn't.
+        def _ensure_index_bufs(self, B: int, device, dtype_long, dtype_i32):
+            """Grow / allocate the persistent index buffers if needed.
+
+            Returns the (B,)-sized slices ready for use this call. Slices
+            are views into a (max_B,) backing buffer; max_B grows to the
+            largest B ever seen on this impl (typically 8 at the ship
+            target, ramping to vLLM's max-concurrency cap).
+            """
+            cur = getattr(self, "_phase5b_idx_max_B", 0)
+            if cur < B or getattr(self, "_phase5b_idx_dev", None) is not device:
+                # (Re-)allocate. Pick a generous cap to avoid frequent regrowth.
+                new_max = max(B, cur, 16)
+                self._phase5b_slot_idx_buf      = torch.zeros(
+                    (new_max,), dtype=dtype_long, device=device,
+                )
+                self._phase5b_batch_idx_arange  = torch.arange(
+                    new_max, dtype=dtype_long, device=device,
+                )
+                self._phase5b_cache_seqlens_i32 = torch.zeros(
+                    (new_max,), dtype=dtype_i32, device=device,
+                )
+                self._phase5b_idx_max_B  = new_max
+                self._phase5b_idx_dev    = device
+            return (
+                self._phase5b_slot_idx_buf[:B],
+                self._phase5b_batch_idx_arange[:B],
+                self._phase5b_cache_seqlens_i32[:B],
+            )
+
+        def _ensure_protect_mask_bhd(self, B: int, writer):
+            """(Re-)allocate the (B, H, D) int8 protect_mask buffer if
+            needed. Content is per-model-frozen (writer.protect_mask is
+            populated at _lazy_alloc), so we can fill it ONCE per max-B
+            grow and never touch it again. Stable address across calls.
+            """
+            cur = getattr(self, "_phase5b_protect_mask_bhd_max_B", 0)
+            existing_buf = getattr(self, "_phase5b_protect_mask_bhd_buf", None)
+            need_realloc = (
+                cur < B
+                or existing_buf is None
+                or existing_buf.device != writer.protect_mask.device
+            )
+            if need_realloc:
+                new_max = max(B, cur, 16)
+                self._phase5b_protect_mask_bhd_buf = (
+                    writer.protect_mask.unsqueeze(0)
+                    .expand(new_max, -1, -1)
+                    .contiguous()
+                )
+                self._phase5b_protect_mask_bhd_max_B = new_max
+            return self._phase5b_protect_mask_bhd_buf[:B]
+
         def _get_paged_writer(self, layer=None):
             """Lazy-construct the PagedKVWriter for this layer. The writer
             doesn't allocate sidecars at construction — that happens on
@@ -345,14 +406,20 @@ if _VLLM_FA_AVAILABLE:
                 # ONE batched gather covering all B seqs.
                 view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
 
-            # Phase 6 v2 Option B pre-flight (B-pre-1): resolve seq_ids
-            # to slot indices ONCE, here. The resolved slot tensor is
-            # what downstream getters consume — they no longer take
-            # Python seq_id lists, so the splice + bf16_backing phases
-            # have no Python dict lookups left.
+            # Phase 6 v2 Option B pre-flight (B-pre-1 + B-pre-4): resolve
+            # seq_ids to slot indices ONCE, and write the result into the
+            # PERSISTENT slot-index buffer (stable address across calls).
+            # batch_idx_t is also pulled from a persistent arange buffer.
+            slot_idx_t, batch_idx_t, _cache_seqlens_i32_buf = \
+                self._ensure_index_bufs(
+                    B, device, dtype_long=torch.long, dtype_i32=torch.int32,
+                )
             slot_idx_list = writer.slot_indices_for(seq_ids)
-            slot_idx_t = torch.tensor(
-                slot_idx_list, dtype=torch.long, device=device,
+            # In-place .copy_() from a small fresh tensor — the destination
+            # buffer's address is preserved.
+            slot_idx_t.copy_(
+                torch.tensor(slot_idx_list, dtype=torch.long, device=device),
+                non_blocking=True,
             )
 
             with _maybe_region("batched.splice"):
@@ -367,7 +434,6 @@ if _VLLM_FA_AVAILABLE:
                 # (slot_idx_t[mask], last_block_indices_t[mask], arange[mask]).
                 # Captured-graph friendly: same op chain runs regardless of
                 # how many seqs are active.
-                batch_idx_t = torch.arange(B, device=device, dtype=torch.long)
                 _splice_k_partial_tail_batched_unconditional(
                     view, writer,
                     slot_idx_t=slot_idx_t,
@@ -386,9 +452,19 @@ if _VLLM_FA_AVAILABLE:
                     )
 
             with _maybe_region("batched.kernel_prep"):
-                # protect_mask + cache_seqlens shape prep + V dispatch decision.
-                protect_mask_bhd = writer.protect_mask.unsqueeze(0).expand(B, -1, -1).contiguous()
-                cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
+                # B-pre-4: persistent (max_B, H, D) protect_mask buffer —
+                # content is per-model-frozen so we populate it once at
+                # first allocation and reuse across all calls. Stable
+                # address.
+                protect_mask_bhd = self._ensure_protect_mask_bhd(B, writer)
+
+                # B-pre-4: persistent (max_B,) int32 cache_seqlens buffer.
+                # Populate via .copy_() from the (possibly-int32) source —
+                # writes into the same backing memory each call.
+                cache_seqlens_i32 = _cache_seqlens_i32_buf
+                cache_seqlens_i32.copy_(
+                    cache_seqlens_orig.to(torch.int32), non_blocking=True,
+                )
 
                 v_bf16 = view.get("v_bf16")
                 if v_bf16 is not None:
