@@ -107,6 +107,10 @@ def _bench_one_B(llm, model, B: int, sampling, n_runs: int = 3) -> Dict[str, Any
         n_out = sum(len(o.outputs[0].token_ids) for o in outs)
         out_lens.append(n_out)
         last_text = outs[0].outputs[0].text
+    # Correctness gate: same prompt + temp=0 + verified batched determinism
+    # ⇒ every sequence in the batched call must emit identical text.
+    all_texts = [o.outputs[0].text for o in outs]
+    all_match = all(t == all_texts[0] for t in all_texts)
     # Median.
     times.sort()
     median_t = times[len(times) // 2]
@@ -115,9 +119,10 @@ def _bench_one_B(llm, model, B: int, sampling, n_runs: int = 3) -> Dict[str, Any
         "B":               B,
         "wall_s":          median_t,
         "n_output_tokens": median_out,
-        "per_prompt_s":    median_t,                        # serial run-equivalent
+        "wall_s_per_seq":  median_t / B,                    # batched call amortized
         "agg_tps":         median_out / median_t if median_t > 0 else 0.0,
         "sample_output":   last_text[:80],
+        "all_match":       all_match,
     }
 
 
@@ -181,40 +186,53 @@ def main(argv) -> int:
     for B in batch_sizes:
         print(f"Running B={B} (×{args.n_runs} runs)...")
         r = _bench_one_B(llm, model, B, sampling, n_runs=args.n_runs)
+        match_mark = "OK" if r["all_match"] else "MISMATCH"
         print(f"  B={B}: wall {r['wall_s']:.3f}s   "
               f"n_out_total={r['n_output_tokens']}   "
-              f"agg_tps={r['agg_tps']:.1f}")
+              f"agg_tps={r['agg_tps']:.1f}   "
+              f"cross-seq={match_mark}")
         results.append(r)
 
     print()
     print("=" * 78)
     print("Results — int4_protected batched throughput")
     print("=" * 78)
-    print(f"  {'B':>3} | {'wall_s':>8} | {'out_tok':>8} | {'tot_tps':>9} | "
-          f"{'per_seq_s':>10} | {'per_seq_tps':>12} | {'tps_speedup':>12}")
+    print(f"  {'B':>3} | {'wall_s':>8} | {'out_tok':>8} | {'agg_tps':>9} | "
+          f"{'wall_s/B':>10} | {'per_seq_tps':>12} | {'tps_speedup':>12}")
     print("  " + "-" * 78)
     base = results[0]
     base_tps = base["agg_tps"]
-    base_per_seq_tps = base["agg_tps"] / base["B"]
     for r in results:
-        per_seq_s = r["wall_s"]            # serialized would be B × wall_s_B1
         per_seq_tps = r["agg_tps"] / r["B"]
         # Speedup vs B=1: how does aggregate throughput scale?
+        # NOTE: includes prefill in both numerator and denominator. At high B,
+        # part of the gain is just prefill batching by vLLM (independent of
+        # Option A's decode-kernel batching). The decode-only contribution is
+        # bounded above by this number.
         speedup = r["agg_tps"] / base_tps if base_tps > 0 else 0.0
         print(f"  {r['B']:>3} | {r['wall_s']:>8.3f} | {r['n_output_tokens']:>8d} | "
-              f"{r['agg_tps']:>9.1f} | {per_seq_s:>10.3f} | "
+              f"{r['agg_tps']:>9.1f} | {r['wall_s_per_seq']:>10.3f} | "
               f"{per_seq_tps:>12.1f} | {speedup:>11.2f}×")
 
-    # Sample output check (sanity).
+    # Cross-batch correctness summary.
     print()
+    any_mismatch = any(not r["all_match"] for r in results if r["B"] > 1)
+    if any_mismatch:
+        print("WARN: cross-sequence output mismatch detected at some B "
+              "(temp=0 + identical prompt should yield identical outputs).")
+    else:
+        print("Cross-seq determinism: all B>1 runs emitted identical text "
+              "across sequences (correctness gate PASS).")
     print(f"Sample output (B={results[0]['B']}, prompt 0): "
           f"{results[0]['sample_output']!r}")
 
     print()
     print("Reading:")
-    print("  - agg_tps   = total output tok/s in the batched call (all B seqs).")
+    print("  - agg_tps    = total output tok/s in the batched call (all B seqs).")
+    print("                 INCLUDES prefill time — for ship-narrative use.")
     print("  - per_seq_tps = agg_tps / B (per-sequence decode rate).")
-    print("  - tps_speedup = agg_tps(B) / agg_tps(1).")
+    print("  - tps_speedup = agg_tps(B) / agg_tps(1). Upper bound on Option A's")
+    print("                  gain (prefill batching also contributes).")
     print("  - Ideal Option A scales agg_tps linearly with B until kernel")
     print("    saturates. per_seq_tps stays constant (or grows) if so.")
     print("  - If per_seq_tps DROPS with B, kernel/launch overhead per layer")
