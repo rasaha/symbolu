@@ -205,55 +205,71 @@ unchanged for the existing equivalence verifies and for any callers
 that prefer the conditional path. New code should call the
 unconditional variant.
 
-#### B-pre-4: Pointer stability — **AUDIT + EASY FIXES LANDED**
+#### B-pre-4: Pointer stability — **COMPLETE**
 
 Audit script `audit_phase6_b_pre4_pointer_stability.py` instruments
 the kernel call to log `data_ptr()` of every argument across decode
 steps, then reports per-tensor stability (STABLE / CYCLE-N / CHURN)
 per (B, n_blocks_max) shape bucket.
 
-Easy fixes landed (cheap pre-allocations on the impl instance):
+Persistent buffers added to `Int4ProtectedAttentionImpl`:
 
-- `_phase5b_slot_idx_buf`     : (max_B,) long — persistent. Populated
-  per-call via `.copy_()` from the Python slot list.
-- `_phase5b_batch_idx_arange` : (max_B,) long — persistent. Filled
-  once with arange(); values never change so we just slice [:B].
-- `_phase5b_cache_seqlens_i32`: (max_B,) int32 — persistent. Populated
-  per-call via `.copy_()`.
-- `_phase5b_protect_mask_bhd` : (max_B, H, D) int8 — persistent.
-  Per-model-frozen content; populated once at first allocation and
-  reused across all calls.
+- `_phase5b_slot_idx_buf`     : (max_B,) long — populated per-call
+  via `.copy_()`. Stable address.
+- `_phase5b_batch_idx_arange` : (max_B,) long — filled once with
+  arange; values never change.
+- `_phase5b_cache_seqlens_i32`: (max_B,) int32 — populated per-call
+  via `.copy_()`. Stable address.
+- `_phase5b_protect_mask_bhd` : (max_B, H, D) int8 — per-model-frozen;
+  populated once at first alloc, reused across all calls.
 
-These buffers are grown lazily (start at max(B, 16); double when a
-larger B comes through). Tensor address stays stable across all
-calls AT a given max_B; growth happens rarely.
+NB: initial commit had a `is not device` bug that triggered
+reallocation on every call (PyTorch's `tensor.device` returns a fresh
+object per access). Fixed in `4b18fd8` with `!=` value comparison.
 
-Remaining CHURN arguments (gather outputs — defer to B-1):
+Audit-final state at B=8, n_blocks_max=4 (1400 kernel calls):
 
-- `bf16_k_batch`, `bf16_v_batch` from
-  `get_bf16_backing_batched_by_slots(slot_idx_t, S_padded)` —
-  advanced-indexed output of pool tensor. Output address depends on
-  PyTorch's caching allocator. To make stable, the gather needs to
-  use `out=` parameter or `index_select(..., out=)` writing into a
-  pre-allocated `(max_B, max_S_padded, H, D)` buffer.
-- `view["k_int4"]`, `view["k_scale"]`, etc. from
-  `get_packed_view_batched(block_ids_batched, kv_cache)` — same
-  pattern; output address churns.
-- Multiple `.contiguous()` calls on view tensors before the kernel —
-  allocate fresh memory each call.
+| Arg | n_addrs | Status | Notes |
+|---|---|---|---|
+| `bf16_k_batch`            | 1   | STABLE  | gather output cached |
+| `v_for_kernel`            | 1   | STABLE  | gather output cached |
+| `k_packed_int4`           | 1   | STABLE  | view cached |
+| `v_packed_int4`           | 1   | STABLE  | view cached |
+| `cache_seqlens`           | 28  | STABLE-per-layer | our buffer (post-fix) |
+| `protect_mask`            | 28  | STABLE-per-layer | our buffer |
+| `k_packed_protect_slot`   | 28  | STABLE-per-layer | writer.protect_slot |
+| `query_q`                 | 4   | CYCLE-4 | vLLM's input rotation |
+| `k_packed_protect_bf16`   | 4   | CYCLE-4 | allocator rotation |
+| `k_packed_scale`          | 3   | CYCLE-3 | allocator rotation |
+| `v_packed_xmin`           | 4   | CYCLE-4 | allocator rotation |
+| `k_packed_xmin`           | 7   | CHURN   | allocator-bucket churn |
+| `v_packed_scale`          | 5   | CHURN   | allocator-bucket churn |
 
-These are the deeper refactor that B-1 needs. The audit's
-StatBLE/CHURN report from the pod will tell us exactly how many
-buckets and how much CHURN remains, so B-1 can prioritize.
+Decoded:
+- **7 args STABLE / STABLE-per-layer**: graph-capturable as-is. The
+  28-addr "per-layer" pattern is exactly what graph capture needs —
+  each layer's instance has its own buffer, captured separately.
+- **4 args CYCLE-3/4**: rotate through a small allocator pool.
+  Whether these break capture depends on whether vLLM's torch.cuda.graph
+  context's memory-pool allocator gives them ONE stable address inside
+  the captured region. Empirically determined by B-1.
+- **2 args true CHURN** (`k_packed_xmin`, `v_packed_scale`): allocator
+  picks different addresses across calls. These are gather outputs
+  from `get_packed_view_batched` followed by `.contiguous()`. Same
+  call pattern as the STABLE `k_packed_int4` — the difference is just
+  PyTorch's caching allocator behavior per size bucket (different
+  sidecar shapes land in different reuse pools).
 
-vLLM's CUDA graph capture machinery (when enabled via
-`enforce_eager=False` + `compilation_config.cudagraph_capture_sizes`)
-uses `torch.cuda.graph()` context with its own memory-pool allocator;
-ops captured inside that context have their output addresses managed
-by the graph. So some CHURN arguments may "just work" under capture
-without needing explicit buffer-output refactoring. The audit
-identifies the worst offenders; the actual fixability is determined
-empirically when we try capture.
+The CHURN/CYCLE behavior is allocator-luck-dependent in eager mode
+but should be tame inside a `torch.cuda.graph()` context, which uses
+a graph-specific memory pool that lets captured ops reuse output
+addresses. The audit gives us the worst-case picture; the real
+question is whether vLLM's graph capture machinery handles these,
+answered empirically by B-1.
+
+Throughput @ B=8 post-buffer-fix: 42.5 tok/s — flat vs B-pre-1's
+43.1 (-1.4%, within noise of the B-pre-2+3 cost). The pre-allocated
+buffers add no measurable overhead.
 
 Once all of B-pre-1 through B-pre-4 land, the read path should run
 entirely in device-only operations after a single sync to resolve
@@ -340,9 +356,16 @@ latency, ahead on aggregate.
   Structural goal achieved: splice region has no Python branches,
   no bool indexing, no data-dependent shapes, all metadata on
   device. Read path is now graph-capturable.
-- **B-pre-2..4: not started.** Remaining preflight blockers (host
-  syncs in seqids_blockids, data-dependent splice branch, fully
-  stable pointer story).
+- **B-pre-4: COMPLETE.** Landed in `54e4fc3` + `4b18fd8` (the
+  `is not device` → `!=` fix). Audit script
+  `audit_phase6_b_pre4_pointer_stability.py` + persistent buffer
+  pre-allocations for slot_idx_t / batch_idx_t / cache_seqlens_i32 /
+  protect_mask_bhd. Audit confirmed 7 of 13 kernel args are
+  STABLE / STABLE-per-layer; 4 are CYCLE-3/4; 2 are CHURN. The
+  remaining CYCLE/CHURN cases are gather outputs whose stability
+  depends on PyTorch's caching allocator behavior — they should be
+  tame inside vLLM's torch.cuda.graph() memory pool, empirically
+  determined by B-1. agg_tps @ B=8 = 42.5 (flat vs B-pre-2+3).
 - **B-1..3 (capture enable + verify + bench): not started.** Will
   resume after the rest of the preflight is in.
 - Profile data justifying the project: `PHASE6_PERF_REPORT.md`
