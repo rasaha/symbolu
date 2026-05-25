@@ -199,6 +199,113 @@ After step 2, the next ceiling becomes either:
 - the bf16_backing existence itself (cp.async-skip Option C — kill
   the bf16_K backing entirely if the rebuild env will cooperate).
 
+## Phase 6 v2 Option D step 2 — measured (noisy)
+
+Re-bench after step 2 (`f10fe5e` — `torch.stack` for bf16_backing,
+one-sync seq_id resolution, slice+mask block_ids_batched):
+
+| B | post-D1 | post-D2 median | post-D2 best | verdict |
+|---|---------|----------------|---------------|---------|
+| 1 | 20.6 | 18.2 | 19.0 | noise (B=1 doesn't hit batched path) |
+| 2 | 27.2 | 24.6 | 27.5 | best matches D1 |
+| 4 | 35.2 | 36.0 | 36.1 | +2% |
+| 8 | 41.7 | **42.6** | 43.1 | **+2-3%** |
+
+Per-run variance at this point exceeded the per-step gain we'd expect
+(~5%). Step 2 helped marginally on best-of-3, but the median signal
+was lost in pod noise. Took this as a flag to STOP guessing and
+profile.
+
+## Phase 6 v2 Option D — DECODE PHASE PROFILE (the actual story)
+
+Instrumented `_read_decode_packed_batched` and `_read_decode_packed_one`
+with per-phase CPU (perf_counter) + GPU (cuda events) timings via
+`DecodeProfiler`. Ran `bench_phase6_decode_phase_profile.py` at B in
+{1, 2, 4, 8}.
+
+### Per-(layer, step) breakdown at B=8
+
+| Phase | cpu_us_mean | gpu_us_mean | cpu/gpu | × 28 layers |
+|-------|-------------|-------------|---------|-------------|
+| `splice` | 296 | 311 | 1.0× | **8.3 ms** |
+| `seqids_blockids` | 140 | 160 | 0.9× | **3.9 ms** |
+| `view_gather` | 116 | 127 | 0.9× | 3.2 ms |
+| `bf16_backing` | 73 | 83 | 0.9× | 2.0 ms |
+| `kernel` | 65 | 75 | 0.9× | 1.8 ms |
+| `kernel_prep` | 21 | 29 | 0.7× | 0.6 ms |
+| **TOTAL read path** | | | | **19.9 ms / step** |
+
+Observed wall at B=8: 4.99s / 26 output tokens = **192 ms / step**.
+**Read path is ~10% of total.** The other ~170 ms / step is outside
+the read path — model forward (MLP, LayerNorm) + write path + vLLM
+scheduling + sampling, dominated by per-kernel launch overhead from
+`enforce_eager=True` (no CUDA graphs).
+
+### Sanity check on the "everything else" budget
+
+Qwen2.5-7B at B=8 has, per decode step:
+- ~28 layers of attention + MLP. MLP is 3 matmuls of shape (B, 3584)
+  × (3584, 18944). At H100 peak (989 TFLOPS bf16) with 30% real
+  efficiency: ~0.5 ms total per step for MLP arithmetic.
+- Output projection + sampling: <1 ms.
+
+**Pure compute would be <10 ms / step.** The 170 ms is launch
+overhead — each tiny kernel pays ~10 µs to launch, multiplied by
+hundreds of launches per layer × 28 layers.
+
+### Implications for the optimization order
+
+1. **Further read-path microoptimization has diminishing returns.**
+   - Triton fused-splice kernel: would shave ~7 ms / step at B=8 →
+     ~3-5% on agg_tps.
+   - cp.async-skip + drop bf16_backing: ~2 ms / step → ~1% agg_tps
+     (plus 224 MB reclaim).
+   - Combined: <8% on agg_tps. ~3-4 days of work.
+
+2. **The real lever is CUDA Graphs (Option B).** Capturing the decode
+   forward into a graph kills the launch overhead in the model forward
+   path — the actual 170 ms / step. Could realistically 2-3× the
+   agg_tps at B=8.
+
+3. **The original "B × 25-30 ms per-seq Python" attribution was wrong.**
+   The per-seq Python cost we attacked with Options A + D1 + D2 was
+   real and helped (sub-linear scaling improved 1.74× → 2.02× at B=8),
+   but the bottleneck for further per-step decode speedup is outside
+   the read path entirely.
+
+### Pre-flight required for Option B
+
+CUDA graphs cannot capture host syncs, data-dependent Python branches,
+or dict lookups. The current `Int4ProtectedAttentionImpl.forward`
+read path has all three:
+
+  - `cache_seqlens_orig.cpu().tolist()` + `block_table[:, 0].cpu().tolist()`
+    — 2 host syncs per layer per step. Unavoidable for Python-side
+    seq metadata but kills capture.
+  - `if seqlens[i] % BS != 0` in the splice path — data-dependent
+    branch.
+  - `writer._seq_states.get(seq_id)` dict lookup in splice +
+    bf16_backing — pure Python.
+
+Scope to unblock graph capture (~3-5 days):
+  1. Move all seq metadata (n_blocks_per_seq, n_blocks_max,
+     S_padded, active_mask) to device tensors. n_blocks_max requires
+     ONE sync per call to size the gather — handled by vLLM's
+     multi-shape graph capture (captures at a set of discrete sizes
+     and dispatches by current shape).
+  2. Make splice unconditional: pass active_mask as a device tensor
+     and let the splice kernel do nothing if all-False.
+  3. Refactor `_seq_states: Dict[Any, SeqState]` into a writer-level
+     `(max_active_seqs, ...)` device tensor stack with a Python-side
+     `seq_id → slot_idx` map. Resolution happens outside the captured
+     region; reads inside use device-indexed access.
+  4. Enable graph capture in `Int4ProtectedLLM` (`enforce_eager=False`,
+     configure `compilation_config.cudagraph_capture_sizes`). Verify
+     correctness preserved via existing gates. Bench.
+
+Steps 1-3 are the read-path refactor. Step 4 is the actual graph enable.
+See `OPTION_B_PREFLIGHT.md` for the implementation plan.
+
 ### Why not test B > 8
 
 We have headroom (218× max concurrency on the int4 cache), but at B=8

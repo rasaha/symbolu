@@ -302,10 +302,25 @@ if _VLLM_FA_AVAILABLE:
             BS = writer.BS
 
             with _maybe_region("batched.seqids_blockids"):
-                # Phase 6 v2 Option D step 2: fuse three CPU/host-sync flows
-                # into a single sync round-trip.
-                seqlens_cpu = cache_seqlens_orig.cpu().tolist()
-                seq_ids = block_table[:, 0].cpu().tolist()
+                # Phase 6 v2 Option D step 3 (Option B pre-flight): coalesce
+                # the two host syncs (seqlens + seq_ids) into ONE memcpyDtoH.
+                # Each `.cpu()` blocks until the GPU queue drains; doing them
+                # serially pays the drain cost twice. Stacking into one tensor
+                # + one `.cpu()` pays it once. Profile shows seqids_blockids
+                # was 140 µs/call at B=8 — most of that was the second sync's
+                # drain wait, since the python work is sub-microsecond.
+                #
+                # n_blocks_per_seq stays as a device tensor; we only need the
+                # int list on host for the splice / bf16_backing dict lookups
+                # downstream, and those need to coexist with the captured
+                # graph via the Python-side seq_id → slot map (see
+                # OPTION_B_PREFLIGHT.md §B-pre-1).
+                _seqlens_and_seqids = torch.stack([
+                    cache_seqlens_orig.long(),
+                    block_table[:, 0].long(),
+                ], dim=0).cpu().tolist()                 # one sync, two rows
+                seqlens_cpu = _seqlens_and_seqids[0]
+                seq_ids     = _seqlens_and_seqids[1]
                 n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
                 n_blocks_max = max(n_blocks_per_seq)
                 S_padded = n_blocks_max * BS
