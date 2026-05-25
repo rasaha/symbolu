@@ -85,7 +85,12 @@ What changed:
 - Pool tensors live on the writer at stable addresses (no per-seq
   re-allocation). Critical for graph capture.
 - `ensure_seq_state(seq_id, device)` pops a free slot and creates a
-  SeqState wrapper. Raises if the pool exhausts.
+  SeqState wrapper. Raises if the pool exhausts. DEFAULT_SEQ_ID is
+  NOT pre-allocated — it gets a slot lazily on first write via the
+  no-arg writer.write(...) entry point (legacy single-seq callers).
+  Pre-reserving the default slot cost a slot of pool capacity, which
+  surfaced as exhaustion at the B=8 ship target when none of vLLM's
+  8 fresh seq_ids equaled 0. Fixed in the same B-pre-1 commit.
 - `evict_sequence(seq_id)` returns the slot to the pool.
 - `reset_sequence("all")` evicts all non-default seqs and resets the
   default — keeps the pool from filling up across long workloads

@@ -639,24 +639,21 @@ class PagedKVWriter:
         self._bf16_v_backing_pool = torch.zeros(
             (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
         )
-        # Slots are handed out via ensure_seq_state; default seq takes 0.
+        # Slots are handed out via ensure_seq_state. ALL slots are free
+        # at alloc time — the default seq is no longer pre-reserved
+        # (B-pre-1 lesson: pre-reserving cost 1 slot of capacity, which
+        # surfaced as pool exhaustion at the documented B=8 ship target
+        # when none of vLLM's 8 fresh seq_ids happened to equal 0).
+        # First write through ensure_seq_state(DEFAULT_SEQ_ID) allocates
+        # it lazily, like any other seq.
         self._free_slots = list(range(n_slots))
         self._allocated = True
 
-        # Phase 5B.6 step 1: per-sequence state container. Allocate the
-        # default seq right away so legacy single-seq attribute access
-        # (self.k_stage, self.bf16_k_backing, etc.) returns a valid
-        # tensor immediately. Multi-seq callers call ensure_seq_state
-        # on demand for additional seqs.
-        default_slot = self._free_slots.pop(0)
-        default = SeqState(self, default_slot)
-        self._seq_states[self.DEFAULT_SEQ_ID] = default
-        self._slot_map[self.DEFAULT_SEQ_ID] = default_slot
-
         logger.info(
             "PagedKVWriter layer=%d allocated: NB=%d BS=%d H=%d D=%d "
-            "n_protect=%d v_n_groups=%d", self.layer_idx, NB, BS, H, D,
-            n_protect, v_n_groups,
+            "n_protect=%d v_n_groups=%d max_active_slots=%d",
+            self.layer_idx, NB, BS, H, D,
+            n_protect, v_n_groups, n_slots,
         )
 
     def reset_sequence(self, seq_id: Any = None) -> None:
