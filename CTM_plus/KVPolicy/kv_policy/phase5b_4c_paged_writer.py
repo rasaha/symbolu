@@ -174,6 +174,62 @@ def _slice_mask_for_layer(mask: "torch.Tensor", layer_idx: int, path: str) -> "t
 
 
 # ----------------------------------------------------------------------
+# Phase 5B.6 step 1: per-sequence state container.
+# ----------------------------------------------------------------------
+
+class SeqState:
+    """Per-sequence streaming state for a PagedKVWriter.
+
+    Holds the K staging buffer + bf16 K/V backing + seq_pos counter for
+    ONE sequence. PagedKVWriter holds a dict of these, keyed by
+    seq_id. For batch=1 / v1 callers there's a single SeqState at
+    seq_id=PagedKVWriter.DEFAULT_SEQ_ID (= 0) and the writer's legacy
+    attributes (self.k_stage etc.) alias / proxy to it.
+
+    Per-LAYER state (k_scale_ext, k_xmin_ext, k_protect_ext,
+    v_scale_ext, v_xmin_ext) is NOT here — those are shared across
+    sequences (keyed by global block_id) and live on the PagedKVWriter.
+    """
+
+    __slots__ = (
+        "k_stage",            # (BS, H, D) bf16
+        "k_stage_count",      # int 0..BS
+        "k_stage_block_id",   # int — block being filled
+        "bf16_k_backing",     # (1, max_S, H, D) bf16 — kernel positional arg
+        "bf16_v_backing",     # (1, max_S, H, D) bf16
+        "seq_pos",            # int — non-padding tokens written so far in this seq
+    )
+
+    def __init__(self, writer: "PagedKVWriter", device: "torch.device") -> None:
+        if torch is None:
+            raise RuntimeError("SeqState requires torch")
+        BS = writer.BS
+        H  = writer.H
+        D  = writer.D
+        dtype = writer.sidecar_dtype
+        max_S = writer._bf16_backing_max_seqlen
+
+        self.k_stage = torch.zeros((BS, H, D), dtype=dtype, device=device)
+        self.k_stage_count = 0
+        self.k_stage_block_id = -1
+        self.bf16_k_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
+        self.bf16_v_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
+        self.seq_pos = 0
+
+    def reset(self) -> None:
+        """Clear streaming state for a fresh sequence. Keeps the
+        allocated tensors — next write() will overwrite their relevant
+        slices. Positions [seq_pos, max_S) of the backing tensors are
+        unread (cache_seqlens masks them in the kernel), so we don't
+        zero them.
+        """
+        self.k_stage.zero_()
+        self.k_stage_count = 0
+        self.k_stage_block_id = -1
+        self.seq_pos = 0
+
+
+# ----------------------------------------------------------------------
 # PagedKVWriter — per-layer quantizing writer.
 # ----------------------------------------------------------------------
 
@@ -182,11 +238,28 @@ class PagedKVWriter:
     uint8 cache + external sidecar tensors.
 
     Lazy-allocates sidecars on first `write()` (needs kv_cache shape).
-    batch=1 v1: one staging buffer per layer.
+
+    Phase 5B.6 step 1: per-sequence state lives in `_seq_states` dict
+    keyed by an opaque seq_id. v1 batch=1 callers always use
+    `DEFAULT_SEQ_ID = 0`; multi-batch callers pass real seq_ids per
+    sequence via `write_for_seq` / `read_for_seq` (lands in step 2/3).
+
+    For backward compatibility, the legacy attributes (`self.k_stage`,
+    `self.k_stage_count`, `self.k_stage_block_id`, `self.bf16_k_backing`,
+    `self.bf16_v_backing`, `self.seq_pos`) PROXY to the default
+    SeqState. Tensors are shared by reference (no copies); ints go
+    through Python @property.
+
+    Per-LAYER state (k_scale_ext, k_xmin_ext, k_protect_ext, v_scale_ext,
+    v_xmin_ext) remains on `self` — shared across sequences via global
+    block_id indexing.
 
     Construction is cheap — no device-bound state. The expensive
     allocations happen in `_lazy_alloc()` on first write.
     """
+
+    # Default sequence id used by single-seq callers (v1 batch=1).
+    DEFAULT_SEQ_ID = 0
 
     def __init__(
         self,
@@ -219,23 +292,117 @@ class PagedKVWriter:
         self.protect_slot: Optional[torch.Tensor] = None       # (H, D) int8
         self.protected_d_per_head: Optional[torch.Tensor] = None  # (H, n_protect) long
 
+        # Per-LAYER (shared across sequences via block_id indexing).
         self.k_scale_ext: Optional[torch.Tensor] = None   # (NB, H, D) bf16
         self.k_xmin_ext:  Optional[torch.Tensor] = None   # (NB, H, D) bf16
         self.k_protect_ext: Optional[torch.Tensor] = None # (NB, BS, H, n_protect) bf16
         self.v_scale_ext: Optional[torch.Tensor] = None   # (NB, BS, H, v_n_groups) bf16
         self.v_xmin_ext:  Optional[torch.Tensor] = None   # (NB, BS, H, v_n_groups) bf16
 
-        self.k_stage: Optional[torch.Tensor] = None       # (BS, H, D) bf16
-        self.k_stage_count: int = 0                       # 0..BS-1
-        self.k_stage_block_id: int = -1                   # block we're filling
+        # Per-SEQUENCE state container. seq_id -> SeqState. Created
+        # lazily on first write to each sequence. The default seq
+        # (DEFAULT_SEQ_ID = 0) is allocated by _lazy_alloc so legacy
+        # single-seq access works immediately.
+        self._seq_states: Dict[Any, SeqState] = {}
 
-        # Phase 5B.4c.3 fix (a): parallel BF16 K/V backing for the kernel
-        # call. seq_pos advances monotonically as writer.write fills tokens
-        # in seq order; reset_sequence() zeroes the counter.
+        # Phase 5B.4c.3 fix (a) backing-tensor sizing — pulled from env.
         self._bf16_backing_max_seqlen = _bf16_backing_max_seqlen()
-        self.bf16_k_backing: Optional[torch.Tensor] = None   # (1, max_S, H, D) bf16
-        self.bf16_v_backing: Optional[torch.Tensor] = None   # (1, max_S, H, D) bf16
-        self.seq_pos: int = 0                                # tokens written in current sequence
+
+    # ------------------------------------------------------------------
+    # Phase 5B.6 step 1: per-sequence state lookups + lifecycle.
+    # ------------------------------------------------------------------
+
+    def get_seq_state(self, seq_id: Any) -> "SeqState":
+        """Return the SeqState for `seq_id`, raising KeyError if not yet
+        created. Use `ensure_seq_state` to allocate on demand."""
+        s = self._seq_states.get(seq_id)
+        if s is None:
+            raise KeyError(
+                f"no SeqState for seq_id={seq_id!r}. Call write_for_seq "
+                f"(which allocates lazily) before reading state."
+            )
+        return s
+
+    def ensure_seq_state(self, seq_id: Any, device: "torch.device") -> "SeqState":
+        """Return the SeqState for `seq_id`, allocating it if needed.
+        Cost ~ 8 MB per new sequence at max_seqlen=4096.
+        """
+        s = self._seq_states.get(seq_id)
+        if s is None:
+            if not self._allocated:
+                raise RuntimeError(
+                    "PagedKVWriter not yet _lazy_alloc'd; can't create SeqState."
+                )
+            s = SeqState(self, device)
+            self._seq_states[seq_id] = s
+        return s
+
+    def evict_sequence(self, seq_id: Any) -> None:
+        """Drop a sequence's state, freeing its bf16 backing + staging
+        memory. Called when a sequence finishes generation."""
+        self._seq_states.pop(seq_id, None)
+
+    @property
+    def _default_state(self) -> Optional["SeqState"]:
+        """The SeqState bound to DEFAULT_SEQ_ID. None before _lazy_alloc."""
+        return self._seq_states.get(self.DEFAULT_SEQ_ID)
+
+    # ------------------------------------------------------------------
+    # Backward-compat properties — proxy legacy `self.x` attribute access
+    # to the default SeqState. New code should pass an explicit SeqState
+    # via write_for_seq / get_seq_state.
+    # ------------------------------------------------------------------
+
+    @property
+    def k_stage(self) -> Optional["torch.Tensor"]:
+        s = self._default_state
+        return s.k_stage if s is not None else None
+
+    @property
+    def k_stage_count(self) -> int:
+        s = self._default_state
+        return s.k_stage_count if s is not None else 0
+
+    @k_stage_count.setter
+    def k_stage_count(self, value: int) -> None:
+        s = self._default_state
+        if s is None:
+            return  # pre-alloc; ignore (matches old field-default behavior)
+        s.k_stage_count = value
+
+    @property
+    def k_stage_block_id(self) -> int:
+        s = self._default_state
+        return s.k_stage_block_id if s is not None else -1
+
+    @k_stage_block_id.setter
+    def k_stage_block_id(self, value: int) -> None:
+        s = self._default_state
+        if s is None:
+            return
+        s.k_stage_block_id = value
+
+    @property
+    def bf16_k_backing(self) -> Optional["torch.Tensor"]:
+        s = self._default_state
+        return s.bf16_k_backing if s is not None else None
+
+    @property
+    def bf16_v_backing(self) -> Optional["torch.Tensor"]:
+        s = self._default_state
+        return s.bf16_v_backing if s is not None else None
+
+    @property
+    def seq_pos(self) -> int:
+        s = self._default_state
+        return s.seq_pos if s is not None else 0
+
+    @seq_pos.setter
+    def seq_pos(self, value: int) -> None:
+        s = self._default_state
+        if s is None:
+            return
+        s.seq_pos = value
 
     # ------------------------------------------------------------------
     # Lazy allocation.
@@ -305,21 +472,18 @@ class PagedKVWriter:
         self.v_scale_ext   = torch.zeros((NB, BS, H, v_n_groups),    dtype=dtype, device=device)
         self.v_xmin_ext    = torch.zeros((NB, BS, H, v_n_groups),    dtype=dtype, device=device)
 
-        # K staging buffer.
-        self.k_stage = torch.zeros((BS, H, D), dtype=dtype, device=device)
-        self.k_stage_count = 0
-        self.k_stage_block_id = -1
-
-        # Phase 5B.4c.3 fix (a): BF16 K/V backing for the kernel call.
-        max_S = self._bf16_backing_max_seqlen
-        self.bf16_k_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
-        self.bf16_v_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
-        self.seq_pos = 0
-
         self.NB, self.BS, self.H, self.D = NB, BS, H, D
         self.n_protect = n_protect
         self.v_n_groups = v_n_groups
         self._allocated = True
+
+        # Phase 5B.6 step 1: per-sequence state container. Allocate the
+        # default seq right away so legacy single-seq attribute access
+        # (self.k_stage, self.bf16_k_backing, etc.) returns a valid
+        # tensor immediately. Multi-seq callers call ensure_seq_state
+        # on demand for additional seqs.
+        default = SeqState(self, device)
+        self._seq_states[self.DEFAULT_SEQ_ID] = default
 
         logger.info(
             "PagedKVWriter layer=%d allocated: NB=%d BS=%d H=%d D=%d "
@@ -327,15 +491,22 @@ class PagedKVWriter:
             n_protect, v_n_groups,
         )
 
-    def reset_sequence(self) -> None:
-        """Clear K staging state for a new sequence. Sidecar tensors
-        and protect tables are kept (they're large + reusable)."""
-        self.k_stage_count = 0
-        self.k_stage_block_id = -1
-        if self.k_stage is not None:
-            self.k_stage.zero_()
-        # Phase 5B.4c.3 fix (a): reset bf16-backing seq counter.
-        self.seq_pos = 0
+    def reset_sequence(self, seq_id: Any = None) -> None:
+        """Reset streaming state for one sequence (default seq if None)
+        or ALL sequences (seq_id='all').
+
+        Per-LAYER sidecar tensors (k_scale_ext etc.) are kept — they're
+        large and reusable; positions of dropped sequences will be
+        overwritten by future writes.
+        """
+        if seq_id == "all":
+            for s in self._seq_states.values():
+                s.reset()
+            return
+        target = self.DEFAULT_SEQ_ID if seq_id is None else seq_id
+        s = self._seq_states.get(target)
+        if s is not None:
+            s.reset()
 
     # ------------------------------------------------------------------
     # Write path.
