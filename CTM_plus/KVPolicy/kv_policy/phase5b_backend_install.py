@@ -53,6 +53,115 @@ logger = logging.getLogger(__name__)
 
 
 # ----------------------------------------------------------------------
+# Decode-path profiler (Phase 6 v2 Option D step 3 prep).
+#
+# Off by default. A bench harness sets `_DECODE_PROFILER = DecodeProfiler()`
+# before generation; the read-path wraps each phase with `_maybe_region`,
+# which is a no-op singleton context when the profiler is None.
+#
+# Records BOTH CPU (perf_counter) and GPU (cuda events) timings per phase.
+# - CPU time captures Python dispatch overhead + any implicit host syncs
+#   (.item(), .cpu(), .tolist()).
+# - GPU time (after a final synchronize) captures actual kernel latency.
+# - If cpu_us >> gpu_us, the phase is Python-bound (target for fusion).
+# - If cpu_us ≈ gpu_us, the phase is GPU-bound (target for kernel work).
+# ----------------------------------------------------------------------
+
+import time as _time_mod
+
+
+class _NullRegion:
+    """Singleton no-op context. Used when profiling is disabled — keeps
+    the production path at a single None check + one attribute load
+    per phase."""
+    def __enter__(self):  return self
+    def __exit__(self, *a):  return None
+
+_NULL_REGION = _NullRegion()
+
+
+class DecodeProfiler:
+    """Records per-phase CPU + GPU timings across all calls to the
+    instrumented decode read path. Bench harness lifecycle:
+        prof = DecodeProfiler()
+        backend_install._DECODE_PROFILER = prof
+        llm.generate(...)
+        backend_install._DECODE_PROFILER = None
+        print(prof.summarize())
+    """
+    def __init__(self) -> None:
+        # phase_name -> list[(cpu_us, ev_start, ev_end)]
+        self.records: Dict[str, list] = {}
+
+    def reset(self) -> None:
+        self.records = {}
+
+    def region(self, name: str) -> "_TimedRegion":
+        return _TimedRegion(self, name)
+
+    def _record(self, name: str, cpu_us: float, ev_start, ev_end) -> None:
+        self.records.setdefault(name, []).append((cpu_us, ev_start, ev_end))
+
+    def summarize(self) -> Dict[str, Dict[str, float]]:
+        """Materialize per-phase aggregates. Syncs once to make all
+        cuda events available for elapsed_time()."""
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.synchronize()
+        out: Dict[str, Dict[str, float]] = {}
+        for name, rec_list in self.records.items():
+            if not rec_list:
+                continue
+            cpu = [r[0] for r in rec_list]
+            gpu = [r[1].elapsed_time(r[2]) * 1e3 for r in rec_list]  # ms -> us
+            out[name] = {
+                "n_calls":      len(cpu),
+                "cpu_us_total": sum(cpu),
+                "cpu_us_mean":  sum(cpu) / len(cpu),
+                "gpu_us_total": sum(gpu),
+                "gpu_us_mean":  sum(gpu) / len(gpu),
+                "cpu_us_max":   max(cpu),
+                "gpu_us_max":   max(gpu),
+            }
+        return out
+
+
+class _TimedRegion:
+    """Context manager that records CPU wall + GPU latency for one phase
+    invocation into a DecodeProfiler."""
+    __slots__ = ("prof", "name", "t0", "ev_start", "ev_end")
+    def __init__(self, prof: DecodeProfiler, name: str) -> None:
+        self.prof = prof
+        self.name = name
+        self.t0 = 0.0
+        self.ev_start = None
+        self.ev_end = None
+    def __enter__(self):
+        self.ev_start = torch.cuda.Event(enable_timing=True)
+        self.ev_end   = torch.cuda.Event(enable_timing=True)
+        self.ev_start.record()
+        self.t0 = _time_mod.perf_counter()
+        return self
+    def __exit__(self, *exc):
+        cpu_us = (_time_mod.perf_counter() - self.t0) * 1e6
+        self.ev_end.record()
+        self.prof._record(self.name, cpu_us, self.ev_start, self.ev_end)
+        return None
+
+
+# Module-level toggle. None = profiling off (no overhead beyond an
+# attribute load per phase). Bench harness flips this.
+_DECODE_PROFILER: Optional[DecodeProfiler] = None
+
+
+def _maybe_region(name: str):
+    """Return either a real timed region (profiling on) or the singleton
+    no-op (profiling off). One attribute load + one None check on the
+    hot path."""
+    p = _DECODE_PROFILER
+    return p.region(name) if p is not None else _NULL_REGION
+
+
+# ----------------------------------------------------------------------
 # Int4ProtectedAttentionImpl — subclass with delegated forward.
 # ----------------------------------------------------------------------
 
@@ -105,6 +214,73 @@ if _VLLM_FA_AVAILABLE:
         @classmethod
         def get_call_stats(cls) -> Dict[str, int]:
             return dict(cls._call_stats)
+
+        # Phase 6 v2 Option B pre-flight (B-pre-4): persistent index/scratch
+        # buffers for the read path. Pre-allocated once per impl instance,
+        # grown lazily if a larger B comes through. Pre-allocation makes
+        # these tensors live at stable addresses across decode calls —
+        # captured graphs can record those addresses once and replay.
+        #
+        # The buffers are populated each call via .copy_() (small DtoD copy
+        # from a fresh fancy-indexed tensor) so the underlying memory is
+        # the same; the values change per call but the address doesn't.
+        def _ensure_index_bufs(self, B: int, device, dtype_long, dtype_i32):
+            """Grow / allocate the persistent index buffers if needed.
+
+            Returns the (B,)-sized slices ready for use this call. Slices
+            are views into a (max_B,) backing buffer; max_B grows to the
+            largest B ever seen on this impl (typically 8 at the ship
+            target, ramping to vLLM's max-concurrency cap).
+            """
+            cur = getattr(self, "_phase5b_idx_max_B", 0)
+            # NB: use `!=` (value equality), NOT `is not` (object identity).
+            # `block_table.device` can return a fresh torch.device object per
+            # call even when the actual device is the same — `is not` would
+            # always be True and trigger a reallocation on EVERY call,
+            # defeating the whole point of pre-allocation.
+            existing_dev = getattr(self, "_phase5b_idx_dev", None)
+            if cur < B or existing_dev is None or existing_dev != device:
+                # (Re-)allocate. Pick a generous cap to avoid frequent regrowth.
+                new_max = max(B, cur, 16)
+                self._phase5b_slot_idx_buf      = torch.zeros(
+                    (new_max,), dtype=dtype_long, device=device,
+                )
+                self._phase5b_batch_idx_arange  = torch.arange(
+                    new_max, dtype=dtype_long, device=device,
+                )
+                self._phase5b_cache_seqlens_i32 = torch.zeros(
+                    (new_max,), dtype=dtype_i32, device=device,
+                )
+                self._phase5b_idx_max_B  = new_max
+                self._phase5b_idx_dev    = device
+            return (
+                self._phase5b_slot_idx_buf[:B],
+                self._phase5b_batch_idx_arange[:B],
+                self._phase5b_cache_seqlens_i32[:B],
+            )
+
+        def _ensure_protect_mask_bhd(self, B: int, writer):
+            """(Re-)allocate the (B, H, D) int8 protect_mask buffer if
+            needed. Content is per-model-frozen (writer.protect_mask is
+            populated at _lazy_alloc), so we can fill it ONCE per max-B
+            grow and never touch it again. Stable address across calls.
+            """
+            cur = getattr(self, "_phase5b_protect_mask_bhd_max_B", 0)
+            existing_buf = getattr(self, "_phase5b_protect_mask_bhd_buf", None)
+            need_realloc = (
+                cur < B
+                or existing_buf is None
+                or existing_buf.device != writer.protect_mask.device
+            )
+            if need_realloc:
+                new_max = max(B, cur, 16)
+                self._phase5b_protect_mask_bhd_buf = (
+                    writer.protect_mask.unsqueeze(0)
+                    .expand(new_max, -1, -1)
+                    .contiguous()
+                )
+                self._phase5b_protect_mask_bhd_max_B = new_max
+            return self._phase5b_protect_mask_bhd_buf[:B]
 
         def _get_paged_writer(self, layer=None):
             """Lazy-construct the PagedKVWriter for this layer. The writer
@@ -191,85 +367,145 @@ if _VLLM_FA_AVAILABLE:
 
             B = block_table.shape[0]
             BS = writer.BS
+            device = block_table.device
 
-            # Per-seq seqlen + n_blocks_used.
-            seqlens_cpu = cache_seqlens_orig.cpu().tolist()
-            n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
-            n_blocks_max = max(n_blocks_per_seq)
-            S_padded = n_blocks_max * BS
+            with _maybe_region("batched.seqids_blockids"):
+                # Phase 6 v2 Option B pre-flight (B-pre-2 + B-pre-3
+                # bundled): keep the working coalesced CPU sync for
+                # seqlens + seq_ids (n_blocks_max stays a Python int
+                # for the slice; n_blocks_per_seq stays a Python list
+                # for the n_blocks_max derivation). The lesson from
+                # the reverted B-pre-2 attempt: splitting these into
+                # separate .item() / .tolist() calls costs ~50 µs
+                # per layer at B=8 because PyTorch can't pipeline them.
+                #
+                # In addition, compute device-side metadata
+                # (last_block_indices_t, active_mask_t) — these are
+                # cheap fused ops that don't add a sync, and they're
+                # what the unconditional splice path (below) consumes
+                # without any data-dependent indexing.
+                _seqlens_and_seqids = torch.stack([
+                    cache_seqlens_orig.long(),
+                    block_table[:, 0].long(),
+                ], dim=0).cpu().tolist()                 # one sync, two rows
+                seqlens_cpu = _seqlens_and_seqids[0]
+                seq_ids     = _seqlens_and_seqids[1]
+                n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
+                n_blocks_max = max(n_blocks_per_seq)
+                S_padded = n_blocks_max * BS
 
-            # Build (B, n_blocks_max) block_ids tensor with padding.
-            # Padded entries use block 0 (or any valid block) — masked
-            # by cache_seqlens in the kernel.
-            block_ids_batched = torch.zeros(
-                (B, n_blocks_max), dtype=torch.long, device=block_table.device,
+                # Device-side metadata for the unconditional splice. No
+                # extra sync — these are fused element-wise ops on the
+                # already-on-device cache_seqlens_orig.
+                cache_seqlens_long_t = cache_seqlens_orig.long()
+                n_blocks_per_seq_t   = (cache_seqlens_long_t + (BS - 1)) // BS  # (B,)
+                last_block_indices_t = n_blocks_per_seq_t - 1                   # (B,)
+                active_mask_t        = (cache_seqlens_long_t % BS) != 0         # (B,) bool
+
+                # Build (B, n_blocks_max) block_ids via slice + mask.
+                block_ids_batched = block_table[:, :n_blocks_max].long().contiguous()
+                pos = torch.arange(n_blocks_max, device=device).unsqueeze(0)
+                pad_mask = pos >= n_blocks_per_seq_t.unsqueeze(1)
+                block_ids_batched.masked_fill_(pad_mask, 0)
+
+            with _maybe_region("batched.view_gather"):
+                # ONE batched gather covering all B seqs.
+                view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
+
+            # Phase 6 v2 Option B pre-flight (B-pre-1 + B-pre-4): resolve
+            # seq_ids to slot indices ONCE, and write the result into the
+            # PERSISTENT slot-index buffer (stable address across calls).
+            # batch_idx_t is also pulled from a persistent arange buffer.
+            slot_idx_t, batch_idx_t, _cache_seqlens_i32_buf = \
+                self._ensure_index_bufs(
+                    B, device, dtype_long=torch.long, dtype_i32=torch.int32,
+                )
+            slot_idx_list = writer.slot_indices_for(seq_ids)
+            # In-place .copy_() from a small fresh tensor — the destination
+            # buffer's address is preserved.
+            slot_idx_t.copy_(
+                torch.tensor(slot_idx_list, dtype=torch.long, device=device),
+                non_blocking=True,
             )
-            for i in range(B):
-                n_i = n_blocks_per_seq[i]
-                block_ids_batched[i, :n_i] = block_table[i, :n_i].long()
-                # Fill padding with block 0 (kernel masks these positions).
 
-            # ONE batched gather covering all B seqs.
-            view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
-
-            # Splice K partial-tail for each seq with a trailing partial.
-            # Each seq's splice writes to view's [i, last_block_i] slot.
-            for i in range(B):
-                tail_len = seqlens_cpu[i] % BS
-                if tail_len == 0:
-                    continue
-                seq_id = _seq_id_from_block_table_row(block_table[i])
-                seq_state = writer.get_seq_state(seq_id)
-                last_block_i = n_blocks_per_seq[i] - 1
-                _splice_k_partial_tail_batched_row(
-                    view, writer, batch_idx=i, last_block_idx=last_block_i,
-                    state=seq_state,
+            with _maybe_region("batched.splice"):
+                # Phase 6 v2 Option B pre-flight (B-pre-3): unconditional
+                # splice — always processes all B seqs uniformly. Inactive
+                # positions (full last block, no partial tail) read-modify-
+                # write to themselves under the active_mask_t, preserving
+                # their previously-finalized block contents.
+                #
+                # Eliminates the prior path's data-dependent control flow
+                # (`if any_active:`) and the 3 bool-indexing implicit syncs
+                # (slot_idx_t[mask], last_block_indices_t[mask], arange[mask]).
+                # Captured-graph friendly: same op chain runs regardless of
+                # how many seqs are active.
+                _splice_k_partial_tail_batched_unconditional(
+                    view, writer,
+                    slot_idx_t=slot_idx_t,
+                    batch_idx_t=batch_idx_t,
+                    last_block_indices_t=last_block_indices_t,
+                    active_mask_t=active_mask_t,
                 )
 
-            # Stack per-seq bf16 backings into (B, S_padded, H, D).
-            seq_ids = [_seq_id_from_block_table_row(block_table[i]) for i in range(B)]
-            bf16_k_batch, bf16_v_batch = writer.get_bf16_backing_batched(
-                seq_ids, S_padded,
-            )
+            with _maybe_region("batched.bf16_backing"):
+                # Phase 6 v2 (B-pre-1): single device gather from the
+                # writer's bf16 backing pools using the resolved slot
+                # tensor. Replaces torch.stack over B per-seq backings.
+                bf16_k_batch, bf16_v_batch = \
+                    writer.get_bf16_backing_batched_by_slots(
+                        slot_idx_t, S_padded,
+                    )
 
-            # protect_mask: (B, H, D) int8. Per-model frozen, same for all seqs.
-            protect_mask_bhd = writer.protect_mask.unsqueeze(0).expand(B, -1, -1).contiguous()
-            cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
+            with _maybe_region("batched.kernel_prep"):
+                # B-pre-4: persistent (max_B, H, D) protect_mask buffer —
+                # content is per-model-frozen so we populate it once at
+                # first allocation and reuse across all calls. Stable
+                # address.
+                protect_mask_bhd = self._ensure_protect_mask_bhd(B, writer)
 
-            # V handling.
-            v_bf16 = view.get("v_bf16")
-            if v_bf16 is not None:
-                v_for_kernel = v_bf16.contiguous()
-                packed_v_kwargs = {}
-            else:
-                v_for_kernel = bf16_v_batch
-                packed_v_kwargs = dict(
-                    v_packed_int4=view["v_int4"].contiguous(),
-                    v_packed_scale=view["v_scale"].contiguous(),
-                    v_packed_xmin=view["v_xmin"].contiguous(),
-                    v_packed_group_size=writer.v_group_size,
+                # B-pre-4: persistent (max_B,) int32 cache_seqlens buffer.
+                # Populate via .copy_() from the (possibly-int32) source —
+                # writes into the same backing memory each call.
+                cache_seqlens_i32 = _cache_seqlens_i32_buf
+                cache_seqlens_i32.copy_(
+                    cache_seqlens_orig.to(torch.int32), non_blocking=True,
                 )
 
-            out = flash_attn_with_int4_kvcache(
-                query_q,
-                bf16_k_batch, v_for_kernel,
-                cache_seqlens=cache_seqlens_i32,
-                protect_mask=protect_mask_bhd,
-                n_protect=writer.n_protect,
-                softmax_scale=self.scale,
-                causal=False,
-                window_size=self.sliding_window,
-                alibi_slopes=self.alibi_slopes,
-                softcap=self.logits_soft_cap,
-                k_packed_int4=view["k_int4"].contiguous(),
-                k_packed_scale=view["k_scale"].contiguous(),
-                k_packed_xmin=view["k_xmin"].contiguous(),
-                k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
-                k_packed_protect_slot=view["protect_slot"].contiguous(),
-                packed_group_size=BS,
-                packed_n_protect=writer.n_protect,
-                **packed_v_kwargs,
-            )
+                v_bf16 = view.get("v_bf16")
+                if v_bf16 is not None:
+                    v_for_kernel = v_bf16.contiguous()
+                    packed_v_kwargs = {}
+                else:
+                    v_for_kernel = bf16_v_batch
+                    packed_v_kwargs = dict(
+                        v_packed_int4=view["v_int4"].contiguous(),
+                        v_packed_scale=view["v_scale"].contiguous(),
+                        v_packed_xmin=view["v_xmin"].contiguous(),
+                        v_packed_group_size=writer.v_group_size,
+                    )
+
+            with _maybe_region("batched.kernel"):
+                out = flash_attn_with_int4_kvcache(
+                    query_q,
+                    bf16_k_batch, v_for_kernel,
+                    cache_seqlens=cache_seqlens_i32,
+                    protect_mask=protect_mask_bhd,
+                    n_protect=writer.n_protect,
+                    softmax_scale=self.scale,
+                    causal=False,
+                    window_size=self.sliding_window,
+                    alibi_slopes=self.alibi_slopes,
+                    softcap=self.logits_soft_cap,
+                    k_packed_int4=view["k_int4"].contiguous(),
+                    k_packed_scale=view["k_scale"].contiguous(),
+                    k_packed_xmin=view["k_xmin"].contiguous(),
+                    k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                    k_packed_protect_slot=view["protect_slot"].contiguous(),
+                    packed_group_size=BS,
+                    packed_n_protect=writer.n_protect,
+                    **packed_v_kwargs,
+                )
             return out
 
         def _read_decode_packed_one(
@@ -287,81 +523,67 @@ if _VLLM_FA_AVAILABLE:
             from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache
 
             BS = writer.BS
-            n_blocks_used = (seqlen + BS - 1) // BS
-            block_ids = bt[:n_blocks_used].long()
-            S = n_blocks_used * BS
 
-            # Gather + view (paged → contiguous).
-            view = writer.get_packed_view(block_ids, kv_cache)
+            with _maybe_region("one.view_gather"):
+                n_blocks_used = (seqlen + BS - 1) // BS
+                block_ids = bt[:n_blocks_used].long()
+                S = n_blocks_used * BS
+                view = writer.get_packed_view(block_ids, kv_cache)
 
-            # Hybrid partial-tail splice using THIS seq's staging.
-            tail_len = seqlen % BS
-            if tail_len != 0:
-                seq_state = writer.get_seq_state(seq_id)
-                _splice_k_partial_tail(
-                    view, writer, last_block_idx=n_blocks_used - 1,
-                    state=seq_state,
+            with _maybe_region("one.splice"):
+                tail_len = seqlen % BS
+                if tail_len != 0:
+                    seq_state = writer.get_seq_state(seq_id)
+                    _splice_k_partial_tail(
+                        view, writer, last_block_idx=n_blocks_used - 1,
+                        state=seq_state,
+                    )
+
+            with _maybe_region("one.bf16_backing"):
+                bf16_k_backing, bf16_v_backing = writer.get_bf16_backing_slice(
+                    S, seq_id=seq_id,
                 )
+                dummy = bf16_k_backing
 
-            # Phase 5B.4c.3 fix (a): bf16 K/V backing for the kernel —
-            # per-seq slice now.
-            bf16_k_backing, bf16_v_backing = writer.get_bf16_backing_slice(
-                S, seq_id=seq_id,
-            )
-            dummy = bf16_k_backing
-
-            # cache_seqlens for THIS seq only (B=1 in the kernel call).
-            cache_seqlens_i32 = torch.tensor(
-                [seqlen], dtype=torch.int32, device=query_q.device,
-            )
-
-            # protect_mask + n_protect must be passed alongside the packed
-            # kwargs — the kernel uses them for some bookkeeping even on
-            # the packed path (mirrors verify_phase2_6_2's call shape).
-            protect_mask_bhd = writer.protect_mask.unsqueeze(0)  # (1, H_kv, D) int8
-
-            # Causal flag: for single-token decode (S_q=1), causal=True and
-            # causal=False produce identical results numerically. But the
-            # kernel's dispatch routes packed only under !Is_causal — pass
-            # False so the packed dispatch fires.
-            # V handling: packed by default; bf16 fallback when env var
-            # PHASE5B_4C_BF16_V=1 isolates packed-V correctness.
-            v_bf16 = view.get("v_bf16")
-            if v_bf16 is not None:
-                v_for_kernel = v_bf16.contiguous()
-                packed_v_kwargs = {}
-            else:
-                # Use the writer's seq-major bf16 V backing (same
-                # small-S workaround as for K).
-                v_for_kernel = bf16_v_backing
-                packed_v_kwargs = dict(
-                    v_packed_int4=view["v_int4"].contiguous(),
-                    v_packed_scale=view["v_scale"].contiguous(),
-                    v_packed_xmin=view["v_xmin"].contiguous(),
-                    v_packed_group_size=writer.v_group_size,
+            with _maybe_region("one.kernel_prep"):
+                cache_seqlens_i32 = torch.tensor(
+                    [seqlen], dtype=torch.int32, device=query_q.device,
                 )
+                protect_mask_bhd = writer.protect_mask.unsqueeze(0)
+                v_bf16 = view.get("v_bf16")
+                if v_bf16 is not None:
+                    v_for_kernel = v_bf16.contiguous()
+                    packed_v_kwargs = {}
+                else:
+                    v_for_kernel = bf16_v_backing
+                    packed_v_kwargs = dict(
+                        v_packed_int4=view["v_int4"].contiguous(),
+                        v_packed_scale=view["v_scale"].contiguous(),
+                        v_packed_xmin=view["v_xmin"].contiguous(),
+                        v_packed_group_size=writer.v_group_size,
+                    )
 
-            out = flash_attn_with_int4_kvcache(
-                query_q,
-                dummy, v_for_kernel,
-                cache_seqlens=cache_seqlens_i32,
-                protect_mask=protect_mask_bhd,
-                n_protect=writer.n_protect,
-                softmax_scale=self.scale,
-                causal=False,
-                window_size=self.sliding_window,
-                alibi_slopes=self.alibi_slopes,
-                softcap=self.logits_soft_cap,
-                # Phase 2.4.1b packed K kwargs.
-                k_packed_int4=view["k_int4"].contiguous(),
-                k_packed_scale=view["k_scale"].contiguous(),
-                k_packed_xmin=view["k_xmin"].contiguous(),
-                k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
-                k_packed_protect_slot=view["protect_slot"].contiguous(),
-                packed_group_size=BS,                # = kernel kInt4GroupSize = 32
-                packed_n_protect=writer.n_protect,
-                **packed_v_kwargs,
-            )
+            with _maybe_region("one.kernel"):
+                out = flash_attn_with_int4_kvcache(
+                    query_q,
+                    dummy, v_for_kernel,
+                    cache_seqlens=cache_seqlens_i32,
+                    protect_mask=protect_mask_bhd,
+                    n_protect=writer.n_protect,
+                    softmax_scale=self.scale,
+                    causal=False,
+                    window_size=self.sliding_window,
+                    alibi_slopes=self.alibi_slopes,
+                    softcap=self.logits_soft_cap,
+                    k_packed_int4=view["k_int4"].contiguous(),
+                    k_packed_scale=view["k_scale"].contiguous(),
+                    k_packed_xmin=view["k_xmin"].contiguous(),
+                    k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                    k_packed_protect_slot=view["protect_slot"].contiguous(),
+                    packed_group_size=BS,
+                    packed_n_protect=writer.n_protect,
+                    **packed_v_kwargs,
+                )
             return out
 
         def _ensure_dummy_kv(self, S, H, D, device):
@@ -830,6 +1052,175 @@ def _splice_k_partial_tail_batched_row(
     view["k_int4"][batch_idx, bstart:bstart + BS] = packed
     view["k_scale"][batch_idx, last_block_idx]    = scale.to(writer.sidecar_dtype)
     view["k_xmin"] [batch_idx, last_block_idx]    = x_min.to(writer.sidecar_dtype)
+
+
+def _splice_k_partial_tail_batched_vectorized(
+    view: Dict[str, Any], writer: Any, *,
+    seq_states_list: list = None, last_block_indices: list = None,
+    active_mask: list = None,
+    active_slot_idx_t: "torch.Tensor" = None,
+    active_batch_idx_t: "torch.Tensor" = None,
+    active_last_block_t: "torch.Tensor" = None,
+) -> None:
+    """Phase 6 v2 Option D step 1 + Option B pre-flight (B-pre-1):
+    vectorized batched K-tail splice.
+
+    Two calling conventions:
+
+    1. Legacy (D step 1) — pass `seq_states_list`, `last_block_indices`,
+       `active_mask` (all Python lists). The helper builds the active
+       subset and gathers k_stage via `torch.stack`. Kept for any
+       external callers and the bit-equivalence verify.
+
+    2. Pre-flight (B-pre-1) — pass `active_slot_idx_t`,
+       `active_batch_idx_t`, `active_last_block_t` (all device long
+       tensors of the same length A). The helper gathers k_stage in
+       ONE op via `writer.get_k_stage_by_slots(slot_idx_t)` — fully
+       device-indexed, no Python loop, no dict lookup. This is the
+       captured-graph-friendly path.
+
+    Math is bit-identical between the two paths (same element-wise
+    quantize+pack chain). The only difference is HOW the (A, BS, H, D)
+    k_stage tensor is materialized:
+      - legacy: `torch.stack([state.k_stage for state in active])`
+      - preflight: `writer._k_stage_pool[active_slot_idx_t]`
+
+    Verified by `verify_phase6_d_step1_splice_equiv.py` (legacy) and
+    `verify_phase6_b_pre1_splice_slots_equiv.py` (preflight).
+    """
+    BS = writer.BS
+    D  = writer.D
+    H  = writer.H
+    half_D = D // 2
+
+    if active_slot_idx_t is not None:
+        # Preflight path: caller already has the active subset as device
+        # tensors. Gather k_stage in ONE op from the slot pool.
+        if active_slot_idx_t.numel() == 0:
+            return
+        if active_batch_idx_t is None or active_last_block_t is None:
+            raise ValueError(
+                "preflight call needs active_batch_idx_t + active_last_block_t"
+            )
+        k_stage_stack = writer.get_k_stage_by_slots(active_slot_idx_t)  # (A, BS, H, D)
+        device = k_stage_stack.device
+        batch_idx_t  = active_batch_idx_t
+        last_block_t = active_last_block_t
+    else:
+        # Legacy path: build the active subset from Python lists.
+        if seq_states_list is None or last_block_indices is None or active_mask is None:
+            raise ValueError(
+                "legacy call needs seq_states_list + last_block_indices + active_mask"
+            )
+        if not any(active_mask):
+            return
+        active_idx = [i for i, m in enumerate(active_mask) if m]
+        k_stage_stack = torch.stack(
+            [seq_states_list[i].k_stage for i in active_idx], dim=0,
+        )
+        device = k_stage_stack.device
+        batch_idx_t = torch.tensor(active_idx, dtype=torch.long, device=device)
+        last_block_t = torch.tensor(
+            [last_block_indices[i] for i in active_idx],
+            dtype=torch.long, device=device,
+        )
+
+    # Quantize + pack — identical for both paths.
+    buf_f = k_stage_stack.float()                                  # (A, BS, H, D)
+    x_max = buf_f.amax(dim=1)                                      # (A, H, D)
+    x_min = buf_f.amin(dim=1)                                      # (A, H, D)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)               # (A, H, D)
+
+    q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+        .round().clamp(0, 15).to(torch.uint8)                      # (A, BS, H, D)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (A, BS, H, half_D)
+
+    # Scatter into view tensors at (batch_idx, last_block_idx) positions.
+    n_blocks_max = view["k_int4"].shape[1] // BS
+    k_int4_blocked = view["k_int4"].view(-1, n_blocks_max, BS, H, half_D)
+    k_int4_blocked[batch_idx_t, last_block_t] = packed
+    sidecar_dtype = writer.sidecar_dtype
+    view["k_scale"][batch_idx_t, last_block_t] = scale.to(sidecar_dtype)
+    view["k_xmin"] [batch_idx_t, last_block_t] = x_min.to(sidecar_dtype)
+
+
+def _splice_k_partial_tail_batched_unconditional(
+    view: Dict[str, Any], writer: Any, *,
+    slot_idx_t: "torch.Tensor",            # (B,) long — slot per batch position
+    batch_idx_t: "torch.Tensor",           # (B,) long — typically arange(B)
+    last_block_indices_t: "torch.Tensor",  # (B,) long — per-seq last block
+    active_mask_t: "torch.Tensor",         # (B,) bool — True iff seq has partial tail
+) -> None:
+    """Phase 6 v2 Option B pre-flight (B-pre-2 + B-pre-3 bundled):
+    unconditional splice that processes ALL B sequences uniformly,
+    masking inactive writes via torch.where.
+
+    Replaces the prior conditional path that:
+      - Filtered to active subset via boolean indexing (3 implicit
+        sync points to resolve data-dependent output shapes).
+      - Wrapped the entire call in a Python `if any_active:` branch.
+
+    The unconditional version is captured-graph-friendly:
+      - Same op chain runs regardless of how many seqs are active.
+      - No data-dependent shapes (all tensors stay (B, ...)).
+      - No host syncs in the splice region (mask is a device tensor).
+
+    For inactive seqs (no partial tail), the helper READS their current
+    k_int4 / k_scale / k_xmin at last_block_indices_t and WRITES IT BACK
+    via where(False, new, old) — a deterministic self-write that
+    preserves the previously-finalized block contents.
+
+    Cost vs the active-only path: B-A extra seqs go through the
+    quantize+pack work (negligible at typical steady-state decode where
+    A ≈ B). The win is removing the implicit-sync penalty of the
+    bool-indexing path — splice cpu_us drops to pure-dispatch overhead.
+
+    Verified by `verify_phase6_b_pre23_unconditional_splice_equiv.py`.
+    """
+    BS = writer.BS
+    D  = writer.D
+    H  = writer.H
+    half_D = D // 2
+
+    # Single device gather of all B k_stages from the slot pool.
+    k_stage_stack = writer.get_k_stage_by_slots(slot_idx_t)             # (B, BS, H, D)
+    B_dim = k_stage_stack.shape[0]
+
+    # Quantize + pack — math identical per-element to the active-only path.
+    buf_f = k_stage_stack.float()                                       # (B, BS, H, D)
+    x_max = buf_f.amax(dim=1)                                           # (B, H, D)
+    x_min = buf_f.amin(dim=1)                                           # (B, H, D)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)                    # (B, H, D)
+
+    q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+        .round().clamp(0, 15).to(torch.uint8)                           # (B, BS, H, D)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)       # (B, BS, H, half_D)
+
+    n_blocks_max = view["k_int4"].shape[1] // BS
+    k_int4_blocked = view["k_int4"].view(-1, n_blocks_max, BS, H, half_D)
+
+    sidecar_dtype = writer.sidecar_dtype
+    # Mask broadcasts: keep batch dim aligned with the target shapes.
+    mask_packed = active_mask_t.view(B_dim, 1, 1, 1)                    # vs (B, BS, H, half_D)
+    mask_meta   = active_mask_t.view(B_dim, 1, 1)                       # vs (B, H, D)
+
+    # Read-modify-write under mask. Each (batch_idx_t[k], last_block_indices_t[k])
+    # pair is unique (distinct batch positions per seq), so no scatter race.
+    # For inactive seqs the new value equals the old value, so the write is a
+    # deterministic no-op preserving the previously-finalized block contents.
+    old_k_int4 = k_int4_blocked[batch_idx_t, last_block_indices_t]      # (B, BS, H, half_D)
+    new_k_int4 = torch.where(mask_packed, packed, old_k_int4)
+    k_int4_blocked[batch_idx_t, last_block_indices_t] = new_k_int4
+
+    scale_sc = scale.to(sidecar_dtype)
+    old_k_scale = view["k_scale"][batch_idx_t, last_block_indices_t]    # (B, H, D)
+    new_k_scale = torch.where(mask_meta, scale_sc, old_k_scale)
+    view["k_scale"][batch_idx_t, last_block_indices_t] = new_k_scale
+
+    xmin_sc = x_min.to(sidecar_dtype)
+    old_k_xmin = view["k_xmin"][batch_idx_t, last_block_indices_t]
+    new_k_xmin = torch.where(mask_meta, xmin_sc, old_k_xmin)
+    view["k_xmin"][batch_idx_t, last_block_indices_t] = new_k_xmin
 
 
 def _splice_k_partial_tail(

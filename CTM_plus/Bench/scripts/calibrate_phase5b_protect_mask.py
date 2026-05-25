@@ -420,8 +420,9 @@ def main(argv) -> int:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default=None,
-                        help="Output .pt path. Default: /workspace/dev/build-logs/"
-                             "qwen2_5_7b_protect_mask_<pct>pct.pt")
+                        help="Output .pt path. Default: derived from --model "
+                             "as /workspace/dev/build-logs/"
+                             "<slug>_protect_mask_<pct>pct.pt")
     parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     parser.add_argument("--protect-fraction", type=float, default=0.04)
     parser.add_argument("--max-model-len", type=int, default=2048,
@@ -434,8 +435,17 @@ def main(argv) -> int:
     args = parser.parse_args(argv)
 
     if args.output is None:
+        # Phase 7: derive output path from model id so calibration for any
+        # model lands in a predictable location. e.g.
+        #   Qwen/Qwen2.5-7B-Instruct        -> qwen2_5_7b_instruct
+        #   mistralai/Mistral-7B-Instruct-v0.3 -> mistral_7b_instruct_v0_3
+        #   meta-llama/Llama-3.1-8B-Instruct -> llama_3_1_8b_instruct
+        # Lowercased, strip vendor prefix, normalize separators.
+        slug = args.model.split("/")[-1].lower()
+        for ch in (".", "-"):
+            slug = slug.replace(ch, "_")
         pct = int(round(args.protect_fraction * 100))
-        args.output = f"/workspace/dev/build-logs/qwen2_5_7b_protect_mask_{pct}pct.pt"
+        args.output = f"/workspace/dev/build-logs/{slug}_protect_mask_{pct}pct.pt"
 
     try:
         import torch  # noqa: F401

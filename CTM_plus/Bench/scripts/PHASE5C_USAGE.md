@@ -3,6 +3,12 @@
 v1 ship-config recipe for running Qwen2.5-7B-Instruct with a
 4× larger effective KV cache on the same GPU.
 
+> **Phase 7 update (commit `9b02fdf`)**: int4_protected now also
+> validated on **mistralai/Mistral-7B-Instruct-v0.3**. Calibration
+> methodology generalizes from Qwen → Mistral with zero code changes
+> required (only the output-path slug derivation was generalized).
+> See §"Supported models" below.
+
 ## TL;DR
 
 ```python
@@ -59,8 +65,55 @@ recommended defaults (`enforce_eager=True`, `gpu_memory_utilization=0.5`).
 |---|---|---|
 | `block_size = 32` | Kernel `kInt4GroupSize` is a compile-time `constexpr`. | Rebuild kernel with different group size (~1-2 hrs CUDA work). |
 | `batch = 1` | PagedKVWriter holds per-layer staging + seq_pos for one sequence at a time. | Phase 5B.6 (multi-batch — per-`(layer, seq)` state). |
-| Qwen2.5-7B (sm80) | Protect mask + kernel instantiation calibrated for this model. | Recalibrate mask + add new kernel instantiation for other models. |
-| `max_model_len <= 4096` | Default bf16 backing buffer at 4096 max_seqlen. | Set `$PHASE5B_4C_BF16_BACKING_MAX_SEQLEN=8192` (etc.). Each doubling = +224 MB. |
+| `D = 128` | Kernel compiled for head dim 128. | Recompile for different D (separate project). |
+| `max_model_len <= 4096` | Default bf16 backing buffer at 4096 max_seqlen. | Set `$PHASE5B_4C_BF16_BACKING_MAX_SEQLEN=8192` (etc.). Each doubling = +224 MB per writer. |
+
+## Supported models
+
+Calibrated + end-to-end verified through the int4_protected backend:
+
+| Model | Architecture | Mask | Status |
+|---|---|---|---|
+| `Qwen/Qwen2.5-7B-Instruct` | 28 layers × H_kv=4 × D=128 | `qwen2_5_7b_protect_mask_4pct.pt` | v1.x ship: 5B.6 GREEN, needle 15/15 |
+| `mistralai/Mistral-7B-Instruct-v0.3` | 32 layers × H_kv=8 × D=128 | `mistral_7b_instruct_v0_3_protect_mask_4pct.pt` | Phase 7 GREEN: smoke 4/4, **needle 15/15 == stock** |
+| `NousResearch/Meta-Llama-3.1-8B-Instruct` *(ungated mirror)* | 32 layers × H_kv=8 × D=128 | `meta_llama_3_1_8b_instruct_protect_mask_4pct.pt` | Phase 7 GREEN: **needle 15/15 == stock**, 0 fallbacks in 30240 decodes + 30720 writes |
+| `Qwen/Qwen2.5-14B-Instruct` | 48 layers × H_kv=8 × D=128 | `qwen2_5_14b_instruct_protect_mask_4pct.pt` | Phase 7 GREEN: **needle 15/15 == stock**, 0 fallbacks in 45360 decodes + 46080 writes |
+
+All four hit 100% needle retrieval at the 4% protect_fraction with
+zero packed-decode fallbacks — int4_protected is quality-equivalent
+to stock bf16 vLLM on the needle-in-haystack benchmark across
+**three model families** (Qwen + Mistral + Llama) and **two
+scales** (7-8B + 14B).
+
+The gated `meta-llama/Llama-3.1-8B-Instruct` weights are
+bit-equivalent to the ungated mirror; either works. The mask is
+agnostic to mirror choice (calibrated from architecture + weights,
+both of which are identical between the gated and ungated repos).
+
+Adding a new model (any D=128 architecture):
+
+```bash
+# 1. Calibrate the protect mask (~30 sec on H100 after weights load).
+/workspace/venv-vllm/bin/python3 \
+    /workspace/symbolu/CTM_plus/Bench/scripts/calibrate_phase5b_protect_mask.py \
+    --model <huggingface/model_id> \
+    --protect-fraction 0.04
+
+# 2. End-to-end smoke (uses the auto-derived mask path).
+PROTECT_MASK_PATH=/workspace/dev/build-logs/<derived_slug>_protect_mask_4pct.pt \
+/workspace/venv-vllm/bin/python3 \
+    /workspace/symbolu/CTM_plus/Bench/scripts/verify_phase7_mistral_int4_protected.py \
+    --model <huggingface/model_id>
+```
+
+If the smoke shows divergent / gibberish output, retry with a higher
+`--protect-fraction` (0.08 or 0.16).
+
+Architecture support matrix:
+  - GQA / MHA: both work (writer is H_kv-agnostic)
+  - Sliding window attention: passes through unchanged
+  - Number of layers: any (PagedKVWriter is per-layer; pool tensors scale)
+  - Head dim D != 128: NOT supported (kernel constraint)
 
 ## What you get
 

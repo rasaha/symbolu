@@ -52,6 +52,16 @@ _DEFAULT_V_GROUP_SIZE = 32
 _BF16_BACKING_MAX_SEQLEN_ENV = "PHASE5B_4C_BF16_BACKING_MAX_SEQLEN"
 _DEFAULT_BF16_BACKING_MAX_SEQLEN = 4096
 
+# Phase 6 v2 Option B pre-flight (B-pre-1): per-(layer) seq state lives
+# in fixed-size pool tensors so the read path can gather via a single
+# device-indexed op (a slot-int tensor) instead of a Python loop with
+# dict lookups. Pool size caps how many sequences can be concurrently
+# active on this writer; default 8 matches the current B=8 ship target
+# and the existing per-seq lazy-alloc memory cost. Bump via env if
+# heavier concurrency is needed.
+_MAX_ACTIVE_SLOTS_ENV = "PHASE6_MAX_ACTIVE_SLOTS"
+_DEFAULT_MAX_ACTIVE_SLOTS = 8
+
 # Debug flag to bypass V packing (writer stashes bf16 V in a parallel
 # sidecar; read path passes it as v_cache positional). Used to isolate
 # V packed-path correctness vs K packed-path correctness.
@@ -70,6 +80,16 @@ def _bf16_backing_max_seqlen() -> int:
         return int(raw)
     except ValueError:
         return _DEFAULT_BF16_BACKING_MAX_SEQLEN
+
+
+def _max_active_slots() -> int:
+    raw = os.environ.get(_MAX_ACTIVE_SLOTS_ENV, "").strip()
+    if not raw:
+        return _DEFAULT_MAX_ACTIVE_SLOTS
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return _DEFAULT_MAX_ACTIVE_SLOTS
 
 # Env var for the per-model protect mask artifact (calibration output
 # from Phase 5B.0). Override via PROTECT_MASK_PATH=...
@@ -180,49 +200,73 @@ def _slice_mask_for_layer(mask: "torch.Tensor", layer_idx: int, path: str) -> "t
 class SeqState:
     """Per-sequence streaming state for a PagedKVWriter.
 
-    Holds the K staging buffer + bf16 K/V backing + seq_pos counter for
-    ONE sequence. PagedKVWriter holds a dict of these, keyed by
-    seq_id. For batch=1 / v1 callers there's a single SeqState at
-    seq_id=PagedKVWriter.DEFAULT_SEQ_ID (= 0) and the writer's legacy
-    attributes (self.k_stage etc.) alias / proxy to it.
+    Phase 6 v2 Option B pre-flight (B-pre-1): tensor fields are now
+    VIEWS into per-writer pool tensors (`_k_stage_pool`,
+    `_bf16_k_backing_pool`, `_bf16_v_backing_pool`), indexed by this
+    SeqState's `slot_idx`. Per-instance fields are just the Python int
+    counters (`k_stage_count`, `k_stage_block_id`, `seq_pos`).
+
+    The pool layout is what unlocks graph-friendly reads: instead of
+    `[state.bf16_k_backing for state in states]` (a Python loop over
+    dict-resolved tensors at unstable addresses) the read path uses
+    `writer._bf16_k_backing_pool[slot_idx_tensor]` — a single device
+    gather from a stable-address pool tensor.
+
+    The external API (state.k_stage, state.bf16_k_backing, etc.) is
+    UNCHANGED so the write path and any legacy single-seq callers keep
+    working without modification.
 
     Per-LAYER state (k_scale_ext, k_xmin_ext, k_protect_ext,
-    v_scale_ext, v_xmin_ext) is NOT here — those are shared across
-    sequences (keyed by global block_id) and live on the PagedKVWriter.
+    v_scale_ext, v_xmin_ext) remains on the writer — shared across
+    sequences via global block_id indexing.
     """
 
     __slots__ = (
-        "k_stage",            # (BS, H, D) bf16
+        "_writer",            # PagedKVWriter — for pool tensor access
+        "slot_idx",           # int — this seq's index into the writer's pools
         "k_stage_count",      # int 0..BS
         "k_stage_block_id",   # int — block being filled
-        "bf16_k_backing",     # (1, max_S, H, D) bf16 — kernel positional arg
-        "bf16_v_backing",     # (1, max_S, H, D) bf16
         "seq_pos",            # int — non-padding tokens written so far in this seq
     )
 
-    def __init__(self, writer: "PagedKVWriter", device: "torch.device") -> None:
+    def __init__(self, writer: "PagedKVWriter", slot_idx: int) -> None:
         if torch is None:
             raise RuntimeError("SeqState requires torch")
-        BS = writer.BS
-        H  = writer.H
-        D  = writer.D
-        dtype = writer.sidecar_dtype
-        max_S = writer._bf16_backing_max_seqlen
-
-        self.k_stage = torch.zeros((BS, H, D), dtype=dtype, device=device)
+        self._writer = writer
+        self.slot_idx = slot_idx
         self.k_stage_count = 0
         self.k_stage_block_id = -1
-        self.bf16_k_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
-        self.bf16_v_backing = torch.zeros((1, max_S, H, D), dtype=torch.bfloat16, device=device)
         self.seq_pos = 0
 
+    # Tensor accessors — views into writer-level pools. Reading these
+    # returns a tensor at a stable address (the pool slice never moves).
+    @property
+    def k_stage(self) -> "torch.Tensor":
+        # (BS, H, D) — view into _k_stage_pool[slot_idx, :, :, :]
+        return self._writer._k_stage_pool[self.slot_idx]
+
+    @property
+    def bf16_k_backing(self) -> "torch.Tensor":
+        # (1, max_S, H, D) — preserves the historical leading-1 batch
+        # dim that callers slice as state.bf16_k_backing[0, :S, ...].
+        s = self.slot_idx
+        return self._writer._bf16_k_backing_pool[s:s + 1]
+
+    @property
+    def bf16_v_backing(self) -> "torch.Tensor":
+        s = self.slot_idx
+        return self._writer._bf16_v_backing_pool[s:s + 1]
+
     def reset(self) -> None:
-        """Clear streaming state for a fresh sequence. Keeps the
-        allocated tensors — next write() will overwrite their relevant
-        slices. Positions [seq_pos, max_S) of the backing tensors are
-        unread (cache_seqlens masks them in the kernel), so we don't
-        zero them.
+        """Clear streaming state for a fresh sequence. Zeros THIS slot's
+        k_stage entry in the pool and resets the Python counters.
+        Backing pool entries [seq_pos, max_S) are unread (cache_seqlens
+        masks them in the kernel), so we don't zero them.
+
+        Does NOT free the slot back to the pool — call
+        writer.evict_sequence(seq_id) for that.
         """
+        # In-place zero via the property view — writes into the pool.
         self.k_stage.zero_()
         self.k_stage_count = 0
         self.k_stage_block_id = -1
@@ -303,10 +347,25 @@ class PagedKVWriter:
         # lazily on first write to each sequence. The default seq
         # (DEFAULT_SEQ_ID = 0) is allocated by _lazy_alloc so legacy
         # single-seq access works immediately.
+        #
+        # Phase 6 v2 Option B pre-flight (B-pre-1): each SeqState's
+        # tensor fields are now views into per-writer POOL tensors
+        # (_k_stage_pool / _bf16_k_backing_pool / _bf16_v_backing_pool)
+        # indexed by a small int slot. _slot_map tracks seq_id -> slot
+        # assignments; _free_slots is the unused-slot pool.
         self._seq_states: Dict[Any, SeqState] = {}
+        self._slot_map: Dict[Any, int] = {}
+        self._free_slots: List[int] = []           # populated in _lazy_alloc
 
         # Phase 5B.4c.3 fix (a) backing-tensor sizing — pulled from env.
         self._bf16_backing_max_seqlen = _bf16_backing_max_seqlen()
+        # Phase 6 v2 (B-pre-1) — pool capacity for active sequences.
+        self._max_active_slots: int = _max_active_slots()
+
+        # Pool tensors — allocated by _lazy_alloc (need device + shapes).
+        self._k_stage_pool: Optional["torch.Tensor"] = None
+        self._bf16_k_backing_pool: Optional["torch.Tensor"] = None
+        self._bf16_v_backing_pool: Optional["torch.Tensor"] = None
 
     # ------------------------------------------------------------------
     # Phase 5B.6 step 1: per-sequence state lookups + lifecycle.
@@ -324,23 +383,110 @@ class PagedKVWriter:
         return s
 
     def ensure_seq_state(self, seq_id: Any, device: "torch.device") -> "SeqState":
-        """Return the SeqState for `seq_id`, allocating it if needed.
-        Cost ~ 8 MB per new sequence at max_seqlen=4096.
+        """Return the SeqState for `seq_id`, allocating a slot if needed.
+
+        Phase 6 v2 Option B pre-flight (B-pre-1): slots are popped from
+        `_free_slots`. Cap is `_max_active_slots` (configurable via
+        $PHASE6_MAX_ACTIVE_SLOTS, default 8). Raises a clear error if
+        exhausted — callers should `evict_sequence(...)` on finished
+        sequences to free slots.
+
+        The `device` argument is retained for API stability but no
+        longer used (pool tensors live on the writer; their device was
+        set at `_lazy_alloc` time).
         """
         s = self._seq_states.get(seq_id)
-        if s is None:
-            if not self._allocated:
-                raise RuntimeError(
-                    "PagedKVWriter not yet _lazy_alloc'd; can't create SeqState."
-                )
-            s = SeqState(self, device)
-            self._seq_states[seq_id] = s
+        if s is not None:
+            return s
+        if not self._allocated:
+            raise RuntimeError(
+                "PagedKVWriter not yet _lazy_alloc'd; can't create SeqState."
+            )
+        if not self._free_slots:
+            raise RuntimeError(
+                f"PagedKVWriter slot pool exhausted "
+                f"(max_active_slots={self._max_active_slots}). "
+                f"Bump ${_MAX_ACTIVE_SLOTS_ENV} or call evict_sequence "
+                f"on finished sequences. Currently assigned: "
+                f"{list(self._slot_map.keys())}"
+            )
+        slot_idx = self._free_slots.pop(0)
+        s = SeqState(self, slot_idx)
+        self._seq_states[seq_id] = s
+        self._slot_map[seq_id] = slot_idx
         return s
 
     def evict_sequence(self, seq_id: Any) -> None:
-        """Drop a sequence's state, freeing its bf16 backing + staging
-        memory. Called when a sequence finishes generation."""
+        """Drop a sequence's state, freeing its slot back to the pool.
+        Called when a sequence finishes generation.
+
+        Phase 6 v2 (B-pre-1): also returns the slot index to
+        `_free_slots` so it can be reused by a future sequence. Does NOT
+        zero the pool entry — the next `ensure_seq_state` reset() (or
+        write through that slot) will overwrite the stale data.
+        """
         self._seq_states.pop(seq_id, None)
+        slot = self._slot_map.pop(seq_id, None)
+        if slot is not None:
+            self._free_slots.append(slot)
+
+    # ------------------------------------------------------------------
+    # Phase 6 v2 Option B pre-flight (B-pre-1): slot-tensor-based read
+    # API for the captured-graph-friendly read path. Resolves seq_id ->
+    # slot Python-side (pre-capture); the captured region uses the slot
+    # tensor for device-indexed gathers into the pool tensors.
+    # ------------------------------------------------------------------
+
+    def slot_indices_for(self, seq_ids: "list") -> "list":
+        """Resolve a list of seq_ids to a list of slot ints.
+
+        KeyErrors here mean a sequence has writes but no allocated slot
+        — should never happen if ensure_seq_state was called before.
+        """
+        try:
+            return [self._slot_map[sid] for sid in seq_ids]
+        except KeyError as e:
+            raise RuntimeError(
+                f"seq_id {e.args[0]!r} has no slot assignment; "
+                f"slot_map keys: {list(self._slot_map.keys())}"
+            )
+
+    def get_bf16_backing_batched_by_slots(
+        self,
+        slot_idx_tensor: "torch.Tensor",   # (B,) long, on device
+        S_padded: int,
+    ):
+        """Device-indexed gather of bf16 K/V backings for the batched
+        decode read. Replaces the per-seq Python copy loop in
+        `get_bf16_backing_batched` with a single CUDA gather.
+
+        Returns (B, S_padded, H, D), (B, S_padded, H, D) — both bf16.
+        """
+        if not self._allocated:
+            raise RuntimeError("get_bf16_backing_batched_by_slots before _lazy_alloc")
+        max_S = self._bf16_k_backing_pool.shape[1]
+        if S_padded > max_S:
+            raise RuntimeError(f"S_padded={S_padded} > max_seqlen={max_S}")
+        # Pool shape: (n_slots, max_S, H, D). Indexing by slot tensor
+        # (B,) and slicing the seq dim gives (B, S_padded, H, D) in one
+        # advanced-index op.
+        bf16_k = self._bf16_k_backing_pool[slot_idx_tensor, :S_padded]
+        bf16_v = self._bf16_v_backing_pool[slot_idx_tensor, :S_padded]
+        return bf16_k, bf16_v
+
+    def get_k_stage_by_slots(
+        self,
+        slot_idx_tensor: "torch.Tensor",   # (A,) long, on device
+    ) -> "torch.Tensor":
+        """Device-indexed gather of K staging buffers, for the
+        vectorized splice. Returns (A, BS, H, D) — sidecar_dtype.
+
+        `slot_idx_tensor` is typically the ACTIVE subset (sequences
+        with non-zero tail length); caller is responsible for masking.
+        """
+        if not self._allocated:
+            raise RuntimeError("get_k_stage_by_slots before _lazy_alloc")
+        return self._k_stage_pool[slot_idx_tensor]
 
     @property
     def _default_state(self) -> Optional["SeqState"]:
@@ -475,20 +621,39 @@ class PagedKVWriter:
         self.NB, self.BS, self.H, self.D = NB, BS, H, D
         self.n_protect = n_protect
         self.v_n_groups = v_n_groups
-        self._allocated = True
 
-        # Phase 5B.6 step 1: per-sequence state container. Allocate the
-        # default seq right away so legacy single-seq attribute access
-        # (self.k_stage, self.bf16_k_backing, etc.) returns a valid
-        # tensor immediately. Multi-seq callers call ensure_seq_state
-        # on demand for additional seqs.
-        default = SeqState(self, device)
-        self._seq_states[self.DEFAULT_SEQ_ID] = default
+        # Phase 6 v2 Option B pre-flight (B-pre-1): allocate the per-
+        # sequence state POOL tensors. Each slot owns one (BS, H, D)
+        # k_stage entry and two (max_S, H, D) bf16 backing entries.
+        # Memory cost at default _max_active_slots=8 matches the
+        # current per-seq lazy-alloc footprint (~256 MB per writer at
+        # max_S=4096).
+        max_S = self._bf16_backing_max_seqlen
+        n_slots = self._max_active_slots
+        self._k_stage_pool = torch.zeros(
+            (n_slots, BS, H, D), dtype=dtype, device=device,
+        )
+        self._bf16_k_backing_pool = torch.zeros(
+            (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
+        )
+        self._bf16_v_backing_pool = torch.zeros(
+            (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
+        )
+        # Slots are handed out via ensure_seq_state. ALL slots are free
+        # at alloc time — the default seq is no longer pre-reserved
+        # (B-pre-1 lesson: pre-reserving cost 1 slot of capacity, which
+        # surfaced as pool exhaustion at the documented B=8 ship target
+        # when none of vLLM's 8 fresh seq_ids happened to equal 0).
+        # First write through ensure_seq_state(DEFAULT_SEQ_ID) allocates
+        # it lazily, like any other seq.
+        self._free_slots = list(range(n_slots))
+        self._allocated = True
 
         logger.info(
             "PagedKVWriter layer=%d allocated: NB=%d BS=%d H=%d D=%d "
-            "n_protect=%d v_n_groups=%d", self.layer_idx, NB, BS, H, D,
-            n_protect, v_n_groups,
+            "n_protect=%d v_n_groups=%d max_active_slots=%d",
+            self.layer_idx, NB, BS, H, D,
+            n_protect, v_n_groups, n_slots,
         )
 
     def reset_sequence(self, seq_id: Any = None) -> None:
@@ -498,10 +663,25 @@ class PagedKVWriter:
         Per-LAYER sidecar tensors (k_scale_ext etc.) are kept — they're
         large and reusable; positions of dropped sequences will be
         overwritten by future writes.
+
+        Phase 6 v2 Option B pre-flight (B-pre-1): `seq_id='all'` now
+        evicts EVERY sequence (including DEFAULT_SEQ_ID if it was
+        lazy-allocated). The intent of "all" is a hard reset between
+        workloads — the writer's slot pool returns to fully free, ready
+        for whatever seq_ids the next workload brings.
+
+        Without this, a workload that ran a sequence with seq_id=0
+        (block_id 0 as first block) would leave the default slot
+        occupied across resets, eating one slot of pool capacity and
+        causing exhaustion at high-B on subsequent runs.
+
+        Legacy single-seq callers use `reset_sequence()` (no args) which
+        resets the default's streaming state in place — slot retained.
         """
         if seq_id == "all":
-            for s in self._seq_states.values():
-                s.reset()
+            # Evict EVERY seq — restores pool to fully free.
+            for sid in list(self._seq_states.keys()):
+                self.evict_sequence(sid)
             return
         target = self.DEFAULT_SEQ_ID if seq_id is None else seq_id
         s = self._seq_states.get(target)
@@ -1061,38 +1241,24 @@ class PagedKVWriter:
         seq_ids: "list",     # list of seq_id, length B
         S_padded: int,
     ):
-        """Phase 6 v2: stack per-seq bf16 K/V backings into batched tensors.
+        """Phase 6 v2: backed bf16 K/V batched for the kernel.
 
-        Each seq's backing is a (1, max_seqlen, H, D) tensor allocated in
-        its SeqState. We slice each to (1, S_padded, H, D) and stack on the
-        batch axis → (B, S_padded, H, D). Positions [seq_pos_i .. S_padded)
-        of each row are zeros (initialized; never written by writes for
-        that seq); cache_seqlens masks them in the kernel.
+        Phase 6 v2 Option B pre-flight (B-pre-1): now resolves seq_ids
+        to slot indices (Python-side dict lookup) and delegates to
+        `get_bf16_backing_batched_by_slots`, which does ONE device
+        gather from the pool tensors. Output is shape-identical to the
+        prior torch.stack path; the new path is graph-capture-friendly
+        (the captured region only sees the device-side slot tensor +
+        the single gather).
         """
         if not self._allocated:
             raise RuntimeError("get_bf16_backing_batched before _lazy_alloc")
-        B = len(seq_ids)
-        if B == 0:
+        if not seq_ids:
             raise ValueError("get_bf16_backing_batched needs B >= 1 seq_ids")
-        # Validate all seqs have backing of sufficient size.
-        any_state = self._seq_states.get(seq_ids[0])
-        if any_state is None or any_state.bf16_k_backing is None:
-            raise RuntimeError(f"bf16 backing missing for seq_id={seq_ids[0]!r}")
-        max_S = any_state.bf16_k_backing.shape[1]
-        if S_padded > max_S:
-            raise RuntimeError(f"S_padded={S_padded} > max_seqlen={max_S}")
-
-        H = self.H
-        D = self.D
-        device = any_state.bf16_k_backing.device
-
-        # Pre-allocate batched buffers and copy each seq's slice in.
-        bf16_k = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
-        bf16_v = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
-        for i, sid in enumerate(seq_ids):
-            state = self._seq_states.get(sid)
-            if state is None or state.bf16_k_backing is None:
-                raise RuntimeError(f"bf16 backing missing for seq_id={sid!r}")
-            bf16_k[i].copy_(state.bf16_k_backing[0, :S_padded])
-            bf16_v[i].copy_(state.bf16_v_backing[0, :S_padded])
-        return bf16_k, bf16_v
+        slot_idx_list = self.slot_indices_for(seq_ids)
+        slot_idx_t = torch.tensor(
+            slot_idx_list,
+            dtype=torch.long,
+            device=self._bf16_k_backing_pool.device,
+        )
+        return self.get_bf16_backing_batched_by_slots(slot_idx_t, S_padded)

@@ -1,4 +1,21 @@
-# CTM+ KV Cache Eviction Policy
+# CTM+ KV Cache Policy module
+
+This module contains two layered pieces of work:
+
+1. **[int4_protected backend](./INT4_PROTECTED_README.md)** *(current
+   ship — Phase 5-7)* — a 4-bit KV-cache quantization backend for
+   vLLM with quality-preserving "protected channels." Four
+   model families validated at 100% needle-retrieval matching stock
+   bf16. **For most users, start there.**
+
+2. **Eviction Policy** *(legacy — Phase 4)* — a scoring-only policy
+   for which KV-cache blocks to evict, intended as a signal source
+   for serving engines that do their own block management.
+   Documented below.
+
+---
+
+# CTM+ KV Cache Eviction Policy (Phase 4 legacy)
 
 A scoring-only eviction policy for LLM KV cache blocks.
 
