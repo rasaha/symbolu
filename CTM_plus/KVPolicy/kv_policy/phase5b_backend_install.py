@@ -58,21 +58,211 @@ logger = logging.getLogger(__name__)
 
 if _VLLM_FA_AVAILABLE:
 
+    # 5B.4c.1: import PagedKVWriter lazily inside forward — keeps the
+    # backend installable in environments where kv_policy is on PYTHONPATH
+    # but the writer module has issues unrelated to the backend skeleton.
+
     class Int4ProtectedAttentionImpl(FlashAttentionImpl):
         """Phase 5B.2 skeleton subclass of FlashAttentionImpl.
 
-        v0 forward: pure delegate. Phase 5B.4 will replace the delegate
-        with a packed-K kernel call (using PartialGroupQuantizer for
-        cache writes and the Phase 2.4.1b packed kernel for reads).
+        Phase 5B.4a-b: forward replication + uint8 storage shape.
+        Phase 5B.4c.1: quantizing write path via PagedKVWriter (replaces
+                       reshape_and_cache_flash). Read path still stock
+                       FA → generation BROKEN. 5B.4c.2 restores it.
 
         We do NOT override __init__ — that lets the install function
         do an in-place class swap on existing FA-impl instances, which
         preserves all the state (head_size, num_heads, scale, etc.)
         that the engine wired up at init time.
+
+        Per-instance attributes set by the installer:
+          _phase5b_layer_idx: int — sequential index used to slice the
+            per-model protect mask artifact.
+        Per-instance attributes set lazily on first forward():
+          _phase5b_paged_writer: PagedKVWriter — owns external sidecars
+            and the K staging buffer for this layer.
         """
 
         # Sentinel for verify scripts to check. Bumped each sub-sub-phase.
-        _phase5b_backend_marker = "5B.4b"
+        _phase5b_backend_marker = "5B.4c.3"
+
+        # Class-level call counters (aggregate across all layer instances).
+        # Reset via Int4ProtectedAttentionImpl.reset_call_stats().
+        _call_stats: Dict[str, int] = {
+            "prefill_calls":         0,
+            "decode_calls_packed":   0,
+            "decode_calls_fallback": 0,
+            "write_path_calls":      0,
+            "write_path_fallback":   0,
+            "spec_decode_calls":     0,
+        }
+
+        @classmethod
+        def reset_call_stats(cls) -> None:
+            for k in cls._call_stats:
+                cls._call_stats[k] = 0
+
+        @classmethod
+        def get_call_stats(cls) -> Dict[str, int]:
+            return dict(cls._call_stats)
+
+        def _get_paged_writer(self, layer=None):
+            """Lazy-construct the PagedKVWriter for this layer. The writer
+            doesn't allocate sidecars at construction — that happens on
+            its first write() call when kv_cache shape is known.
+
+            layer_idx resolution order (first wins):
+              1. _phase5b_layer_idx already set on this instance
+                 (assigned by install_int4_protected_backend at post-init swap).
+              2. Parsed from layer.prefix (vLLM 0.7+ Attention layers carry
+                 a 'prefix' string like 'model.layers.<N>.self_attn.attn').
+              3. RuntimeError — no way to slice the per-model protect mask.
+            """
+            existing = getattr(self, "_phase5b_paged_writer", None)
+            if existing is not None:
+                return existing
+            from kv_policy.phase5b_4c_paged_writer import PagedKVWriter
+            layer_idx = getattr(self, "_phase5b_layer_idx", None)
+            if layer_idx is None and layer is not None:
+                prefix = getattr(layer, "prefix", None) or getattr(layer, "layer_name", None)
+                if isinstance(prefix, str):
+                    layer_idx = _parse_layer_idx_from_name(prefix)
+                    if layer_idx is not None:
+                        # Cache on the impl so subsequent calls skip the parse.
+                        self._phase5b_layer_idx = layer_idx
+            if layer_idx is None:
+                raise RuntimeError(
+                    "Cannot determine _phase5b_layer_idx for this impl instance. "
+                    "Either run install_int4_protected_backend(model) AFTER LLM(...) "
+                    "to assign indices via named_modules walk, or set the "
+                    "layer's .prefix attribute to a name containing 'layers.<N>'."
+                )
+            writer = PagedKVWriter(layer_idx=layer_idx)
+            self._phase5b_paged_writer = writer
+            return writer
+
+        def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer):
+            """Phase 5B.4c.2: replace flash_attn_with_kvcache decode call.
+
+            query_q     : (B, S_q=1, H_q, D) bf16
+            kv_cache    : (2, NB, BS, H_kv, D) uint8
+            decode_meta : attn_metadata.decode_metadata (vLLM)
+            layer       : the Attention layer module (for layer_idx fallback)
+
+            Returns: (B, S_q=1, H_q, D) bf16
+
+            batch=1 v1: asserts decode_meta has exactly one sequence.
+            Hybrid splice: rewrites the last block of the gathered view
+            with bf16 staging buffer quantized on the fly for the
+            partial tail.
+            """
+            from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache
+            writer = self._get_paged_writer(layer=layer)
+
+            block_table = decode_meta.block_tables           # (B, max_blocks) int
+            cache_seqlens_orig = decode_meta.seq_lens_tensor # (B,) int
+            B = block_table.shape[0]
+            if B != 1:
+                raise NotImplementedError(
+                    f"Int4Protected batch=1 v1; got batch={B}"
+                )
+            bt = block_table[0]                              # (max_blocks,)
+            seqlen = int(cache_seqlens_orig[0].item())
+            BS = writer.BS
+            n_blocks_used = (seqlen + BS - 1) // BS
+            block_ids = bt[:n_blocks_used].long()
+            S = n_blocks_used * BS
+
+            # Gather + view (paged → contiguous).
+            view = writer.get_packed_view(block_ids, kv_cache)
+
+            # Hybrid partial-tail splice: rewrite the last block with the
+            # in-RAM staging buffer's bf16 K, quantized on the fly with the
+            # same numerical convention as _finalize_k_group.
+            tail_len = seqlen % BS
+            if tail_len != 0:
+                _splice_k_partial_tail(view, writer, last_block_idx=n_blocks_used - 1)
+
+            # Phase 5B.4c.3 fix (a): the kernel reads bf16 K/V backing
+            # at small S (n_block_max=1). Use the writer's seq-major bf16
+            # backing rather than a zero dummy. Bisection (E_zero vs
+            # E_real at S=128) proved this is required for correctness.
+            bf16_k_backing, bf16_v_backing = writer.get_bf16_backing_slice(S)
+            # The "dummy" name is preserved for kwarg-binding clarity but
+            # the tensor now carries the real backing content.
+            dummy = bf16_k_backing  # only used as K positional below
+
+            cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
+
+            # protect_mask + n_protect must be passed alongside the packed
+            # kwargs — the kernel uses them for some bookkeeping even on
+            # the packed path (mirrors verify_phase2_6_2's call shape).
+            protect_mask_bhd = writer.protect_mask.unsqueeze(0)  # (1, H_kv, D) int8
+
+            # Causal flag: for single-token decode (S_q=1), causal=True and
+            # causal=False produce identical results numerically. But the
+            # kernel's dispatch routes packed only under !Is_causal — pass
+            # False so the packed dispatch fires.
+            # V handling: packed by default; bf16 fallback when env var
+            # PHASE5B_4C_BF16_V=1 isolates packed-V correctness.
+            v_bf16 = view.get("v_bf16")
+            if v_bf16 is not None:
+                v_for_kernel = v_bf16.contiguous()
+                packed_v_kwargs = {}
+            else:
+                # Use the writer's seq-major bf16 V backing (same
+                # small-S workaround as for K).
+                v_for_kernel = bf16_v_backing
+                packed_v_kwargs = dict(
+                    v_packed_int4=view["v_int4"].contiguous(),
+                    v_packed_scale=view["v_scale"].contiguous(),
+                    v_packed_xmin=view["v_xmin"].contiguous(),
+                    v_packed_group_size=writer.v_group_size,
+                )
+
+            out = flash_attn_with_int4_kvcache(
+                query_q,
+                dummy, v_for_kernel,
+                cache_seqlens=cache_seqlens_i32,
+                protect_mask=protect_mask_bhd,
+                n_protect=writer.n_protect,
+                softmax_scale=self.scale,
+                causal=False,
+                window_size=self.sliding_window,
+                alibi_slopes=self.alibi_slopes,
+                softcap=self.logits_soft_cap,
+                # Phase 2.4.1b packed K kwargs.
+                k_packed_int4=view["k_int4"].contiguous(),
+                k_packed_scale=view["k_scale"].contiguous(),
+                k_packed_xmin=view["k_xmin"].contiguous(),
+                k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                k_packed_protect_slot=view["protect_slot"].contiguous(),
+                packed_group_size=BS,                # = kernel kInt4GroupSize = 32
+                packed_n_protect=writer.n_protect,
+                **packed_v_kwargs,
+            )
+            return out
+
+        def _ensure_dummy_kv(self, S, H, D, device):
+            """Allocate or grow the dummy bf16 K/V buffer for the kernel's
+            shape contract. Only seqlen matters; content is unused on
+            the packed path — verify_phase5b_4c_2_read confirmed cosine
+            is identical with zero, random, or real bf16 content.
+
+            We use zeros (not empty) because the alloc happens once per
+            impl lifetime; the cost of memset is amortized to zero across
+            all decode steps that reuse the buffer.
+            """
+            existing = getattr(self, "_phase5b_dummy_kv", None)
+            if (existing is not None
+                    and existing.shape[1] >= S
+                    and existing.shape[2] == H
+                    and existing.shape[3] == D
+                    and existing.device == device):
+                return
+            self._phase5b_dummy_kv = torch.zeros(
+                (1, S, H, D), dtype=torch.bfloat16, device=device,
+            )
 
         def forward(
             self,
@@ -150,15 +340,20 @@ if _VLLM_FA_AVAILABLE:
             alibi_slopes = self.alibi_slopes
             logits_soft_cap = self.logits_soft_cap
 
-            # 5B.4a: swap "int4_protected" -> "auto" before
-            # reshape_and_cache_flash, which is a compiled C++ op that
-            # rejects unknown dtype strings. The cache LAYOUT is still
-            # stock bf16 in this sub-sub-phase, so "auto" is correct.
-            # Phase 5B.4c will REPLACE this call entirely, not swap.
-            if kv_cache_dtype == "int4_protected":
-                kv_cache_dtype = "auto"
+            # 5B.4c.1: the kv_cache layout is now uint8 D=128 (from 5B.4b)
+            # and reshape_and_cache_flash would treat its bytes as bf16 →
+            # corrupted writes. Replace the call with PagedKVWriter which
+            # quantizes K + V before writing the right slot regions.
+            # The legacy "auto" swap below is still kept for the FALLBACK
+            # path (e.g., when kv_policy isn't importable).
+            use_paged_writer = (kv_cache_dtype == "int4_protected")
+            if not use_paged_writer:
+                # Defensive: if a stock dtype somehow reached here, fall
+                # back to the legacy behavior.
+                if kv_cache_dtype == "int4_protected":
+                    kv_cache_dtype = "auto"
 
-            # ---- Cache write (5B.4c will replace this with PartialGroupQuantizer) ----
+            # ---- Cache write ----
             if kv_cache.numel() > 0:
                 key_cache = kv_cache[0]
                 value_cache = kv_cache[1]
@@ -168,12 +363,23 @@ if _VLLM_FA_AVAILABLE:
                         updated_slot_mapping = attn_metadata.cross_slot_mapping
                     else:
                         updated_slot_mapping = attn_metadata.slot_mapping
-                    torch.ops._C_cache_ops.reshape_and_cache_flash(
-                        key, value, kv_cache[0], kv_cache[1],
-                        updated_slot_mapping.flatten(),
-                        kv_cache_dtype,
-                        layer._k_scale, layer._v_scale,
-                    )
+                    if use_paged_writer:
+                        writer = self._get_paged_writer(layer=layer)
+                        writer.write(
+                            key=key,
+                            value=value,
+                            kv_cache=kv_cache,
+                            slot_mapping=updated_slot_mapping.flatten(),
+                        )
+                        Int4ProtectedAttentionImpl._call_stats["write_path_calls"] += 1
+                    else:
+                        Int4ProtectedAttentionImpl._call_stats["write_path_fallback"] += 1
+                        torch.ops._C_cache_ops.reshape_and_cache_flash(
+                            key, value, kv_cache[0], kv_cache[1],
+                            updated_slot_mapping.flatten(),
+                            kv_cache_dtype,
+                            layer._k_scale, layer._v_scale,
+                        )
 
             # ---- Token routing ----
             (num_prefill_query_tokens, num_prefill_kv_tokens,
@@ -188,6 +394,7 @@ if _VLLM_FA_AVAILABLE:
 
             # ---- Prefill attention (5B.4c will replace inner kernel call) ----
             if prefill_meta := attn_metadata.prefill_metadata:
+                Int4ProtectedAttentionImpl._call_stats["prefill_calls"] += 1
                 if (kv_cache.numel() == 0 or prefill_meta.block_tables is None
                         or prefill_meta.block_tables.numel() == 0):
                     # Normal varlen attention (no paged cache yet).
@@ -238,6 +445,7 @@ if _VLLM_FA_AVAILABLE:
                     # Speculative-decode-style varlen path.
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support max_decode_query_len > 1")
+                    Int4ProtectedAttentionImpl._call_stats["spec_decode_calls"] += 1
                     flash_attn_varlen_func(
                         q=decode_query, k=key_cache, v=value_cache,
                         cu_seqlens_q=decode_meta.query_start_loc,
@@ -255,22 +463,34 @@ if _VLLM_FA_AVAILABLE:
                     )
                 else:
                     # Standard decode path (the common case).
-                    seq_lens_arg, _, block_tables_arg = (
-                        get_seq_len_block_table_args(decode_meta, False, attn_type)
-                    )
-                    flash_attn_with_kvcache(
-                        q=decode_query.unsqueeze(1),
-                        k_cache=key_cache, v_cache=value_cache,
-                        block_table=block_tables_arg,
-                        cache_seqlens=seq_lens_arg,
-                        softmax_scale=softmax_scale,
-                        causal=True,
-                        window_size=window_size,
-                        alibi_slopes=alibi_slopes,
-                        softcap=logits_soft_cap,
-                        out=decode_output.unsqueeze(1),
-                        fa_version=self.vllm_flash_attn_version,
-                    )
+                    if use_paged_writer:
+                        # 5B.4c.2: packed read via gather + packed kernel.
+                        Int4ProtectedAttentionImpl._call_stats["decode_calls_packed"] += 1
+                        out_packed = self._read_decode_packed(
+                            query_q=decode_query.unsqueeze(1),
+                            kv_cache=kv_cache,
+                            decode_meta=decode_meta,
+                            layer=layer,
+                        )
+                        decode_output.copy_(out_packed.squeeze(1))
+                    else:
+                        Int4ProtectedAttentionImpl._call_stats["decode_calls_fallback"] += 1
+                        seq_lens_arg, _, block_tables_arg = (
+                            get_seq_len_block_table_args(decode_meta, False, attn_type)
+                        )
+                        flash_attn_with_kvcache(
+                            q=decode_query.unsqueeze(1),
+                            k_cache=key_cache, v_cache=value_cache,
+                            block_table=block_tables_arg,
+                            cache_seqlens=seq_lens_arg,
+                            softmax_scale=softmax_scale,
+                            causal=True,
+                            window_size=window_size,
+                            alibi_slopes=alibi_slopes,
+                            softcap=logits_soft_cap,
+                            out=decode_output.unsqueeze(1),
+                            fa_version=self.vllm_flash_attn_version,
+                        )
             return output
 
 else:
@@ -363,6 +583,53 @@ class Int4ProtectedBackendManager:
 # Attention layer detection (same heuristic as Phase 5A).
 # ----------------------------------------------------------------------
 
+def _splice_k_partial_tail(view: Dict[str, Any], writer: Any, last_block_idx: int) -> None:
+    """Phase 5B.4c.2 hybrid splice. Rewrites the last block of the
+    gathered packed-K view with on-the-fly quantization of the in-RAM
+    staging buffer.
+
+    Mirrors PagedKVWriter._finalize_k_group's math so the kernel sees
+    a self-consistent (scale, xmin, nibbles) triple. Positions in the
+    staging buffer beyond k_stage_count are zero-padded (they wouldn't
+    be attended because cache_seqlens cuts off there).
+
+    view modified in-place at:
+      k_int4[0, last_block_idx*BS : (last_block_idx+1)*BS]
+      k_scale[0, last_block_idx]
+      k_xmin [0, last_block_idx]
+    """
+    BS = writer.BS
+    D  = writer.D
+    half_D = D // 2
+
+    buf_f = writer.k_stage.float()                 # (BS, H, D)
+    x_max = buf_f.amax(dim=0)                       # (H, D)
+    x_min = buf_f.amin(dim=0)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
+
+    q = ((buf_f - x_min.unsqueeze(0)) / scale.unsqueeze(0)) \
+        .round().clamp(0, 15).to(torch.uint8)       # (BS, H, D)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (BS, H, D/2)
+
+    bstart = last_block_idx * BS
+    view["k_int4"][0, bstart:bstart + BS] = packed
+    view["k_scale"][0, last_block_idx]    = scale.to(writer.sidecar_dtype)
+    view["k_xmin"] [0, last_block_idx]    = x_min.to(writer.sidecar_dtype)
+
+
+def _parse_layer_idx_from_name(name: str) -> Optional[int]:
+    """Parse the integer N out of 'model.layers.<N>.self_attn' style names.
+    Returns None if the name doesn't match — caller falls back to walk-order."""
+    parts = name.split(".")
+    for i, part in enumerate(parts):
+        if part == "layers" and i + 1 < len(parts):
+            try:
+                return int(parts[i + 1])
+            except ValueError:
+                return None
+    return None
+
+
 def _looks_like_attention(module: Any) -> bool:
     cls_name = type(module).__name__
     if not cls_name.endswith("Attention"):
@@ -418,6 +685,11 @@ def install_int4_protected_backend(
     # Track forward-fallback swaps separately (for teardown).
     forward_swaps: List[Tuple[Any, Callable]] = []
 
+    # Phase 5B.4c.1: track sequential layer index for protect-mask slicing.
+    # Walk-order matches model.named_modules() iteration, which for vLLM
+    # 0.7.3's Qwen impl matches model.layers.0..N self_attn order.
+    _next_layer_idx = 0
+
     for name, sub in model.named_modules():
         if not _looks_like_attention(sub):
             continue
@@ -437,6 +709,14 @@ def install_int4_protected_backend(
         original_class = impl.__class__
         try:
             impl.__class__ = Int4ProtectedAttentionImpl
+            # Phase 5B.4c.1: prefer the integer parsed out of a name like
+            # 'model.layers.<N>.self_attn' (matches Phase 5B.0 calibrator
+            # ordering). Fall back to walk-order if the name doesn't fit.
+            layer_idx = _parse_layer_idx_from_name(name)
+            if layer_idx is None:
+                layer_idx = _next_layer_idx
+            impl._phase5b_layer_idx = layer_idx
+            _next_layer_idx += 1
             manager.swapped.append((impl, original_class))
             manager._stats["swapped_impls"] += 1
         except TypeError as e:
