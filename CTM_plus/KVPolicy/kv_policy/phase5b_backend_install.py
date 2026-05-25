@@ -233,7 +233,13 @@ if _VLLM_FA_AVAILABLE:
             target, ramping to vLLM's max-concurrency cap).
             """
             cur = getattr(self, "_phase5b_idx_max_B", 0)
-            if cur < B or getattr(self, "_phase5b_idx_dev", None) is not device:
+            # NB: use `!=` (value equality), NOT `is not` (object identity).
+            # `block_table.device` can return a fresh torch.device object per
+            # call even when the actual device is the same — `is not` would
+            # always be True and trigger a reallocation on EVERY call,
+            # defeating the whole point of pre-allocation.
+            existing_dev = getattr(self, "_phase5b_idx_dev", None)
+            if cur < B or existing_dev is None or existing_dev != device:
                 # (Re-)allocate. Pick a generous cap to avoid frequent regrowth.
                 new_max = max(B, cur, 16)
                 self._phase5b_slot_idx_buf      = torch.zeros(
