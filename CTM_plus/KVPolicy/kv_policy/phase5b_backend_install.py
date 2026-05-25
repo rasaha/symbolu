@@ -165,17 +165,111 @@ if _VLLM_FA_AVAILABLE:
                     seq_id=_seq_id_from_block_table_row(block_table[0]),
                 )
 
-            # Multi-batch path: per-seq gather + kernel call, stack outputs.
-            out = torch.empty_like(query_q)
+            # Multi-batch path (Phase 6 v2 Option A): ONE batched kernel
+            # call. Gather all B seqs' paged blocks + sidecars in one
+            # advanced-index op, splice each seq's K tail (small per-seq
+            # work), stack bf16 backings, then dispatch the kernel with
+            # B>1.
+            return self._read_decode_packed_batched(
+                query_q, kv_cache, layer, writer,
+                block_table=block_table,
+                cache_seqlens_orig=cache_seqlens_orig,
+            )
+
+        def _read_decode_packed_batched(
+            self, query_q, kv_cache, layer, writer, *,
+            block_table, cache_seqlens_orig,
+        ):
+            """Multi-seq packed decode in a SINGLE kernel call.
+
+            Pads each seq's gathered tensors to a common n_blocks_max
+            (= max over seqs). Padded positions have block_id=0 and
+            are masked by cache_seqlens in the kernel — they don't
+            affect output.
+            """
+            from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache
+
+            B = block_table.shape[0]
+            BS = writer.BS
+
+            # Per-seq seqlen + n_blocks_used.
+            seqlens_cpu = cache_seqlens_orig.cpu().tolist()
+            n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
+            n_blocks_max = max(n_blocks_per_seq)
+            S_padded = n_blocks_max * BS
+
+            # Build (B, n_blocks_max) block_ids tensor with padding.
+            # Padded entries use block 0 (or any valid block) — masked
+            # by cache_seqlens in the kernel.
+            block_ids_batched = torch.zeros(
+                (B, n_blocks_max), dtype=torch.long, device=block_table.device,
+            )
             for i in range(B):
+                n_i = n_blocks_per_seq[i]
+                block_ids_batched[i, :n_i] = block_table[i, :n_i].long()
+                # Fill padding with block 0 (kernel masks these positions).
+
+            # ONE batched gather covering all B seqs.
+            view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
+
+            # Splice K partial-tail for each seq with a trailing partial.
+            # Each seq's splice writes to view's [i, last_block_i] slot.
+            for i in range(B):
+                tail_len = seqlens_cpu[i] % BS
+                if tail_len == 0:
+                    continue
                 seq_id = _seq_id_from_block_table_row(block_table[i])
-                out_i = self._read_decode_packed_one(
-                    query_q[i:i+1], kv_cache, layer, writer,
-                    bt=block_table[i],
-                    seqlen=int(cache_seqlens_orig[i].item()),
-                    seq_id=seq_id,
+                seq_state = writer.get_seq_state(seq_id)
+                last_block_i = n_blocks_per_seq[i] - 1
+                _splice_k_partial_tail_batched_row(
+                    view, writer, batch_idx=i, last_block_idx=last_block_i,
+                    state=seq_state,
                 )
-                out[i:i+1] = out_i
+
+            # Stack per-seq bf16 backings into (B, S_padded, H, D).
+            seq_ids = [_seq_id_from_block_table_row(block_table[i]) for i in range(B)]
+            bf16_k_batch, bf16_v_batch = writer.get_bf16_backing_batched(
+                seq_ids, S_padded,
+            )
+
+            # protect_mask: (B, H, D) int8. Per-model frozen, same for all seqs.
+            protect_mask_bhd = writer.protect_mask.unsqueeze(0).expand(B, -1, -1).contiguous()
+            cache_seqlens_i32 = cache_seqlens_orig.to(torch.int32)
+
+            # V handling.
+            v_bf16 = view.get("v_bf16")
+            if v_bf16 is not None:
+                v_for_kernel = v_bf16.contiguous()
+                packed_v_kwargs = {}
+            else:
+                v_for_kernel = bf16_v_batch
+                packed_v_kwargs = dict(
+                    v_packed_int4=view["v_int4"].contiguous(),
+                    v_packed_scale=view["v_scale"].contiguous(),
+                    v_packed_xmin=view["v_xmin"].contiguous(),
+                    v_packed_group_size=writer.v_group_size,
+                )
+
+            out = flash_attn_with_int4_kvcache(
+                query_q,
+                bf16_k_batch, v_for_kernel,
+                cache_seqlens=cache_seqlens_i32,
+                protect_mask=protect_mask_bhd,
+                n_protect=writer.n_protect,
+                softmax_scale=self.scale,
+                causal=False,
+                window_size=self.sliding_window,
+                alibi_slopes=self.alibi_slopes,
+                softcap=self.logits_soft_cap,
+                k_packed_int4=view["k_int4"].contiguous(),
+                k_packed_scale=view["k_scale"].contiguous(),
+                k_packed_xmin=view["k_xmin"].contiguous(),
+                k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                k_packed_protect_slot=view["protect_slot"].contiguous(),
+                packed_group_size=BS,
+                packed_n_protect=writer.n_protect,
+                **packed_v_kwargs,
+            )
             return out
 
         def _read_decode_packed_one(
@@ -707,6 +801,35 @@ def _seq_id_from_block_table_row(bt_row: "torch.Tensor") -> int:
     `writer.evict_sequence(seq_id)` on completion to drop stale state.
     """
     return int(bt_row[0].item())
+
+
+def _splice_k_partial_tail_batched_row(
+    view: Dict[str, Any], writer: Any, *, batch_idx: int,
+    last_block_idx: int, state: Any,
+) -> None:
+    """Phase 6 v2: K-tail splice for one batch row inside a batched view.
+
+    Same math as `_splice_k_partial_tail` but writes into the
+    `batch_idx`-th slice of view's batched tensors (k_int4, k_scale,
+    k_xmin shaped (B, ...)) rather than the (1, ...) single-seq view.
+    """
+    BS = writer.BS
+    D  = writer.D
+    half_D = D // 2
+
+    buf_f = state.k_stage.float()
+    x_max = buf_f.amax(dim=0)
+    x_min = buf_f.amin(dim=0)
+    scale = ((x_max - x_min) / 15.0).clamp(min=1e-8)
+
+    q = ((buf_f - x_min.unsqueeze(0)) / scale.unsqueeze(0)) \
+        .round().clamp(0, 15).to(torch.uint8)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (BS, H, D/2)
+
+    bstart = last_block_idx * BS
+    view["k_int4"][batch_idx, bstart:bstart + BS] = packed
+    view["k_scale"][batch_idx, last_block_idx]    = scale.to(writer.sidecar_dtype)
+    view["k_xmin"] [batch_idx, last_block_idx]    = x_min.to(writer.sidecar_dtype)
 
 
 def _splice_k_partial_tail(

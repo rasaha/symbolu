@@ -970,3 +970,129 @@ class PagedKVWriter:
         if _bf16_v_mode() and getattr(self, "_v_bf16_ext", None) is not None:
             result["v_bf16"] = self._v_bf16_ext[block_ids].view(1, S, self.H, self.D)
         return result
+
+    def get_packed_view_batched(
+        self,
+        block_ids_batched: "torch.Tensor",   # (B, n_blocks_max) long; padded slots = 0
+        kv_cache: "torch.Tensor",            # (2, NB, BS, H, D) uint8
+    ) -> Dict[str, Any]:
+        """Phase 6 v2 (Option A): batched-gather for multi-seq decode.
+
+        Replaces B separate `get_packed_view` calls with ONE set of CUDA
+        advanced-index ops that gathers ALL B sequences' paged blocks +
+        sidecars simultaneously.
+
+        Per-seq sequences may have different `n_blocks_used`. The caller
+        pads `block_ids_batched[i]` to a common `n_blocks_max` length —
+        unused trailing slots should point at block 0 (or any valid
+        block) since `cache_seqlens` masks the padded positions in the
+        kernel anyway.
+
+        Returns:
+          dict with batched tensors of shapes:
+            k_int4:         (B, S, H, D/2)             uint8
+            k_scale:        (B, n_blocks_max, H, D)    bf16
+            k_xmin:         (B, n_blocks_max, H, D)    bf16
+            k_protect_bf16: (B, S, H, n_protect)       bf16
+            protect_slot:   (H, D)                     int8 (shared)
+            v_int4:         (B, S, H, D/2)             uint8
+            v_scale:        (B, S, H, v_n_groups)      bf16
+            v_xmin:         (B, S, H, v_n_groups)      bf16
+          where S = n_blocks_max * BS.
+
+        The caller still applies the K partial-tail splice per-seq
+        (one per sequence with a trailing partial group) on this
+        batched view, writing into the corresponding slice.
+        """
+        if not self._allocated:
+            raise RuntimeError("get_packed_view_batched before _lazy_alloc")
+        if block_ids_batched.ndim != 2:
+            raise ValueError(
+                f"block_ids_batched shape {tuple(block_ids_batched.shape)} != (B, n_blocks_max)"
+            )
+        B, n_blocks_max = block_ids_batched.shape
+        BS = self.BS
+        D = self.D
+        half_D = D // 2
+        H = self.H
+        S = n_blocks_max * BS
+
+        block_ids_long = block_ids_batched.long()
+
+        # Gather paged blocks in ONE shot.
+        # kv_cache[0]: (NB, BS, H, D). Indexed with (B, n_blocks_max) →
+        # (B, n_blocks_max, BS, H, D).
+        k_blocks = kv_cache[0][block_ids_long]
+        v_blocks = kv_cache[1][block_ids_long]
+
+        # Slice nibbles (first D/2 bytes per slot) and flatten block+slot
+        # dims to S.
+        k_nibbles = k_blocks[..., :half_D].contiguous().view(B, S, H, half_D)
+        v_nibbles = v_blocks[..., :half_D].contiguous().view(B, S, H, half_D)
+
+        # Gather sidecars in ONE shot too.
+        k_scale = self.k_scale_ext[block_ids_long]                              # (B, n_blocks_max, H, D)
+        k_xmin  = self.k_xmin_ext [block_ids_long]                              # (B, n_blocks_max, H, D)
+        k_prot  = self.k_protect_ext[block_ids_long].view(B, S, H, self.n_protect)
+        v_scale = self.v_scale_ext[block_ids_long].view(B, S, H, self.v_n_groups)
+        v_xmin  = self.v_xmin_ext [block_ids_long].view(B, S, H, self.v_n_groups)
+
+        result: Dict[str, Any] = {
+            "k_int4":         k_nibbles,
+            "k_scale":        k_scale,
+            "k_xmin":         k_xmin,
+            "k_protect_bf16": k_prot,
+            "protect_slot":   self.protect_slot,
+            "n_protect":      self.n_protect,
+            "group_size":     BS,
+            "v_int4":         v_nibbles,
+            "v_scale":        v_scale,
+            "v_xmin":         v_xmin,
+            "v_group_size":   self.v_group_size,
+            "n_blocks_max":   n_blocks_max,
+            "S":              S,
+        }
+        if _bf16_v_mode() and getattr(self, "_v_bf16_ext", None) is not None:
+            result["v_bf16"] = self._v_bf16_ext[block_ids_long].view(B, S, H, D)
+        return result
+
+    def get_bf16_backing_batched(
+        self,
+        seq_ids: "list",     # list of seq_id, length B
+        S_padded: int,
+    ):
+        """Phase 6 v2: stack per-seq bf16 K/V backings into batched tensors.
+
+        Each seq's backing is a (1, max_seqlen, H, D) tensor allocated in
+        its SeqState. We slice each to (1, S_padded, H, D) and stack on the
+        batch axis → (B, S_padded, H, D). Positions [seq_pos_i .. S_padded)
+        of each row are zeros (initialized; never written by writes for
+        that seq); cache_seqlens masks them in the kernel.
+        """
+        if not self._allocated:
+            raise RuntimeError("get_bf16_backing_batched before _lazy_alloc")
+        B = len(seq_ids)
+        if B == 0:
+            raise ValueError("get_bf16_backing_batched needs B >= 1 seq_ids")
+        # Validate all seqs have backing of sufficient size.
+        any_state = self._seq_states.get(seq_ids[0])
+        if any_state is None or any_state.bf16_k_backing is None:
+            raise RuntimeError(f"bf16 backing missing for seq_id={seq_ids[0]!r}")
+        max_S = any_state.bf16_k_backing.shape[1]
+        if S_padded > max_S:
+            raise RuntimeError(f"S_padded={S_padded} > max_seqlen={max_S}")
+
+        H = self.H
+        D = self.D
+        device = any_state.bf16_k_backing.device
+
+        # Pre-allocate batched buffers and copy each seq's slice in.
+        bf16_k = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
+        bf16_v = torch.empty((B, S_padded, H, D), dtype=torch.bfloat16, device=device)
+        for i, sid in enumerate(seq_ids):
+            state = self._seq_states.get(sid)
+            if state is None or state.bf16_k_backing is None:
+                raise RuntimeError(f"bf16 backing missing for seq_id={sid!r}")
+            bf16_k[i].copy_(state.bf16_k_backing[0, :S_padded])
+            bf16_v[i].copy_(state.bf16_v_backing[0, :S_padded])
+        return bf16_k, bf16_v
