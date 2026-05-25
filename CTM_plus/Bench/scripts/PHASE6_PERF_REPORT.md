@@ -306,6 +306,57 @@ Scope to unblock graph capture (~3-5 days):
 Steps 1-3 are the read-path refactor. Step 4 is the actual graph enable.
 See `OPTION_B_PREFLIGHT.md` for the implementation plan.
 
+## Phase 6 v2 Option B pre-flight B-pre-1 — measured
+
+Landed in `78e19c2` + fix `2b98f0a` (lazy default slot) + fix `1f04819`
+(reset_sequence("all") evicts default too). The seq state storage
+refactor: per-(layer, seq) state lives in fixed-size pool tensors on
+the writer; SeqState is a thin slot-indexed wrapper; new device-indexed
+read API (`get_bf16_backing_batched_by_slots`, `get_k_stage_by_slots`)
+replaces the prior `torch.stack`-over-per-seq-views path.
+
+Throughput sanity (same fixture):
+
+| B | post-D2 | post-B-pre-1 | Δ |
+|---|---------|---------------|---|
+| 1 | 20.6 | 20.6 | noise (no batched path) |
+| 2 | 27.2 | 27.2 | flat |
+| 4 | 35.8 | 35.8 | flat |
+| 8 | 42.6 | **43.1** | +1% |
+
+Cumulative since session start (Option A baseline `446f7f4`):
+36.3 → 41.7 (D step 1) → 42.6 (D step 2) → 43.1 (B-pre-1) at B=8.
+1.19× lifetime gain on agg_tps at B=8.
+
+Per-phase decode-path profile (B=8, post-B-pre-1):
+
+| Phase | cpu_us pre | cpu_us post | Δ | scaling-with-B |
+|-------|------------|-------------|---|----------------|
+| `bf16_backing` | 72.8 | **23.9** | **-67%** | **flat now** (was linear: 38/50/72 for B=2/4/8) |
+| `splice` | 296.1 | 274.2 | -7% | flat |
+| `seqids_blockids` | 145.9 | 146.9 | flat | flat |
+| `view_gather` | 115.9 | 119.4 | flat | flat |
+| `kernel` | 65.5 | 65.2 | flat | flat |
+| `kernel_prep` | 21.1 | 20.3 | flat | flat |
+| TOTAL cpu_us per call | 498 | **455** | **-9%** | — |
+
+The structural change is the headline: `bf16_backing` is now **flat
+with B**. Single device gather (`pool[slot_idx_t]`) replaces
+`torch.stack` over B per-seq backing views. This is the architecture
+needed for graph capture — output is at a stable advanced-index
+address, no Python loop, no dict resolution inside the captured
+region.
+
+Splice picked up a smaller incidental win from the same pattern
+(slot-pool gather of k_stage tensors).
+
+Total read path budget at B=8: 19.9 ms / step → 18.2 ms / step. The
+read path went from 10% of total decode budget to ~9%. Modest agg_tps
+gain at this layer because the per-step bottleneck is still the
+~170 ms / step of model-forward launch overhead (unchanged by
+B-pre-1; the actual point of B-pre-1 is to unblock CUDA Graphs,
+which IS what would attack that 170 ms).
+
 ### Failed micro: sync coalesce (`629386e`)
 
 Hypothesis: each of the two `.cpu().tolist()` calls in
