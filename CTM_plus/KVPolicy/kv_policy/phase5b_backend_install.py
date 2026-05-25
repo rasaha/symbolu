@@ -338,24 +338,54 @@ if _VLLM_FA_AVAILABLE:
                 # ONE batched gather covering all B seqs.
                 view = writer.get_packed_view_batched(block_ids_batched, kv_cache)
 
+            # Phase 6 v2 Option B pre-flight (B-pre-1): resolve seq_ids
+            # to slot indices ONCE, here. The resolved slot tensor is
+            # what downstream getters consume — they no longer take
+            # Python seq_id lists, so the splice + bf16_backing phases
+            # have no Python dict lookups left.
+            slot_idx_list = writer.slot_indices_for(seq_ids)
+            slot_idx_t = torch.tensor(
+                slot_idx_list, dtype=torch.long,
+                device=block_table.device,
+            )
+
             with _maybe_region("batched.splice"):
-                # Phase 6 v2 Option D step 1: vectorized K partial-tail splice.
-                last_block_indices = [n_blocks_per_seq[i] - 1 for i in range(B)]
-                active_mask = [seqlens_cpu[i] % BS != 0 for i in range(B)]
-                if any(active_mask):
-                    seq_states_list = [writer.get_seq_state(seq_ids[i]) for i in range(B)]
+                # Phase 6 v2 Option D step 1 (vectorized) + B-pre-1
+                # (slot-pool gather): build the active subset on host
+                # (cheap — just list comprehensions over already-resolved
+                # seqlens/n_blocks lists), then call the splice helper
+                # with device-tensor active_slot_idx_t + active_batch_idx_t
+                # + active_last_block_t. The helper does ONE
+                # writer.get_k_stage_by_slots(slot_t) gather instead of
+                # torch.stack-ing B per-state views.
+                active_pos_b = [
+                    i for i in range(B) if seqlens_cpu[i] % BS != 0
+                ]
+                if active_pos_b:
+                    device = block_table.device
+                    active_batch_idx_t = torch.tensor(
+                        active_pos_b, dtype=torch.long, device=device,
+                    )
+                    active_last_block_t = torch.tensor(
+                        [n_blocks_per_seq[i] - 1 for i in active_pos_b],
+                        dtype=torch.long, device=device,
+                    )
+                    active_slot_idx_t = slot_idx_t[active_batch_idx_t]
                     _splice_k_partial_tail_batched_vectorized(
                         view, writer,
-                        seq_states_list=seq_states_list,
-                        last_block_indices=last_block_indices,
-                        active_mask=active_mask,
+                        active_slot_idx_t=active_slot_idx_t,
+                        active_batch_idx_t=active_batch_idx_t,
+                        active_last_block_t=active_last_block_t,
                     )
 
             with _maybe_region("batched.bf16_backing"):
-                # Stack per-seq bf16 backings into (B, S_padded, H, D).
-                bf16_k_batch, bf16_v_batch = writer.get_bf16_backing_batched(
-                    seq_ids, S_padded,
-                )
+                # Phase 6 v2 (B-pre-1): single device gather from the
+                # writer's bf16 backing pools using the resolved slot
+                # tensor. Replaces torch.stack over B per-seq backings.
+                bf16_k_batch, bf16_v_batch = \
+                    writer.get_bf16_backing_batched_by_slots(
+                        slot_idx_t, S_padded,
+                    )
 
             with _maybe_region("batched.kernel_prep"):
                 # protect_mask + cache_seqlens shape prep + V dispatch decision.
@@ -946,49 +976,76 @@ def _splice_k_partial_tail_batched_row(
 
 def _splice_k_partial_tail_batched_vectorized(
     view: Dict[str, Any], writer: Any, *,
-    seq_states_list: list, last_block_indices: list, active_mask: list,
+    seq_states_list: list = None, last_block_indices: list = None,
+    active_mask: list = None,
+    active_slot_idx_t: "torch.Tensor" = None,
+    active_batch_idx_t: "torch.Tensor" = None,
+    active_last_block_t: "torch.Tensor" = None,
 ) -> None:
-    """Phase 6 v2 Option D step 1: vectorized batched K-tail splice.
+    """Phase 6 v2 Option D step 1 + Option B pre-flight (B-pre-1):
+    vectorized batched K-tail splice.
 
-    Collapses the per-sequence Python loop in `_read_decode_packed_batched`
-    (which called `_splice_k_partial_tail_batched_row` once per active
-    seq, ~18 tensor ops per call) into one batched op chain that processes
-    all active sequences in parallel.
+    Two calling conventions:
 
-    Inputs:
-      seq_states_list    : list[SeqState], length B (one per batch position)
-      last_block_indices : list[int],      length B (per-seq last_block_idx)
-      active_mask        : list[bool],     length B (True if tail_len != 0)
+    1. Legacy (D step 1) — pass `seq_states_list`, `last_block_indices`,
+       `active_mask` (all Python lists). The helper builds the active
+       subset and gathers k_stage via `torch.stack`. Kept for any
+       external callers and the bit-equivalence verify.
 
-    Bit-equivalence to `_splice_k_partial_tail_batched_row`: every
-    per-element operation (float cast, amax/amin per (h,d), scale=(max-min)/15
-    clamped, quantize=round+clamp+to(uint8), pack via low|high<<4) is
-    element-wise across (h, d, bs), so batching across the new B axis
-    leaves the per-element results identical. Verified by
-    `verify_phase6_d_step1_splice_equiv.py`.
+    2. Pre-flight (B-pre-1) — pass `active_slot_idx_t`,
+       `active_batch_idx_t`, `active_last_block_t` (all device long
+       tensors of the same length A). The helper gathers k_stage in
+       ONE op via `writer.get_k_stage_by_slots(slot_idx_t)` — fully
+       device-indexed, no Python loop, no dict lookup. This is the
+       captured-graph-friendly path.
 
-    Caller must ensure active_mask has at least one True before calling.
+    Math is bit-identical between the two paths (same element-wise
+    quantize+pack chain). The only difference is HOW the (A, BS, H, D)
+    k_stage tensor is materialized:
+      - legacy: `torch.stack([state.k_stage for state in active])`
+      - preflight: `writer._k_stage_pool[active_slot_idx_t]`
+
+    Verified by `verify_phase6_d_step1_splice_equiv.py` (legacy) and
+    `verify_phase6_b_pre1_splice_slots_equiv.py` (preflight).
     """
-    if not any(active_mask):
-        return
-
     BS = writer.BS
     D  = writer.D
     H  = writer.H
     half_D = D // 2
 
-    # Build the active subset.
-    active_idx = [i for i, m in enumerate(active_mask) if m]
+    if active_slot_idx_t is not None:
+        # Preflight path: caller already has the active subset as device
+        # tensors. Gather k_stage in ONE op from the slot pool.
+        if active_slot_idx_t.numel() == 0:
+            return
+        if active_batch_idx_t is None or active_last_block_t is None:
+            raise ValueError(
+                "preflight call needs active_batch_idx_t + active_last_block_t"
+            )
+        k_stage_stack = writer.get_k_stage_by_slots(active_slot_idx_t)  # (A, BS, H, D)
+        device = k_stage_stack.device
+        batch_idx_t  = active_batch_idx_t
+        last_block_t = active_last_block_t
+    else:
+        # Legacy path: build the active subset from Python lists.
+        if seq_states_list is None or last_block_indices is None or active_mask is None:
+            raise ValueError(
+                "legacy call needs seq_states_list + last_block_indices + active_mask"
+            )
+        if not any(active_mask):
+            return
+        active_idx = [i for i, m in enumerate(active_mask) if m]
+        k_stage_stack = torch.stack(
+            [seq_states_list[i].k_stage for i in active_idx], dim=0,
+        )
+        device = k_stage_stack.device
+        batch_idx_t = torch.tensor(active_idx, dtype=torch.long, device=device)
+        last_block_t = torch.tensor(
+            [last_block_indices[i] for i in active_idx],
+            dtype=torch.long, device=device,
+        )
 
-    # Stack each active seq's k_stage into one (A, BS, H, D) tensor.
-    # Per-state k_stage is (BS, H, D) sidecar_dtype on the same device.
-    k_stage_stack = torch.stack(
-        [seq_states_list[i].k_stage for i in active_idx], dim=0,
-    )
-    device = k_stage_stack.device
-
-    # Quantize in one batched op chain. Math identical to the per-row
-    # version; the leading B axis just adds broadcast.
+    # Quantize + pack — identical for both paths.
     buf_f = k_stage_stack.float()                                  # (A, BS, H, D)
     x_max = buf_f.amax(dim=1)                                      # (A, H, D)
     x_min = buf_f.amin(dim=1)                                      # (A, H, D)
@@ -999,20 +1056,8 @@ def _splice_k_partial_tail_batched_vectorized(
     packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (A, BS, H, half_D)
 
     # Scatter into view tensors at (batch_idx, last_block_idx) positions.
-    # k_int4 is (B, n_blocks_max*BS, H, half_D) contiguous — reshape to
-    # (B, n_blocks_max, BS, H, half_D) so we can index by (b, block).
     n_blocks_max = view["k_int4"].shape[1] // BS
     k_int4_blocked = view["k_int4"].view(-1, n_blocks_max, BS, H, half_D)
-
-    batch_idx_t = torch.tensor(active_idx, dtype=torch.long, device=device)
-    last_block_t = torch.tensor(
-        [last_block_indices[i] for i in active_idx],
-        dtype=torch.long, device=device,
-    )
-
-    # Indexed assignment: writes packed[k] to k_int4_blocked[batch_idx[k], last_block[k]].
-    # Each (batch_idx[k], last_block[k]) pair is unique across k (different
-    # seqs have different batch indices), so no scatter race.
     k_int4_blocked[batch_idx_t, last_block_t] = packed
     sidecar_dtype = writer.sidecar_dtype
     view["k_scale"][batch_idx_t, last_block_t] = scale.to(sidecar_dtype)

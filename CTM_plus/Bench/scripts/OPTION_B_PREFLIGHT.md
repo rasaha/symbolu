@@ -58,39 +58,85 @@ A pre-flight refactor must eliminate ALL of them.
 data-independent control flow. Verify gates stay GREEN. No perf
 expectation — this is structural prep.
 
-#### B-pre-1: Unify the seq-state storage on writer (1-2 days)
+#### B-pre-1: Unify the seq-state storage on writer — **LANDED**
 
-The current `PagedKVWriter._seq_states: Dict[Any, SeqState]` is the
-biggest blocker. Refactor to:
+The current `PagedKVWriter._seq_states: Dict[Any, SeqState]` was the
+biggest blocker. Refactor landed in this commit. The new layout:
 
 ```python
 class PagedKVWriter:
-    # Fixed-size device tensor stacks, indexed by SLOT (small int 0..max-1).
-    self.k_stage_pool       : Tensor  # (max_slots, BS, H, D) sidecar_dtype
-    self.bf16_k_backing_pool: Tensor  # (max_slots, max_S, H, D) bf16
-    self.bf16_v_backing_pool: Tensor  # (max_slots, max_S, H, D) bf16
-    # Per-slot counters (small device tensors).
-    self.seq_pos_pool       : Tensor  # (max_slots,) int32 — written tokens per slot
-    self.k_stage_count_pool : Tensor  # (max_slots,) int32
-    self.k_stage_block_id_pool: Tensor # (max_slots,) int32
+    # Fixed-size pool tensors, indexed by SLOT (small int).
+    self._k_stage_pool       : Tensor  # (max_slots, BS, H, D) sidecar_dtype
+    self._bf16_k_backing_pool: Tensor  # (max_slots, max_S, H, D) bf16
+    self._bf16_v_backing_pool: Tensor  # (max_slots, max_S, H, D) bf16
     # Python-side seq_id → slot map (NOT on device — resolved before capture).
     self._slot_map          : Dict[Any, int]
-    self._next_free_slot    : int
+    self._free_slots        : List[int]
+    self._max_active_slots  : int     # env $PHASE6_MAX_ACTIVE_SLOTS, default 8
+
+class SeqState:
+    self._writer, self.slot_idx,
+    self.k_stage_count, self.k_stage_block_id, self.seq_pos
+    # Tensor accessors (k_stage, bf16_k_backing, bf16_v_backing) are
+    # properties returning views into the pool tensors at slot_idx.
 ```
 
-API changes:
+What changed:
+- Pool tensors live on the writer at stable addresses (no per-seq
+  re-allocation). Critical for graph capture.
+- `ensure_seq_state(seq_id, device)` pops a free slot and creates a
+  SeqState wrapper. Raises if the pool exhausts.
+- `evict_sequence(seq_id)` returns the slot to the pool.
+- `reset_sequence("all")` evicts all non-default seqs and resets the
+  default — keeps the pool from filling up across long workloads
+  that cycle through many seq_ids.
+- New device-indexed read API on the writer:
+  - `slot_indices_for(seq_ids) -> list[int]` — Python-side resolution
+    (the one host operation per call before captured region).
+  - `get_bf16_backing_batched_by_slots(slot_idx_t, S_padded)` —
+    ONE device gather from `_bf16_k_backing_pool` /
+    `_bf16_v_backing_pool` instead of `torch.stack` over per-seq
+    backings.
+  - `get_k_stage_by_slots(slot_idx_t)` — ONE device gather from
+    `_k_stage_pool` instead of `torch.stack` over per-state
+    `k_stage` views.
+- `_splice_k_partial_tail_batched_vectorized` accepts both the
+  legacy seq_states_list path (back-compat for tests / verifies) and
+  a new preflight path that takes `active_slot_idx_t` (device long
+  tensor) + `active_batch_idx_t` + `active_last_block_t`. Math is
+  bit-equivalent between the two paths.
+- `_read_decode_packed_batched` was rewired: after resolving
+  seq_ids → slot_idx_t once, the splice and bf16_backing phases use
+  the slot-tensor path exclusively. No more `torch.stack` over
+  per-seq state tensors, no more dict lookups inside the read path.
 
-- `write_for_seq(seq_id, ...)` and `read_for_seq(seq_id, ...)`
-  resolve seq_id → slot via `_slot_map` (Python-side, pre-capture)
-  and pass the slot int to a graph-capturable inner method that
-  uses device-indexed accesses.
-- `reset_sequence(seq_id)` zeros the slot's k_stage and resets its
-  counters in-place. Frees the slot back to the pool.
-- `evict_sequence(seq_id)` removes from `_slot_map`, returns slot
-  to pool.
+Backward compatibility:
+- `PagedKVWriter._seq_states` dict still exists with the same
+  semantics for external callers.
+- SeqState's external API (`state.k_stage`, `state.bf16_k_backing`,
+  etc.) is unchanged — properties return tensor views.
+- `get_bf16_backing_batched(seq_ids, S_padded)` legacy entry point
+  still exists; now delegates to `_by_slots`.
+- Write path is untouched (it goes through SeqState's properties,
+  which already write into the pool via in-place ops).
 
-Verify: `verify_phase5b_4c_1_write.py`, `verify_phase5b_6_batch.py`
-all PASS unchanged.
+Verify (must all stay GREEN after this commit):
+- `verify_phase6_b_pre1_splice_slots_equiv.py` (NEW) — asserts the
+  preflight splice + bf16_backing-by-slots paths produce
+  tensor-equal output to the legacy paths, plus exercises slot
+  recycling via evict_sequence.
+- `verify_phase5b_6_batch.py` — main regression gate (multi-batch
+  end-to-end output).
+- `verify_phase5b_4c_1_write.py` — write-path math unchanged.
+- `verify_phase5b_4c_3_e2e.py` — full int4_protected generation.
+- `bench_phase6_decode_phase_profile.py` — phase timings still
+  reported correctly.
+
+Memory cost at default `_max_active_slots=8`:
+- ~256 MB per writer (8 slots × 4 MB K backing + 8 slots × 4 MB V
+  backing at max_S=4096). Times 28 layers = ~1.8 GB total. Matches
+  the current per-seq-lazy-alloc footprint at peak B=8 usage — net
+  zero memory change vs pre-B-pre-1.
 
 #### B-pre-2: Move metadata to device (~0.5 day)
 
@@ -187,8 +233,33 @@ latency, ahead on aggregate.
 
 ## Status
 
-- Pre-flight: **not started**. This doc is the scoping artifact.
+- **B-pre-1: LANDED** (this commit). Pool tensors + slot map + new
+  device-indexed read API. All correctness gates expected GREEN.
+  Backward-compat preserved.
+- **B-pre-2..4: not started.** Remaining preflight blockers (host
+  syncs in seqids_blockids, data-dependent splice branch, fully
+  stable pointer story).
+- **B-1..3 (capture enable + verify + bench): not started.** Will
+  resume after the rest of the preflight is in.
 - Profile data justifying the project: `PHASE6_PERF_REPORT.md`
   §"DECODE PHASE PROFILE", commit `1f4157e`.
 - Phase 5B.6 multi-batch + correctness gates: all GREEN, locked.
 - Current ship narrative (pre-Option-B): "42 tok/s agg at B=8".
+
+## Remaining preflight blockers (post-B-pre-1)
+
+| Violation | Where | Status after B-pre-1 |
+|-----------|-------|----------------------|
+| Host sync | `cache_seqlens_orig.cpu().tolist()` | still present — B-pre-2 |
+| Host sync | `block_table[:, 0].cpu().tolist()` | still present — B-pre-2 |
+| Data branch | `if any(active_mask):` in batched splice path | still present — B-pre-3 (make splice unconditional) |
+| Data branch | `if seqlens[i] % BS != 0` (per-seq, used to build active_pos_b) | still present — B-pre-3 |
+| Dict lookup | `writer._slot_map[seq_id]` per call | **moved out of read path**, runs once Python-side; OK for graph capture if invoked pre-capture |
+| Pointer churn | `state.k_stage` per call | **resolved** — now a stable pool view |
+| Pointer churn | `state.bf16_k_backing` per call | **resolved** — pool view |
+| Pointer churn | `bf16_k_batch` from torch.stack | **resolved** — single device gather, output addr = stable pool advanced-index |
+
+After B-pre-2 the only remaining host trip will be `n_blocks_max =
+int(...max().item())` for sizing the gather — handled at capture
+time by vLLM's multi-shape capture (one captured graph per discrete
+n_blocks_max bucket).
