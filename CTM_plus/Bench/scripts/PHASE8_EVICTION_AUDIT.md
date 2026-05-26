@@ -146,3 +146,72 @@ work resumes, the kickoff choice is:
 - Pivot to Route-A Days 4-5 first (audit-recommended)
 - Stick with original 8a remeasurement first
 - Run both in parallel and pick after seeing scripts for each
+
+## Update — finding #2 refined after second-pass code read
+
+The audit said "Route-A as-shipped is dequant-only — it does NOT
+wire eviction-attention through." This was 80% right but 20%
+incomplete:
+
+**80% right:** Route-A's `_wrap_attention_forward_with_kv_rewrite`
+(int4_cache_kv_route_a.py:527-590) only rewrites K/V. It does not
+call `forward_block_attention`.
+
+**20% incomplete:** A SEPARATE wrapper, `install_attention_capture`
+(vllm_evictor.py:1691-1797), is installed alongside route-A in
+`runner_vllm_streaming.py:1004-1098`. It pushes per-block sums to
+`AttentionAggregator`, which `_run_attention_flusher` flushes
+into `evictor.forward_block_attention` every
+`sample_interval_seconds`. **The bridge infrastructure exists in
+code.** It has just never been verified composing with route-A on
+the same model, on GPU, end-to-end.
+
+So the "1-day bridge" task is mostly **verification** plus one
+small logging hook (`forward_block_attention_calls` /
+`_nonzero_sum_calls` counters in `CTMEvictorModern`), not new
+architecture. See `PHASE8B_ROUTE_A_BRIDGE_PLAN.md` for the
+end-to-end call graph and `test_route_a_phase3_composition.py`
+for the CPU regression that locks the install order.
+
+This makes the audit-recommended path even stronger: Phase 8b is
+mostly verification with one small logging patch, and Phase 8a
+becomes a downstream measurement task on top of a verified bridge.
+
+## Update — finding #3: Phase 3 / Phase 4 are mutex by design
+
+`runner_vllm_streaming.py:601-606` raises ValueError when both
+`--phase3-attention` AND `--phase4-trig-calibration` are set:
+"competing hypotheses; run in separate cells of the four-cell
+experiment". The audit conflated two different levers:
+
+* **Phase 3 = real softmax attention** → `forward_block_attention`
+  → fills the `on_block_attention` slot vLLM's Evictor-ABC zeros
+  out. This is what CLOSES THE BRIDGE.
+* **Phase 4 = trig score** → separate `_block_trig_score` cache
+  → re-rank inside `evict()`. This is the v5 -11% ALGORITHM WIN.
+
+8a's four-cell design respects the mutex:
+1. LRU baseline (symmetric prefix caching)
+2. CTM+ + Phase 3 attention (bridge cell)
+3. CTM+ + Phase 4 trig (algorithm cell, per-layer cal)
+4. Combined (Phase 4 trig + INT4 route-A)
+
+The combined cell uses Phase 4 trig (not Phase 3) because Phase 4
+is the empirically stronger algorithm. Whether composing Phase 3
+AND Phase 4 in a single cell would beat either alone is an open
+question worth post-8a work, but it requires lifting the mutex
+guard — a deliberate design choice the team made for measurement
+clarity.
+
+## Execution order LOCKED (user directive)
+
+1. **Phase 8b first** — Route-A Days 4-5 GPU smoke + bridge
+   composition cell. Driver: `Bench/scripts/phase8b_route_a_gpu_smoke.sh`.
+2. **Then the bridge logging patch** if Day 5b's assertions fail
+   on harness, not on bridge.
+3. **Then Phase 8a** — only after Day 5b reports
+   `forward_block_attention_nonzero_sum_calls > 0`. Driver:
+   `Bench/scripts/phase8a_remeasure.sh`. The script has a
+   precondition check that refuses to run otherwise.
+4. **No VC brief updates** until post-bridge 8a numbers are
+   measured.
