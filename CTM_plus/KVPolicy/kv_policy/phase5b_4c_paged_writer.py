@@ -1024,12 +1024,35 @@ class PagedKVWriter:
                 f"slot_idx_t shape {tuple(slot_idx_t.shape)} != ({B},)"
             )
 
-        # PRE-CAPTURE: ensure pool counters reflect legacy SeqState ints.
-        # Pre-capture-hoistable; runs once per call OUTSIDE the captured
-        # region (6B.2's vLLM hook moves it before capture entirely).
+        # =============== PRE-CAPTURE REGION (host-sync OK) ================
+        # The pre-capture region performs Python-side resolution (seq_id ->
+        # slot, overflow guard) and is HOISTABLE OUTSIDE the captured
+        # graph by 6B.2's vLLM hook. The AST + runtime capture-safety
+        # checker treats this region as exempt from the "no host sync"
+        # rule.
+        # CAPTURE-EXEMPT: pre-capture-hoistable slot-idx materialization.
         slot_idx_list = slot_idx_t.cpu().tolist()  # B small ints; coalesced
         self._sync_pool_counters_from_states(slot_idx_list)
 
+        # Overflow guard runs Python-side from the synced SeqState ints
+        # (cheap dict lookup; no captured-region access). Pre-capture-
+        # hoistable.
+        max_S = self._bf16_k_backing_pool.shape[1]
+        for _slot in slot_idx_list:
+            # CAPTURE-EXEMPT: pre-capture overflow guard.
+            if int(self._seq_pos_pool[_slot].item()) >= max_S:
+                raise RuntimeError(
+                    f"bf16 backing overflow at slot={_slot}: "
+                    f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
+                    f">= max_seqlen={max_S}. Bump "
+                    f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
+                )
+
+        # ================ CAPTURED REGION (no host sync) =================
+        # Every op below this marker MUST be device-only. The AST + runtime
+        # capture-safety verifier asserts zero .item() / .cpu() / .tolist()
+        # / Python dict-lookup occurrences in this region.
+        # CAPTURED-REGION-START
         dtype = self.sidecar_dtype
         BS = self.BS
         D = self.D
@@ -1057,13 +1080,6 @@ class PagedKVWriter:
 
         # ===== BF16 K/V backing scatter (per-seq, indexed by slot_idx + seq_pos) =====
         seq_pos_t = self._seq_pos_pool[slot_idx_t].long()         # (B,) long
-        max_S = self._bf16_k_backing_pool.shape[1]
-        if int(seq_pos_t.max().item()) >= max_S:
-            raise RuntimeError(
-                f"bf16 backing overflow: max seq_pos={int(seq_pos_t.max().item())} "
-                f">= max_seqlen={max_S}. Bump "
-                f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
-            )
         # Advance-indexed scatter — same bytes as legacy
         # state.bf16_k_backing[0, seq_pos] = real_key for each slot.
         # Inactive rows still write but to position 0 of slot 0 (harmless
@@ -1182,9 +1198,13 @@ class PagedKVWriter:
             self._k_stage_count_pool[slot_idx_t],
         )
 
-        # POST-CAPTURE: writeback pool counters to SeqState Python ints
-        # so legacy introspection (verify scripts, prefill mid-decode)
-        # reads consistent state.
+        # CAPTURED-REGION-END
+        # ============== POST-CAPTURE REGION (host-sync OK) ===============
+        # Writeback pool counters to SeqState Python ints so legacy
+        # introspection (verify scripts, prefill mid-decode) reads
+        # consistent state. Post-capture-hoistable; the captured region
+        # has already written to the device-side pool tensors in place.
+        # CAPTURE-EXEMPT: post-capture writeback.
         self._writeback_pool_counters_to_states(slot_idx_list)
 
     def _finalize_k_full_blocks_batched(

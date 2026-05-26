@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "TIER5A.1 design freeze - initial baseline (branch claude/peaceful-einstein-hZmJs, HEAD post-brief-correction)",
+  "note": "Phase 6B.1 write-path preflight \u2014 authorized edits to phase5b_4c_paged_writer.py (add write_decode_batched + 3 device-side per-slot counter pools) and phase5b_backend_install.py (add _is_pure_decode_write helper + decode dispatch fork in Int4ProtectedAttentionImpl.forward). G5a class fingerprint preserved; G5b TIER5A AST walk preserved; G6a in-tree CUDA SHA preserved. Backed by 36-cell bit-equivalence verify + AST+runtime capture-safety verify, both GREEN on CPU.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -8,8 +8,8 @@
     "KVPolicy/kv_policy/int4_protected.py": "710b222b4cb2977eedc11a7c536f0685a127bbfaebee657a7c8fa2f2089697b5",
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
-    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "17445ddba6598902da72493bc18be01cb8bf068518a4debad017f05be44e0de7",
-    "KVPolicy/kv_policy/phase5b_backend_install.py": "176ef5f809aae4dc289a7cb02e2b65f294c120267f47647e52ebb9bc46757517",
+    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "75c25ae0cdd762785b6c5a359475145c271a363ad26617294da3418fd74e0ae2",
+    "KVPolicy/kv_policy/phase5b_backend_install.py": "aefea181a246d52b7f6b840ac2e713750cf585470d9731fb87ce55059cbc50bf",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299"
   }
 }
