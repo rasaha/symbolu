@@ -1,12 +1,19 @@
 # V2 Cache-Reuse — Phase 1 Integration Note
 
-> **Status:** Reconnaissance only. No code in this commit. This doc
-> identifies the vLLM 0.7.3 surfaces the Phase 1 patch will touch
-> and defines the acceptance criteria the patch must satisfy.
+> **Project status:** ⚠️ **Phase 3 CLOSED with a measured finding.**
+> See `PHASE3_CACHE_AWARE_FINDINGS.md` for the partner-credible
+> 2-seed Tier-A measurement and disposition. Cache-aware reorder
+> is **not productionized**; code stays in-tree as experimental.
+>
+> This document was the **implementation reconnaissance + acceptance
+> criteria** for Phase 1. It records the design decisions, the V2
+> block-manager shape fix, and the Phase 3C measurement-path fix.
+> Kept in-tree for archaeology + as the technical reference for any
+> future revisit (per the conditions in
+> `PHASE3_CACHE_AWARE_FINDINGS.md`).
 >
 > **Phase 0 (CPU prototype + tests):** ✅ committed at `3168e94`.
-> **Phase 1 (vLLM integration):** scoped below — implementation NOT
-> in this commit.
+> **Phase 1 (vLLM integration):** ✅ implemented (PR-1 + PR-2).
 
 ## 1. vLLM 0.7.3 admission flow — files and functions
 

@@ -299,14 +299,19 @@ def main(argv: Sequence[str]) -> int:
         "--cache-aware-scheduling",
         action="store_true",
         help=(
-            "v2 cache-reuse PR-2: enable cache-aware admission "
-            "scheduling. Reorders the engine's waiting queue by "
-            "predicted block-aligned prefix-cache hit rate, with a "
-            "starvation guard. Orthogonal to --ctm-plus, "
-            "--int4-kv-route-a, and the shipped int4_protected "
-            "backend (different layer). Default OFF; flag-off path "
-            "matches pre-PR-2 stock behaviour. See "
-            "V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md."
+            "EXPERIMENTAL — DO NOT ENABLE IN PRODUCTION. Cache-aware "
+            "admission scheduling: reorders the engine's waiting "
+            "queue by predicted block-aligned prefix-cache hit rate, "
+            "with a starvation guard. Two-seed Tier-A measurement on "
+            "Qwen-7B chat workload returned an INCONCLUSIVE "
+            "realized-hit signal (C/B = 0.903 and 1.115, opposite "
+            "signs) with a consistent mild E2E p99 regression "
+            "(1.4-1.6x). See PHASE3_CACHE_AWARE_FINDINGS.md for the "
+            "full measurement + revisit conditions. The CLI flag is "
+            "retained for further experimentation; it is NOT a "
+            "production-validated v2 surface. Orthogonal to "
+            "--ctm-plus, --int4-kv-route-a, and the shipped "
+            "int4_protected backend (different layer)."
         ),
     )
     parser.add_argument(

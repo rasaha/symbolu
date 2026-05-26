@@ -17,23 +17,28 @@ Qwen-7B is at-the-margin under 4% mask. Brief is partner-safe.
 * Phase 4 KV eviction (CTM+ trig scoring) — `PHASE8_RETIREMENT.md`
 * Local TurboQuant / QJL KV-cache path — `TURBOQUANT_RETIREMENT.md`
 
-**In progress:** v2 cache-reuse layer (cache-aware admission
-scheduling, RadixAttention-style):
+**CLOSED:** v2 cache-reuse layer (cache-aware admission
+scheduling, RadixAttention-style). See
+`PHASE3_CACHE_AWARE_FINDINGS.md` for the measured finding.
+
+History:
 * Phase 0 (CPU prototype + tests): ✅ commit `3168e94`
 * Phase 1 PR-1 (vLLM install + CPU smoke): ✅ commit `34763c8`
-* Phase 1 PR-2 CPU plumbing (driver arg + install hook +
-  CLI flag + stats field + 8 CPU tests): ✅ commit `d14383f`
-* Phase 1 PR-2 V2 block-manager BlockTable shape fix (CPU
-  mock-vs-real-vLLM drift): ✅ commit `d812324`
-* Phase 1 PR-2 GPU smoke (Qwen-7B H100): ✅ **GREEN** —
-  gates B1/B2/B3/B5/B7 + flag-OFF regression + Tier A needle
-  15/15 all verified. Workload-shape-dependent gates B4 and B6
-  (`reordered_count > 0`, `prediction_accuracy >= 0.85`) deferred
-  per PR-2 scope ("no hit-rate-improvement claim in PR-2").
-* **PR-2 acceptance set CLOSED.**
-* Phase 1 PR-2 follow-up (shared-prefix workload + B4/B6
-  smoke): pending
-* Phase 3 (GPU validation on chat_32k): pending
+* Phase 1 PR-2 CPU plumbing: ✅ commit `d14383f`
+* Phase 1 PR-2 V2 block-manager shape fix: ✅ commit `d812324`
+* Phase 1 PR-2 GPU smoke (Qwen-7B H100): ✅ GREEN
+* Phase 3A (shared-prefix workload + latency + probe): ✅ commit `fef82cc`
+* Phase 3B (three-cell bench + dry-run): ✅ commit `5a85be8`
+* Phase 3C measurement-path fix (cache-aware tree as instrument): ✅ commit `a873757`
+* Phase 3C 2-seed Tier-A GPU runs: ✅ GREEN measurement,
+  **inconclusive realized-hit signal + mild E2E p99 regression**
+* Phase 3D measured finding: ✅ `PHASE3_CACHE_AWARE_FINDINGS.md`
+* **Phase 3 CLOSED.** Cache-aware reorder is **not productionized**.
+  Code stays in-tree per the Phase 4 + TurboQuant precedent. CLI
+  flag retained as experimental. The measurement-only install +
+  three-cell bench harness retained as v2 measurement utilities.
+
+VC brief: unchanged. Cache-aware was never in the brief.
 
 ## Five pending v2 items (the brief's Tier 1 list)
 
@@ -42,7 +47,7 @@ Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5
 
 | # | Item | Effort | GPU $ | Status | Key reference |
 |---|---|---:|---:|---|---|
-| 1 | **Cache reuse** (v2 cache-aware scheduling) | PR-2 done; ~1 day shared-prefix workload + ~2-3 days Phase 3 GPU | ~$0.20 | PR-2 acceptance set CLOSED (gates B1/B2/B3/B5/B7 + flag-OFF + Tier A 15/15 all GREEN); shared-prefix workload + Phase 3 next | `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` (§"PR-2 status" + acceptance-gate table) |
+| 1 | **Cache reuse** (v2 cache-aware scheduling) | CLOSED at Phase 3D | ~$0.50 spent | **Inconclusive measured finding** — not productionized. CLI flag retained as experimental. See `PHASE3_CACHE_AWARE_FINDINGS.md`. | `PHASE3_CACHE_AWARE_FINDINGS.md`, `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` |
 | 2 | **CUDA Graphs** for the model forward path | 4-7 days | ~$0.20 | Read-path preflight done (B-pre-1..4); write-path preflight is the gating item | `OPTION_B_PREFLIGHT.md`, `PHASE6_PERF_REPORT.md` |
 | 3 | **Tensor parallelism** for 70B-class | 3-5 days | ~$0.50 (multi-GPU pod) | Untouched; code "expected to Just Work" per brief, unverified | brief page 5; INT4_PROTECTED_README.md |
 | 4 | **Quality benchmark harness** (MMLU + HumanEval + LongBench) | 2-3 days | ~$0.30 | Untouched; current quality bar is needle-only | brief page 5 "Broader quality bench" row |
@@ -109,42 +114,44 @@ User chooses; this is a recommendation, not a directive.
 
 ## Per-item entry hooks
 
-### 1. Cache reuse PR-2
+### 1. Cache reuse — CLOSED at Phase 3D
 
-**STATUS: PR-2 acceptance set CLOSED.** See
-`V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` §"PR-2 status" for
-the full acceptance-gate table and committed evidence.
+**STATUS: Phase 3 CLOSED.** Measured finding documented at
+`Bench/scripts/PHASE3_CACHE_AWARE_FINDINGS.md`. Two-seed
+Tier-A measurement on Qwen-7B H100 returned an inconclusive
+realized-hit signal (C/B = 0.903 and 1.115, opposite signs)
+with a consistent mild E2E p99 regression (1.4-1.6×). Cache-
+aware reorder is **not productionized**.
 
-What landed:
+What stays in-tree (per Phase 4 + TurboQuant precedent — keep
+code, document the finding, no destructive removals):
 
-- ✅ `AsyncEngineDriver(cache_aware_scheduling: bool = False,
-  cache_aware_max_starvation_seconds: float = 30.0)` arg
-- ✅ Hook `install_cache_aware_scheduler()` into engine init
-  (same pattern as `int4_route_a` install in
-  `runner_vllm_streaming.py`)
-- ✅ New `cache_aware_scheduler_stats` field on
-  `StreamingRunCellResult`
-- ✅ CLI flag `--cache-aware-scheduling` on `run_streaming.py`
-- ✅ V2 block-manager BlockTable shape fix (commit `d812324`)
-  to handle real vLLM 0.7.3 V0+V2 path
-- ✅ 12 CPU plumbing/regression tests (8 in
-  `Bench/tests/test_cache_aware_runner_plumbing.py` + 4 V2-shape
-  tests in `test_cache_aware_install.py`)
-- ✅ Qwen-7B GPU smoke GREEN (admitted=20, completed=20,
-  decode_tokens=640, `tree_inserts=20`, `tree_evictions=632`,
-  all 9 stats keys populated with `enabled=True`)
-- ✅ int4_protected Tier A regression GREEN (Qwen-7B seed=44:
-  **15/15 == stock bf16**, 0 fallbacks)
+- `KVPolicy/kv_policy/cache_aware_scheduler.py` (Phase 0)
+- `KVPolicy/kv_policy/cache_aware_install.py` (full +
+  measurement-only modes)
+- `KVPolicy/kv_policy/prefix_hit_probe.py` (Phase 3A probe)
+- `Bench/ctm_bench/runner_vllm_streaming.py` (driver wiring +
+  shared-prefix builder + latency telemetry)
+- `Bench/ctm_bench/scripts/bench_phase3_cache_aware.py` (the
+  three-cell bench harness — partner-credible measurement
+  utility, retained as a v2 tool)
+- CLI flags `--cache-aware-scheduling` (experimental warning in
+  --help; do not enable in production) and
+  `--cache-aware-measurement-only` (retained as a measurement
+  utility independent of reorder)
+- 119 CPU tests
 
-Pending (not in PR-2 scope per the original approval — "no
-hit-rate-improvement claim in PR-2"):
+What VC brief says: unchanged. Cache-aware was never in the brief.
 
-- Shared-prefix workload to exercise gates 4 (`reordered_count >
-  0`) and 6 (`prediction_accuracy >= 0.85`); ~1 day code + CPU
-  test + a short GPU smoke (~$0.05). Could land as PR-2.5 or
-  fold into Phase 3.
-- Phase 3 GPU validation on chat_32k (the real
-  measurement-of-effect run). ~2-3 days + ~$0.30.
+Revisit conditions (per `PHASE3_CACHE_AWARE_FINDINGS.md`):
+1. Better-calibrated predictor (the 3.1× under-prediction is the
+   load-bearing mechanism behind the inconclusive signal)
+2. Real chat workload replay (synthetic Pareto may not represent
+   production)
+3. Tier-A 5-seed replication (~$0.50; would tighten confidence
+   interval on the 10-15% effect)
+4. Partner-driven workload where FCFS produces less natural
+   concurrent overlap
 
 ### 2. CUDA Graphs
 
