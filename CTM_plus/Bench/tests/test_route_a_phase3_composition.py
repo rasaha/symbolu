@@ -290,12 +290,18 @@ def test_install_attention_capture_subsamples_layers():
     )
 
 
-def test_is_vllm_attention_module_rejects_projection_modules():
-    """Day 5b May 2026 GPU run regression: the fallback heuristic
-    matched QKVParallelLinear (84 modules patched on Qwen2.5-7B
-    vs route-A's 56). Strict matching keeps the heuristic from
-    over-patching projection modules that happen to have
-    head_dim/num_heads attributes.
+def test_is_vllm_attention_module_strict_to_inner_attention():
+    """Day 5b May 2026 GPU run, iteration 2: the broader
+    ``endswith("Attention")`` match combined with capture_every_n=4
+    preferentially picked the OUTER model wrappers (Qwen2Attention),
+    whose forward signature doesn't carry attn_metadata at args[4].
+    Capture extracted 0 samples even though throughput recovered.
+
+    Lock the strict match: only vLLM's inner Attention /
+    PagedAttention class names match. The per-model wrappers
+    (Qwen2Attention, LlamaAttention, MistralAttention) are
+    intentionally REJECTED here even though they pass route-A's
+    looser check.
     """
     import torch
     from kv_policy.vllm_evictor import _is_vllm_attention_module
@@ -305,24 +311,32 @@ def test_is_vllm_attention_module_rejects_projection_modules():
         num_heads = 4
         def forward(self, *a, **k): pass
 
+    class PagedAttention(torch.nn.Module):
+        head_size = 128
+        num_heads = 4
+        def forward(self, *a, **k): pass
+
     class Qwen2Attention(torch.nn.Module):
+        # The outer wrapper. Its forward signature does NOT carry
+        # attn_metadata at args[4] — capture would silently fail.
         head_size = 128
         num_heads = 4
         def forward(self, *a, **k): pass
 
     class QKVParallelLinear(torch.nn.Module):
-        # Has the heuristic-matched attrs, but it's not an attention
-        # module — the Day 5b smoking gun.
+        # Has heuristic-match attrs, but it's not an attention module.
         head_size = 128
         num_heads = 4
         def forward(self, x): return x
 
     assert _is_vllm_attention_module(Attention())
-    assert _is_vllm_attention_module(Qwen2Attention())
-    assert not _is_vllm_attention_module(QKVParallelLinear()), (
-        "QKVParallelLinear class name does not end with Attention; "
-        "must be rejected. Pre-fix, the fallback heuristic accepted it."
+    assert _is_vllm_attention_module(PagedAttention())
+    assert not _is_vllm_attention_module(Qwen2Attention()), (
+        "Qwen2Attention is the outer wrapper; its forward signature "
+        "doesn't carry attn_metadata at args[4]. Day 5b iteration 2 "
+        "regression: subsampling picked these and got 0 samples."
     )
+    assert not _is_vllm_attention_module(QKVParallelLinear())
 
 
 def test_compose_does_not_double_quantize_kv():

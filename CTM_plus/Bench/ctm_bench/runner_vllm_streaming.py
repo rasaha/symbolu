@@ -1031,6 +1031,11 @@ class AsyncEngineDriver:
                         aggregator=attention_aggregator,
                         evictor=installed_evictor,
                         capture_every_n=self.phase3_capture_every_n,
+                        # Surface capture exceptions during bridge
+                        # debugging. Day 5b iteration 2 May 2026
+                        # had 0 samples; without this we couldn't
+                        # see WHY. Keep on until bridge is green.
+                        enable_logging=True,
                     )
                     logger.info(
                         "Phase 3: attention capture installed on "

@@ -1790,7 +1790,14 @@ def install_attention_capture(
     # torch IS installed).
     patched_count = 0
     seen_count = 0
+    seen_class_names: Dict[str, int] = {}
     for name, module in _walk_modules(model):
+        # Diagnostic: track which classes the walk encountered (every
+        # module, not just matches). On Day 5b iteration 2 the strict
+        # matcher returned 0 samples; this log line surfaces whether
+        # the walk found the expected "Attention" class at all.
+        cls_name = type(module).__name__
+        seen_class_names[cls_name] = seen_class_names.get(cls_name, 0) + 1
         if not _is_vllm_attention_module(module):
             continue
         # Layer subsampling: skip all but every Nth eligible
@@ -1840,16 +1847,27 @@ def install_attention_capture(
         module.forward = make_wrapper(original_forward, head_size, name)
         patched_count += 1
 
+    # Day 5b iteration 2 diagnostic: log the top-K class names seen
+    # in the walk. If 'Attention' isn't in the top names, the
+    # heuristic is wrong for this vLLM version.
+    top_classes = sorted(
+        seen_class_names.items(), key=lambda kv: -kv[1],
+    )[:10]
     if patched_count == 0:
         logger.warning(
             "install_attention_capture: no Attention modules found "
             "in model. Phase 3 attention forwarding will be a no-op. "
-            "vLLM minor version may have different module structure."
+            "Top classes seen in walk: %s. vLLM minor version may "
+            "have different module structure; adjust "
+            "_is_vllm_attention_module accordingly.",
+            top_classes,
         )
     else:
         logger.info(
-            "install_attention_capture: patched %d Attention layers",
-            patched_count,
+            "install_attention_capture: patched %d Attention layers "
+            "out of %d eligible (capture_every_n=%d). Top classes "
+            "seen in walk: %s",
+            patched_count, seen_count, capture_every_n, top_classes,
         )
     return patched_count
 
@@ -1886,18 +1904,24 @@ def _is_vllm_attention_module(module: Any) -> bool:
     """Identify vLLM's Attention layer by class name (avoids
     requiring vllm to be importable).
 
-    Strict matching: class name must end with "Attention". This
-    matches both vLLM's inner ``Attention`` and the model-level
-    wrapper (e.g., ``Qwen2Attention``), but rejects QKV projection
-    classes (``QKVParallelLinear`` etc.) that happen to expose
-    ``head_dim`` / ``num_heads`` attributes. The earlier fallback
-    heuristic overmatched 84 modules on Qwen2.5-7B (vs route-A's
-    56) on the May 2026 Day 5b GPU run; the over-matched modules
-    burned wall time on capture failures and dropped throughput
-    5-10x. Align with route-A's ``_looks_like_attention``.
+    Match the vLLM-internal Attention class ONLY (not the per-model
+    wrapper such as ``Qwen2Attention`` or ``LlamaAttention``). The
+    inner Attention's forward signature is
+    ``forward(query, key, value, kv_cache, attn_metadata)`` — the
+    capture extractor reads ``attn_metadata`` at ``args[4]``. The
+    outer per-model wrapper has a different signature
+    (``forward(positions, hidden_states, kv_cache, attn_metadata)``);
+    matching it makes ``_capture_attention_to_aggregator`` silently
+    early-return because ``args[4]`` is no longer the metadata.
+
+    Day 5b May 2026 GPU run iteration 2: the broader
+    ``endswith("Attention")`` match combined with
+    ``capture_every_n=4`` preferentially picked the outer wrappers
+    (walk-order interleaves both classes) and capture extracted 0
+    samples. Strict matching to the inner Attention only.
     """
     cls = type(module).__name__
-    if not cls.endswith("Attention"):
+    if cls not in ("Attention", "PagedAttention"):
         return False
     return hasattr(module, "forward")
 
