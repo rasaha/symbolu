@@ -64,6 +64,39 @@ History:
 
 VC brief: unchanged. Extended pinning was never in the brief.
 
+**CLOSED, POSITIVE:** Phase TIER5A swap-restore verification. See
+`PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md` for the measured finding.
+
+History (branch `claude/peaceful-einstein-hZmJs`):
+* TIER5A.1 (CPU prototype + tests + G5/G6 gate): ✅ commit `2e0b355`
+* TIER5A.2 (composition smoke for 4 install layers): ✅ commit `bdd92e1`
+* TIER5A.2.1 (audit fix-up — 5 load-bearing): ✅ commit `8546203`
+* TIER5A.3 (GPU-ready code + G6b wheel pin + audit A1): ✅ commit `ba2efbc`
+* TIER5A.3b (recompute-mode baseline — test design fix): ✅ commit `d2bd459`
+* TIER5A.3 wheel SHA freeze (post-first-green): ✅ commit `a44c6ed`
+* TIER5A.4 diagnostic script: ✅ commit `84db06d`
+* TIER5A.4 V0 block_manager fast path (closes G3 telemetry gap): ✅ commit `ed2ebdf`
+* TIER5A.4 closure doc: ✅ `PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md`
+* **TIER5A CLOSED, positive measured finding.** Final green run on
+  Qwen-2.5-7B-Instruct + A100-80GB + vLLM 0.7.3 (forked) returned all
+  six gates GREEN. Cell B (swap, 1174 swap_out_blocks) and cell D
+  (recompute, 0 swap_out_blocks) produced bit-identical 64-token
+  verifier output → **int4_protected's packed KV layout survives the
+  GPU↔CPU swap round-trip byte-for-byte**.
+
+GPU spend: ≈ $0.30-0.50 across iterations (single A100 pod, ~30 min
+live).
+
+VC brief: **updated to reflect the TIER5A measured outcome.** TIER5A
+was not previously in the brief; the new Appendix entry records the
+positive finding as a Phase 5 prerequisite met.
+
+Implication: Phase 5B (cold tier) is **unblocked** by the TIER5A
+positive finding. The warm-tier swap-restore foundation is bit-clean.
+Phase 5B remains its own design + CPU prototype + GPU smoke +
+finding-doc cycle; do NOT start it without explicit per-phase
+approval.
+
 ## Five pending v2 items (the brief's Tier 1 list)
 
 Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5
@@ -89,9 +122,21 @@ Tier 1 cleanly" framing with margin for findings.
 2. **Do NOT restart local TurboQuant KV-path.** Retired after
    3052× perplexity ratio on Qwen-7B. Don't restore the
    `--turboquant-kv` flag.
-3. **Do NOT edit `INT4_PROTECTED_VC_BRIEF.md` without explicit
+3. **Do NOT re-litigate the TIER5A warm-tier swap-restore
+   finding.** Closed POSITIVE — int4_protected survives vLLM's
+   swap path bit-for-bit. The bench harness, orthogonality gate,
+   and recompute-baseline machinery stay in-tree as the
+   partner-credible verification utility for any future change
+   that could affect the swap path (kernel edits, vLLM version
+   bumps, allocator changes). If TIER5A re-verification is
+   needed after such a change, **re-run the existing bench with
+   `--recompute-baseline` — do NOT change the test design.**
+4. **Do NOT edit `INT4_PROTECTED_VC_BRIEF.md` without explicit
    user approval.** Tier A replication is the current state;
-   any edit must be backed by replicated measurement.
+   any edit must be backed by replicated measurement. TIER5A's
+   positive finding was added to the Appendix with explicit
+   user approval and is backed by the green
+   `tier5a_swap_restore_report.json` artifact.
 4. **CPU-first verification.** Every new code path lands with
    CPU tests before any GPU spend. See the v2 cache-reuse PR-1
    pattern: 22 CPU tests gate the vLLM integration.

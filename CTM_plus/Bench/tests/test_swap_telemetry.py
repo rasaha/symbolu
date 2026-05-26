@@ -1,0 +1,803 @@
+"""Phase TIER5A.1 CPU tests for ``kv_policy.swap_telemetry``.
+
+Acceptance gates exercised (CPU-only):
+
+* CPU pool snapshot — V1, V2 property, V2 dict, no-known-path
+  fallback (4 paths).
+* Block-count read fallbacks: total only, free only, both, neither.
+* Direct used-block API takes precedence over derived used = total - free.
+* ``bytes_per_block_estimate`` propagates through the snapshot.
+* Latency probe install:
+  - returns inert handle when ``enable=False``.
+  - returns inert handle on no-known-path block_manager.
+  - returns inert handle when no swap-in attr is callable.
+  - wraps the first available callable from
+    ``_SWAP_IN_WRAP_CANDIDATES``.
+  - records per-event wall-time on each invocation.
+  - teardown restores original behaviour; idempotent.
+* Peak tracker tracks max, ignores unreadable samples.
+* Composes additively (no shared state) with mock cache_aware /
+  extended_pinning install attribute names.
+
+No torch, no vllm, no GPU. Real-vLLM verification is part of
+TIER5A.3 GPU smoke.
+"""
+
+from __future__ import annotations
+
+import time
+from typing import Any, List
+
+import pytest
+
+from ctm_bench.policies import _add_kv_policy_to_path
+_add_kv_policy_to_path()
+
+from kv_policy.swap_telemetry import (
+    CpuSwapPoolPeakTracker,
+    CpuSwapPoolSnapshot,
+    SwapInLatencyProbe,
+    _percentile_ms,
+    _read_allocator_block_counts,
+    _resolve_block_size_tokens,
+    _resolve_cpu_allocator,
+    _SWAP_IN_WRAP_CANDIDATES,
+    install_swap_in_latency_probe,
+    read_cpu_swap_pool,
+)
+
+
+# ---------------------------------------------------------------- #
+# Mock vLLM allocator shapes
+# ---------------------------------------------------------------- #
+
+
+class _MockCpuAllocator:
+    """CPU allocator with the attributes vLLM 0.7.x exposes.
+
+    Configurable per-test for which getters / methods are
+    present; absence of an attribute simulates an older vLLM
+    minor version.
+    """
+
+    def __init__(
+        self,
+        *,
+        num_total_blocks: int = 0,
+        num_free_blocks: int = 0,
+        num_used_blocks: int | None = None,
+        swap_in_callable: Any = None,
+        expose_total_as_method: bool = False,
+        expose_free_as_method: bool = True,
+    ) -> None:
+        if expose_total_as_method:
+            self.num_total_blocks = lambda: num_total_blocks
+        else:
+            self.num_total_blocks = num_total_blocks
+        if expose_free_as_method:
+            self.get_num_free_blocks = lambda: num_free_blocks
+        else:
+            self.num_free_blocks = num_free_blocks
+        if num_used_blocks is not None:
+            self.num_used_blocks = num_used_blocks
+        if swap_in_callable is not None:
+            # Assign by the first wrap-candidate name so the probe
+            # resolves it.
+            setattr(self, "swap_in", swap_in_callable)
+
+
+class _MockBlockAllocatorV2Property:
+    """Mock CpuGpuBlockAllocator with property-form cpu_allocator."""
+
+    def __init__(self, cpu_allocator: Any) -> None:
+        self.cpu_allocator = cpu_allocator
+
+
+class _MockBlockAllocatorV2Dict:
+    """Mock CpuGpuBlockAllocator with dict-form _allocators."""
+
+    def __init__(self, cpu_allocator: Any, *, key: str = "Device.CPU") -> None:
+        self._allocators = {key: cpu_allocator}
+
+
+class _MockBlockManagerV2Property:
+    def __init__(
+        self, cpu_allocator: Any, *, block_size: int = 32,
+    ) -> None:
+        self.block_allocator = _MockBlockAllocatorV2Property(cpu_allocator)
+        self.block_size = block_size
+
+
+class _MockBlockManagerV2Dict:
+    def __init__(
+        self, cpu_allocator: Any, *, block_size: int = 32,
+        key: str = "Device.CPU",
+    ) -> None:
+        self.block_allocator = _MockBlockAllocatorV2Dict(
+            cpu_allocator, key=key,
+        )
+        self.block_size = block_size
+
+
+class _MockBlockManagerV1:
+    """Mock V1 block manager: cpu_allocator directly on the
+    block_manager, no block_allocator wrapper."""
+
+    def __init__(
+        self, cpu_allocator: Any, *, block_size: int = 16,
+    ) -> None:
+        self.cpu_allocator = cpu_allocator
+        # V1 didn't expose block_size on the block_manager directly;
+        # the cache_config did. Mirror that.
+        self._cache_config = type(
+            "CacheConfig", (), {"block_size": block_size}
+        )()
+
+
+class _MockBlockManagerNoPath:
+    """Mock block manager with no allocator at all — exercises the
+    no_known_path fallback."""
+
+    pass
+
+
+# ---------------------------------------------------------------- #
+# Allocator path resolution
+# ---------------------------------------------------------------- #
+
+
+def test_resolve_cpu_allocator_v2_property():
+    cpu = _MockCpuAllocator(num_total_blocks=4096, num_free_blocks=4000)
+    bm = _MockBlockManagerV2Property(cpu)
+    allocator, hint = _resolve_cpu_allocator(bm)
+    assert allocator is cpu
+    assert hint == "v2_block_allocator.cpu_allocator"
+
+
+def test_resolve_cpu_allocator_v2_dict():
+    cpu = _MockCpuAllocator(num_total_blocks=4096, num_free_blocks=4000)
+    bm = _MockBlockManagerV2Dict(cpu)
+    allocator, hint = _resolve_cpu_allocator(bm)
+    assert allocator is cpu
+    assert hint == "v2_block_allocator._allocators[CPU]"
+
+
+def test_resolve_cpu_allocator_v1_direct():
+    cpu = _MockCpuAllocator(num_total_blocks=4096, num_free_blocks=4000)
+    bm = _MockBlockManagerV1(cpu)
+    allocator, hint = _resolve_cpu_allocator(bm)
+    assert allocator is cpu
+    assert hint == "v1_block_manager.cpu_allocator"
+
+
+def test_resolve_cpu_allocator_no_known_path():
+    bm = _MockBlockManagerNoPath()
+    allocator, hint = _resolve_cpu_allocator(bm)
+    assert allocator is None
+    assert hint == "no_known_path"
+
+
+# ---------------------------------------------------------------- #
+# Block-count read
+# ---------------------------------------------------------------- #
+
+
+def test_read_allocator_block_counts_total_and_free_attrs():
+    cpu = _MockCpuAllocator(
+        num_total_blocks=1000, num_free_blocks=900,
+        expose_free_as_method=False,
+    )
+    used, total = _read_allocator_block_counts(cpu)
+    assert used == 100
+    assert total == 1000
+
+
+def test_read_allocator_block_counts_free_as_method():
+    cpu = _MockCpuAllocator(
+        num_total_blocks=1000, num_free_blocks=900,
+        expose_free_as_method=True,
+    )
+    used, total = _read_allocator_block_counts(cpu)
+    assert used == 100
+    assert total == 1000
+
+
+def test_read_allocator_block_counts_total_as_method():
+    cpu = _MockCpuAllocator(
+        num_total_blocks=1000, num_free_blocks=900,
+        expose_total_as_method=True,
+    )
+    used, total = _read_allocator_block_counts(cpu)
+    assert used == 100
+    assert total == 1000
+
+
+def test_read_allocator_block_counts_direct_used_wins():
+    """When the allocator exposes ``num_used_blocks`` directly,
+    the read uses it verbatim instead of derived total-free."""
+    cpu = _MockCpuAllocator(
+        num_total_blocks=1000, num_free_blocks=999,
+        num_used_blocks=42,
+    )
+    used, total = _read_allocator_block_counts(cpu)
+    assert used == 42       # direct, not total-free=1
+    assert total == 1000
+
+
+def test_read_allocator_block_counts_no_attrs():
+    """Allocator exposes neither total nor free — used returns
+    -1 sentinel meaning 'unreadable'."""
+    cpu = object()
+    used, total = _read_allocator_block_counts(cpu)
+    assert used == -1
+    assert total == 0
+
+
+# ---------------------------------------------------------------- #
+# Block-size resolution
+# ---------------------------------------------------------------- #
+
+
+def test_resolve_block_size_tokens_from_block_manager():
+    bm = _MockBlockManagerV2Property(
+        _MockCpuAllocator(), block_size=32,
+    )
+    assert _resolve_block_size_tokens(bm) == 32
+
+
+def test_resolve_block_size_tokens_from_cache_config():
+    bm = _MockBlockManagerV1(_MockCpuAllocator(), block_size=16)
+    assert _resolve_block_size_tokens(bm) == 16
+
+
+def test_resolve_block_size_tokens_fallback():
+    bm = _MockBlockManagerNoPath()
+    assert _resolve_block_size_tokens(bm, fallback=99) == 99
+
+
+# ---------------------------------------------------------------- #
+# read_cpu_swap_pool snapshot
+# ---------------------------------------------------------------- #
+
+
+def test_read_cpu_swap_pool_v2_property_with_use():
+    cpu = _MockCpuAllocator(num_total_blocks=1024, num_free_blocks=900)
+    bm = _MockBlockManagerV2Property(cpu, block_size=32)
+    snap = read_cpu_swap_pool(bm, bytes_per_block_estimate=4096)
+    assert isinstance(snap, CpuSwapPoolSnapshot)
+    assert snap.num_used_blocks == 124
+    assert snap.num_total_blocks == 1024
+    assert snap.block_size_tokens == 32
+    assert snap.bytes_per_block_estimate == 4096
+    assert snap.hint_path == "v2_block_allocator.cpu_allocator"
+
+
+def test_read_cpu_swap_pool_no_path_marker():
+    bm = _MockBlockManagerNoPath()
+    snap = read_cpu_swap_pool(bm, block_size_fallback=16)
+    assert snap.num_used_blocks == -1
+    assert snap.num_total_blocks == 0
+    assert snap.block_size_tokens == 16
+    assert snap.hint_path == "no_known_path"
+
+
+def test_read_cpu_swap_pool_utilization_and_bytes_helpers():
+    cpu = _MockCpuAllocator(num_total_blocks=200, num_free_blocks=150)
+    bm = _MockBlockManagerV2Property(cpu, block_size=32)
+    snap = read_cpu_swap_pool(bm, bytes_per_block_estimate=4096)
+    assert snap.utilization == pytest.approx(50 / 200)
+    assert snap.num_used_bytes_estimate == 50 * 4096
+
+
+def test_read_cpu_swap_pool_utilization_with_unreadable_used():
+    cpu = object()
+    bm = _MockBlockManagerV2Property(cpu, block_size=32)
+    snap = read_cpu_swap_pool(bm)
+    assert snap.num_used_blocks == -1
+    # Utilization safely returns 0 when used is unreadable.
+    assert snap.utilization == 0.0
+    # Bytes estimate is 0 (both used unknown AND per-block estimate
+    # unset).
+    assert snap.num_used_bytes_estimate == 0
+
+
+# ---------------------------------------------------------------- #
+# SwapInLatencyProbe install + teardown
+# ---------------------------------------------------------------- #
+
+
+def test_install_probe_disabled_via_flag():
+    cpu = _MockCpuAllocator()
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm, enable=False)
+    assert handle.enabled is False
+    assert handle.hint_path == "disabled"
+    assert handle.latencies_ms == []
+    handle.teardown()  # no-op; idempotent
+    handle.teardown()
+
+
+def test_install_probe_no_known_path_returns_disabled_handle():
+    bm = _MockBlockManagerNoPath()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is False
+    assert handle.hint_path == "no_known_path"
+
+
+def test_install_probe_no_swap_attr_returns_disabled():
+    cpu = _MockCpuAllocator(num_total_blocks=1, num_free_blocks=1)
+    # cpu has no swap_in / swap_in_blocks / _swap_in / swap_blocks_in
+    # AND block_manager/block_allocator likewise have no swap entry.
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is False
+    # Broadened resolver (TIER5A.3 fixup): when no level exposes a
+    # callable, the hint is the canonical 'no_known_path' marker.
+    assert handle.hint_path == "no_known_path"
+
+
+def test_install_probe_wraps_first_candidate_swap_in():
+    calls: List[tuple] = []
+
+    def fake_swap_in(*args, **kwargs):
+        calls.append((args, kwargs))
+        return "OK"
+
+    cpu = _MockCpuAllocator(swap_in_callable=fake_swap_in)
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap_in"
+
+    # Invoke the wrapped method; it should delegate + record time.
+    result = cpu.swap_in("a", "b", flag=True)
+    assert result == "OK"
+    assert calls == [(("a", "b"), {"flag": True})]
+    assert len(handle.latencies_ms) == 1
+    assert handle.latencies_ms[0] >= 0.0
+
+    # Aggregates.
+    assert handle.stats()["call_count"] == 1
+    assert handle.stats()["p50_ms"] >= 0.0
+    assert handle.stats()["enabled"] is True
+
+    handle.teardown()
+    # After teardown the wrap should be reverted; calling swap_in
+    # delegates to the original (not the wrap).
+    cpu.swap_in("c")
+    # latencies_ms should NOT grow after teardown.
+    assert len(handle.latencies_ms) == 1
+
+
+def test_install_probe_records_multiple_events_in_order():
+    def slow_in(_payload):
+        time.sleep(0.001)
+        return None
+
+    cpu = _MockCpuAllocator(swap_in_callable=slow_in)
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm)
+    try:
+        for i in range(5):
+            cpu.swap_in(i)
+        assert len(handle.latencies_ms) == 5
+        # Each event should record positive wall time (we slept).
+        for ms in handle.latencies_ms:
+            assert ms > 0.0
+        # p50 and p99 should be non-negative and ordered.
+        stats = handle.stats()
+        assert stats["p50_ms"] <= stats["p99_ms"]
+        assert stats["mean_ms"] > 0.0
+    finally:
+        handle.teardown()
+    assert handle.stats()["torn_down"] is True
+
+
+def test_install_probe_teardown_is_idempotent():
+    cpu = _MockCpuAllocator(swap_in_callable=lambda: None)
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm)
+    handle.teardown()
+    handle.teardown()        # second teardown silent
+    assert handle.stats()["torn_down"] is True
+
+
+def test_swap_in_candidate_list_is_documented():
+    """Sanity: the candidate name list is non-empty and includes
+    the canonical swap_in name."""
+    assert "swap_in" in _SWAP_IN_WRAP_CANDIDATES
+    assert len(_SWAP_IN_WRAP_CANDIDATES) >= 2
+
+
+# ---------------------------------------------------------------- #
+# Broadened wrap target resolution (TIER5A.3 fixup) — V1 block_manager
+# and V2 block_allocator levels now resolve in addition to the legacy
+# per-device cpu_allocator level. Probe walks the three levels in
+# order; first level with a matching callable wins.
+# ---------------------------------------------------------------- #
+
+
+def test_install_probe_wraps_block_manager_v1_swap_in_direct():
+    """V1 BlockSpaceManagerV1 exposes swap_in(seq_group) directly on
+    the block_manager. The resolver should pick this up before
+    walking deeper."""
+    calls: List[tuple] = []
+
+    class _V1BlockManagerWithSwapIn:
+        block_size = 16
+        def __init__(self):
+            # No cpu_allocator/block_allocator at all — pure V1 shape.
+            pass
+        def swap_in(self, *args, **kwargs):
+            calls.append((args, kwargs))
+            return "V1_OK"
+
+    bm = _V1BlockManagerWithSwapIn()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap_in"
+    assert handle.hint_path == "block_manager.swap_in"
+    # Fire the wrap.
+    assert bm.swap_in("seq_group_handle") == "V1_OK"
+    assert calls == [(("seq_group_handle",), {})]
+    assert len(handle.latencies_ms) == 1
+    handle.teardown()
+    # After teardown, the class method is visible again.
+    assert bm.swap_in("post_td") == "V1_OK"
+    assert len(handle.latencies_ms) == 1  # no new event recorded
+
+
+def test_install_probe_wraps_block_allocator_v2_swap():
+    """V2 CpuGpuBlockAllocator exposes swap(blocks, src, dst). The
+    resolver should pick this up when block_manager has no direct
+    swap entry but block_allocator does."""
+    calls: List[tuple] = []
+
+    class _CpuGpuBlockAllocatorV2WithSwap:
+        def swap(self, blocks, src, dst):
+            calls.append((blocks, src, dst))
+            return "V2_SWAP_OK"
+
+    class _BlockManagerV2WithSwapAllocator:
+        block_size = 32
+        def __init__(self):
+            self.block_allocator = _CpuGpuBlockAllocatorV2WithSwap()
+            # No swap_in on block_manager itself; resolver should
+            # fall through to block_allocator.
+
+    bm = _BlockManagerV2WithSwapAllocator()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap"
+    assert handle.hint_path == "block_allocator.swap"
+    # Bidirectional swap fires the wrap regardless of src/dst.
+    result = bm.block_allocator.swap([1, 2, 3], "GPU", "CPU")
+    assert result == "V2_SWAP_OK"
+    assert calls == [([1, 2, 3], "GPU", "CPU")]
+    assert len(handle.latencies_ms) == 1
+    handle.teardown()
+
+
+def test_install_probe_falls_back_to_cpu_allocator_swap_in():
+    """Legacy fallback: only the per-device cpu_allocator has a
+    swap_in. The new resolver still finds it as the innermost
+    level."""
+    calls: List[tuple] = []
+
+    def fake_swap_in(*args, **kwargs):
+        calls.append((args, kwargs))
+        return "LEGACY_OK"
+
+    cpu = _MockCpuAllocator(swap_in_callable=fake_swap_in)
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap_in"
+    assert handle.hint_path == "cpu_allocator.swap_in"
+    cpu.swap_in("z")
+    assert calls == [(("z",), {})]
+    assert len(handle.latencies_ms) == 1
+    handle.teardown()
+
+
+def test_install_probe_resolution_prefers_block_manager_over_block_allocator():
+    """When BOTH block_manager.swap_in AND block_allocator.swap
+    exist, the resolver picks block_manager (the V1 surface) per
+    the documented level order. Locks the precedence so a future
+    edit doesn't silently re-order."""
+    bm_calls: List[tuple] = []
+    ba_calls: List[tuple] = []
+
+    class _BothBlockAllocator:
+        def swap(self, blocks, src, dst):
+            ba_calls.append((blocks, src, dst))
+            return "BA"
+
+    class _BothBlockManager:
+        block_size = 16
+        def __init__(self):
+            self.block_allocator = _BothBlockAllocator()
+        def swap_in(self, sg):
+            bm_calls.append((sg,))
+            return "BM"
+
+    bm = _BothBlockManager()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.wrap_target_name == "swap_in"
+    assert handle.hint_path == "block_manager.swap_in"
+    # Calling bm.swap_in records latency; calling
+    # block_allocator.swap does NOT (only one level was wrapped).
+    bm.swap_in("seq1")
+    bm.block_allocator.swap([], "GPU", "CPU")
+    assert len(handle.latencies_ms) == 1
+    assert bm_calls == [("seq1",)]
+    assert ba_calls == [([], "GPU", "CPU")]
+    handle.teardown()
+
+
+# ---------------------------------------------------------------- #
+# TIER5A.4 — V0 block_manager-direct fast path for CPU pool counts.
+# Closes the G3 telemetry gap surfaced by the first green TIER5A.3
+# smoke run (cpu_pool_peak=0 of 0). vLLM 0.7.x SelfAttnBlockSpaceManager
+# exposes num_total_cpu_blocks + get_num_free_cpu_blocks() directly
+# on the block_manager; the resolver now tries those FIRST.
+# ---------------------------------------------------------------- #
+
+
+def test_v0_block_manager_direct_path_returns_used_and_total():
+    """When block_manager has the V0 helpers, read_cpu_swap_pool
+    takes the fast path and returns the correct used+total."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _V0BlockManager:
+        block_size = 16
+        num_total_cpu_blocks = 9362
+        def get_num_free_cpu_blocks(self):
+            return 7000   # 2362 in use
+
+    bm = _V0BlockManager()
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_total_blocks == 9362
+    assert snapshot.num_used_blocks == 2362
+    assert snapshot.block_size_tokens == 16
+    assert snapshot.hint_path == "v0_block_manager.get_num_free_cpu_blocks"
+
+
+def test_v0_block_manager_direct_path_with_zero_used():
+    """At engine init (no swaps yet), free == total → used = 0,
+    NOT -1. This is the case the first GPU run reported as
+    'unreadable'; the fix makes it surface as 'no swap activity'."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _V0BlockManager:
+        block_size = 16
+        num_total_cpu_blocks = 9362
+        def get_num_free_cpu_blocks(self):
+            return 9362   # nothing swapped out
+
+    bm = _V0BlockManager()
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_total_blocks == 9362
+    assert snapshot.num_used_blocks == 0    # NOT -1
+    assert snapshot.hint_path == "v0_block_manager.get_num_free_cpu_blocks"
+
+
+def test_v0_block_manager_direct_path_under_load():
+    """Simulates the load case where some blocks are swapped to CPU.
+    free decreases; used = total - free."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _V0BlockManager:
+        block_size = 16
+        num_total_cpu_blocks = 9362
+        def __init__(self):
+            self._free = 9362
+        def get_num_free_cpu_blocks(self):
+            return self._free
+
+    bm = _V0BlockManager()
+    # Drop free by 80 (simulates 80 blocks swapped to CPU).
+    bm._free = 9362 - 80
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_used_blocks == 80
+    assert snapshot.num_total_blocks == 9362
+
+
+def test_v0_fast_path_skipped_when_attributes_missing():
+    """If block_manager lacks the V0 helpers, the fast path returns
+    (-1, 0, '') and read_cpu_swap_pool falls back to the allocator
+    walk."""
+    from kv_policy.swap_telemetry import (
+        _try_v0_block_manager_cpu_counts, read_cpu_swap_pool,
+    )
+
+    class _NoV0Helpers:
+        # block_manager without the new V0 helpers
+        block_size = 16
+        # no num_total_cpu_blocks, no get_num_free_cpu_blocks
+
+    bm = _NoV0Helpers()
+    used, total, hint = _try_v0_block_manager_cpu_counts(bm)
+    assert used == -1
+    assert total == 0
+    assert hint == ""
+    # And read_cpu_swap_pool falls through to no_known_path
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_used_blocks == -1
+    assert snapshot.hint_path == "no_known_path"
+
+
+def test_v0_fast_path_skipped_when_total_is_zero():
+    """An attribute that exists but is 0 (e.g. swap_space_gb=0)
+    should skip the V0 path so the fallback can decide. Otherwise
+    we'd lock the snapshot at 0/0 which the tracker classifies as
+    unreadable."""
+    from kv_policy.swap_telemetry import (
+        _try_v0_block_manager_cpu_counts,
+    )
+
+    class _V0ZeroTotal:
+        block_size = 16
+        num_total_cpu_blocks = 0
+        def get_num_free_cpu_blocks(self):
+            return 0
+
+    used, total, hint = _try_v0_block_manager_cpu_counts(_V0ZeroTotal())
+    assert used == -1
+    assert total == 0
+    assert hint == ""
+
+
+def test_read_allocator_block_counts_reads_get_num_total_blocks():
+    """TIER5A.4 fixup to _read_allocator_block_counts: add
+    get_num_total_blocks (no-arg method) to the total-candidate list.
+    This is vLLM 0.7.3 NaiveBlockAllocator's canonical API; the
+    legacy attribute names (num_total_blocks etc.) don't exist on it.
+    """
+    from kv_policy.swap_telemetry import _read_allocator_block_counts
+
+    class _NaiveBlockAllocator:
+        def get_num_total_blocks(self):
+            return 9362
+        def get_num_free_blocks(self):
+            return 9300
+
+    used, total = _read_allocator_block_counts(_NaiveBlockAllocator())
+    assert total == 9362
+    assert used == 62
+
+
+def test_v0_path_used_in_preference_to_allocator_walk():
+    """When BOTH the V0 fast path AND the allocator walk would
+    work, the fast path wins (it's cleaner — one hop)."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _CpuAlloc:
+        def get_num_total_blocks(self):
+            return 5000     # different from V0 path
+        def get_num_free_blocks(self):
+            return 4000
+
+    class _BlockAllocator:
+        def __init__(self, cpu):
+            self._allocators = {"Device.CPU": cpu, "Device.GPU": object()}
+
+    class _BothPathsBlockManager:
+        block_size = 16
+        # V0 path: this should win
+        num_total_cpu_blocks = 9362
+        def __init__(self):
+            self.block_allocator = _BlockAllocator(_CpuAlloc())
+        def get_num_free_cpu_blocks(self):
+            return 9000     # used = 362 from V0 path
+
+    bm = _BothPathsBlockManager()
+    snapshot = read_cpu_swap_pool(bm)
+    # V0 numbers, not allocator numbers
+    assert snapshot.num_total_blocks == 9362
+    assert snapshot.num_used_blocks == 362
+    assert snapshot.hint_path == "v0_block_manager.get_num_free_cpu_blocks"
+
+
+def test_record_ms_rejects_negative():
+    handle = SwapInLatencyProbe(
+        enabled=True, hint_path="", wrap_target_name="swap_in",
+    )
+    with pytest.raises(ValueError):
+        handle.record_ms(-1.0)
+
+
+def test_record_ms_silent_when_disabled():
+    handle = SwapInLatencyProbe(
+        enabled=False, hint_path="disabled", wrap_target_name="",
+    )
+    handle.record_ms(5.0)
+    assert handle.latencies_ms == []
+
+
+# ---------------------------------------------------------------- #
+# Percentile helper
+# ---------------------------------------------------------------- #
+
+
+def test_percentile_ms_empty_returns_zero():
+    assert _percentile_ms([], 0.50) == 0.0
+    assert _percentile_ms([], 0.99) == 0.0
+
+
+def test_percentile_ms_single_returns_value():
+    assert _percentile_ms([3.0], 0.50) == 3.0
+    assert _percentile_ms([3.0], 0.99) == 3.0
+
+
+def test_percentile_ms_linear_interpolation():
+    """Type-7 (R / numpy default) linear interpolation between
+    sorted samples — same convention as the runner's existing
+    _compute_p50_p99_ms helper. For 5 samples [1,2,3,4,5]:
+      p50 rank = 0.5*(5-1) = 2.0 → exactly s[2] = 3.0
+      p99 rank = 0.99*4 = 3.96 → 0.96*s[4] + 0.04*s[3] = 4.96
+    """
+    samples = [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert _percentile_ms(samples, 0.50) == pytest.approx(3.0)
+    assert _percentile_ms(samples, 0.99) == pytest.approx(4.96)
+
+
+# ---------------------------------------------------------------- #
+# CpuSwapPoolPeakTracker
+# ---------------------------------------------------------------- #
+
+
+def test_peak_tracker_tracks_max_used():
+    tracker = CpuSwapPoolPeakTracker()
+    for used in [10, 50, 30, 75, 60]:
+        snap = CpuSwapPoolSnapshot(
+            num_used_blocks=used,
+            num_total_blocks=100,
+            block_size_tokens=32,
+            bytes_per_block_estimate=0,
+            hint_path="v2",
+        )
+        tracker.observe(snap)
+    assert tracker.peak_used_blocks == 75
+    assert tracker.final_used_blocks == 60   # last sample
+    assert tracker.total_blocks == 100
+    assert tracker.n_samples == 5
+    assert tracker.n_unreadable_samples == 0
+
+
+def test_peak_tracker_ignores_unreadable_samples_for_peak():
+    tracker = CpuSwapPoolPeakTracker()
+    # mix of readable and unreadable.
+    readable_used = [20, 40, 30]
+    for u in readable_used:
+        tracker.observe(CpuSwapPoolSnapshot(
+            num_used_blocks=u, num_total_blocks=100,
+            block_size_tokens=32, bytes_per_block_estimate=0,
+            hint_path="v2",
+        ))
+    # Insert an unreadable snapshot between samples.
+    tracker.observe(CpuSwapPoolSnapshot(
+        num_used_blocks=-1, num_total_blocks=0,
+        block_size_tokens=0, bytes_per_block_estimate=0,
+        hint_path="no_known_path",
+    ))
+    assert tracker.peak_used_blocks == 40
+    assert tracker.final_used_blocks == 30   # unchanged by unreadable
+    assert tracker.n_samples == 4
+    assert tracker.n_unreadable_samples == 1
+
+
+def test_peak_tracker_bytes_estimates():
+    tracker = CpuSwapPoolPeakTracker()
+    tracker.observe(CpuSwapPoolSnapshot(
+        num_used_blocks=50, num_total_blocks=100,
+        block_size_tokens=32, bytes_per_block_estimate=4096,
+        hint_path="v2",
+    ))
+    tracker.observe(CpuSwapPoolSnapshot(
+        num_used_blocks=20, num_total_blocks=100,
+        block_size_tokens=32, bytes_per_block_estimate=4096,
+        hint_path="v2",
+    ))
+    assert tracker.peak_used_bytes_estimate == 50 * 4096
+    assert tracker.final_used_bytes_estimate == 20 * 4096

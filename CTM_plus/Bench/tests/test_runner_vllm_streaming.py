@@ -2549,3 +2549,507 @@ def test_extract_model_from_engine_walks_documented_paths():
     eng3 = _Engine()
     found3 = AsyncEngineDriver._extract_model_from_engine(eng3)
     assert found3 is eng3
+
+
+
+# ------------------------------------------------------------------ #
+# Phase TIER5A — additive StreamingRunCellResult fields
+#
+# The TIER5A.1 surface is additive: new optional fields with
+# defaults of 0 / empty dict. These tests verify the defaults +
+# round-trip through the dataclass constructor.
+# ------------------------------------------------------------------ #
+
+
+def test_streaming_result_tier5a_fields_default_to_zero():
+    """All TIER5A telemetry fields default to 0 / empty when not
+    explicitly set, so pre-TIER5A callers are byte-identical."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    assert r.cpu_swap_pool_used_blocks_peak == 0
+    assert r.cpu_swap_pool_used_blocks_final == 0
+    assert r.cpu_swap_pool_total_blocks == 0
+    assert r.swap_in_latency_p50_ms == 0.0
+    assert r.swap_in_latency_p99_ms == 0.0
+    assert r.swap_in_latency_call_count == 0
+    assert r.swap_telemetry_stats == {}
+
+
+def test_streaming_result_tier5a_fields_round_trip():
+    """All TIER5A fields accept the documented value ranges and
+    survive a construct."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+        cpu_swap_pool_used_blocks_peak=128,
+        cpu_swap_pool_used_blocks_final=64,
+        cpu_swap_pool_total_blocks=4096,
+        swap_in_latency_p50_ms=2.5,
+        swap_in_latency_p99_ms=12.0,
+        swap_in_latency_call_count=42,
+        swap_telemetry_stats={
+            "hint_path": "v2_block_allocator.cpu_allocator",
+            "enabled": True,
+        },
+    )
+    assert r.cpu_swap_pool_used_blocks_peak == 128
+    assert r.swap_in_latency_p99_ms == 12.0
+    assert r.swap_telemetry_stats["enabled"] is True
+
+
+def test_streaming_result_is_still_frozen_after_tier5a_extension():
+    """The dataclass remains frozen — adding optional fields must
+    not silently un-freeze the structure."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    with pytest.raises(Exception):
+        r.cpu_swap_pool_used_blocks_peak = 99  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------- #
+# Phase TIER5A — runner wiring for swap-restore telemetry. The 5
+# audit-load-bearing fixes (B1, C1, C3, A3, A2) — the runner-side
+# tests live here; the verdict-logic tests for A3/A2 are in
+# test_bench_tier5a_swap_restore.py.
+# ---------------------------------------------------------------- #
+
+
+def test_async_engine_driver_constructor_accepts_swap_telemetry_flag():
+    """B1 fixup: constructor takes ``swap_telemetry`` and stores
+    it. Default is False (opt-in); the TIER5A bench passes True
+    for all three cells (always-on telemetry surface)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver_default = AsyncEngineDriver(model="dummy")
+    assert driver_default.swap_telemetry is False
+    assert driver_default._swap_in_latency_probe is None
+    assert driver_default._cpu_swap_pool_peak_tracker is None
+    assert driver_default._swap_telemetry_block_manager_ref is None
+
+    driver_on = AsyncEngineDriver(model="dummy", swap_telemetry=True)
+    assert driver_on.swap_telemetry is True
+    # Handles remain None until run() installs them.
+    assert driver_on._swap_in_latency_probe is None
+    assert driver_on._cpu_swap_pool_peak_tracker is None
+
+
+def test_async_engine_driver_run_cpu_swap_pool_sampler_calls_observe_and_handles_cancel():
+    """C3 fixup: ``_run_cpu_swap_pool_sampler`` is the polling loop
+    that feeds CpuSwapPoolPeakTracker.observe(...) on the same
+    cadence as SwapCounterSampler. Without this loop, peak
+    collapses to a single end-of-cell snapshot.
+
+    Verifies: (a) the sampler calls observe() at least once before
+    cancellation; (b) on cancel, a final observe() captures the
+    end-of-cell state; (c) exceptions inside read are swallowed
+    (best-effort telemetry; never crashes the run loop).
+    """
+    import asyncio
+
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    from kv_policy.swap_telemetry import CpuSwapPoolPeakTracker
+
+    class _MockBM:
+        def __init__(self):
+            self.read_count = 0
+        # Match read_cpu_swap_pool's resolution: no block_allocator;
+        # falls through to no_known_path → snapshot with used=-1.
+        # The tracker classifies that as n_unreadable_samples; for
+        # this test we drive observe directly via a mock read.
+
+    # Patch read_cpu_swap_pool in the swap_telemetry module the
+    # sampler imports from. We use a tiny fake that increments a
+    # counter and returns a synthetic snapshot.
+    import kv_policy.swap_telemetry as st_mod
+    from kv_policy.swap_telemetry import CpuSwapPoolSnapshot
+
+    tracker = CpuSwapPoolPeakTracker()
+    bm = _MockBM()
+    read_calls: list[int] = []
+
+    def fake_read(block_manager, **kwargs):
+        bm.read_count += 1
+        read_calls.append(bm.read_count)
+        # Drive a non-trivial peak: 1st sample used=10, 2nd=42
+        used = 10 if bm.read_count == 1 else 42
+        return CpuSwapPoolSnapshot(
+            num_used_blocks=used,
+            num_total_blocks=1024,
+            block_size_tokens=32,
+            bytes_per_block_estimate=0,
+            hint_path="test_fixture",
+        )
+
+    driver = AsyncEngineDriver(
+        model="dummy", swap_telemetry=True,
+        sample_interval_seconds=0.001,
+    )
+    driver._swap_telemetry_block_manager_ref = bm
+    driver._cpu_swap_pool_peak_tracker = tracker
+
+    orig_read = st_mod.read_cpu_swap_pool
+    st_mod.read_cpu_swap_pool = fake_read
+    try:
+        async def _drive():
+            task = asyncio.create_task(
+                driver._run_cpu_swap_pool_sampler()
+            )
+            # Let the sampler tick at least twice.
+            await asyncio.sleep(0.005)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(_drive())
+    finally:
+        st_mod.read_cpu_swap_pool = orig_read
+
+    # observe() was called multiple times — at least 1 in-loop +
+    # 1 final-on-cancel. Peak reflects the higher value seen.
+    assert tracker.n_samples >= 2, (
+        f"sampler called observe {tracker.n_samples} times — "
+        "should have been at least 2 (in-loop + final-on-cancel)"
+    )
+    assert tracker.peak_used_blocks == 42, (
+        f"peak should track max-observed; got {tracker.peak_used_blocks}"
+    )
+    assert tracker.total_blocks == 1024
+
+
+def test_async_engine_driver_run_cpu_swap_pool_sampler_no_op_when_missing_refs():
+    """If the install path didn't run (no probe / no tracker), the
+    sampler is a structural no-op — never reads, never observes."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(model="dummy", swap_telemetry=True)
+    # Don't populate the refs — simulates the no-install path.
+    assert driver._swap_telemetry_block_manager_ref is None
+    assert driver._cpu_swap_pool_peak_tracker is None
+
+    async def _drive():
+        # Should return immediately without raising.
+        await driver._run_cpu_swap_pool_sampler()
+
+    asyncio.run(_drive())  # raises only if the sampler crashes
+
+
+def test_async_engine_driver_accepts_verifier_prompt_token_ids():
+    """TIER5A.3: constructor takes ``verifier_prompt_token_ids`` and
+    ``verifier_max_decode_tokens``. Defaults preserve pre-TIER5A.3
+    behaviour exactly (both None → no verifier submission)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver_default = AsyncEngineDriver(model="dummy")
+    assert driver_default.verifier_prompt_token_ids is None
+    assert driver_default.verifier_max_decode_tokens is None
+    assert driver_default._verifier_request_id is None
+    assert driver_default._verifier_output_token_ids == []
+    assert driver_default._verifier_request_completed is False
+
+    driver_with_verifier = AsyncEngineDriver(
+        model="dummy",
+        verifier_prompt_token_ids=[10, 20, 30, 40],
+        verifier_max_decode_tokens=16,
+    )
+    assert driver_with_verifier.verifier_prompt_token_ids == [10, 20, 30, 40]
+    assert driver_with_verifier.verifier_max_decode_tokens == 16
+    # List is copied (not aliased) — caller mutation must not bleed.
+    src = [99, 88, 77]
+    driver_aliased = AsyncEngineDriver(
+        model="dummy", verifier_prompt_token_ids=src,
+    )
+    src.append(66)
+    assert driver_aliased.verifier_prompt_token_ids == [99, 88, 77]
+
+
+def test_streaming_result_verifier_fields_default_empty_tuple():
+    """TIER5A.3: new verifier_output_token_ids field defaults to
+    the empty tuple (not None) so JSON serialisation of cells without
+    a verifier produces stable output. verifier_request_completed
+    defaults to False."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    assert r.verifier_output_token_ids == ()
+    assert isinstance(r.verifier_output_token_ids, tuple)
+    assert r.verifier_request_completed is False
+
+
+def test_streaming_result_verifier_fields_round_trip():
+    """Constructing with verifier output preserves the values."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+        verifier_output_token_ids=(101, 102, 103),
+        verifier_request_completed=True,
+    )
+    assert r.verifier_output_token_ids == (101, 102, 103)
+    assert r.verifier_request_completed is True
+
+
+def test_streaming_result_still_frozen_after_verifier_extension():
+    """TIER5A.3 dataclass fields don't accidentally un-freeze."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    with pytest.raises(Exception):
+        r.verifier_output_token_ids = (1, 2, 3)  # type: ignore[misc]
+    with pytest.raises(Exception):
+        r.verifier_request_completed = True  # type: ignore[misc]
+
+
+def test_async_engine_driver_run_submits_verifier_first_and_captures_output():
+    """TIER5A.3 end-to-end: driver with verifier_prompt_token_ids set
+    submits the verifier as the FIRST request (before any pressure
+    arrival), and captures its full output_token_ids on the result.
+    Mock engine yields deterministic outputs so the test is fast +
+    repeatable.
+    """
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    class FakeFinishedOutput:
+        def __init__(self, token_ids, finished=False):
+            class _Inner:
+                pass
+            inner = _Inner()
+            inner.token_ids = list(token_ids)
+            self.outputs = [inner]
+            self.finished = finished
+
+    submitted_requests: list[dict] = []
+
+    class FakeEngine:
+        def __init__(self):
+            class _BM:
+                class _Alloc:
+                    def get_and_reset_swaps(self):
+                        return (0, 0)
+                block_allocator = _Alloc()
+            class _Sched:
+                num_preemption_events = 0
+                block_manager = _BM()
+            class _Inner:
+                scheduler = _Sched()
+            self.engine = _Inner()
+
+        async def generate(self, prompt, sampling_params, request_id):
+            submitted_requests.append({
+                "request_id": request_id,
+                "prompt_token_ids": list(prompt["prompt_token_ids"]),
+            })
+            # Two streaming yields; final output finishes.
+            if "verifier" in request_id:
+                yield FakeFinishedOutput([501, 502], finished=False)
+                yield FakeFinishedOutput([501, 502, 503, 504], finished=True)
+            else:
+                yield FakeFinishedOutput([1, 2], finished=False)
+                yield FakeFinishedOutput([1, 2, 3, 4], finished=True)
+
+    class FakeAsyncEngineArgs:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeAsyncLLMEngine:
+        @classmethod
+        def from_engine_args(cls, args):
+            return FakeEngine()
+
+    class FakeSamplingParams:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAsyncEngineArgs
+        AsyncLLMEngine = FakeAsyncLLMEngine
+        SamplingParams = FakeSamplingParams
+
+    verifier_prompt = [9001, 9002, 9003]
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        max_decode_tokens=8,
+        verifier_prompt_token_ids=verifier_prompt,
+        verifier_max_decode_tokens=4,
+        sample_interval_seconds=0.001,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    result = asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=3, max_wall_seconds=2.0,
+            workload_name="tier5a_cell",
+        )
+    )
+
+    # Verifier was submitted first.
+    assert len(submitted_requests) >= 1
+    assert "verifier" in submitted_requests[0]["request_id"]
+    assert submitted_requests[0]["prompt_token_ids"] == verifier_prompt
+
+    # Verifier output captured on the result.
+    assert result.verifier_output_token_ids == (501, 502, 503, 504), (
+        f"verifier output not captured; got "
+        f"{result.verifier_output_token_ids}"
+    )
+    assert result.verifier_request_completed is True
+
+    # The verifier counts as one admission; max_requests=3 cap
+    # admits the verifier + up to 2 pressure requests.
+    assert result.n_requests_admitted >= 1
+    assert result.n_requests_admitted <= 3
+
+
+def test_async_engine_driver_run_no_verifier_keeps_fields_empty():
+    """Without verifier_prompt_token_ids, the fields stay at their
+    defaults (empty tuple / False). Locks the additive-only
+    contract."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    class FakeOutput:
+        def __init__(self, n_tokens):
+            class _Inner:
+                token_ids = list(range(n_tokens))
+            self.outputs = [_Inner()]
+            self.finished = False
+
+    class FakeEngine:
+        engine = type("_", (), {
+            "scheduler": type("_", (), {
+                "num_preemption_events": 0,
+                "block_manager": type("_", (), {
+                    "block_allocator": type("_", (), {
+                        "get_and_reset_swaps": lambda self: (0, 0),
+                    })(),
+                })(),
+            })(),
+        })()
+        async def generate(self, prompt, sp, rid):
+            yield FakeOutput(2)
+            yield FakeOutput(4)
+
+    class FakeVLLM:
+        AsyncEngineArgs = type("_", (), {"__init__": lambda self, **k: None})
+        AsyncLLMEngine = type("_", (), {
+            "from_engine_args": classmethod(lambda cls, args: FakeEngine()),
+        })
+        SamplingParams = type("_", (), {"__init__": lambda self, **k: None})
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42, max_decode_tokens=4,
+        sample_interval_seconds=0.001, vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    result = asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=2, max_wall_seconds=2.0,
+            workload_name="no_verifier_cell",
+        )
+    )
+    assert result.verifier_output_token_ids == ()
+    assert result.verifier_request_completed is False
+
+
+def test_async_engine_driver_run_cpu_swap_pool_sampler_swallows_read_errors():
+    """Best-effort telemetry: a read that raises must not crash
+    the polling loop. The next tick tries again."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    from kv_policy.swap_telemetry import (
+        CpuSwapPoolPeakTracker, CpuSwapPoolSnapshot,
+    )
+    import kv_policy.swap_telemetry as st_mod
+
+    tracker = CpuSwapPoolPeakTracker()
+    n_calls = [0]
+
+    def crashing_then_ok_read(block_manager, **kwargs):
+        n_calls[0] += 1
+        if n_calls[0] == 1:
+            raise RuntimeError("simulated allocator unavailable")
+        return CpuSwapPoolSnapshot(
+            num_used_blocks=7, num_total_blocks=100,
+            block_size_tokens=32, bytes_per_block_estimate=0,
+            hint_path="test_fixture",
+        )
+
+    driver = AsyncEngineDriver(
+        model="dummy", swap_telemetry=True,
+        sample_interval_seconds=0.001,
+    )
+    driver._swap_telemetry_block_manager_ref = object()  # any non-None
+    driver._cpu_swap_pool_peak_tracker = tracker
+
+    orig_read = st_mod.read_cpu_swap_pool
+    st_mod.read_cpu_swap_pool = crashing_then_ok_read
+    try:
+        async def _drive():
+            task = asyncio.create_task(
+                driver._run_cpu_swap_pool_sampler()
+            )
+            await asyncio.sleep(0.005)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(_drive())
+    finally:
+        st_mod.read_cpu_swap_pool = orig_read
+
+    # Despite the first read raising, the loop survived and the
+    # tracker saw subsequent successful reads.
+    assert n_calls[0] >= 2
+    assert tracker.peak_used_blocks == 7

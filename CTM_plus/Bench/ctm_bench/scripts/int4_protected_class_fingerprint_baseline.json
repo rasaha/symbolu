@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "note": "TIER5A.1 design freeze - initial baseline (branch claude/peaceful-einstein-hZmJs, HEAD post-brief-correction)",
+  "classes": {
+    "KVPolicy/kv_policy/phase5b_backend_install.py": [
+      {
+        "class_name": "Int4ProtectedAttentionImpl",
+        "bases": [
+          "FlashAttentionImpl"
+        ],
+        "methods": [
+          {
+            "name": "_ensure_dummy_kv",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "_ensure_index_bufs",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "_ensure_protect_mask_bhd",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "_get_paged_writer",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "_read_decode_packed",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "_read_decode_packed_batched",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "_read_decode_packed_one",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "forward",
+            "kind": "plain",
+            "async": false
+          },
+          {
+            "name": "get_call_stats",
+            "kind": "classmethod",
+            "async": false
+          },
+          {
+            "name": "reset_call_stats",
+            "kind": "classmethod",
+            "async": false
+          }
+        ]
+      },
+      {
+        "class_name": "Int4ProtectedAttentionImpl",
+        "bases": [],
+        "methods": [
+          {
+            "name": "__init__",
+            "kind": "plain",
+            "async": false
+          }
+        ]
+      },
+      {
+        "class_name": "Int4ProtectedAttentionBackend",
+        "bases": [
+          "FlashAttentionBackend"
+        ],
+        "methods": [
+          {
+            "name": "get_impl_cls",
+            "kind": "staticmethod",
+            "async": false
+          },
+          {
+            "name": "get_name",
+            "kind": "staticmethod",
+            "async": false
+          }
+        ]
+      },
+      {
+        "class_name": "Int4ProtectedAttentionBackend",
+        "bases": [],
+        "methods": [
+          {
+            "name": "__init__",
+            "kind": "plain",
+            "async": false
+          }
+        ]
+      }
+    ]
+  }
+}

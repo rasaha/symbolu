@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "note": "TIER5A.1 design freeze - initial baseline (branch claude/peaceful-einstein-hZmJs, HEAD post-brief-correction)",
+  "files": {
+    "CUDA/ctm_plus/benchmark.cu": "973c0e2aa6e19db4a2a618598dc2e85ef4fea0760c2716a890b05c467b3af899",
+    "CUDA/ctm_plus/ctm_plus.cu": "d0e4fbebabe3ef5848b6654c26dc8aa8209666799b8e14d4abc5044c7012f61b",
+    "CUDA/ctm_plus/ctm_plus.cuh": "b3691b47209f78d3280f41990cff5dc8f7a969b7033248f52e2f993d613d99e9",
+    "CUDA/ctm_plus/example.cu": "3f85db27019dce6685a8a8d7ee5c5a65f9f97c9cd2d111ea8c1a4798e540d28f",
+    "CUDA/ctm_plus/mm_compress_kernels.cu": "542952568cf5202d3e1f6f0f7cccf900401c42d5e10f1ac5d5eeab2a18856f2b",
+    "CUDA/ctm_plus/mm_controller.cu": "da46a252b5cd52483bb86e0a462fb2ad6085e3f9dbd9fd55123e66350d15c656",
+    "CUDA/ctm_plus/mm_cxl_kernels.cu": "0e299fbfa62b64951df574533fccf24011b7db5d230d5f4b2566b80da88c9626",
+    "CUDA/ctm_plus/mm_importance_lut.cu": "d04f98d0d6879cd29fcd2fd5a7c574df8a31ede06c6ecec0749d35076961f140",
+    "CUDA/ctm_plus/mm_scoring_kernel.cu": "bf3849b6a82a6864a95ce8f567a6a9f8d4b5bda661c7e64e1a3b6d5e3135bc9b",
+    "CUDA/ctm_plus/multimodal_inference.cuh": "5a72aa2ac8f9e11765a242282854a6d39f854191fecd3af2787447fa81485905",
+    "CUDA/ctm_plus/turboquant.cu": "242c1c93bc6e7d541271a2b3e3f3e144ec49a709993b4f6e435032dbe6da1cad",
+    "CUDA/ctm_plus/turboquant.cuh": "9d830b405baba09e81697a05b27a67f9ce635b69bb086ecf7d8025f5fd5d20b6",
+    "CUDA/ctm_plus/turboquant_benchmark.cu": "3f5203add56ceb5d3f35fd177ec9cdf9a94e43a7d0d60a93c6864092e578629d",
+    "CUDA/ctm_plus/turboquant_ctxl_integration.cu": "ea2cb6453aadf7cbf5f7f2d4102e895275e58a64c800092b4773dfecb5d84bd7",
+    "CUDA/ctm_plus/turboquant_ctxl_integration.cuh": "dbe0e3572526e7a85513177882aabe75146fd0ceff38a9cb93698b0b878a0d67"
+  }
+}

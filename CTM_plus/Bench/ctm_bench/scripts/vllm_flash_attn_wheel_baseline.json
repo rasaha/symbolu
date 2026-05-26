@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "note": "TIER5A.3 first green smoke 2026-05-26",
+  "files": {
+    "__init__.py": "4dfa2cab644c7adc257f568bdc0e33818b005face5757554cad1c43ce74fbd05",
+    "_vllm_fa2_C.abi3.so": "c2469eae5235e53eb41aaa902a545f7fed2c77567d211f8bfa0ecc6c40b02c54",
+    "_vllm_fa3_C.abi3.so": "4db93b24c668e85fc848661411bf5b75d54cbf61c33bd455bdda6549303fc222",
+    "flash_attn_interface.py": "38b8213b34f0576a3fecd89cad98e2f50fe58b109c34f24035e394d2c611f705"
+  }
+}

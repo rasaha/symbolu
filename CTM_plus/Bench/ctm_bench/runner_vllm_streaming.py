@@ -180,6 +180,38 @@ class StreamingRunCellResult:
     # probe wasn't installed (default). When installed (via
     # collect_native_prefix_hits=True), mirrors PrefixHitProbe.stats().
     native_prefix_hit_stats: Dict[str, Any] = field(default_factory=dict)
+    # Phase TIER5A — CPU swap pool occupancy gauge + swap-in
+    # latency telemetry. All fields default to 0 / empty so
+    # existing callers + tests are byte-identical to the
+    # pre-TIER5A behaviour. Populated only when
+    # ``collect_swap_telemetry=True`` on the driver AND the
+    # underlying vLLM block_manager exposes the CPU-allocator
+    # path (see KVPolicy/kv_policy/swap_telemetry.py for the
+    # V1/V2 fallback walk).
+    #
+    # The "peak" gauge tracks max-observed CPU pool occupancy
+    # across the cell; "final" is the last sample's value.
+    # ``cpu_swap_pool_total_blocks`` is the engine's configured
+    # CPU pool size (controlled by ``swap_space`` GB at engine
+    # init). ``swap_in_latency_*_ms`` are computed via
+    # SwapInLatencyProbe (LIFO teardown matches the Phase 3 + 4
+    # install pattern). ``swap_telemetry_stats`` carries the
+    # probe.stats() dict for partner-credible deep inspection.
+    cpu_swap_pool_used_blocks_peak: int = 0
+    cpu_swap_pool_used_blocks_final: int = 0
+    cpu_swap_pool_total_blocks: int = 0
+    swap_in_latency_p50_ms: float = 0.0
+    swap_in_latency_p99_ms: float = 0.0
+    swap_in_latency_call_count: int = 0
+    swap_telemetry_stats: Dict[str, Any] = field(default_factory=dict)
+    # Phase TIER5A.3 — verifier prompt output. Populated when the
+    # driver runs with ``verifier_prompt_token_ids`` set: a single
+    # deterministic request submitted before the pressure workload,
+    # whose full output_token_ids are captured here for the G1
+    # bit-identity verdict. Empty tuple when no verifier was
+    # configured (the default for non-TIER5A cells).
+    verifier_output_token_ids: Tuple[int, ...] = ()
+    verifier_request_completed: bool = False
 
 
 # ---------------------------------------------------------------- #
@@ -815,6 +847,9 @@ class AsyncEngineDriver:
         pin_first_n_blocks: int = 0,
         pin_tokens_file: Optional[Path] = None,
         pin_max_budget_blocks: int = 1024,
+        swap_telemetry: bool = False,
+        verifier_prompt_token_ids: Optional[Sequence[int]] = None,
+        verifier_max_decode_tokens: Optional[int] = None,
         max_model_len: Optional[int] = None,
         preemption_mode: str = "swap",
         vllm_module: Any = None,
@@ -1037,6 +1072,37 @@ class AsyncEngineDriver:
         self.preemption_mode = preemption_mode
         self._extended_pinning_install: Any = None
 
+        # Phase TIER5A — swap-restore telemetry. Always-on for the
+        # TIER5A bench (cells A/B/C all install it); opt-in via
+        # ``swap_telemetry=True`` elsewhere. Installs the swap-in
+        # latency probe AND drives a periodic CpuSwapPoolPeakTracker
+        # poll on the same cadence as SwapCounterSampler. Both
+        # surface the 7 swap-telemetry fields on
+        # StreamingRunCellResult.
+        self.swap_telemetry = bool(swap_telemetry)
+        self._swap_in_latency_probe: Any = None
+        self._cpu_swap_pool_peak_tracker: Any = None
+        self._swap_telemetry_block_manager_ref: Any = None
+
+        # Phase TIER5A.3 — verifier prompt. When configured, the
+        # driver submits a single deterministic request BEFORE the
+        # pressure workload and captures its full output_token_ids
+        # on the StreamingRunCellResult. The G1 bit-identity verdict
+        # compares this output across cells. None → no verifier
+        # (the default for non-TIER5A cells).
+        self.verifier_prompt_token_ids: Optional[List[int]] = (
+            list(verifier_prompt_token_ids)
+            if verifier_prompt_token_ids is not None else None
+        )
+        self.verifier_max_decode_tokens = (
+            int(verifier_max_decode_tokens)
+            if verifier_max_decode_tokens is not None else None
+        )
+        # Set in run() once the verifier request is constructed.
+        self._verifier_request_id: Optional[str] = None
+        self._verifier_output_token_ids: List[int] = []
+        self._verifier_request_completed: bool = False
+
     @staticmethod
     def _extract_model_from_engine(inner_engine: Any) -> Any:
         """Walk an LLMEngine to find the underlying torch model
@@ -1169,6 +1235,10 @@ class AsyncEngineDriver:
         last_seen = 0
         evictor = self._installed_evictor
         cohort_index = self._prompt_builder.cohort_of(request_id_counter)
+        is_verifier = (
+            self._verifier_request_id is not None
+            and request_id == self._verifier_request_id
+        )
         try:
             async for output in engine.generate(
                 {"prompt_token_ids": prompt_token_ids},
@@ -1180,6 +1250,22 @@ class AsyncEngineDriver:
                     # generation proceeds; final value is the
                     # total decode count for this request.
                     new_n_tokens = len(output.outputs[0].token_ids)
+                    # Phase TIER5A.3 — verifier output capture. Track
+                    # the accumulated token_ids list so the post-run
+                    # G1 verdict can compare bit-identity across
+                    # cells. List is overwritten each yield; final
+                    # value is the complete output.
+                    if is_verifier:
+                        try:
+                            self._verifier_output_token_ids = list(
+                                output.outputs[0].token_ids
+                            )
+                            if getattr(output, "finished", False):
+                                self._verifier_request_completed = True
+                        except Exception:
+                            # Best-effort capture; never crash the
+                            # decode loop on a token-id readback bug.
+                            pass
                     if first_token_time == 0.0 and new_n_tokens > 0:
                         first_token_time = time.perf_counter()
                     n_tokens = new_n_tokens
@@ -1290,6 +1376,44 @@ class AsyncEngineDriver:
                     return
         except asyncio.CancelledError:
             pass
+
+    async def _run_cpu_swap_pool_sampler(self) -> None:
+        """Phase TIER5A — periodically poll the CPU swap pool gauge
+        (``read_cpu_swap_pool``) and feed snapshots into the
+        ``CpuSwapPoolPeakTracker`` set up at install time.
+
+        Matches the cadence of ``_run_sampler`` so the gauge and
+        counter timelines align. Without this loop, the peak
+        degenerates to a single end-of-cell snapshot — likely 0
+        after the swap-in restore has drained the CPU pool — and
+        the G3 acceptance gate false-fails on a successful swap.
+
+        Errors during a single read are swallowed (best-effort
+        telemetry; never crash the run); the next sample tries
+        again.
+        """
+        from kv_policy.swap_telemetry import read_cpu_swap_pool  # type: ignore
+        bm = self._swap_telemetry_block_manager_ref
+        tracker = self._cpu_swap_pool_peak_tracker
+        if bm is None or tracker is None:
+            return
+        try:
+            while True:
+                await asyncio.sleep(self.sample_interval_seconds)
+                try:
+                    snapshot = read_cpu_swap_pool(bm)
+                    tracker.observe(snapshot)
+                except Exception as exc:
+                    logger.debug(
+                        "cpu_swap_pool sampler tick failed: %s", exc,
+                    )
+        except asyncio.CancelledError:
+            # Final read so the end-of-cell snapshot is captured.
+            try:
+                snapshot = read_cpu_swap_pool(bm)
+                tracker.observe(snapshot)
+            except Exception:
+                pass
 
     async def run(
         self,
@@ -1505,6 +1629,74 @@ class AsyncEngineDriver:
                         continue
                 raise
 
+        # Phase TIER5A — swap-restore telemetry install. Runs BEFORE
+        # the allocate-wrapping layers (prefix_hit_probe / extended
+        # _pinning / cache_aware) since its wrap target is the swap
+        # entry point (block_manager.swap_in / block_allocator.swap
+        # / cpu_allocator.swap_in), which is disjoint from the
+        # allocate fan-out — install order doesn't change observed
+        # behaviour, but installing innermost matches the LIFO
+        # teardown discipline of the composition smoke.
+        if self.swap_telemetry:
+            try:
+                from kv_policy.swap_telemetry import (  # type: ignore
+                    CpuSwapPoolPeakTracker,
+                    install_swap_in_latency_probe,
+                )
+                inner_engine_for_swap = getattr(engine, "engine", engine)
+                sched_attr_swap = getattr(
+                    inner_engine_for_swap, "scheduler", None,
+                )
+                if sched_attr_swap is None:
+                    raise RuntimeError(
+                        "swap_telemetry=True but the engine has no "
+                        ".scheduler attribute"
+                    )
+                sched_for_swap = (
+                    sched_attr_swap[0]
+                    if isinstance(sched_attr_swap, list)
+                    else sched_attr_swap
+                )
+                bm_for_swap = getattr(
+                    sched_for_swap, "block_manager", None,
+                )
+                if bm_for_swap is None:
+                    raise RuntimeError(
+                        "swap_telemetry=True but the scheduler has no "
+                        ".block_manager attribute"
+                    )
+                swap_probe = install_swap_in_latency_probe(
+                    bm_for_swap, enable=True,
+                )
+                self._swap_in_latency_probe = swap_probe
+                self._cpu_swap_pool_peak_tracker = CpuSwapPoolPeakTracker()
+                self._swap_telemetry_block_manager_ref = bm_for_swap
+                logger.info(
+                    "Phase TIER5A: swap-restore telemetry installed "
+                    "(probe_enabled=%s, hint_path=%s, "
+                    "wrap_target=%s)",
+                    swap_probe.enabled,
+                    swap_probe.hint_path,
+                    swap_probe.wrap_target_name,
+                )
+            except BaseException:
+                # No prior installs yet (swap_telemetry is innermost);
+                # just engine shutdown + re-raise.
+                for shutdown_name in (
+                    "shutdown_background_loop", "shutdown", "stop",
+                ):
+                    shutdown = getattr(engine, shutdown_name, None)
+                    if shutdown is None:
+                        continue
+                    try:
+                        result = shutdown()
+                        if asyncio.iscoroutine(result):
+                            await result
+                        break
+                    except Exception:
+                        continue
+                raise
+
         # Phase 3A — native prefix-hit probe install. Must run BEFORE
         # the cache-aware install so the probe is innermost in the
         # call chain (cache-aware wraps over the probe wraps over the
@@ -1562,6 +1754,16 @@ class AsyncEngineDriver:
                     resolved_block_size,
                 )
             except BaseException:
+                # Tear down swap_telemetry probe (innermost; installed
+                # before this) before engine shutdown.
+                if self._swap_in_latency_probe is not None:
+                    try:
+                        self._swap_in_latency_probe.teardown()
+                    except Exception as exc:
+                        logger.warning(
+                            "swap_telemetry teardown on prefix-hit "
+                            "install failure failed: %s", exc,
+                        )
                 for shutdown_name in (
                     "shutdown_background_loop", "shutdown", "stop",
                 ):
@@ -1646,6 +1848,14 @@ class AsyncEngineDriver:
                             "prefix-hit probe teardown on "
                             "extended-pinning install failure failed: %s",
                             exc,
+                        )
+                if self._swap_in_latency_probe is not None:
+                    try:
+                        self._swap_in_latency_probe.teardown()
+                    except Exception as exc:
+                        logger.warning(
+                            "swap_telemetry teardown on extended-"
+                            "pinning install failure failed: %s", exc,
                         )
                 for shutdown_name in (
                     "shutdown_background_loop", "shutdown", "stop",
@@ -1751,6 +1961,14 @@ class AsyncEngineDriver:
                             "prefix-hit probe teardown on cache-aware "
                             "install failure failed: %s", exc,
                         )
+                if self._swap_in_latency_probe is not None:
+                    try:
+                        self._swap_in_latency_probe.teardown()
+                    except Exception as exc:
+                        logger.warning(
+                            "swap_telemetry teardown on cache-aware "
+                            "install failure failed: %s", exc,
+                        )
                 # Best-effort engine teardown on install failure — same
                 # chain as the ctm_plus and route-A install blocks above.
                 for shutdown_name in (
@@ -1793,6 +2011,22 @@ class AsyncEngineDriver:
             self._run_sampler(engine, sampler)
         )
 
+        # Phase TIER5A — parallel sampler that polls
+        # read_cpu_swap_pool on the same cadence and feeds the
+        # CpuSwapPoolPeakTracker. Only spawned when swap_telemetry
+        # is on AND the install succeeded (probe + tracker both
+        # populated). Without this loop, peak collapses to the
+        # final-snapshot value and G3 false-fails.
+        cpu_swap_pool_sampler_task = None
+        if (
+            self.swap_telemetry
+            and self._swap_in_latency_probe is not None
+            and self._cpu_swap_pool_peak_tracker is not None
+        ):
+            cpu_swap_pool_sampler_task = asyncio.create_task(
+                self._run_cpu_swap_pool_sampler()
+            )
+
         # Phase 3: a parallel flusher that periodically pushes
         # accumulated per-block attention from the aggregator into
         # the evictor. The flush cadence matches the swap-counter
@@ -1813,6 +2047,47 @@ class AsyncEngineDriver:
         submission_tasks: List[asyncio.Task] = []
         request_id_counter = 0
         start = time.perf_counter()
+
+        # Phase TIER5A.3 — submit the verifier request FIRST, before
+        # any pressure arrives. Doing so admits the verifier while
+        # GPU memory is uncontested; the subsequent pressure workload
+        # then has to choose whether to preempt the verifier (which
+        # is exactly the path TIER5A is verifying — the int4_protected
+        # KV layout must survive that preempt + restore cycle).
+        if self.verifier_prompt_token_ids is not None:
+            verifier_max_tokens = (
+                self.verifier_max_decode_tokens
+                if self.verifier_max_decode_tokens is not None
+                else self.max_decode_tokens
+            )
+            verifier_sampling_params = SamplingParams(
+                temperature=0.0,
+                max_tokens=verifier_max_tokens,
+                seed=self.seed,
+            )
+            self._verifier_request_id = (
+                f"tier5a_verifier_{workload_name}_{self.seed}"
+            )
+            submission_tasks.append(
+                asyncio.create_task(
+                    self._submit_one(
+                        engine=engine,
+                        request_id=self._verifier_request_id,
+                        prompt_token_ids=list(self.verifier_prompt_token_ids),
+                        sampling_params=verifier_sampling_params,
+                        request_id_counter=request_id_counter,
+                    )
+                )
+            )
+            n_admitted += 1
+            request_id_counter += 1
+            logger.info(
+                "TIER5A verifier submitted (request_id=%s, "
+                "prompt_tokens=%d, max_decode=%d)",
+                self._verifier_request_id,
+                len(self.verifier_prompt_token_ids),
+                verifier_max_tokens,
+            )
 
         try:
             while True:
@@ -1953,6 +2228,23 @@ class AsyncEngineDriver:
                 except Exception as exc:
                     logger.warning(
                         "prefix-hit probe teardown failed: %s", exc,
+                    )
+            # Phase TIER5A — cancel CPU swap pool sampler + revert
+            # swap-in latency probe wrap (innermost of the four; tears
+            # down LAST in the LIFO chain).
+            if cpu_swap_pool_sampler_task is not None:
+                cpu_swap_pool_sampler_task.cancel()
+                try:
+                    await cpu_swap_pool_sampler_task
+                except asyncio.CancelledError:
+                    pass
+            if self._swap_in_latency_probe is not None:
+                try:
+                    self._swap_in_latency_probe.teardown()
+                except Exception as exc:
+                    logger.warning(
+                        "swap-in latency probe teardown failed: %s",
+                        exc,
                     )
             if attention_flush_task is not None:
                 attention_flush_task.cancel()
@@ -2110,6 +2402,44 @@ class AsyncEngineDriver:
                 extended_pinning_stats = {
                     "enabled": True, "error": "stats() raised",
                 }
+
+        # Phase TIER5A — swap-restore telemetry: read probe + tracker
+        # stats. The probe's teardown reverted the wrap but preserved
+        # the recorded latencies_ms list; the tracker has no teardown
+        # (pure data object), so its peak/final are stable to read.
+        swap_telemetry_stats_dict: Dict[str, Any] = {}
+        cpu_swap_pool_used_blocks_peak_val = 0
+        cpu_swap_pool_used_blocks_final_val = 0
+        cpu_swap_pool_total_blocks_val = 0
+        swap_in_latency_p50_ms_val = 0.0
+        swap_in_latency_p99_ms_val = 0.0
+        swap_in_latency_call_count_val = 0
+        if self._swap_in_latency_probe is not None:
+            try:
+                probe_stats = self._swap_in_latency_probe.stats()
+                swap_telemetry_stats_dict["probe"] = dict(probe_stats)
+                swap_in_latency_p50_ms_val = float(probe_stats.get("p50_ms", 0.0))
+                swap_in_latency_p99_ms_val = float(probe_stats.get("p99_ms", 0.0))
+                swap_in_latency_call_count_val = int(
+                    probe_stats.get("call_count", 0)
+                )
+            except Exception as exc:
+                swap_telemetry_stats_dict["probe_error"] = str(exc)
+        if self._cpu_swap_pool_peak_tracker is not None:
+            try:
+                tracker_stats = self._cpu_swap_pool_peak_tracker.stats()
+                swap_telemetry_stats_dict["tracker"] = dict(tracker_stats)
+                cpu_swap_pool_used_blocks_peak_val = int(
+                    tracker_stats.get("peak_used_blocks", 0)
+                )
+                cpu_swap_pool_used_blocks_final_val = int(
+                    tracker_stats.get("final_used_blocks", 0)
+                )
+                cpu_swap_pool_total_blocks_val = int(
+                    tracker_stats.get("total_blocks", 0)
+                )
+            except Exception as exc:
+                swap_telemetry_stats_dict["tracker_error"] = str(exc)
 
         # Phase 3A latency aggregation. Filter out failed requests
         # (first_token_time == 0) so failures don't inflate the p50
@@ -2304,6 +2634,17 @@ class AsyncEngineDriver:
             per_request_cohort=per_request_cohort,
             native_prefix_hit_stats=native_prefix_hit_stats,
             extended_pinning_stats=extended_pinning_stats,
+            # Phase TIER5A — swap-restore telemetry surface.
+            cpu_swap_pool_used_blocks_peak=cpu_swap_pool_used_blocks_peak_val,
+            cpu_swap_pool_used_blocks_final=cpu_swap_pool_used_blocks_final_val,
+            cpu_swap_pool_total_blocks=cpu_swap_pool_total_blocks_val,
+            swap_in_latency_p50_ms=swap_in_latency_p50_ms_val,
+            swap_in_latency_p99_ms=swap_in_latency_p99_ms_val,
+            swap_in_latency_call_count=swap_in_latency_call_count_val,
+            swap_telemetry_stats=swap_telemetry_stats_dict,
+            # Phase TIER5A.3 — verifier output for the G1 verdict.
+            verifier_output_token_ids=tuple(self._verifier_output_token_ids),
+            verifier_request_completed=self._verifier_request_completed,
         )
 
     def _build_pin_specs(self) -> List[Any]:
