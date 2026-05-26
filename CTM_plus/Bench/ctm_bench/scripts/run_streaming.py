@@ -320,6 +320,51 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--shared-prefix-length",
+        type=int, default=0,
+        help=(
+            "Phase 3A workload shape: when > 0, switches to the "
+            "cohort-shared prompt builder used by the Phase 3 "
+            "comparison cells. Each request becomes "
+            "[cohort_prefix of this length] + [unique tail]. "
+            "Default 0 (= legacy Pareto-unique-head shape; "
+            "preserves PR-2 behaviour byte-identical)."
+        ),
+    )
+    parser.add_argument(
+        "--shared-prefix-unique-tail-choices",
+        default="32,64,128,256",
+        help=(
+            "Phase 3A: comma-separated tail-length choices for the "
+            "shared-prefix builder (sampled uniformly per request). "
+            "Only used when --shared-prefix-length > 0. Default "
+            "matches the chat-shape distribution in the Phase 3 "
+            "design (32, 64, 128, 256 tokens)."
+        ),
+    )
+    parser.add_argument(
+        "--n-shared-prefixes",
+        type=int, default=4,
+        help=(
+            "Phase 3A: number of distinct shared-prefix cohorts. "
+            "Default 4 per the approved cohort design (4 cohorts × "
+            "25 requests = 100 reqs at the typical workload size). "
+            "Only used when --shared-prefix-length > 0."
+        ),
+    )
+    parser.add_argument(
+        "--collect-native-prefix-hits",
+        action="store_true",
+        help=(
+            "Phase 3A: install the prefix-hit probe — a "
+            "measurement-only wrap of block_manager.allocate that "
+            "counts vLLM's native prefix-cache hits per request. "
+            "Default OFF (preserves PR-2 behaviour). Set this for "
+            "the Phase 3 cell-comparison harness so cells A/B/C "
+            "all report directly-comparable realized-hit numbers."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -408,6 +453,15 @@ def main(argv: Sequence[str]) -> int:
         cache_aware_max_starvation_seconds=(
             args.cache_aware_max_starvation_seconds
         ),
+        shared_prefix_length=args.shared_prefix_length,
+        shared_prefix_unique_tail_choices=(
+            [int(s.strip())
+             for s in args.shared_prefix_unique_tail_choices.split(",")
+             if s.strip()]
+            if args.shared_prefix_length > 0 else None
+        ),
+        n_shared_prefixes=args.n_shared_prefixes,
+        collect_native_prefix_hits=args.collect_native_prefix_hits,
         max_decode_tokens=args.max_decode_tokens,
     )
 
