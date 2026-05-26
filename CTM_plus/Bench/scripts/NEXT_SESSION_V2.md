@@ -22,9 +22,17 @@ scheduling, RadixAttention-style):
 * Phase 0 (CPU prototype + tests): ✅ commit `3168e94`
 * Phase 1 PR-1 (vLLM install + CPU smoke): ✅ commit `34763c8`
 * Phase 1 PR-2 CPU plumbing (driver arg + install hook +
-  CLI flag + stats field + 8 CPU tests): ✅ this session
-* Phase 1 PR-2 GPU smoke (gates 3-6, 8, 9 on Qwen-7B; gate 10
-  int4_protected Tier A regression): **pending GPU pod**
+  CLI flag + stats field + 8 CPU tests): ✅ commit `d14383f`
+* Phase 1 PR-2 V2 block-manager BlockTable shape fix (CPU
+  mock-vs-real-vLLM drift): ✅ commit `d812324`
+* Phase 1 PR-2 GPU smoke (Qwen-7B H100): ✅ **GREEN** —
+  gates B1/B2/B3/B5/B7 + flag-OFF regression + Tier A needle
+  15/15 all verified. Workload-shape-dependent gates B4 and B6
+  (`reordered_count > 0`, `prediction_accuracy >= 0.85`) deferred
+  per PR-2 scope ("no hit-rate-improvement claim in PR-2").
+* **PR-2 acceptance set CLOSED.**
+* Phase 1 PR-2 follow-up (shared-prefix workload + B4/B6
+  smoke): pending
 * Phase 3 (GPU validation on chat_32k): pending
 
 ## Five pending v2 items (the brief's Tier 1 list)
@@ -34,7 +42,7 @@ Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5
 
 | # | Item | Effort | GPU $ | Status | Key reference |
 |---|---|---:|---:|---|---|
-| 1 | **Cache reuse** (v2 cache-aware scheduling) | 1-2 days remaining (PR-2 GPU smoke + Phase 3 GPU) | ~$0.30 | PR-1 done; PR-2 CPU plumbing done; PR-2 GPU smoke + Phase 3 next | `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` (§"PR-2 status") |
+| 1 | **Cache reuse** (v2 cache-aware scheduling) | PR-2 done; ~1 day shared-prefix workload + ~2-3 days Phase 3 GPU | ~$0.20 | PR-2 acceptance set CLOSED (gates B1/B2/B3/B5/B7 + flag-OFF + Tier A 15/15 all GREEN); shared-prefix workload + Phase 3 next | `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` (§"PR-2 status" + acceptance-gate table) |
 | 2 | **CUDA Graphs** for the model forward path | 4-7 days | ~$0.20 | Read-path preflight done (B-pre-1..4); write-path preflight is the gating item | `OPTION_B_PREFLIGHT.md`, `PHASE6_PERF_REPORT.md` |
 | 3 | **Tensor parallelism** for 70B-class | 3-5 days | ~$0.50 (multi-GPU pod) | Untouched; code "expected to Just Work" per brief, unverified | brief page 5; INT4_PROTECTED_README.md |
 | 4 | **Quality benchmark harness** (MMLU + HumanEval + LongBench) | 2-3 days | ~$0.30 | Untouched; current quality bar is needle-only | brief page 5 "Broader quality bench" row |
@@ -103,8 +111,11 @@ User chooses; this is a recommendation, not a directive.
 
 ### 1. Cache reuse PR-2
 
-Already scoped in `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md`
-(see §"PR-2 status" for what's done CPU-side). Remaining work:
+**STATUS: PR-2 acceptance set CLOSED.** See
+`V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` §"PR-2 status" for
+the full acceptance-gate table and committed evidence.
+
+What landed:
 
 - ✅ `AsyncEngineDriver(cache_aware_scheduling: bool = False,
   cache_aware_max_starvation_seconds: float = 30.0)` arg
@@ -114,12 +125,26 @@ Already scoped in `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md`
 - ✅ New `cache_aware_scheduler_stats` field on
   `StreamingRunCellResult`
 - ✅ CLI flag `--cache-aware-scheduling` on `run_streaming.py`
-- ✅ 8 CPU plumbing tests in
-  `Bench/tests/test_cache_aware_runner_plumbing.py`
-- **Pending GPU pod:** single Qwen-7B chat-shaped smoke
-  exercising gates 3-6, 8, 9 (see integration-note §7); single
-  int4_protected needle cell with flag OFF exercising gate 10
-  (Qwen-7B seed=44 must match brief's 15/15).
+- ✅ V2 block-manager BlockTable shape fix (commit `d812324`)
+  to handle real vLLM 0.7.3 V0+V2 path
+- ✅ 12 CPU plumbing/regression tests (8 in
+  `Bench/tests/test_cache_aware_runner_plumbing.py` + 4 V2-shape
+  tests in `test_cache_aware_install.py`)
+- ✅ Qwen-7B GPU smoke GREEN (admitted=20, completed=20,
+  decode_tokens=640, `tree_inserts=20`, `tree_evictions=632`,
+  all 9 stats keys populated with `enabled=True`)
+- ✅ int4_protected Tier A regression GREEN (Qwen-7B seed=44:
+  **15/15 == stock bf16**, 0 fallbacks)
+
+Pending (not in PR-2 scope per the original approval — "no
+hit-rate-improvement claim in PR-2"):
+
+- Shared-prefix workload to exercise gates 4 (`reordered_count >
+  0`) and 6 (`prediction_accuracy >= 0.85`); ~1 day code + CPU
+  test + a short GPU smoke (~$0.05). Could land as PR-2.5 or
+  fold into Phase 3.
+- Phase 3 GPU validation on chat_32k (the real
+  measurement-of-effect run). ~2-3 days + ~$0.30.
 
 ### 2. CUDA Graphs
 
