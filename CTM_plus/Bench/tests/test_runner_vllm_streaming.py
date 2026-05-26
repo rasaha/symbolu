@@ -2549,3 +2549,74 @@ def test_extract_model_from_engine_walks_documented_paths():
     eng3 = _Engine()
     found3 = AsyncEngineDriver._extract_model_from_engine(eng3)
     assert found3 is eng3
+
+
+
+# ------------------------------------------------------------------ #
+# Phase TIER5A — additive StreamingRunCellResult fields
+#
+# The TIER5A.1 surface is additive: new optional fields with
+# defaults of 0 / empty dict. These tests verify the defaults +
+# round-trip through the dataclass constructor.
+# ------------------------------------------------------------------ #
+
+
+def test_streaming_result_tier5a_fields_default_to_zero():
+    """All TIER5A telemetry fields default to 0 / empty when not
+    explicitly set, so pre-TIER5A callers are byte-identical."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    assert r.cpu_swap_pool_used_blocks_peak == 0
+    assert r.cpu_swap_pool_used_blocks_final == 0
+    assert r.cpu_swap_pool_total_blocks == 0
+    assert r.swap_in_latency_p50_ms == 0.0
+    assert r.swap_in_latency_p99_ms == 0.0
+    assert r.swap_in_latency_call_count == 0
+    assert r.swap_telemetry_stats == {}
+
+
+def test_streaming_result_tier5a_fields_round_trip():
+    """All TIER5A fields accept the documented value ranges and
+    survive a construct."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+        cpu_swap_pool_used_blocks_peak=128,
+        cpu_swap_pool_used_blocks_final=64,
+        cpu_swap_pool_total_blocks=4096,
+        swap_in_latency_p50_ms=2.5,
+        swap_in_latency_p99_ms=12.0,
+        swap_in_latency_call_count=42,
+        swap_telemetry_stats={
+            "hint_path": "v2_block_allocator.cpu_allocator",
+            "enabled": True,
+        },
+    )
+    assert r.cpu_swap_pool_used_blocks_peak == 128
+    assert r.swap_in_latency_p99_ms == 12.0
+    assert r.swap_telemetry_stats["enabled"] is True
+
+
+def test_streaming_result_is_still_frozen_after_tier5a_extension():
+    """The dataclass remains frozen — adding optional fields must
+    not silently un-freeze the structure."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    with pytest.raises(Exception):
+        r.cpu_swap_pool_used_blocks_peak = 99  # type: ignore[misc]

@@ -495,7 +495,7 @@ serving solution."
 | Quality bench (needle) | `CTM_plus/Bench/scripts/verify_phase5b_5_needle.py` |
 | Multi-batch regression gate | `CTM_plus/Bench/scripts/verify_phase5b_6_batch.py` |
 | Backend impl + writer | `CTM_plus/KVPolicy/kv_policy/phase5b_backend_install.py`, `phase5b_4c_paged_writer.py` |
-| Vendored vLLM-FA fork (SHA `720c948` + int4 path) | `CTM_plus/CUDA/` |
+| Vendored vLLM-FA fork (SHA `720c948` + int4 path) | installed via forked vllm wheel; import path `vllm.vllm_flash_attn` — see `CTM_plus/KVPolicy/kv_policy/phase5b_backend_install.py:366` |
 
 ---
 

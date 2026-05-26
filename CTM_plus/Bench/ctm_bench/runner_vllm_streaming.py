@@ -180,6 +180,30 @@ class StreamingRunCellResult:
     # probe wasn't installed (default). When installed (via
     # collect_native_prefix_hits=True), mirrors PrefixHitProbe.stats().
     native_prefix_hit_stats: Dict[str, Any] = field(default_factory=dict)
+    # Phase TIER5A — CPU swap pool occupancy gauge + swap-in
+    # latency telemetry. All fields default to 0 / empty so
+    # existing callers + tests are byte-identical to the
+    # pre-TIER5A behaviour. Populated only when
+    # ``collect_swap_telemetry=True`` on the driver AND the
+    # underlying vLLM block_manager exposes the CPU-allocator
+    # path (see KVPolicy/kv_policy/swap_telemetry.py for the
+    # V1/V2 fallback walk).
+    #
+    # The "peak" gauge tracks max-observed CPU pool occupancy
+    # across the cell; "final" is the last sample's value.
+    # ``cpu_swap_pool_total_blocks`` is the engine's configured
+    # CPU pool size (controlled by ``swap_space`` GB at engine
+    # init). ``swap_in_latency_*_ms`` are computed via
+    # SwapInLatencyProbe (LIFO teardown matches the Phase 3 + 4
+    # install pattern). ``swap_telemetry_stats`` carries the
+    # probe.stats() dict for partner-credible deep inspection.
+    cpu_swap_pool_used_blocks_peak: int = 0
+    cpu_swap_pool_used_blocks_final: int = 0
+    cpu_swap_pool_total_blocks: int = 0
+    swap_in_latency_p50_ms: float = 0.0
+    swap_in_latency_p99_ms: float = 0.0
+    swap_in_latency_call_count: int = 0
+    swap_telemetry_stats: Dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------- #
