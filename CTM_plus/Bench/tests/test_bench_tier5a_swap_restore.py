@@ -1036,6 +1036,340 @@ def test_compute_g5_g6_verdicts_g6_surfaces_g6a_and_g6b_separately():
     }
 
 
+# ---------------------------------------------------------------- #
+# TIER5A.3b — recompute-baseline cell. G1 compares cell B (swap)
+# vs cell D (recompute) instead of cell A (no pressure) vs cell B.
+# ---------------------------------------------------------------- #
+
+
+def test_build_bench_spec_with_recompute_baseline_adds_cell_d():
+    """When recompute_baseline_enabled=True, cell D is appended
+    between cell B and cell C (when --g4-smoke is also on).
+    """
+    from ctm_bench.scripts.bench_tier5a_swap_restore import build_bench_spec
+
+    # Just A + B + D
+    spec = build_bench_spec(
+        model="x", seed=0, output_dir=Path("/tmp"),
+        recompute_baseline_enabled=True,
+    )
+    cell_names = [c.cell_name for c in spec.cells]
+    assert cell_names == [
+        "cell_A_no_pressure",
+        "cell_B_pressure",
+        "cell_D_recompute_baseline",
+    ]
+    # All cells with --g4-smoke
+    spec = build_bench_spec(
+        model="x", seed=0, output_dir=Path("/tmp"),
+        recompute_baseline_enabled=True, g4_smoke_enabled=True,
+    )
+    cell_names = [c.cell_name for c in spec.cells]
+    assert cell_names == [
+        "cell_A_no_pressure",
+        "cell_B_pressure",
+        "cell_D_recompute_baseline",
+        "cell_C_g4_composition",
+    ]
+
+
+def test_cell_d_recompute_baseline_has_recompute_preemption_mode():
+    """cell D must use preemption_mode='recompute'. That's the
+    whole point — same workload as cell B but no swap fires."""
+    from ctm_bench.scripts.bench_tier5a_swap_restore import build_bench_spec
+
+    spec = build_bench_spec(
+        model="x", seed=0, output_dir=Path("/tmp"),
+        recompute_baseline_enabled=True,
+    )
+    cell_d = next(c for c in spec.cells if c.cell_name == "cell_D_recompute_baseline")
+    assert cell_d.preemption_mode == "recompute"
+    # Same memory pressure as cell B
+    cell_b = next(c for c in spec.cells if c.cell_name == "cell_B_pressure")
+    assert cell_d.gpu_memory_utilization == cell_b.gpu_memory_utilization
+    assert cell_d.n_pressure_requests == cell_b.n_pressure_requests
+    assert cell_d.pressure_max_decode_tokens == cell_b.pressure_max_decode_tokens
+    # Composition flags OFF (cell D mirrors cell B, not cell C)
+    assert cell_d.install_extended_pinning is False
+    assert cell_d.install_cache_aware_measurement_only is False
+    assert cell_d.install_prefix_hit_probe is False
+
+
+def test_bench_spec_recompute_baseline_enabled_field_round_trips():
+    """The new spec field appears in BenchSpec and the JSON
+    report's spec dict."""
+    from ctm_bench.scripts.bench_tier5a_swap_restore import (
+        build_bench_spec, BenchReport,
+    )
+    spec = build_bench_spec(
+        model="x", seed=0, output_dir=Path("/tmp"),
+        recompute_baseline_enabled=True,
+    )
+    assert spec.recompute_baseline_enabled is True
+    spec_default = build_bench_spec(
+        model="x", seed=0, output_dir=Path("/tmp"),
+    )
+    assert spec_default.recompute_baseline_enabled is False
+
+
+def test_dry_run_renderer_describes_g1_baseline_swap_when_recompute_baseline():
+    from ctm_bench.scripts.bench_tier5a_swap_restore import (
+        build_bench_spec, render_dry_run,
+    )
+    spec = build_bench_spec(
+        model="x", seed=0, output_dir=Path("/tmp"),
+        recompute_baseline_enabled=True,
+    )
+    out = render_dry_run(spec)
+    assert "cell_D_recompute_baseline" in out
+    assert "recompute" in out
+    assert "G1: verifier output bit-identical cell_B (swap) vs cell_D (recompute)" in out
+
+
+def test_execute_bench_on_engine_g1_uses_cell_d_when_recompute_enabled(monkeypatch):
+    """End-to-end: when recompute_baseline_enabled=True and cell D
+    runs successfully, G1 compares cell B (swap) vs cell D
+    (recompute) — NOT cell A vs cell B. The reported baseline_cell
+    is cell_D_recompute_baseline.
+
+    Synthetic results:
+      * cell A: verifier_output_A (different from B/D — represents
+        the batch-size=1 baseline that DIFFERS from concurrent-
+        batching outputs)
+      * cell B: verifier_output_BD (concurrent batching + swap)
+      * cell D: verifier_output_BD (concurrent batching + recompute,
+        IDENTICAL to cell B since the swap path is bit-clean)
+
+    With these inputs, the recompute-baseline comparison gives
+    G1 GREEN even though cell A != cell B (which would have been
+    legacy RED). Locks the TIER5A.3b improvement.
+    """
+    import sys, types
+
+    fake_vllm = types.ModuleType("vllm")
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+    from ctm_bench import runner_vllm_streaming
+
+    def _result_for_cell(workload_name: str) -> StreamingRunCellResult:
+        # Output A = batch_size=1 baseline; B and D match each
+        # other (concurrent batching effect on numerics) but
+        # differ from A.
+        if workload_name == "cell_A_no_pressure":
+            output = (101, 102, 103, 104, 105)
+        else:
+            # Cells B + D both have pressure; their KV restoration
+            # mechanism differs (swap vs recompute) but if the
+            # swap path is bit-clean, their outputs match.
+            output = (201, 202, 203, 204, 205)
+        return StreamingRunCellResult(
+            workload_name=workload_name, policy_name="lru", seed=42,
+            n_requests_admitted=10, n_requests_completed=10,
+            n_decode_tokens=50, wall_clock_seconds=1.0,
+            swap_in_blocks=(0 if workload_name != "cell_B_pressure"
+                            else 30),
+            swap_out_blocks=(
+                0 if workload_name in (
+                    "cell_A_no_pressure", "cell_D_recompute_baseline"
+                ) else 60
+            ),
+            preemption_events=(
+                0 if workload_name == "cell_A_no_pressure" else 5
+            ),
+            cpu_swap_pool_used_blocks_peak=(
+                10 if workload_name == "cell_B_pressure" else 0
+            ),
+            cpu_swap_pool_total_blocks=1024,
+            swap_in_latency_call_count=(
+                3 if workload_name == "cell_B_pressure" else 0
+            ),
+            verifier_output_token_ids=output,
+            verifier_request_completed=True,
+        )
+
+    class FakeDriver:
+        def __init__(self, **kwargs):
+            pass
+        async def run(self, *, workload_name, **kwargs):
+            return _result_for_cell(workload_name)
+
+    monkeypatch.setattr(
+        runner_vllm_streaming, "AsyncEngineDriver", FakeDriver,
+    )
+
+    spec = build_bench_spec(
+        model="x", seed=42,
+        output_dir=Path("/tmp/tier5a_recompute_test"),
+        recompute_baseline_enabled=True,
+    )
+
+    pre_orth = {
+        "g5a_fingerprint_passed": True, "g5b_ast_passed": True,
+        "g5c_sha_passed": True, "g6_passed": True,
+        "g6a_passed": True, "g6b_passed": True,
+        "g6b_vllm_importable": True,
+        "vllm_flash_attn_wheel_baseline_missing": False,
+        "g5a_violations": {}, "g5b_violations": {},
+        "g5c_violations": {}, "g6_violations": {},
+        "g6b_violations": {},
+    }
+    report = execute_bench_on_engine(
+        spec=spec, pre_orthogonality=pre_orth,
+        skip_post_orthogonality=True,
+        max_wall_seconds_per_cell=10.0,
+    )
+
+    # G1 GREEN: cell B and cell D produced identical outputs.
+    assert report.gate_verdicts["G1"].passed is True, (
+        f"G1 should be GREEN when cell B == cell D; got "
+        f"{report.gate_verdicts['G1'].summary}"
+    )
+    # Baseline is cell D, NOT cell A.
+    assert report.g1_result["baseline_cell"] == "cell_D_recompute_baseline"
+    assert report.g1_result["baseline_mode"] == "recompute"
+    assert report.g1_result["pressure_cell"] == "cell_B_pressure"
+    assert report.g1_result["bit_identical"] is True
+
+
+def test_execute_bench_on_engine_g1_red_with_recompute_baseline_when_swap_differs(monkeypatch):
+    """When cells B and D diverge (swap path NOT bit-clean), G1
+    reports RED — the real negative finding for int4_protected
+    surviving the swap path."""
+    import sys, types
+
+    fake_vllm = types.ModuleType("vllm")
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+    from ctm_bench import runner_vllm_streaming
+
+    def _result_for_cell(workload_name: str) -> StreamingRunCellResult:
+        if workload_name == "cell_A_no_pressure":
+            output = (101, 102, 103, 104, 105)
+        elif workload_name == "cell_B_pressure":
+            # B (swap) — divergence at index 3 from D (recompute)
+            output = (201, 202, 203, 999, 205)
+        else:  # cell_D_recompute_baseline
+            output = (201, 202, 203, 204, 205)
+        return StreamingRunCellResult(
+            workload_name=workload_name, policy_name="lru", seed=42,
+            n_requests_admitted=10, n_requests_completed=10,
+            n_decode_tokens=50, wall_clock_seconds=1.0,
+            swap_in_blocks=(30 if workload_name == "cell_B_pressure" else 0),
+            swap_out_blocks=(60 if workload_name == "cell_B_pressure" else 0),
+            preemption_events=(5 if workload_name != "cell_A_no_pressure" else 0),
+            cpu_swap_pool_used_blocks_peak=(
+                10 if workload_name == "cell_B_pressure" else 0
+            ),
+            cpu_swap_pool_total_blocks=1024,
+            swap_in_latency_call_count=(
+                3 if workload_name == "cell_B_pressure" else 0
+            ),
+            verifier_output_token_ids=output,
+            verifier_request_completed=True,
+        )
+
+    class FakeDriver:
+        def __init__(self, **kwargs):
+            pass
+        async def run(self, *, workload_name, **kwargs):
+            return _result_for_cell(workload_name)
+
+    monkeypatch.setattr(
+        runner_vllm_streaming, "AsyncEngineDriver", FakeDriver,
+    )
+
+    spec = build_bench_spec(
+        model="x", seed=42,
+        output_dir=Path("/tmp/tier5a_recompute_red"),
+        recompute_baseline_enabled=True,
+    )
+    pre_orth = {
+        "g5a_fingerprint_passed": True, "g5b_ast_passed": True,
+        "g5c_sha_passed": True, "g6_passed": True,
+        "g6a_passed": True, "g6b_passed": True,
+        "g6b_vllm_importable": True,
+        "vllm_flash_attn_wheel_baseline_missing": False,
+        "g5a_violations": {}, "g5b_violations": {},
+        "g5c_violations": {}, "g6_violations": {},
+        "g6b_violations": {},
+    }
+    report = execute_bench_on_engine(
+        spec=spec, pre_orthogonality=pre_orth,
+        skip_post_orthogonality=True,
+        max_wall_seconds_per_cell=10.0,
+    )
+    assert report.gate_verdicts["G1"].passed is False
+    assert report.g1_result["verdict"] == "red"
+    assert report.g1_result["divergence_index"] == 3
+    assert report.g1_result["baseline_cell"] == "cell_D_recompute_baseline"
+    assert report.g1_result["baseline_mode"] == "recompute"
+
+
+def test_execute_bench_on_engine_g1_legacy_baseline_when_recompute_disabled(monkeypatch):
+    """Back-compat: when recompute_baseline_enabled=False (the
+    default), G1 still compares cell A vs cell B and reports
+    baseline_mode='no_pressure'."""
+    import sys, types
+
+    fake_vllm = types.ModuleType("vllm")
+    monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
+
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+    from ctm_bench import runner_vllm_streaming
+
+    def _result_for_cell(workload_name: str) -> StreamingRunCellResult:
+        if workload_name == "cell_A_no_pressure":
+            output = (1, 2, 3, 4)
+        else:
+            output = (1, 2, 3, 4)
+        return StreamingRunCellResult(
+            workload_name=workload_name, policy_name="lru", seed=42,
+            n_requests_admitted=10, n_requests_completed=10,
+            n_decode_tokens=40, wall_clock_seconds=1.0,
+            swap_in_blocks=10, swap_out_blocks=20, preemption_events=1,
+            cpu_swap_pool_used_blocks_peak=5,
+            cpu_swap_pool_total_blocks=100,
+            swap_in_latency_call_count=1,
+            verifier_output_token_ids=output,
+            verifier_request_completed=True,
+        )
+
+    class FakeDriver:
+        def __init__(self, **kwargs):
+            pass
+        async def run(self, *, workload_name, **kwargs):
+            return _result_for_cell(workload_name)
+
+    monkeypatch.setattr(
+        runner_vllm_streaming, "AsyncEngineDriver", FakeDriver,
+    )
+
+    # No recompute_baseline_enabled flag → default False.
+    spec = build_bench_spec(
+        model="x", seed=42,
+        output_dir=Path("/tmp/tier5a_legacy"),
+    )
+    pre_orth = {
+        "g5a_fingerprint_passed": True, "g5b_ast_passed": True,
+        "g5c_sha_passed": True, "g6_passed": True,
+        "g6a_passed": True, "g6b_passed": True,
+        "g6b_vllm_importable": True,
+        "vllm_flash_attn_wheel_baseline_missing": False,
+        "g5a_violations": {}, "g5b_violations": {},
+        "g5c_violations": {}, "g6_violations": {},
+        "g6b_violations": {},
+    }
+    report = execute_bench_on_engine(
+        spec=spec, pre_orthogonality=pre_orth,
+        skip_post_orthogonality=True,
+        max_wall_seconds_per_cell=10.0,
+    )
+    assert report.g1_result["baseline_cell"] == "cell_A_no_pressure"
+    assert report.g1_result["baseline_mode"] == "no_pressure"
+
+
 def test_execute_bench_on_engine_invalid_g1_when_cell_failed(monkeypatch):
     """If a cell's driver run raises, the cell's record marks
     completed=False; G1 routes to INVALID with the operator-facing

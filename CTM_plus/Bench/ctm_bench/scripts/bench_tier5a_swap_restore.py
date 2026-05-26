@@ -128,6 +128,14 @@ class BenchSpec:
     cells: Tuple[CellConfig, ...]
     g4_smoke_enabled: bool
     sample_interval_seconds: float
+    # TIER5A.3b — recompute-mode baseline. When True, the spec
+    # includes cell_D_recompute_baseline (same engine config as
+    # cell B but ``preemption_mode='recompute'``). The G1 verdict
+    # then compares cell B (swap) vs cell D (recompute) instead of
+    # cell A (no pressure) vs cell B. This isolates the swap-path
+    # effect from FlashAttention's batching-shape-dependent
+    # numerics. See TIER5A_GPU_SMOKE_RUNBOOK.md for the rationale.
+    recompute_baseline_enabled: bool = False
 
 
 # ---------------------------------------------------------------- #
@@ -194,6 +202,55 @@ def _build_cell_b(
     )
 
 
+def _build_cell_d_recompute_baseline(
+    *,
+    pressure_gpu_mem_util: float,
+    swap_space_gb: int,
+    max_model_len: Optional[int],
+    n_pressure_requests: int,
+    pressure_decode_tokens: int,
+    pressure_arrival_rate: float,
+    pressure_alpha: float,
+    verifier_decode_tokens: int,
+    verifier_prompt_length_tokens: int,
+    enable_prefix_caching: bool,
+) -> CellConfig:
+    """TIER5A.3b: recompute-mode baseline cell.
+
+    Identical to cell B in every respect EXCEPT
+    ``preemption_mode='recompute'`` — vLLM evicts blocks instead
+    of swapping. The G1 verdict compares this cell's verifier
+    output against cell B's (swap-mode) verifier output. If they
+    match bit-for-bit, the swap path is byte-clean for
+    int4_protected's packed KV layout.
+
+    Why this is the cleaner test (vs cell A vs cell B):
+      * Both cell B and cell D run the verifier alongside the
+        same pressure workload — same concurrent batching, so
+        FlashAttention's batch-shape-dependent reduction order
+        is the same in both.
+      * The ONLY material difference is the KV restoration
+        mechanism: swap-restore (cell B) vs recompute (cell D).
+      * If outputs match, the swap path round-trip is bit-clean.
+        If they differ, int4_protected's packed layout was
+        corrupted somewhere on the GPU<->CPU<->GPU path.
+    """
+    return CellConfig(
+        cell_name="cell_D_recompute_baseline",
+        gpu_memory_utilization=pressure_gpu_mem_util,
+        swap_space_gb=swap_space_gb,
+        preemption_mode="recompute",
+        max_model_len=max_model_len,
+        n_pressure_requests=n_pressure_requests,
+        pressure_max_decode_tokens=pressure_decode_tokens,
+        pressure_arrival_rate=pressure_arrival_rate,
+        pressure_alpha=pressure_alpha,
+        verifier_max_decode_tokens=verifier_decode_tokens,
+        verifier_prompt_length_tokens=verifier_prompt_length_tokens,
+        enable_prefix_caching=enable_prefix_caching,
+    )
+
+
 def _build_cell_c_composition(
     *,
     pressure_gpu_mem_util: float,
@@ -248,10 +305,17 @@ def build_bench_spec(
     enable_prefix_caching_baseline: bool = False,
     g4_smoke_enabled: bool = False,
     g4_pin_first_n_blocks: int = 8,
+    recompute_baseline_enabled: bool = False,
     sample_interval_seconds: float = 0.05,
 ) -> BenchSpec:
     """Construct a complete TIER5A bench spec from CLI-shaped
     defaults. Pure-Python; no vLLM dependency.
+
+    When ``recompute_baseline_enabled=True`` (TIER5A.3b), adds
+    cell_D_recompute_baseline between cell B and cell C. The G1
+    verdict then compares cell B (swap mode) vs cell D (recompute
+    mode) instead of cell A (no pressure) vs cell B, isolating
+    the swap-path effect from concurrent-batching numerics.
     """
     cell_a = _build_cell_a(
         base_gpu_mem_util=base_gpu_mem_util,
@@ -274,6 +338,21 @@ def build_bench_spec(
         enable_prefix_caching=enable_prefix_caching_baseline,
     )
     cells: List[CellConfig] = [cell_a, cell_b]
+    if recompute_baseline_enabled:
+        cells.append(
+            _build_cell_d_recompute_baseline(
+                pressure_gpu_mem_util=pressure_gpu_mem_util,
+                swap_space_gb=swap_space_gb,
+                max_model_len=max_model_len,
+                n_pressure_requests=n_pressure_requests,
+                pressure_decode_tokens=pressure_decode_tokens,
+                pressure_arrival_rate=pressure_arrival_rate,
+                pressure_alpha=pressure_alpha,
+                verifier_decode_tokens=verifier_decode_tokens,
+                verifier_prompt_length_tokens=verifier_prompt_length_tokens,
+                enable_prefix_caching=enable_prefix_caching_baseline,
+            )
+        )
     if g4_smoke_enabled:
         cells.append(
             _build_cell_c_composition(
@@ -295,6 +374,7 @@ def build_bench_spec(
         output_dir=output_dir,
         cells=tuple(cells),
         g4_smoke_enabled=g4_smoke_enabled,
+        recompute_baseline_enabled=recompute_baseline_enabled,
         sample_interval_seconds=sample_interval_seconds,
     )
 
@@ -641,6 +721,14 @@ def render_dry_run(spec: BenchSpec) -> str:
     lines.append(f"output_dir:        {spec.output_dir}")
     lines.append(f"sample_interval:   {spec.sample_interval_seconds:.3f}s")
     lines.append(f"g4_smoke_enabled:  {spec.g4_smoke_enabled}")
+    lines.append(
+        f"recompute_baseline_enabled: {spec.recompute_baseline_enabled} "
+        + (
+            "(G1 compares cell_B swap vs cell_D recompute)"
+            if spec.recompute_baseline_enabled
+            else "(G1 compares cell_A no_pressure vs cell_B swap)"
+        )
+    )
     lines.append(f"n_cells:           {len(spec.cells)}")
     lines.append("")
     for i, c in enumerate(spec.cells):
@@ -669,7 +757,12 @@ def render_dry_run(spec: BenchSpec) -> str:
             )
     lines.append("")
     lines.append("Acceptance gates (load-bearing):")
-    lines.append("  G1: verifier output bit-identical cell_A vs cell_B")
+    g1_desc = (
+        "verifier output bit-identical cell_B (swap) vs cell_D (recompute)"
+        if spec.recompute_baseline_enabled
+        else "verifier output bit-identical cell_A vs cell_B"
+    )
+    lines.append(f"  G1: {g1_desc}")
     lines.append("  G2: cell_B swap_out_blocks > 0")
     lines.append("  G3: cpu_swap_pool_used_blocks_peak > 0 AND "
                  "swap_in_latency_call_count > 0 (p50_ms evidence only)")
@@ -761,6 +854,17 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="pin_first_n_blocks for cell C extended_pinning install.",
     )
     p.add_argument(
+        "--recompute-baseline", action="store_true",
+        help="TIER5A.3b: add cell D — same engine config + pressure "
+             "workload as cell B, but with preemption_mode='recompute' "
+             "(vLLM evicts + recomputes preempted blocks instead of "
+             "swapping). G1 then compares cell B (swap) vs cell D "
+             "(recompute) instead of cell A (no pressure) vs cell B, "
+             "isolating the swap-path effect from concurrent-"
+             "batching numerics. Recommended for partner-credible "
+             "G1 verdict.",
+    )
+    p.add_argument(
         "--sample-interval-seconds", type=float, default=0.05,
         help="Swap-counter + CPU-pool polling cadence.",
     )
@@ -804,6 +908,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         enable_prefix_caching_baseline=args.enable_prefix_caching_baseline,
         g4_smoke_enabled=args.g4_smoke,
         g4_pin_first_n_blocks=args.g4_pin_first_n_blocks,
+        recompute_baseline_enabled=args.recompute_baseline,
         sample_interval_seconds=args.sample_interval_seconds,
     )
 
@@ -1119,16 +1224,30 @@ def execute_bench_on_engine(
     # ---- Gate verdicts ----
     gate_verdicts: Dict[str, GateVerdict] = {}
 
-    # G1 — bit-identity (cell A vs cell B).
+    # G1 — bit-identity. The baseline depends on the spec:
+    #   * TIER5A.3b mode (spec.recompute_baseline_enabled=True):
+    #     baseline = cell D (recompute mode under SAME pressure as
+    #     cell B). This isolates the swap-path effect from
+    #     concurrent-batching numerics — the cleaner test design.
+    #   * Legacy mode (default): baseline = cell A (no pressure).
+    #     Confounded by concurrent-batching effects when cell B is
+    #     under pressure; kept for back-compat.
     from ctm_bench.swap_restore_verifier import (
         G1Result, G1Verdict, compute_g1_verdict,
         VerifierCellRecord,
     )
     cell_a_rec = verifier_records.get("cell_A_no_pressure")
     cell_b_rec = verifier_records.get("cell_B_pressure")
-    if cell_a_rec is not None and cell_b_rec is not None:
+    cell_d_rec = verifier_records.get("cell_D_recompute_baseline")
+    if spec.recompute_baseline_enabled and cell_d_rec is not None:
+        g1_baseline_rec = cell_d_rec
+        g1_baseline_label = "cell_D_recompute_baseline"
+    else:
+        g1_baseline_rec = cell_a_rec
+        g1_baseline_label = "cell_A_no_pressure"
+    if g1_baseline_rec is not None and cell_b_rec is not None:
         g1_result = compute_g1_verdict(
-            baseline=cell_a_rec, pressure=cell_b_rec,
+            baseline=g1_baseline_rec, pressure=cell_b_rec,
         )
     else:
         # Build a sentinel INVALID verdict when either cell failed.
@@ -1139,15 +1258,20 @@ def execute_bench_on_engine(
             preemption_events_total=0, completed=False,
             notes=("cell did not run",),
         )
+        required_label = (
+            "cells (B + D recompute baseline)"
+            if spec.recompute_baseline_enabled
+            else "cells (A + B)"
+        )
         g1_result = G1Result(
             verdict=G1Verdict.INVALID,
-            baseline=cell_a_rec or empty,
+            baseline=g1_baseline_rec or empty,
             pressure=cell_b_rec or empty,
             bit_identical=False,
             common_prefix_tokens=0,
             divergence_index=None,
             reason=(
-                "one or both required cells (A / B) did not run; "
+                f"one or both required {required_label} did not run; "
                 f"errors={cell_errors!r}"
             ),
         )
@@ -1291,8 +1415,14 @@ def execute_bench_on_engine(
         "common_prefix_tokens": g1_result.common_prefix_tokens,
         "divergence_index": g1_result.divergence_index,
         "reason": g1_result.reason,
-        "baseline_cell": cell_a_rec.cell_name if cell_a_rec else None,
+        "baseline_cell": (
+            g1_baseline_rec.cell_name if g1_baseline_rec else None
+        ),
         "pressure_cell": cell_b_rec.cell_name if cell_b_rec else None,
+        "baseline_mode": (
+            "recompute" if spec.recompute_baseline_enabled
+            else "no_pressure"
+        ),
     }
 
     return BenchReport(

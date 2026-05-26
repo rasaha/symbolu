@@ -18,17 +18,27 @@ Pairs with:
 
 The shipped `int4_protected` backend's packed KV layout survives
 vLLM 0.7.3's `preemption_mode='swap'` swap-out + swap-in cycle.
-**Bit-identical** output bytes between a no-pressure baseline and an
-engineered-pressure cell. The verifier prompt is decoded **through**
-a forced preemption; its KV blocks are evicted to CPU and restored
-to GPU; the post-restore decode must produce the same tokens as the
-no-pressure decode, byte-for-byte.
+**Bit-identical** output bytes between two cells under the SAME
+pressure workload, differing only in whether vLLM swaps (cell B) or
+recomputes (cell D) preempted blocks. The verifier prompt is decoded
+**through** forced preemption in both cells; if the swap path is
+byte-clean, both cells produce identical output tokens.
+
+> **Use `--recompute-baseline` (TIER5A.3b). The legacy A-vs-B
+> comparison is confounded by concurrent-batching numerics (cell A
+> decodes the verifier alone at batch=1; cell B decodes alongside
+> pressure at batch=N — FlashAttention's reduction order differs
+> across batch shapes). The recompute baseline puts cell D under the
+> same pressure as cell B; the only material difference is then the
+> KV restoration mechanism (swap vs recompute), which IS the swap
+> path under test.
 
 ## Acceptance gates
 
 | Gate | What it checks | Pass criterion |
 |------|----------------|----------------|
-| **G1** | Verifier output bit-identity | Cell A output bytes == Cell B output bytes |
+| **G1** (with `--recompute-baseline`, **recommended**) | Verifier output bit-identity across KV restoration paths | Cell B (swap) output bytes == Cell D (recompute) output bytes |
+| **G1** (legacy, default) | Verifier output bit-identity | Cell A output bytes == Cell B output bytes (confounded by batching) |
 | **G2** | Swap path was exercised | Cell B `swap_out_blocks > 0` |
 | **G3** | Telemetry surfaced | Cell B `cpu_swap_pool_used_blocks_peak > 0` AND `swap_in_latency_call_count > 0` |
 | **G4** *(if `--g4-smoke`)* | Composition smoke | Cell C ran to completion with all 3 install layers (extended_pinning + cache_aware_measurement_only + prefix_hit_probe) reporting enabled |
@@ -133,57 +143,111 @@ the cell C composition flags True.
 
 ## Step 4 — run the smoke
 
+**Recommended (TIER5A.3b)** — use `--recompute-baseline` so G1
+compares cell B (swap) vs cell D (recompute) under identical
+pressure, isolating the swap-path effect from batching numerics.
+Match `--base-gpu-mem-util` to `--pressure-gpu-mem-util` so all
+cells share the same engine config:
+
 ```bash
 python -m ctm_bench.scripts.bench_tier5a_swap_restore \
     --model Qwen/Qwen2.5-7B-Instruct \
     --seed 42 \
     --output-dir ./tier5a_run/$(date +%Y%m%d_%H%M) \
-    --base-gpu-mem-util 0.5 \
+    --base-gpu-mem-util 0.20 \
     --pressure-gpu-mem-util 0.20 \
     --swap-space-gb 8 \
-    --max-model-len 4096 \
+    --max-model-len 1024 \
     --n-pressure-requests 200 \
-    --pressure-decode-tokens 256 \
+    --pressure-decode-tokens 128 \
     --pressure-arrival-rate 20.0 \
     --pressure-alpha 1.5 \
     --verifier-decode-tokens 64 \
     --verifier-prompt-length 96 \
-    --g4-smoke \
-    --g4-pin-first-n-blocks 8 \
+    --recompute-baseline \
     --sample-interval-seconds 0.05
 ```
 
-This loads Qwen-2.5-7B once per cell, runs cells A → B → C in
-sequence, writes `tier5a_swap_restore_report.json` to the output
-dir, prints the overall verdict.
+This loads Qwen-2.5-7B three times (once per cell A, B, D), writes
+`tier5a_swap_restore_report.json`, prints overall verdict.
 
-Expected wall time: ≈ 8-12 minutes on H100; ≈ 12-20 minutes on A100.
-Most of it is model load (vLLM warmup) × 3 cells.
+Add `--g4-smoke --g4-pin-first-n-blocks 4` for the cell C
+composition smoke too (adds one more cell — bench then runs A → B
+→ D → C). G4 is independent of the G1 swap-path question.
 
-**Estimated cost**: ≈ \$0.10 on an H100 pod (one-shot; no iteration
-expected on first run if all checks landed correctly).
+Expected wall time: ≈ 12-15 min on H100; ≈ 18-25 min on A100 for
+three cells (longer with `--g4-smoke`).
+
+**Estimated cost**: ≈ \$0.10-0.15 on an H100 pod.
+
+### Memory math (why these numbers)
+
+At `--pressure-gpu-mem-util 0.20` on H100/A100-80GB with Qwen-7B
+(weights = 14.25 GiB, activations ≈ 1.4 GiB, non_torch ≈ 0.1 GiB),
+vLLM has ≈ 0.1–0.2 GiB left for KV cache → ≈ 126–236 blocks ×
+16 tokens/block = 2016–3776 tokens of cache. We need
+`max_model_len` < cache capacity for engine init to succeed, hence
+`--max-model-len 1024` (1024 ÷ 16 = 64 blocks needed; well below
+236). The 200 pressure requests × ~250 tokens each = ~50k token
+demand vs ~3k cache → heavy oversubscription → guaranteed
+preemption + swap activity in cell B.
+
+If pressure isn't producing swap activity (G2 reports
+`swap_out_blocks=0`), step `--pressure-gpu-mem-util` down to 0.15
+or 0.12. Below ≈ 0.10 vLLM won't load Qwen-7B at all.
 
 ## Step 5 — read the report
 
 ```bash
-jq '.gate_verdicts | to_entries | map({(.key): .value.passed}) | add' \
-    ./tier5a_run/<timestamp>/tier5a_swap_restore_report.json
+REPORT=./tier5a_run/<timestamp>/tier5a_swap_restore_report.json
+
+# Per-gate pass/fail
+jq '.gate_verdicts | to_entries
+    | map({(.key): {passed: .value.passed, summary: .value.summary}})' \
+    "$REPORT"
+
+# Overall verdict (true if all required gates green)
+jq '.overall_passed' "$REPORT"
+
+# G1 bit-identity evidence — note baseline_mode (recompute vs no_pressure)
+jq '.g1_result' "$REPORT"
+
+# With --recompute-baseline: directly verify cell B == cell D
+jq '.cell_records | {
+  cell_B_first_16: .cell_B_pressure.verifier_output_token_ids[:16],
+  cell_D_first_16: .cell_D_recompute_baseline.verifier_output_token_ids[:16],
+  match: (.cell_B_pressure.verifier_output_token_ids
+          == .cell_D_recompute_baseline.verifier_output_token_ids),
+  cell_B_swap_out: .cell_B_pressure.swap_out_blocks,
+  cell_D_swap_out: .cell_D_recompute_baseline.swap_out_blocks
+}' "$REPORT"
 ```
 
-Sample green run:
+Sample green run with `--recompute-baseline`:
 ```json
 {
-  "G1": true, "G2": true, "G3": true,
-  "G4": true, "G5": true, "G6": true
+  "G1": {"passed": true, "summary": "verdict=green; bit_identical=True; ..."},
+  "G2": {"passed": true, "summary": "swap_out_blocks=3174 (>0 -> GREEN)"},
+  "G3": {"passed": true, "summary": "..."},
+  "G5": {"passed": true, ...},
+  "G6": {"passed": true, ...}
 }
 ```
 
-`jq '.overall_passed'` should print `true`.
-
-For the bit-identity evidence:
-```bash
-jq '.g1_result' ./tier5a_run/<timestamp>/tier5a_swap_restore_report.json
+Sample cell-output comparison (the headline TIER5A.3 result):
+```json
+{
+  "cell_B_first_16": [101, 102, 103, ..., 116],
+  "cell_D_first_16": [101, 102, 103, ..., 116],
+  "match": true,
+  "cell_B_swap_out": 1162,
+  "cell_D_swap_out": 0
+}
 ```
+
+`match: true` AND `cell_B_swap_out > 0` AND `cell_D_swap_out == 0`
+together prove the swap path round-trip is bit-clean (cell B
+exercised it, cell D didn't; outputs match).
 
 For per-cell telemetry:
 ```bash
@@ -252,17 +316,29 @@ The wheel on disk has diverged from the freeze baseline. Either:
 
 ### G1 RED: verifier output diverges
 
-This is the **negative outcome** the smoke is designed to detect.
-The int4_protected packed KV layout did NOT survive the swap path.
-The `g1_result` evidence dict shows:
-* `divergence_index` — first token where outputs differ
-* `common_prefix_tokens` — how many tokens matched before divergence
+Interpretation depends on which baseline mode you ran:
 
-This is a material finding. **Do not** re-run with different
-parameters trying to make it pass. File the finding in
-`PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md` (TIER5A.4) and bring it to
-the int4_protected maintainers; the swap path is a kernel-level
-concern that needs root-cause investigation.
+**With `--recompute-baseline` (the recommended test)**: cells B
+(swap) and D (recompute) produced different output bytes under
+identical pressure. This IS the negative finding the smoke is
+designed to detect — the int4_protected packed KV layout did NOT
+survive a GPU → CPU → GPU round-trip. Check `g1_result`:
+* `baseline_mode` should be `"recompute"`
+* `divergence_index` — first differing token
+* `common_prefix_tokens` — matched prefix length
+
+**Do not** re-run with different parameters trying to make it pass.
+File the finding in `PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md`
+(TIER5A.4) and bring it to int4_protected maintainers; the swap
+path is a kernel-level concern needing root-cause investigation.
+
+**Without `--recompute-baseline` (legacy A-vs-B)**: G1 RED is
+**inconclusive** — the divergence may be from concurrent-batching
+numerics rather than the swap path. Re-run with
+`--recompute-baseline` to disambiguate before treating as a
+negative finding. Cells A and B run at different concurrent-batch
+shapes in the legacy mode, and FlashAttention is not strictly
+deterministic across batch shapes for 7B models.
 
 ## Post-run cleanup
 
