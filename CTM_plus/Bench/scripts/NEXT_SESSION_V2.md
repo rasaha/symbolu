@@ -448,4 +448,159 @@ engineering + measurement at minimum — so its scope must be
 explicitly approved phase-by-phase, NOT folded into 5A.
 ```
 
+> **⚠️ The Phase 5A prompt above is HISTORICAL.** Phase TIER5A
+> (renamed from 5A during execution) is now **CLOSED, POSITIVE** —
+> see `PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md`. The CURRENT focus is
+> **Phase 6B.1 (CUDA Graphs write-path preflight)** — prompt below.
+
+## PROMPT — Phase 6B.1 CUDA Graphs write-path preflight (CURRENT FOCUS)
+
+Use this to start the next session. **Approval scope is ONLY
+Phase 6B.1 (option A from the plan-of-record).** Phase 6B.2 / 6B.3
+/ 6B.4 stay gated on separate approvals each.
+
+```
+Continuing v2 production-hardening on branch claude/peaceful-einstein-hZmJs.
+Latest commit is 19e62d7 (v2 Phase 6B — CUDA Graphs plan-of-record).
+
+Phase TIER5A (warm-tier swap-restore verification) closed POSITIVE
+last session. int4_protected's packed KV layout survives vLLM 0.7.3's
+preemption_mode='swap' GPU<->CPU round-trip byte-for-byte. All six
+TIER5A gates GREEN on Qwen-7B + A100 + vLLM 0.7.3 (forked). The
+TIER5A bench harness + orthogonality gate (incl. G6b load-bearing
+forked-wheel SHA pin frozen on the verified pod) are in-tree as
+partner-credible measurement utilities. See
+PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md for the measured finding.
+
+Today's focus: Phase 6B.1 — write-path preflight for CUDA Graphs
+capture enablement. This is the FIRST phase of Phase 6B (the CUDA
+Graphs continuation). Approval scope is ONLY 6B.1, NOT the full
+6B.1 -> 6B.4 path. Other Tier 1 v2 items (quality bench, TP, auto
+seq-eviction) remain deferred.
+
+Before doing any work, read these files in order:
+1. INT4_PROTECTED_VC_BRIEF.md (root) — current partner-safe state.
+   Note Page 6's TIER5A measured row + Page 5 Tier 2 cold-tier row.
+2. CTM_plus/Bench/scripts/NEXT_SESSION_V2.md — this is your briefing;
+   read the CLOSED-positive TIER5A section + the discipline rules.
+3. CTM_plus/Bench/scripts/PHASE_6B_CUDA_GRAPHS_PLAN.md — plan-of-
+   record. Phase 6B.1 deliverables + G_PRE-WRITE acceptance gate
+   are sections "Phase 6B.1" and "Acceptance gates".
+4. CTM_plus/Bench/scripts/OPTION_B_PREFLIGHT.md — read-path
+   preflight (B-pre-1..4) that's the STRUCTURAL MODEL for 6B.1.
+   Pay attention to: B-pre-1 slot-pool pattern, B-pre-2+3 device
+   metadata + unconditional splice, B-pre-4 pointer stability
+   audit + persistent buffers. The write path will mirror all four.
+5. CTM_plus/Bench/scripts/PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md —
+   the most recent closure. Same discipline pattern (CPU-first,
+   per-phase approval, orthogonality gate pre+post) applies.
+6. CTM_plus/KVPolicy/kv_policy/phase5b_4c_paged_writer.py — the
+   write path source. Look for PagedKVWriter.write(),
+   ensure_seq_state(), and the seq_id -> SeqState dict lookup
+   that's the capture-hostile pattern.
+7. The B-1 failure trace from OPTION_B_PREFLIGHT.md "Status"
+   section: the .item() crash inside _derive_write_partitions ->
+   _seq_id_from_block_table_row at int(bt_row[0].item()), then
+   the writer.write(seq_id=...) dict lookup that would bake at
+   capture time.
+
+Phase 6B.1 scope (per the plan):
+- Mirror the read-path preflight (B-pre-1..4) on the write path.
+- Pool-based slot routing for write side (write equivalent of
+  B-pre-1's _k_stage_pool / _bf16_k_backing_pool pattern).
+- Device-side write-partition derivation — eliminate the
+  _derive_write_partitions Python loop + .item() pattern.
+  Replace with device tensor ops producing per-seq write
+  metadata (slot_idx, start_pos, length).
+- Pointer stability audit on write-path kernel args (analogous
+  to audit_phase6_b_pre4_pointer_stability.py); pre-allocate
+  any churning buffers.
+- Two new CPU verifies:
+  * verify_phase6_b_pre5_write_path_capture_safe.py — AST +
+    runtime instrumentation. Asserts zero .item() calls and
+    zero dict lookups inside the captured region of the write
+    path.
+  * verify_phase6_b_pre5_write_equiv.py — byte-identical KV
+    cache state legacy vs refactored, B in {1, 2, 4, 8}, 64-step
+    decode.
+
+Phase 6B.1 acceptance gate (G_PRE-WRITE):
+1. Zero .item() calls + zero per-call dict lookups in the write
+   path's captured region (AST + runtime checks).
+2. Write equivalence: legacy vs refactored produces byte-
+   identical KV cache state for B in {1, 2, 4, 8} over a 64-step
+   decode.
+3. All existing verifies still GREEN: verify_phase5b_4c_*.py,
+   verify_phase5b_5_needle.py, verify_phase5b_6_batch.py.
+4. TIER5A orthogonality gate GREEN pre + post — the refactor
+   MUST NOT modify Int4ProtectedAttentionImpl, the forked
+   vLLM-FA kernel, or the protected-channel splice logic. Run:
+       cd CTM_plus/Bench
+       python -m ctm_bench.scripts.tier5a_orthogonality_gate
+   The four in-tree tracks (G5a/G5b/G5c/G6a) MUST all PASS.
+   G6b will FAIL on CPU CI (vllm_flash_attn not importable) —
+   that's expected; not a 6B.1 concern.
+
+Phase 6B.1 budget: 2-3 engineer-days CPU work + ~$0.02 GPU smoke
+(one small B=2 decode to confirm the refactored write path
+produces unchanged output at one model + batch size).
+
+For your FIRST response: read the briefing docs (1-7 above), then
+propose a detailed design doc for the write-path preflight covering:
+
+- INVENTORY: every .item() / dict-lookup / data-dependent branch
+  violation in PagedKVWriter + _derive_write_partitions, with
+  concrete file:line references and which capture rule each
+  violates (host sync / data branch / dict lookup / pointer
+  churn — same taxonomy as OPTION_B_PREFLIGHT's table at the
+  top).
+- REFACTOR STRATEGY mirroring B-pre-1..4. For each violation in
+  the inventory, name which B-pre-* pattern applies and what
+  the write-path equivalent looks like. Special attention:
+  * Is the write-path slot pool a NEW pool, or can it reuse
+    B-pre-1's _k_stage_pool / _bf16_k_backing_pool? (Likely
+    reuse — the storage is already there.)
+  * How does the pre-capture hook resolve seq_id -> slot for
+    the write path? (Hint: same hook 6B.2 will need; the
+    resolution is one Python step before captured region.)
+- POOL/BUFFER OWNERSHIP: writer-side or model-side. Justify.
+- TEST PLAN: AST check details (which Python module to AST-parse;
+  which call sites count as "captured region"); runtime
+  instrumentation approach; equivalence fixture shape (model,
+  workload, batch sizes, step count); integration with the
+  existing verify_phase5b_4c_*.py gates.
+- ANTICIPATED EQUIVALENCE-VERIFIER SHAPE: workload generator,
+  seed, expected KV-state comparison method (e.g., per-block-id
+  per-layer tensor comparison via bitwise eq).
+- RISK AREAS: what could surprise. Document each + a mitigation
+  hypothesis.
+- ESTIMATED DAY-LEVEL TIMELINE: which deliverable on which day.
+
+Do NOT write code yet. The design doc must come first; the user
+approves the design doc before any implementation lands.
+
+Discipline rules (durable; pulled from NEXT_SESSION_V2.md):
+- CPU-first verification: design -> CPU prototype -> CPU tests
+  -> GPU smoke (only at G_PRE-WRITE gate verification).
+- Orthogonality: no touch to int4_protected backend stack.
+- Do NOT edit INT4_PROTECTED_VC_BRIEF.md without explicit user
+  approval.
+- Do NOT re-litigate the TIER5A finding; the swap path is verified
+  bit-clean (discipline rule #3 in NEXT_SESSION_V2.md).
+- Phase-gated execution; no skipping ahead to 6B.2+.
+- No combined-stack X-times projections without measurement.
+
+Ship-narrative target (gated on Phase 6B.4 completion, NOT 6B.1):
+aggregate >= 80 tok/s @ B=8 on Qwen-7B H100, closing the brief's
+4.3x per-seq latency caveat. Phase 6B.1 itself is STRUCTURAL PREP
+with no throughput expectation — only equivalence.
+
+If the design doc surfaces a fundamental blocker (e.g., the write
+path can't be made graph-safe without invasive vLLM changes, or
+the pool pattern doesn't generalize), STOP and surface to the
+user before proceeding. Better to discover this in design than
+mid-implementation.
+```
+
+
 End of file.
