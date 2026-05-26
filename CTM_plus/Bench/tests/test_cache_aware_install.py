@@ -681,3 +681,181 @@ def test_composition_with_int4_block_size_32():
         assert s["prediction_accuracy"] >= 0.85
     finally:
         handle.teardown()
+
+
+# ----------------------------------------------------------------------
+# vLLM 0.7.3 V2 block-manager shape regression
+#
+# The V0 engine in vLLM 0.7.3 uses a V2 block manager whose
+# ``block_tables[seq_id]`` is a ``BlockTable`` wrapper — not a
+# directly-iterable list. PR-2's first GPU smoke surfaced this:
+# ``_block_ids_for_seq`` originally did ``[... for b in bt]``, which
+# raised ``TypeError: 'BlockTable' object is not iterable`` inside
+# vLLM's _allocate_and_set_running.
+#
+# These mocks reproduce the V2 shape so the bug can't regress.
+# ----------------------------------------------------------------------
+
+
+class MockBlockTableV2:
+    """Mimics vLLM 0.7.3 V2's ``BlockTable`` wrapper.
+
+    Exposes ``.physical_block_ids`` (the canonical accessor — a
+    ``List[Optional[int]]``) and ``.blocks`` (alt accessor → list of
+    block-like objects). Crucially, it is **not directly iterable**
+    — iterating it raises ``TypeError`` to match real vLLM behavior.
+    """
+
+    def __init__(self, block_numbers: Sequence[int]):
+        self._block_numbers = [int(b) for b in block_numbers]
+
+    @property
+    def physical_block_ids(self) -> List[Optional[int]]:
+        # vLLM populates this list with the integer block_id of each
+        # allocated slot (or None for sentinels).
+        return list(self._block_numbers)
+
+    @property
+    def blocks(self) -> List[MockPhysicalTokenBlock]:
+        # Alt accessor — returns block-like objects with .block_id.
+        return [
+            type("_FakeBlock", (), {
+                "block_id": bn, "block_number": bn,
+            })()
+            for bn in self._block_numbers
+        ]
+
+    def __iter__(self):  # pragma: no cover - exercised by assertion
+        raise TypeError("'BlockTable' object is not iterable")
+
+
+class MockBlockSpaceManagerV2(MockBlockSpaceManager):
+    """V2 variant of the block-manager mock.
+
+    Same prefix-cache + free-pool semantics as the V1 parent, but
+    ``block_tables[seq_id]`` stores a ``MockBlockTableV2`` (wrapper
+    object) instead of a plain ``List[MockPhysicalTokenBlock]``.
+    """
+
+    def allocate(self, seq_group: MockSequenceGroup) -> None:
+        seq = seq_group.get_seqs()[0]
+        tokens = seq.get_prompt_token_ids()
+        block_numbers: List[int] = []
+        i = 0
+        n = len(tokens)
+        hit_tokens = 0
+        while i + self.block_size <= n:
+            chunk = tuple(tokens[i:i + self.block_size])
+            existing = self._cached_chunks.get(chunk)
+            if existing is not None:
+                block_numbers.append(existing)
+                hit_tokens += self.block_size
+            else:
+                bn = self._next_block_number
+                self._next_block_number += 1
+                self._cached_chunks[chunk] = bn
+                block_numbers.append(bn)
+            i += self.block_size
+        self.block_tables[seq.seq_id] = MockBlockTableV2(block_numbers)
+        self._realized_hits_in_last_allocate = hit_tokens
+
+    def free(self, seq_or_seq_group) -> None:
+        if hasattr(seq_or_seq_group, "get_prompt_token_ids"):
+            seq = seq_or_seq_group
+        else:
+            seq = seq_or_seq_group.get_seqs()[0]
+        bt = self.block_tables.pop(seq.seq_id, None)
+        if bt is None:
+            return
+        block_numbers = list(bt.physical_block_ids)
+        for bn in block_numbers:
+            if bn is not None:
+                self._free_pool.append(int(bn))
+        kept = set(block_numbers)
+        self._cached_chunks = {
+            ch: bn for ch, bn in self._cached_chunks.items()
+            if bn not in kept
+        }
+
+
+def test_v2_block_table_is_not_iterable_sanity_check():
+    """Sanity check: the V2 mock matches real vLLM shape — direct
+    iteration raises TypeError. If this regresses, the V2-path tests
+    below would not be exercising the bug they're meant to catch."""
+    bt = MockBlockTableV2([1, 2, 3])
+    with pytest.raises(TypeError, match="not iterable"):
+        for _ in bt:
+            pass
+    # But .physical_block_ids must work.
+    assert bt.physical_block_ids == [1, 2, 3]
+    # And .blocks must yield block-like objects.
+    blocks = bt.blocks
+    assert len(blocks) == 3
+    assert blocks[0].block_id == 1
+    assert blocks[1].block_number == 2
+
+
+def test_allocate_wrap_works_against_v2_block_manager():
+    """The install's allocate wrap must populate the tree correctly
+    when block_tables[seq_id] is a V2 BlockTable wrapper (not a
+    plain list). This is the regression gate for the GPU-smoke
+    crash:
+
+        TypeError: 'BlockTable' object is not iterable
+        at _block_ids_for_seq, called from _allocate_with_tree_update.
+    """
+    sched = MockScheduler()
+    bm = MockBlockSpaceManagerV2(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        tokens = list(range(96))
+        bm.allocate(_mk_sg("r1", tokens, 0.0))
+        # Without the fix this would have crashed in the wrap with
+        # TypeError before reaching here.
+        assert handle.tree.query(tokens) == 96
+        assert handle.tree.stats()["tracked_tokens"] > 0
+    finally:
+        handle.teardown()
+
+
+def test_free_wrap_works_against_v2_block_manager():
+    """The install's free wrap must extract block_ids correctly from
+    a V2 BlockTable before invoking the original free()."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManagerV2(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        tokens = list(range(64))
+        sg = _mk_sg("r1", tokens, 0.0)
+        bm.allocate(sg)
+        assert handle.tree.query(tokens) == 64
+        bm.free(sg.get_seqs()[0])
+        # If _block_ids_for_seq returned [] silently on a V2 shape,
+        # the tree.evict call would be a no-op and the prefix would
+        # still be queryable here. That would mask the bug rather
+        # than reproduce it.
+        assert handle.tree.query(tokens) == 0
+    finally:
+        handle.teardown()
+
+
+def test_realized_hits_with_v2_block_manager():
+    """Realized-hit measurement still works against the V2 shape —
+    second request sharing a 64-token prefix logs 64 realized hits."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManagerV2(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        SHARED = list(range(64))
+        bm.allocate(_mk_sg("seed", SHARED + list(range(500, 532)), 0.0))
+        bm.allocate(_mk_sg("reuser", SHARED + list(range(600, 632)), 1.0))
+        assert handle._realized_hits_total == 64
+        assert handle.stats()["realized_hit_tokens_total"] == 64
+    finally:
+        handle.teardown()

@@ -186,15 +186,56 @@ def _arrival_time_of(seq_group: Any) -> float:
 def _block_ids_for_seq(block_manager: Any, seq_id: Any) -> List[int]:
     """Extract integer block_ids from ``block_manager.block_tables[seq_id]``.
 
-    vLLM 0.7.3 stores ``List[PhysicalTokenBlock]`` (each with a
-    ``.block_number`` attribute). Mock tests may store plain ints.
-    This helper normalizes to ``List[int]``.
+    vLLM 0.7.3 has two ``block_tables`` layouts:
+
+    * **V1 block manager:** ``Dict[seq_id, List[PhysicalTokenBlock]]``;
+      each ``PhysicalTokenBlock`` has a ``.block_number`` attribute.
+      Direct iteration over the list works.
+    * **V2 block manager (default in V0 engine + 0.7.3 paths):**
+      ``Dict[seq_id, BlockTable]``. ``BlockTable`` is a wrapper
+      object that exposes ``.physical_block_ids`` →
+      ``List[Optional[int]]`` (the canonical accessor) and
+      ``.blocks`` → ``List[Block]``. It is NOT directly iterable
+      — iterating it raises ``TypeError``.
+
+    Mock tests historically used ``List[MockPhysicalTokenBlock]``
+    (V1-shape). The runtime crash on a real H100 pod surfaced the
+    V1-only assumption (PR-2 GPU smoke initial run); this helper
+    now handles both shapes plus the mocks.
+
+    Returns ``List[int]``.
     """
     bt_dict = getattr(block_manager, "block_tables", None)
     if not bt_dict:
         return []
-    bt = bt_dict.get(seq_id, [])
-    return [int(getattr(b, "block_number", b)) for b in bt]
+    bt = bt_dict.get(seq_id)
+    if bt is None:
+        return []
+    # V2 block manager: canonical accessor.
+    physical_ids = getattr(bt, "physical_block_ids", None)
+    if physical_ids is not None:
+        return [int(b) for b in physical_ids if b is not None]
+    # V2 block manager: alternate accessor exposing the underlying
+    # Block objects (whose ``.block_id`` is the integer index).
+    blocks_attr = getattr(bt, "blocks", None)
+    if blocks_attr is not None:
+        return [
+            int(getattr(b, "block_id", getattr(b, "block_number", b)))
+            for b in blocks_attr
+            if b is not None
+        ]
+    # V1 block manager / mock test path: bt is iterable, elements
+    # carry either .block_number (vLLM) or .block_id (mock variants).
+    try:
+        return [
+            int(getattr(b, "block_number", getattr(b, "block_id", b)))
+            for b in bt
+        ]
+    except TypeError:
+        # Neither a V2 wrapper nor an iterable — unknown shape;
+        # return empty so the wrap stays a structural no-op
+        # rather than crashing the engine loop.
+        return []
 
 
 # ----------------------------------------------------------------------

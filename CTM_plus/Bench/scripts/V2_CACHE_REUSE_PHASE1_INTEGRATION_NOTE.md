@@ -402,3 +402,38 @@ three help strings in `run_streaming.py` had unescaped `%` chars
 _call_impl`) that broke `python -m … --help` because argparse
 percent-formats action help. Doubled to `%%` so `--help` works
 again — needed for the new CLI smoke test.
+
+### V2 block-manager shape fix (post-first-GPU-smoke)
+
+PR-1's recon assumed `block_manager.block_tables[seq_id]` is
+`List[PhysicalTokenBlock]` (V1 block manager). vLLM 0.7.3's V0
+engine actually uses a V2 block manager whose `block_tables[seq_id]`
+is a `BlockTable` wrapper object — exposes `.physical_block_ids`
+and `.blocks` but is **not directly iterable**.
+
+The first GPU smoke attempt surfaced this:
+
+```
+File ".../kv_policy/cache_aware_install.py:197", in _block_ids_for_seq
+    return [int(getattr(b, "block_number", b)) for b in bt]
+TypeError: 'BlockTable' object is not iterable
+```
+
+Fix: `_block_ids_for_seq` in `cache_aware_install.py` now tries
+three accessor patterns in order — `.physical_block_ids` (V2
+canonical), `.blocks` (V2 alt), direct iteration (V1 + mocks)
+— and returns `[]` on unknown shapes rather than crashing the
+engine loop.
+
+CPU regression coverage: `MockBlockTableV2` +
+`MockBlockSpaceManagerV2` in `test_cache_aware_install.py` (4 new
+tests, including a sanity check that the V2 mock raises
+`TypeError` on iteration to match real vLLM). With those tests in
+place this regression can't slip back in.
+
+Lesson: the CPU mock-vs-real-vLLM surface drift is a real risk
+of CPU-first verification. The orthogonality + monkey-patch
+pattern is robust to it (the wrap stays a structural no-op when
+the helper returns `[]`), but the helper itself has to know the
+real interface shape. Future installs should mirror this fix
+pattern: try canonical → alt → iterate → fail-safe.
