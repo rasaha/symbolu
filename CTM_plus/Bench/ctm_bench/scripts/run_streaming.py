@@ -370,6 +370,57 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--extended-pinning",
+        action="store_true",
+        help=(
+            "Phase 4B: install the Extended Pinning Policy — marks "
+            "configured blocks as eviction-protected on top of "
+            "vLLM's LRU + prefix caching. Pinning is deterministic "
+            "(not predictive like --cache-aware-scheduling), so the "
+            "ship/inconclusive/negative decision is bounded by "
+            "the workload's prefix-sharing structure. See "
+            "PHASE4_VLLM_EVICTOR_HOOK_RESEARCH.md for the design. "
+            "Default OFF; with the flag off, all extended pinning "
+            "machinery is inert. Combine with --pin-first-n-blocks "
+            "and/or --pin-tokens-file to specify what to pin."
+        ),
+    )
+    parser.add_argument(
+        "--pin-first-n-blocks",
+        type=int, default=0,
+        help=(
+            "Phase 4B: pin the first N blocks of every admitted "
+            "request, regardless of content. Useful when every "
+            "request shares a system prompt of known length but "
+            "the exact tokens vary per deployment. Only effective "
+            "when --extended-pinning is set. Default 0 (no "
+            "positional pin)."
+        ),
+    )
+    parser.add_argument(
+        "--pin-tokens-file",
+        type=Path, default=None,
+        help=(
+            "Phase 4B: path to a JSON file containing pin specs. "
+            "Each entry is a dict with `name` plus exactly one of "
+            "`token_ids` (content-based) or "
+            "`first_n_blocks_per_request` (position-based). "
+            "Either a single object or a list of objects. Only "
+            "effective when --extended-pinning is set."
+        ),
+    )
+    parser.add_argument(
+        "--pin-max-budget-blocks",
+        type=int, default=1024,
+        help=(
+            "Phase 4B: hard cap on the total pinned block count. "
+            "Default 1024 (≈32K tokens at block_size=32, ~4%% of a "
+            "24K-block cache). Once reached, new pin candidates are "
+            "rejected and counted in stats[pin_budget_rejections]. "
+            "Only effective when --extended-pinning is set."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -467,6 +518,10 @@ def main(argv: Sequence[str]) -> int:
         ),
         n_shared_prefixes=args.n_shared_prefixes,
         collect_native_prefix_hits=args.collect_native_prefix_hits,
+        extended_pinning=args.extended_pinning,
+        pin_first_n_blocks=args.pin_first_n_blocks,
+        pin_tokens_file=args.pin_tokens_file,
+        pin_max_budget_blocks=args.pin_max_budget_blocks,
         max_decode_tokens=args.max_decode_tokens,
     )
 

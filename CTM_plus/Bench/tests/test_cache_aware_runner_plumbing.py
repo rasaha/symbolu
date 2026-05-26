@@ -699,6 +699,222 @@ def test_cancelled_request_still_records_latency() -> None:
     assert r.completion_time > r.submit_time
 
 
+# ---------------------------------------------------------------- #
+# Phase 4B — Extended pinning driver wiring tests
+# ---------------------------------------------------------------- #
+
+
+def test_driver_default_extended_pinning_off() -> None:
+    """Default constructor leaves extended_pinning OFF; flag-OFF
+    cells preserve the pre-Phase-4B behavior."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(model="dummy")
+    assert driver.extended_pinning is False
+    assert driver.pin_first_n_blocks == 0
+    assert driver.pin_tokens_file is None
+    assert driver.pin_max_budget_blocks == 1024
+    assert driver._extended_pinning_install is None
+
+
+def test_driver_accepts_extended_pinning_params() -> None:
+    """Constructor accepts the four new pinning params + plumbs them."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        extended_pinning=True,
+        pin_first_n_blocks=4,
+        pin_max_budget_blocks=512,
+    )
+    assert driver.extended_pinning is True
+    assert driver.pin_first_n_blocks == 4
+    assert driver.pin_max_budget_blocks == 512
+
+
+def test_streaming_run_cell_result_has_extended_pinning_stats() -> None:
+    """The result dataclass has the new ``extended_pinning_stats``
+    field defaulting to ``{}``."""
+    import dataclasses
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    field_names = {f.name for f in dataclasses.fields(StreamingRunCellResult)}
+    assert "extended_pinning_stats" in field_names
+
+    result = StreamingRunCellResult(
+        workload_name="t", policy_name="lru", seed=0,
+        n_requests_admitted=0, n_requests_completed=0,
+        n_decode_tokens=0, wall_clock_seconds=0.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    assert result.extended_pinning_stats == {}
+
+
+def test_build_pin_specs_positional_only() -> None:
+    """pin_first_n_blocks > 0 → produces one positional PinSpec."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    from kv_policy.extended_pinning import PinSpec
+
+    driver = AsyncEngineDriver(
+        model="dummy", extended_pinning=True, pin_first_n_blocks=5,
+    )
+    specs = driver._build_pin_specs()
+    assert len(specs) == 1
+    assert isinstance(specs[0], PinSpec)
+    assert specs[0].first_n_blocks_per_request == 5
+    assert specs[0].name == "positional_first_n"
+
+
+def test_build_pin_specs_empty_when_no_inputs() -> None:
+    """No pin_first_n_blocks and no pin_tokens_file → empty spec list."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    driver = AsyncEngineDriver(
+        model="dummy", extended_pinning=True, pin_first_n_blocks=0,
+    )
+    assert driver._build_pin_specs() == []
+
+
+def test_build_pin_specs_reads_tokens_file(tmp_path) -> None:
+    """pin_tokens_file is loaded into PinSpecs; supports single
+    object or list of objects."""
+    import json
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    from kv_policy.extended_pinning import PinSpec
+
+    # List form with both content + position specs.
+    spec_file = tmp_path / "specs.json"
+    spec_file.write_text(json.dumps([
+        {"name": "system_prompt", "token_ids": [1, 2, 3, 4]},
+        {"name": "first_3", "first_n_blocks_per_request": 3},
+    ]))
+    driver = AsyncEngineDriver(
+        model="dummy",
+        extended_pinning=True,
+        pin_first_n_blocks=2,           # also adds a positional spec
+        pin_tokens_file=spec_file,
+    )
+    specs = driver._build_pin_specs()
+    # 1 positional (pin_first_n_blocks=2) + 2 from file = 3 total.
+    assert len(specs) == 3
+    names = {s.name for s in specs}
+    assert "positional_first_n" in names
+    assert "system_prompt" in names
+    assert "first_3" in names
+
+
+def test_build_pin_specs_rejects_invalid_file_entry(tmp_path) -> None:
+    """JSON entry without token_ids or first_n_blocks_per_request
+    raises ValueError."""
+    import json
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    spec_file = tmp_path / "bad.json"
+    spec_file.write_text(json.dumps([
+        {"name": "no_payload"},
+    ]))
+    driver = AsyncEngineDriver(
+        model="dummy",
+        extended_pinning=True,
+        pin_tokens_file=spec_file,
+    )
+    with pytest.raises(ValueError, match="must set token_ids"):
+        driver._build_pin_specs()
+
+
+def test_run_extended_pinning_off_does_not_install() -> None:
+    """End-to-end mocked run: extended_pinning=False (default)
+    leaves stats empty and self._extended_pinning_install=None."""
+    fake_vllm = _FakeVLLM()
+    result, _, driver = _run_driver_extended_pinning(
+        fake_vllm=fake_vllm,
+        extended_pinning=False,
+    )
+    assert result.extended_pinning_stats == {}
+    assert driver._extended_pinning_install is None
+    # block_manager.allocate is unwrapped (no pinning install).
+    engine = fake_vllm.AsyncLLMEngine.last_instance
+    sched = engine.engine.scheduler
+    # Pinning wrap not present → bound method's __func__ is the
+    # mock's class method.
+    assert (
+        sched.block_manager.allocate.__func__
+        is _FakeBlockManager.allocate
+    )
+
+
+def test_run_extended_pinning_on_installs_and_populates_stats() -> None:
+    """End-to-end mocked run: extended_pinning=True installs the
+    wraps + populates stats with the canonical key set."""
+    fake_vllm = _FakeVLLM()
+    result, _, driver = _run_driver_extended_pinning(
+        fake_vllm=fake_vllm,
+        extended_pinning=True,
+        pin_first_n_blocks=2,
+    )
+    s = result.extended_pinning_stats
+    assert s.get("enabled") is True
+    expected_keys = {
+        "enabled",
+        "pinned_blocks_total",
+        "pin_specs_count",
+        "pinned_evictions_avoided",
+        "pin_budget_rejections",
+        "forced_pin_evictions",
+        "pinned_memory_overhead_bytes",
+        "per_spec_pinned_blocks",
+        "evictor_path_taken",
+    }
+    missing = expected_keys - set(s.keys())
+    assert not missing, f"missing keys: {missing}"
+
+    # Teardown reverted the wrap.
+    engine = fake_vllm.AsyncLLMEngine.last_instance
+    sched = engine.engine.scheduler
+    assert (
+        sched.block_manager.allocate.__func__
+        is _FakeBlockManager.allocate
+    )
+
+
+def _run_driver_extended_pinning(
+    *,
+    fake_vllm: Any,
+    extended_pinning: bool,
+    pin_first_n_blocks: int = 0,
+) -> Any:
+    """Helper: drive a tiny mocked run with the pinning flag set."""
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver,
+        ArrivalScheduler,
+        ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+    driver = AsyncEngineDriver(
+        model="dummy",
+        extended_pinning=extended_pinning,
+        pin_first_n_blocks=pin_first_n_blocks,
+        vllm_module=fake_vllm,
+        sample_interval_seconds=0.02,
+    )
+    arrival = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=10.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(
+            driver.run(
+                scheduler=arrival, sampler=sampler,
+                max_requests=0, max_wall_seconds=0.05,
+                workload_name="pin-test",
+            )
+        )
+    finally:
+        loop.close()
+    return result, fake_vllm, driver
+
+
 def test_cli_help_lists_cache_aware_flag() -> None:
     """``python -m ctm_bench.scripts.run_streaming --help`` mentions
     the new ``--cache-aware-scheduling`` flag.

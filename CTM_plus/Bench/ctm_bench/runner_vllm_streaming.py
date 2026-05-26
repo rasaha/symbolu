@@ -151,6 +151,11 @@ class StreamingRunCellResult:
     # entered). When ON, mirrors CacheAwareInstall.stats() output —
     # see KVPolicy/kv_policy/cache_aware_install.py.
     cache_aware_scheduler_stats: Dict[str, Any] = field(default_factory=dict)
+    # Phase 4B: populated when extended_pinning=True. Empty dict
+    # when the flag is OFF. When ON, mirrors
+    # ExtendedPinningInstall.stats() output —
+    # see KVPolicy/kv_policy/extended_pinning.py.
+    extended_pinning_stats: Dict[str, Any] = field(default_factory=dict)
     # Phase 3A latency telemetry: per-request first-token + e2e
     # latency, collected in _submit_one and aggregated to
     # p50/p99 here. Populated for every cell; the empty-list
@@ -806,6 +811,10 @@ class AsyncEngineDriver:
         shared_prefix_unique_tail_choices: Optional[Sequence[int]] = None,
         n_shared_prefixes: int = 4,
         collect_native_prefix_hits: bool = False,
+        extended_pinning: bool = False,
+        pin_first_n_blocks: int = 0,
+        pin_tokens_file: Optional[Path] = None,
+        pin_max_budget_blocks: int = 1024,
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -992,6 +1001,18 @@ class AsyncEngineDriver:
         # in run() and torn down in the finally block.
         self.collect_native_prefix_hits = bool(collect_native_prefix_hits)
         self._prefix_hit_probe: Any = None
+
+        # Phase 4B — Extended pinning (eviction-protection policy).
+        # Orthogonal to int4_protected and the cache-aware scheduler
+        # layers; sits at the LRU evictor + allocator layer.
+        # Off by default; opt-in via extended_pinning=True. Pin specs
+        # are constructed from pin_first_n_blocks + pin_tokens_file
+        # (one or both; union semantics in the manager).
+        self.extended_pinning = bool(extended_pinning)
+        self.pin_first_n_blocks = int(pin_first_n_blocks)
+        self.pin_tokens_file = pin_tokens_file
+        self.pin_max_budget_blocks = int(pin_max_budget_blocks)
+        self._extended_pinning_install: Any = None
 
     @staticmethod
     def _extract_model_from_engine(inner_engine: Any) -> Any:
@@ -1528,6 +1549,91 @@ class AsyncEngineDriver:
                         continue
                 raise
 
+        # Phase 4B — Extended pinning install. Sits between probe
+        # (innermost) and cache-aware (outermost) in the call chain.
+        # Probe wraps original allocate; pinning wraps probe's
+        # allocate; cache-aware wraps pinning's allocate. The
+        # pinning install ALSO wraps evictor.evict (only pinning
+        # touches the evictor).
+        extended_pinning_install: Any = None
+        if self.extended_pinning:
+            try:
+                from kv_policy.extended_pinning import (  # type: ignore
+                    PinSpec,
+                    install_extended_pinning,
+                )
+                inner_engine_for_pin = getattr(engine, "engine", engine)
+                sched_attr_pin = getattr(
+                    inner_engine_for_pin, "scheduler", None,
+                )
+                if sched_attr_pin is None:
+                    raise RuntimeError(
+                        "extended_pinning=True but the engine has no "
+                        ".scheduler attribute"
+                    )
+                sched_for_pin = (
+                    sched_attr_pin[0]
+                    if isinstance(sched_attr_pin, list)
+                    else sched_attr_pin
+                )
+                bm_for_pin = getattr(sched_for_pin, "block_manager", None)
+                if bm_for_pin is None:
+                    raise RuntimeError(
+                        "extended_pinning=True but the scheduler has no "
+                        ".block_manager attribute"
+                    )
+                pin_specs = self._build_pin_specs()
+                pin_block_size = _resolve_block_size_from_engine(
+                    engine, default=32,
+                )
+                extended_pinning_install = install_extended_pinning(
+                    block_manager=bm_for_pin,
+                    pin_specs=pin_specs,
+                    max_budget_blocks=self.pin_max_budget_blocks,
+                    enable=True,
+                    block_size=pin_block_size,
+                )
+                # Assign handle to self immediately (matches the
+                # audit fix #5 pattern for the probe + cache-aware
+                # installs) so any later install failure leaves the
+                # finally block able to tear this down.
+                self._extended_pinning_install = extended_pinning_install
+                logger.info(
+                    "Phase 4B: extended pinning installed "
+                    "(n_specs=%d, evictor_path_taken=%s, "
+                    "block_size=%d, max_budget_blocks=%d)",
+                    len(pin_specs),
+                    extended_pinning_install.evictor_path_taken,
+                    pin_block_size,
+                    self.pin_max_budget_blocks,
+                )
+            except BaseException:
+                # Tear down probe (installed before this) before
+                # propagating, then engine shutdown.
+                if self._prefix_hit_probe is not None:
+                    try:
+                        self._prefix_hit_probe.teardown()
+                    except Exception as exc:
+                        logger.warning(
+                            "prefix-hit probe teardown on "
+                            "extended-pinning install failure failed: %s",
+                            exc,
+                        )
+                for shutdown_name in (
+                    "shutdown_background_loop", "shutdown", "stop",
+                ):
+                    shutdown = getattr(engine, shutdown_name, None)
+                    if shutdown is None:
+                        continue
+                    try:
+                        result = shutdown()
+                        if asyncio.iscoroutine(result):
+                            await result
+                        break
+                    except Exception:
+                        continue
+                raise
+
         # v2 cache-reuse PR-2 — cache-aware admission scheduler install.
         # Lives at the scheduler layer; orthogonal to int4_protected, CTM+,
         # and route-A INT4 (all of which act at the attention layer).
@@ -1596,11 +1702,19 @@ class AsyncEngineDriver:
                 )
             except BaseException:
                 # Audit fix #5 (continued): if the cache-aware install
-                # fails, the prefix-hit probe (if installed at this
-                # point) would otherwise leak — the main-loop
-                # try/finally is unreachable from here because we're
-                # still in the setup phase. Tear it down explicitly
-                # before propagating the exception.
+                # fails, prior installs (probe + extended_pinning) would
+                # otherwise leak — the main-loop try/finally is
+                # unreachable from here because we're still in the
+                # setup phase. Tear them down explicitly LIFO before
+                # propagating the exception.
+                if self._extended_pinning_install is not None:
+                    try:
+                        self._extended_pinning_install.teardown()
+                    except Exception as exc:
+                        logger.warning(
+                            "extended pinning teardown on cache-aware "
+                            "install failure failed: %s", exc,
+                        )
                 if self._prefix_hit_probe is not None:
                     try:
                         self._prefix_hit_probe.teardown()
@@ -1640,6 +1754,7 @@ class AsyncEngineDriver:
         self._int4_route_a_teardown = int4_route_a_teardown
         self._cache_aware_install = cache_aware_install
         self._prefix_hit_probe = prefix_hit_probe
+        self._extended_pinning_install = extended_pinning_install
         sampling_params = SamplingParams(
             temperature=0.0,
             max_tokens=self.max_decode_tokens,
@@ -1785,6 +1900,9 @@ class AsyncEngineDriver:
             # wraps before engine shutdown. Best-effort; the install
             # handle's teardown() is itself a no-op on the disabled
             # path and idempotent on re-entry.
+            #
+            # LIFO chain: cache-aware (outermost) -> extended_pinning
+            # -> prefix_hit_probe -> original.
             if self._cache_aware_install is not None:
                 try:
                     self._cache_aware_install.teardown()
@@ -1792,9 +1910,15 @@ class AsyncEngineDriver:
                     logger.warning(
                         "cache-aware scheduler teardown failed: %s", exc,
                     )
-            # Phase 3A — revert the prefix-hit probe wrap. Runs AFTER
-            # the cache-aware teardown so the LIFO chain is:
-            # cache-aware (outermost) -> probe -> original allocate.
+            # Phase 4B — revert extended pinning wraps.
+            if self._extended_pinning_install is not None:
+                try:
+                    self._extended_pinning_install.teardown()
+                except Exception as exc:
+                    logger.warning(
+                        "extended pinning teardown failed: %s", exc,
+                    )
+            # Phase 3A — revert the prefix-hit probe wrap.
             if self._prefix_hit_probe is not None:
                 try:
                     self._prefix_hit_probe.teardown()
@@ -1945,6 +2069,18 @@ class AsyncEngineDriver:
             except Exception:
                 native_prefix_hit_stats = {
                     "installed": True, "error": "stats() raised",
+                }
+
+        # Phase 4B extended pinning — snapshot before teardown.
+        extended_pinning_stats: Dict[str, Any] = {}
+        if self._extended_pinning_install is not None:
+            try:
+                extended_pinning_stats = dict(
+                    self._extended_pinning_install.stats()
+                )
+            except Exception:
+                extended_pinning_stats = {
+                    "enabled": True, "error": "stats() raised",
                 }
 
         # Phase 3A latency aggregation. Filter out failed requests
@@ -2139,7 +2275,56 @@ class AsyncEngineDriver:
             prompt_builder_name=self._prompt_builder.name,
             per_request_cohort=per_request_cohort,
             native_prefix_hit_stats=native_prefix_hit_stats,
+            extended_pinning_stats=extended_pinning_stats,
         )
+
+    def _build_pin_specs(self) -> List[Any]:
+        """Phase 4B: convert CLI/driver pin args into a list of
+        ``PinSpec`` objects.
+
+        Two input sources are supported (union semantics):
+          * ``self.pin_first_n_blocks`` (int): if > 0, produces a
+            single positional PinSpec.
+          * ``self.pin_tokens_file`` (Path): if set, reads a JSON
+            file containing one or more pin specs. Each entry is a
+            dict with ``name`` plus exactly one of ``token_ids`` /
+            ``first_n_blocks_per_request``.
+
+        Returns ``[]`` when neither source is configured — the
+        install proceeds with no PinSpecs (allocate-wrap still runs
+        but pins nothing; the evictor wrap is a structural no-op).
+        """
+        from kv_policy.extended_pinning import PinSpec  # type: ignore
+        specs: List[Any] = []
+        if self.pin_first_n_blocks > 0:
+            specs.append(PinSpec(
+                name="positional_first_n",
+                first_n_blocks_per_request=self.pin_first_n_blocks,
+            ))
+        if self.pin_tokens_file is not None:
+            import json as _json
+            raw = self.pin_tokens_file.read_text()
+            data = _json.loads(raw)
+            # Accept either a single object or a list of objects.
+            entries = data if isinstance(data, list) else [data]
+            for entry in entries:
+                name = str(entry.get("name", "unnamed"))
+                token_ids = entry.get("token_ids")
+                first_n = entry.get("first_n_blocks_per_request")
+                if token_ids is not None:
+                    specs.append(PinSpec(
+                        name=name, token_ids=tuple(token_ids),
+                    ))
+                elif first_n is not None:
+                    specs.append(PinSpec(
+                        name=name, first_n_blocks_per_request=int(first_n),
+                    ))
+                else:
+                    raise ValueError(
+                        f"pin spec {name!r} in {self.pin_tokens_file}: "
+                        "must set token_ids or first_n_blocks_per_request"
+                    )
+        return specs
 
     @staticmethod
     def _compute_p50_p99_ms(
