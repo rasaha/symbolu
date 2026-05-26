@@ -899,11 +899,28 @@ class CTMEvictorModern:
 
         Silently no-ops on untracked blocks (matches the ``update``
         tolerance).
+
+        **Speculative admission (May 2026 Day 5b GPU run):** Phase 3
+        capture forwards attention for ALL block_ids the decode-step
+        query attends to, including blocks vLLM's prefix-caching
+        allocator hasn't promoted to immutable yet (and thus aren't
+        in ``self._tracked``). The earlier ``_tracked`` guard
+        dropped every such call — the Day 5b run showed 1.15M
+        flush calls reaching this method, all dropped silently.
+        Now: when an un-tracked block_id arrives, admit it
+        speculatively to the policy (same pattern
+        ``set_block_pre_rope_keys`` uses for pre-RoPE keys at
+        line 1148). The block is NOT added to ``self._tracked``
+        (vLLM's allocator owns that), but the policy gets the
+        attention signal so on_block_attention has somewhere to land.
         """
-        if block_id not in self._tracked:
-            return
         if seq_len is None:
             seq_len = self._num_hashed_tokens.get(block_id, self._block_size)
+        if block_id not in self._tracked:
+            self._policy.ensure_block(
+                block_id=block_id, sequence_id=0,
+                positions=[self._block_size - 1],
+            )
         self._forward_block_attention_calls += 1
         if float(attention_sum) > 0.0:
             self._forward_block_attention_nonzero_sum_calls += 1
@@ -1703,6 +1720,7 @@ def install_attention_capture(
     aggregator: AttentionAggregator,
     evictor: Any,
     enable_logging: bool = False,
+    capture_every_n: int = 1,
 ) -> int:
     """Monkey-patch every ``Attention`` module in ``model`` so its
     ``forward`` also computes per-block attention manually and
@@ -1734,11 +1752,33 @@ def install_attention_capture(
 
     The actual attention computation in step 2 is wrapped in a
     try/except — if extraction fails for any reason (backend
-    incompatibility, shape mismatch, missing attribute on
-    attn_metadata), we log + continue. The model's output is
+    incompatibility, shape mismatch, missing attention
+    extraction), we log + continue. The model's output is
     unchanged; only the side-channel attention forwarding is
     affected.
+
+    Args:
+        capture_every_n: Layer subsampling. The capture cost per
+            attention layer is dominated by a ``.tolist()`` of
+            ``seq_len``-sized softmax weights followed by a
+            Python-loop aggregator (vllm_evictor.py:2134-2143). At
+            32K context the per-call overhead is ~2ms; running on
+            56 attention modules costs ~112ms per forward step.
+            Day 5b May 2026 measured this as 82% of wall clock
+            (49.5s out of 60s) on Qwen2.5-7B chat_32k. Subsampling
+            with ``capture_every_n=4`` keeps roughly 1/4 of the
+            modules — capture from every 4th attention layer —
+            cutting the overhead 4x. Attention patterns are
+            strongly correlated across adjacent layers (the
+            empirical motivation for ``--phase4-capture-every-n``
+            on the Phase 4 path); 1/4 sampling is the methodology-
+            consistent default. ``capture_every_n=1`` preserves
+            the legacy "patch every layer" behaviour for ablation.
     """
+    if capture_every_n < 1:
+        raise ValueError(
+            f"capture_every_n must be >= 1; got {capture_every_n}"
+        )
     # Find attention modules. vLLM 0.7+ uses
     # vllm.attention.layer.Attention; we identify by class name
     # so we don't have to import vllm here (keeps this function
@@ -1749,8 +1789,15 @@ def install_attention_capture(
     # at runtime, which is fine because forward() running implies
     # torch IS installed).
     patched_count = 0
+    seen_count = 0
     for name, module in _walk_modules(model):
         if not _is_vllm_attention_module(module):
+            continue
+        # Layer subsampling: skip all but every Nth eligible
+        # module. seen_count is incremented first so the count
+        # starts at 1, picking module 0 (the first eligible).
+        seen_count += 1
+        if (seen_count - 1) % capture_every_n != 0:
             continue
         original_forward = module.forward
         head_size = getattr(module, "head_size", None)
@@ -1837,18 +1884,22 @@ def _walk_modules(model: Any):
 
 def _is_vllm_attention_module(module: Any) -> bool:
     """Identify vLLM's Attention layer by class name (avoids
-    requiring vllm to be importable)."""
+    requiring vllm to be importable).
+
+    Strict matching: class name must end with "Attention". This
+    matches both vLLM's inner ``Attention`` and the model-level
+    wrapper (e.g., ``Qwen2Attention``), but rejects QKV projection
+    classes (``QKVParallelLinear`` etc.) that happen to expose
+    ``head_dim`` / ``num_heads`` attributes. The earlier fallback
+    heuristic overmatched 84 modules on Qwen2.5-7B (vs route-A's
+    56) on the May 2026 Day 5b GPU run; the over-matched modules
+    burned wall time on capture failures and dropped throughput
+    5-10x. Align with route-A's ``_looks_like_attention``.
+    """
     cls = type(module).__name__
-    if cls in ("Attention", "PagedAttention"):
-        return True
-    # Heuristic fallback: an attention-like module typically has
-    # `head_size` or `head_dim` AND `num_heads` AND a forward
-    # method whose signature includes "kv_cache" or "attn_metadata".
-    has_head_dim = (
-        hasattr(module, "head_size") or hasattr(module, "head_dim")
-    )
-    has_heads = hasattr(module, "num_heads")
-    return has_head_dim and has_heads and hasattr(module, "forward")
+    if not cls.endswith("Attention"):
+        return False
+    return hasattr(module, "forward")
 
 
 def _capture_attention_to_aggregator(

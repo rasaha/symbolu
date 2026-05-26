@@ -533,6 +533,7 @@ class AsyncEngineDriver:
         ctm_plus_evictor: bool = False,
         enable_prefix_caching: Optional[bool] = None,
         phase3_attention_capture: bool = False,
+        phase3_capture_every_n: int = 4,
         phase4_trig_calibration_path: Optional[Path] = None,
         phase4_window_interval: int = 128,
         phase4_future_offsets: Optional[Sequence[int]] = None,
@@ -590,6 +591,7 @@ class AsyncEngineDriver:
                 "there's nowhere to push the attention to."
             )
         self.phase3_attention_capture = bool(phase3_attention_capture)
+        self.phase3_capture_every_n = max(1, int(phase3_capture_every_n))
 
         # ---- Phase 4 wiring ----
         if phase4_trig_calibration_path is not None and not ctm_plus_evictor:
@@ -1028,10 +1030,12 @@ class AsyncEngineDriver:
                         model=model,
                         aggregator=attention_aggregator,
                         evictor=installed_evictor,
+                        capture_every_n=self.phase3_capture_every_n,
                     )
                     logger.info(
                         "Phase 3: attention capture installed on "
-                        "%d Attention layers", n_patched,
+                        "%d Attention layers (capture_every_n=%d)",
+                        n_patched, self.phase3_capture_every_n,
                     )
             except BaseException:
                 # Best-effort teardown then re-raise. Same chain

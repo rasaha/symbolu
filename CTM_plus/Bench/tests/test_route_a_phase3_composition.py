@@ -232,6 +232,99 @@ def test_only_route_a_no_capture_means_zero_attention_to_evictor():
     assert evictor.received == []
 
 
+def test_real_ctm_evictor_admits_untracked_blocks_speculatively():
+    """Day 5b May 2026 GPU run regression test: forward_block_attention
+    received 1.15M calls but every single one hit the `_tracked` early-
+    return because vLLM hadn't promoted the block_ids to IMMUTABLE yet
+    in the 60s wall window. The fix admits un-tracked blocks
+    speculatively via policy.ensure_block; this test locks that
+    behaviour so it doesn't regress.
+
+    Without speculative admission, this test fails with
+    forward_block_attention_calls == 0 (the Day 5b symptom).
+    """
+    from kv_policy.vllm_evictor import CTMEvictorModern
+
+    evictor = CTMEvictorModern(num_blocks_capacity=128, block_size=16)
+    assert 99 not in evictor._tracked
+
+    evictor.forward_block_attention(block_id=99, attention_sum=0.7)
+    evictor.forward_block_attention(block_id=99, attention_sum=0.3)
+    evictor.forward_block_attention(block_id=42, attention_sum=0.0)
+
+    assert evictor._forward_block_attention_calls == 3, (
+        "All three calls should tick the counter; pre-fix this was 0"
+    )
+    assert evictor._forward_block_attention_nonzero_sum_calls == 2, (
+        "Two calls had attention_sum > 0; the third was zero"
+    )
+    assert 99 in evictor._policy.blocks
+    assert 42 in evictor._policy.blocks
+    assert 99 not in evictor._tracked, (
+        "Speculative admission must NOT add to _tracked "
+        "(vLLM's allocator owns _tracked membership)"
+    )
+
+
+def test_install_attention_capture_subsamples_layers():
+    """Day 5b May 2026 GPU run regression test: Phase 3 capture
+    overhead was 82% of wall on Qwen2.5-7B because every Attention
+    layer ran the per-call .tolist() + Python aggregator. The
+    capture_every_n knob reduces patched modules; this test locks
+    the subsampling math.
+    """
+    from kv_policy.vllm_evictor import (
+        AttentionAggregator, install_attention_capture,
+    )
+
+    model = _build_fake_vllm_model(num_layers=8)
+    aggregator = AttentionAggregator()
+    evictor = _StubEvictor()
+
+    n_patched = install_attention_capture(
+        model=model, aggregator=aggregator, evictor=evictor,
+        capture_every_n=4,
+    )
+    assert n_patched == 2, (
+        f"8 attention modules, every 4th -> 2 patched; got {n_patched}"
+    )
+
+
+def test_is_vllm_attention_module_rejects_projection_modules():
+    """Day 5b May 2026 GPU run regression: the fallback heuristic
+    matched QKVParallelLinear (84 modules patched on Qwen2.5-7B
+    vs route-A's 56). Strict matching keeps the heuristic from
+    over-patching projection modules that happen to have
+    head_dim/num_heads attributes.
+    """
+    import torch
+    from kv_policy.vllm_evictor import _is_vllm_attention_module
+
+    class Attention(torch.nn.Module):
+        head_size = 128
+        num_heads = 4
+        def forward(self, *a, **k): pass
+
+    class Qwen2Attention(torch.nn.Module):
+        head_size = 128
+        num_heads = 4
+        def forward(self, *a, **k): pass
+
+    class QKVParallelLinear(torch.nn.Module):
+        # Has the heuristic-matched attrs, but it's not an attention
+        # module — the Day 5b smoking gun.
+        head_size = 128
+        num_heads = 4
+        def forward(self, x): return x
+
+    assert _is_vllm_attention_module(Attention())
+    assert _is_vllm_attention_module(Qwen2Attention())
+    assert not _is_vllm_attention_module(QKVParallelLinear()), (
+        "QKVParallelLinear class name does not end with Attention; "
+        "must be rejected. Pre-fix, the fallback heuristic accepted it."
+    )
+
+
 def test_compose_does_not_double_quantize_kv():
     """If both wrappers fire on the same forward, the int4 round-trip
     must run exactly ONCE per forward, not twice. A composition bug
