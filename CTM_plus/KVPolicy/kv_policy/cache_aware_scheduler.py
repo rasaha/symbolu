@@ -155,7 +155,14 @@ class PrefixRadixTree:
             )
             child.children = {seg[j]: split}
             child.segment = seg[:j]
-            child.block_ids = set()
+            # Parent retains the block_ids: the original node represented
+            # "this full path is cached at these blocks". After the split,
+            # the prefix (parent) AND the suffix (split node) are both
+            # still cached — same physical blocks back them. Empty
+            # parent would make partial-prefix queries return 0 even
+            # when the prefix is materially cached (the multi-request
+            # prefix-sharing case the v2 layer exists to optimize).
+            child.block_ids = set(split.block_ids)
             child.pinned = child.pinned  # parent of split inherits pin
             child.total_tokens = node.total_tokens + j
             node = child
