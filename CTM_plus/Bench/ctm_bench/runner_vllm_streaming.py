@@ -815,6 +815,8 @@ class AsyncEngineDriver:
         pin_first_n_blocks: int = 0,
         pin_tokens_file: Optional[Path] = None,
         pin_max_budget_blocks: int = 1024,
+        max_model_len: Optional[int] = None,
+        preemption_mode: str = "swap",
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -1012,6 +1014,27 @@ class AsyncEngineDriver:
         self.pin_first_n_blocks = int(pin_first_n_blocks)
         self.pin_tokens_file = pin_tokens_file
         self.pin_max_budget_blocks = int(pin_max_budget_blocks)
+        # Phase 4C operational knob: cap vLLM's max_model_len so the
+        # engine can start under tight gpu_memory_utilization. Default
+        # None preserves vLLM's per-model default (32768 for Qwen-7B).
+        # Useful when the workload's actual prompt length is much
+        # smaller than the model's max context and we want to force
+        # eviction pressure via tight KV cache.
+        self.max_model_len = (
+            int(max_model_len) if max_model_len is not None else None
+        )
+        # Phase 4C diagnostic knob: vLLM's preemption policy. Default
+        # "swap" matches the existing behavior (preemption swaps
+        # blocks to CPU). "recompute" forces vLLM to evict cached
+        # blocks under pressure instead of swapping — necessary to
+        # exercise the LRUEvictor that extended-pinning wraps when
+        # the bench's workload doesn't naturally produce eviction.
+        if preemption_mode not in ("swap", "recompute"):
+            raise ValueError(
+                f"preemption_mode must be 'swap' or 'recompute'; "
+                f"got {preemption_mode!r}"
+            )
+        self.preemption_mode = preemption_mode
         self._extended_pinning_install: Any = None
 
     @staticmethod
@@ -1093,13 +1116,14 @@ class AsyncEngineDriver:
             # a Phase 2 ctm_plus_evictor=True cell on the SAME
             # operational question (cache retention).
             "enable_prefix_caching": self.enable_prefix_caching,
-            # preemption_mode="swap" tells vLLM's scheduler to swap
-            # preempted sequences to CPU rather than recomputing
-            # them. Kept ON in both phases so swap counters always
-            # accumulate; the difference between phases is which
-            # decision the evictor controls (cache retention with
-            # prefix caching, vs no evictor without).
-            "preemption_mode": "swap",
+            # preemption_mode: "swap" (default) swaps preempted
+            # sequences to CPU; "recompute" instead evicts cached
+            # blocks under pressure. Phase 4C diagnostic: the swap
+            # path bypasses the LRUEvictor that extended-pinning
+            # wraps, so recompute mode is needed to actually
+            # exercise the pinning evictor wrap on workloads that
+            # don't naturally fill the cache.
+            "preemption_mode": self.preemption_mode,
         }
         # FP8 KV cache lane. Only set the field when the caller asked
         # for an override — leave the AsyncEngineArgs default in place
@@ -1108,6 +1132,10 @@ class AsyncEngineDriver:
         # through the hardware tensor cores at 2x compression.
         if self.kv_cache_dtype is not None:
             kwargs["kv_cache_dtype"] = self.kv_cache_dtype
+        # Phase 4C: max_model_len override for tight-memory scenarios.
+        # When None, leave vLLM's per-model default in place.
+        if self.max_model_len is not None:
+            kwargs["max_model_len"] = self.max_model_len
         # Allow the caller to override or extend the args, e.g. to
         # test with preemption_mode="recompute" for comparison.
         kwargs.update(self.scheduler_config_overrides)

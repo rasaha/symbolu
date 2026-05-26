@@ -40,6 +40,30 @@ History:
 
 VC brief: unchanged. Cache-aware was never in the brief.
 
+**CLOSED:** v2 Extended Pinning Policy. See
+`PHASE4_EXTENDED_PINNING_FINDINGS.md` for the measured finding.
+
+History:
+* Phase 4A (CPU prototype + 32 tests): ✅ commit `2590505`
+* Phase 4B (driver wiring + CLI + 3-cell bench): ✅ commit `451d307`
+* Phase 4F design (v2.1 priority-LRU; gated on 4C ship signal): ✅ commit `ab66df1` — ARCHAEOLOGY (gating condition not met)
+* Phase 4C runbook: ✅ commit `2aa5d36`
+* Phase 4C operational fixes (`--max-model-len`, `--preemption-mode`): commits `14a4ba0`, `14cac6a`
+* Phase 4C three GPU runs at seed=42 (A100):
+  - Loose memory (gpu_mem=0.5): zero preemption, zero pinned_evictions_avoided
+  - Tight memory (gpu_mem=0.25, max_model_len=4096): zero preemption, zero pinned_evictions_avoided
+  - Recompute + cranked-up pressure (n=500, rate=20, decode=256, recompute mode): cell A produced 96 preemption events (confirming workload size is sufficient), but cells B and C with prefix caching ON still produced ZERO preemption — vLLM's content-hash dedupe absorbs the demand
+* Phase 4D measured finding: ✅ `PHASE4_EXTENDED_PINNING_FINDINGS.md`
+* **Phase 4 CLOSED.** Extended pinning is **not productionized**.
+  Mechanism mechanically correct (all install/manager/wrap gates
+  pass); had no opportunity to act because vLLM's stock LRU +
+  prefix caching already handles cohort-shared workloads natively.
+  Code stays in-tree per the Phase 3 + TurboQuant precedent.
+  CLI flags retained as experimental. The three-cell bench
+  harness retained as a v2 measurement utility.
+
+VC brief: unchanged. Extended pinning was never in the brief.
+
 ## Five pending v2 items (the brief's Tier 1 list)
 
 Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5

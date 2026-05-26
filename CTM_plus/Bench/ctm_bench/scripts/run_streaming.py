@@ -373,16 +373,18 @@ def main(argv: Sequence[str]) -> int:
         "--extended-pinning",
         action="store_true",
         help=(
-            "Phase 4B: install the Extended Pinning Policy — marks "
-            "configured blocks as eviction-protected on top of "
-            "vLLM's LRU + prefix caching. Pinning is deterministic "
-            "(not predictive like --cache-aware-scheduling), so the "
-            "ship/inconclusive/negative decision is bounded by "
-            "the workload's prefix-sharing structure. See "
-            "PHASE4_VLLM_EVICTOR_HOOK_RESEARCH.md for the design. "
-            "Default OFF; with the flag off, all extended pinning "
-            "machinery is inert. Combine with --pin-first-n-blocks "
-            "and/or --pin-tokens-file to specify what to pin."
+            "EXPERIMENTAL — DO NOT ENABLE IN PRODUCTION. Phase 4 "
+            "Extended Pinning Policy: marks configured blocks as "
+            "eviction-protected on top of vLLM's LRU + prefix "
+            "caching. Three-GPU-run Phase 4C measurement on "
+            "Qwen-7B + A100 produced INCONCLUSIVE results — "
+            "mechanism mechanically correct, but no opportunity "
+            "to act on cohort-shared workloads because vLLM's "
+            "stock prefix caching already handles them natively. "
+            "See PHASE4_EXTENDED_PINNING_FINDINGS.md for the full "
+            "measurement + revisit conditions. CLI flags retained "
+            "for further experimentation. Combine with "
+            "--pin-first-n-blocks and/or --pin-tokens-file."
         ),
     )
     parser.add_argument(
@@ -418,6 +420,26 @@ def main(argv: Sequence[str]) -> int:
             "24K-block cache). Once reached, new pin candidates are "
             "rejected and counted in stats[pin_budget_rejections]. "
             "Only effective when --extended-pinning is set."
+        ),
+    )
+    parser.add_argument(
+        "--max-model-len",
+        type=int, default=None,
+        help=(
+            "Override vLLM's max_model_len for the engine. Required "
+            "under tight --gpu-memory-utilization where the model's "
+            "default context doesn't fit in the KV cache. Default "
+            "None (vLLM's per-model default)."
+        ),
+    )
+    parser.add_argument(
+        "--preemption-mode",
+        default="swap", choices=["swap", "recompute"],
+        help=(
+            "vLLM preemption policy. Default 'swap' moves blocks "
+            "to CPU. 'recompute' forces eviction of cached blocks "
+            "under memory pressure (needed to exercise the LRU "
+            "evictor that --extended-pinning wraps)."
         ),
     )
     parser.add_argument(
@@ -522,6 +544,8 @@ def main(argv: Sequence[str]) -> int:
         pin_first_n_blocks=args.pin_first_n_blocks,
         pin_tokens_file=args.pin_tokens_file,
         pin_max_budget_blocks=args.pin_max_budget_blocks,
+        max_model_len=args.max_model_len,
+        preemption_mode=args.preemption_mode,
         max_decode_tokens=args.max_decode_tokens,
     )
 
