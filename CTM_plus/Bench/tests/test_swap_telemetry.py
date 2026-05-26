@@ -535,6 +535,170 @@ def test_install_probe_resolution_prefers_block_manager_over_block_allocator():
     handle.teardown()
 
 
+# ---------------------------------------------------------------- #
+# TIER5A.4 — V0 block_manager-direct fast path for CPU pool counts.
+# Closes the G3 telemetry gap surfaced by the first green TIER5A.3
+# smoke run (cpu_pool_peak=0 of 0). vLLM 0.7.x SelfAttnBlockSpaceManager
+# exposes num_total_cpu_blocks + get_num_free_cpu_blocks() directly
+# on the block_manager; the resolver now tries those FIRST.
+# ---------------------------------------------------------------- #
+
+
+def test_v0_block_manager_direct_path_returns_used_and_total():
+    """When block_manager has the V0 helpers, read_cpu_swap_pool
+    takes the fast path and returns the correct used+total."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _V0BlockManager:
+        block_size = 16
+        num_total_cpu_blocks = 9362
+        def get_num_free_cpu_blocks(self):
+            return 7000   # 2362 in use
+
+    bm = _V0BlockManager()
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_total_blocks == 9362
+    assert snapshot.num_used_blocks == 2362
+    assert snapshot.block_size_tokens == 16
+    assert snapshot.hint_path == "v0_block_manager.get_num_free_cpu_blocks"
+
+
+def test_v0_block_manager_direct_path_with_zero_used():
+    """At engine init (no swaps yet), free == total → used = 0,
+    NOT -1. This is the case the first GPU run reported as
+    'unreadable'; the fix makes it surface as 'no swap activity'."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _V0BlockManager:
+        block_size = 16
+        num_total_cpu_blocks = 9362
+        def get_num_free_cpu_blocks(self):
+            return 9362   # nothing swapped out
+
+    bm = _V0BlockManager()
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_total_blocks == 9362
+    assert snapshot.num_used_blocks == 0    # NOT -1
+    assert snapshot.hint_path == "v0_block_manager.get_num_free_cpu_blocks"
+
+
+def test_v0_block_manager_direct_path_under_load():
+    """Simulates the load case where some blocks are swapped to CPU.
+    free decreases; used = total - free."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _V0BlockManager:
+        block_size = 16
+        num_total_cpu_blocks = 9362
+        def __init__(self):
+            self._free = 9362
+        def get_num_free_cpu_blocks(self):
+            return self._free
+
+    bm = _V0BlockManager()
+    # Drop free by 80 (simulates 80 blocks swapped to CPU).
+    bm._free = 9362 - 80
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_used_blocks == 80
+    assert snapshot.num_total_blocks == 9362
+
+
+def test_v0_fast_path_skipped_when_attributes_missing():
+    """If block_manager lacks the V0 helpers, the fast path returns
+    (-1, 0, '') and read_cpu_swap_pool falls back to the allocator
+    walk."""
+    from kv_policy.swap_telemetry import (
+        _try_v0_block_manager_cpu_counts, read_cpu_swap_pool,
+    )
+
+    class _NoV0Helpers:
+        # block_manager without the new V0 helpers
+        block_size = 16
+        # no num_total_cpu_blocks, no get_num_free_cpu_blocks
+
+    bm = _NoV0Helpers()
+    used, total, hint = _try_v0_block_manager_cpu_counts(bm)
+    assert used == -1
+    assert total == 0
+    assert hint == ""
+    # And read_cpu_swap_pool falls through to no_known_path
+    snapshot = read_cpu_swap_pool(bm)
+    assert snapshot.num_used_blocks == -1
+    assert snapshot.hint_path == "no_known_path"
+
+
+def test_v0_fast_path_skipped_when_total_is_zero():
+    """An attribute that exists but is 0 (e.g. swap_space_gb=0)
+    should skip the V0 path so the fallback can decide. Otherwise
+    we'd lock the snapshot at 0/0 which the tracker classifies as
+    unreadable."""
+    from kv_policy.swap_telemetry import (
+        _try_v0_block_manager_cpu_counts,
+    )
+
+    class _V0ZeroTotal:
+        block_size = 16
+        num_total_cpu_blocks = 0
+        def get_num_free_cpu_blocks(self):
+            return 0
+
+    used, total, hint = _try_v0_block_manager_cpu_counts(_V0ZeroTotal())
+    assert used == -1
+    assert total == 0
+    assert hint == ""
+
+
+def test_read_allocator_block_counts_reads_get_num_total_blocks():
+    """TIER5A.4 fixup to _read_allocator_block_counts: add
+    get_num_total_blocks (no-arg method) to the total-candidate list.
+    This is vLLM 0.7.3 NaiveBlockAllocator's canonical API; the
+    legacy attribute names (num_total_blocks etc.) don't exist on it.
+    """
+    from kv_policy.swap_telemetry import _read_allocator_block_counts
+
+    class _NaiveBlockAllocator:
+        def get_num_total_blocks(self):
+            return 9362
+        def get_num_free_blocks(self):
+            return 9300
+
+    used, total = _read_allocator_block_counts(_NaiveBlockAllocator())
+    assert total == 9362
+    assert used == 62
+
+
+def test_v0_path_used_in_preference_to_allocator_walk():
+    """When BOTH the V0 fast path AND the allocator walk would
+    work, the fast path wins (it's cleaner — one hop)."""
+    from kv_policy.swap_telemetry import read_cpu_swap_pool
+
+    class _CpuAlloc:
+        def get_num_total_blocks(self):
+            return 5000     # different from V0 path
+        def get_num_free_blocks(self):
+            return 4000
+
+    class _BlockAllocator:
+        def __init__(self, cpu):
+            self._allocators = {"Device.CPU": cpu, "Device.GPU": object()}
+
+    class _BothPathsBlockManager:
+        block_size = 16
+        # V0 path: this should win
+        num_total_cpu_blocks = 9362
+        def __init__(self):
+            self.block_allocator = _BlockAllocator(_CpuAlloc())
+        def get_num_free_cpu_blocks(self):
+            return 9000     # used = 362 from V0 path
+
+    bm = _BothPathsBlockManager()
+    snapshot = read_cpu_swap_pool(bm)
+    # V0 numbers, not allocator numbers
+    assert snapshot.num_total_blocks == 9362
+    assert snapshot.num_used_blocks == 362
+    assert snapshot.hint_path == "v0_block_manager.get_num_free_cpu_blocks"
+
+
 def test_record_ms_rejects_negative():
     handle = SwapInLatencyProbe(
         enabled=True, hint_path="", wrap_target_name="swap_in",

@@ -166,18 +166,31 @@ def _read_allocator_block_counts(
     class (``NaiveBlockAllocator`` vs ``PrefixCachingBlockAllocator``
     vs ``CpuGpuBlockAllocator``'s per-device member).
 
+    vLLM 0.7.3's ``NaiveBlockAllocator`` (confirmed via the
+    tier5a_v0_engine_inspect diagnostic on a live H100/A100 pod)
+    exposes counts via ``get_num_total_blocks()`` and
+    ``get_num_free_blocks()`` — no-arg methods, not attributes.
+    The ``get_num_total_blocks`` candidate was added in TIER5A.4
+    to close the G3 telemetry gap surfaced by the first green
+    smoke run.
+
     Returns ``(-1, 0)`` if neither used nor total can be read; the
     snapshot's ``num_used_blocks=-1`` is the signal to upstream that
     "we found an allocator but couldn't get a count".
     """
     # num_total_blocks: try the obvious attribute, then a few
-    # method/property variants.
+    # method/property variants. TIER5A.4 fix: include
+    # ``get_num_total_blocks`` (no-arg method) — the canonical name
+    # on vLLM 0.7.3's NaiveBlockAllocator.
     total = -1
     for attr in (
+        "get_num_total_blocks",
         "num_total_blocks",
         "_num_total_blocks",
         "num_blocks",
+        "_num_blocks",
         "total_blocks",
+        "_total_blocks",
     ):
         v = getattr(allocator, attr, None)
         if v is None:
@@ -278,6 +291,47 @@ def _resolve_block_size_tokens(
     return int(fallback)
 
 
+def _try_v0_block_manager_cpu_counts(
+    block_manager: Any,
+) -> Tuple[int, int, str]:
+    """TIER5A.4 fast path: vLLM 0.7.x ``SelfAttnBlockSpaceManager``
+    exposes CPU-specific block counts DIRECTLY on the block_manager
+    (confirmed via the ``tier5a_v0_engine_inspect`` diagnostic on a
+    live H100/A100 pod):
+
+      * ``block_manager.num_total_cpu_blocks`` (int attribute)
+      * ``block_manager.get_num_free_cpu_blocks()`` (no-arg method)
+
+    Use these when present — one hop instead of walking
+    ``block_allocator._allocators[Device.CPU]``. Returns
+    ``(used, total, hint)`` on success, ``(-1, 0, "")`` when the
+    methods aren't there (older / forked builds with a different
+    block_manager class).
+    """
+    total = -1
+    raw_total = getattr(block_manager, "num_total_cpu_blocks", None)
+    if raw_total is None:
+        return -1, 0, ""
+    try:
+        total = int(raw_total)
+    except (TypeError, ValueError):
+        return -1, 0, ""
+    if total <= 0:
+        return -1, 0, ""
+
+    raw_free = getattr(block_manager, "get_num_free_cpu_blocks", None)
+    if raw_free is None:
+        return -1, 0, ""
+    if not callable(raw_free):
+        return -1, 0, ""
+    try:
+        free = int(raw_free())
+    except (TypeError, ValueError, Exception):
+        return -1, 0, ""
+    used = max(0, total - free)
+    return used, total, "v0_block_manager.get_num_free_cpu_blocks"
+
+
 def read_cpu_swap_pool(
     block_manager: Any,
     *,
@@ -286,22 +340,48 @@ def read_cpu_swap_pool(
 ) -> CpuSwapPoolSnapshot:
     """Take a point-in-time snapshot of the CPU swap pool.
 
-    Returns a fully-populated ``CpuSwapPoolSnapshot``. When the
-    allocator path can't be resolved (e.g. running against an
-    early vLLM minor version that doesn't expose ``block_allocator``
-    at all), the snapshot reports ``num_used_blocks=-1`` and
-    ``hint_path="no_known_path"`` so the caller can distinguish
-    "no swap activity" from "could not read at all".
+    Returns a fully-populated ``CpuSwapPoolSnapshot``. Resolution
+    order (TIER5A.4 fixup):
+
+      1. **V0 block_manager-direct fast path** — read
+         ``block_manager.num_total_cpu_blocks`` +
+         ``block_manager.get_num_free_cpu_blocks()`` directly. This
+         is the canonical API on vLLM 0.7.x's
+         ``SelfAttnBlockSpaceManager``; one hop, no allocator walk.
+      2. **Allocator walk fallback** — `_resolve_cpu_allocator`
+         walks the block_allocator → per-device CPU allocator
+         hierarchy; `_read_allocator_block_counts` reads counts via
+         a candidate attribute / method list.
+
+    Both paths produce a uniform ``CpuSwapPoolSnapshot``. When
+    neither resolves, the snapshot reports
+    ``num_used_blocks=-1`` and ``hint_path="no_known_path"`` so the
+    caller can distinguish "no swap activity" from "could not read".
 
     ``bytes_per_block_estimate`` is plumbed through unchanged.
     Compute it from the engine's cache_config in the caller (see
     ``runner_vllm_streaming.py``); this function does not import
     vLLM and treats the value as opaque.
     """
-    allocator, hint = _resolve_cpu_allocator(block_manager)
     block_size_tokens = _resolve_block_size_tokens(
         block_manager, fallback=block_size_fallback,
     )
+
+    # Path 1: V0 block_manager-direct fast path (TIER5A.4 fix).
+    used_v0, total_v0, hint_v0 = _try_v0_block_manager_cpu_counts(
+        block_manager
+    )
+    if total_v0 > 0:
+        return CpuSwapPoolSnapshot(
+            num_used_blocks=used_v0,
+            num_total_blocks=total_v0,
+            block_size_tokens=block_size_tokens,
+            bytes_per_block_estimate=int(bytes_per_block_estimate),
+            hint_path=hint_v0,
+        )
+
+    # Path 2: allocator walk fallback.
+    allocator, hint = _resolve_cpu_allocator(block_manager)
     if allocator is None:
         return CpuSwapPoolSnapshot(
             num_used_blocks=-1,
