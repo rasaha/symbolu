@@ -271,7 +271,7 @@ kernel supports.
             └── (historical runs)
 ```
 
-## PROMPT (copy-paste into the next session)
+## PROMPT — original v2 production-hardening (historical, pre-Phase-3/4 closure)
 
 ```
 Continuing v2 production-hardening on branch claude/dazzling-maxwell-xzQYx.
@@ -313,6 +313,94 @@ For your first response: tell me which of the five items you'd
 work on first and why, then propose a phased plan with explicit
 acceptance gates for the first phase. Do NOT write code until I
 approve.
+```
+
+## PROMPT — Tiered KV storage Phase 5A (copy-paste into the next session)
+
+Use this for the **next focus**: extending the int4_protected
+shipped backend with verified warm-tier (CPU RAM) support
+and — if warm tier checks out — designing the cold-tier
+(NAND/disk) snapshot/restore path.
+
+```
+Continuing v2 production-hardening on branch claude/magical-cannon-zDMkY.
+Latest commit is 3cbc01d (v2 Extended Pinning Phase 4 CLOSED — measured
+finding + experimental disposition).
+
+Phase 3 (cache-aware admission scheduling) and Phase 4 (extended
+pinning) both closed as inconclusive measured findings. v1 INT4
+protected remains the shipped headline. Code from both phases stays
+in-tree as experimental measurement utilities. VC brief unchanged.
+
+Before doing any work, read these files in order:
+1. INT4_PROTECTED_VC_BRIEF.md (root) — current partner-safe state
+2. CTM_plus/Bench/scripts/NEXT_SESSION_V2.md — this is your briefing
+3. CTM_plus/Bench/scripts/PHASE3_CACHE_AWARE_FINDINGS.md — Phase 3 closure
+4. CTM_plus/Bench/scripts/PHASE4_EXTENDED_PINNING_FINDINGS.md — Phase 4 closure
+5. CTM_plus/Bench/scripts/PHASE8_RETIREMENT.md — Phase 4 trig retirement
+6. CTM_plus/TURBOQUANT_RETIREMENT.md — TurboQuant retirement
+
+Today's focus is Phase 5A — verify that the int4_protected
+shipped backend's packed KV layout survives vLLM 0.7.3's built-in
+CPU swap path (preemption_mode='swap' + swap_space=N).
+This is the lowest-cost way to determine whether a "warm tier in
+CPU RAM" exists today (free from vLLM) or requires custom work.
+
+Phase 5A scope (the only phase greenlit so far):
+* CPU work + ONE GPU smoke (~2-3 days + ~$0.10).
+* Verify int4_protected output is bit-identical before vs after
+  a forced preemption-swap-restore cycle.
+* Add telemetry for cpu_swap_pool usage + swap-in latency.
+* Sweep gpu_memory_utilization to find where CPU swap kicks in.
+* Confirm composition with extended_pinning / cache_aware_install /
+  prefix_hit_probe (or document which combinations are incompatible).
+
+Phase 5A acceptance gates (the load-bearing ones):
+* G1: int4_protected output bit-identical pre vs post swap-restore
+* G2: swap_out_blocks > 0 under engineered pressure
+* G3: telemetry: cpu_swap_pool_bytes_in_use + swap_in_latency_ms
+      surfaced in the streaming summary
+* G4: extended_pinning + cache_aware_install + prefix_hit_probe
+      composition smoke — all three install paths coexist with
+      preemption_mode='swap' without crashing
+* G5: no Int4ProtectedAttentionImpl modification (AST gate)
+* G6: no vllm-flash-attn kernel modification
+
+Conditional Phase 5B+ — gated on Phase 5A green:
+* 5B (cold tier prototype): per-session snapshot/restore via
+  safetensors. 1 week CPU. Bit-equivalence round-trip.
+* 5C (allocator integration): demand-paging restore from cold
+  back to warm/hot. 1-2 weeks. THIS is the hard part.
+* 5D (3-tier bench): hot-only / +warm / +warm+cold cells. ~$0.50.
+* 5E (decision + finding doc).
+
+If 5A is red (vLLM's swap doesn't preserve int4_protected layout),
+warm tier requires custom work — another 1-2 weeks before 5B can
+even start. Phase 5A is the cheapest way to learn this.
+
+Discipline rules (durable):
+* Do NOT restart Phase 4 KV eviction (trig). Retired.
+* Do NOT restart local TurboQuant KV-path. Retired.
+* Do NOT restart Phase 3 cache-aware reorder. Closed inconclusive.
+* Do NOT restart Phase 4 extended pinning reorder. Closed inconclusive.
+* Do NOT edit INT4_PROTECTED_VC_BRIEF.md without explicit approval.
+* CPU-first verification: design → CPU prototype → CPU tests → GPU.
+* Orthogonality: v2 work does not touch Int4ProtectedAttentionImpl,
+  the forked vllm-flash-attn kernel, or the protected-channel splice.
+  (Phase 5A's verification of swap-restore is observation-only; it
+  may need to READ but not WRITE int4_protected backend state.)
+* No combined-stack X× projections without measurement.
+* Phase-gated execution; honest scope (mark provisional vs replicated).
+
+For your first response: read the briefing docs, then propose a
+phased plan for Phase 5A with explicit acceptance gates. Do NOT
+write code until I approve.
+
+If Phase 5A is approved AND green, also draft Phase 5B (cold tier
+CPU prototype) as a separate plan-of-record before implementing.
+The cold tier is genuinely new product surface — 4-6 weeks of
+engineering + measurement at minimum — so its scope must be
+explicitly approved phase-by-phase, NOT folded into 5A.
 ```
 
 End of file.
