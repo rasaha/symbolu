@@ -798,6 +798,13 @@ class CTMEvictorModern:
             interval_tokens=int(window_pruning_interval)
         )
 
+        # Phase 8b bridge counters — Day 5b's BRIDGE COMPOSITION cell
+        # asserts these are > 0 to prove non-zero attention reaches
+        # the evictor (the audit's gap). Read by the streaming runner
+        # into ctm_evictor_stats in the streaming_summary.json.
+        self._forward_block_attention_calls: int = 0
+        self._forward_block_attention_nonzero_sum_calls: int = 0
+
     # ---- vLLM 0.7 Evictor ABC ----
 
     def __contains__(self, block_id: int) -> bool:
@@ -897,6 +904,9 @@ class CTMEvictorModern:
             return
         if seq_len is None:
             seq_len = self._num_hashed_tokens.get(block_id, self._block_size)
+        self._forward_block_attention_calls += 1
+        if float(attention_sum) > 0.0:
+            self._forward_block_attention_nonzero_sum_calls += 1
         self._policy.on_block_attention(
             block_id=block_id,
             attention_sum=float(attention_sum),

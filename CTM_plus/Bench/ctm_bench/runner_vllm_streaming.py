@@ -137,6 +137,15 @@ class StreamingRunCellResult:
     phase4_trig_score_lookups: int = 0
     phase4_trig_score_cache_misses: int = 0
     phase4_trig_score_compute_exceptions: int = 0
+    # Stats dictionaries snapshotted from the live managers BEFORE
+    # teardown. Empty when the corresponding manager isn't installed.
+    # Phase 8b bridge verification reads these to assert the
+    # route-A wrapper fired, the aggregator captured non-zero
+    # attention, and forward_block_attention reached the evictor
+    # with non-zero attention_sum (the audit's gap).
+    int4_route_a_stats: Dict[str, Any] = field(default_factory=dict)
+    attention_aggregator_stats: Dict[str, Any] = field(default_factory=dict)
+    ctm_evictor_stats: Dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------- #
@@ -1342,6 +1351,58 @@ class AsyncEngineDriver:
         else:
             tokens_per_second = 0.0
 
+        # Stats snapshots — populated from the live managers BEFORE
+        # teardown. Phase 8b bridge verification reads these from the
+        # streaming_summary.json to assert the bridge is working.
+        int4_route_a_stats: Dict[str, Any] = {}
+        if self._int4_route_a_manager is not None:
+            try:
+                int4_route_a_stats = dict(self._int4_route_a_manager.stats)
+            except Exception:
+                int4_route_a_stats = {}
+
+        attention_aggregator_stats: Dict[str, Any] = {}
+        if self._attention_aggregator is not None:
+            try:
+                attention_aggregator_stats = dict(
+                    self._attention_aggregator.stats
+                )
+            except Exception:
+                attention_aggregator_stats = {}
+
+        ctm_evictor_stats: Dict[str, Any] = {}
+        if self._installed_evictor is not None:
+            try:
+                # Phase 8b bridge counters — the two assertions Day 5b
+                # needs to prove non-zero attention reaches the evictor.
+                # These attrs are set by CTMEvictorModern.__init__ and
+                # incremented inside forward_block_attention.
+                ctm_evictor_stats["forward_block_attention_calls"] = int(
+                    getattr(
+                        self._installed_evictor,
+                        "_forward_block_attention_calls", 0,
+                    )
+                )
+                ctm_evictor_stats[
+                    "forward_block_attention_nonzero_sum_calls"
+                ] = int(
+                    getattr(
+                        self._installed_evictor,
+                        "_forward_block_attention_nonzero_sum_calls", 0,
+                    )
+                )
+                # The evictor's own get_stats() (proxies policy.stats)
+                # — useful for the eviction/filler counts.
+                policy_stats_fn = getattr(
+                    self._installed_evictor, "get_stats", None,
+                )
+                if callable(policy_stats_fn):
+                    ps = policy_stats_fn()
+                    if isinstance(ps, dict):
+                        ctm_evictor_stats["policy"] = dict(ps)
+            except Exception:
+                pass
+
         return StreamingRunCellResult(
             workload_name=workload_name,
             policy_name=("ctm_plus" if self.ctm_plus_evictor else "lru"),
@@ -1470,6 +1531,9 @@ class AsyncEngineDriver:
                     "_phase4_trig_score_compute_exceptions", 0,
                 )
             ),
+            int4_route_a_stats=int4_route_a_stats,
+            attention_aggregator_stats=attention_aggregator_stats,
+            ctm_evictor_stats=ctm_evictor_stats,
         )
 
     @staticmethod
