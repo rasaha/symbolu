@@ -17,12 +17,28 @@ Qwen-7B is at-the-margin under 4% mask. Brief is partner-safe.
 * Phase 4 KV eviction (CTM+ trig scoring) — `PHASE8_RETIREMENT.md`
 * Local TurboQuant / QJL KV-cache path — `TURBOQUANT_RETIREMENT.md`
 
-**In progress:** v2 cache-reuse layer (cache-aware admission
-scheduling, RadixAttention-style):
+**CLOSED:** v2 cache-reuse layer (cache-aware admission
+scheduling, RadixAttention-style). See
+`PHASE3_CACHE_AWARE_FINDINGS.md` for the measured finding.
+
+History:
 * Phase 0 (CPU prototype + tests): ✅ commit `3168e94`
 * Phase 1 PR-1 (vLLM install + CPU smoke): ✅ commit `34763c8`
-* Phase 1 PR-2 (vLLM streaming-runner plumbing + GPU smoke): pending
-* Phase 3 (GPU validation on chat_32k): pending
+* Phase 1 PR-2 CPU plumbing: ✅ commit `d14383f`
+* Phase 1 PR-2 V2 block-manager shape fix: ✅ commit `d812324`
+* Phase 1 PR-2 GPU smoke (Qwen-7B H100): ✅ GREEN
+* Phase 3A (shared-prefix workload + latency + probe): ✅ commit `fef82cc`
+* Phase 3B (three-cell bench + dry-run): ✅ commit `5a85be8`
+* Phase 3C measurement-path fix (cache-aware tree as instrument): ✅ commit `a873757`
+* Phase 3C 2-seed Tier-A GPU runs: ✅ GREEN measurement,
+  **inconclusive realized-hit signal + mild E2E p99 regression**
+* Phase 3D measured finding: ✅ `PHASE3_CACHE_AWARE_FINDINGS.md`
+* **Phase 3 CLOSED.** Cache-aware reorder is **not productionized**.
+  Code stays in-tree per the Phase 4 + TurboQuant precedent. CLI
+  flag retained as experimental. The measurement-only install +
+  three-cell bench harness retained as v2 measurement utilities.
+
+VC brief: unchanged. Cache-aware was never in the brief.
 
 ## Five pending v2 items (the brief's Tier 1 list)
 
@@ -31,7 +47,7 @@ Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5
 
 | # | Item | Effort | GPU $ | Status | Key reference |
 |---|---|---:|---:|---|---|
-| 1 | **Cache reuse** (v2 cache-aware scheduling) | 4-7 days (Phase 1 PR-2 + Phase 3 GPU) | ~$0.40 | PR-1 done; PR-2 + Phase 3 next | `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` |
+| 1 | **Cache reuse** (v2 cache-aware scheduling) | CLOSED at Phase 3D | ~$0.50 spent | **Inconclusive measured finding** — not productionized. CLI flag retained as experimental. See `PHASE3_CACHE_AWARE_FINDINGS.md`. | `PHASE3_CACHE_AWARE_FINDINGS.md`, `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` |
 | 2 | **CUDA Graphs** for the model forward path | 4-7 days | ~$0.20 | Read-path preflight done (B-pre-1..4); write-path preflight is the gating item | `OPTION_B_PREFLIGHT.md`, `PHASE6_PERF_REPORT.md` |
 | 3 | **Tensor parallelism** for 70B-class | 3-5 days | ~$0.50 (multi-GPU pod) | Untouched; code "expected to Just Work" per brief, unverified | brief page 5; INT4_PROTECTED_README.md |
 | 4 | **Quality benchmark harness** (MMLU + HumanEval + LongBench) | 2-3 days | ~$0.30 | Untouched; current quality bar is needle-only | brief page 5 "Broader quality bench" row |
@@ -98,21 +114,44 @@ User chooses; this is a recommendation, not a directive.
 
 ## Per-item entry hooks
 
-### 1. Cache reuse PR-2
+### 1. Cache reuse — CLOSED at Phase 3D
 
-Already scoped in `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md`.
-PR-2 outline at the end of that doc + the PR-1 commit message
-(`34763c8`):
+**STATUS: Phase 3 CLOSED.** Measured finding documented at
+`Bench/scripts/PHASE3_CACHE_AWARE_FINDINGS.md`. Two-seed
+Tier-A measurement on Qwen-7B H100 returned an inconclusive
+realized-hit signal (C/B = 0.903 and 1.115, opposite signs)
+with a consistent mild E2E p99 regression (1.4-1.6×). Cache-
+aware reorder is **not productionized**.
 
-- `AsyncEngineDriver(cache_aware_scheduling: bool = False)` arg
-- Hook `install_cache_aware_scheduler()` into engine init
-  (same pattern as `int4_route_a` install in
-  `runner_vllm_streaming.py`)
-- New `cache_aware_scheduler_stats` field on
-  `StreamingRunCellResult`
-- CLI flag `--cache-aware-scheduling` on `run_streaming.py`
-- Single Qwen-7B GPU smoke verifying the install + Tier A
-  needle regression remains green
+What stays in-tree (per Phase 4 + TurboQuant precedent — keep
+code, document the finding, no destructive removals):
+
+- `KVPolicy/kv_policy/cache_aware_scheduler.py` (Phase 0)
+- `KVPolicy/kv_policy/cache_aware_install.py` (full +
+  measurement-only modes)
+- `KVPolicy/kv_policy/prefix_hit_probe.py` (Phase 3A probe)
+- `Bench/ctm_bench/runner_vllm_streaming.py` (driver wiring +
+  shared-prefix builder + latency telemetry)
+- `Bench/ctm_bench/scripts/bench_phase3_cache_aware.py` (the
+  three-cell bench harness — partner-credible measurement
+  utility, retained as a v2 tool)
+- CLI flags `--cache-aware-scheduling` (experimental warning in
+  --help; do not enable in production) and
+  `--cache-aware-measurement-only` (retained as a measurement
+  utility independent of reorder)
+- 119 CPU tests
+
+What VC brief says: unchanged. Cache-aware was never in the brief.
+
+Revisit conditions (per `PHASE3_CACHE_AWARE_FINDINGS.md`):
+1. Better-calibrated predictor (the 3.1× under-prediction is the
+   load-bearing mechanism behind the inconclusive signal)
+2. Real chat workload replay (synthetic Pareto may not represent
+   production)
+3. Tier-A 5-seed replication (~$0.50; would tighten confidence
+   interval on the 10-15% effect)
+4. Partner-driven workload where FCFS produces less natural
+   concurrent overlap
 
 ### 2. CUDA Graphs
 

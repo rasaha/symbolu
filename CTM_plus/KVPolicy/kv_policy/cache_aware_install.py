@@ -57,24 +57,43 @@ class CacheAwareInstall:
     stub with no tree, no scheduler, no teardowns. Stats return
     ``{"enabled": False}``.
 
-    With ``enabled=True``, the handle owns the live
-    ``PrefixRadixTree``, the ``CacheAwareScheduler``, and the
-    teardown closures for the three monkey-patches. Callers must
-    invoke ``teardown()`` to revert the wraps when the engine
-    shuts down — typically from the streaming runner's finally
-    block (PR-2 wiring).
+    With ``enabled=True, measurement_only=False`` (full mode), the
+    handle owns the live ``PrefixRadixTree``, the
+    ``CacheAwareScheduler``, and teardown closures for all three
+    monkey-patches (schedule + allocate + free).
+
+    With ``enabled=True, measurement_only=True`` (Phase 3C
+    measurement mode), the handle owns the tree + scheduler but
+    only the allocate + free wraps. The scheduler.schedule wrap is
+    NOT installed, so admission order is unchanged from stock
+    FCFS. The allocate-wrap's realized_hit_tokens_total is still
+    populated, making this useful as an instrument to measure
+    realized prefix-cache hits in a cell that is otherwise pure
+    FCFS (cell B of the Phase 3B/C comparison).
+
+    Callers must invoke ``teardown()`` to revert the wraps when
+    the engine shuts down — typically from the streaming runner's
+    finally block.
     """
 
     enabled: bool
+    measurement_only: bool = False
     tree: Optional[PrefixRadixTree] = None
     cas: Optional[CacheAwareScheduler] = None
     _teardowns: List[Callable[[], None]] = field(default_factory=list)
     # Per-request predicted hits captured at schedule time, used
     # later to compute prediction_accuracy in stats(). Bounded by
-    # active-request count; cleaned by .free's wrap.
+    # active-request count; cleaned by .free's wrap. Stays empty in
+    # measurement_only mode (no schedule wrap fires).
     _predicted_hits_per_request: Dict[str, int] = field(default_factory=dict)
     _predicted_hits_total: int = 0
     _realized_hits_total: int = 0
+    # Audit fix #4: vLLM 0.7.3 calls `block_manager.free(seq)` with a
+    # Sequence (not a SequenceGroup) — the Sequence has no
+    # ``request_id`` attribute, so we can't look up the per-request
+    # prediction entry to clean. Track seq_id -> request_id at
+    # schedule time so the free wrap can clean by seq_id.
+    _seq_id_to_request_id: Dict[Any, str] = field(default_factory=dict)
 
     def teardown(self) -> None:
         """Revert all monkey-patches (LIFO). Safe to call multiple
@@ -94,6 +113,8 @@ class CacheAwareInstall:
         Returns ``{"enabled": False}`` when the install was a no-op.
         Otherwise includes admissions count, reorder count,
         predicted vs realized hit totals, and prediction accuracy.
+        The ``measurement_only`` field flags Phase 3C measurement-mode
+        installs (tree present, schedule wrap NOT installed).
         """
         if not self.enabled:
             return {"enabled": False}
@@ -103,6 +124,7 @@ class CacheAwareInstall:
         accuracy = (realized / predicted) if predicted > 0 else 0.0
         return {
             "enabled": True,
+            "measurement_only": bool(self.measurement_only),
             "admissions": s.get("admissions", 0),
             "reordered_count": s.get("reordered_count", 0),
             "starvation_overrides": s.get("starvation_overrides", 0),
@@ -167,34 +189,107 @@ def _request_id_of(seq_group: Any) -> str:
 
 
 def _arrival_time_of(seq_group: Any) -> float:
-    """Try multiple attribute paths; fall back to ``time.monotonic()``.
+    """Return an arrival timestamp on the **monotonic** clock base.
 
-    vLLM 0.7.3 surfaces arrival via ``seq_group.metrics.arrival_time``;
-    older mocks may use ``seq_group.arrival_time`` directly.
+    vLLM 0.7.3 surfaces ``seq_group.metrics.arrival_time`` as an
+    epoch timestamp set via ``time.time()`` (~1.7e9 today). The
+    ``CacheAwareScheduler`` starvation guard compares against
+    ``time.monotonic()`` (~1e4 seconds since boot, typically).
+    Subtracting the two yields ~-1.7e9 → the guard would never
+    fire on real vLLM. Found by the audit (Finding #1).
+
+    Fix: detect epoch-style timestamps (>1e9) and translate them
+    into the monotonic clock domain by computing the request's
+    age via ``time.time()`` and projecting it back onto
+    ``time.monotonic()``. Small monotonic-style values (< 1e9)
+    are passed through, preserving mock/test fixtures that already
+    pass monotonic-relative times.
+
+    Edge cases:
+      * Epoch values < 1e9 only exist before year 2001 — unreachable.
+      * Monotonic values > 1e9 require 31+ years of uptime — unreachable.
+      * Clock skew (e.g., NTP correction between arrival capture and
+        this read) would yield an apparently negative age; we clamp
+        to 0 so we don't claim the request arrived in the future.
     """
     m = getattr(seq_group, "metrics", None)
     if m is not None:
         t = getattr(m, "arrival_time", None)
         if t is not None:
-            return float(t)
+            return _to_monotonic(float(t))
     t = getattr(seq_group, "arrival_time", None)
     if t is not None:
-        return float(t)
+        return _to_monotonic(float(t))
     return time.monotonic()
+
+
+def _to_monotonic(t: float) -> float:
+    """Translate a timestamp to the monotonic clock base.
+
+    Heuristic: values > 1e9 are treated as ``time.time()`` epoch
+    timestamps and reprojected onto ``time.monotonic()``; values
+    <= 1e9 are treated as already-monotonic (test fixtures use
+    small numbers like 0.0, 1.0, 2.0).
+    """
+    if t > 1e9:
+        age = max(0.0, time.time() - t)
+        return time.monotonic() - age
+    return t
 
 
 def _block_ids_for_seq(block_manager: Any, seq_id: Any) -> List[int]:
     """Extract integer block_ids from ``block_manager.block_tables[seq_id]``.
 
-    vLLM 0.7.3 stores ``List[PhysicalTokenBlock]`` (each with a
-    ``.block_number`` attribute). Mock tests may store plain ints.
-    This helper normalizes to ``List[int]``.
+    vLLM 0.7.3 has two ``block_tables`` layouts:
+
+    * **V1 block manager:** ``Dict[seq_id, List[PhysicalTokenBlock]]``;
+      each ``PhysicalTokenBlock`` has a ``.block_number`` attribute.
+      Direct iteration over the list works.
+    * **V2 block manager (default in V0 engine + 0.7.3 paths):**
+      ``Dict[seq_id, BlockTable]``. ``BlockTable`` is a wrapper
+      object that exposes ``.physical_block_ids`` →
+      ``List[Optional[int]]`` (the canonical accessor) and
+      ``.blocks`` → ``List[Block]``. It is NOT directly iterable
+      — iterating it raises ``TypeError``.
+
+    Mock tests historically used ``List[MockPhysicalTokenBlock]``
+    (V1-shape). The runtime crash on a real H100 pod surfaced the
+    V1-only assumption (PR-2 GPU smoke initial run); this helper
+    now handles both shapes plus the mocks.
+
+    Returns ``List[int]``.
     """
     bt_dict = getattr(block_manager, "block_tables", None)
     if not bt_dict:
         return []
-    bt = bt_dict.get(seq_id, [])
-    return [int(getattr(b, "block_number", b)) for b in bt]
+    bt = bt_dict.get(seq_id)
+    if bt is None:
+        return []
+    # V2 block manager: canonical accessor.
+    physical_ids = getattr(bt, "physical_block_ids", None)
+    if physical_ids is not None:
+        return [int(b) for b in physical_ids if b is not None]
+    # V2 block manager: alternate accessor exposing the underlying
+    # Block objects (whose ``.block_id`` is the integer index).
+    blocks_attr = getattr(bt, "blocks", None)
+    if blocks_attr is not None:
+        return [
+            int(getattr(b, "block_id", getattr(b, "block_number", b)))
+            for b in blocks_attr
+            if b is not None
+        ]
+    # V1 block manager / mock test path: bt is iterable, elements
+    # carry either .block_number (vLLM) or .block_id (mock variants).
+    try:
+        return [
+            int(getattr(b, "block_number", getattr(b, "block_id", b)))
+            for b in bt
+        ]
+    except TypeError:
+        # Neither a V2 wrapper nor an iterable — unknown shape;
+        # return empty so the wrap stays a structural no-op
+        # rather than crashing the engine loop.
+        return []
 
 
 # ----------------------------------------------------------------------
@@ -207,6 +302,7 @@ def install_cache_aware_scheduler(
     scheduler: Any,
     block_manager: Any,
     enable: bool = False,
+    measurement_only: bool = False,
     block_size: int = 32,
     max_starvation_seconds: float = 30.0,
     tree_max_tokens: int = 1_000_000,
@@ -224,11 +320,20 @@ def install_cache_aware_scheduler(
             ``block_tables`` (``Dict[seq_id, List[block_id_like]]``).
         enable: feature flag. **Defaults to False.** When False,
             returns a no-op handle and applies zero patches.
+        measurement_only: Phase 3C measurement mode. When True,
+            installs the allocate + free tree wraps but SKIPS the
+            scheduler.schedule reorder wrap. The result is a
+            measurement-only install: ``realized_hit_tokens_total``
+            still accumulates (so we have an apples-to-apples
+            realized-hits counter for FCFS-only cells), but admission
+            order is unchanged from stock. Defaults to False (full
+            cache-aware mode). Has no effect when ``enable=False``.
         block_size: KV-cache block size. ``int4_protected`` forces
             32; stock vLLM defaults to 16.
         max_starvation_seconds: fairness guard. Any request older
             than this in ``waiting`` is admitted next regardless
-            of predicted hit. Default 30s.
+            of predicted hit. Default 30s. No effect in
+            measurement_only mode (no schedule wrap).
         tree_max_tokens: ``PrefixRadixTree`` memory budget.
 
     Returns:
@@ -260,9 +365,16 @@ def install_cache_aware_scheduler(
         block_size=block_size,
         max_starvation_seconds=max_starvation_seconds,
     )
-    install = CacheAwareInstall(enabled=True, tree=tree, cas=cas)
+    install = CacheAwareInstall(
+        enabled=True,
+        measurement_only=bool(measurement_only),
+        tree=tree, cas=cas,
+    )
 
     # --- Wrap 1: Scheduler.schedule reorders waiting -----------------
+    # Skipped entirely in measurement_only mode. The scheduler
+    # behaves identically to stock vLLM; only allocate + free are
+    # wrapped (for tree measurement, no admission-order side-effects).
 
     original_schedule = scheduler.schedule
 
@@ -280,27 +392,49 @@ def install_cache_aware_scheduler(
                     )
                 )
             ordered_pending = cas.order_admissions(pending)
-            # Re-pack into the deque in the new order, preserving
-            # SequenceGroup object identity (critical for vLLM's
-            # internal references and abort_request).
+            # Audit fix #6: do the deque re-pack BEFORE the
+            # exception-prone per-request prediction capture.
+            # Previously, if predict_cache_hit raised mid-loop after
+            # waiting.clear(), already-cleared-but-not-yet-re-appended
+            # requests vanished from the engine queue and their
+            # futures hung forever. Now the reorder is complete and
+            # the deque is in a consistent state before any
+            # prediction work happens.
             by_id = {_request_id_of(sg): sg for sg in waiting}
             waiting.clear()
             for req in ordered_pending:
                 sg = by_id.get(req.request_id)
                 if sg is not None:
                     waiting.append(sg)
-                # Capture per-request predicted hit for later
-                # realized-hit attribution (used in stats()).
-                if req.request_id not in install._predicted_hits_per_request:
+                    # Audit fix #4: record seq_id → request_id so the
+                    # Sequence-path free wrap can clean
+                    # _predicted_hits_per_request by seq_id (the
+                    # Sequence has no request_id attribute).
+                    seq_id = _seq_id_from_seq_group(sg)
+                    install._seq_id_to_request_id[seq_id] = req.request_id
+            # Audit fix #6 (cont): capture predictions in a separate
+            # loop wrapped in try/except so a predictor exception
+            # never affects waiting-deque state.
+            for req in ordered_pending:
+                if req.request_id in install._predicted_hits_per_request:
+                    continue
+                try:
                     phit = cas.predictor.predict_cache_hit(req.tokens)
                     install._predicted_hits_per_request[req.request_id] = phit
                     install._predicted_hits_total += phit
+                except Exception as exc:
+                    # Don't let a predictor bug propagate into vLLM
+                    # and kill the scheduler. Skipping a capture for
+                    # one request only biases prediction_accuracy
+                    # downstream — it does NOT drop the request.
+                    pass
         return original_schedule(*args, **kwargs)
 
-    scheduler.schedule = _schedule_with_reorder
-    install._teardowns.append(
-        lambda: setattr(scheduler, "schedule", original_schedule)
-    )
+    if not measurement_only:
+        scheduler.schedule = _schedule_with_reorder
+        install._teardowns.append(
+            lambda: setattr(scheduler, "schedule", original_schedule)
+        )
 
     # --- Wrap 2: BlockSpaceManager.allocate updates tree --------------
 
@@ -340,21 +474,44 @@ def install_cache_aware_scheduler(
 
     def _free_with_tree_evict(seq_or_seq_group, *args, **kwargs):
         # vLLM 0.7.3's free() can be called with a Sequence or a
-        # SequenceGroup depending on the call site. Detect both.
+        # SequenceGroup depending on the call site.
+        #
+        # Audit fix #7: for the SequenceGroup path, iterate ALL
+        # sequences (beam search / SamplingParams(n>1) have
+        # multiple sequences per group). Previously only seqs[0]'s
+        # block_ids were evicted, leaving the other sequences'
+        # blocks in the tree forever.
         if hasattr(seq_or_seq_group, "get_prompt_token_ids"):
-            seq = seq_or_seq_group
-            request_id_for_cleanup = None
+            # Sequence path — typical V2 call site, one seq per call.
+            seqs: List[Any] = [seq_or_seq_group]
+            request_id_for_cleanup: Optional[str] = None
         else:
-            seq = _seq_from(seq_or_seq_group)
+            # SequenceGroup path — fan out across all sequences.
+            get_seqs = getattr(seq_or_seq_group, "get_seqs", None)
+            if callable(get_seqs):
+                seqs = list(get_seqs())
+            else:
+                seqs = [seq_or_seq_group]
             request_id_for_cleanup = _request_id_of(seq_or_seq_group)
-        seq_id = _seq_id_of(seq)
-        # Snapshot block_ids BEFORE the free — post-free they're
-        # gone from block_tables.
-        block_ids_freed = _block_ids_for_seq(block_manager, seq_id)
+        # Snapshot block_ids from EACH sequence BEFORE the free —
+        # post-free they're gone from block_tables.
+        all_block_ids: List[int] = []
+        per_seq_ids: List[Any] = []
+        for seq in seqs:
+            sid = _seq_id_of(seq)
+            per_seq_ids.append(sid)
+            all_block_ids.extend(_block_ids_for_seq(block_manager, sid))
         result = original_free(seq_or_seq_group, *args, **kwargs)
-        if block_ids_freed:
-            tree.evict(block_ids_freed)
-        # Drop per-request prediction cache to bound memory.
+        if all_block_ids:
+            tree.evict(all_block_ids)
+        # Audit fix #4: drop per-request prediction cache. Use the
+        # seq_id → request_id map so the Sequence-path call site
+        # (vLLM 0.7.3's hot path) also cleans, not just the
+        # SequenceGroup path.
+        for sid in per_seq_ids:
+            mapped_rid = install._seq_id_to_request_id.pop(sid, None)
+            if mapped_rid is not None:
+                install._predicted_hits_per_request.pop(mapped_rid, None)
         if request_id_for_cleanup is not None:
             install._predicted_hits_per_request.pop(
                 request_id_for_cleanup, None,

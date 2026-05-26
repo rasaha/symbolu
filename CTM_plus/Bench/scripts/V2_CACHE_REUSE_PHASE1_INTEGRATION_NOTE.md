@@ -1,12 +1,19 @@
 # V2 Cache-Reuse — Phase 1 Integration Note
 
-> **Status:** Reconnaissance only. No code in this commit. This doc
-> identifies the vLLM 0.7.3 surfaces the Phase 1 patch will touch
-> and defines the acceptance criteria the patch must satisfy.
+> **Project status:** ⚠️ **Phase 3 CLOSED with a measured finding.**
+> See `PHASE3_CACHE_AWARE_FINDINGS.md` for the partner-credible
+> 2-seed Tier-A measurement and disposition. Cache-aware reorder
+> is **not productionized**; code stays in-tree as experimental.
+>
+> This document was the **implementation reconnaissance + acceptance
+> criteria** for Phase 1. It records the design decisions, the V2
+> block-manager shape fix, and the Phase 3C measurement-path fix.
+> Kept in-tree for archaeology + as the technical reference for any
+> future revisit (per the conditions in
+> `PHASE3_CACHE_AWARE_FINDINGS.md`).
 >
 > **Phase 0 (CPU prototype + tests):** ✅ committed at `3168e94`.
-> **Phase 1 (vLLM integration):** scoped below — implementation NOT
-> in this commit.
+> **Phase 1 (vLLM integration):** ✅ implemented (PR-1 + PR-2).
 
 ## 1. vLLM 0.7.3 admission flow — files and functions
 
@@ -338,3 +345,308 @@ If approved, Phase 1 lands in two PRs:
 1. `install_cache_aware_scheduler` + tests (PR-1, CPU-only)
 2. Streaming-runner telemetry + smoke verification (PR-2, GPU
    needed for gates 4, 5, 6)
+
+## PR-2 status (post-implementation, CPU phase)
+
+**CPU plumbing landed.** What's in:
+* `AsyncEngineDriver(cache_aware_scheduling: bool = False,
+  cache_aware_max_starvation_seconds: float = 30.0)` constructor
+  args.
+* `install_cache_aware_scheduler` hooked into the engine init in
+  `runner_vllm_streaming.run()` after engine construction and
+  after the route-A INT4 install block (same `try / except
+  BaseException → best-effort engine teardown` pattern). Lives at
+  the scheduler layer; orthogonal to `Int4ProtectedAttentionImpl`,
+  the vendored vllm-flash-attn fork, CTM+ evictor, and route-A
+  INT4.
+* `StreamingRunCellResult.cache_aware_scheduler_stats: Dict[str,
+  Any]` populated at end-of-run from
+  `CacheAwareInstall.stats()`. Empty dict when flag OFF;
+  populated with the canonical 9-key dict when flag ON.
+* CLI flag `--cache-aware-scheduling` (+
+  `--cache-aware-max-starvation-seconds`) on `run_streaming.py`,
+  plumbed through to the driver.
+* Teardown wired into the existing finally block, LIFO order:
+  cache-aware-scheduler → route-A INT4 → attention flusher →
+  engine shutdown.
+* CPU test suite `Bench/tests/test_cache_aware_runner_plumbing.py`
+  with 8 tests covering:
+  - constructor default (flag OFF) regression
+  - constructor accepts flag ON + custom max-starvation
+  - dataclass field present + default
+  - flag-OFF install branch not entered (bound-method identity
+    check on the engine's scheduler / block_manager methods)
+  - flag-ON install populates stats with the canonical key set
+  - max-starvation override plumbs through to `CacheAwareScheduler`
+  - install-failure path invokes engine shutdown
+  - `--help` output lists both new flags (subprocess smoke)
+
+Acceptance-gate status (per §7):
+
+| Gate | Status | Evidence |
+|---|---|---|
+| 1. vLLM starts with flag ON | **GREEN** | GPU smoke `smoke_flag_on_v2`; engine init completed, exit 0 |
+| 2. vLLM starts with flag OFF (regression) | **GREEN** | GPU smoke `smoke_flag_off`: admitted=20, completed=20, no engine errors |
+| 3. Requests complete correctly with flag ON | **GREEN** | `smoke_flag_on_v2`: `n_requests_completed=20`, `n_decode_tokens=640` |
+| 4. Scheduler ordering applied | **not exercised by this workload** | `reordered_count=0`; expected on a workload with unique head tokens (no shared prefixes for the predictor to act on). Needs a shared-prefix workload — deferred per PR-2 scoping ("no hit-rate-improvement claim in PR-2; Phase 3"). |
+| 5. No starvation | **GREEN** | `starvation_overrides=0` (no contention on the fast-draining 5s workload) |
+| 6. Prefix-hit telemetry emitted | **GREEN** | `cache_aware_scheduler_stats` populated with all 9 canonical keys + `enabled=True` |
+| 7. Stock path byte-identical when disabled | **GREEN** | flag-OFF run: `cache_aware_scheduler_stats == {}`; no install side-effects visible |
+| 8. Allocator events received | **GREEN** | `tree_inserts=20` (one per admission), `tree_evictions=632` (free() wrap reaches every block on completion) |
+| 9. Prediction accuracy bounded | **not exercised by this workload** | `predicted_hit_tokens_total=0` (unique heads → predictor sees no overlap); accuracy is 0.0 by the special-case in `CacheAwareInstall.stats()`. Same shared-prefix workload requirement as gate 4. |
+| 10. No regression on int4_protected Tier A | **GREEN** | `verify_phase5b_5_needle.py` Qwen-7B seed=44: **15/15 == stock**, 0 packed-decode fallbacks, 0 write fallbacks. Matches the brief's claim. |
+
+GPU smoke artifacts (committed evidence pending — JSONs live at
+`Bench/bench_out/PR2_CACHE_AWARE/` on the pod that ran the smoke):
+
+* `smoke_flag_on_v2/streaming_summary.json` — `enabled=True`,
+  `admissions=2`, `reordered_count=0`,
+  `starvation_overrides=0`, `tree_inserts=20`,
+  `tree_evictions=632`, `tree_tracked_tokens=0` (post-run empty
+  state), `predicted_hit_tokens_total=0`,
+  `realized_hit_tokens_total=0`, `n_requests_completed=20`,
+  `n_decode_tokens=640`, `wall=5.49s`.
+* `smoke_flag_off/streaming_summary.json` —
+  `cache_aware_scheduler_stats={}`, `n_requests_completed=20`,
+  `n_decode_tokens=640`, `wall=5.27s`.
+* `needle_qwen7b_seed44.log` — `int4 retrieval rate: 100.0%
+  (15/15)`, `agreement: 100.0% (15/15)`, `Phase 5B.5 needle:
+  GREEN`.
+
+**PR-2 acceptance set (your scoping) — all GREEN:**
+
+> * vLLM starts with flag OFF and ON.
+> * Stock/disabled path remains unchanged.
+> * Requests complete correctly with flag ON.
+> * `streaming_summary.json` contains populated
+>   `cache_aware_scheduler_stats`.
+> * `int4_protected` Tier A needle regression remains green.
+
+What's pending on a GPU pod:
+
+* A shared-prefix workload patch + smoke to exercise gates 4 and
+  9 (the load-bearing "scheduler ordering applied" + "prediction
+  accuracy bounded" gates). Deferred per PR-2 scope; lands as a
+  follow-up PR or as part of Phase 3 GPU validation.
+
+Pre-existing argparse `%` bug fix (collateral, not in scope):
+three help strings in `run_streaming.py` had unescaped `%` chars
+(`20% Python`, `62% trig_changed_pick`, `20% throughput`, `15%
+_call_impl`) that broke `python -m … --help` because argparse
+percent-formats action help. Doubled to `%%` so `--help` works
+again — needed for the new CLI smoke test.
+
+### V2 block-manager shape fix (post-first-GPU-smoke)
+
+PR-1's recon assumed `block_manager.block_tables[seq_id]` is
+`List[PhysicalTokenBlock]` (V1 block manager). vLLM 0.7.3's V0
+engine actually uses a V2 block manager whose `block_tables[seq_id]`
+is a `BlockTable` wrapper object — exposes `.physical_block_ids`
+and `.blocks` but is **not directly iterable**.
+
+The first GPU smoke attempt surfaced this:
+
+```
+File ".../kv_policy/cache_aware_install.py:197", in _block_ids_for_seq
+    return [int(getattr(b, "block_number", b)) for b in bt]
+TypeError: 'BlockTable' object is not iterable
+```
+
+Fix: `_block_ids_for_seq` in `cache_aware_install.py` now tries
+three accessor patterns in order — `.physical_block_ids` (V2
+canonical), `.blocks` (V2 alt), direct iteration (V1 + mocks)
+— and returns `[]` on unknown shapes rather than crashing the
+engine loop.
+
+CPU regression coverage: `MockBlockTableV2` +
+`MockBlockSpaceManagerV2` in `test_cache_aware_install.py` (4 new
+tests, including a sanity check that the V2 mock raises
+`TypeError` on iteration to match real vLLM). With those tests in
+place this regression can't slip back in.
+
+Lesson: the CPU mock-vs-real-vLLM surface drift is a real risk
+of CPU-first verification. The orthogonality + monkey-patch
+pattern is robust to it (the wrap stays a structural no-op when
+the helper returns `[]`), but the helper itself has to know the
+real interface shape. Future installs should mirror this fix
+pattern: try canonical → alt → iterate → fail-safe.
+
+### Phase 3C measurement-path fix (post-first-3C-GPU-smoke)
+
+The Phase 3A `prefix_hit_probe` was designed to count vLLM's
+native prefix-cache hits via either a native counter (preferred)
+or chunk-hash derivation against `_cached_blocks` (fallback).
+The first Phase 3C run on real Qwen-7B + vLLM 0.7.3 surfaced
+that:
+
+* The probe's V2 path resolves cleanly
+  (`v2_block_allocator._allocators[GPU]`).
+* But the GPU allocator exposes only `_cached_blocks` (no native
+  hit counter on this vLLM version), so the probe falls back to
+  the chunk-hash derivation.
+* The derivation reports **zero hits** because vLLM uses a
+  **chained content_hash** (each block's hash includes the parent
+  block's hash + the current block's tokens). Our flat blake2b
+  hash can't match vLLM's chained keys.
+
+So the probe correctly identified the path but can't measure
+hits on real vLLM 0.7.3. **The cache-aware tree (PR-1) is an
+independent measurement instrument** that doesn't depend on
+vLLM's hash function — it tracks token sequences directly and
+records a match when the new request's tokens prefix-overlap with
+a previously-inserted sequence's tokens. The same Phase 3C run
+reported `realized_hit_tokens_total_via_tree = 6912` in cell C
+under bursty arrivals (in-flight overlap of cohort-mate requests).
+
+Fix: add a `measurement_only=True` mode to
+`install_cache_aware_scheduler` that installs the allocate + free
+tree wraps for hit measurement but **skips the scheduler.schedule
+reorder wrap**. Apply it in cell B of the Phase 3 bench so cells
+B and C share the same realized-hit instrument (apples-to-apples
+comparison).
+
+Surface changes:
+
+* `cache_aware_install.py`:
+  - New `measurement_only: bool = False` param on
+    `install_cache_aware_scheduler`.
+  - `CacheAwareInstall` dataclass gets a `measurement_only`
+    field; `stats()` surfaces it.
+  - When `measurement_only=True`: schedule wrap not installed
+    (verified via `__func__` identity); allocate/free wraps
+    install as usual.
+
+* `runner_vllm_streaming.py`:
+  - New `cache_aware_measurement_only: bool = False` driver
+    param.
+  - Constructor mutex check rejects both
+    `cache_aware_scheduling` and `cache_aware_measurement_only`
+    being True simultaneously.
+  - Install path triggers when either is True; passes through
+    the mode flag.
+
+* `bench_phase3_cache_aware.py`:
+  - `CellConfig` gets a `cache_aware_measurement_only` field.
+  - Cell B's config now sets `cache_aware_measurement_only=True`
+    so the tree is installed for measurement in cell B (no
+    admission reorder, same instrument as cell C).
+  - `extract_cell_metrics` prefers the cache-aware tree's
+    `realized_hit_tokens_total_via_tree` over the broken probe
+    when the tree is installed. New `realized_hit_source` field
+    flags which instrument supplied the number
+    (`"cache_aware_tree"` vs `"prefix_hit_probe"`).
+
+CPU regression coverage (13 new tests):
+
+* `test_cache_aware_install.py` +6:
+  - `test_measurement_only_skips_schedule_wrap`
+  - `test_measurement_only_installs_allocate_and_free_wraps`
+  - `test_measurement_only_accumulates_realized_hits` (the
+    load-bearing assertion: measurement_only mode still counts
+    realized hits via the allocate wrap)
+  - `test_measurement_only_does_not_reorder_waiting_deque`
+  - `test_full_mode_stats_reports_measurement_only_false`
+  - `test_disabled_install_has_no_measurement_only_field_in_stub_stats`
+* `test_cache_aware_runner_plumbing.py` +3:
+  - `test_async_engine_driver_accepts_measurement_only`
+  - `test_async_engine_driver_rejects_both_cache_aware_modes`
+  - `test_run_measurement_only_installs_tree_without_reorder`
+* `test_bench_phase3_cache_aware.py` +4:
+  - `test_cell_b_uses_measurement_only_tree`
+  - `test_cell_c_uses_full_cache_aware_tree`
+  - `test_cell_a_realized_hit_source_is_probe`
+  - `test_b_vs_c_apples_to_apples_via_tree`
+  - `test_per_cell_schema_includes_realized_hit_source`
+
+Caveat: the cache-aware tree only counts **in-flight overlap**
+(concurrently-live sequences with shared prefixes). It does NOT
+model vLLM's LRU prefix-cache pool (where freed blocks remain
+cacheable for a while). This is a reasonable approximation since
+the primary source of measurable benefit on a chat workload is
+in-flight overlap; LRU-pool-mediated reuse is a smaller secondary
+effect. If Phase 3D's analysis suggests LRU-pool reuse matters,
+the recovery options in `PHASE3_VLLM_NATIVE_PREFIX_HITS_RESEARCH.md`
+(patch vLLM directly / use Prometheus counters / instrument
+`allocate_immutable_block`) are the path forward.
+
+### Post-closure audit fixes
+
+After Phase 3 closure, a multi-angle code-review audit of the
+entire branch (5 finder angles × 8 candidates each, deduped) found
+7 CRITICAL defects in the cache-aware machinery. All landed
+in-tree with CPU regression tests:
+
+**Fix #1 — Clock-base mismatch in starvation guard.**
+`_arrival_time_of` returned vLLM's epoch-style `metrics.arrival_time`
+(via `time.time()`) but `cas.order_admissions` compared it against
+`time.monotonic()`. The age was always ~-1.7e9; the starvation
+guard **never fired on real vLLM**. Fix: detect epoch-style values
+(`> 1e9`) and reproject via `time.monotonic() - (time.time() -
+arrival_epoch)`. Small monotonic-style values (test fixtures) pass
+through unchanged. New tests:
+`test_to_monotonic_*`, `test_arrival_time_of_handles_vllm_epoch_via_metrics`,
+`test_starvation_guard_fires_with_epoch_arrival_times`.
+
+**Fix #2 — Cancellation drops slowest requests from p99.**
+`_submit_one`'s `except Exception` doesn't catch `CancelledError`
+(BaseException-derived in Py 3.8+). Tasks cancelled at wall-budget
+skipped the latency record append. Fix: wrap the latency record
+in a `finally` block. New test:
+`test_cancelled_request_still_records_latency`.
+
+**Fix #3 — Hardcoded `block_size=32` vs vLLM default 16.**
+Both install sites hardcoded 32; stock vLLM defaults to 16. Tree
+realized_hit was truncated to multiples of 32; probe's chunk-hash
+search never matched vLLM's 16-token-keyed `_cached_blocks`. Fix:
+new `_resolve_block_size_from_engine` helper reads
+`engine.cache_config.block_size` (canonical vLLM 0.7.3 V0 location);
+both installs use the resolved value. New tests:
+`test_resolve_block_size_*`.
+
+**Fix #4 — `_predicted_hits_per_request` memory leak.**
+vLLM 0.7.3 calls `block_manager.free(seq)` per-Sequence (not
+per-SequenceGroup); the old code set `request_id_for_cleanup=None`
+in the Sequence path and skipped the dict pop. Long-running
+deployments leaked memory unboundedly. Fix: track
+`seq_id → request_id` map at schedule time; the free wrap
+cleans by `seq_id` regardless of caller-arg shape. New test:
+`test_predicted_hits_cleaned_via_sequence_path_free`.
+
+**Fix #5 — Probe wrap leaks on cache-aware install failure.**
+`self._prefix_hit_probe` was assigned AFTER both installs; a
+cache-aware-install failure left the probe wrap on
+`block_manager.allocate` because the finally block saw
+`self._prefix_hit_probe is None`. Fix: (a) assign
+`self._prefix_hit_probe = probe` immediately after install;
+(b) the cache-aware install's `except` block now also tears down
+the probe before re-raising (the main-loop finally is unreachable
+during setup-phase failures). New test:
+`test_probe_torn_down_when_cache_aware_install_fails`.
+
+**Fix #6 — `waiting.clear()` + predictor exception drops requests.**
+The pre-fix schedule wrap did `waiting.clear()` then re-appended
+SequenceGroups + called predictor in a single loop. If the
+predictor raised mid-iteration, not-yet-re-appended requests
+vanished from the engine queue forever. Fix: split into two
+loops — re-append first (exception-free), then capture predictions
+in a separate loop with each call wrapped in try/except. New
+tests:
+`test_predictor_exception_in_install_loop_does_not_drop_requests`,
+`test_predictor_exception_in_cas_does_not_drop_requests`.
+
+**Fix #7 — Multi-sequence SequenceGroup orphans tree state.**
+`_seq_from` returned only the first sequence; SequenceGroups with
+`n>1` sampling or beam search left the other sequences' block_ids
+in the tree forever. Fix: free wrap iterates ALL sequences in
+the SequenceGroup path; combines with #4's seq_id → request_id
+cleanup. New test:
+`test_multi_sequence_group_evicts_all_block_ids`.
+
+**Bonus init-time fix (medium finding).** `self._installed_evictor`
+and `self._attention_aggregator` are now initialized to None in
+`__init__` so direct invocation of `_submit_one` (the documented
+unit-testability path) doesn't AttributeError before `run()` runs.
+
+CPU regression coverage after audit: 133/133 cache-aware + Phase
+3 tests (was 119 pre-audit; +14 net additive). 392/392 broader
+Bench CPU sweep. No regressions.

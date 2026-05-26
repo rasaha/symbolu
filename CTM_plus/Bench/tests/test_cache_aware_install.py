@@ -681,3 +681,685 @@ def test_composition_with_int4_block_size_32():
         assert s["prediction_accuracy"] >= 0.85
     finally:
         handle.teardown()
+
+
+# ----------------------------------------------------------------------
+# vLLM 0.7.3 V2 block-manager shape regression
+#
+# The V0 engine in vLLM 0.7.3 uses a V2 block manager whose
+# ``block_tables[seq_id]`` is a ``BlockTable`` wrapper — not a
+# directly-iterable list. PR-2's first GPU smoke surfaced this:
+# ``_block_ids_for_seq`` originally did ``[... for b in bt]``, which
+# raised ``TypeError: 'BlockTable' object is not iterable`` inside
+# vLLM's _allocate_and_set_running.
+#
+# These mocks reproduce the V2 shape so the bug can't regress.
+# ----------------------------------------------------------------------
+
+
+class MockBlockTableV2:
+    """Mimics vLLM 0.7.3 V2's ``BlockTable`` wrapper.
+
+    Exposes ``.physical_block_ids`` (the canonical accessor — a
+    ``List[Optional[int]]``) and ``.blocks`` (alt accessor → list of
+    block-like objects). Crucially, it is **not directly iterable**
+    — iterating it raises ``TypeError`` to match real vLLM behavior.
+    """
+
+    def __init__(self, block_numbers: Sequence[int]):
+        self._block_numbers = [int(b) for b in block_numbers]
+
+    @property
+    def physical_block_ids(self) -> List[Optional[int]]:
+        # vLLM populates this list with the integer block_id of each
+        # allocated slot (or None for sentinels).
+        return list(self._block_numbers)
+
+    @property
+    def blocks(self) -> List[MockPhysicalTokenBlock]:
+        # Alt accessor — returns block-like objects with .block_id.
+        return [
+            type("_FakeBlock", (), {
+                "block_id": bn, "block_number": bn,
+            })()
+            for bn in self._block_numbers
+        ]
+
+    def __iter__(self):  # pragma: no cover - exercised by assertion
+        raise TypeError("'BlockTable' object is not iterable")
+
+
+class MockBlockSpaceManagerV2(MockBlockSpaceManager):
+    """V2 variant of the block-manager mock.
+
+    Same prefix-cache + free-pool semantics as the V1 parent, but
+    ``block_tables[seq_id]`` stores a ``MockBlockTableV2`` (wrapper
+    object) instead of a plain ``List[MockPhysicalTokenBlock]``.
+    """
+
+    def allocate(self, seq_group: MockSequenceGroup) -> None:
+        seq = seq_group.get_seqs()[0]
+        tokens = seq.get_prompt_token_ids()
+        block_numbers: List[int] = []
+        i = 0
+        n = len(tokens)
+        hit_tokens = 0
+        while i + self.block_size <= n:
+            chunk = tuple(tokens[i:i + self.block_size])
+            existing = self._cached_chunks.get(chunk)
+            if existing is not None:
+                block_numbers.append(existing)
+                hit_tokens += self.block_size
+            else:
+                bn = self._next_block_number
+                self._next_block_number += 1
+                self._cached_chunks[chunk] = bn
+                block_numbers.append(bn)
+            i += self.block_size
+        self.block_tables[seq.seq_id] = MockBlockTableV2(block_numbers)
+        self._realized_hits_in_last_allocate = hit_tokens
+
+    def free(self, seq_or_seq_group) -> None:
+        if hasattr(seq_or_seq_group, "get_prompt_token_ids"):
+            seq = seq_or_seq_group
+        else:
+            seq = seq_or_seq_group.get_seqs()[0]
+        bt = self.block_tables.pop(seq.seq_id, None)
+        if bt is None:
+            return
+        block_numbers = list(bt.physical_block_ids)
+        for bn in block_numbers:
+            if bn is not None:
+                self._free_pool.append(int(bn))
+        kept = set(block_numbers)
+        self._cached_chunks = {
+            ch: bn for ch, bn in self._cached_chunks.items()
+            if bn not in kept
+        }
+
+
+def test_v2_block_table_is_not_iterable_sanity_check():
+    """Sanity check: the V2 mock matches real vLLM shape — direct
+    iteration raises TypeError. If this regresses, the V2-path tests
+    below would not be exercising the bug they're meant to catch."""
+    bt = MockBlockTableV2([1, 2, 3])
+    with pytest.raises(TypeError, match="not iterable"):
+        for _ in bt:
+            pass
+    # But .physical_block_ids must work.
+    assert bt.physical_block_ids == [1, 2, 3]
+    # And .blocks must yield block-like objects.
+    blocks = bt.blocks
+    assert len(blocks) == 3
+    assert blocks[0].block_id == 1
+    assert blocks[1].block_number == 2
+
+
+def test_allocate_wrap_works_against_v2_block_manager():
+    """The install's allocate wrap must populate the tree correctly
+    when block_tables[seq_id] is a V2 BlockTable wrapper (not a
+    plain list). This is the regression gate for the GPU-smoke
+    crash:
+
+        TypeError: 'BlockTable' object is not iterable
+        at _block_ids_for_seq, called from _allocate_with_tree_update.
+    """
+    sched = MockScheduler()
+    bm = MockBlockSpaceManagerV2(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        tokens = list(range(96))
+        bm.allocate(_mk_sg("r1", tokens, 0.0))
+        # Without the fix this would have crashed in the wrap with
+        # TypeError before reaching here.
+        assert handle.tree.query(tokens) == 96
+        assert handle.tree.stats()["tracked_tokens"] > 0
+    finally:
+        handle.teardown()
+
+
+def test_free_wrap_works_against_v2_block_manager():
+    """The install's free wrap must extract block_ids correctly from
+    a V2 BlockTable before invoking the original free()."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManagerV2(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        tokens = list(range(64))
+        sg = _mk_sg("r1", tokens, 0.0)
+        bm.allocate(sg)
+        assert handle.tree.query(tokens) == 64
+        bm.free(sg.get_seqs()[0])
+        # If _block_ids_for_seq returned [] silently on a V2 shape,
+        # the tree.evict call would be a no-op and the prefix would
+        # still be queryable here. That would mask the bug rather
+        # than reproduce it.
+        assert handle.tree.query(tokens) == 0
+    finally:
+        handle.teardown()
+
+
+# ----------------------------------------------------------------------
+# Audit fix regression tests (Findings #1, #4, #6, #7)
+# ----------------------------------------------------------------------
+
+
+def test_to_monotonic_passes_through_small_values():
+    """Audit fix #1: small (< 1e9) timestamps are passed through
+    unchanged — they're already monotonic-relative (test fixtures
+    use 0.0, 1.0, etc.)."""
+    from kv_policy.cache_aware_install import _to_monotonic
+    assert _to_monotonic(0.0) == 0.0
+    assert _to_monotonic(42.5) == 42.5
+    assert _to_monotonic(1e8) == 1e8
+
+
+def test_to_monotonic_converts_epoch_to_monotonic_age():
+    """Audit fix #1: large (epoch-style) timestamps are reprojected
+    onto the monotonic clock by computing the age via time.time()
+    and subtracting it from time.monotonic().
+
+    For an arrival_time matching the current epoch ("just arrived"),
+    the returned value should be ~= time.monotonic() (age ~= 0)."""
+    from kv_policy.cache_aware_install import _to_monotonic
+    now_epoch = time.time()
+    now_mono = time.monotonic()
+    converted = _to_monotonic(now_epoch)
+    # Within a few hundred microseconds of monotonic-now (allow for
+    # the time.time() / time.monotonic() reads being non-atomic).
+    assert abs(converted - now_mono) < 0.01
+
+    # An epoch arrival_time 60 seconds ago should yield a converted
+    # value 60 seconds before monotonic-now.
+    sixty_sec_ago_epoch = now_epoch - 60.0
+    converted_old = _to_monotonic(sixty_sec_ago_epoch)
+    assert abs(converted_old - (now_mono - 60.0)) < 0.05
+
+
+def test_arrival_time_of_handles_vllm_epoch_via_metrics():
+    """Audit fix #1: a real vLLM-shaped seq_group whose
+    metrics.arrival_time is an epoch timestamp must NOT compare
+    catastrophically against time.monotonic() in the starvation
+    guard. Pre-fix: returned the epoch value unchanged; guard
+    never fired. Post-fix: returns a monotonic-equivalent."""
+    from kv_policy.cache_aware_install import _arrival_time_of
+
+    class _FakeMetrics:
+        arrival_time = time.time() - 5.0   # arrived 5s ago
+
+    class _FakeSeqGroup:
+        metrics = _FakeMetrics()
+
+    sg = _FakeSeqGroup()
+    converted = _arrival_time_of(sg)
+    now_mono = time.monotonic()
+    # The converted "arrival_time" should be ~5s before
+    # monotonic-now, so now_mono - converted ≈ 5.
+    age = now_mono - converted
+    assert 4.5 < age < 5.5, age
+
+    # And critically: age must be POSITIVE and bounded, not the
+    # ~-1.7e9 the pre-fix code would have produced.
+    assert age > 0
+    assert age < 60
+
+
+def test_starvation_guard_fires_with_epoch_arrival_times():
+    """Audit fix #1 integration test: simulate the real vLLM
+    epoch-based arrival_time, push two requests through schedule,
+    and verify the starvation guard kicks in when one is old."""
+
+    class _EpochSeq:
+        def __init__(self, prompt: List[int]):
+            self.seq_id = id(self)
+            self._prompt = list(prompt)
+
+        def get_prompt_token_ids(self) -> List[int]:
+            return list(self._prompt)
+
+    class _EpochMetrics:
+        def __init__(self, arrival_time: float):
+            self.arrival_time = arrival_time
+
+    class _EpochSeqGroup:
+        def __init__(self, request_id: str, prompt: List[int],
+                     epoch_arrival_time: float):
+            self.request_id = request_id
+            self.metrics = _EpochMetrics(epoch_arrival_time)
+            self._seqs = [_EpochSeq(prompt)]
+
+        def get_seqs(self):
+            return list(self._seqs)
+
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+        max_starvation_seconds=1.0,  # tight so the test runs fast
+    )
+    try:
+        now_epoch = time.time()
+        # Old request: arrived 30s ago (epoch timestamp).
+        old = _EpochSeqGroup(
+            "old_req", list(range(32)), epoch_arrival_time=now_epoch - 30.0,
+        )
+        # Young request with a richer (predicted-high) prompt.
+        # Seed the tree so 'young' would be predicted high; old has
+        # no overlap so it'd lose without the starvation guard.
+        bm.allocate(_mk_sg("seeder", list(range(100, 164)), t=now_epoch - 60))
+        young = _EpochSeqGroup(
+            "young_req", list(range(100, 164)) + list(range(900, 932)),
+            epoch_arrival_time=now_epoch - 0.1,
+        )
+        sched.waiting.append(young)
+        sched.waiting.append(old)
+        sched.schedule()
+        # Starvation guard should have promoted 'old' to the front
+        # because its age (~30s) > max_starvation_seconds (1s).
+        # Pre-fix: the guard saw age ~= -1.7e9 and never fired, so
+        # 'young' (higher predicted hit) would win.
+        admitted_request_ids = [
+            getattr(sg, "request_id", None) for sg in sched.admitted_order
+        ]
+        assert admitted_request_ids[0] == "old_req", admitted_request_ids
+        # Counter should reflect the override.
+        s = handle.stats()
+        assert s["starvation_overrides"] >= 1, s
+    finally:
+        handle.teardown()
+
+
+def test_predicted_hits_cleaned_via_sequence_path_free():
+    """Audit fix #4: cleaning _predicted_hits_per_request when free()
+    is called with a Sequence (the real vLLM 0.7.3 hot path), not
+    just a SequenceGroup. Pre-fix: dict grew unboundedly because
+    the Sequence-path set request_id_for_cleanup=None."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        # Enqueue + schedule 3 requests so the schedule wrap fires
+        # with n > 1 and populates _predicted_hits_per_request.
+        sg_a = _mk_sg("req_a", list(range(64)), t=0.0)
+        sg_b = _mk_sg("req_b", list(range(100, 164)), t=0.1)
+        sg_c = _mk_sg("req_c", list(range(200, 264)), t=0.2)
+        sched.waiting.append(sg_a)
+        sched.waiting.append(sg_b)
+        sched.waiting.append(sg_c)
+        sched.schedule()
+        # All 3 request_ids should be in the per-request dict.
+        assert len(handle._predicted_hits_per_request) == 3
+        # And the seq_id → request_id map should also have 3 entries.
+        assert len(handle._seq_id_to_request_id) == 3
+        # Allocate so the seq_id → block_table mapping exists for the
+        # free wrap to find.
+        for sg in (sg_a, sg_b, sg_c):
+            bm.allocate(sg)
+        # Now free via the SEQUENCE path (Pre-fix: cleanup skipped).
+        bm.free(sg_a.get_seqs()[0])
+        # Dict should have lost 'req_a'.
+        assert "req_a" not in handle._predicted_hits_per_request
+        # Other entries still present.
+        assert "req_b" in handle._predicted_hits_per_request
+        assert "req_c" in handle._predicted_hits_per_request
+        # Free the other two as well.
+        bm.free(sg_b.get_seqs()[0])
+        bm.free(sg_c.get_seqs()[0])
+        # Dict should now be empty.
+        assert len(handle._predicted_hits_per_request) == 0
+        assert len(handle._seq_id_to_request_id) == 0
+    finally:
+        handle.teardown()
+
+
+def test_predictor_exception_in_install_loop_does_not_drop_requests():
+    """Audit fix #6: if the install-side predictor capture loop
+    raises mid-iteration, requests are NOT dropped from the waiting
+    deque.
+
+    Pre-fix: waiting.clear() ran then the SINGLE loop both
+    re-appended requests AND called predictor; an exception in
+    predict_cache_hit left requests N+1..end unappended (lost).
+
+    Post-fix: re-append happens in a dedicated loop with no
+    exception-prone code; predictor capture is a separate loop
+    with each call wrapped in try/except.
+
+    Note: a predictor exception inside ``cas.order_admissions``
+    (which also calls the predictor) propagates BEFORE
+    waiting.clear() runs, so the deque stays intact there too —
+    that path isn't the focus of this test, but isn't a drop bug.
+    """
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        original_predictor = handle.cas.predictor
+        call_count = {"n": 0}
+        n_requests = 5
+        # cas.order_admissions calls predictor n_requests times to
+        # build _AdmissionDecisions. We want exceptions to fire ONLY
+        # in the install-side loop (calls n_requests+1 and beyond).
+        # Configure the mock to raise on the (n_requests + 2)-th
+        # call — i.e. the 2nd call from the install loop. This
+        # exercises post-fix behavior: re-append completes, then
+        # one install-side predict succeeds, then one raises.
+
+        class _RaisingPredictor:
+            def predict_cache_hit(self, tokens):
+                call_count["n"] += 1
+                if call_count["n"] > n_requests + 1:
+                    raise RuntimeError(
+                        "simulated install-loop predictor failure"
+                    )
+                return original_predictor.predict_cache_hit(tokens)
+
+        handle.cas.predictor = _RaisingPredictor()
+        sgs = [
+            _mk_sg(f"req_{i}", list(range(i * 100, i * 100 + 64)), t=i * 0.1)
+            for i in range(n_requests)
+        ]
+        for sg in sgs:
+            sched.waiting.append(sg)
+        # Schedule — must NOT raise; the install-side except
+        # swallows the predictor failure.
+        sched.schedule()
+        # All requests still in the engine — either admitted by
+        # the mock's drain, or still in waiting.
+        n_in_play = (
+            len(sched.admitted_order)
+            + len([sg for sg in sched.waiting])
+        )
+        assert n_in_play == n_requests, (
+            f"requests dropped: admitted={sched.admitted_order}, "
+            f"waiting={list(sched.waiting)}"
+        )
+        # And the predictor was indeed called more than n_requests
+        # times (i.e., the install-side loop ran past the cas-side
+        # calls).
+        assert call_count["n"] > n_requests, (
+            "install-side predictor loop did not run; "
+            f"call_count={call_count['n']}"
+        )
+    finally:
+        handle.teardown()
+
+
+def test_predictor_exception_in_cas_does_not_drop_requests():
+    """Companion: a predictor exception inside cas.order_admissions
+    (the FIRST predictor-call site) also must not drop requests.
+    This path is structurally safe because waiting.clear() hasn't
+    run yet when cas raises — pre-fix AND post-fix both pass this
+    assertion."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        call_count = {"n": 0}
+
+        class _RaisingPredictor:
+            def predict_cache_hit(self, tokens):
+                call_count["n"] += 1
+                if call_count["n"] >= 3:
+                    raise RuntimeError("simulated cas-side failure")
+                return 0   # match prefix length
+
+        handle.cas.predictor = _RaisingPredictor()
+        sgs = [
+            _mk_sg(f"req_{i}", list(range(i * 100, i * 100 + 64)), t=i * 0.1)
+            for i in range(5)
+        ]
+        for sg in sgs:
+            sched.waiting.append(sg)
+        # Schedule — the predictor raises inside cas.order_admissions
+        # at the 3rd call. The exception propagates OUT of the
+        # install wrap because cas's exception isn't (and shouldn't
+        # be) swallowed there. Verify waiting is intact (no clear
+        # happened yet).
+        with pytest.raises(RuntimeError, match="cas-side"):
+            sched.schedule()
+        # Pre-clear state preserved: 5 still in waiting (none were
+        # admitted because schedule() raised before drain).
+        assert len(sched.waiting) == 5
+    finally:
+        handle.teardown()
+
+
+class _MultiSeqSequenceGroup:
+    """SequenceGroup-shape mock with multiple sequences (mimics
+    beam search / SamplingParams(n>1))."""
+
+    def __init__(self, request_id: str, n_seqs: int, prompt: List[int]):
+        self.request_id = request_id
+        self.arrival_time = 0.0
+        self._seqs = [
+            type("_MS", (MockSequence,), {})(
+                seq_id=hash((request_id, i)) & 0x7FFFFFFF,
+                prompt_token_ids=prompt,
+            )
+            for i in range(n_seqs)
+        ]
+
+    def get_seqs(self) -> List[MockSequence]:
+        return list(self._seqs)
+
+
+def test_multi_sequence_group_evicts_all_block_ids():
+    """Audit fix #7: SequenceGroup with n>1 sequences must have ALL
+    sequences' block_ids evicted from the tree on free, not just
+    seqs[0]'s. Pre-fix: orphan block_ids leaked, leaving the tree
+    reporting stale-positive matches for blocks vLLM has freed."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        # Multi-seq group with 3 sequences sharing a prompt.
+        tokens = list(range(64))
+        msg = _MultiSeqSequenceGroup(
+            "multi_req", n_seqs=3, prompt=tokens,
+        )
+        # Allocate each sequence (mimic vLLM's allocator behavior
+        # populating block_tables per-seq_id).
+        for seq in msg.get_seqs():
+            sg_proxy = MockSequenceGroup(
+                f"proxy_{seq.seq_id}", tokens,
+                arrival_time=0.0, seq_id=seq.seq_id,
+            )
+            bm.allocate(sg_proxy)
+        # All 3 seq_ids should be in block_tables.
+        for seq in msg.get_seqs():
+            assert seq.seq_id in bm.block_tables, seq.seq_id
+        # Now free the SequenceGroup (not individual sequences).
+        bm.free(msg)
+        # Pre-fix: only seqs[0]'s block_ids would have been evicted
+        # from the tree. Post-fix: all 3 sequences' block_ids gone
+        # from block_tables (because original_free pops them; verify
+        # the wrap correctly snapshotted block_ids BEFORE the free
+        # by checking that tree.query for the prompt is now 0 — the
+        # blocks for all 3 seqs should have been evicted).
+        # (Note: bm.free for a SequenceGroup in our mock only frees
+        # the first seq via _seq_from; we're testing the install
+        # wrap's behavior here, which iterates all seqs explicitly.)
+        # Verify tree.query for the original prompt returns 0
+        # (because all live mappings for those block_ids should have
+        # been evicted via tree.evict).
+        assert handle.tree.query(tokens) == 0
+    finally:
+        handle.teardown()
+
+
+def test_realized_hits_with_v2_block_manager():
+    """Realized-hit measurement still works against the V2 shape —
+    second request sharing a 64-token prefix logs 64 realized hits."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManagerV2(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True, block_size=32,
+    )
+    try:
+        SHARED = list(range(64))
+        bm.allocate(_mk_sg("seed", SHARED + list(range(500, 532)), 0.0))
+        bm.allocate(_mk_sg("reuser", SHARED + list(range(600, 632)), 1.0))
+        assert handle._realized_hits_total == 64
+        assert handle.stats()["realized_hit_tokens_total"] == 64
+    finally:
+        handle.teardown()
+
+
+# ----------------------------------------------------------------------
+# Phase 3C measurement-only mode
+#
+# install_cache_aware_scheduler(measurement_only=True) installs the
+# allocate + free tree wraps for realized-hit measurement, but
+# SKIPS the scheduler.schedule reorder wrap. Used by cell B of the
+# Phase 3 comparison to bridge the probe failure (vLLM's chained
+# content_hash defeats the flat-hash probe).
+# ----------------------------------------------------------------------
+
+
+def test_measurement_only_skips_schedule_wrap():
+    """measurement_only=True does NOT install the scheduler.schedule
+    wrap — bound-method identity unchanged."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    original_schedule = sched.schedule
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        assert handle.enabled is True
+        assert handle.measurement_only is True
+        # The schedule method's underlying function should remain the
+        # MockScheduler class method (the wrap was NOT applied).
+        assert sched.schedule.__func__ is MockScheduler.schedule
+        # Sanity: scheduler still callable, returns admitted list.
+        assert sched.schedule() == []
+    finally:
+        handle.teardown()
+
+
+def test_measurement_only_installs_allocate_and_free_wraps():
+    """measurement_only=True DOES install the allocate + free
+    wraps — bound-method identity changes for both."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    original_allocate = bm.allocate
+    original_free = bm.free
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        # Allocate / free are wrapped — closures, not bound methods.
+        assert bm.allocate is not original_allocate
+        assert bm.free is not original_free
+    finally:
+        handle.teardown()
+    # Teardown restores them.
+    assert bm.allocate.__func__ is MockBlockSpaceManager.allocate
+    assert bm.free.__func__ is MockBlockSpaceManager.free
+
+
+def test_measurement_only_accumulates_realized_hits():
+    """The load-bearing assertion: measurement_only mode still
+    counts realized hit tokens via the allocate wrap. This is what
+    cell B of Phase 3 will rely on."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        SHARED = list(range(64))  # 2 blocks @ 32
+        # Seed allocate populates the tree.
+        bm.allocate(_mk_sg("seed", SHARED + list(range(500, 532)), 0.0))
+        # Reuser shares the 64-token prefix → 64-token realized hit.
+        bm.allocate(_mk_sg("reuser", SHARED + list(range(600, 632)), 1.0))
+        assert handle._realized_hits_total == 64
+        s = handle.stats()
+        assert s["realized_hit_tokens_total"] == 64
+        # No reorder happened (no schedule wrap), no predictor ran.
+        assert s["admissions"] == 0
+        assert s["reordered_count"] == 0
+        assert s["predicted_hit_tokens_total"] == 0
+        # measurement_only flag surfaces in stats.
+        assert s["measurement_only"] is True
+    finally:
+        handle.teardown()
+
+
+def test_measurement_only_does_not_reorder_waiting_deque():
+    """End-to-end: even with multiple pending requests of varying
+    predicted hit rates, measurement_only mode preserves FCFS
+    admission order (verifies the schedule wrap really isn't
+    installed)."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        # Seed the tree so a future request would have a high
+        # predicted hit rate.
+        seed_tokens = list(range(64))
+        bm.allocate(_mk_sg(
+            "seed", seed_tokens + list(range(500, 532)), 0.0,
+        ))
+        # Enqueue two pending requests: r_low_hit (no overlap with
+        # tree) and r_high_hit (shares the 64-token prefix).
+        r_low = _mk_sg("r_low", list(range(9000, 9064)), 1.0)
+        r_high = _mk_sg("r_high", seed_tokens + list(range(7000, 7032)), 2.0)
+        sched.waiting.append(r_low)
+        sched.waiting.append(r_high)
+        admitted = sched.schedule()
+        # FCFS order preserved: r_low (older arrival_time) admitted
+        # before r_high, even though r_high has a higher predicted hit.
+        assert admitted == [r_low, r_high]
+    finally:
+        handle.teardown()
+
+
+def test_full_mode_stats_reports_measurement_only_false():
+    """Sanity check: the default (full-mode) install reports
+    measurement_only=False in stats."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True,
+        block_size=32,
+        # measurement_only defaults to False
+    )
+    try:
+        s = handle.stats()
+        assert s["enabled"] is True
+        assert s["measurement_only"] is False
+    finally:
+        handle.teardown()
+
+
+def test_disabled_install_has_no_measurement_only_field_in_stub_stats():
+    """When enable=False, stats() returns the minimal {'enabled': False}
+    stub — no measurement_only field needed since nothing's installed."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=False, measurement_only=True,   # measurement_only ignored
+    )
+    assert handle.enabled is False
+    assert handle.stats() == {"enabled": False}

@@ -179,9 +179,9 @@ def main(argv: Sequence[str]) -> int:
         help=(
             "Phase 4: oversample factor for the trig-blend re-rank "
             "in evict(). The v5 GPU run used 8 (hardcoded); 8x base "
-            "scoring per evict accounts for some of the 20% Python "
+            "scoring per evict accounts for some of the 20%% Python "
             "throughput regression. Default 4 keeps most of the "
-            "62% trig_changed_pick rate at half the cost. Set to "
+            "62%% trig_changed_pick rate at half the cost. Set to "
             "1 to disable trig blending in evict() (trig still "
             "affects window_pruning_pass)."
         ),
@@ -194,7 +194,7 @@ def main(argv: Sequence[str]) -> int:
             "instead of CTMEvictorModern (pure Python). Semantically "
             "identical at the algorithm layer; closes the per-call "
             "Python dispatch overhead the v8 py-spy profile "
-            "(PHASE4_GPU_FINDINGS §11) attributed the 20% throughput "
+            "(PHASE4_GPU_FINDINGS §11) attributed the 20%% throughput "
             "regression to. Requires the compiled .so at "
             "kv_policy/_ctm_evictor.cpython-*.so; build with "
             "`cd CTM_plus/KVPolicy && python3 setup.py build_ext "
@@ -210,7 +210,7 @@ def main(argv: Sequence[str]) -> int:
             "Phase 4: install hooks via direct monkey-patch of "
             "module.forward instead of register_forward_pre_hook. "
             "Skips torch's _call_impl _forward_pre_hooks walk on "
-            "every fire — that walk is a slice of the 15% "
+            "every fire — that walk is a slice of the 15%% "
             "_call_impl share in PHASE4_GPU_FINDINGS §11.1, §11.3 "
             "row 2 estimate is 2-5pp recovery (combined with the "
             "implicit row-3 model-level consolidation here, 3-8pp). "
@@ -293,6 +293,131 @@ def main(argv: Sequence[str]) -> int:
         help=(
             "RETIRED. Selecting this flag will exit with an error. "
             "See CTM_plus/TURBOQUANT_RETIREMENT.md."
+        ),
+    )
+    parser.add_argument(
+        "--cache-aware-scheduling",
+        action="store_true",
+        help=(
+            "EXPERIMENTAL — DO NOT ENABLE IN PRODUCTION. Cache-aware "
+            "admission scheduling: reorders the engine's waiting "
+            "queue by predicted block-aligned prefix-cache hit rate, "
+            "with a starvation guard. Two-seed Tier-A measurement on "
+            "Qwen-7B chat workload returned an INCONCLUSIVE "
+            "realized-hit signal (C/B = 0.903 and 1.115, opposite "
+            "signs) with a consistent mild E2E p99 regression "
+            "(1.4-1.6x). See PHASE3_CACHE_AWARE_FINDINGS.md for the "
+            "full measurement + revisit conditions. The CLI flag is "
+            "retained for further experimentation; it is NOT a "
+            "production-validated v2 surface. Orthogonal to "
+            "--ctm-plus, --int4-kv-route-a, and the shipped "
+            "int4_protected backend (different layer)."
+        ),
+    )
+    parser.add_argument(
+        "--cache-aware-max-starvation-seconds",
+        type=float, default=30.0,
+        help=(
+            "v2 cache-reuse PR-2: fairness guard. Any request older "
+            "than this in the waiting queue is admitted next "
+            "regardless of predicted cache-hit rate. Default 30s "
+            "(matches the Phase 0 CPU prototype default)."
+        ),
+    )
+    parser.add_argument(
+        "--shared-prefix-length",
+        type=int, default=0,
+        help=(
+            "Phase 3A workload shape: when > 0, switches to the "
+            "cohort-shared prompt builder used by the Phase 3 "
+            "comparison cells. Each request becomes "
+            "[cohort_prefix of this length] + [unique tail]. "
+            "Default 0 (= legacy Pareto-unique-head shape; "
+            "preserves PR-2 behaviour byte-identical)."
+        ),
+    )
+    parser.add_argument(
+        "--shared-prefix-unique-tail-choices",
+        default="32,64,128,256",
+        help=(
+            "Phase 3A: comma-separated tail-length choices for the "
+            "shared-prefix builder (sampled uniformly per request). "
+            "Only used when --shared-prefix-length > 0. Default "
+            "matches the chat-shape distribution in the Phase 3 "
+            "design (32, 64, 128, 256 tokens)."
+        ),
+    )
+    parser.add_argument(
+        "--n-shared-prefixes",
+        type=int, default=4,
+        help=(
+            "Phase 3A: number of distinct shared-prefix cohorts. "
+            "Default 4 per the approved cohort design (4 cohorts × "
+            "25 requests = 100 reqs at the typical workload size). "
+            "Only used when --shared-prefix-length > 0."
+        ),
+    )
+    parser.add_argument(
+        "--collect-native-prefix-hits",
+        action="store_true",
+        help=(
+            "Phase 3A: install the prefix-hit probe — a "
+            "measurement-only wrap of block_manager.allocate that "
+            "counts vLLM's native prefix-cache hits per request. "
+            "Default OFF (preserves PR-2 behaviour). Set this for "
+            "the Phase 3 cell-comparison harness so cells A/B/C "
+            "all report directly-comparable realized-hit numbers."
+        ),
+    )
+    parser.add_argument(
+        "--extended-pinning",
+        action="store_true",
+        help=(
+            "Phase 4B: install the Extended Pinning Policy — marks "
+            "configured blocks as eviction-protected on top of "
+            "vLLM's LRU + prefix caching. Pinning is deterministic "
+            "(not predictive like --cache-aware-scheduling), so the "
+            "ship/inconclusive/negative decision is bounded by "
+            "the workload's prefix-sharing structure. See "
+            "PHASE4_VLLM_EVICTOR_HOOK_RESEARCH.md for the design. "
+            "Default OFF; with the flag off, all extended pinning "
+            "machinery is inert. Combine with --pin-first-n-blocks "
+            "and/or --pin-tokens-file to specify what to pin."
+        ),
+    )
+    parser.add_argument(
+        "--pin-first-n-blocks",
+        type=int, default=0,
+        help=(
+            "Phase 4B: pin the first N blocks of every admitted "
+            "request, regardless of content. Useful when every "
+            "request shares a system prompt of known length but "
+            "the exact tokens vary per deployment. Only effective "
+            "when --extended-pinning is set. Default 0 (no "
+            "positional pin)."
+        ),
+    )
+    parser.add_argument(
+        "--pin-tokens-file",
+        type=Path, default=None,
+        help=(
+            "Phase 4B: path to a JSON file containing pin specs. "
+            "Each entry is a dict with `name` plus exactly one of "
+            "`token_ids` (content-based) or "
+            "`first_n_blocks_per_request` (position-based). "
+            "Either a single object or a list of objects. Only "
+            "effective when --extended-pinning is set."
+        ),
+    )
+    parser.add_argument(
+        "--pin-max-budget-blocks",
+        type=int, default=1024,
+        help=(
+            "Phase 4B: hard cap on the total pinned block count. "
+            "Default 1024 (≈32K tokens at block_size=32, ~4%% of a "
+            "24K-block cache). Once reached, new pin candidates are "
+            "rejected and counted in stats[pin_budget_rejections]. "
+            "Only effective when --extended-pinning is set."
         ),
     )
     parser.add_argument(
@@ -380,6 +505,23 @@ def main(argv: Sequence[str]) -> int:
         int4_kv_bits=args.int4_kv_bits,
         int4_kv_sink_size=args.int4_kv_sink_size,
         int4_kv_num_kv_heads=args.int4_kv_num_kv_heads,
+        cache_aware_scheduling=args.cache_aware_scheduling,
+        cache_aware_max_starvation_seconds=(
+            args.cache_aware_max_starvation_seconds
+        ),
+        shared_prefix_length=args.shared_prefix_length,
+        shared_prefix_unique_tail_choices=(
+            [int(s.strip())
+             for s in args.shared_prefix_unique_tail_choices.split(",")
+             if s.strip()]
+            if args.shared_prefix_length > 0 else None
+        ),
+        n_shared_prefixes=args.n_shared_prefixes,
+        collect_native_prefix_hits=args.collect_native_prefix_hits,
+        extended_pinning=args.extended_pinning,
+        pin_first_n_blocks=args.pin_first_n_blocks,
+        pin_tokens_file=args.pin_tokens_file,
+        pin_max_budget_blocks=args.pin_max_budget_blocks,
         max_decode_tokens=args.max_decode_tokens,
     )
 
