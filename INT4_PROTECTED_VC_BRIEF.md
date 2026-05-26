@@ -333,6 +333,7 @@ recompile, not a methodology change.
 | Port to vLLM V1 engine | 1-2 weeks | Forward-compat; V0 is being deprecated |
 | Long-context benchmark (>4096) | 1-2 days | Sliding window already supported; needs ≥32K measurement |
 | Pre-calibrated mask zoo | 1 day | Ship 10-20 popular models pre-calibrated; remove user-side calibration step |
+| Cold-tier (per-session safetensors snapshot/restore) | 4-6 weeks | Optional 3-tier KV storage (hot GPU / warm CPU swap / cold disk). Warm-tier foundation verified bit-clean (TIER5A measured GREEN — see Page 6) so this is the only remaining work to ship a 3-tier system. Speculative — not in the production-blocker set. |
 
 **Tier 3 — research extensions**
 
@@ -376,6 +377,7 @@ should be able to tell which is which.
 | 3/6 diverse prompts produce bit-identical greedy output vs stock; remaining 3 share 33% / 76% / 82% prefix; fp8 diverges within 6-16 chars on every prompt | `bench_phase5c_v1.py` (Qwen-7B, Tier A) |
 | Multi-batch determinism (run1 == run2 byte-identical at B=2..8) | `verify_phase5b_6_batch.py` ALL 7 gates GREEN |
 | Aggregate throughput ~42 tok/s @ B=8 on Qwen-7B H100 (Tier A: 41.9 tok/s, n_runs=5 median) | `bench_phase6_batched_throughput.py` |
+| Warm-tier swap-restore is byte-clean for int4_protected on vLLM 0.7.3 (Qwen-7B + A100 + `preemption_mode='swap'`): under matched concurrent pressure, swap-mode (1174 swap_out_blocks, 21 preemption events, CPU pool peak 70 blocks) and recompute-mode baselines produced bit-identical 64-token verifier output. All six TIER5A acceptance gates GREEN including the load-bearing G6b forked-wheel SHA pin. | TIER5A bench: `Bench/scripts/PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md`; runbook: `Bench/scripts/TIER5A_GPU_SMOKE_RUNBOOK.md`; report artifact: `tier5a_run/20260526_2024/tier5a_swap_restore_report.json` |
 | Per-seq decode latency ~4.3× bf16 (Tier A: bf16 83.6 dec_tps vs int4_protected 19.2 dec_tps) | `bench_phase5c_v1.py` three-way bench |
 | Per-phase decode-path profile (10% of step is our read path; 90% is launch overhead) | `bench_phase6_decode_phase_profile.py` |
 | Read-path preflight for CUDA Graphs (B-pre-1..4) COMPLETE | `Bench/scripts/OPTION_B_PREFLIGHT.md` |
@@ -496,6 +498,9 @@ serving solution."
 | Multi-batch regression gate | `CTM_plus/Bench/scripts/verify_phase5b_6_batch.py` |
 | Backend impl + writer | `CTM_plus/KVPolicy/kv_policy/phase5b_backend_install.py`, `phase5b_4c_paged_writer.py` |
 | Vendored vLLM-FA fork (SHA `720c948` + int4 path) | installed via forked vllm wheel; import path `vllm.vllm_flash_attn` — see `CTM_plus/KVPolicy/kv_policy/phase5b_backend_install.py:366` |
+| TIER5A warm-tier swap-restore finding | `CTM_plus/Bench/scripts/PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md` |
+| TIER5A operator runbook (GPU smoke) | `CTM_plus/Bench/scripts/TIER5A_GPU_SMOKE_RUNBOOK.md` |
+| TIER5A orthogonality gate (G5 + G6, incl. load-bearing wheel SHA pin) | `CTM_plus/Bench/ctm_bench/scripts/tier5a_orthogonality_gate.py` |
 
 ---
 
