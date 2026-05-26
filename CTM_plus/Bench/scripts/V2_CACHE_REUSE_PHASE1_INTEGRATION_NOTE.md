@@ -338,3 +338,67 @@ If approved, Phase 1 lands in two PRs:
 1. `install_cache_aware_scheduler` + tests (PR-1, CPU-only)
 2. Streaming-runner telemetry + smoke verification (PR-2, GPU
    needed for gates 4, 5, 6)
+
+## PR-2 status (post-implementation, CPU phase)
+
+**CPU plumbing landed.** What's in:
+* `AsyncEngineDriver(cache_aware_scheduling: bool = False,
+  cache_aware_max_starvation_seconds: float = 30.0)` constructor
+  args.
+* `install_cache_aware_scheduler` hooked into the engine init in
+  `runner_vllm_streaming.run()` after engine construction and
+  after the route-A INT4 install block (same `try / except
+  BaseException → best-effort engine teardown` pattern). Lives at
+  the scheduler layer; orthogonal to `Int4ProtectedAttentionImpl`,
+  the vendored vllm-flash-attn fork, CTM+ evictor, and route-A
+  INT4.
+* `StreamingRunCellResult.cache_aware_scheduler_stats: Dict[str,
+  Any]` populated at end-of-run from
+  `CacheAwareInstall.stats()`. Empty dict when flag OFF;
+  populated with the canonical 9-key dict when flag ON.
+* CLI flag `--cache-aware-scheduling` (+
+  `--cache-aware-max-starvation-seconds`) on `run_streaming.py`,
+  plumbed through to the driver.
+* Teardown wired into the existing finally block, LIFO order:
+  cache-aware-scheduler → route-A INT4 → attention flusher →
+  engine shutdown.
+* CPU test suite `Bench/tests/test_cache_aware_runner_plumbing.py`
+  with 8 tests covering:
+  - constructor default (flag OFF) regression
+  - constructor accepts flag ON + custom max-starvation
+  - dataclass field present + default
+  - flag-OFF install branch not entered (bound-method identity
+    check on the engine's scheduler / block_manager methods)
+  - flag-ON install populates stats with the canonical key set
+  - max-starvation override plumbs through to `CacheAwareScheduler`
+  - install-failure path invokes engine shutdown
+  - `--help` output lists both new flags (subprocess smoke)
+
+Acceptance-gate status (per §7):
+
+| Gate | Status | Evidence |
+|---|---|---|
+| 1. vLLM starts with flag ON | **mocked GREEN** | `test_run_flag_on_installs_and_populates_stats` (real-vLLM still pending GPU pod) |
+| 2. vLLM starts with flag OFF (regression) | **mocked GREEN** | `test_run_flag_off_does_not_install` + 313-test CPU sweep no-regression |
+| 3. Requests complete correctly with flag ON | **pending GPU** | gate B2 |
+| 4. Scheduler ordering applied | **pending GPU** | gate B4 |
+| 5. No starvation | **pending GPU** | gate B7 |
+| 6. Prefix-hit telemetry emitted | **pending GPU** | gate B3 |
+| 7. Stock path byte-identical when disabled | **structurally GREEN** | flag-OFF path has zero patches applied (bound-method identity check); full byte-identical regression still pending GPU pod |
+| 8. Allocator events received | **pending GPU** | gate B5 |
+| 9. Prediction accuracy bounded | **pending GPU** | gate B6 |
+| 10. No regression on int4_protected Tier A | **pending GPU** | gate C2 |
+
+What's pending on a GPU pod:
+* One Qwen-7B chat-shaped smoke with `--cache-aware-scheduling`
+  to exercise gates 3-6, 8, 9.
+* One int4_protected needle cell with flag OFF to exercise
+  gate 10 (`verify_phase5b_5_needle.py` on Qwen-7B seed=44 —
+  must match the brief's 15/15 result).
+
+Pre-existing argparse `%` bug fix (collateral, not in scope):
+three help strings in `run_streaming.py` had unescaped `%` chars
+(`20% Python`, `62% trig_changed_pick`, `20% throughput`, `15%
+_call_impl`) that broke `python -m … --help` because argparse
+percent-formats action help. Doubled to `%%` so `--help` works
+again — needed for the new CLI smoke test.

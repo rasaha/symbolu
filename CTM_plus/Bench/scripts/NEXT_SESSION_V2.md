@@ -21,7 +21,10 @@ Qwen-7B is at-the-margin under 4% mask. Brief is partner-safe.
 scheduling, RadixAttention-style):
 * Phase 0 (CPU prototype + tests): ✅ commit `3168e94`
 * Phase 1 PR-1 (vLLM install + CPU smoke): ✅ commit `34763c8`
-* Phase 1 PR-2 (vLLM streaming-runner plumbing + GPU smoke): pending
+* Phase 1 PR-2 CPU plumbing (driver arg + install hook +
+  CLI flag + stats field + 8 CPU tests): ✅ this session
+* Phase 1 PR-2 GPU smoke (gates 3-6, 8, 9 on Qwen-7B; gate 10
+  int4_protected Tier A regression): **pending GPU pod**
 * Phase 3 (GPU validation on chat_32k): pending
 
 ## Five pending v2 items (the brief's Tier 1 list)
@@ -31,7 +34,7 @@ Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5
 
 | # | Item | Effort | GPU $ | Status | Key reference |
 |---|---|---:|---:|---|---|
-| 1 | **Cache reuse** (v2 cache-aware scheduling) | 4-7 days (Phase 1 PR-2 + Phase 3 GPU) | ~$0.40 | PR-1 done; PR-2 + Phase 3 next | `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` |
+| 1 | **Cache reuse** (v2 cache-aware scheduling) | 1-2 days remaining (PR-2 GPU smoke + Phase 3 GPU) | ~$0.30 | PR-1 done; PR-2 CPU plumbing done; PR-2 GPU smoke + Phase 3 next | `V2_CACHE_REUSE_DESIGN.md`, `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` (§"PR-2 status") |
 | 2 | **CUDA Graphs** for the model forward path | 4-7 days | ~$0.20 | Read-path preflight done (B-pre-1..4); write-path preflight is the gating item | `OPTION_B_PREFLIGHT.md`, `PHASE6_PERF_REPORT.md` |
 | 3 | **Tensor parallelism** for 70B-class | 3-5 days | ~$0.50 (multi-GPU pod) | Untouched; code "expected to Just Work" per brief, unverified | brief page 5; INT4_PROTECTED_README.md |
 | 4 | **Quality benchmark harness** (MMLU + HumanEval + LongBench) | 2-3 days | ~$0.30 | Untouched; current quality bar is needle-only | brief page 5 "Broader quality bench" row |
@@ -100,19 +103,23 @@ User chooses; this is a recommendation, not a directive.
 
 ### 1. Cache reuse PR-2
 
-Already scoped in `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md`.
-PR-2 outline at the end of that doc + the PR-1 commit message
-(`34763c8`):
+Already scoped in `V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md`
+(see §"PR-2 status" for what's done CPU-side). Remaining work:
 
-- `AsyncEngineDriver(cache_aware_scheduling: bool = False)` arg
-- Hook `install_cache_aware_scheduler()` into engine init
+- ✅ `AsyncEngineDriver(cache_aware_scheduling: bool = False,
+  cache_aware_max_starvation_seconds: float = 30.0)` arg
+- ✅ Hook `install_cache_aware_scheduler()` into engine init
   (same pattern as `int4_route_a` install in
   `runner_vllm_streaming.py`)
-- New `cache_aware_scheduler_stats` field on
+- ✅ New `cache_aware_scheduler_stats` field on
   `StreamingRunCellResult`
-- CLI flag `--cache-aware-scheduling` on `run_streaming.py`
-- Single Qwen-7B GPU smoke verifying the install + Tier A
-  needle regression remains green
+- ✅ CLI flag `--cache-aware-scheduling` on `run_streaming.py`
+- ✅ 8 CPU plumbing tests in
+  `Bench/tests/test_cache_aware_runner_plumbing.py`
+- **Pending GPU pod:** single Qwen-7B chat-shaped smoke
+  exercising gates 3-6, 8, 9 (see integration-note §7); single
+  int4_protected needle cell with flag OFF exercising gate 10
+  (Qwen-7B seed=44 must match brief's 15/15).
 
 ### 2. CUDA Graphs
 

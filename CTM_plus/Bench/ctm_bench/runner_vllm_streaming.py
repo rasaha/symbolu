@@ -146,6 +146,11 @@ class StreamingRunCellResult:
     int4_route_a_stats: Dict[str, Any] = field(default_factory=dict)
     attention_aggregator_stats: Dict[str, Any] = field(default_factory=dict)
     ctm_evictor_stats: Dict[str, Any] = field(default_factory=dict)
+    # v2 cache-reuse PR-2: populated when cache_aware_scheduling=True.
+    # Empty dict when the flag is OFF (the install branch is not
+    # entered). When ON, mirrors CacheAwareInstall.stats() output —
+    # see KVPolicy/kv_policy/cache_aware_install.py.
+    cache_aware_scheduler_stats: Dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------- #
@@ -552,6 +557,8 @@ class AsyncEngineDriver:
         int4_kv_bits: int = 4,
         int4_kv_sink_size: int = 0,
         int4_kv_num_kv_heads: Optional[int] = None,
+        cache_aware_scheduling: bool = False,
+        cache_aware_max_starvation_seconds: float = 30.0,
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -676,6 +683,16 @@ class AsyncEngineDriver:
         # Route-A INT4 install handles — set in run(); None until then.
         self._int4_route_a_manager: Any = None
         self._int4_route_a_teardown: Any = None
+        # v2 cache-reuse PR-2 — cache-aware admission scheduling.
+        # Orthogonal to int4_protected, CTM+ evictor, and route-A
+        # INT4: lives at the scheduler layer. Default OFF preserves
+        # pre-PR-2 behaviour exactly. The install handle is set in
+        # run() and torn down in the finally block.
+        self.cache_aware_scheduling = bool(cache_aware_scheduling)
+        self.cache_aware_max_starvation_seconds = float(
+            cache_aware_max_starvation_seconds
+        )
+        self._cache_aware_install: Any = None
 
     @staticmethod
     def _extract_model_from_engine(inner_engine: Any) -> Any:
@@ -1110,11 +1127,72 @@ class AsyncEngineDriver:
                         continue
                 raise
 
+        # v2 cache-reuse PR-2 — cache-aware admission scheduler install.
+        # Lives at the scheduler layer; orthogonal to int4_protected, CTM+,
+        # and route-A INT4 (all of which act at the attention layer).
+        # Walks engine.engine.scheduler{[0]}.block_manager — the same
+        # path the swap-counter probe uses.
+        cache_aware_install: Any = None
+        if self.cache_aware_scheduling:
+            try:
+                from kv_policy.cache_aware_install import (  # type: ignore
+                    install_cache_aware_scheduler,
+                )
+                inner_engine = getattr(engine, "engine", engine)
+                sched_attr = getattr(inner_engine, "scheduler", None)
+                if sched_attr is None:
+                    raise RuntimeError(
+                        "cache_aware_scheduling=True but the engine "
+                        "has no .scheduler attribute"
+                    )
+                sched = (
+                    sched_attr[0] if isinstance(sched_attr, list)
+                    else sched_attr
+                )
+                bm = getattr(sched, "block_manager", None)
+                if bm is None:
+                    raise RuntimeError(
+                        "cache_aware_scheduling=True but the scheduler "
+                        "has no .block_manager attribute"
+                    )
+                cache_aware_install = install_cache_aware_scheduler(
+                    scheduler=sched,
+                    block_manager=bm,
+                    enable=True,
+                    block_size=32,
+                    max_starvation_seconds=(
+                        self.cache_aware_max_starvation_seconds
+                    ),
+                )
+                logger.info(
+                    "v2 cache-reuse: cache-aware scheduler installed "
+                    "(block_size=32, max_starvation_seconds=%.1f)",
+                    self.cache_aware_max_starvation_seconds,
+                )
+            except BaseException:
+                # Best-effort engine teardown on install failure — same
+                # chain as the ctm_plus and route-A install blocks above.
+                for shutdown_name in (
+                    "shutdown_background_loop", "shutdown", "stop",
+                ):
+                    shutdown = getattr(engine, shutdown_name, None)
+                    if shutdown is None:
+                        continue
+                    try:
+                        result = shutdown()
+                        if asyncio.iscoroutine(result):
+                            await result
+                        break
+                    except Exception:
+                        continue
+                raise
+
         # Stash so the run loop can flush after each decode batch.
         self._attention_aggregator = attention_aggregator
         self._installed_evictor = installed_evictor
         self._int4_route_a_manager = int4_route_a_manager
         self._int4_route_a_teardown = int4_route_a_teardown
+        self._cache_aware_install = cache_aware_install
         sampling_params = SamplingParams(
             temperature=0.0,
             max_tokens=self.max_decode_tokens,
@@ -1262,6 +1340,17 @@ class AsyncEngineDriver:
                     logger.warning(
                         "route-A INT4 teardown failed: %s", exc,
                     )
+            # v2 cache-reuse PR-2 — revert the scheduler / block_manager
+            # wraps before engine shutdown. Best-effort; the install
+            # handle's teardown() is itself a no-op on the disabled
+            # path and idempotent on re-entry.
+            if self._cache_aware_install is not None:
+                try:
+                    self._cache_aware_install.teardown()
+                except Exception as exc:
+                    logger.warning(
+                        "cache-aware scheduler teardown failed: %s", exc,
+                    )
             if attention_flush_task is not None:
                 attention_flush_task.cancel()
                 try:
@@ -1378,6 +1467,21 @@ class AsyncEngineDriver:
                 )
             except Exception:
                 attention_aggregator_stats = {}
+
+        # v2 cache-reuse PR-2 — snapshot scheduler stats. Empty dict
+        # when the install was OFF; CacheAwareInstall.stats() returns
+        # {"enabled": False} for the disabled stub but we keep the
+        # empty-dict default for symmetry with the other stats fields.
+        cache_aware_scheduler_stats: Dict[str, Any] = {}
+        if self._cache_aware_install is not None:
+            try:
+                cache_aware_scheduler_stats = dict(
+                    self._cache_aware_install.stats()
+                )
+            except Exception:
+                cache_aware_scheduler_stats = {
+                    "enabled": True, "error": "stats() raised",
+                }
 
         ctm_evictor_stats: Dict[str, Any] = {}
         if self._installed_evictor is not None:
@@ -1543,6 +1647,7 @@ class AsyncEngineDriver:
             int4_route_a_stats=int4_route_a_stats,
             attention_aggregator_stats=attention_aggregator_stats,
             ctm_evictor_stats=ctm_evictor_stats,
+            cache_aware_scheduler_stats=cache_aware_scheduler_stats,
         )
 
     @staticmethod

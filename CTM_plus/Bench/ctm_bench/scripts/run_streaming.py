@@ -179,9 +179,9 @@ def main(argv: Sequence[str]) -> int:
         help=(
             "Phase 4: oversample factor for the trig-blend re-rank "
             "in evict(). The v5 GPU run used 8 (hardcoded); 8x base "
-            "scoring per evict accounts for some of the 20% Python "
+            "scoring per evict accounts for some of the 20%% Python "
             "throughput regression. Default 4 keeps most of the "
-            "62% trig_changed_pick rate at half the cost. Set to "
+            "62%% trig_changed_pick rate at half the cost. Set to "
             "1 to disable trig blending in evict() (trig still "
             "affects window_pruning_pass)."
         ),
@@ -194,7 +194,7 @@ def main(argv: Sequence[str]) -> int:
             "instead of CTMEvictorModern (pure Python). Semantically "
             "identical at the algorithm layer; closes the per-call "
             "Python dispatch overhead the v8 py-spy profile "
-            "(PHASE4_GPU_FINDINGS §11) attributed the 20% throughput "
+            "(PHASE4_GPU_FINDINGS §11) attributed the 20%% throughput "
             "regression to. Requires the compiled .so at "
             "kv_policy/_ctm_evictor.cpython-*.so; build with "
             "`cd CTM_plus/KVPolicy && python3 setup.py build_ext "
@@ -210,7 +210,7 @@ def main(argv: Sequence[str]) -> int:
             "Phase 4: install hooks via direct monkey-patch of "
             "module.forward instead of register_forward_pre_hook. "
             "Skips torch's _call_impl _forward_pre_hooks walk on "
-            "every fire — that walk is a slice of the 15% "
+            "every fire — that walk is a slice of the 15%% "
             "_call_impl share in PHASE4_GPU_FINDINGS §11.1, §11.3 "
             "row 2 estimate is 2-5pp recovery (combined with the "
             "implicit row-3 model-level consolidation here, 3-8pp). "
@@ -293,6 +293,30 @@ def main(argv: Sequence[str]) -> int:
         help=(
             "RETIRED. Selecting this flag will exit with an error. "
             "See CTM_plus/TURBOQUANT_RETIREMENT.md."
+        ),
+    )
+    parser.add_argument(
+        "--cache-aware-scheduling",
+        action="store_true",
+        help=(
+            "v2 cache-reuse PR-2: enable cache-aware admission "
+            "scheduling. Reorders the engine's waiting queue by "
+            "predicted block-aligned prefix-cache hit rate, with a "
+            "starvation guard. Orthogonal to --ctm-plus, "
+            "--int4-kv-route-a, and the shipped int4_protected "
+            "backend (different layer). Default OFF; flag-off path "
+            "matches pre-PR-2 stock behaviour. See "
+            "V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md."
+        ),
+    )
+    parser.add_argument(
+        "--cache-aware-max-starvation-seconds",
+        type=float, default=30.0,
+        help=(
+            "v2 cache-reuse PR-2: fairness guard. Any request older "
+            "than this in the waiting queue is admitted next "
+            "regardless of predicted cache-hit rate. Default 30s "
+            "(matches the Phase 0 CPU prototype default)."
         ),
     )
     parser.add_argument(
@@ -380,6 +404,10 @@ def main(argv: Sequence[str]) -> int:
         int4_kv_bits=args.int4_kv_bits,
         int4_kv_sink_size=args.int4_kv_sink_size,
         int4_kv_num_kv_heads=args.int4_kv_num_kv_heads,
+        cache_aware_scheduling=args.cache_aware_scheduling,
+        cache_aware_max_starvation_seconds=(
+            args.cache_aware_max_starvation_seconds
+        ),
         max_decode_tokens=args.max_decode_tokens,
     )
 
