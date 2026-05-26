@@ -2620,3 +2620,187 @@ def test_streaming_result_is_still_frozen_after_tier5a_extension():
     )
     with pytest.raises(Exception):
         r.cpu_swap_pool_used_blocks_peak = 99  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------- #
+# Phase TIER5A — runner wiring for swap-restore telemetry. The 5
+# audit-load-bearing fixes (B1, C1, C3, A3, A2) — the runner-side
+# tests live here; the verdict-logic tests for A3/A2 are in
+# test_bench_tier5a_swap_restore.py.
+# ---------------------------------------------------------------- #
+
+
+def test_async_engine_driver_constructor_accepts_swap_telemetry_flag():
+    """B1 fixup: constructor takes ``swap_telemetry`` and stores
+    it. Default is False (opt-in); the TIER5A bench passes True
+    for all three cells (always-on telemetry surface)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver_default = AsyncEngineDriver(model="dummy")
+    assert driver_default.swap_telemetry is False
+    assert driver_default._swap_in_latency_probe is None
+    assert driver_default._cpu_swap_pool_peak_tracker is None
+    assert driver_default._swap_telemetry_block_manager_ref is None
+
+    driver_on = AsyncEngineDriver(model="dummy", swap_telemetry=True)
+    assert driver_on.swap_telemetry is True
+    # Handles remain None until run() installs them.
+    assert driver_on._swap_in_latency_probe is None
+    assert driver_on._cpu_swap_pool_peak_tracker is None
+
+
+def test_async_engine_driver_run_cpu_swap_pool_sampler_calls_observe_and_handles_cancel():
+    """C3 fixup: ``_run_cpu_swap_pool_sampler`` is the polling loop
+    that feeds CpuSwapPoolPeakTracker.observe(...) on the same
+    cadence as SwapCounterSampler. Without this loop, peak
+    collapses to a single end-of-cell snapshot.
+
+    Verifies: (a) the sampler calls observe() at least once before
+    cancellation; (b) on cancel, a final observe() captures the
+    end-of-cell state; (c) exceptions inside read are swallowed
+    (best-effort telemetry; never crashes the run loop).
+    """
+    import asyncio
+
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    from kv_policy.swap_telemetry import CpuSwapPoolPeakTracker
+
+    class _MockBM:
+        def __init__(self):
+            self.read_count = 0
+        # Match read_cpu_swap_pool's resolution: no block_allocator;
+        # falls through to no_known_path → snapshot with used=-1.
+        # The tracker classifies that as n_unreadable_samples; for
+        # this test we drive observe directly via a mock read.
+
+    # Patch read_cpu_swap_pool in the swap_telemetry module the
+    # sampler imports from. We use a tiny fake that increments a
+    # counter and returns a synthetic snapshot.
+    import kv_policy.swap_telemetry as st_mod
+    from kv_policy.swap_telemetry import CpuSwapPoolSnapshot
+
+    tracker = CpuSwapPoolPeakTracker()
+    bm = _MockBM()
+    read_calls: list[int] = []
+
+    def fake_read(block_manager, **kwargs):
+        bm.read_count += 1
+        read_calls.append(bm.read_count)
+        # Drive a non-trivial peak: 1st sample used=10, 2nd=42
+        used = 10 if bm.read_count == 1 else 42
+        return CpuSwapPoolSnapshot(
+            num_used_blocks=used,
+            num_total_blocks=1024,
+            block_size_tokens=32,
+            bytes_per_block_estimate=0,
+            hint_path="test_fixture",
+        )
+
+    driver = AsyncEngineDriver(
+        model="dummy", swap_telemetry=True,
+        sample_interval_seconds=0.001,
+    )
+    driver._swap_telemetry_block_manager_ref = bm
+    driver._cpu_swap_pool_peak_tracker = tracker
+
+    orig_read = st_mod.read_cpu_swap_pool
+    st_mod.read_cpu_swap_pool = fake_read
+    try:
+        async def _drive():
+            task = asyncio.create_task(
+                driver._run_cpu_swap_pool_sampler()
+            )
+            # Let the sampler tick at least twice.
+            await asyncio.sleep(0.005)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(_drive())
+    finally:
+        st_mod.read_cpu_swap_pool = orig_read
+
+    # observe() was called multiple times — at least 1 in-loop +
+    # 1 final-on-cancel. Peak reflects the higher value seen.
+    assert tracker.n_samples >= 2, (
+        f"sampler called observe {tracker.n_samples} times — "
+        "should have been at least 2 (in-loop + final-on-cancel)"
+    )
+    assert tracker.peak_used_blocks == 42, (
+        f"peak should track max-observed; got {tracker.peak_used_blocks}"
+    )
+    assert tracker.total_blocks == 1024
+
+
+def test_async_engine_driver_run_cpu_swap_pool_sampler_no_op_when_missing_refs():
+    """If the install path didn't run (no probe / no tracker), the
+    sampler is a structural no-op — never reads, never observes."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(model="dummy", swap_telemetry=True)
+    # Don't populate the refs — simulates the no-install path.
+    assert driver._swap_telemetry_block_manager_ref is None
+    assert driver._cpu_swap_pool_peak_tracker is None
+
+    async def _drive():
+        # Should return immediately without raising.
+        await driver._run_cpu_swap_pool_sampler()
+
+    asyncio.run(_drive())  # raises only if the sampler crashes
+
+
+def test_async_engine_driver_run_cpu_swap_pool_sampler_swallows_read_errors():
+    """Best-effort telemetry: a read that raises must not crash
+    the polling loop. The next tick tries again."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    from kv_policy.swap_telemetry import (
+        CpuSwapPoolPeakTracker, CpuSwapPoolSnapshot,
+    )
+    import kv_policy.swap_telemetry as st_mod
+
+    tracker = CpuSwapPoolPeakTracker()
+    n_calls = [0]
+
+    def crashing_then_ok_read(block_manager, **kwargs):
+        n_calls[0] += 1
+        if n_calls[0] == 1:
+            raise RuntimeError("simulated allocator unavailable")
+        return CpuSwapPoolSnapshot(
+            num_used_blocks=7, num_total_blocks=100,
+            block_size_tokens=32, bytes_per_block_estimate=0,
+            hint_path="test_fixture",
+        )
+
+    driver = AsyncEngineDriver(
+        model="dummy", swap_telemetry=True,
+        sample_interval_seconds=0.001,
+    )
+    driver._swap_telemetry_block_manager_ref = object()  # any non-None
+    driver._cpu_swap_pool_peak_tracker = tracker
+
+    orig_read = st_mod.read_cpu_swap_pool
+    st_mod.read_cpu_swap_pool = crashing_then_ok_read
+    try:
+        async def _drive():
+            task = asyncio.create_task(
+                driver._run_cpu_swap_pool_sampler()
+            )
+            await asyncio.sleep(0.005)
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(_drive())
+    finally:
+        st_mod.read_cpu_swap_pool = orig_read
+
+    # Despite the first read raising, the loop survived and the
+    # tracker saw subsequent successful reads.
+    assert n_calls[0] >= 2
+    assert tracker.peak_used_blocks == 7

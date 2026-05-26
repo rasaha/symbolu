@@ -327,10 +327,13 @@ def test_install_probe_no_known_path_returns_disabled_handle():
 def test_install_probe_no_swap_attr_returns_disabled():
     cpu = _MockCpuAllocator(num_total_blocks=1, num_free_blocks=1)
     # cpu has no swap_in / swap_in_blocks / _swap_in / swap_blocks_in
+    # AND block_manager/block_allocator likewise have no swap entry.
     bm = _MockBlockManagerV2Property(cpu)
     handle = install_swap_in_latency_probe(bm)
     assert handle.enabled is False
-    assert handle.hint_path.endswith("/no_swap_in_attr")
+    # Broadened resolver (TIER5A.3 fixup): when no level exposes a
+    # callable, the hint is the canonical 'no_known_path' marker.
+    assert handle.hint_path == "no_known_path"
 
 
 def test_install_probe_wraps_first_candidate_swap_in():
@@ -404,6 +407,132 @@ def test_swap_in_candidate_list_is_documented():
     the canonical swap_in name."""
     assert "swap_in" in _SWAP_IN_WRAP_CANDIDATES
     assert len(_SWAP_IN_WRAP_CANDIDATES) >= 2
+
+
+# ---------------------------------------------------------------- #
+# Broadened wrap target resolution (TIER5A.3 fixup) — V1 block_manager
+# and V2 block_allocator levels now resolve in addition to the legacy
+# per-device cpu_allocator level. Probe walks the three levels in
+# order; first level with a matching callable wins.
+# ---------------------------------------------------------------- #
+
+
+def test_install_probe_wraps_block_manager_v1_swap_in_direct():
+    """V1 BlockSpaceManagerV1 exposes swap_in(seq_group) directly on
+    the block_manager. The resolver should pick this up before
+    walking deeper."""
+    calls: List[tuple] = []
+
+    class _V1BlockManagerWithSwapIn:
+        block_size = 16
+        def __init__(self):
+            # No cpu_allocator/block_allocator at all — pure V1 shape.
+            pass
+        def swap_in(self, *args, **kwargs):
+            calls.append((args, kwargs))
+            return "V1_OK"
+
+    bm = _V1BlockManagerWithSwapIn()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap_in"
+    assert handle.hint_path == "block_manager.swap_in"
+    # Fire the wrap.
+    assert bm.swap_in("seq_group_handle") == "V1_OK"
+    assert calls == [(("seq_group_handle",), {})]
+    assert len(handle.latencies_ms) == 1
+    handle.teardown()
+    # After teardown, the class method is visible again.
+    assert bm.swap_in("post_td") == "V1_OK"
+    assert len(handle.latencies_ms) == 1  # no new event recorded
+
+
+def test_install_probe_wraps_block_allocator_v2_swap():
+    """V2 CpuGpuBlockAllocator exposes swap(blocks, src, dst). The
+    resolver should pick this up when block_manager has no direct
+    swap entry but block_allocator does."""
+    calls: List[tuple] = []
+
+    class _CpuGpuBlockAllocatorV2WithSwap:
+        def swap(self, blocks, src, dst):
+            calls.append((blocks, src, dst))
+            return "V2_SWAP_OK"
+
+    class _BlockManagerV2WithSwapAllocator:
+        block_size = 32
+        def __init__(self):
+            self.block_allocator = _CpuGpuBlockAllocatorV2WithSwap()
+            # No swap_in on block_manager itself; resolver should
+            # fall through to block_allocator.
+
+    bm = _BlockManagerV2WithSwapAllocator()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap"
+    assert handle.hint_path == "block_allocator.swap"
+    # Bidirectional swap fires the wrap regardless of src/dst.
+    result = bm.block_allocator.swap([1, 2, 3], "GPU", "CPU")
+    assert result == "V2_SWAP_OK"
+    assert calls == [([1, 2, 3], "GPU", "CPU")]
+    assert len(handle.latencies_ms) == 1
+    handle.teardown()
+
+
+def test_install_probe_falls_back_to_cpu_allocator_swap_in():
+    """Legacy fallback: only the per-device cpu_allocator has a
+    swap_in. The new resolver still finds it as the innermost
+    level."""
+    calls: List[tuple] = []
+
+    def fake_swap_in(*args, **kwargs):
+        calls.append((args, kwargs))
+        return "LEGACY_OK"
+
+    cpu = _MockCpuAllocator(swap_in_callable=fake_swap_in)
+    bm = _MockBlockManagerV2Property(cpu)
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.enabled is True
+    assert handle.wrap_target_name == "swap_in"
+    assert handle.hint_path == "cpu_allocator.swap_in"
+    cpu.swap_in("z")
+    assert calls == [(("z",), {})]
+    assert len(handle.latencies_ms) == 1
+    handle.teardown()
+
+
+def test_install_probe_resolution_prefers_block_manager_over_block_allocator():
+    """When BOTH block_manager.swap_in AND block_allocator.swap
+    exist, the resolver picks block_manager (the V1 surface) per
+    the documented level order. Locks the precedence so a future
+    edit doesn't silently re-order."""
+    bm_calls: List[tuple] = []
+    ba_calls: List[tuple] = []
+
+    class _BothBlockAllocator:
+        def swap(self, blocks, src, dst):
+            ba_calls.append((blocks, src, dst))
+            return "BA"
+
+    class _BothBlockManager:
+        block_size = 16
+        def __init__(self):
+            self.block_allocator = _BothBlockAllocator()
+        def swap_in(self, sg):
+            bm_calls.append((sg,))
+            return "BM"
+
+    bm = _BothBlockManager()
+    handle = install_swap_in_latency_probe(bm)
+    assert handle.wrap_target_name == "swap_in"
+    assert handle.hint_path == "block_manager.swap_in"
+    # Calling bm.swap_in records latency; calling
+    # block_allocator.swap does NOT (only one level was wrapped).
+    bm.swap_in("seq1")
+    bm.block_allocator.swap([], "GPU", "CPU")
+    assert len(handle.latencies_ms) == 1
+    assert bm_calls == [("seq1",)]
+    assert ba_calls == [([], "GPU", "CPU")]
+    handle.teardown()
 
 
 def test_record_ms_rejects_negative():

@@ -342,15 +342,18 @@ def compute_g3_verdict(
 
     * ``cpu_swap_pool_used_blocks_peak > 0`` — at least one
       sample saw nonzero CPU pool occupancy.
-    * ``swap_in_latency_p50_ms > 0.0`` — the swap-in probe wrap
-      fired and timed at least one event.
+    * ``swap_in_latency_call_count > 0`` — the swap-in probe wrap
+      fired at least once.
 
-    NB: ``call_count > 0`` is reported as supporting evidence;
-    the gate value is the p50.
+    The p50 latency is reported as supporting evidence but is NOT
+    the gating signal: a legitimately-fast swap can record
+    ``dt_ms=0.0`` under coarse ``time.perf_counter()`` resolution
+    or zero-block early-exit, which would false-fail the gate if
+    p50 were load-bearing.
     """
     passed = (
         cpu_swap_pool_used_blocks_peak > 0
-        and swap_in_latency_p50_ms > 0.0
+        and swap_in_latency_call_count > 0
     )
     return GateVerdict(
         gate_id="G3",
@@ -358,8 +361,8 @@ def compute_g3_verdict(
         summary=(
             f"cpu_pool_peak_used_blocks={cpu_swap_pool_used_blocks_peak} "
             f"of {cpu_swap_pool_total_blocks}, "
-            f"swap_in_latency_p50_ms={swap_in_latency_p50_ms:.3f}, "
-            f"call_count={swap_in_latency_call_count}"
+            f"swap_in_latency_call_count={swap_in_latency_call_count}, "
+            f"p50_ms={swap_in_latency_p50_ms:.3f} (evidence only)"
         ),
         evidence={
             "cpu_swap_pool_used_blocks_peak":
@@ -372,20 +375,58 @@ def compute_g3_verdict(
     )
 
 
+def _is_install_layer_enabled(status: Any) -> bool:
+    """Interpret a layer's status value as a boolean 'this install
+    actually composed'. Accepts the shapes the runner / smoke test
+    actually emit:
+
+    * ``True`` / ``False`` (raw bool)
+    * the strings ``'True'`` / ``'False'`` (from ``str(bool)``)
+    * a stats dict carrying ``'enabled'`` or ``'installed'`` keys
+    * any other truthy non-empty value (lenient fallback)
+
+    Returns False for ``None``, the empty string, the string
+    ``'False'``, the string ``'None'``, an empty dict, or a dict
+    whose ``enabled``/``installed`` key is False.
+    """
+    if status is None:
+        return False
+    if isinstance(status, bool):
+        return status
+    if isinstance(status, str):
+        s = status.strip()
+        if s == "" or s.lower() in ("false", "none", "disabled"):
+            return False
+        return True
+    if isinstance(status, dict):
+        if "enabled" in status:
+            return bool(status["enabled"])
+        if "installed" in status:
+            return bool(status["installed"])
+        return bool(status)
+    return bool(status)
+
+
 def compute_g4_verdict(
     *,
     composition_cell_completed: bool,
     composition_cell_completed_requests: int,
-    composition_install_layer_status: Dict[str, str],
+    composition_install_layer_status: Dict[str, Any],
 ) -> GateVerdict:
     """G4: composition smoke. cell C ran to completion (no crash,
     no hang past the wall budget) AND all three install layers
-    report ``enabled`` (or whatever positive status their stats()
-    return).
+    report a truthy 'enabled' status (not merely 'key present').
 
     ``composition_install_layer_status`` keys: ``extended_pinning``,
-    ``cache_aware_measurement_only``, ``prefix_hit_probe``. Values:
-    short status strings the stats() dicts surface.
+    ``cache_aware_measurement_only``, ``prefix_hit_probe``. Values
+    may be raw bool, the string ``'True'``/``'False'``, the layer's
+    full stats() dict (with ``enabled``/``installed`` key), or any
+    other truthy/falsy shape — see ``_is_install_layer_enabled``.
+
+    A layer whose install returned ``enabled=False`` (e.g. the
+    allocator-walk fallback didn't resolve) is reported as
+    ``not_enabled`` rather than ``missing``, and G4 fails so the
+    operator sees the half-installed composition explicitly.
     """
     expected_layers = {
         "extended_pinning",
@@ -394,10 +435,17 @@ def compute_g4_verdict(
     }
     present_layers = set(composition_install_layer_status.keys())
     layers_missing = expected_layers - present_layers
+    layers_not_enabled = {
+        name for name in (expected_layers & present_layers)
+        if not _is_install_layer_enabled(
+            composition_install_layer_status.get(name)
+        )
+    }
     passed = (
         composition_cell_completed
         and composition_cell_completed_requests > 0
         and not layers_missing
+        and not layers_not_enabled
     )
     return GateVerdict(
         gate_id="G4",
@@ -406,13 +454,15 @@ def compute_g4_verdict(
             f"completed={composition_cell_completed}, "
             f"completed_requests={composition_cell_completed_requests}, "
             f"layers_present={sorted(present_layers)}, "
-            f"layers_missing={sorted(layers_missing)}"
+            f"layers_missing={sorted(layers_missing)}, "
+            f"layers_not_enabled={sorted(layers_not_enabled)}"
         ),
         evidence={
             "composition_cell_completed": composition_cell_completed,
             "composition_cell_completed_requests":
                 composition_cell_completed_requests,
             "install_layer_status": dict(composition_install_layer_status),
+            "layers_not_enabled": sorted(layers_not_enabled),
         },
     )
 
@@ -586,7 +636,7 @@ def render_dry_run(spec: BenchSpec) -> str:
     lines.append("  G1: verifier output bit-identical cell_A vs cell_B")
     lines.append("  G2: cell_B swap_out_blocks > 0")
     lines.append("  G3: cpu_swap_pool_used_blocks_peak > 0 AND "
-                 "swap_in_latency_p50_ms > 0")
+                 "swap_in_latency_call_count > 0 (p50_ms evidence only)")
     if spec.g4_smoke_enabled:
         lines.append("  G4: cell_C composition (extended_pinning + "
                      "cache_aware_measurement_only + prefix_hit_probe) "

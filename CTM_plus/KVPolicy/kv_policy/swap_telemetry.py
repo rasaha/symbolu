@@ -431,14 +431,75 @@ def _percentile_ms(samples: List[float], p: float) -> float:
     return s[lo] * (1 - frac) + s[hi] * frac
 
 
-# Wrap target candidates, in order of preference. The first one
-# present on the resolved CPU allocator wins.
-_SWAP_IN_WRAP_CANDIDATES: Tuple[str, ...] = (
-    "swap_in",
-    "swap_in_blocks",
-    "_swap_in",
-    "swap_blocks_in",
+# Wrap target candidates, per vLLM API level. In vLLM 0.7.x the
+# swap entry point lives at one of three layers depending on the
+# block-manager version + scheduler config:
+#
+#  * V1 BlockSpaceManagerV1 has ``swap_in(seq_group)`` /
+#    ``swap_out(seq_group)`` methods directly on the block_manager.
+#  * V2 BlockSpaceManagerV2 delegates to the parent
+#    ``CpuGpuBlockAllocator.swap(blocks, src_device, dst_device)``;
+#    no per-device allocator has swap_in.
+#  * Some legacy / patched builds expose swap_in on the per-device
+#    CPU allocator directly — kept as the innermost fallback.
+#
+# The resolver walks in V1 → V2 → legacy-CPU order and returns the
+# first level that exposes a callable. The probe wraps that
+# callable with a ``time.perf_counter()`` delta. For the V2
+# ``CpuGpuBlockAllocator.swap(blocks, src, dst)`` shape the timing
+# is bi-directional (swap-out and swap-in share the same call); for
+# the V1 shape it's strictly the named direction. The ``hint_path``
+# string surfaces which level matched so operators can interpret
+# the latency semantics correctly.
+_SWAP_TARGET_LEVELS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    # Level 1: block_manager itself (V1 BlockSpaceManagerV1).
+    ("block_manager", ("swap_in", "swap_in_blocks")),
+    # Level 2: block_allocator (V2 CpuGpuBlockAllocator).
+    ("block_allocator", ("swap", "swap_in")),
+    # Level 3: cpu_allocator (per-device, legacy fallback).
+    ("cpu_allocator", (
+        "swap_in", "swap_in_blocks", "_swap_in", "swap_blocks_in",
+    )),
 )
+
+
+# Legacy alias — preserved so external callers + the test suite
+# that imports the constant by name keep working. Reflects the
+# legacy cpu_allocator-level candidate list only.
+_SWAP_IN_WRAP_CANDIDATES: Tuple[str, ...] = _SWAP_TARGET_LEVELS[2][1]
+
+
+def _resolve_swap_target(
+    block_manager: Any,
+) -> Tuple[Any, Optional[str], str]:
+    """Resolve the (target_object, attribute_name, hint_path) the
+    swap-in latency probe should wrap.
+
+    Walks block_manager → block_allocator → cpu_allocator. Returns
+    the first level whose object exposes a callable matching one of
+    the level's candidate attribute names. Returns
+    ``(None, None, 'no_known_path')`` if no level matches — the
+    caller surfaces this as an inert probe.
+
+    The third element is a human-readable hint path that names both
+    the level matched and the attribute selected.
+    """
+    for level_attr, candidates in _SWAP_TARGET_LEVELS:
+        if level_attr == "block_manager":
+            obj: Any = block_manager
+        elif level_attr == "block_allocator":
+            obj = getattr(block_manager, "block_allocator", None)
+        elif level_attr == "cpu_allocator":
+            obj, _ = _resolve_cpu_allocator(block_manager)
+        else:
+            obj = None
+        if obj is None:
+            continue
+        for name in candidates:
+            fn = getattr(obj, name, None)
+            if callable(fn):
+                return obj, name, f"{level_attr}.{name}"
+    return None, None, "no_known_path"
 
 
 def install_swap_in_latency_probe(
@@ -446,30 +507,38 @@ def install_swap_in_latency_probe(
     *,
     enable: bool = True,
 ) -> SwapInLatencyProbe:
-    """Install a timing wrap on the CPU allocator's swap-in
-    callable. Returns a handle that records per-event latency
-    in ``latencies_ms`` and supports LIFO teardown.
+    """Install a timing wrap on the engine's swap-in callable.
+    Returns a handle that records per-event latency in
+    ``latencies_ms`` and supports LIFO teardown.
+
+    Wrap target resolution (broadened in TIER5A.3 fixup): walks
+    block_manager → block_allocator → cpu_allocator and selects the
+    first callable that matches the per-level candidate set (see
+    ``_SWAP_TARGET_LEVELS``). Matches vLLM 0.7.x's actual swap entry
+    points across V1 (block_manager.swap_in) and V2
+    (block_allocator.swap) shapes. The legacy cpu_allocator-level
+    candidates remain as the innermost fallback.
 
     Behaviour:
 
     * ``enable=False`` returns an inert handle. Zero patching.
-      Useful for callers that always construct the handle and
-      conditionally enable via a flag.
-    * ``enable=True`` resolves the CPU allocator via
-      ``_resolve_cpu_allocator``. If no allocator is found OR
-      none of ``_SWAP_IN_WRAP_CANDIDATES`` is callable on it,
-      returns a handle with ``enabled=False`` and
-      ``hint_path`` reflecting the failure. The streaming runner
-      reports this in the cell summary so an operator can see
-      "we tried but vLLM didn't expose the swap entry point".
-    * ``enable=True`` AND a callable swap target found: wraps
-      that callable with a ``time.perf_counter()`` delta; appends
-      to ``latencies_ms``; restores on ``teardown()``.
+    * ``enable=True`` AND no level matches → inert handle with
+      ``hint_path='no_known_path'``. The streaming runner surfaces
+      this so an operator can see "we tried but vLLM didn't expose
+      a swap entry point".
+    * ``enable=True`` AND a callable found → wraps it with a
+      ``time.perf_counter()`` delta; appends to ``latencies_ms``;
+      restores on ``teardown()``.
 
-    The wrap is **delegate-only**: it calls the original with the
-    same args and returns the original's result verbatim. There is
-    no behavioural change. The orthogonality contract is preserved
+    The wrap is **delegate-only**: it calls the original verbatim
+    and returns its result. The orthogonality contract is preserved
     because we observe but never modify the swap operation.
+
+    NB: for the V2 ``block_allocator.swap(blocks, src, dst)`` shape
+    the latency captures the **bidirectional** swap op (both
+    swap-in and swap-out fire the same callable). The ``hint_path``
+    on the returned handle starts with ``block_allocator.`` for
+    this case so callers can interpret the latency semantics.
     """
     if not enable:
         return SwapInLatencyProbe(
@@ -477,29 +546,25 @@ def install_swap_in_latency_probe(
             wrap_target_name="",
         )
 
-    allocator, hint = _resolve_cpu_allocator(block_manager)
-    if allocator is None:
+    target_obj, target_name, hint = _resolve_swap_target(block_manager)
+    if target_obj is None or target_name is None:
         return SwapInLatencyProbe(
             enabled=False, hint_path=hint,
             wrap_target_name="",
         )
 
-    # Find a callable wrap target on the allocator.
-    target_name: Optional[str] = None
-    original_fn: Optional[Callable[..., Any]] = None
-    for name in _SWAP_IN_WRAP_CANDIDATES:
-        fn = getattr(allocator, name, None)
-        if callable(fn):
-            target_name = name
-            original_fn = fn
-            break
-
-    if target_name is None or original_fn is None:
+    original_fn = getattr(target_obj, target_name)
+    # The resolver already filtered for callable; re-checking is
+    # defensive against a race that never realistically fires.
+    if not callable(original_fn):
         return SwapInLatencyProbe(
-            enabled=False,
-            hint_path=hint + "/no_swap_in_attr",
+            enabled=False, hint_path=hint + "/not_callable",
             wrap_target_name="",
         )
+
+    # Local alias to keep the wrap/revert closures readable; matches
+    # the prior layout that the test suite indexes against.
+    allocator = target_obj
 
     handle = SwapInLatencyProbe(
         enabled=True, hint_path=hint,

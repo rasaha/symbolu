@@ -228,6 +228,112 @@ def test_compute_g4_verdict_fails_when_cell_did_not_complete():
     assert v.passed is False
 
 
+def test_compute_g3_verdict_passes_when_call_count_positive_even_if_p50_zero():
+    """TIER5A.3 fixup (audit A3): G3 gates on call_count > 0, NOT
+    on p50_ms > 0.0. A legitimately-fast swap or coarse perf_counter
+    resolution can record dt_ms = 0.0 on every event — that's a
+    probe that fired, not a probe that didn't.
+    """
+    v = compute_g3_verdict(
+        cpu_swap_pool_used_blocks_peak=10,
+        swap_in_latency_p50_ms=0.0,          # all events rounded to zero
+        swap_in_latency_call_count=4,        # but the probe fired 4x
+        cpu_swap_pool_total_blocks=4096,
+    )
+    assert v.passed is True, (
+        "G3 must pass when call_count > 0 and pool > 0, even if "
+        "interpolated p50_ms is 0.0; p50 is supporting evidence only"
+    )
+    # p50 still in evidence for inspection.
+    assert v.evidence["swap_in_latency_p50_ms"] == 0.0
+    assert "evidence only" in v.summary
+
+
+def test_compute_g3_verdict_fails_when_call_count_zero():
+    """The other side of the fixup: call_count == 0 is the probe-
+    never-fired signal; G3 must fail there even if p50 looks
+    plausible (which it can't, since latencies_ms is empty)."""
+    v = compute_g3_verdict(
+        cpu_swap_pool_used_blocks_peak=10,
+        swap_in_latency_p50_ms=0.0,
+        swap_in_latency_call_count=0,
+        cpu_swap_pool_total_blocks=4096,
+    )
+    assert v.passed is False
+
+
+def test_compute_g4_verdict_fails_when_layer_present_but_disabled_string():
+    """TIER5A.3 fixup (audit A2): a layer whose status value is the
+    string 'False' (the shape the smoke test emits via
+    str(stats().get('enabled'))) is NOT enabled. G4 must fail, not
+    treat the layer as 'present and therefore OK'.
+    """
+    v = compute_g4_verdict(
+        composition_cell_completed=True,
+        composition_cell_completed_requests=200,
+        composition_install_layer_status={
+            "extended_pinning": "True",
+            "cache_aware_measurement_only": "False",   # disabled stub
+            "prefix_hit_probe": "True",
+        },
+    )
+    assert v.passed is False, (
+        "G4 must fail when a layer reports str(False) — half-"
+        "installed composition was the silent green path the audit "
+        "caught"
+    )
+    assert "cache_aware_measurement_only" in v.evidence["layers_not_enabled"]
+
+
+def test_compute_g4_verdict_fails_when_layer_stats_dict_has_enabled_false():
+    """Same audit-A2 fixup, but with the layer value being the full
+    stats() dict (the runner-side shape). The dict's enabled=False
+    must surface as 'not_enabled'."""
+    v = compute_g4_verdict(
+        composition_cell_completed=True,
+        composition_cell_completed_requests=200,
+        composition_install_layer_status={
+            "extended_pinning": {"enabled": True, "n_pinned": 5},
+            "cache_aware_measurement_only": {"enabled": False},
+            "prefix_hit_probe": {"installed": True},
+        },
+    )
+    assert v.passed is False
+    assert "cache_aware_measurement_only" in v.evidence["layers_not_enabled"]
+
+
+def test_compute_g4_verdict_passes_when_layer_stats_dict_has_enabled_true():
+    """The 'all good' shape: stats dicts carrying enabled=True OR
+    installed=True (prefix_hit_probe uses installed) pass G4."""
+    v = compute_g4_verdict(
+        composition_cell_completed=True,
+        composition_cell_completed_requests=200,
+        composition_install_layer_status={
+            "extended_pinning": {"enabled": True, "n_pinned": 5},
+            "cache_aware_measurement_only": {"enabled": True},
+            "prefix_hit_probe": {"installed": True, "path_taken": "..."},
+        },
+    )
+    assert v.passed is True
+    assert v.evidence["layers_not_enabled"] == []
+
+
+def test_compute_g4_verdict_accepts_raw_bool_layer_status():
+    """Raw bool values also work — covers the legacy / direct test
+    fixture pattern."""
+    v = compute_g4_verdict(
+        composition_cell_completed=True,
+        composition_cell_completed_requests=200,
+        composition_install_layer_status={
+            "extended_pinning": True,
+            "cache_aware_measurement_only": False,
+            "prefix_hit_probe": True,
+        },
+    )
+    assert v.passed is False
+    assert "cache_aware_measurement_only" in v.evidence["layers_not_enabled"]
+
+
 def test_compute_g5_g6_verdicts_aggregate_three_track_g5():
     """G5 passes iff all three sub-tracks pass. G6 is its own."""
     gate_report = {
