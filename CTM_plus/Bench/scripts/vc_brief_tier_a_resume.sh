@@ -82,13 +82,32 @@ preserved_path.write_text(json.dumps(preserved, indent=2))
 print(f"wrote {preserved_path}")
 PY
 
-# ---- 2. Move the previous (partial / crashed) R3 results aside so the new
-#         run lands clean. Keep the partial logs as evidence.
+# ---- 2. Resumability: backfill exit codes for cells that already
+#         have a run.log from a prior attempt. Each cell's outcome
+#         is durable; this just reconstructs the exit_code.txt that
+#         the new wrap-and-record path expects.
+echo "[RESUME] Backfilling exit codes from prior attempts (if any)..."
 if [[ -d "$OUT_ROOT/r3_needle_replication" ]]; then
-  STAMP=$(date +%Y%m%d_%H%M%S)
-  mv "$OUT_ROOT/r3_needle_replication" "$OUT_ROOT/r3_needle_replication_failed_${STAMP}"
-  echo "[RESUME] Archived prior r3 attempt to r3_needle_replication_failed_${STAMP}"
+  for d in "$OUT_ROOT/r3_needle_replication"/*/; do
+    [[ -d "$d" ]] || continue
+    if [[ -s "$d/run.log" && ! -s "$d/exit_code.txt" ]]; then
+      if grep -q "Phase 5B.5 needle: PASS" "$d/run.log" 2>/dev/null; then
+        echo "0" > "$d/exit_code.txt"
+        echo "  backfilled $d/exit_code.txt = 0 (PASS verdict in log)"
+      elif grep -q "Phase 5B.5 needle: FAIL" "$d/run.log" 2>/dev/null; then
+        echo "1" > "$d/exit_code.txt"
+        echo "  backfilled $d/exit_code.txt = 1 (FAIL verdict in log)"
+      fi
+    fi
+  done
 fi
+for d in "$OUT_ROOT/r7_throughput_b8_int4_protected" \
+         "$OUT_ROOT/r5_r7lat_phase5c_three_way"; do
+  if [[ -s "$d/run.log" && ! -s "$d/exit_code.txt" ]]; then
+    echo "0" > "$d/exit_code.txt"
+    echo "  backfilled $d/exit_code.txt = 0 (assumed; bench has no gate)"
+  fi
+done
 
 QWEN_7B="${QWEN_7B:-Qwen/Qwen2.5-7B-Instruct}"
 MISTRAL_7B="${MISTRAL_7B:-mistralai/Mistral-7B-Instruct-v0.3}"
@@ -113,7 +132,13 @@ for model_pair in \
     seed_for_run=$((42 + run_idx))
     out="$OUT_ROOT/r3_needle_replication/${short}_run${run_idx}"
     mkdir -p "$out"
+    if [[ -s "$out/exit_code.txt" ]]; then
+      prior=$(cat "$out/exit_code.txt")
+      echo "  [R3] ${short} run ${run_idx}/2: SKIP (already ran; exit_code=$prior)"
+      continue
+    fi
     echo "  [R3] ${short} run ${run_idx}/2 (seed=${seed_for_run})"
+    CELL_EXIT=0
     python Bench/scripts/verify_phase5b_5_needle.py \
       --model "$full" \
       --gpu-memory-utilization "$GPU_UTIL" \
@@ -121,7 +146,11 @@ for model_pair in \
       --num-needles 5 \
       --lengths 200,600,1200 \
       --seed "$seed_for_run" \
-      2>&1 | tee "$out/run.log"
+      2>&1 | tee "$out/run.log" || CELL_EXIT=$?
+    echo "$CELL_EXIT" > "$out/exit_code.txt"
+    if [[ "$CELL_EXIT" -ne 0 ]]; then
+      echo "  [R3] ${short} run ${run_idx}/2: FAIL (exit_code=$CELL_EXIT; continuing)"
+    fi
   done
 done
 
@@ -131,14 +160,23 @@ echo "[RESUME] R7-aggregate - bench_phase6 throughput @ B=8, n_runs=5"
 echo
 R7_AGG_OUT="$OUT_ROOT/r7_throughput_b8_int4_protected"
 mkdir -p "$R7_AGG_OUT"
-python Bench/scripts/bench_phase6_batched_throughput.py \
-  --model "$QWEN_7B" \
-  --gpu-memory-utilization "$GPU_UTIL" \
-  --max-model-len "$MAX_MODEL_LEN" \
-  --batch-sizes 8 \
-  --n-runs 5 \
-  --max-tokens 32 \
-  2>&1 | tee "$R7_AGG_OUT/run.log"
+if [[ -s "$R7_AGG_OUT/exit_code.txt" ]]; then
+  echo "  [R7-agg] SKIP (already ran; exit_code=$(cat "$R7_AGG_OUT/exit_code.txt"))"
+else
+  CELL_EXIT=0
+  python Bench/scripts/bench_phase6_batched_throughput.py \
+    --model "$QWEN_7B" \
+    --gpu-memory-utilization "$GPU_UTIL" \
+    --max-model-len "$MAX_MODEL_LEN" \
+    --batch-sizes 8 \
+    --n-runs 5 \
+    --max-tokens 32 \
+    2>&1 | tee "$R7_AGG_OUT/run.log" || CELL_EXIT=$?
+  echo "$CELL_EXIT" > "$R7_AGG_OUT/exit_code.txt"
+  if [[ "$CELL_EXIT" -ne 0 ]]; then
+    echo "  [R7-agg] FAIL (exit_code=$CELL_EXIT; continuing)"
+  fi
+fi
 
 # ---- 5. R7-latency (PHASE5C three-way: covers per-seq latency comparison) ----
 echo
@@ -146,12 +184,21 @@ echo "[RESUME] R7-latency - PHASE5C three-way bench (per-seq latency)"
 echo
 R5_OUT="$OUT_ROOT/r5_r7lat_phase5c_three_way"
 mkdir -p "$R5_OUT"
-python Bench/scripts/bench_phase5c_v1.py \
-  --model "$QWEN_7B" \
-  --gpu-memory-utilization "$GPU_UTIL" \
-  --max-model-len "$MAX_MODEL_LEN" \
-  --max-tokens 64 \
-  2>&1 | tee "$R5_OUT/run.log"
+if [[ -s "$R5_OUT/exit_code.txt" ]]; then
+  echo "  [R5+R7-lat] SKIP (already ran; exit_code=$(cat "$R5_OUT/exit_code.txt"))"
+else
+  CELL_EXIT=0
+  python Bench/scripts/bench_phase5c_v1.py \
+    --model "$QWEN_7B" \
+    --gpu-memory-utilization "$GPU_UTIL" \
+    --max-model-len "$MAX_MODEL_LEN" \
+    --max-tokens 64 \
+    2>&1 | tee "$R5_OUT/run.log" || CELL_EXIT=$?
+  echo "$CELL_EXIT" > "$R5_OUT/exit_code.txt"
+  if [[ "$CELL_EXIT" -ne 0 ]]; then
+    echo "  [R5+R7-lat] FAIL (exit_code=$CELL_EXIT; continuing)"
+  fi
+fi
 
 # ---- 6. Consolidated report ----
 echo
@@ -228,29 +275,65 @@ lines.append("")
 # --- R3 ---
 lines += ["## R3 — 4-model needle 2-of-2 replication", ""]
 lines += [
-    "| Model | Run 1 (seed=43) | Run 2 (seed=44) | Replicated? |",
-    "|---|:-:|:-:|:-:|",
+    "| Model | Run 1 (seed=43) | Run 2 (seed=44) | L1200 detail | Gate | Replicated? |",
+    "|---|:-:|:-:|---|:-:|:-:|",
 ]
+
+def parse_needle_log(log: pathlib.Path):
+    """Returns dict with rate ('13/15'), buckets ('L1200:3/5'), gate."""
+    if not log.exists():
+        return {"rate": "?", "buckets": "", "gate": "?"}
+    text = log.read_text()
+    rate = "?"
+    m = re.search(r"int4\s+retrieval rate:\s*[0-9.]+%\s*\((\d+)/(\d+)\)", text)
+    if m:
+        rate = f"{m.group(1)}/{m.group(2)}"
+    bucket_lines = []
+    for bm in re.finditer(
+        r"^\s*(\d+)\s+\d+/\d+\s+\([^\)]+\)\s+(\d+)/(\d+)\s*\(\s*\d+%\)",
+        text, flags=re.MULTILINE,
+    ):
+        bucket_lines.append(f"L{bm.group(1)}:{bm.group(2)}/{bm.group(3)}")
+    buckets = " ".join(bucket_lines)
+    gate = "?"
+    gm = re.search(r"Phase 5B\.5 needle:\s*(PASS|FAIL)", text)
+    if gm:
+        gate = gm.group(1)
+    return {"rate": rate, "buckets": buckets, "gate": gate}
+
 for short in ["qwen2_5_7b_instruct", "mistral_7b_instruct_v0_3",
               "meta_llama_3_1_8b_instruct", "qwen2_5_14b_instruct"]:
-    rates = []
+    parsed = []
     for r in (1, 2):
-        log = out_root / "r3_needle_replication" / f"{short}_run{r}" / "run.log"
-        if not log.exists():
-            rates.append("?"); continue
-        text = log.read_text()
-        # The verify script prints a final summary like:
-        #   '  int4_rate    : 15/15 (1.000)'
-        # or similar. Try multiple patterns.
-        m = (re.search(r"int4_rate\s*:?\s*(\d+)\s*/\s*(\d+)", text)
-             or re.search(r"int4[^|]*?(\d+)\s*/\s*(\d+)\s+(retrieved|hits|passed)", text)
-             or re.search(r"int4_proto[^|]*?(\d+)\s*/\s*(\d+)", text))
-        rates.append(f"{m.group(1)}/{m.group(2)}" if m else "?")
-    repl = ("yes" if all(r == "15/15" for r in rates)
-            else "partial" if any(r == "15/15" for r in rates)
-            else "no" if all(r != "?" for r in rates)
-            else "?")
-    lines.append(f"| {short} | {rates[0]} | {rates[1]} | {repl} |")
+        cell = out_root / "r3_needle_replication" / f"{short}_run{r}"
+        parsed.append(parse_needle_log(cell / "run.log"))
+    rate1, rate2 = parsed[0]["rate"], parsed[1]["rate"]
+    # Replication verdict
+    if rate1 == "15/15" and rate2 == "15/15":
+        repl = "yes"
+    elif "?" in (rate1, rate2):
+        repl = "?"
+    elif rate1 == "15/15" or rate2 == "15/15":
+        repl = "partial"
+    else:
+        repl = "no"
+    # Worst-case gate across the two runs
+    gates = {p["gate"] for p in parsed}
+    if gates == {"PASS"}:
+        gate_summary = "PASS"
+    elif "FAIL" in gates:
+        gate_summary = "FAIL"
+    else:
+        gate_summary = "?"
+    # L1200 detail (the hard bucket); show worst across runs
+    l1200_strs = []
+    for p in parsed:
+        m1200 = re.search(r"L1200:(\d+)/(\d+)", p["buckets"])
+        l1200_strs.append(f"{m1200.group(1)}/{m1200.group(2)}" if m1200 else "?")
+    l1200 = " / ".join(l1200_strs)
+    lines.append(
+        f"| {short} | {rate1} | {rate2} | L1200 r1+r2: {l1200} | {gate_summary} | {repl} |"
+    )
 lines.append("")
 
 # --- R7 ---
