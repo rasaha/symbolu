@@ -373,16 +373,18 @@ def main(argv: Sequence[str]) -> int:
         "--extended-pinning",
         action="store_true",
         help=(
-            "Phase 4B: install the Extended Pinning Policy — marks "
-            "configured blocks as eviction-protected on top of "
-            "vLLM's LRU + prefix caching. Pinning is deterministic "
-            "(not predictive like --cache-aware-scheduling), so the "
-            "ship/inconclusive/negative decision is bounded by "
-            "the workload's prefix-sharing structure. See "
-            "PHASE4_VLLM_EVICTOR_HOOK_RESEARCH.md for the design. "
-            "Default OFF; with the flag off, all extended pinning "
-            "machinery is inert. Combine with --pin-first-n-blocks "
-            "and/or --pin-tokens-file to specify what to pin."
+            "EXPERIMENTAL — DO NOT ENABLE IN PRODUCTION. Phase 4 "
+            "Extended Pinning Policy: marks configured blocks as "
+            "eviction-protected on top of vLLM's LRU + prefix "
+            "caching. Three-GPU-run Phase 4C measurement on "
+            "Qwen-7B + A100 produced INCONCLUSIVE results — "
+            "mechanism mechanically correct, but no opportunity "
+            "to act on cohort-shared workloads because vLLM's "
+            "stock prefix caching already handles them natively. "
+            "See PHASE4_EXTENDED_PINNING_FINDINGS.md for the full "
+            "measurement + revisit conditions. CLI flags retained "
+            "for further experimentation. Combine with "
+            "--pin-first-n-blocks and/or --pin-tokens-file."
         ),
     )
     parser.add_argument(

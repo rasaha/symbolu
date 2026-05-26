@@ -1,18 +1,22 @@
-# Phase 4F — Priority-LRU pinning (design proposal)
+# Phase 4F — Priority-LRU pinning (design proposal — ARCHAEOLOGY)
 
-> **Status:** Design only. **Gated on Phase 4C ship signal.**
+> **Status: ARCHAEOLOGY.** Phase 4C closed Phase 4 as
+> **inconclusive** — pinning's mechanism is mechanically correct
+> but had no opportunity to act on cohort-shared workloads
+> because vLLM's stock LRU + prefix caching already handles
+> protection natively. See `PHASE4_EXTENDED_PINNING_FINDINGS.md`
+> for the measurement.
 >
-> Phase 4F implements priority classes on top of the Phase 4A/B
-> binary Extended Pinning Policy. It is NOT a committed
-> workstream; it lands only if Phase 4C measures a meaningful
-> realized-hit / latency improvement over stock vLLM's LRU +
-> prefix caching. If Phase 4C returns inconclusive or negative,
-> Phase 4F is deferred indefinitely and this document becomes
-> archaeology.
+> The gating condition for Phase 4F (Phase 4C ship signal)
+> **did not materialize**. Phase 4F is **not a committed
+> workstream**. This document is preserved in-tree as design
+> archaeology for any future revisit, not as a plan-of-record.
 >
-> If Phase 4C ships, 4F is the next-cleanest v2.1 product step:
-> "binary pinning is too coarse; partners want tiered protection
-> for system prompts vs tool schemas vs user prefixes."
+> Any future revisit should first satisfy the conditions listed
+> in `PHASE4_EXTENDED_PINNING_FINDINGS.md` §"Revisit conditions"
+> (a workload that actually produces eviction pressure with
+> prefix caching ON) AND fix the stale-pinning bug identified
+> by the post-Phase-3 audit (no `unmark_pinned` on free).
 
 ## TL;DR — what 4F adds
 
