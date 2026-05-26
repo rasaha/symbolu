@@ -141,6 +141,40 @@ def test_is_pure_decode_no_decode_meta_rejects():
     assert not _is_pure_decode_write(_FakeMeta(), T_total=0)
 
 
+def test_is_pure_decode_env_override_forces_legacy():
+    """PHASE6B1_USE_DECODE_BATCHED=0 forces the gate to return False,
+    routing all writes through the legacy partition + per-seq loop.
+    Used by the GPU smoke to capture a pre-refactor reference cell."""
+    from kv_policy.phase5b_backend_install import _is_pure_decode_write
+    prior = os.environ.get("PHASE6B1_USE_DECODE_BATCHED")
+    os.environ["PHASE6B1_USE_DECODE_BATCHED"] = "0"
+    try:
+        # Even a clean pure-decode shape returns False under override.
+        assert not _is_pure_decode_write(
+            _FakeMeta(decode=_FakeDecodeMeta(2)), T_total=2,
+        )
+    finally:
+        if prior is None:
+            os.environ.pop("PHASE6B1_USE_DECODE_BATCHED", None)
+        else:
+            os.environ["PHASE6B1_USE_DECODE_BATCHED"] = prior
+
+
+def test_is_pure_decode_env_default_is_on():
+    """Default behavior: when env unset, the gate returns True for a
+    clean pure-decode shape. (Regression for the env-var addition.)"""
+    from kv_policy.phase5b_backend_install import _is_pure_decode_write
+    prior = os.environ.get("PHASE6B1_USE_DECODE_BATCHED")
+    os.environ.pop("PHASE6B1_USE_DECODE_BATCHED", None)
+    try:
+        assert _is_pure_decode_write(
+            _FakeMeta(decode=_FakeDecodeMeta(4)), T_total=4,
+        )
+    finally:
+        if prior is not None:
+            os.environ["PHASE6B1_USE_DECODE_BATCHED"] = prior
+
+
 # ---------------------------------------------------------------------- #
 # write_decode_batched bit-equivalence vs legacy writer.write loop
 # ---------------------------------------------------------------------- #

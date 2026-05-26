@@ -30,6 +30,7 @@ operates on `module.impl` not `module.forward`. RAII-style teardown.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
@@ -198,12 +199,14 @@ if _VLLM_FA_AVAILABLE:
         # Class-level call counters (aggregate across all layer instances).
         # Reset via Int4ProtectedAttentionImpl.reset_call_stats().
         _call_stats: Dict[str, int] = {
-            "prefill_calls":         0,
-            "decode_calls_packed":   0,
-            "decode_calls_fallback": 0,
-            "write_path_calls":      0,
-            "write_path_fallback":   0,
-            "spec_decode_calls":     0,
+            "prefill_calls":              0,
+            "decode_calls_packed":        0,
+            "decode_calls_fallback":      0,
+            "write_path_calls":           0,
+            "write_path_fallback":        0,
+            "write_decode_batched_calls": 0,   # Phase 6B.1 — refactored decode write path fired
+            "write_legacy_loop_calls":    0,   # Phase 6B.1 — legacy partition+loop path fired
+            "spec_decode_calls":          0,
         }
 
         @classmethod
@@ -734,7 +737,8 @@ if _VLLM_FA_AVAILABLE:
                         # partition + per-seq write loop (eager only;
                         # vLLM 0.7.3 V0 doesn't graph-capture prefill).
                         T_total = int(key.shape[0])
-                        if _is_pure_decode_write(attn_metadata, T_total):
+                        _pure_decode = _is_pure_decode_write(attn_metadata, T_total)
+                        if _pure_decode:
                             dec_meta = attn_metadata.decode_metadata
                             B_decode = int(dec_meta.block_tables.shape[0])
                             # Resolve seq_ids -> slot_idx ONCE, then call
@@ -764,6 +768,9 @@ if _VLLM_FA_AVAILABLE:
                                 slot_mapping=slot_mapping_flat,
                                 slot_idx_t=slot_idx_t,
                             )
+                            Int4ProtectedAttentionImpl._call_stats[
+                                "write_decode_batched_calls"
+                            ] += 1
                         else:
                             # Legacy partition + per-seq write (eager).
                             partitions = _derive_write_partitions(
@@ -777,6 +784,9 @@ if _VLLM_FA_AVAILABLE:
                                     slot_mapping=slot_mapping_flat[sl],
                                     seq_id=seq_id,
                                 )
+                            Int4ProtectedAttentionImpl._call_stats[
+                                "write_legacy_loop_calls"
+                            ] += 1
                         Int4ProtectedAttentionImpl._call_stats["write_path_calls"] += 1
                     else:
                         Int4ProtectedAttentionImpl._call_stats["write_path_fallback"] += 1
@@ -1006,7 +1016,14 @@ def _is_pure_decode_write(attn_metadata: Any, T_total: int) -> bool:
     When False, the legacy partition + per-seq `writer.write(seq_id=...)`
     loop runs (prefill / spec-decode / mixed). Prefill is NOT graph-
     captured by vLLM 0.7.3 V0 so eager-only handling is fine.
+
+    Override: set env `PHASE6B1_USE_DECODE_BATCHED=0` to disable the
+    new path entirely (always returns False). Used by the Phase 6B.1
+    GPU smoke to capture a "pre-refactor reference" cell from the
+    same process tree where the refactored cell runs.
     """
+    if os.environ.get("PHASE6B1_USE_DECODE_BATCHED", "1").strip() == "0":
+        return False
     dec_meta = getattr(attn_metadata, "decode_metadata", None)
     if dec_meta is None:
         return False
