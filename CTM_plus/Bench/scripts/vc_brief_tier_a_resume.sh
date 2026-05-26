@@ -104,8 +104,17 @@ fi
 for d in "$OUT_ROOT/r7_throughput_b8_int4_protected" \
          "$OUT_ROOT/r5_r7lat_phase5c_three_way"; do
   if [[ -s "$d/run.log" && ! -s "$d/exit_code.txt" ]]; then
-    echo "0" > "$d/exit_code.txt"
-    echo "  backfilled $d/exit_code.txt = 0 (assumed; bench has no gate)"
+    # Bench scripts don't print a gate verdict, so we infer
+    # from failure markers in the log. Tracebacks and OOMs are
+    # the dominant failure modes; if either appears the log is
+    # a failed run, not a successful one.
+    if grep -q -E "Traceback|OutOfMemoryError|RuntimeError|raise " "$d/run.log" 2>/dev/null; then
+      echo "1" > "$d/exit_code.txt"
+      echo "  backfilled $d/exit_code.txt = 1 (failure markers in log)"
+    else
+      echo "0" > "$d/exit_code.txt"
+      echo "  backfilled $d/exit_code.txt = 0 (no failure markers)"
+    fi
   fi
 done
 
