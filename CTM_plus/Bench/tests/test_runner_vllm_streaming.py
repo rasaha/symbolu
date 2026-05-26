@@ -2752,6 +2752,255 @@ def test_async_engine_driver_run_cpu_swap_pool_sampler_no_op_when_missing_refs()
     asyncio.run(_drive())  # raises only if the sampler crashes
 
 
+def test_async_engine_driver_accepts_verifier_prompt_token_ids():
+    """TIER5A.3: constructor takes ``verifier_prompt_token_ids`` and
+    ``verifier_max_decode_tokens``. Defaults preserve pre-TIER5A.3
+    behaviour exactly (both None → no verifier submission)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver_default = AsyncEngineDriver(model="dummy")
+    assert driver_default.verifier_prompt_token_ids is None
+    assert driver_default.verifier_max_decode_tokens is None
+    assert driver_default._verifier_request_id is None
+    assert driver_default._verifier_output_token_ids == []
+    assert driver_default._verifier_request_completed is False
+
+    driver_with_verifier = AsyncEngineDriver(
+        model="dummy",
+        verifier_prompt_token_ids=[10, 20, 30, 40],
+        verifier_max_decode_tokens=16,
+    )
+    assert driver_with_verifier.verifier_prompt_token_ids == [10, 20, 30, 40]
+    assert driver_with_verifier.verifier_max_decode_tokens == 16
+    # List is copied (not aliased) — caller mutation must not bleed.
+    src = [99, 88, 77]
+    driver_aliased = AsyncEngineDriver(
+        model="dummy", verifier_prompt_token_ids=src,
+    )
+    src.append(66)
+    assert driver_aliased.verifier_prompt_token_ids == [99, 88, 77]
+
+
+def test_streaming_result_verifier_fields_default_empty_tuple():
+    """TIER5A.3: new verifier_output_token_ids field defaults to
+    the empty tuple (not None) so JSON serialisation of cells without
+    a verifier produces stable output. verifier_request_completed
+    defaults to False."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    assert r.verifier_output_token_ids == ()
+    assert isinstance(r.verifier_output_token_ids, tuple)
+    assert r.verifier_request_completed is False
+
+
+def test_streaming_result_verifier_fields_round_trip():
+    """Constructing with verifier output preserves the values."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+        verifier_output_token_ids=(101, 102, 103),
+        verifier_request_completed=True,
+    )
+    assert r.verifier_output_token_ids == (101, 102, 103)
+    assert r.verifier_request_completed is True
+
+
+def test_streaming_result_still_frozen_after_verifier_extension():
+    """TIER5A.3 dataclass fields don't accidentally un-freeze."""
+    from ctm_bench.runner_vllm_streaming import StreamingRunCellResult
+
+    r = StreamingRunCellResult(
+        workload_name="any", policy_name="lru", seed=0,
+        n_requests_admitted=1, n_requests_completed=1,
+        n_decode_tokens=10, wall_clock_seconds=1.0,
+        swap_in_blocks=0, swap_out_blocks=0, preemption_events=0,
+    )
+    with pytest.raises(Exception):
+        r.verifier_output_token_ids = (1, 2, 3)  # type: ignore[misc]
+    with pytest.raises(Exception):
+        r.verifier_request_completed = True  # type: ignore[misc]
+
+
+def test_async_engine_driver_run_submits_verifier_first_and_captures_output():
+    """TIER5A.3 end-to-end: driver with verifier_prompt_token_ids set
+    submits the verifier as the FIRST request (before any pressure
+    arrival), and captures its full output_token_ids on the result.
+    Mock engine yields deterministic outputs so the test is fast +
+    repeatable.
+    """
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    class FakeFinishedOutput:
+        def __init__(self, token_ids, finished=False):
+            class _Inner:
+                pass
+            inner = _Inner()
+            inner.token_ids = list(token_ids)
+            self.outputs = [inner]
+            self.finished = finished
+
+    submitted_requests: list[dict] = []
+
+    class FakeEngine:
+        def __init__(self):
+            class _BM:
+                class _Alloc:
+                    def get_and_reset_swaps(self):
+                        return (0, 0)
+                block_allocator = _Alloc()
+            class _Sched:
+                num_preemption_events = 0
+                block_manager = _BM()
+            class _Inner:
+                scheduler = _Sched()
+            self.engine = _Inner()
+
+        async def generate(self, prompt, sampling_params, request_id):
+            submitted_requests.append({
+                "request_id": request_id,
+                "prompt_token_ids": list(prompt["prompt_token_ids"]),
+            })
+            # Two streaming yields; final output finishes.
+            if "verifier" in request_id:
+                yield FakeFinishedOutput([501, 502], finished=False)
+                yield FakeFinishedOutput([501, 502, 503, 504], finished=True)
+            else:
+                yield FakeFinishedOutput([1, 2], finished=False)
+                yield FakeFinishedOutput([1, 2, 3, 4], finished=True)
+
+    class FakeAsyncEngineArgs:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeAsyncLLMEngine:
+        @classmethod
+        def from_engine_args(cls, args):
+            return FakeEngine()
+
+    class FakeSamplingParams:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    class FakeVLLM:
+        AsyncEngineArgs = FakeAsyncEngineArgs
+        AsyncLLMEngine = FakeAsyncLLMEngine
+        SamplingParams = FakeSamplingParams
+
+    verifier_prompt = [9001, 9002, 9003]
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42,
+        max_decode_tokens=8,
+        verifier_prompt_token_ids=verifier_prompt,
+        verifier_max_decode_tokens=4,
+        sample_interval_seconds=0.001,
+        vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    result = asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=3, max_wall_seconds=2.0,
+            workload_name="tier5a_cell",
+        )
+    )
+
+    # Verifier was submitted first.
+    assert len(submitted_requests) >= 1
+    assert "verifier" in submitted_requests[0]["request_id"]
+    assert submitted_requests[0]["prompt_token_ids"] == verifier_prompt
+
+    # Verifier output captured on the result.
+    assert result.verifier_output_token_ids == (501, 502, 503, 504), (
+        f"verifier output not captured; got "
+        f"{result.verifier_output_token_ids}"
+    )
+    assert result.verifier_request_completed is True
+
+    # The verifier counts as one admission; max_requests=3 cap
+    # admits the verifier + up to 2 pressure requests.
+    assert result.n_requests_admitted >= 1
+    assert result.n_requests_admitted <= 3
+
+
+def test_async_engine_driver_run_no_verifier_keeps_fields_empty():
+    """Without verifier_prompt_token_ids, the fields stay at their
+    defaults (empty tuple / False). Locks the additive-only
+    contract."""
+    import asyncio
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, ArrivalScheduler, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    class FakeOutput:
+        def __init__(self, n_tokens):
+            class _Inner:
+                token_ids = list(range(n_tokens))
+            self.outputs = [_Inner()]
+            self.finished = False
+
+    class FakeEngine:
+        engine = type("_", (), {
+            "scheduler": type("_", (), {
+                "num_preemption_events": 0,
+                "block_manager": type("_", (), {
+                    "block_allocator": type("_", (), {
+                        "get_and_reset_swaps": lambda self: (0, 0),
+                    })(),
+                })(),
+            })(),
+        })()
+        async def generate(self, prompt, sp, rid):
+            yield FakeOutput(2)
+            yield FakeOutput(4)
+
+    class FakeVLLM:
+        AsyncEngineArgs = type("_", (), {"__init__": lambda self, **k: None})
+        AsyncLLMEngine = type("_", (), {
+            "from_engine_args": classmethod(lambda cls, args: FakeEngine()),
+        })
+        SamplingParams = type("_", (), {"__init__": lambda self, **k: None})
+
+    driver = AsyncEngineDriver(
+        model="dummy", seed=42, max_decode_tokens=4,
+        sample_interval_seconds=0.001, vllm_module=FakeVLLM,
+    )
+    sched = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=100.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    result = asyncio.new_event_loop().run_until_complete(
+        driver.run(
+            scheduler=sched, sampler=sampler,
+            max_requests=2, max_wall_seconds=2.0,
+            workload_name="no_verifier_cell",
+        )
+    )
+    assert result.verifier_output_token_ids == ()
+    assert result.verifier_request_completed is False
+
+
 def test_async_engine_driver_run_cpu_swap_pool_sampler_swallows_read_errors():
     """Best-effort telemetry: a read that raises must not crash
     the polling loop. The next tick tries again."""

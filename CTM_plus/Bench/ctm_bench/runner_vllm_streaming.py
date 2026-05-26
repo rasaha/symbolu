@@ -204,6 +204,14 @@ class StreamingRunCellResult:
     swap_in_latency_p99_ms: float = 0.0
     swap_in_latency_call_count: int = 0
     swap_telemetry_stats: Dict[str, Any] = field(default_factory=dict)
+    # Phase TIER5A.3 — verifier prompt output. Populated when the
+    # driver runs with ``verifier_prompt_token_ids`` set: a single
+    # deterministic request submitted before the pressure workload,
+    # whose full output_token_ids are captured here for the G1
+    # bit-identity verdict. Empty tuple when no verifier was
+    # configured (the default for non-TIER5A cells).
+    verifier_output_token_ids: Tuple[int, ...] = ()
+    verifier_request_completed: bool = False
 
 
 # ---------------------------------------------------------------- #
@@ -840,6 +848,8 @@ class AsyncEngineDriver:
         pin_tokens_file: Optional[Path] = None,
         pin_max_budget_blocks: int = 1024,
         swap_telemetry: bool = False,
+        verifier_prompt_token_ids: Optional[Sequence[int]] = None,
+        verifier_max_decode_tokens: Optional[int] = None,
         max_model_len: Optional[int] = None,
         preemption_mode: str = "swap",
         vllm_module: Any = None,
@@ -1074,6 +1084,25 @@ class AsyncEngineDriver:
         self._cpu_swap_pool_peak_tracker: Any = None
         self._swap_telemetry_block_manager_ref: Any = None
 
+        # Phase TIER5A.3 — verifier prompt. When configured, the
+        # driver submits a single deterministic request BEFORE the
+        # pressure workload and captures its full output_token_ids
+        # on the StreamingRunCellResult. The G1 bit-identity verdict
+        # compares this output across cells. None → no verifier
+        # (the default for non-TIER5A cells).
+        self.verifier_prompt_token_ids: Optional[List[int]] = (
+            list(verifier_prompt_token_ids)
+            if verifier_prompt_token_ids is not None else None
+        )
+        self.verifier_max_decode_tokens = (
+            int(verifier_max_decode_tokens)
+            if verifier_max_decode_tokens is not None else None
+        )
+        # Set in run() once the verifier request is constructed.
+        self._verifier_request_id: Optional[str] = None
+        self._verifier_output_token_ids: List[int] = []
+        self._verifier_request_completed: bool = False
+
     @staticmethod
     def _extract_model_from_engine(inner_engine: Any) -> Any:
         """Walk an LLMEngine to find the underlying torch model
@@ -1206,6 +1235,10 @@ class AsyncEngineDriver:
         last_seen = 0
         evictor = self._installed_evictor
         cohort_index = self._prompt_builder.cohort_of(request_id_counter)
+        is_verifier = (
+            self._verifier_request_id is not None
+            and request_id == self._verifier_request_id
+        )
         try:
             async for output in engine.generate(
                 {"prompt_token_ids": prompt_token_ids},
@@ -1217,6 +1250,22 @@ class AsyncEngineDriver:
                     # generation proceeds; final value is the
                     # total decode count for this request.
                     new_n_tokens = len(output.outputs[0].token_ids)
+                    # Phase TIER5A.3 — verifier output capture. Track
+                    # the accumulated token_ids list so the post-run
+                    # G1 verdict can compare bit-identity across
+                    # cells. List is overwritten each yield; final
+                    # value is the complete output.
+                    if is_verifier:
+                        try:
+                            self._verifier_output_token_ids = list(
+                                output.outputs[0].token_ids
+                            )
+                            if getattr(output, "finished", False):
+                                self._verifier_request_completed = True
+                        except Exception:
+                            # Best-effort capture; never crash the
+                            # decode loop on a token-id readback bug.
+                            pass
                     if first_token_time == 0.0 and new_n_tokens > 0:
                         first_token_time = time.perf_counter()
                     n_tokens = new_n_tokens
@@ -1999,6 +2048,47 @@ class AsyncEngineDriver:
         request_id_counter = 0
         start = time.perf_counter()
 
+        # Phase TIER5A.3 — submit the verifier request FIRST, before
+        # any pressure arrives. Doing so admits the verifier while
+        # GPU memory is uncontested; the subsequent pressure workload
+        # then has to choose whether to preempt the verifier (which
+        # is exactly the path TIER5A is verifying — the int4_protected
+        # KV layout must survive that preempt + restore cycle).
+        if self.verifier_prompt_token_ids is not None:
+            verifier_max_tokens = (
+                self.verifier_max_decode_tokens
+                if self.verifier_max_decode_tokens is not None
+                else self.max_decode_tokens
+            )
+            verifier_sampling_params = SamplingParams(
+                temperature=0.0,
+                max_tokens=verifier_max_tokens,
+                seed=self.seed,
+            )
+            self._verifier_request_id = (
+                f"tier5a_verifier_{workload_name}_{self.seed}"
+            )
+            submission_tasks.append(
+                asyncio.create_task(
+                    self._submit_one(
+                        engine=engine,
+                        request_id=self._verifier_request_id,
+                        prompt_token_ids=list(self.verifier_prompt_token_ids),
+                        sampling_params=verifier_sampling_params,
+                        request_id_counter=request_id_counter,
+                    )
+                )
+            )
+            n_admitted += 1
+            request_id_counter += 1
+            logger.info(
+                "TIER5A verifier submitted (request_id=%s, "
+                "prompt_tokens=%d, max_decode=%d)",
+                self._verifier_request_id,
+                len(self.verifier_prompt_token_ids),
+                verifier_max_tokens,
+            )
+
         try:
             while True:
                 wall = time.perf_counter() - start
@@ -2552,6 +2642,9 @@ class AsyncEngineDriver:
             swap_in_latency_p99_ms=swap_in_latency_p99_ms_val,
             swap_in_latency_call_count=swap_in_latency_call_count_val,
             swap_telemetry_stats=swap_telemetry_stats_dict,
+            # Phase TIER5A.3 — verifier output for the G1 verdict.
+            verifier_output_token_ids=tuple(self._verifier_output_token_ids),
+            verifier_request_completed=self._verifier_request_completed,
         )
 
     def _build_pin_specs(self) -> List[Any]:

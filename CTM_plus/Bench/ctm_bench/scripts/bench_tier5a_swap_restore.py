@@ -482,16 +482,30 @@ def compute_g5_g6_verdicts(
       * G5c — int4_protected python SHA pin
     G5 passes iff all three sub-tracks pass.
 
-    G6 is the CTM_plus/CUDA defensive SHA pin. The load-bearing
-    G6 enforcement is the runtime wheel check deferred to
-    TIER5A.3 GPU smoke; this bench harness records only the
-    defensive in-tree check.
+    G6 is the conjunction G6a AND G6b (TIER5A.3 audit B2 fix):
+      * G6a — defensive in-tree CTM_plus/CUDA SHA pin.
+      * G6b — load-bearing forked vllm_flash_attn wheel SHA pin.
+        Frozen on the GPU pod via
+        ``--regenerate-vllm-flash-attn-wheel-sha``.
+
+    The bench harness reports G6 as the conjunction so a poisoned
+    wheel (G6b FAIL) is never silently green just because the
+    in-tree CUDA is unchanged (G6a PASS).
     """
     g5a = bool(gate_report_dict.get("g5a_fingerprint_passed", False))
     g5b = bool(gate_report_dict.get("g5b_ast_passed", False))
     g5c = bool(gate_report_dict.get("g5c_sha_passed", False))
     g5_passed = g5a and g5b and g5c
     g6_passed = bool(gate_report_dict.get("g6_passed", False))
+    # TIER5A.3 sub-tracks — surface for evidence.
+    g6a_passed = bool(gate_report_dict.get("g6a_passed", g6_passed))
+    g6b_passed = bool(gate_report_dict.get("g6b_passed", False))
+    g6b_vllm_importable = bool(
+        gate_report_dict.get("g6b_vllm_importable", False)
+    )
+    g6b_baseline_missing = bool(
+        gate_report_dict.get("vllm_flash_attn_wheel_baseline_missing", True)
+    )
 
     g5 = GateVerdict(
         gate_id="G5",
@@ -520,20 +534,42 @@ def compute_g5_g6_verdicts(
                 gate_report_dict.get("int4_sha_baseline_path", ""),
         },
     )
+    g6b_status: str
+    if g6b_passed:
+        g6b_status = "GREEN"
+    elif not g6b_vllm_importable:
+        g6b_status = "FAIL (vllm_flash_attn not importable)"
+    elif g6b_baseline_missing:
+        g6b_status = "FAIL (baseline NOT FROZEN — see runbook)"
+    else:
+        g6b_status = "FAIL (wheel SHA mismatch)"
     g6 = GateVerdict(
         gate_id="G6",
         passed=g6_passed,
         summary=(
-            "cuda fork defensive SHA pin "
-            f"{'GREEN' if g6_passed else 'FAIL'} "
-            f"({len(gate_report_dict.get('g6_violations', {}))} "
-            "violations); load-bearing G6 wheel check deferred "
-            "to TIER5A.3 GPU smoke"
+            f"G6a={'GREEN' if g6a_passed else 'FAIL'} "
+            f"(in-tree CUDA defensive; "
+            f"{len(gate_report_dict.get('g6_violations', {}))} "
+            f"violations); G6b={g6b_status} "
+            f"(load-bearing forked-wheel SHA pin)"
         ),
         evidence={
-            "violations": dict(gate_report_dict.get("g6_violations", {})),
+            "g6a_passed": g6a_passed,
+            "g6b_passed": g6b_passed,
+            "g6b_vllm_importable": g6b_vllm_importable,
+            "g6b_baseline_missing": g6b_baseline_missing,
+            "g6a_violations": dict(
+                gate_report_dict.get("g6_violations", {})
+            ),
+            "g6b_violations": dict(
+                gate_report_dict.get("g6b_violations", {})
+            ),
             "cuda_sha_baseline_path":
                 gate_report_dict.get("cuda_sha_baseline_path", ""),
+            "vllm_flash_attn_wheel_baseline_path":
+                gate_report_dict.get(
+                    "vllm_flash_attn_wheel_baseline_path", "",
+                ),
         },
     )
     return g5, g6
@@ -642,7 +678,10 @@ def render_dry_run(spec: BenchSpec) -> str:
                      "cache_aware_measurement_only + prefix_hit_probe) "
                      "runs to completion")
     lines.append("  G5: int4_protected SHA pin (pre AND post run)")
-    lines.append("  G6: CUDA-fork SHA pin (pre AND post run)")
+    lines.append(
+        "  G6: G6a in-tree CUDA SHA pin AND G6b load-bearing forked-"
+        "wheel SHA pin (pre AND post run)"
+    )
     lines.append("=" * 72)
     return "\n".join(lines)
 
@@ -823,21 +862,448 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 # ---------------------------------------------------------------- #
 
 
+# ---------------------------------------------------------------- #
+# Verifier prompt generation — deterministic from spec.seed so the
+# same prompt is submitted to every cell (G1 bit-identity is
+# meaningless if the prompt diverges between baseline and pressure).
+# Pure-Python; no tokenizer dependency. CPU-testable.
+# ---------------------------------------------------------------- #
+
+
+def _generate_verifier_prompt_token_ids(
+    *, seed: int, length: int,
+    token_id_lo: int = 100,
+    token_id_hi: int = 50000,
+) -> List[int]:
+    """Generate a deterministic list of valid-ish token IDs.
+
+    Range [100, 50000) avoids most tokenizers' special-token region
+    (typically 0..100) and stays well below Qwen-2.5's vocab size
+    (152K). Operators using a different model with a smaller vocab
+    can override the range via CLI flags (out of scope for the
+    default TIER5A bench).
+    """
+    import random
+    rng = random.Random(seed)
+    return [
+        rng.randrange(token_id_lo, token_id_hi)
+        for _ in range(int(length))
+    ]
+
+
+# ---------------------------------------------------------------- #
+# Cell→driver wiring. Maps a frozen CellConfig + spec.seed to the
+# kwargs the AsyncEngineDriver expects. Pure-data; AsyncEngineDriver
+# is imported lazily by ``execute_bench_on_engine`` to keep the
+# CPU-side dry-run free of the vLLM dependency.
+# ---------------------------------------------------------------- #
+
+
+def _driver_kwargs_for_cell(
+    *,
+    spec: BenchSpec,
+    cell: CellConfig,
+    verifier_prompt: List[int],
+) -> Dict[str, Any]:
+    """Build the kwargs AsyncEngineDriver expects for a single
+    TIER5A cell. The four optional install-layer flags are toggled
+    per the cell's install_* attributes (cell A/B have them all
+    False; cell C sets them True). swap_telemetry is True for ALL
+    TIER5A cells — that's the always-on telemetry surface."""
+    return dict(
+        model=spec.model,
+        gpu_memory_utilization=cell.gpu_memory_utilization,
+        swap_space_gb=cell.swap_space_gb,
+        seed=spec.seed,
+        enable_prefix_caching=cell.enable_prefix_caching,
+        max_model_len=cell.max_model_len,
+        preemption_mode=cell.preemption_mode,
+        max_decode_tokens=cell.pressure_max_decode_tokens or 64,
+        sample_interval_seconds=spec.sample_interval_seconds,
+        # Phase TIER5A — always-on telemetry surface.
+        swap_telemetry=True,
+        verifier_prompt_token_ids=list(verifier_prompt),
+        verifier_max_decode_tokens=cell.verifier_max_decode_tokens,
+        # Composition layers — cell A + B leave these False; cell C
+        # turns them on via the CellConfig flags.
+        collect_native_prefix_hits=cell.install_prefix_hit_probe,
+        extended_pinning=cell.install_extended_pinning,
+        pin_first_n_blocks=cell.pin_first_n_blocks,
+        cache_aware_measurement_only=(
+            cell.install_cache_aware_measurement_only
+        ),
+    )
+
+
+def _cell_result_to_verifier_record(
+    *,
+    cell: CellConfig,
+    verifier_prompt: Tuple[int, ...],
+    cell_result: Any,
+    extra_notes: Sequence[str] = (),
+) -> Any:
+    """Convert a ``StreamingRunCellResult`` to a
+    ``VerifierCellRecord``. Defined inline so the bench harness has
+    no static import dependency on swap_restore_verifier (already
+    imported by the gate-verdict helpers above)."""
+    from ctm_bench.swap_restore_verifier import VerifierCellRecord
+    return VerifierCellRecord(
+        cell_name=cell.cell_name,
+        prompt_token_ids=tuple(verifier_prompt),
+        output_token_ids=tuple(cell_result.verifier_output_token_ids),
+        n_decode_tokens=len(cell_result.verifier_output_token_ids),
+        swap_out_blocks_total=int(cell_result.swap_out_blocks),
+        swap_in_blocks_total=int(cell_result.swap_in_blocks),
+        preemption_events_total=int(cell_result.preemption_events),
+        cpu_swap_pool_peak_used_blocks=int(
+            cell_result.cpu_swap_pool_used_blocks_peak
+        ),
+        cpu_swap_pool_total_blocks=int(
+            cell_result.cpu_swap_pool_total_blocks
+        ),
+        request_id=None,
+        completed=bool(cell_result.verifier_request_completed),
+        notes=tuple(extra_notes),
+    )
+
+
+def _run_one_cell(
+    *,
+    spec: BenchSpec,
+    cell: CellConfig,
+    verifier_prompt: List[int],
+    max_wall_seconds: float,
+) -> Tuple[Any, Optional[str]]:
+    """Run one cell to completion (or budget). Returns
+    (StreamingRunCellResult, error_or_none). The error string is
+    populated only when engine init / run raised; the result is
+    None in that case.
+    """
+    import asyncio
+
+    from ctm_bench.runner_vllm_streaming import (
+        ArrivalScheduler, AsyncEngineDriver, ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    driver = AsyncEngineDriver(
+        **_driver_kwargs_for_cell(
+            spec=spec, cell=cell, verifier_prompt=verifier_prompt,
+        )
+    )
+    scheduler = ArrivalScheduler(
+        seed=spec.seed,
+        pareto=ParetoArrivalConfig(
+            base_rate_per_sec=max(cell.pressure_arrival_rate, 0.001),
+            alpha=cell.pressure_alpha,
+        ),
+    )
+    sampler = SwapCounterSampler()
+
+    # max_requests counts the verifier (1) plus all pressure
+    # requests. Cell A has n_pressure_requests=0 so max_requests=1
+    # (just the verifier).
+    max_requests = 1 + max(0, int(cell.n_pressure_requests))
+
+    try:
+        result = asyncio.new_event_loop().run_until_complete(
+            driver.run(
+                scheduler=scheduler,
+                sampler=sampler,
+                max_requests=max_requests,
+                max_wall_seconds=max_wall_seconds,
+                workload_name=cell.cell_name,
+            )
+        )
+        return result, None
+    except Exception as exc:
+        # Don't crash the bench on a single cell's failure; record
+        # the error and let downstream verdict logic surface it.
+        logger.exception("cell %s raised: %s", cell.cell_name, exc)
+        return None, f"{type(exc).__name__}: {exc}"
+
+
 def execute_bench_on_engine(
     *,
     spec: BenchSpec,
     pre_orthogonality: Dict[str, Any],
     skip_post_orthogonality: bool,
-) -> BenchReport:  # pragma: no cover (TIER5A.3 wiring)
-    """GPU execution hook. Wired in TIER5A.3 (GPU smoke).
+    max_wall_seconds_per_cell: float = 300.0,
+) -> BenchReport:
+    """Run the TIER5A bench cells on a live vLLM engine.
 
-    TIER5A.1 leaves this as a NotImplementedError so the CPU
-    surface is fully tested first. The CLI gracefully reports
-    the unwired state.
+    Per-cell loop:
+      1. Build AsyncEngineDriver from the cell's CellConfig + the
+         deterministic verifier prompt (generated once per bench
+         from spec.seed).
+      2. Run the driver to completion or per-cell wall budget.
+      3. Convert the result to a VerifierCellRecord.
+
+    After all cells run:
+      * G1 verdict from cell A (baseline) vs cell B (pressure)
+        VerifierCellRecords.
+      * G2 verdict from cell B's swap_out_blocks total.
+      * G3 verdict from cell B's CPU swap pool + swap-in latency
+        telemetry (populated by the runner's swap_telemetry
+        install + polling loop landed in TIER5A.2.1).
+      * G4 verdict from cell C's composition install layer status
+        (only when ``spec.g4_smoke_enabled``).
+      * Post-run orthogonality gate (G5 + G6) unless skipped.
+
+    Raises ``RuntimeError`` only when vLLM is not importable; cell
+    failures are recorded in the report rather than propagated.
     """
-    raise NotImplementedError(
-        "execute_bench_on_engine is wired in TIER5A.3 (GPU smoke). "
-        "Use --dry-run to validate the CLI + cell spec on CPU."
+    import time as _time
+
+    try:
+        import vllm  # noqa: F401
+    except ImportError as exc:
+        raise RuntimeError(
+            "TIER5A.3 execute_bench_on_engine requires vLLM. "
+            "Install vllm (the int4_protected forked build for the "
+            "G6 wheel pin) on the GPU pod. Original error: "
+            + str(exc)
+        ) from exc
+
+    # Deterministic verifier prompt — same for all cells. Length
+    # comes from cell A's spec (all cells share it; design freeze
+    # acknowledges this).
+    cell_a_for_prompt_length = next(
+        (c for c in spec.cells if c.n_pressure_requests == 0),
+        spec.cells[0],
+    )
+    verifier_prompt = _generate_verifier_prompt_token_ids(
+        seed=spec.seed,
+        length=cell_a_for_prompt_length.verifier_prompt_length_tokens,
+    )
+
+    # Run each cell. cell_records is keyed by cell_name; we also
+    # keep a name→VerifierCellRecord side index for the G1 verdict.
+    cell_records: Dict[str, Dict[str, Any]] = {}
+    verifier_records: Dict[str, Any] = {}
+    raw_results: Dict[str, Any] = {}
+    cell_errors: Dict[str, str] = {}
+    for cell in spec.cells:
+        result, err = _run_one_cell(
+            spec=spec, cell=cell,
+            verifier_prompt=verifier_prompt,
+            max_wall_seconds=max_wall_seconds_per_cell,
+        )
+        if err is not None:
+            cell_errors[cell.cell_name] = err
+            cell_records[cell.cell_name] = {
+                "cell_name": cell.cell_name,
+                "error": err,
+                "verifier_completed": False,
+                "verifier_output_token_ids": [],
+            }
+            continue
+        raw_results[cell.cell_name] = result
+        record = _cell_result_to_verifier_record(
+            cell=cell,
+            verifier_prompt=tuple(verifier_prompt),
+            cell_result=result,
+        )
+        verifier_records[cell.cell_name] = record
+        # Serialise the cell's full StreamingRunCellResult for the
+        # report. Best-effort; the result is a frozen dataclass so
+        # dataclasses.asdict captures all fields.
+        try:
+            cell_records[cell.cell_name] = dataclasses.asdict(result)
+        except Exception as exc:  # pragma: no cover
+            cell_records[cell.cell_name] = {
+                "cell_name": cell.cell_name,
+                "asdict_error": str(exc),
+            }
+
+    # ---- Gate verdicts ----
+    gate_verdicts: Dict[str, GateVerdict] = {}
+
+    # G1 — bit-identity (cell A vs cell B).
+    from ctm_bench.swap_restore_verifier import (
+        G1Result, G1Verdict, compute_g1_verdict,
+        VerifierCellRecord,
+    )
+    cell_a_rec = verifier_records.get("cell_A_no_pressure")
+    cell_b_rec = verifier_records.get("cell_B_pressure")
+    if cell_a_rec is not None and cell_b_rec is not None:
+        g1_result = compute_g1_verdict(
+            baseline=cell_a_rec, pressure=cell_b_rec,
+        )
+    else:
+        # Build a sentinel INVALID verdict when either cell failed.
+        empty = VerifierCellRecord(
+            cell_name="missing", prompt_token_ids=tuple(verifier_prompt),
+            output_token_ids=(), n_decode_tokens=0,
+            swap_out_blocks_total=0, swap_in_blocks_total=0,
+            preemption_events_total=0, completed=False,
+            notes=("cell did not run",),
+        )
+        g1_result = G1Result(
+            verdict=G1Verdict.INVALID,
+            baseline=cell_a_rec or empty,
+            pressure=cell_b_rec or empty,
+            bit_identical=False,
+            common_prefix_tokens=0,
+            divergence_index=None,
+            reason=(
+                "one or both required cells (A / B) did not run; "
+                f"errors={cell_errors!r}"
+            ),
+        )
+    gate_verdicts["G1"] = GateVerdict(
+        gate_id="G1",
+        passed=(g1_result.verdict == G1Verdict.GREEN),
+        summary=(
+            f"verdict={g1_result.verdict.value}; "
+            f"bit_identical={g1_result.bit_identical}; "
+            f"reason={g1_result.reason}"
+        ),
+        evidence={
+            "verdict": g1_result.verdict.value,
+            "bit_identical": g1_result.bit_identical,
+            "common_prefix_tokens": g1_result.common_prefix_tokens,
+            "divergence_index": g1_result.divergence_index,
+            "reason": g1_result.reason,
+        },
+    )
+
+    # G2 — swap_out_blocks > 0 in cell B.
+    cell_b_result = raw_results.get("cell_B_pressure")
+    g2_swap_out = (
+        int(cell_b_result.swap_out_blocks)
+        if cell_b_result is not None else 0
+    )
+    gate_verdicts["G2"] = compute_g2_verdict(
+        cell_b_swap_out_blocks=g2_swap_out,
+    )
+
+    # G3 — telemetry surfaced in cell B (runner's swap_telemetry
+    # install + polling loop from TIER5A.2.1 populates the fields).
+    if cell_b_result is not None:
+        gate_verdicts["G3"] = compute_g3_verdict(
+            cpu_swap_pool_used_blocks_peak=int(
+                cell_b_result.cpu_swap_pool_used_blocks_peak
+            ),
+            swap_in_latency_p50_ms=float(
+                cell_b_result.swap_in_latency_p50_ms
+            ),
+            swap_in_latency_call_count=int(
+                cell_b_result.swap_in_latency_call_count
+            ),
+            cpu_swap_pool_total_blocks=int(
+                cell_b_result.cpu_swap_pool_total_blocks
+            ),
+            swap_in_probe_hint_path=str(
+                cell_b_result.swap_telemetry_stats.get(
+                    "probe", {}
+                ).get("hint_path", "")
+            ),
+        )
+    else:
+        gate_verdicts["G3"] = GateVerdict(
+            gate_id="G3",
+            passed=False,
+            summary="cell B did not produce a result",
+            evidence={"cell_b_error": cell_errors.get(
+                "cell_B_pressure", "missing"
+            )},
+        )
+
+    # G4 — composition smoke (cell C). Only required when the
+    # spec enables --g4-smoke.
+    if spec.g4_smoke_enabled:
+        cell_c_result = raw_results.get("cell_C_g4_composition")
+        if cell_c_result is not None:
+            install_layer_status = {
+                "extended_pinning": dict(
+                    cell_c_result.extended_pinning_stats or {}
+                ),
+                "cache_aware_measurement_only": dict(
+                    cell_c_result.cache_aware_scheduler_stats or {}
+                ),
+                "prefix_hit_probe": dict(
+                    cell_c_result.native_prefix_hit_stats or {}
+                ),
+            }
+            gate_verdicts["G4"] = compute_g4_verdict(
+                composition_cell_completed=(
+                    cell_c_result.verifier_request_completed
+                    or cell_c_result.n_requests_completed > 0
+                ),
+                composition_cell_completed_requests=int(
+                    cell_c_result.n_requests_completed
+                ),
+                composition_install_layer_status=install_layer_status,
+            )
+        else:
+            gate_verdicts["G4"] = GateVerdict(
+                gate_id="G4",
+                passed=False,
+                summary="cell C did not produce a result",
+                evidence={"cell_c_error": cell_errors.get(
+                    "cell_C_g4_composition", "missing"
+                )},
+            )
+
+    # G5 + G6 — orthogonality gate, post-run. Skipped when the
+    # operator passed --skip-orthogonality-post (e.g. for debug
+    # iteration). The pre-run gate already ran before this function
+    # was called; we read it from ``pre_orthogonality`` for the
+    # verdict structure.
+    if skip_post_orthogonality:
+        post_orthogonality = {"skipped": True}
+        # G5 + G6 use the pre-run report; the spec calls for BOTH
+        # pre and post to be GREEN, but operator-skipped post is
+        # respected here.
+        g5, g6 = compute_g5_g6_verdicts(
+            gate_report_dict=pre_orthogonality,
+        )
+    else:
+        from ctm_bench.scripts.tier5a_orthogonality_gate import (
+            verify_orthogonality,
+        )
+        post_report = verify_orthogonality()
+        post_orthogonality = post_report.to_dict()
+        # Strict semantic: both pre and post must agree on the
+        # SHA pins. Combine by intersection — any failure in either
+        # report fails the aggregate.
+        combined = dict(post_orthogonality)
+        for key in (
+            "g5a_fingerprint_passed", "g5b_ast_passed",
+            "g5c_sha_passed", "g6_passed",
+        ):
+            combined[key] = bool(
+                pre_orthogonality.get(key, False)
+                and post_orthogonality.get(key, False)
+            )
+        g5, g6 = compute_g5_g6_verdicts(gate_report_dict=combined)
+    gate_verdicts["G5"] = g5
+    gate_verdicts["G6"] = g6
+
+    # Assemble G1 result for the report (kept as a separate field
+    # alongside the gate_verdicts dict so the JSON consumer can
+    # read the bit-identity evidence without unwrapping evidence
+    # dicts).
+    g1_result_dict = {
+        "verdict": g1_result.verdict.value,
+        "bit_identical": g1_result.bit_identical,
+        "common_prefix_tokens": g1_result.common_prefix_tokens,
+        "divergence_index": g1_result.divergence_index,
+        "reason": g1_result.reason,
+        "baseline_cell": cell_a_rec.cell_name if cell_a_rec else None,
+        "pressure_cell": cell_b_rec.cell_name if cell_b_rec else None,
+    }
+
+    return BenchReport(
+        spec=spec,
+        gate_verdicts=gate_verdicts,
+        cell_records=cell_records,
+        pre_run_orthogonality=dict(pre_orthogonality),
+        post_run_orthogonality=dict(post_orthogonality),
+        g1_result=g1_result_dict,
+        timestamp_unix=_time.time(),
+        dry_run=False,
     )
 
 

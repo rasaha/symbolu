@@ -110,6 +110,15 @@ DEFAULT_INT4_SHA_BASELINE_PATH = (
 DEFAULT_CUDA_SHA_BASELINE_PATH = (
     _SCRIPTS_DIR / "cuda_files_baseline.json"
 )
+# Phase TIER5A.3 — load-bearing G6 check. SHA pin of the
+# vllm_flash_attn wheel (the forked build that ships the
+# int4_protected attention kernel). Frozen on the GPU pod after
+# the first green TIER5A.3 run; until then, G6b reports
+# baseline_missing=True and G6 overall is RED (the audit B2 fix
+# — no silent green without the wheel check).
+DEFAULT_VLLM_FLASH_ATTN_WHEEL_BASELINE_PATH = (
+    _SCRIPTS_DIR / "vllm_flash_attn_wheel_baseline.json"
+)
 
 
 # ---------------------------------------------------------------- #
@@ -222,6 +231,139 @@ def save_sha_baseline(
     tmp.replace(path)
 
 
+# ---------------------------------------------------------------- #
+# G6b — forked vllm_flash_attn wheel SHA pin (TIER5A.3 audit B2)
+#
+# The load-bearing G6 contract: the forked vllm_flash_attn wheel
+# installed on the GPU pod must match the SHA pinned at TIER5A.3
+# first green. Without this, an operator could swap a poisoned
+# wheel and the orthogonality gate would still report GREEN
+# (because the in-tree CUDA SHA — G6a — is unchanged).
+#
+# CPU-testable design: ``_compute_vllm_flash_attn_wheel_sha``
+# accepts an optional ``wheel_module_dir`` override; tests pass a
+# tmp_path with synthetic .py/.so files. Production resolves the
+# directory from ``vllm_flash_attn.__file__``.
+# ---------------------------------------------------------------- #
+
+
+def _resolve_vllm_flash_attn_dir() -> Tuple[Optional[Path], str]:
+    """Locate the installed vllm_flash_attn package directory.
+
+    Returns ``(path_or_none, hint_path)``. The hint distinguishes:
+
+    * ``not_importable`` — vllm_flash_attn (or vllm.vllm_flash_attn)
+      not found on sys.path. Common on CPU CI; TIER5A.3 GPU pod
+      MUST have it.
+    * ``vllm_flash_attn`` — top-level forked-wheel package.
+    * ``vllm.vllm_flash_attn`` — nested under vllm in some builds.
+    """
+    for module_name in ("vllm_flash_attn", "vllm.vllm_flash_attn"):
+        try:
+            mod = __import__(module_name, fromlist=["_"])
+        except ImportError:
+            continue
+        except BaseException:  # pragma: no cover
+            # Importing vllm has known side effects on some platforms
+            # (CUDA init etc.); a non-ImportError BaseException
+            # shouldn't crash the gate.
+            continue
+        file_attr = getattr(mod, "__file__", None)
+        if file_attr:
+            return Path(file_attr).parent, module_name
+    return None, "not_importable"
+
+
+def _wheel_files_in(dir_path: Path) -> List[Path]:
+    """List the .py + .so files under ``dir_path`` (recursive). The
+    wheel's compiled extension lives in .so files; the Python entry
+    points and metadata live in .py. .pyc and __pycache__ are
+    excluded (they're build-time artifacts, not the wheel's
+    canonical state)."""
+    out: List[Path] = []
+    for p in sorted(dir_path.rglob("*")):
+        if not p.is_file():
+            continue
+        if "__pycache__" in p.parts:
+            continue
+        if p.suffix not in (".py", ".so"):
+            continue
+        out.append(p)
+    return out
+
+
+def _wheel_relpath(p: Path, root: Path) -> str:
+    """Relative path inside the wheel directory as a POSIX string."""
+    try:
+        return p.resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return p.resolve().as_posix()
+
+
+def _compute_vllm_flash_attn_wheel_sha(
+    *,
+    wheel_module_dir: Optional[Path] = None,
+) -> Tuple[Dict[str, str], str]:
+    """Compute the wheel's per-file SHA pin.
+
+    Returns ``(sha_map, hint_path)``. ``sha_map`` keys are
+    POSIX relpaths under the wheel's module dir. On
+    ``not_importable``, returns ``({}, 'not_importable')``.
+    """
+    if wheel_module_dir is None:
+        wheel_module_dir, hint = _resolve_vllm_flash_attn_dir()
+        if wheel_module_dir is None:
+            return {}, hint
+    else:
+        hint = "test_override"
+    if not wheel_module_dir.is_dir():
+        return {}, hint + "/dir_missing"
+    files = _wheel_files_in(wheel_module_dir)
+    return (
+        {_wheel_relpath(p, wheel_module_dir): sha256_of(p) for p in files},
+        hint,
+    )
+
+
+def _verify_wheel_sha_pin(
+    baseline: Dict[str, str],
+    current: Dict[str, str],
+) -> Dict[str, Dict[str, str]]:
+    """Diff baseline vs current for the wheel SHA pin.
+
+    Same shape as ``_verify_sha_pin`` (union iteration so
+    deletions are caught — audit A1 fix applies here too). The
+    paths_in_scope concept doesn't apply for the wheel: every
+    file in the baseline OR the current wheel must match.
+    """
+    all_relpaths = set(baseline.keys()) | set(current.keys())
+    violations: Dict[str, Dict[str, str]] = {}
+    for relpath in sorted(all_relpaths):
+        expected = baseline.get(relpath)
+        actual = current.get(relpath)
+        if expected is None:
+            violations[relpath] = {
+                "status": "not_in_baseline",
+                "expected": "",
+                "actual": actual or "",
+            }
+            continue
+        if actual is None:
+            violations[relpath] = {
+                "status": "missing",
+                "expected": expected,
+                "actual": "",
+            }
+            continue
+        if actual != expected:
+            violations[relpath] = {
+                "status": "modified",
+                "expected": expected,
+                "actual": actual,
+            }
+    return violations
+
+
 def _verify_sha_pin(
     baseline: Dict[str, str],
     current: Dict[str, str],
@@ -229,14 +371,28 @@ def _verify_sha_pin(
 ) -> Dict[str, Dict[str, str]]:
     """Diff baseline vs current for a defined scope of files.
 
-    Files in ``paths_in_scope`` but missing from baseline →
-    ``status=not_in_baseline``. Files in baseline but missing
-    from current → ``status=missing``. SHA mismatch →
-    ``status=modified``.
+    Iteration walks ``set(baseline) | set(current) | in_scope_relpaths``
+    so the gate catches:
+
+    * Files in baseline + on disk + SHA mismatch → ``status=modified``.
+    * Files in baseline but absent from disk → ``status=missing``
+      (TIER5A.3 fixup for audit A1: previously this case was
+      silently dropped because the loop only iterated the
+      file-system-filtered scope; deletion of a pinned file would
+      pass the gate. Matches the union-iteration discipline
+      ``_verify_fingerprint`` already uses).
+    * Files on disk but not in baseline → ``status=not_in_baseline``
+      (operator added a new file in the protected scope but didn't
+      freeze it).
     """
     in_scope_relpaths = {_relpath(p) for p in paths_in_scope}
+    # Audit A1 fixup: iterate the union of baseline + current +
+    # in-scope so deletions are caught.
+    all_relpaths = (
+        set(baseline.keys()) | set(current.keys()) | in_scope_relpaths
+    )
     violations: Dict[str, Dict[str, str]] = {}
-    for relpath in sorted(in_scope_relpaths):
+    for relpath in sorted(all_relpaths):
         expected = baseline.get(relpath)
         actual = current.get(relpath)
         if expected is None:
@@ -573,7 +729,20 @@ def ast_gate_violations(
 
 @dataclass
 class GateReport:
-    """G5 three-track + G6 defensive verdict + supporting evidence."""
+    """G5 three-track + G6 two-track verdict + supporting evidence.
+
+    G6 splits into:
+      * G6a — defensive in-tree CTM_plus/CUDA SHA pin (existing).
+      * G6b — load-bearing forked vllm_flash_attn wheel SHA pin
+        (TIER5A.3 audit B2 fix; closes the silent-green-without-
+        wheel-check gap).
+
+    ``g6_passed`` is the conjunction g6a_passed AND g6b_passed.
+    Pre-freeze (or on CPU CI without vllm installed), G6b reports
+    structurally as ``g6b_baseline_missing=True`` /
+    ``g6b_vllm_importable=False`` so the verdict is honestly RED
+    instead of silently GREEN.
+    """
 
     passed: bool
 
@@ -581,23 +750,39 @@ class GateReport:
     g5b_ast_passed: bool
     g5c_sha_passed: bool
     g6_passed: bool
+    # G6 sub-tracks (TIER5A.3): keep g6_passed as the conjunction
+    # for back-compat; expose g6a_passed + g6b_passed so callers can
+    # inspect WHICH sub-track failed.
+    g6a_passed: bool = False
+    g6b_passed: bool = False
 
-    fingerprint_baseline_path: str
-    int4_sha_baseline_path: str
-    cuda_sha_baseline_path: str
+    fingerprint_baseline_path: str = ""
+    int4_sha_baseline_path: str = ""
+    cuda_sha_baseline_path: str = ""
+    vllm_flash_attn_wheel_baseline_path: str = ""
 
-    fingerprint_baseline_missing: bool
-    int4_sha_baseline_missing: bool
-    cuda_sha_baseline_missing: bool
+    fingerprint_baseline_missing: bool = False
+    int4_sha_baseline_missing: bool = False
+    cuda_sha_baseline_missing: bool = False
+    vllm_flash_attn_wheel_baseline_missing: bool = False
+
+    # G6b status: True if vllm_flash_attn is importable on this
+    # host; False on CPU CI / pre-pip-install. When False, the
+    # gate cannot verify the wheel and surfaces this distinctly
+    # (passed=False, structurally not silently green).
+    g6b_vllm_importable: bool = False
+    g6b_hint_path: str = "not_importable"
 
     g5a_violations: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     g5b_violations: Dict[str, List[str]] = field(default_factory=dict)
     g5c_violations: Dict[str, Dict[str, str]] = field(default_factory=dict)
     g6_violations: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    g6b_violations: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
     pinned_class_count: int = 0
     int4_python_file_count: int = 0
     cuda_file_count: int = 0
+    vllm_flash_attn_wheel_file_count: int = 0
     summary: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -609,10 +794,14 @@ def verify_orthogonality(
     fingerprint_baseline_path: Path = DEFAULT_FINGERPRINT_BASELINE_PATH,
     int4_sha_baseline_path: Path = DEFAULT_INT4_SHA_BASELINE_PATH,
     cuda_sha_baseline_path: Path = DEFAULT_CUDA_SHA_BASELINE_PATH,
+    vllm_flash_attn_wheel_baseline_path: Path = (
+        DEFAULT_VLLM_FLASH_ATTN_WHEEL_BASELINE_PATH
+    ),
 ) -> GateReport:
-    """Run G5 (three tracks) + G6 (defensive SHA). Returns a
-    populated GateReport. Does not raise on failure — the caller
-    decides what to do with the verdict.
+    """Run G5 (three tracks) + G6 (two tracks: defensive in-tree
+    CUDA SHA + load-bearing forked vllm_flash_attn wheel SHA).
+    Returns a populated GateReport. Does not raise on failure —
+    the caller decides what to do with the verdict.
     """
     # G5a — class fingerprint.
     fp_baseline = load_fingerprint_baseline(fingerprint_baseline_path)
@@ -636,24 +825,46 @@ def verify_orthogonality(
         if not int4_baseline_missing else {}
     )
 
-    # G6 — CTM_plus/CUDA defensive SHA pin.
+    # G6a — CTM_plus/CUDA defensive SHA pin (in-tree).
     cuda_paths = _cuda_files()
     cuda_baseline = load_sha_baseline(cuda_sha_baseline_path)
     cuda_baseline_missing = not cuda_baseline
     cuda_current = compute_sha_pin(cuda_paths)
-    g6_violations = (
+    g6a_violations = (
         _verify_sha_pin(cuda_baseline, cuda_current, cuda_paths)
         if not cuda_baseline_missing else {}
+    )
+
+    # G6b — load-bearing forked vllm_flash_attn wheel SHA pin
+    # (TIER5A.3 audit B2 fix).
+    wheel_baseline = load_sha_baseline(vllm_flash_attn_wheel_baseline_path)
+    wheel_baseline_missing = not wheel_baseline
+    wheel_current, wheel_hint = _compute_vllm_flash_attn_wheel_sha()
+    vllm_importable = wheel_hint != "not_importable"
+    g6b_violations = (
+        _verify_wheel_sha_pin(wheel_baseline, wheel_current)
+        if not wheel_baseline_missing else {}
     )
 
     g5a_passed = not fp_baseline_missing and not g5a_violations
     g5b_passed = not g5b_violations
     g5c_passed = not int4_baseline_missing and not g5c_violations
-    g6_passed = not cuda_baseline_missing and not g6_violations
+    g6a_passed = not cuda_baseline_missing and not g6a_violations
+    # G6b passes ONLY when: vllm is importable AND baseline exists
+    # AND no violations. Pre-freeze or on CPU CI, g6b_passed=False.
+    # This is the audit B2 fix — no silent green without the wheel.
+    g6b_passed = (
+        vllm_importable
+        and not wheel_baseline_missing
+        and not g6b_violations
+    )
+    g6_passed = g6a_passed and g6b_passed
 
     pinned_class_count = sum(len(v) for v in fp_current.values())
 
-    overall_passed = g5a_passed and g5b_passed and g5c_passed and g6_passed
+    overall_passed = (
+        g5a_passed and g5b_passed and g5c_passed and g6_passed
+    )
 
     parts: List[str] = []
     parts.append(
@@ -669,21 +880,36 @@ def verify_orthogonality(
         f"({len(int4_paths)} files)"
     )
     parts.append(
-        f"g6={'pass' if g6_passed else 'FAIL'} "
+        f"g6a={'pass' if g6a_passed else 'FAIL'} "
         f"({len(cuda_paths)} files)"
     )
-    if (
-        fp_baseline_missing
-        or int4_baseline_missing
-        or cuda_baseline_missing
-    ):
-        missing = []
-        if fp_baseline_missing:
-            missing.append("g5a")
-        if int4_baseline_missing:
-            missing.append("g5c")
-        if cuda_baseline_missing:
-            missing.append("g6")
+    if vllm_importable and not wheel_baseline_missing:
+        parts.append(
+            f"g6b={'pass' if g6b_passed else 'FAIL'} "
+            f"({len(wheel_current)} files; hint={wheel_hint})"
+        )
+    elif not vllm_importable:
+        parts.append(
+            f"g6b=FAIL (vllm_flash_attn not importable; load-bearing "
+            f"wheel SHA pin cannot be verified — TIER5A.3 GPU pod "
+            f"must have the forked wheel installed)"
+        )
+    else:
+        parts.append(
+            f"g6b=FAIL (baseline not frozen; run "
+            f"--regenerate-vllm-flash-attn-wheel-sha on the GPU pod "
+            f"to freeze it after first green TIER5A.3 run)"
+        )
+    missing = []
+    if fp_baseline_missing:
+        missing.append("g5a")
+    if int4_baseline_missing:
+        missing.append("g5c")
+    if cuda_baseline_missing:
+        missing.append("g6a")
+    if wheel_baseline_missing:
+        missing.append("g6b_wheel")
+    if missing:
         parts.append(f"baselines_missing={','.join(missing)}")
     summary = "; ".join(parts)
 
@@ -693,19 +919,29 @@ def verify_orthogonality(
         g5b_ast_passed=g5b_passed,
         g5c_sha_passed=g5c_passed,
         g6_passed=g6_passed,
+        g6a_passed=g6a_passed,
+        g6b_passed=g6b_passed,
         fingerprint_baseline_path=str(fingerprint_baseline_path),
         int4_sha_baseline_path=str(int4_sha_baseline_path),
         cuda_sha_baseline_path=str(cuda_sha_baseline_path),
+        vllm_flash_attn_wheel_baseline_path=str(
+            vllm_flash_attn_wheel_baseline_path
+        ),
         fingerprint_baseline_missing=fp_baseline_missing,
         int4_sha_baseline_missing=int4_baseline_missing,
         cuda_sha_baseline_missing=cuda_baseline_missing,
+        vllm_flash_attn_wheel_baseline_missing=wheel_baseline_missing,
+        g6b_vllm_importable=vllm_importable,
+        g6b_hint_path=wheel_hint,
         g5a_violations=g5a_violations,
         g5b_violations=g5b_violations,
         g5c_violations=g5c_violations,
-        g6_violations=g6_violations,
+        g6_violations=g6a_violations,
+        g6b_violations=g6b_violations,
         pinned_class_count=pinned_class_count,
         int4_python_file_count=len(int4_paths),
         cuda_file_count=len(cuda_paths),
+        vllm_flash_attn_wheel_file_count=len(wheel_current),
         summary=summary,
     )
 
@@ -737,6 +973,10 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         default=DEFAULT_CUDA_SHA_BASELINE_PATH,
     )
     p.add_argument(
+        "--vllm-flash-attn-wheel-baseline-path", type=Path,
+        default=DEFAULT_VLLM_FLASH_ATTN_WHEEL_BASELINE_PATH,
+    )
+    p.add_argument(
         "--regenerate-fingerprint", action="store_true",
         help="Recompute the G5a class-fingerprint baseline. ONLY "
              "use after explicit approval of an int4_protected "
@@ -750,9 +990,17 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--regenerate-cuda-sha", action="store_true",
-        help="Recompute the G6 CUDA-fork defensive SHA baseline. "
+        help="Recompute the G6a CUDA-fork defensive SHA baseline. "
              "ONLY use after explicit approval of an in-tree "
              "kernel edit.",
+    )
+    p.add_argument(
+        "--regenerate-vllm-flash-attn-wheel-sha", action="store_true",
+        help="Freeze the G6b load-bearing forked-wheel SHA baseline. "
+             "Run on the GPU pod after first green TIER5A.3 to lock "
+             "the wheel; subsequent runs verify against this freeze. "
+             "Requires vllm_flash_attn (or vllm.vllm_flash_attn) to "
+             "be importable.",
     )
     p.add_argument(
         "--regen-note", type=str, default="",
@@ -799,14 +1047,41 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             note=args.regen_note or "regenerated via CLI",
         )
         print(
-            f"G6 CUDA defensive SHA baseline regenerated at "
+            f"G6a CUDA defensive SHA baseline regenerated at "
             f"{args.cuda_sha_baseline_path} ({len(pin)} files)"
+        )
+
+    if args.regenerate_vllm_flash_attn_wheel_sha:
+        # TIER5A.3 audit B2 freeze step. Operator runs this on the
+        # GPU pod AFTER the first green TIER5A.3 smoke. If vllm
+        # isn't importable, fail cleanly.
+        pin, hint = _compute_vllm_flash_attn_wheel_sha()
+        if hint == "not_importable" or not pin:
+            print(
+                "G6b regenerate FAILED: vllm_flash_attn is not "
+                "importable on this host. Install the forked wheel "
+                "on the GPU pod and rerun.",
+                file=sys.stderr,
+            )
+            return 2
+        save_sha_baseline(
+            pin, path=args.vllm_flash_attn_wheel_baseline_path,
+            note=(
+                args.regen_note
+                or f"frozen on first green TIER5A.3 (hint={hint})"
+            ),
+        )
+        print(
+            f"G6b vllm_flash_attn wheel SHA baseline frozen at "
+            f"{args.vllm_flash_attn_wheel_baseline_path} "
+            f"({len(pin)} files; hint={hint})"
         )
 
     if (
         args.regenerate_fingerprint
         or args.regenerate_int4_sha
         or args.regenerate_cuda_sha
+        or args.regenerate_vllm_flash_attn_wheel_sha
     ):
         return 0
 
@@ -814,6 +1089,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fingerprint_baseline_path=args.fingerprint_baseline_path,
         int4_sha_baseline_path=args.int4_sha_baseline_path,
         cuda_sha_baseline_path=args.cuda_sha_baseline_path,
+        vllm_flash_attn_wheel_baseline_path=(
+            args.vllm_flash_attn_wheel_baseline_path
+        ),
     )
 
     if args.json:
@@ -837,15 +1115,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             f"({len(report.g5c_violations)} violations)"
         )
         print(
-            f"  g6  (cuda fork sha):     "
-            f"{'pass' if report.g6_passed else 'fail'} "
-            f"({len(report.g6_violations)} violations)"
+            f"  g6a (cuda fork sha):     "
+            f"{'pass' if report.g6a_passed else 'fail'} "
+            f"({len(report.g6_violations)} violations; in-tree "
+            "defensive)"
+        )
+        g6b_note = ""
+        if not report.g6b_vllm_importable:
+            g6b_note = " (vllm_flash_attn not importable)"
+        elif report.vllm_flash_attn_wheel_baseline_missing:
+            g6b_note = (
+                " (baseline NOT FROZEN — run "
+                "--regenerate-vllm-flash-attn-wheel-sha on GPU pod)"
+            )
+        print(
+            f"  g6b (wheel sha pin):     "
+            f"{'pass' if report.g6b_passed else 'fail'} "
+            f"({len(report.g6b_violations)} violations; load-bearing"
+            f"{g6b_note})"
         )
         for label, vio in (
             ("g5a", report.g5a_violations),
             ("g5b", report.g5b_violations),
             ("g5c", report.g5c_violations),
-            ("g6", report.g6_violations),
+            ("g6a", report.g6_violations),
+            ("g6b", report.g6b_violations),
         ):
             if vio:
                 print(f"  {label} violations:")

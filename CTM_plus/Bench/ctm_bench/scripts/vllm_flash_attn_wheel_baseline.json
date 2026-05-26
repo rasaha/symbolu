@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "note": "PLACEHOLDER. Frozen on the GPU pod after the first green TIER5A.3 smoke run. Until then, G6b reports baseline_missing=True and G6 overall is RED (audit B2 fix: no silent green without the load-bearing wheel check). To freeze, run on the GPU pod: python -m ctm_bench.scripts.tier5a_orthogonality_gate --regenerate-vllm-flash-attn-wheel-sha --regen-note 'TIER5A.3 first green <date>'. See TIER5A_GPU_SMOKE_RUNBOOK.md for the full procedure.",
+  "files": {}
+}
