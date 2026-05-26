@@ -71,10 +71,20 @@ logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class CellConfig:
-    """Static config for one Phase 3B cell."""
+    """Static config for one Phase 3B cell.
+
+    ``cache_aware_measurement_only=True`` installs the cache-aware
+    tree wraps in measurement-only mode (no reorder) so the cell
+    surfaces a tree-based realized_hit_tokens_total comparable
+    against a full-mode cell C. Cell B uses this to bridge the
+    measurement gap created by the prefix-hit probe failing on real
+    vLLM 0.7.3 (vLLM uses chained content_hash; our flat probe
+    can't match it). See PHASE3_VLLM_NATIVE_PREFIX_HITS_RESEARCH.md.
+    """
     name: str
     enable_prefix_caching: bool
     cache_aware_scheduling: bool
+    cache_aware_measurement_only: bool = False
 
 
 CELLS: Dict[str, CellConfig] = {
@@ -82,16 +92,21 @@ CELLS: Dict[str, CellConfig] = {
         name="A_prefix_off_cache_aware_off",
         enable_prefix_caching=False,
         cache_aware_scheduling=False,
+        cache_aware_measurement_only=False,
     ),
     "B": CellConfig(
         name="B_prefix_on_cache_aware_off",
         enable_prefix_caching=True,
         cache_aware_scheduling=False,
+        # Phase 3C measurement bridge: tree wraps fire for hit count;
+        # no admission reorder (cell B is stock FCFS by design).
+        cache_aware_measurement_only=True,
     ),
     "C": CellConfig(
         name="C_prefix_on_cache_aware_on",
         enable_prefix_caching=True,
         cache_aware_scheduling=True,
+        cache_aware_measurement_only=False,
     ),
 }
 
@@ -108,11 +123,15 @@ def extract_cell_metrics(
 ) -> Dict[str, Any]:
     """Project StreamingRunCellResult onto the Phase 3B per-cell schema.
 
-    The probe's ``cache_hit_tokens`` is the apples-to-apples
-    realized-hit number across all three cells (since the probe
-    measures vLLM's native allocator state, not our tree). For
-    cell C, the cache-aware tree's view is also surfaced under
-    ``cache_aware_extra`` for cross-check.
+    realized_hit_tokens_total preference order (Phase 3C fix):
+      1. cache_aware tree's realized_hit_tokens_total (full mode or
+         measurement-only). Apples-to-apples across cells B and C
+         because both install the same tree instrument.
+      2. prefix-hit probe's cache_hit_tokens (fallback for cells
+         without the tree install, e.g. cell A).
+
+    realized_hit_source flags which instrument supplied the number
+    so downstream analysis (Phase 3D) knows which to compare.
     """
     probe = dict(getattr(result, "native_prefix_hit_stats", {}) or {})
     cas = dict(getattr(result, "cache_aware_scheduler_stats", {}) or {})
@@ -121,37 +140,48 @@ def extract_cell_metrics(
         prediction_accuracy = float(cas.get("prediction_accuracy", 0.0))
         reordered_count = int(cas.get("reordered_count", 0))
         starvation_overrides = int(cas.get("starvation_overrides", 0))
+        tree_realized = int(cas.get("realized_hit_tokens_total", 0))
         cache_aware_extra: Optional[Dict[str, Any]] = {
+            "measurement_only": bool(cas.get("measurement_only", False)),
             "predicted_hit_tokens_total": int(
                 cas.get("predicted_hit_tokens_total", 0)
             ),
-            "realized_hit_tokens_total_via_tree": int(
-                cas.get("realized_hit_tokens_total", 0)
-            ),
+            "realized_hit_tokens_total_via_tree": tree_realized,
             "tree_inserts": int(cas.get("tree_inserts", 0)),
             "tree_evictions": int(cas.get("tree_evictions", 0)),
             "tree_tracked_tokens": int(cas.get("tree_tracked_tokens", 0)),
             "admissions": int(cas.get("admissions", 0)),
         }
+        # Tree is the apples-to-apples instrument when it's installed.
+        realized_hit_tokens_total = tree_realized
+        realized_hit_source = "cache_aware_tree"
     else:
         prediction_accuracy = 0.0
         reordered_count = 0
         starvation_overrides = 0
         cache_aware_extra = None
+        # Fall back to the probe (only meaningful when its
+        # path_taken != 'no_known_path').
+        realized_hit_tokens_total = int(probe.get("cache_hit_tokens", 0))
+        realized_hit_source = "prefix_hit_probe"
 
     return {
         "cell_name": cell.name,
         "config": {
             "enable_prefix_caching": cell.enable_prefix_caching,
             "cache_aware_scheduling": cell.cache_aware_scheduling,
+            "cache_aware_measurement_only": cell.cache_aware_measurement_only,
         },
         "n_requests_admitted": int(result.n_requests_admitted),
         "n_requests_completed": int(result.n_requests_completed),
         "n_decode_tokens": int(result.n_decode_tokens),
         "tokens_per_second": float(result.tokens_per_second),
         "wall_clock_seconds": float(result.wall_clock_seconds),
-        "realized_hit_tokens_total": int(probe.get("cache_hit_tokens", 0)),
-        "realized_hit_blocks_total": int(probe.get("cache_hit_blocks", 0)),
+        "realized_hit_tokens_total": realized_hit_tokens_total,
+        "realized_hit_source": realized_hit_source,
+        "realized_hit_blocks_total_via_probe": int(
+            probe.get("cache_hit_blocks", 0)
+        ),
         "prediction_accuracy": prediction_accuracy,
         "reordered_count": reordered_count,
         "starvation_overrides": starvation_overrides,
@@ -344,6 +374,7 @@ async def run_one_cell(
         seed=seed,
         enable_prefix_caching=cell.enable_prefix_caching,
         cache_aware_scheduling=cell.cache_aware_scheduling,
+        cache_aware_measurement_only=cell.cache_aware_measurement_only,
         shared_prefix_length=shared_prefix_length,
         shared_prefix_unique_tail_choices=list(unique_tail_choices),
         n_shared_prefixes=n_shared_prefixes,

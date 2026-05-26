@@ -760,6 +760,7 @@ class AsyncEngineDriver:
         int4_kv_sink_size: int = 0,
         int4_kv_num_kv_heads: Optional[int] = None,
         cache_aware_scheduling: bool = False,
+        cache_aware_measurement_only: bool = False,
         cache_aware_max_starvation_seconds: float = 30.0,
         shared_prefix_length: int = 0,
         shared_prefix_unique_tail_choices: Optional[Sequence[int]] = None,
@@ -894,7 +895,21 @@ class AsyncEngineDriver:
         # INT4: lives at the scheduler layer. Default OFF preserves
         # pre-PR-2 behaviour exactly. The install handle is set in
         # run() and torn down in the finally block.
+        #
+        # Phase 3C — cache_aware_measurement_only is a separate
+        # mode: installs the allocate/free tree wraps for
+        # realized-hit measurement, but SKIPS the schedule reorder
+        # wrap. Mutually exclusive with cache_aware_scheduling.
+        # Used in cell B of the Phase 3 comparison so cells B and
+        # C share the same measurement instrument.
+        if cache_aware_scheduling and cache_aware_measurement_only:
+            raise ValueError(
+                "cache_aware_scheduling and "
+                "cache_aware_measurement_only are mutually exclusive; "
+                "set exactly one (or neither)."
+            )
         self.cache_aware_scheduling = bool(cache_aware_scheduling)
+        self.cache_aware_measurement_only = bool(cache_aware_measurement_only)
         self.cache_aware_max_starvation_seconds = float(
             cache_aware_max_starvation_seconds
         )
@@ -1453,8 +1468,17 @@ class AsyncEngineDriver:
         # and route-A INT4 (all of which act at the attention layer).
         # Walks engine.engine.scheduler{[0]}.block_manager — the same
         # path the swap-counter probe uses.
+        #
+        # Phase 3C: also installs (in measurement_only mode) when
+        # cache_aware_measurement_only=True. Allocate/free wraps fire
+        # for realized-hit measurement; schedule reorder wrap is
+        # skipped so admission order is unchanged from stock FCFS.
         cache_aware_install: Any = None
-        if self.cache_aware_scheduling:
+        install_cache_aware = (
+            self.cache_aware_scheduling
+            or self.cache_aware_measurement_only
+        )
+        if install_cache_aware:
             try:
                 from kv_policy.cache_aware_install import (  # type: ignore
                     install_cache_aware_scheduler,
@@ -1463,7 +1487,7 @@ class AsyncEngineDriver:
                 sched_attr = getattr(inner_engine, "scheduler", None)
                 if sched_attr is None:
                     raise RuntimeError(
-                        "cache_aware_scheduling=True but the engine "
+                        "cache-aware install requested but the engine "
                         "has no .scheduler attribute"
                     )
                 sched = (
@@ -1473,21 +1497,24 @@ class AsyncEngineDriver:
                 bm = getattr(sched, "block_manager", None)
                 if bm is None:
                     raise RuntimeError(
-                        "cache_aware_scheduling=True but the scheduler "
+                        "cache-aware install requested but the scheduler "
                         "has no .block_manager attribute"
                     )
                 cache_aware_install = install_cache_aware_scheduler(
                     scheduler=sched,
                     block_manager=bm,
                     enable=True,
+                    measurement_only=self.cache_aware_measurement_only,
                     block_size=32,
                     max_starvation_seconds=(
                         self.cache_aware_max_starvation_seconds
                     ),
                 )
                 logger.info(
-                    "v2 cache-reuse: cache-aware scheduler installed "
+                    "v2 cache-reuse: cache-aware install (%s) "
                     "(block_size=32, max_starvation_seconds=%.1f)",
+                    "measurement_only" if self.cache_aware_measurement_only
+                    else "full",
                     self.cache_aware_max_starvation_seconds,
                 )
             except BaseException:

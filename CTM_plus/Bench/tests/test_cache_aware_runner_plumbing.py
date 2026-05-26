@@ -207,6 +207,86 @@ def test_async_engine_driver_accepts_cache_aware_true() -> None:
     assert driver.cache_aware_max_starvation_seconds == 15.0
 
 
+def test_async_engine_driver_accepts_measurement_only() -> None:
+    """Phase 3C: cache_aware_measurement_only flag is accepted +
+    plumbs to the install."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    driver = AsyncEngineDriver(
+        model="dummy",
+        cache_aware_measurement_only=True,
+    )
+    assert driver.cache_aware_measurement_only is True
+    assert driver.cache_aware_scheduling is False
+
+
+def test_async_engine_driver_rejects_both_cache_aware_modes() -> None:
+    """Mutually exclusive: cache_aware_scheduling and
+    cache_aware_measurement_only cannot both be True."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        AsyncEngineDriver(
+            model="dummy",
+            cache_aware_scheduling=True,
+            cache_aware_measurement_only=True,
+        )
+
+
+def test_run_measurement_only_installs_tree_without_reorder() -> None:
+    """End-to-end mocked run: measurement_only=True installs the
+    allocate / free wraps (tree-inserts > 0 once a request runs)
+    but leaves the scheduler.schedule wrap untouched."""
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver,
+        ArrivalScheduler,
+        ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    fake_vllm = _FakeVLLM()
+    driver = AsyncEngineDriver(
+        model="dummy",
+        cache_aware_measurement_only=True,
+        vllm_module=fake_vllm,
+        sample_interval_seconds=0.02,
+    )
+    arrival = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=10.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    loop = asyncio.new_event_loop()
+    try:
+        result = loop.run_until_complete(
+            driver.run(
+                scheduler=arrival, sampler=sampler,
+                max_requests=0, max_wall_seconds=0.05,
+                workload_name="meas-only-test",
+            )
+        )
+    finally:
+        loop.close()
+
+    # Stats dict reports the measurement-only mode.
+    s = result.cache_aware_scheduler_stats
+    assert s.get("enabled") is True
+    assert s.get("measurement_only") is True
+    assert s.get("reordered_count", 0) == 0   # no schedule wrap fired
+
+    # The engine's scheduler.schedule was NOT wrapped — bound-method
+    # identity recovers to the class method.
+    engine = fake_vllm.AsyncLLMEngine.last_instance
+    assert engine is not None
+    sched = engine.engine.scheduler
+    assert sched.schedule.__func__ is _FakeScheduler.schedule
+    # But allocate/free WERE wrapped + later torn down. Post-teardown
+    # they're back to the class methods.
+    assert sched.block_manager.allocate.__func__ is _FakeBlockManager.allocate
+    assert sched.block_manager.free.__func__ is _FakeBlockManager.free
+
+
 # ---------------------------------------------------------------- #
 # StreamingRunCellResult field
 # ---------------------------------------------------------------- #

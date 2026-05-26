@@ -57,21 +57,34 @@ class CacheAwareInstall:
     stub with no tree, no scheduler, no teardowns. Stats return
     ``{"enabled": False}``.
 
-    With ``enabled=True``, the handle owns the live
-    ``PrefixRadixTree``, the ``CacheAwareScheduler``, and the
-    teardown closures for the three monkey-patches. Callers must
-    invoke ``teardown()`` to revert the wraps when the engine
-    shuts down — typically from the streaming runner's finally
-    block (PR-2 wiring).
+    With ``enabled=True, measurement_only=False`` (full mode), the
+    handle owns the live ``PrefixRadixTree``, the
+    ``CacheAwareScheduler``, and teardown closures for all three
+    monkey-patches (schedule + allocate + free).
+
+    With ``enabled=True, measurement_only=True`` (Phase 3C
+    measurement mode), the handle owns the tree + scheduler but
+    only the allocate + free wraps. The scheduler.schedule wrap is
+    NOT installed, so admission order is unchanged from stock
+    FCFS. The allocate-wrap's realized_hit_tokens_total is still
+    populated, making this useful as an instrument to measure
+    realized prefix-cache hits in a cell that is otherwise pure
+    FCFS (cell B of the Phase 3B/C comparison).
+
+    Callers must invoke ``teardown()`` to revert the wraps when
+    the engine shuts down — typically from the streaming runner's
+    finally block.
     """
 
     enabled: bool
+    measurement_only: bool = False
     tree: Optional[PrefixRadixTree] = None
     cas: Optional[CacheAwareScheduler] = None
     _teardowns: List[Callable[[], None]] = field(default_factory=list)
     # Per-request predicted hits captured at schedule time, used
     # later to compute prediction_accuracy in stats(). Bounded by
-    # active-request count; cleaned by .free's wrap.
+    # active-request count; cleaned by .free's wrap. Stays empty in
+    # measurement_only mode (no schedule wrap fires).
     _predicted_hits_per_request: Dict[str, int] = field(default_factory=dict)
     _predicted_hits_total: int = 0
     _realized_hits_total: int = 0
@@ -94,6 +107,8 @@ class CacheAwareInstall:
         Returns ``{"enabled": False}`` when the install was a no-op.
         Otherwise includes admissions count, reorder count,
         predicted vs realized hit totals, and prediction accuracy.
+        The ``measurement_only`` field flags Phase 3C measurement-mode
+        installs (tree present, schedule wrap NOT installed).
         """
         if not self.enabled:
             return {"enabled": False}
@@ -103,6 +118,7 @@ class CacheAwareInstall:
         accuracy = (realized / predicted) if predicted > 0 else 0.0
         return {
             "enabled": True,
+            "measurement_only": bool(self.measurement_only),
             "admissions": s.get("admissions", 0),
             "reordered_count": s.get("reordered_count", 0),
             "starvation_overrides": s.get("starvation_overrides", 0),
@@ -248,6 +264,7 @@ def install_cache_aware_scheduler(
     scheduler: Any,
     block_manager: Any,
     enable: bool = False,
+    measurement_only: bool = False,
     block_size: int = 32,
     max_starvation_seconds: float = 30.0,
     tree_max_tokens: int = 1_000_000,
@@ -265,11 +282,20 @@ def install_cache_aware_scheduler(
             ``block_tables`` (``Dict[seq_id, List[block_id_like]]``).
         enable: feature flag. **Defaults to False.** When False,
             returns a no-op handle and applies zero patches.
+        measurement_only: Phase 3C measurement mode. When True,
+            installs the allocate + free tree wraps but SKIPS the
+            scheduler.schedule reorder wrap. The result is a
+            measurement-only install: ``realized_hit_tokens_total``
+            still accumulates (so we have an apples-to-apples
+            realized-hits counter for FCFS-only cells), but admission
+            order is unchanged from stock. Defaults to False (full
+            cache-aware mode). Has no effect when ``enable=False``.
         block_size: KV-cache block size. ``int4_protected`` forces
             32; stock vLLM defaults to 16.
         max_starvation_seconds: fairness guard. Any request older
             than this in ``waiting`` is admitted next regardless
-            of predicted hit. Default 30s.
+            of predicted hit. Default 30s. No effect in
+            measurement_only mode (no schedule wrap).
         tree_max_tokens: ``PrefixRadixTree`` memory budget.
 
     Returns:
@@ -301,9 +327,16 @@ def install_cache_aware_scheduler(
         block_size=block_size,
         max_starvation_seconds=max_starvation_seconds,
     )
-    install = CacheAwareInstall(enabled=True, tree=tree, cas=cas)
+    install = CacheAwareInstall(
+        enabled=True,
+        measurement_only=bool(measurement_only),
+        tree=tree, cas=cas,
+    )
 
     # --- Wrap 1: Scheduler.schedule reorders waiting -----------------
+    # Skipped entirely in measurement_only mode. The scheduler
+    # behaves identically to stock vLLM; only allocate + free are
+    # wrapped (for tree measurement, no admission-order side-effects).
 
     original_schedule = scheduler.schedule
 
@@ -338,10 +371,11 @@ def install_cache_aware_scheduler(
                     install._predicted_hits_total += phit
         return original_schedule(*args, **kwargs)
 
-    scheduler.schedule = _schedule_with_reorder
-    install._teardowns.append(
-        lambda: setattr(scheduler, "schedule", original_schedule)
-    )
+    if not measurement_only:
+        scheduler.schedule = _schedule_with_reorder
+        install._teardowns.append(
+            lambda: setattr(scheduler, "schedule", original_schedule)
+        )
 
     # --- Wrap 2: BlockSpaceManager.allocate updates tree --------------
 

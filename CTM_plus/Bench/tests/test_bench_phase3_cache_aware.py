@@ -142,25 +142,31 @@ def test_per_cell_schema_covers_user_spec(tmp_path: Path) -> None:
 
 
 def test_cell_configs_match_spec(tmp_path: Path) -> None:
-    """Cells A/B/C carry the canonical {enable_prefix_caching,
-    cache_aware_scheduling} pair the user specified.
+    """Cells A/B/C carry the canonical config triple:
 
-    * A: prefix OFF, cache-aware OFF
-    * B: prefix ON,  cache-aware OFF
-    * C: prefix ON,  cache-aware ON
+    * A: prefix OFF, cache-aware reorder OFF, measurement-only OFF
+    * B: prefix ON,  cache-aware reorder OFF, measurement-only ON
+         (Phase 3C bridge: tree measures hits; no admission reorder)
+    * C: prefix ON,  cache-aware reorder ON,  measurement-only OFF
     """
     comp = _run_bench(tmp_path=tmp_path)
     a = comp["cells"]["A_prefix_off_cache_aware_off"]["config"]
     assert a == {
-        "enable_prefix_caching": False, "cache_aware_scheduling": False,
+        "enable_prefix_caching": False,
+        "cache_aware_scheduling": False,
+        "cache_aware_measurement_only": False,
     }
     b = comp["cells"]["B_prefix_on_cache_aware_off"]["config"]
     assert b == {
-        "enable_prefix_caching": True, "cache_aware_scheduling": False,
+        "enable_prefix_caching": True,
+        "cache_aware_scheduling": False,
+        "cache_aware_measurement_only": True,
     }
     c = comp["cells"]["C_prefix_on_cache_aware_on"]["config"]
     assert c == {
-        "enable_prefix_caching": True, "cache_aware_scheduling": True,
+        "enable_prefix_caching": True,
+        "cache_aware_scheduling": True,
+        "cache_aware_measurement_only": False,
     }
 
 
@@ -201,17 +207,85 @@ def test_cell_b_probe_lands_on_cached_blocks_derived(tmp_path: Path) -> None:
     assert b["prefix_hit_probe_path_taken"] == "cached_blocks_derived"
 
 
-def test_cell_c_cache_aware_extra_present(tmp_path: Path) -> None:
-    """Cell C's cache_aware_extra block is populated (non-None)
-    since the cache-aware install fired. Cells A and B have
-    cache_aware_extra == None."""
+def test_cell_b_uses_measurement_only_tree(tmp_path: Path) -> None:
+    """Phase 3C fix: cell B installs the cache-aware tree in
+    measurement_only mode (allocate/free wraps fire, schedule wrap
+    does NOT). cache_aware_extra is populated; measurement_only
+    flag is True. realized_hit_source reports 'cache_aware_tree'.
+
+    This is the gate that confirms cells B and C now share the
+    same realized-hit instrument (apples-to-apples)."""
     comp = _run_bench(tmp_path=tmp_path)
-    assert comp["cells"]["A_prefix_off_cache_aware_off"]["cache_aware_extra"] is None
-    assert comp["cells"]["B_prefix_on_cache_aware_off"]["cache_aware_extra"] is None
-    cae = comp["cells"]["C_prefix_on_cache_aware_on"]["cache_aware_extra"]
+    b = comp["cells"]["B_prefix_on_cache_aware_off"]
+    # Cell B's config flag must reflect measurement_only=True.
+    assert b["config"]["cache_aware_measurement_only"] is True
+    assert b["config"]["cache_aware_scheduling"] is False
+    # cache_aware_extra populated (install fired) with
+    # measurement_only=True surfaced.
+    assert b["cache_aware_extra"] is not None
+    assert b["cache_aware_extra"]["measurement_only"] is True
+    # Allocate wrap fires → tree_inserts > 0.
+    assert b["cache_aware_extra"]["tree_inserts"] > 0
+    # Realized-hit source is the tree, not the broken probe.
+    assert b["realized_hit_source"] == "cache_aware_tree"
+
+
+def test_cell_c_uses_full_cache_aware_tree(tmp_path: Path) -> None:
+    """Cell C's cache_aware_extra block is populated AND
+    measurement_only=False (full mode with schedule reorder wrap)."""
+    comp = _run_bench(tmp_path=tmp_path)
+    c = comp["cells"]["C_prefix_on_cache_aware_on"]
+    assert c["config"]["cache_aware_scheduling"] is True
+    assert c["config"]["cache_aware_measurement_only"] is False
+    cae = c["cache_aware_extra"]
     assert cae is not None
-    # Tree inserts > 0 confirms allocate hook is firing in cell C.
+    assert cae["measurement_only"] is False
     assert cae["tree_inserts"] > 0
+    assert c["realized_hit_source"] == "cache_aware_tree"
+
+
+def test_cell_a_realized_hit_source_is_probe(tmp_path: Path) -> None:
+    """Cell A doesn't install the cache-aware tree (no
+    cache_aware_scheduling, no measurement_only), so realized_hit
+    falls back to the probe. With prefix caching OFF the probe
+    lands on no_known_path → 0 hits → no measurement available."""
+    comp = _run_bench(tmp_path=tmp_path)
+    a = comp["cells"]["A_prefix_off_cache_aware_off"]
+    assert a["cache_aware_extra"] is None
+    assert a["realized_hit_source"] == "prefix_hit_probe"
+    assert a["realized_hit_tokens_total"] == 0
+
+
+def test_b_vs_c_apples_to_apples_via_tree(tmp_path: Path) -> None:
+    """Both cells B and C now report realized hits via the SAME
+    instrument (cache_aware_tree). The B-vs-C ratio is therefore
+    a meaningful direct comparison once a workload with concurrent
+    overlap produces non-zero tree hits.
+
+    NOTE: the dry-run mock yields outputs then immediately frees
+    each request (no in-flight overlap → no concurrent hits in
+    the tree → both cells report 0). The CPU test gates only on
+    the realized_hit_source being identical; non-zero hits are a
+    GPU-mode property verified in Phase 3C."""
+    comp = _run_bench(tmp_path=tmp_path)
+    b = comp["cells"]["B_prefix_on_cache_aware_off"]
+    c = comp["cells"]["C_prefix_on_cache_aware_on"]
+    assert b["realized_hit_source"] == "cache_aware_tree"
+    assert c["realized_hit_source"] == "cache_aware_tree"
+    # Same instrument → ratio is well-defined when non-zero;
+    # the comparison block is populated regardless.
+    assert "realized_hit_tokens_ratio" in comp["comparison"]["B_vs_C"]
+
+
+def test_per_cell_schema_includes_realized_hit_source(tmp_path: Path) -> None:
+    """The new realized_hit_source field is present in every
+    per-cell dict (Phase 3C addition to the schema)."""
+    comp = _run_bench(tmp_path=tmp_path)
+    for cell_name, cell in comp["cells"].items():
+        assert "realized_hit_source" in cell, cell_name
+        assert cell["realized_hit_source"] in (
+            "cache_aware_tree", "prefix_hit_probe",
+        ), (cell_name, cell["realized_hit_source"])
 
 
 def test_subset_cells_selection(tmp_path: Path) -> None:

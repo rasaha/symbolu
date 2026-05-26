@@ -463,3 +463,101 @@ pattern is robust to it (the wrap stays a structural no-op when
 the helper returns `[]`), but the helper itself has to know the
 real interface shape. Future installs should mirror this fix
 pattern: try canonical → alt → iterate → fail-safe.
+
+### Phase 3C measurement-path fix (post-first-3C-GPU-smoke)
+
+The Phase 3A `prefix_hit_probe` was designed to count vLLM's
+native prefix-cache hits via either a native counter (preferred)
+or chunk-hash derivation against `_cached_blocks` (fallback).
+The first Phase 3C run on real Qwen-7B + vLLM 0.7.3 surfaced
+that:
+
+* The probe's V2 path resolves cleanly
+  (`v2_block_allocator._allocators[GPU]`).
+* But the GPU allocator exposes only `_cached_blocks` (no native
+  hit counter on this vLLM version), so the probe falls back to
+  the chunk-hash derivation.
+* The derivation reports **zero hits** because vLLM uses a
+  **chained content_hash** (each block's hash includes the parent
+  block's hash + the current block's tokens). Our flat blake2b
+  hash can't match vLLM's chained keys.
+
+So the probe correctly identified the path but can't measure
+hits on real vLLM 0.7.3. **The cache-aware tree (PR-1) is an
+independent measurement instrument** that doesn't depend on
+vLLM's hash function — it tracks token sequences directly and
+records a match when the new request's tokens prefix-overlap with
+a previously-inserted sequence's tokens. The same Phase 3C run
+reported `realized_hit_tokens_total_via_tree = 6912` in cell C
+under bursty arrivals (in-flight overlap of cohort-mate requests).
+
+Fix: add a `measurement_only=True` mode to
+`install_cache_aware_scheduler` that installs the allocate + free
+tree wraps for hit measurement but **skips the scheduler.schedule
+reorder wrap**. Apply it in cell B of the Phase 3 bench so cells
+B and C share the same realized-hit instrument (apples-to-apples
+comparison).
+
+Surface changes:
+
+* `cache_aware_install.py`:
+  - New `measurement_only: bool = False` param on
+    `install_cache_aware_scheduler`.
+  - `CacheAwareInstall` dataclass gets a `measurement_only`
+    field; `stats()` surfaces it.
+  - When `measurement_only=True`: schedule wrap not installed
+    (verified via `__func__` identity); allocate/free wraps
+    install as usual.
+
+* `runner_vllm_streaming.py`:
+  - New `cache_aware_measurement_only: bool = False` driver
+    param.
+  - Constructor mutex check rejects both
+    `cache_aware_scheduling` and `cache_aware_measurement_only`
+    being True simultaneously.
+  - Install path triggers when either is True; passes through
+    the mode flag.
+
+* `bench_phase3_cache_aware.py`:
+  - `CellConfig` gets a `cache_aware_measurement_only` field.
+  - Cell B's config now sets `cache_aware_measurement_only=True`
+    so the tree is installed for measurement in cell B (no
+    admission reorder, same instrument as cell C).
+  - `extract_cell_metrics` prefers the cache-aware tree's
+    `realized_hit_tokens_total_via_tree` over the broken probe
+    when the tree is installed. New `realized_hit_source` field
+    flags which instrument supplied the number
+    (`"cache_aware_tree"` vs `"prefix_hit_probe"`).
+
+CPU regression coverage (13 new tests):
+
+* `test_cache_aware_install.py` +6:
+  - `test_measurement_only_skips_schedule_wrap`
+  - `test_measurement_only_installs_allocate_and_free_wraps`
+  - `test_measurement_only_accumulates_realized_hits` (the
+    load-bearing assertion: measurement_only mode still counts
+    realized hits via the allocate wrap)
+  - `test_measurement_only_does_not_reorder_waiting_deque`
+  - `test_full_mode_stats_reports_measurement_only_false`
+  - `test_disabled_install_has_no_measurement_only_field_in_stub_stats`
+* `test_cache_aware_runner_plumbing.py` +3:
+  - `test_async_engine_driver_accepts_measurement_only`
+  - `test_async_engine_driver_rejects_both_cache_aware_modes`
+  - `test_run_measurement_only_installs_tree_without_reorder`
+* `test_bench_phase3_cache_aware.py` +4:
+  - `test_cell_b_uses_measurement_only_tree`
+  - `test_cell_c_uses_full_cache_aware_tree`
+  - `test_cell_a_realized_hit_source_is_probe`
+  - `test_b_vs_c_apples_to_apples_via_tree`
+  - `test_per_cell_schema_includes_realized_hit_source`
+
+Caveat: the cache-aware tree only counts **in-flight overlap**
+(concurrently-live sequences with shared prefixes). It does NOT
+model vLLM's LRU prefix-cache pool (where freed blocks remain
+cacheable for a while). This is a reasonable approximation since
+the primary source of measurable benefit on a chat workload is
+in-flight overlap; LRU-pool-mediated reuse is a smaller secondary
+effect. If Phase 3D's analysis suggests LRU-pool reuse matters,
+the recovery options in `PHASE3_VLLM_NATIVE_PREFIX_HITS_RESEARCH.md`
+(patch vLLM directly / use Prometheus counters / instrument
+`allocate_immutable_block`) are the path forward.

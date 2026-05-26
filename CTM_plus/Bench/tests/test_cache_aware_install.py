@@ -859,3 +859,150 @@ def test_realized_hits_with_v2_block_manager():
         assert handle.stats()["realized_hit_tokens_total"] == 64
     finally:
         handle.teardown()
+
+
+# ----------------------------------------------------------------------
+# Phase 3C measurement-only mode
+#
+# install_cache_aware_scheduler(measurement_only=True) installs the
+# allocate + free tree wraps for realized-hit measurement, but
+# SKIPS the scheduler.schedule reorder wrap. Used by cell B of the
+# Phase 3 comparison to bridge the probe failure (vLLM's chained
+# content_hash defeats the flat-hash probe).
+# ----------------------------------------------------------------------
+
+
+def test_measurement_only_skips_schedule_wrap():
+    """measurement_only=True does NOT install the scheduler.schedule
+    wrap — bound-method identity unchanged."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    original_schedule = sched.schedule
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        assert handle.enabled is True
+        assert handle.measurement_only is True
+        # The schedule method's underlying function should remain the
+        # MockScheduler class method (the wrap was NOT applied).
+        assert sched.schedule.__func__ is MockScheduler.schedule
+        # Sanity: scheduler still callable, returns admitted list.
+        assert sched.schedule() == []
+    finally:
+        handle.teardown()
+
+
+def test_measurement_only_installs_allocate_and_free_wraps():
+    """measurement_only=True DOES install the allocate + free
+    wraps — bound-method identity changes for both."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    original_allocate = bm.allocate
+    original_free = bm.free
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        # Allocate / free are wrapped — closures, not bound methods.
+        assert bm.allocate is not original_allocate
+        assert bm.free is not original_free
+    finally:
+        handle.teardown()
+    # Teardown restores them.
+    assert bm.allocate.__func__ is MockBlockSpaceManager.allocate
+    assert bm.free.__func__ is MockBlockSpaceManager.free
+
+
+def test_measurement_only_accumulates_realized_hits():
+    """The load-bearing assertion: measurement_only mode still
+    counts realized hit tokens via the allocate wrap. This is what
+    cell B of Phase 3 will rely on."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        SHARED = list(range(64))  # 2 blocks @ 32
+        # Seed allocate populates the tree.
+        bm.allocate(_mk_sg("seed", SHARED + list(range(500, 532)), 0.0))
+        # Reuser shares the 64-token prefix → 64-token realized hit.
+        bm.allocate(_mk_sg("reuser", SHARED + list(range(600, 632)), 1.0))
+        assert handle._realized_hits_total == 64
+        s = handle.stats()
+        assert s["realized_hit_tokens_total"] == 64
+        # No reorder happened (no schedule wrap), no predictor ran.
+        assert s["admissions"] == 0
+        assert s["reordered_count"] == 0
+        assert s["predicted_hit_tokens_total"] == 0
+        # measurement_only flag surfaces in stats.
+        assert s["measurement_only"] is True
+    finally:
+        handle.teardown()
+
+
+def test_measurement_only_does_not_reorder_waiting_deque():
+    """End-to-end: even with multiple pending requests of varying
+    predicted hit rates, measurement_only mode preserves FCFS
+    admission order (verifies the schedule wrap really isn't
+    installed)."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=True, measurement_only=True, block_size=32,
+    )
+    try:
+        # Seed the tree so a future request would have a high
+        # predicted hit rate.
+        seed_tokens = list(range(64))
+        bm.allocate(_mk_sg(
+            "seed", seed_tokens + list(range(500, 532)), 0.0,
+        ))
+        # Enqueue two pending requests: r_low_hit (no overlap with
+        # tree) and r_high_hit (shares the 64-token prefix).
+        r_low = _mk_sg("r_low", list(range(9000, 9064)), 1.0)
+        r_high = _mk_sg("r_high", seed_tokens + list(range(7000, 7032)), 2.0)
+        sched.waiting.append(r_low)
+        sched.waiting.append(r_high)
+        admitted = sched.schedule()
+        # FCFS order preserved: r_low (older arrival_time) admitted
+        # before r_high, even though r_high has a higher predicted hit.
+        assert admitted == [r_low, r_high]
+    finally:
+        handle.teardown()
+
+
+def test_full_mode_stats_reports_measurement_only_false():
+    """Sanity check: the default (full-mode) install reports
+    measurement_only=False in stats."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm, enable=True,
+        block_size=32,
+        # measurement_only defaults to False
+    )
+    try:
+        s = handle.stats()
+        assert s["enabled"] is True
+        assert s["measurement_only"] is False
+    finally:
+        handle.teardown()
+
+
+def test_disabled_install_has_no_measurement_only_field_in_stub_stats():
+    """When enable=False, stats() returns the minimal {'enabled': False}
+    stub — no measurement_only field needed since nothing's installed."""
+    sched = MockScheduler()
+    bm = MockBlockSpaceManager(block_size=32)
+    handle = install_cache_aware_scheduler(
+        scheduler=sched, block_manager=bm,
+        enable=False, measurement_only=True,   # measurement_only ignored
+    )
+    assert handle.enabled is False
+    assert handle.stats() == {"enabled": False}
