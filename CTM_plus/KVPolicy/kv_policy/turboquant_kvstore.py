@@ -177,6 +177,18 @@ class TurboQuantKVStore:
         torch_device: Optional[Any] = None,
         per_channel_scale: bool = False,
     ) -> None:
+        # Retirement guard (May 2026). The local TurboQuant / QJL
+        # KV-cache path was retired after failing Qwen2.5-7B
+        # validation (3052x perplexity ratio; PHASE4_GPU_FINDINGS
+        # §17). Code preserved in-tree for archaeology /
+        # reproducing the negative result; opt in with
+        # TURBOQUANT_KV_RETIRED_BYPASS=1.
+        import os as _os
+        if _os.environ.get("TURBOQUANT_KV_RETIRED_BYPASS") != "1":
+            raise RuntimeError(
+                "TurboQuant/QJL KV path retired after failed local "
+                "validation; see TURBOQUANT_RETIREMENT.md"
+            )
         if backend not in ("numpy", "torch"):
             raise ValueError(
                 f"TurboQuantKVStore backend must be 'numpy' or 'torch', got "

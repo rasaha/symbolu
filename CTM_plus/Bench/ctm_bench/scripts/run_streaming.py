@@ -291,13 +291,8 @@ def main(argv: Sequence[str]) -> int:
         "--turboquant-kv",
         action="store_true",
         help=(
-            "Track B Tier 1: construct a TurboQuantKVStore alongside "
-            "the CTM+ evictor. **Tier 1 does NOT install a real "
-            "vLLM hook** — it constructs the wrapper so its stats "
-            "are visible in the streaming summary, and reserves the "
-            "CLI surface for Tier 2's actual cache_kv monkey-patch. "
-            "See kv_policy.turboquant_kvstore module docstring and "
-            "PHASE4_GPU_FINDINGS §14 for the integration plan."
+            "RETIRED. Selecting this flag will exit with an error. "
+            "See CTM_plus/TURBOQUANT_RETIREMENT.md."
         ),
     )
     parser.add_argument(
@@ -305,6 +300,12 @@ def main(argv: Sequence[str]) -> int:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     args = parser.parse_args(argv)
+
+    if getattr(args, "turboquant_kv", False):
+        raise SystemExit(
+            "TurboQuant/QJL KV path retired after failed local validation; "
+            "see TURBOQUANT_RETIREMENT.md"
+        )
 
     logging.basicConfig(
         level=args.log_level,

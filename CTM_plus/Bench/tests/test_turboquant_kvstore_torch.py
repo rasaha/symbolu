@@ -32,6 +32,13 @@ import is missing.
 
 from __future__ import annotations
 
+import os
+
+# Retirement guard bypass: TurboQuantKVStore is retired from the
+# active product path (TURBOQUANT_RETIREMENT.md). These tests
+# remain to reproduce the historical Tier 2 contracts.
+os.environ.setdefault("TURBOQUANT_KV_RETIRED_BYPASS", "1")
+
 import pytest
 
 from ctm_bench.policies import _add_kv_policy_to_path

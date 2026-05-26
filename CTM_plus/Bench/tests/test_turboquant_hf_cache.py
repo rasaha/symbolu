@@ -11,6 +11,14 @@ Skips cleanly when transformers or torch is missing.
 
 from __future__ import annotations
 
+import os
+
+# Retirement guard bypass: TurboQuantKVStore (which TurboQuantCache
+# wraps) is retired from the active product path. See
+# TURBOQUANT_RETIREMENT.md. Tests remain for archaeology /
+# negative-result reproducibility.
+os.environ.setdefault("TURBOQUANT_KV_RETIRED_BYPASS", "1")
+
 import pytest
 
 from ctm_bench.policies import _add_kv_policy_to_path
