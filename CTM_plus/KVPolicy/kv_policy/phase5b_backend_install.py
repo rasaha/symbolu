@@ -725,17 +725,58 @@ if _VLLM_FA_AVAILABLE:
                         # batch verify hit common-prefix=4 chars on both
                         # prompts because of this.
                         BS = int(kv_cache.shape[2]) if kv_cache.numel() > 0 else 32
-                        partitions = _derive_write_partitions(
-                            attn_metadata, slot_mapping_flat, BS,
-                        )
-                        for seq_id, sl in partitions:
-                            writer.write(
-                                key=key[sl],
-                                value=value[sl],
-                                kv_cache=kv_cache,
-                                slot_mapping=slot_mapping_flat[sl],
-                                seq_id=seq_id,
+
+                        # Phase 6B.1 — dispatch on pure-decode vs mixed.
+                        # Pure decode (1 new token per active seq, no
+                        # prefill rows) routes through the graph-capture-
+                        # friendly write_decode_batched. Mixed / prefill
+                        # / spec-decode-style writes stay on the legacy
+                        # partition + per-seq write loop (eager only;
+                        # vLLM 0.7.3 V0 doesn't graph-capture prefill).
+                        T_total = int(key.shape[0])
+                        if _is_pure_decode_write(attn_metadata, T_total):
+                            dec_meta = attn_metadata.decode_metadata
+                            B_decode = int(dec_meta.block_tables.shape[0])
+                            # Resolve seq_ids -> slot_idx ONCE, then call
+                            # the batched write. The seq_id derivation
+                            # mirrors _derive_write_partitions's decode
+                            # branch (block_tables[i, 0]); same identifier
+                            # the read path uses. This is the ONE pre-
+                            # capture-hoistable Python step in the write
+                            # path (analogous to the read path's coalesced
+                            # seqlens+seq_ids sync); 6B.2's vLLM hook moves
+                            # it out of the captured region entirely.
+                            seq_ids = dec_meta.block_tables[:, 0] \
+                                .cpu().tolist()
+                            # Ensure SeqState exists for each decode seq
+                            # (allocates a pool slot lazily on first write).
+                            for sid in seq_ids:
+                                writer.ensure_seq_state(sid, kv_cache.device)
+                            slot_idx_list = writer.slot_indices_for(seq_ids)
+                            slot_idx_t = torch.tensor(
+                                slot_idx_list, dtype=torch.long,
+                                device=kv_cache.device,
                             )
+                            writer.write_decode_batched(
+                                key=key,
+                                value=value,
+                                kv_cache=kv_cache,
+                                slot_mapping=slot_mapping_flat,
+                                slot_idx_t=slot_idx_t,
+                            )
+                        else:
+                            # Legacy partition + per-seq write (eager).
+                            partitions = _derive_write_partitions(
+                                attn_metadata, slot_mapping_flat, BS,
+                            )
+                            for seq_id, sl in partitions:
+                                writer.write(
+                                    key=key[sl],
+                                    value=value[sl],
+                                    kv_cache=kv_cache,
+                                    slot_mapping=slot_mapping_flat[sl],
+                                    seq_id=seq_id,
+                                )
                         Int4ProtectedAttentionImpl._call_stats["write_path_calls"] += 1
                     else:
                         Int4ProtectedAttentionImpl._call_stats["write_path_fallback"] += 1
@@ -947,6 +988,49 @@ class Int4ProtectedBackendManager:
 # ----------------------------------------------------------------------
 # Attention layer detection (same heuristic as Phase 5A).
 # ----------------------------------------------------------------------
+
+
+def _is_pure_decode_write(attn_metadata: Any, T_total: int) -> bool:
+    """Phase 6B.1 — dispatch gate: True iff the current forward() write
+    is a pure decode (one new token per active seq, no prefill rows).
+
+    A pure decode call satisfies ALL of:
+      1. `decode_metadata` is set with non-empty `block_tables`.
+      2. `prefill_metadata` is None or has zero query tokens.
+      3. `max_decode_query_len == 1` (rules out spec-decode style multi-
+         token-per-seq writes).
+      4. Total write rows `T_total` == number of decode sequences B.
+
+    When True, the dispatch routes through
+    `PagedKVWriter.write_decode_batched` (graph-capture-friendly).
+    When False, the legacy partition + per-seq `writer.write(seq_id=...)`
+    loop runs (prefill / spec-decode / mixed). Prefill is NOT graph-
+    captured by vLLM 0.7.3 V0 so eager-only handling is fine.
+    """
+    dec_meta = getattr(attn_metadata, "decode_metadata", None)
+    if dec_meta is None:
+        return False
+    block_tables = getattr(dec_meta, "block_tables", None)
+    if block_tables is None or block_tables.numel() == 0:
+        return False
+    max_decode_q = getattr(dec_meta, "max_decode_query_len", None)
+    if max_decode_q is not None and max_decode_q > 1:
+        return False
+    pre_meta = getattr(attn_metadata, "prefill_metadata", None)
+    if pre_meta is not None:
+        n_prefill_q = getattr(pre_meta, "num_prefill_tokens", None)
+        if n_prefill_q is None:
+            # Older vLLM shape — fall back to checking query_start_loc.
+            qsl = getattr(pre_meta, "query_start_loc", None)
+            if qsl is not None and qsl.numel() > 0:
+                n_prefill_q = int(qsl[-1].item())
+        if n_prefill_q is not None and n_prefill_q > 0:
+            return False
+    B_decode = int(block_tables.shape[0])
+    if T_total != B_decode:
+        return False
+    return True
+
 
 def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tensor", BS: int):
     """Phase 5B.6 step 3 fix: partition a multi-token write call across
