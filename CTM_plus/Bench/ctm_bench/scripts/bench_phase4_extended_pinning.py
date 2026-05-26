@@ -368,8 +368,14 @@ async def run_three_cells(
     vllm_module_factory: Any,
     cells_to_run: Sequence[str],
     output_dir: Optional[Path] = None,
+    pin_first_n_blocks_override: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Run cells sequentially; aggregate into comparison JSON."""
+    """Run cells sequentially; aggregate into comparison JSON.
+
+    ``pin_first_n_blocks_override``: when not None, overrides
+    cell C's compiled-in ``pin_first_n_blocks`` for this run.
+    Other cells are not affected (they have pinning OFF).
+    """
     cells_out: Dict[str, Dict[str, Any]] = {}
     workload = {
         "model": model,
@@ -384,6 +390,7 @@ async def run_three_cells(
         "gpu_memory_utilization": gpu_memory_utilization,
         "seed": seed,
         "pin_max_budget_blocks": pin_max_budget_blocks,
+        "pin_first_n_blocks_override": pin_first_n_blocks_override,
     }
 
     for cell_key in cells_to_run:
@@ -392,6 +399,14 @@ async def run_three_cells(
                 f"unknown cell key {cell_key!r}; expected one of A, B, C"
             )
         cell = CELLS[cell_key]
+        # Apply CLI override to cell C's pin_first_n_blocks if set.
+        if (
+            pin_first_n_blocks_override is not None
+            and cell.extended_pinning
+        ):
+            cell = dataclasses.replace(
+                cell, pin_first_n_blocks=pin_first_n_blocks_override,
+            )
         cell_dir = output_dir / f"cell_{cell_key}" if output_dir else None
         logger.info(
             "Phase 4B: running cell %s (%s)", cell_key, cell.name,
@@ -762,6 +777,18 @@ def main(argv: Sequence[str]) -> int:
         "--sample-interval-seconds", type=float, default=0.1,
     )
     parser.add_argument(
+        "--pin-first-n-blocks", type=int, default=None,
+        help=(
+            "Override cell C's first_n_blocks_per_request pinning "
+            "value. Default is the cell's compiled-in value "
+            "(currently 4). Set higher to pin more of each "
+            "request's prefix; set 0 to disable position-based "
+            "pinning entirely (operator would then need to wire "
+            "PinSpecs via a tokens file — not currently exposed "
+            "by this bench script)."
+        ),
+    )
+    parser.add_argument(
         "--pin-max-budget-blocks", type=int, default=1024,
     )
     parser.add_argument(
@@ -831,6 +858,7 @@ def main(argv: Sequence[str]) -> int:
             vllm_module_factory=factory,
             cells_to_run=cells_to_run,
             output_dir=args.output_dir,
+            pin_first_n_blocks_override=args.pin_first_n_blocks,
         )
     )
 

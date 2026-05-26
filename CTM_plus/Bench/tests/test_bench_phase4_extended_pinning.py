@@ -220,6 +220,57 @@ def test_b_vs_c_comparison_has_c_only_enrichment(tmp_path: Path) -> None:
     assert bvc["c_pinned_blocks_total"] > 0
 
 
+def test_pin_first_n_blocks_cli_override(tmp_path: Path) -> None:
+    """CLI flag --pin-first-n-blocks overrides cell C's compiled-in
+    pin_first_n_blocks. Verifies the override plumbs through
+    run_three_cells -> dataclasses.replace(cell, ...)."""
+    from ctm_bench.scripts.bench_phase4_extended_pinning import (
+        CELLS,
+        make_dry_run_vllm_module_factory,
+        run_three_cells,
+    )
+    factory = make_dry_run_vllm_module_factory()
+    loop = asyncio.new_event_loop()
+    try:
+        comp = loop.run_until_complete(
+            run_three_cells(
+                model="dummy",
+                shared_prefix_length=64,
+                n_shared_prefixes=2,
+                unique_tail_choices=[16],
+                n_requests=2,
+                arrival_rate=20.0,
+                arrival_alpha=2.0,
+                max_wall_seconds=1.0,
+                max_decode_tokens=2,
+                gpu_memory_utilization=0.5,
+                swap_space_gb=4,
+                seed=42,
+                sample_interval_seconds=0.05,
+                pin_max_budget_blocks=1024,
+                vllm_module_factory=factory,
+                cells_to_run=["C"],
+                output_dir=tmp_path,
+                pin_first_n_blocks_override=2,
+            )
+        )
+    finally:
+        loop.close()
+    # Cell C's config reflects the override (NOT the default 4).
+    c = comp["cells"]["C_prefix_on_pinning_on"]
+    assert c["config"]["pin_first_n_blocks"] == 2
+    # Workload block records the override for reproducibility.
+    assert comp["workload"]["pin_first_n_blocks_override"] == 2
+
+
+def test_pin_first_n_blocks_default_when_unset(tmp_path: Path) -> None:
+    """Without the CLI override, cell C uses its compiled-in default."""
+    from ctm_bench.scripts.bench_phase4_extended_pinning import CELLS
+    comp = _run_bench(tmp_path=tmp_path)
+    c = comp["cells"]["C_prefix_on_pinning_on"]
+    assert c["config"]["pin_first_n_blocks"] == CELLS["C"].pin_first_n_blocks
+
+
 def test_pin_budget_rejections_when_cap_low(tmp_path: Path) -> None:
     """Setting a tiny max_budget_blocks forces budget rejection
     after the first few admissions. Verifies the budget knob is
