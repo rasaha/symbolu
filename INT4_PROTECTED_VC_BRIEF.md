@@ -21,9 +21,9 @@ The industry has tried four mitigations:
 | Approach | Memory savings | Quality | Status |
 |---|---:|---|---|
 | **bf16** (baseline) | 1.0× | perfect | the reference |
-| **fp8** (half-precision) | 0.5× | **poor** — ~12% needle-in-haystack recall vs bf16's 100% | shipped, widely deployed; quality degradation accepted |
-| **pure int4** (naive 4-bit) | 0.5× | broken — needle retrieval collapses to ~11-29% at long context | research-grade only; not shippable |
-| **int4 with protected channels** *(our approach)* | **0.5×** | **100% needle retrieval matching bf16** | **shipped via vLLM, 4 models validated this quarter** |
+| **fp8** (half-precision) | 0.5× | **poor** — 0/6 bit-identical greedy decode, 12% common-prefix overlap vs bf16 (own measurement; fp8 needle not measured) | shipped, widely deployed; quality degradation accepted |
+| **pure int4** (naive 4-bit) | 0.5× | broken — long-context needle recall collapses (own KIVI-on-K-and-V measurement at 16K context pending) | research-grade only; not shippable |
+| **int4 with protected channels** *(our approach)* | **0.5×** | **100% needle retrieval (15/15) matching bf16, single-run per model in v1** | **shipped via vLLM, 4 models validated this quarter** |
 
 The dominant production answer (fp8) sacrifices quality. The
 research-grade answer (pure int4) is unshippable. Neither is
@@ -42,8 +42,10 @@ collapses at long context because attention propagation needs
 exactly those channels intact across many decode steps.
 
 We diagnosed this empirically: route-B int4 KIVI on K **and** V
-catastrophically loses long-context recall (100% → 11-29% on
-needle-in-haystack at 16K context). The K channel is the blocker;
+catastrophically loses long-context recall. Our own needle
+measurement of route-B KIVI at 16K context is **pending**; the
+qualitative collapse is reproducible from the route-B
+implementation in this repository. The K channel is the blocker;
 V tolerates int4 cleanly.
 
 ### The breakthrough
@@ -146,12 +148,15 @@ quantization-aware fine-tuning. Pure post-hoc cache compression.
 |---|---|---|:-:|:-:|:-:|
 | Qwen2.5-7B-Instruct | Qwen | 28L × H_kv=4 × D=128 | ✓ | **✓** | 0 |
 | Mistral-7B-Instruct-v0.3 | Mistral | 32L × H_kv=8 × D=128 | ✓ | **✓** | 0 |
-| Llama-3.1-8B-Instruct | Llama | 32L × H_kv=8 × D=128 | ✓ | **✓** | 0 |
+| Llama-3.1-8B-Instruct *(NousResearch ungated mirror)* | Llama | 32L × H_kv=8 × D=128 | ✓ | **✓** | 0 |
 | Qwen2.5-14B-Instruct | Qwen | 48L × H_kv=8 × D=128 | ✓ | **✓** | 0 |
 
 All four hit **100% needle retrieval at 4% protect_fraction**
-matching stock bf16 vLLM exactly. Zero kernel fallbacks across
-roughly 100,000 decode calls in aggregate testing.
+matching stock bf16 vLLM exactly. **Single measurement run per
+model in v1 (2-of-2 replication scheduled).** Zero kernel
+fallbacks across roughly 100,000 aggregate decode-plus-write
+calls in testing (decode-call-only count: ~75K across the
+Phase-7 cross-family runs).
 
 ### What "needle 15/15" means
 
@@ -176,18 +181,23 @@ mid-context — the failure mode that catastrophic int4 schemes
 trigger. We do not rely on perplexity (a smoothing metric that
 hides catastrophic failures) for our quality claim.
 
-### Memory + concurrency numbers (Qwen2.5-7B, H100, max_model_len=4096)
+### Memory + concurrency numbers (Qwen2.5-7B, H100, max_model_len=4096, gpu_memory_utilization=0.5)
 
 | Metric | bf16 stock | fp8 | int4_protected |
 |---|---:|---:|---:|
 | cuda blocks | 13,967 | 28,060 | **28,060** |
 | max concurrency at 4096 ctx | 109× | 219× | **218×** |
 | Real KV memory savings | — | 0.50× | **0.50×** |
-| Needle 15/15 | ✓ | **fails (~12%)** | **✓** |
-| Bit-identical greedy output (5 prompts) | (baseline) | **0/5** | **3/5** |
+| Needle 15/15 (own measurement) | ✓ | **not measured for fp8 in v1** | **✓** |
+| Bit-identical greedy output (6 prompts, `bench_phase5c_v1.py`) | (baseline) | **0/6** | **3/6** |
 
 int4_protected delivers fp8's memory profile with bf16's quality.
-That is the value proposition in one row.
+That is the value proposition in one row. Cuda-block counts are
+sensitive to `gpu_memory_utilization`; the **2.01× ratio** (bf16 →
+int4_protected at the same memory budget) is the stable summary.
+Concurrency and cuda-block numbers come from a single engine-init
+log line per backend (`vllm/executor_base.py:116`); re-bench
+scheduled.
 
 ### The per-seq latency trade-off
 
@@ -201,7 +211,10 @@ This is the honest cost. int4_protected pays per-sequence latency
 to recover the memory + quality combination. Aggregate throughput
 at batch=8 is **42.5 tok/s on Qwen-7B** — competitive when the
 workload is memory-bound (many concurrent users) rather than
-latency-bound (single-user chat).
+latency-bound (single-user chat). **Both the 3.7× latency and
+42.5 tok/s @ B=8 are v1 provisional measurements** (single run,
+post B-pre-1 buffer fix per `OPTION_B_PREFLIGHT.md`); 180s
+replication is scheduled.
 
 Roadmap addresses this: CUDA Graphs preflight is complete on the
 read path this quarter (B-pre-1 through B-pre-4); enabling capture
@@ -216,11 +229,11 @@ projects 2-3× aggregate throughput, closing most of the gap.
 | Approach | Memory | Quality | Notes |
 |---|---:|---|---|
 | **bf16** (vLLM default) | 1.0× | perfect | the reference |
-| **fp8** (vLLM-supported) | 0.5× | poor (~12% needle, 0/6 bit-identical) | half-precision; ships, accepted as a quality compromise |
+| **fp8** (vLLM-supported) | 0.5× | poor (0/6 bit-identical greedy, 12% common-prefix overlap; fp8 needle not measured) | half-precision; ships, accepted as a quality compromise |
 | **AWQ / GPTQ** (weight-only quantization) | weights only, not KV | high | does NOT compress KV-cache; orthogonal solution |
-| **KIVI (route B)** | 0.5× | broken at long context | research-grade; needle 11-29% at 16K |
-| **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 | W4A4 not KV; complementary, not competitive |
-| **int4_protected** *(this work)* | **0.5×** | **15/15 needle (100% == bf16)** | **first 4-bit KV scheme to preserve long-context quality** |
+| **KIVI (route B)** | 0.5× | broken at long context | research-grade; own long-context needle measurement pending |
+| **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 *(competitor's reported figure)* | W4A4 not KV; complementary, not competitive |
+| **int4_protected** *(this work)* | **0.5×** | **15/15 needle (100% == bf16), single-run per model in v1** | **first 4-bit KV scheme to preserve long-context quality** |
 
 The relevant comparison is **fp8 vs int4_protected** — both occupy
 the half-memory tier, both ship as vLLM backends, both target the
@@ -254,7 +267,9 @@ Three independent observations from this quarter's work:
    methods typically need per-architecture tuning.
 2. **Cross-scale transfer**: validated at 7B + 8B + 14B. Larger
    models actually exhibit *more* per-layer channel specialization
-   (Qwen-7B Layer-0 vs Layer-1 IoU: 11.1%; Qwen-14B: 2.6%) —
+   (Qwen-7B Layer-0 vs Layer-1 channel-overlap: 11.1%; Qwen-14B:
+   2.6% — computed by `calibrate_phase5b_protect_mask.py` at
+   calibration time, single calibration run per model) —
    consistent with deeper feature specialization at scale.
 3. **Static masks are sufficient**: the protected channels are
    frozen per model at calibration time. No per-step or per-prompt
@@ -332,13 +347,13 @@ should be able to tell which is which.
 
 | Claim | Evidence |
 |---|---|
-| 4 models all hit 15/15 needle retrieval == stock bf16 at 4% protect_fraction | `Bench/scripts/verify_phase5b_5_needle.py` — runs on each model |
-| 2.01× cuda blocks at same memory budget (Qwen-7B) | `Bench/scripts/PHASE5C_USAGE.md` §"Memory accounting" |
-| 218× max concurrency vs stock 109× (Qwen-7B at max_model_len=4096) | vLLM `executor_base.py:116` log line, reproducible from any verify run |
-| 0 fallbacks across ~100K aggregate packed decodes | `Int4ProtectedAttentionImpl.get_call_stats()` snapshots |
-| 3/5 diverse prompts produce bit-identical greedy output vs stock | `verify_phase5b_4c_3_char_diff.py` (Qwen-7B) |
+| 4 models all hit 15/15 needle retrieval == stock bf16 at 4% protect_fraction *(single run per model in v1; 2-of-2 replication scheduled)* | `Bench/scripts/verify_phase5b_5_needle.py` — runs on each model |
+| 2.01× cuda blocks at same memory budget (Qwen-7B, gpu_memory_utilization=0.5) | `Bench/scripts/PHASE5C_USAGE.md` §"Memory accounting" |
+| 218× max concurrency vs stock 109× (Qwen-7B at max_model_len=4096) *(single engine-init log line)* | vLLM `executor_base.py:116` log line, reproducible from any verify run |
+| 0 fallbacks across ~100K aggregate decode+write calls *(decode-only count: ~75K across Phase-7 cross-family runs)* | `Int4ProtectedAttentionImpl.get_call_stats()` snapshots |
+| 3/6 diverse prompts produce bit-identical greedy output vs stock | `bench_phase5c_v1.py` / `verify_phase5b_4c_3_char_diff.py` (Qwen-7B) |
 | Multi-batch determinism (run1 == run2 byte-identical at B=2..8) | `verify_phase5b_6_batch.py` ALL 7 gates GREEN |
-| Aggregate throughput 42.5 tok/s @ B=8 on Qwen-7B H100 | `bench_phase6_batched_throughput.py` |
+| Aggregate throughput 42.5 tok/s @ B=8 on Qwen-7B H100 *(v1 provisional, post B-pre-1; 180s replication scheduled)* | `bench_phase6_batched_throughput.py`, `OPTION_B_PREFLIGHT.md` |
 | Per-phase decode-path profile (10% of step is our read path; 90% is launch overhead) | `bench_phase6_decode_phase_profile.py` |
 | Read-path preflight for CUDA Graphs (B-pre-1..4) COMPLETE | `Bench/scripts/OPTION_B_PREFLIGHT.md` |
 
@@ -346,7 +361,7 @@ should be able to tell which is which.
 
 | Item | Result |
 |---|---|
-| Pure int4 KIVI on K + V | Catastrophic long-context collapse (needle 11-29% at 16K). The K channel is the failure mode — protected-K is the fix. |
+| Pure int4 KIVI on K + V | Qualitative long-context collapse confirmed via our route-B implementation; **quantitative needle measurement at 16K pending**. The K channel is the failure mode — protected-K is the fix. |
 | Higher protect_fractions (8%, 16%) | Not needed — 4% already at quality parity. Lower n_protect minimizes sidecar overhead. |
 | `enforce_eager=False` (naive CUDA graph capture) | Crashes at `_seq_id_from_block_table_row().item()` in the write path. Write-path preflight (~4-7 days of additional work) is the gating item for graph capture; preflight roadmap scoped in `OPTION_B_PREFLIGHT.md`. |
 
