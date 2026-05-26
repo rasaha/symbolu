@@ -821,6 +821,43 @@ def test_build_pin_specs_rejects_invalid_file_entry(tmp_path) -> None:
         driver._build_pin_specs()
 
 
+def test_driver_max_model_len_default_none() -> None:
+    """Default constructor leaves max_model_len=None; vLLM uses its
+    per-model default."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    driver = AsyncEngineDriver(model="dummy")
+    assert driver.max_model_len is None
+
+
+def test_driver_max_model_len_passes_to_engine_args() -> None:
+    """When max_model_len is set, _build_engine_args includes it in
+    the AsyncEngineArgs kwargs. Important for tight gpu_memory_
+    utilization scenarios (Phase 4C operational requirement)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: Dict[str, Any] = {}
+
+    class _CaptureArgs:
+        def __init__(self, **kwargs: Any):
+            captured.update(kwargs)
+
+    class _Fake:
+        AsyncEngineArgs = _CaptureArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy", max_model_len=4096, vllm_module=_Fake(),
+    )
+    assert driver.max_model_len == 4096
+    driver._build_engine_args(_Fake())
+    assert captured.get("max_model_len") == 4096
+
+    # And when None, max_model_len is NOT passed (vLLM uses default).
+    captured.clear()
+    driver2 = AsyncEngineDriver(model="dummy", vllm_module=_Fake())
+    driver2._build_engine_args(_Fake())
+    assert "max_model_len" not in captured
+
+
 def test_run_extended_pinning_off_does_not_install() -> None:
     """End-to-end mocked run: extended_pinning=False (default)
     leaves stats empty and self._extended_pinning_install=None."""

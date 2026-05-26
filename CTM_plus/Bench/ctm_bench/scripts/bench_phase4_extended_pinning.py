@@ -292,6 +292,7 @@ async def run_one_cell(
     pin_max_budget_blocks: int,
     vllm_module: Any,
     output_dir: Optional[Path] = None,
+    max_model_len: Optional[int] = None,
 ) -> Any:
     """Run a single Phase 4B cell. Returns the
     ``StreamingRunCellResult``."""
@@ -314,6 +315,7 @@ async def run_one_cell(
         extended_pinning=cell.extended_pinning,
         pin_first_n_blocks=cell.pin_first_n_blocks,
         pin_max_budget_blocks=pin_max_budget_blocks,
+        max_model_len=max_model_len,
         max_decode_tokens=max_decode_tokens,
         sample_interval_seconds=sample_interval_seconds,
         vllm_module=vllm_module,
@@ -369,12 +371,18 @@ async def run_three_cells(
     cells_to_run: Sequence[str],
     output_dir: Optional[Path] = None,
     pin_first_n_blocks_override: Optional[int] = None,
+    max_model_len: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Run cells sequentially; aggregate into comparison JSON.
 
     ``pin_first_n_blocks_override``: when not None, overrides
     cell C's compiled-in ``pin_first_n_blocks`` for this run.
     Other cells are not affected (they have pinning OFF).
+
+    ``max_model_len``: when not None, caps vLLM's per-engine
+    max_model_len. Required under tight gpu_memory_utilization
+    where the model's native max context (e.g. Qwen-7B's 32768)
+    cannot fit in the available KV cache.
     """
     cells_out: Dict[str, Dict[str, Any]] = {}
     workload = {
@@ -391,6 +399,7 @@ async def run_three_cells(
         "seed": seed,
         "pin_max_budget_blocks": pin_max_budget_blocks,
         "pin_first_n_blocks_override": pin_first_n_blocks_override,
+        "max_model_len": max_model_len,
     }
 
     for cell_key in cells_to_run:
@@ -431,6 +440,7 @@ async def run_three_cells(
             pin_max_budget_blocks=pin_max_budget_blocks,
             vllm_module=vllm_module,
             output_dir=cell_dir,
+            max_model_len=max_model_len,
         )
         cell_elapsed = time.perf_counter() - cell_start
         logger.info(
@@ -792,6 +802,21 @@ def main(argv: Sequence[str]) -> int:
         "--pin-max-budget-blocks", type=int, default=1024,
     )
     parser.add_argument(
+        "--max-model-len", type=int, default=None,
+        help=(
+            "Override vLLM's max_model_len for the engine. "
+            "Required when running with tight gpu_memory_"
+            "utilization where the model's default context "
+            "(e.g. Qwen-7B's 32768) doesn't fit in the KV "
+            "cache. Workload prompts on this bench are bounded "
+            "to shared_prefix_length + max(unique_tail_choices) "
+            "+ max_decode_tokens — set max_model_len to at "
+            "least that value (e.g. 4096 is safe for the "
+            "default 256+256+32). Default: None (use vLLM's "
+            "per-model default)."
+        ),
+    )
+    parser.add_argument(
         "--output-dir", type=Path, required=True,
     )
     parser.add_argument(
@@ -859,6 +884,7 @@ def main(argv: Sequence[str]) -> int:
             cells_to_run=cells_to_run,
             output_dir=args.output_dir,
             pin_first_n_blocks_override=args.pin_first_n_blocks,
+            max_model_len=args.max_model_len,
         )
     )
 

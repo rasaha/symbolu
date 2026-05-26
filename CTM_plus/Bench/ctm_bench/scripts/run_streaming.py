@@ -421,6 +421,16 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--max-model-len",
+        type=int, default=None,
+        help=(
+            "Override vLLM's max_model_len for the engine. Required "
+            "under tight --gpu-memory-utilization where the model's "
+            "default context doesn't fit in the KV cache. Default "
+            "None (vLLM's per-model default)."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -522,6 +532,7 @@ def main(argv: Sequence[str]) -> int:
         pin_first_n_blocks=args.pin_first_n_blocks,
         pin_tokens_file=args.pin_tokens_file,
         pin_max_budget_blocks=args.pin_max_budget_blocks,
+        max_model_len=args.max_model_len,
         max_decode_tokens=args.max_decode_tokens,
     )
 

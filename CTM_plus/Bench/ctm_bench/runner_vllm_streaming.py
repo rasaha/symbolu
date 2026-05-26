@@ -815,6 +815,7 @@ class AsyncEngineDriver:
         pin_first_n_blocks: int = 0,
         pin_tokens_file: Optional[Path] = None,
         pin_max_budget_blocks: int = 1024,
+        max_model_len: Optional[int] = None,
         vllm_module: Any = None,
     ) -> None:
         self.model = model
@@ -1012,6 +1013,15 @@ class AsyncEngineDriver:
         self.pin_first_n_blocks = int(pin_first_n_blocks)
         self.pin_tokens_file = pin_tokens_file
         self.pin_max_budget_blocks = int(pin_max_budget_blocks)
+        # Phase 4C operational knob: cap vLLM's max_model_len so the
+        # engine can start under tight gpu_memory_utilization. Default
+        # None preserves vLLM's per-model default (32768 for Qwen-7B).
+        # Useful when the workload's actual prompt length is much
+        # smaller than the model's max context and we want to force
+        # eviction pressure via tight KV cache.
+        self.max_model_len = (
+            int(max_model_len) if max_model_len is not None else None
+        )
         self._extended_pinning_install: Any = None
 
     @staticmethod
@@ -1108,6 +1118,10 @@ class AsyncEngineDriver:
         # through the hardware tensor cores at 2x compression.
         if self.kv_cache_dtype is not None:
             kwargs["kv_cache_dtype"] = self.kv_cache_dtype
+        # Phase 4C: max_model_len override for tight-memory scenarios.
+        # When None, leave vLLM's per-model default in place.
+        if self.max_model_len is not None:
+            kwargs["max_model_len"] = self.max_model_len
         # Allow the caller to override or extend the args, e.g. to
         # test with preemption_mode="recompute" for comparison.
         kwargs.update(self.scheduler_config_overrides)
