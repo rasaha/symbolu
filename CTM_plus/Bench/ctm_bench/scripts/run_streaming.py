@@ -431,6 +431,16 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--preemption-mode",
+        default="swap", choices=["swap", "recompute"],
+        help=(
+            "vLLM preemption policy. Default 'swap' moves blocks "
+            "to CPU. 'recompute' forces eviction of cached blocks "
+            "under memory pressure (needed to exercise the LRU "
+            "evictor that --extended-pinning wraps)."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
@@ -533,6 +543,7 @@ def main(argv: Sequence[str]) -> int:
         pin_tokens_file=args.pin_tokens_file,
         pin_max_budget_blocks=args.pin_max_budget_blocks,
         max_model_len=args.max_model_len,
+        preemption_mode=args.preemption_mode,
         max_decode_tokens=args.max_decode_tokens,
     )
 

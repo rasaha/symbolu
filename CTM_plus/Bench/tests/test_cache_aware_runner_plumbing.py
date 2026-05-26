@@ -829,6 +829,52 @@ def test_driver_max_model_len_default_none() -> None:
     assert driver.max_model_len is None
 
 
+def test_driver_preemption_mode_default_swap() -> None:
+    """Default constructor uses preemption_mode='swap' (preserves
+    pre-Phase-4C behavior)."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    driver = AsyncEngineDriver(model="dummy")
+    assert driver.preemption_mode == "swap"
+
+
+def test_driver_preemption_mode_recompute_passes_to_engine_args() -> None:
+    """When preemption_mode='recompute', _build_engine_args includes
+    it in the AsyncEngineArgs kwargs. Phase 4C diagnostic gate:
+    the swap path bypasses the LRUEvictor that extended-pinning
+    wraps, so recompute mode is needed to actually exercise the
+    pinning evictor wrap."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+
+    captured: Dict[str, Any] = {}
+
+    class _CaptureArgs:
+        def __init__(self, **kwargs: Any):
+            captured.update(kwargs)
+
+    class _Fake:
+        AsyncEngineArgs = _CaptureArgs
+
+    driver = AsyncEngineDriver(
+        model="dummy", preemption_mode="recompute", vllm_module=_Fake(),
+    )
+    driver._build_engine_args(_Fake())
+    assert captured.get("preemption_mode") == "recompute"
+
+    # Default driver passes "swap".
+    captured.clear()
+    driver2 = AsyncEngineDriver(model="dummy", vllm_module=_Fake())
+    driver2._build_engine_args(_Fake())
+    assert captured.get("preemption_mode") == "swap"
+
+
+def test_driver_preemption_mode_rejects_invalid() -> None:
+    """Constructor validates preemption_mode against the
+    vLLM-accepted values."""
+    from ctm_bench.runner_vllm_streaming import AsyncEngineDriver
+    with pytest.raises(ValueError, match="preemption_mode"):
+        AsyncEngineDriver(model="dummy", preemption_mode="invalid")
+
+
 def test_driver_max_model_len_passes_to_engine_args() -> None:
     """When max_model_len is set, _build_engine_args includes it in
     the AsyncEngineArgs kwargs. Important for tight gpu_memory_

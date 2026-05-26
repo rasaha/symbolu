@@ -293,6 +293,7 @@ async def run_one_cell(
     vllm_module: Any,
     output_dir: Optional[Path] = None,
     max_model_len: Optional[int] = None,
+    preemption_mode: str = "swap",
 ) -> Any:
     """Run a single Phase 4B cell. Returns the
     ``StreamingRunCellResult``."""
@@ -316,6 +317,7 @@ async def run_one_cell(
         pin_first_n_blocks=cell.pin_first_n_blocks,
         pin_max_budget_blocks=pin_max_budget_blocks,
         max_model_len=max_model_len,
+        preemption_mode=preemption_mode,
         max_decode_tokens=max_decode_tokens,
         sample_interval_seconds=sample_interval_seconds,
         vllm_module=vllm_module,
@@ -372,6 +374,7 @@ async def run_three_cells(
     output_dir: Optional[Path] = None,
     pin_first_n_blocks_override: Optional[int] = None,
     max_model_len: Optional[int] = None,
+    preemption_mode: str = "swap",
 ) -> Dict[str, Any]:
     """Run cells sequentially; aggregate into comparison JSON.
 
@@ -400,6 +403,7 @@ async def run_three_cells(
         "pin_max_budget_blocks": pin_max_budget_blocks,
         "pin_first_n_blocks_override": pin_first_n_blocks_override,
         "max_model_len": max_model_len,
+        "preemption_mode": preemption_mode,
     }
 
     for cell_key in cells_to_run:
@@ -441,6 +445,7 @@ async def run_three_cells(
             vllm_module=vllm_module,
             output_dir=cell_dir,
             max_model_len=max_model_len,
+            preemption_mode=preemption_mode,
         )
         cell_elapsed = time.perf_counter() - cell_start
         logger.info(
@@ -817,6 +822,19 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--preemption-mode", default="swap",
+        choices=["swap", "recompute"],
+        help=(
+            "Phase 4C diagnostic: vLLM's preemption policy. "
+            "Default 'swap' (vLLM swaps preempted sequences to "
+            "CPU). 'recompute' forces vLLM to evict cached "
+            "blocks under pressure instead of swapping — "
+            "necessary to exercise the LRUEvictor that "
+            "extended-pinning wraps. Only meaningful when the "
+            "workload actually produces memory pressure."
+        ),
+    )
+    parser.add_argument(
         "--output-dir", type=Path, required=True,
     )
     parser.add_argument(
@@ -885,6 +903,7 @@ def main(argv: Sequence[str]) -> int:
             output_dir=args.output_dir,
             pin_first_n_blocks_override=args.pin_first_n_blocks,
             max_model_len=args.max_model_len,
+            preemption_mode=args.preemption_mode,
         )
     )
 
