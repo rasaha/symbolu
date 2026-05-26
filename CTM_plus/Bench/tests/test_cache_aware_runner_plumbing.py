@@ -476,6 +476,229 @@ def test_run_flag_on_engine_teardown_on_install_failure(
 # ---------------------------------------------------------------- #
 
 
+# ---------------------------------------------------------------- #
+# Audit fix regression tests (Findings #2, #3, #5)
+# ---------------------------------------------------------------- #
+
+
+def test_resolve_block_size_from_engine_reads_cache_config() -> None:
+    """Audit fix #3: helper reads vLLM's actual block_size from
+    ``engine.engine.cache_config.block_size`` (the canonical vLLM
+    0.7.3 V0 location) instead of hardcoding 32."""
+    from ctm_bench.runner_vllm_streaming import _resolve_block_size_from_engine
+
+    class _CacheCfg:
+        block_size = 16
+
+    class _Inner:
+        cache_config = _CacheCfg()
+
+    class _Engine:
+        engine = _Inner()
+
+    assert _resolve_block_size_from_engine(_Engine()) == 16
+
+
+def test_resolve_block_size_falls_back_to_default() -> None:
+    """Audit fix #3: when no recognized config path exists,
+    return the documented default (32) rather than raising."""
+    from ctm_bench.runner_vllm_streaming import _resolve_block_size_from_engine
+
+    class _Bare:
+        pass
+
+    assert _resolve_block_size_from_engine(
+        _Bare(), default=32,
+    ) == 32
+    # Different defaults pass through.
+    assert _resolve_block_size_from_engine(
+        _Bare(), default=64,
+    ) == 64
+
+
+def test_resolve_block_size_handles_engine_lacks_inner_engine() -> None:
+    """Edge case: passed object IS the inner engine (no .engine
+    attribute) — helper uses the object directly."""
+    from ctm_bench.runner_vllm_streaming import _resolve_block_size_from_engine
+
+    class _CacheCfg:
+        block_size = 8
+
+    class _DirectEngine:
+        cache_config = _CacheCfg()
+
+    assert _resolve_block_size_from_engine(_DirectEngine()) == 8
+
+
+def test_resolve_block_size_handles_string_block_size_value() -> None:
+    """Defensive: helper coerces to int; non-int-coercible value
+    falls back to default."""
+    from ctm_bench.runner_vllm_streaming import _resolve_block_size_from_engine
+
+    class _CacheCfg:
+        block_size = "not-an-int"
+
+    class _Inner:
+        cache_config = _CacheCfg()
+
+    class _E:
+        engine = _Inner()
+
+    # Falls back to default since int() raises on "not-an-int".
+    assert _resolve_block_size_from_engine(_E(), default=32) == 32
+
+
+def test_probe_torn_down_when_cache_aware_install_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Audit fix #5: when the cache-aware install fails AFTER the
+    prefix-hit probe is installed, the probe's monkey-patch on
+    block_manager.allocate must be torn down by the finally block.
+
+    Pre-fix: self._prefix_hit_probe was assigned AFTER both
+    installs, so a cache-aware-install failure left
+    self._prefix_hit_probe == None and the finally block skipped
+    teardown. The probe wrap leaked onto the (now dead) engine."""
+    from ctm_bench import runner_vllm_streaming as rvs
+    from kv_policy import cache_aware_install as cai
+    from kv_policy import prefix_hit_probe as php
+
+    # Track whether probe.teardown was invoked.
+    teardowns_called: List[str] = []
+
+    real_install_probe = php.install_prefix_hit_probe
+
+    def _wrapped_install_probe(**kwargs: Any):
+        probe = real_install_probe(**kwargs)
+        original_teardown = probe.teardown
+
+        def _tracked():
+            teardowns_called.append("probe")
+            original_teardown()
+        probe.teardown = _tracked
+        return probe
+
+    monkeypatch.setattr(
+        php, "install_prefix_hit_probe", _wrapped_install_probe,
+    )
+
+    # Force the cache-aware install to raise after the probe is in.
+    def _raising_cache_aware_install(**kwargs: Any):
+        raise RuntimeError("simulated cache-aware install failure")
+
+    monkeypatch.setattr(
+        cai, "install_cache_aware_scheduler",
+        _raising_cache_aware_install,
+    )
+
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver,
+        ArrivalScheduler,
+        ParetoArrivalConfig,
+        SwapCounterSampler,
+    )
+
+    fake_vllm = _FakeVLLM()
+    driver = AsyncEngineDriver(
+        model="dummy",
+        collect_native_prefix_hits=True,
+        cache_aware_scheduling=True,
+        vllm_module=fake_vllm,
+        sample_interval_seconds=0.02,
+    )
+    arrival = ArrivalScheduler(
+        seed=42,
+        pareto=ParetoArrivalConfig(base_rate_per_sec=10.0, alpha=2.0),
+    )
+    sampler = SwapCounterSampler()
+
+    loop = asyncio.new_event_loop()
+    try:
+        with pytest.raises(RuntimeError, match="simulated cache-aware"):
+            loop.run_until_complete(
+                driver.run(
+                    scheduler=arrival, sampler=sampler,
+                    max_requests=0, max_wall_seconds=0.05,
+                    workload_name="probe-teardown-test",
+                )
+            )
+    finally:
+        loop.close()
+
+    # Pre-fix: teardown was NOT called (probe leaked).
+    # Post-fix: teardown IS called via the finally block.
+    assert "probe" in teardowns_called, (
+        f"probe.teardown was not invoked; "
+        f"calls={teardowns_called}; "
+        f"driver._prefix_hit_probe={driver._prefix_hit_probe}"
+    )
+
+
+def test_cancelled_request_still_records_latency() -> None:
+    """Audit fix #2: when a request's coroutine is cancelled
+    (e.g., via task.cancel() at wall-budget time), the latency
+    record must still be appended via the new finally block.
+
+    Pre-fix: except Exception did NOT catch CancelledError (which
+    is BaseException-derived in Py 3.8+), so the latency-record
+    append was skipped. The slowest requests (the ones reorder
+    most-affects via push-back) were silently dropped from p99."""
+    from ctm_bench.runner_vllm_streaming import (
+        AsyncEngineDriver, RequestLatency,
+    )
+
+    fake_vllm = _FakeVLLM()
+    driver = AsyncEngineDriver(
+        model="dummy",
+        vllm_module=fake_vllm,
+    )
+
+    # Configure the mock engine's generate() to sleep forever so
+    # we can cancel mid-flight.
+    class _SlowEngine:
+        async def generate(self, prompt_dict, sp, request_id):
+            await asyncio.sleep(10)
+            yield None  # never reached
+
+    fake_engine = _SlowEngine()
+
+    async def _drive():
+        task = asyncio.create_task(
+            driver._submit_one(
+                fake_engine, "cancel_me", [1, 2, 3],
+                sampling_params=None, request_id_counter=0,
+            )
+        )
+        # Let the coroutine start.
+        await asyncio.sleep(0.05)
+        # Cancel mid-flight (mimics wall-budget cancellation).
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(_drive())
+    finally:
+        loop.close()
+
+    # Pre-fix: _request_latencies would be empty (CancelledError
+    # bypassed the append). Post-fix: one record exists with
+    # first_token_time=0 (never emitted a token) but a meaningful
+    # completion_time (capturing the cancellation latency).
+    assert len(driver._request_latencies) == 1, (
+        f"cancelled request was not recorded; "
+        f"records={driver._request_latencies}"
+    )
+    r = driver._request_latencies[0]
+    assert r.request_id == "cancel_me"
+    assert r.first_token_time == 0.0  # never emitted
+    # Completion time captures the wall-clock at cancellation.
+    assert r.completion_time > r.submit_time
+
+
 def test_cli_help_lists_cache_aware_flag() -> None:
     """``python -m ctm_bench.scripts.run_streaming --help`` mentions
     the new ``--cache-aware-scheduling`` flag.

@@ -293,3 +293,37 @@ workload at this predictor calibration; the path back is named.
 
 Same disposition as Phase 4 and TurboQuant: code preserved,
 finding documented, brief unchanged, revisit conditions named.
+
+## Post-closure audit (CRITICAL fixes landed)
+
+A multi-angle code-review audit run after Phase 3 closure surfaced
+seven CRITICAL defects in the cache-aware machinery. All seven
+were fixed in-tree (see commit log + the
+`V2_CACHE_REUSE_PHASE1_INTEGRATION_NOTE.md` §"Post-closure audit
+fixes" section). None of the fixes change the Phase 3 directional
+conclusion (cache-aware does not productionize on this workload),
+but two affect the **absolute numbers** in the per-seed tables
+above:
+
+* **Audit fix #2 (cancellation drops slowest requests from p99).**
+  Cancelled-at-wall-budget tasks now record their latency. The
+  cell C `e2e_p99_ms` of 1302ms (seed 42) / 923ms (seed 43)
+  was a **lower bound** — the worst pushed-back requests (the
+  ones reorder most-affects) were silently dropped pre-fix. A
+  re-run with the fix would likely show higher cell C p99 values,
+  strengthening (not weakening) the "do not productionize"
+  recommendation. The B-vs-C ratio direction is unchanged.
+
+* **Audit fix #3 (hardcoded `block_size=32` vs vLLM default 16).**
+  The install + probe now read vLLM's actual `block_size` from
+  `engine.cache_config.block_size`. For the Phase 3 workload
+  (prefix=256, tails ∈ {32,64,128,256} — all 32-aligned) this
+  fix is a no-op on the numbers. For workloads with irregular
+  prompt lengths (real chat replay), the pre-fix code would have
+  truncated realized_hit to multiples of 32, biasing low.
+
+The other five fixes (starvation guard clock-base, predicted-hits
+memory leak, probe-teardown-on-failure, waiting.clear() race,
+multi-sequence orphan) are production-correctness items that did
+not affect the Phase 3 measurement on this workload (no beam
+search, no long-running deployment, no epoch-clock starvation).

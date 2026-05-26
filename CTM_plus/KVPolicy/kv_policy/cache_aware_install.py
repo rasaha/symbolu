@@ -88,6 +88,12 @@ class CacheAwareInstall:
     _predicted_hits_per_request: Dict[str, int] = field(default_factory=dict)
     _predicted_hits_total: int = 0
     _realized_hits_total: int = 0
+    # Audit fix #4: vLLM 0.7.3 calls `block_manager.free(seq)` with a
+    # Sequence (not a SequenceGroup) — the Sequence has no
+    # ``request_id`` attribute, so we can't look up the per-request
+    # prediction entry to clean. Track seq_id -> request_id at
+    # schedule time so the free wrap can clean by seq_id.
+    _seq_id_to_request_id: Dict[Any, str] = field(default_factory=dict)
 
     def teardown(self) -> None:
         """Revert all monkey-patches (LIFO). Safe to call multiple
@@ -183,20 +189,52 @@ def _request_id_of(seq_group: Any) -> str:
 
 
 def _arrival_time_of(seq_group: Any) -> float:
-    """Try multiple attribute paths; fall back to ``time.monotonic()``.
+    """Return an arrival timestamp on the **monotonic** clock base.
 
-    vLLM 0.7.3 surfaces arrival via ``seq_group.metrics.arrival_time``;
-    older mocks may use ``seq_group.arrival_time`` directly.
+    vLLM 0.7.3 surfaces ``seq_group.metrics.arrival_time`` as an
+    epoch timestamp set via ``time.time()`` (~1.7e9 today). The
+    ``CacheAwareScheduler`` starvation guard compares against
+    ``time.monotonic()`` (~1e4 seconds since boot, typically).
+    Subtracting the two yields ~-1.7e9 → the guard would never
+    fire on real vLLM. Found by the audit (Finding #1).
+
+    Fix: detect epoch-style timestamps (>1e9) and translate them
+    into the monotonic clock domain by computing the request's
+    age via ``time.time()`` and projecting it back onto
+    ``time.monotonic()``. Small monotonic-style values (< 1e9)
+    are passed through, preserving mock/test fixtures that already
+    pass monotonic-relative times.
+
+    Edge cases:
+      * Epoch values < 1e9 only exist before year 2001 — unreachable.
+      * Monotonic values > 1e9 require 31+ years of uptime — unreachable.
+      * Clock skew (e.g., NTP correction between arrival capture and
+        this read) would yield an apparently negative age; we clamp
+        to 0 so we don't claim the request arrived in the future.
     """
     m = getattr(seq_group, "metrics", None)
     if m is not None:
         t = getattr(m, "arrival_time", None)
         if t is not None:
-            return float(t)
+            return _to_monotonic(float(t))
     t = getattr(seq_group, "arrival_time", None)
     if t is not None:
-        return float(t)
+        return _to_monotonic(float(t))
     return time.monotonic()
+
+
+def _to_monotonic(t: float) -> float:
+    """Translate a timestamp to the monotonic clock base.
+
+    Heuristic: values > 1e9 are treated as ``time.time()`` epoch
+    timestamps and reprojected onto ``time.monotonic()``; values
+    <= 1e9 are treated as already-monotonic (test fixtures use
+    small numbers like 0.0, 1.0, 2.0).
+    """
+    if t > 1e9:
+        age = max(0.0, time.time() - t)
+        return time.monotonic() - age
+    return t
 
 
 def _block_ids_for_seq(block_manager: Any, seq_id: Any) -> List[int]:
@@ -354,21 +392,42 @@ def install_cache_aware_scheduler(
                     )
                 )
             ordered_pending = cas.order_admissions(pending)
-            # Re-pack into the deque in the new order, preserving
-            # SequenceGroup object identity (critical for vLLM's
-            # internal references and abort_request).
+            # Audit fix #6: do the deque re-pack BEFORE the
+            # exception-prone per-request prediction capture.
+            # Previously, if predict_cache_hit raised mid-loop after
+            # waiting.clear(), already-cleared-but-not-yet-re-appended
+            # requests vanished from the engine queue and their
+            # futures hung forever. Now the reorder is complete and
+            # the deque is in a consistent state before any
+            # prediction work happens.
             by_id = {_request_id_of(sg): sg for sg in waiting}
             waiting.clear()
             for req in ordered_pending:
                 sg = by_id.get(req.request_id)
                 if sg is not None:
                     waiting.append(sg)
-                # Capture per-request predicted hit for later
-                # realized-hit attribution (used in stats()).
-                if req.request_id not in install._predicted_hits_per_request:
+                    # Audit fix #4: record seq_id → request_id so the
+                    # Sequence-path free wrap can clean
+                    # _predicted_hits_per_request by seq_id (the
+                    # Sequence has no request_id attribute).
+                    seq_id = _seq_id_from_seq_group(sg)
+                    install._seq_id_to_request_id[seq_id] = req.request_id
+            # Audit fix #6 (cont): capture predictions in a separate
+            # loop wrapped in try/except so a predictor exception
+            # never affects waiting-deque state.
+            for req in ordered_pending:
+                if req.request_id in install._predicted_hits_per_request:
+                    continue
+                try:
                     phit = cas.predictor.predict_cache_hit(req.tokens)
                     install._predicted_hits_per_request[req.request_id] = phit
                     install._predicted_hits_total += phit
+                except Exception as exc:
+                    # Don't let a predictor bug propagate into vLLM
+                    # and kill the scheduler. Skipping a capture for
+                    # one request only biases prediction_accuracy
+                    # downstream — it does NOT drop the request.
+                    pass
         return original_schedule(*args, **kwargs)
 
     if not measurement_only:
@@ -415,21 +474,44 @@ def install_cache_aware_scheduler(
 
     def _free_with_tree_evict(seq_or_seq_group, *args, **kwargs):
         # vLLM 0.7.3's free() can be called with a Sequence or a
-        # SequenceGroup depending on the call site. Detect both.
+        # SequenceGroup depending on the call site.
+        #
+        # Audit fix #7: for the SequenceGroup path, iterate ALL
+        # sequences (beam search / SamplingParams(n>1) have
+        # multiple sequences per group). Previously only seqs[0]'s
+        # block_ids were evicted, leaving the other sequences'
+        # blocks in the tree forever.
         if hasattr(seq_or_seq_group, "get_prompt_token_ids"):
-            seq = seq_or_seq_group
-            request_id_for_cleanup = None
+            # Sequence path — typical V2 call site, one seq per call.
+            seqs: List[Any] = [seq_or_seq_group]
+            request_id_for_cleanup: Optional[str] = None
         else:
-            seq = _seq_from(seq_or_seq_group)
+            # SequenceGroup path — fan out across all sequences.
+            get_seqs = getattr(seq_or_seq_group, "get_seqs", None)
+            if callable(get_seqs):
+                seqs = list(get_seqs())
+            else:
+                seqs = [seq_or_seq_group]
             request_id_for_cleanup = _request_id_of(seq_or_seq_group)
-        seq_id = _seq_id_of(seq)
-        # Snapshot block_ids BEFORE the free — post-free they're
-        # gone from block_tables.
-        block_ids_freed = _block_ids_for_seq(block_manager, seq_id)
+        # Snapshot block_ids from EACH sequence BEFORE the free —
+        # post-free they're gone from block_tables.
+        all_block_ids: List[int] = []
+        per_seq_ids: List[Any] = []
+        for seq in seqs:
+            sid = _seq_id_of(seq)
+            per_seq_ids.append(sid)
+            all_block_ids.extend(_block_ids_for_seq(block_manager, sid))
         result = original_free(seq_or_seq_group, *args, **kwargs)
-        if block_ids_freed:
-            tree.evict(block_ids_freed)
-        # Drop per-request prediction cache to bound memory.
+        if all_block_ids:
+            tree.evict(all_block_ids)
+        # Audit fix #4: drop per-request prediction cache. Use the
+        # seq_id → request_id map so the Sequence-path call site
+        # (vLLM 0.7.3's hot path) also cleans, not just the
+        # SequenceGroup path.
+        for sid in per_seq_ids:
+            mapped_rid = install._seq_id_to_request_id.pop(sid, None)
+            if mapped_rid is not None:
+                install._predicted_hits_per_request.pop(mapped_rid, None)
         if request_id_for_cleanup is not None:
             install._predicted_hits_per_request.pop(
                 request_id_for_cleanup, None,

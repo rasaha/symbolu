@@ -568,3 +568,85 @@ effect. If Phase 3D's analysis suggests LRU-pool reuse matters,
 the recovery options in `PHASE3_VLLM_NATIVE_PREFIX_HITS_RESEARCH.md`
 (patch vLLM directly / use Prometheus counters / instrument
 `allocate_immutable_block`) are the path forward.
+
+### Post-closure audit fixes
+
+After Phase 3 closure, a multi-angle code-review audit of the
+entire branch (5 finder angles × 8 candidates each, deduped) found
+7 CRITICAL defects in the cache-aware machinery. All landed
+in-tree with CPU regression tests:
+
+**Fix #1 — Clock-base mismatch in starvation guard.**
+`_arrival_time_of` returned vLLM's epoch-style `metrics.arrival_time`
+(via `time.time()`) but `cas.order_admissions` compared it against
+`time.monotonic()`. The age was always ~-1.7e9; the starvation
+guard **never fired on real vLLM**. Fix: detect epoch-style values
+(`> 1e9`) and reproject via `time.monotonic() - (time.time() -
+arrival_epoch)`. Small monotonic-style values (test fixtures) pass
+through unchanged. New tests:
+`test_to_monotonic_*`, `test_arrival_time_of_handles_vllm_epoch_via_metrics`,
+`test_starvation_guard_fires_with_epoch_arrival_times`.
+
+**Fix #2 — Cancellation drops slowest requests from p99.**
+`_submit_one`'s `except Exception` doesn't catch `CancelledError`
+(BaseException-derived in Py 3.8+). Tasks cancelled at wall-budget
+skipped the latency record append. Fix: wrap the latency record
+in a `finally` block. New test:
+`test_cancelled_request_still_records_latency`.
+
+**Fix #3 — Hardcoded `block_size=32` vs vLLM default 16.**
+Both install sites hardcoded 32; stock vLLM defaults to 16. Tree
+realized_hit was truncated to multiples of 32; probe's chunk-hash
+search never matched vLLM's 16-token-keyed `_cached_blocks`. Fix:
+new `_resolve_block_size_from_engine` helper reads
+`engine.cache_config.block_size` (canonical vLLM 0.7.3 V0 location);
+both installs use the resolved value. New tests:
+`test_resolve_block_size_*`.
+
+**Fix #4 — `_predicted_hits_per_request` memory leak.**
+vLLM 0.7.3 calls `block_manager.free(seq)` per-Sequence (not
+per-SequenceGroup); the old code set `request_id_for_cleanup=None`
+in the Sequence path and skipped the dict pop. Long-running
+deployments leaked memory unboundedly. Fix: track
+`seq_id → request_id` map at schedule time; the free wrap
+cleans by `seq_id` regardless of caller-arg shape. New test:
+`test_predicted_hits_cleaned_via_sequence_path_free`.
+
+**Fix #5 — Probe wrap leaks on cache-aware install failure.**
+`self._prefix_hit_probe` was assigned AFTER both installs; a
+cache-aware-install failure left the probe wrap on
+`block_manager.allocate` because the finally block saw
+`self._prefix_hit_probe is None`. Fix: (a) assign
+`self._prefix_hit_probe = probe` immediately after install;
+(b) the cache-aware install's `except` block now also tears down
+the probe before re-raising (the main-loop finally is unreachable
+during setup-phase failures). New test:
+`test_probe_torn_down_when_cache_aware_install_fails`.
+
+**Fix #6 — `waiting.clear()` + predictor exception drops requests.**
+The pre-fix schedule wrap did `waiting.clear()` then re-appended
+SequenceGroups + called predictor in a single loop. If the
+predictor raised mid-iteration, not-yet-re-appended requests
+vanished from the engine queue forever. Fix: split into two
+loops — re-append first (exception-free), then capture predictions
+in a separate loop with each call wrapped in try/except. New
+tests:
+`test_predictor_exception_in_install_loop_does_not_drop_requests`,
+`test_predictor_exception_in_cas_does_not_drop_requests`.
+
+**Fix #7 — Multi-sequence SequenceGroup orphans tree state.**
+`_seq_from` returned only the first sequence; SequenceGroups with
+`n>1` sampling or beam search left the other sequences' block_ids
+in the tree forever. Fix: free wrap iterates ALL sequences in
+the SequenceGroup path; combines with #4's seq_id → request_id
+cleanup. New test:
+`test_multi_sequence_group_evicts_all_block_ids`.
+
+**Bonus init-time fix (medium finding).** `self._installed_evictor`
+and `self._attention_aggregator` are now initialized to None in
+`__init__` so direct invocation of `_submit_one` (the documented
+unit-testability path) doesn't AttributeError before `run()` runs.
+
+CPU regression coverage after audit: 133/133 cache-aware + Phase
+3 tests (was 119 pre-audit; +14 net additive). 392/392 broader
+Bench CPU sweep. No regressions.

@@ -577,6 +577,46 @@ class SwapCounterSampler:
 # ---------------------------------------------------------------- #
 
 
+def _resolve_block_size_from_engine(
+    engine: Any, *, default: int = 32,
+) -> int:
+    """Audit fix #3: read vLLM's actual ``block_size`` instead of
+    hardcoding 32.
+
+    Stock vLLM 0.7.3 defaults to ``block_size=16``. The cache-aware
+    install + prefix-hit probe previously hardcoded 32, which:
+      * truncated tree-derived realized_hit to multiples of 32
+        (losing up to 16 tokens per match);
+      * chunked the probe's prompt-hash search at 32 tokens while
+        vLLM's ``_cached_blocks`` is keyed by 16-token chained
+        hashes (resulting in zero matches even when reuse is heavy).
+
+    Reads ``engine.engine.cache_config.block_size`` (the canonical
+    location in vLLM 0.7.3 V0). Falls back through scheduler config
+    and the default if the canonical path isn't present.
+    """
+    inner = getattr(engine, "engine", engine)
+    cache_config = getattr(inner, "cache_config", None)
+    if cache_config is not None:
+        bs = getattr(cache_config, "block_size", None)
+        if bs is not None:
+            try:
+                return int(bs)
+            except (TypeError, ValueError):
+                pass
+    # Defensive fallbacks for other vLLM minor versions.
+    for cfg_attr in ("scheduler_config", "model_config"):
+        cfg = getattr(inner, cfg_attr, None)
+        if cfg is not None:
+            bs = getattr(cfg, "block_size", None)
+            if bs is not None:
+                try:
+                    return int(bs)
+                except (TypeError, ValueError):
+                    continue
+    return int(default)
+
+
 def _read_swap_counters_from_engine(engine: Any) -> Tuple[int, int, int]:
     """Read swap counter deltas since the last reset.
 
@@ -890,6 +930,12 @@ class AsyncEngineDriver:
         # Route-A INT4 install handles — set in run(); None until then.
         self._int4_route_a_manager: Any = None
         self._int4_route_a_teardown: Any = None
+        # Audit fix (medium finding): initialize handles read by
+        # _submit_one and the run-loop helpers so direct invocation
+        # (e.g. unit tests) doesn't AttributeError before run() has
+        # populated them.
+        self._installed_evictor: Any = None
+        self._attention_aggregator: Any = None
         # v2 cache-reuse PR-2 — cache-aware admission scheduling.
         # Orthogonal to int4_protected, CTM+ evictor, and route-A
         # INT4: lives at the scheduler layer. Default OFF preserves
@@ -1073,6 +1119,7 @@ class AsyncEngineDriver:
         n_tokens = 0
         last_seen = 0
         evictor = self._installed_evictor
+        cohort_index = self._prompt_builder.cohort_of(request_id_counter)
         try:
             async for output in engine.generate(
                 {"prompt_token_ids": prompt_token_ids},
@@ -1117,21 +1164,24 @@ class AsyncEngineDriver:
             logger.warning(
                 "request %s failed: %s", request_id, exc,
             )
-        # Phase 3A latency record. completion_time is always now;
-        # first_token_time stays 0 when the request produced no
-        # tokens (engine error path). Aggregation filters out
-        # records with first_token_time == 0 to avoid skewing
-        # p50/p99 with failed-request "latency" of 0.
-        completion_time = time.perf_counter()
-        cohort_index = self._prompt_builder.cohort_of(request_id_counter)
-        self._request_latencies.append(RequestLatency(
-            request_id=request_id,
-            submit_time=submit_time,
-            first_token_time=first_token_time,
-            completion_time=completion_time,
-            n_decode_tokens=n_tokens,
-            cohort_index=cohort_index,
-        ))
+        finally:
+            # Audit fix #2: always record the latency snapshot, even
+            # if the coroutine was cancelled at wall-budget time.
+            # CancelledError is a BaseException (Py 3.8+), not caught
+            # by `except Exception`, so without this finally block
+            # the slowest requests (the ones cache-aware most-affects
+            # via reorder push-back) were silently dropped from the
+            # p99 aggregation. Cell C's e2e_p99 in the Phase 3
+            # finding doc was a lower bound for this reason.
+            completion_time = time.perf_counter()
+            self._request_latencies.append(RequestLatency(
+                request_id=request_id,
+                submit_time=submit_time,
+                first_token_time=first_token_time,
+                completion_time=completion_time,
+                n_decode_tokens=n_tokens,
+                cohort_index=cohort_index,
+            ))
         return n_tokens
 
     async def _run_attention_flusher(
@@ -1436,16 +1486,31 @@ class AsyncEngineDriver:
                         "collect_native_prefix_hits=True but the scheduler "
                         "has no .block_manager attribute"
                     )
+                # Audit fix #3: read vLLM's actual block_size at
+                # install time, don't hardcode 32.
+                resolved_block_size = _resolve_block_size_from_engine(
+                    engine, default=32,
+                )
                 prefix_hit_probe = install_prefix_hit_probe(
                     block_manager=bm_for_probe,
-                    block_size=32,
+                    block_size=resolved_block_size,
                     enable=True,
                 )
+                # Audit fix #5: assign the probe handle to self
+                # IMMEDIATELY (before any later install can fail).
+                # Previously self._prefix_hit_probe was assigned
+                # several lines below, AFTER the cache-aware
+                # install ran — meaning a cache-aware install
+                # failure left the probe's allocate-wrap installed
+                # but unreachable for teardown.
+                self._prefix_hit_probe = prefix_hit_probe
                 logger.info(
                     "Phase 3A: prefix-hit probe installed "
-                    "(path_taken=%s, vllm_version_hint=%s)",
+                    "(path_taken=%s, vllm_version_hint=%s, "
+                    "block_size=%d)",
                     prefix_hit_probe.path_taken,
                     prefix_hit_probe.vllm_version_hint,
+                    resolved_block_size,
                 )
             except BaseException:
                 for shutdown_name in (
@@ -1500,24 +1565,50 @@ class AsyncEngineDriver:
                         "cache-aware install requested but the scheduler "
                         "has no .block_manager attribute"
                     )
+                # Audit fix #3: same resolved block_size as the
+                # probe install (and falls back to 32 when the
+                # probe wasn't installed — i.e. cache-aware-only
+                # path with no probe).
+                resolved_block_size = _resolve_block_size_from_engine(
+                    engine, default=32,
+                )
                 cache_aware_install = install_cache_aware_scheduler(
                     scheduler=sched,
                     block_manager=bm,
                     enable=True,
                     measurement_only=self.cache_aware_measurement_only,
-                    block_size=32,
+                    block_size=resolved_block_size,
                     max_starvation_seconds=(
                         self.cache_aware_max_starvation_seconds
                     ),
                 )
+                # Audit fix #5 (symmetry with probe): assign handle
+                # to self immediately so any later failure leaves
+                # the finally block able to tear this down.
+                self._cache_aware_install = cache_aware_install
                 logger.info(
                     "v2 cache-reuse: cache-aware install (%s) "
-                    "(block_size=32, max_starvation_seconds=%.1f)",
+                    "(block_size=%d, max_starvation_seconds=%.1f)",
                     "measurement_only" if self.cache_aware_measurement_only
                     else "full",
+                    resolved_block_size,
                     self.cache_aware_max_starvation_seconds,
                 )
             except BaseException:
+                # Audit fix #5 (continued): if the cache-aware install
+                # fails, the prefix-hit probe (if installed at this
+                # point) would otherwise leak — the main-loop
+                # try/finally is unreachable from here because we're
+                # still in the setup phase. Tear it down explicitly
+                # before propagating the exception.
+                if self._prefix_hit_probe is not None:
+                    try:
+                        self._prefix_hit_probe.teardown()
+                    except Exception as exc:
+                        logger.warning(
+                            "prefix-hit probe teardown on cache-aware "
+                            "install failure failed: %s", exc,
+                        )
                 # Best-effort engine teardown on install failure — same
                 # chain as the ctm_plus and route-A install blocks above.
                 for shutdown_name in (
@@ -1536,6 +1627,13 @@ class AsyncEngineDriver:
                 raise
 
         # Stash so the run loop can flush after each decode batch.
+        # NOTE: self._cache_aware_install and self._prefix_hit_probe
+        # are also assigned inside their respective install blocks
+        # immediately after construction (Audit fix #5) so that a
+        # later install failure leaves the finally block able to
+        # tear them down. These re-assignments are idempotent
+        # noops — same object — but kept for symmetry with the
+        # other handles that don't have the same failure-mode risk.
         self._attention_aggregator = attention_aggregator
         self._installed_evictor = installed_evictor
         self._int4_route_a_manager = int4_route_a_manager
