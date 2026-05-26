@@ -1,5 +1,25 @@
 # TurboQuant + CTXL Integration: Cross-Layer Implementation Overview
 
+> # 🛑 RETIRED — HISTORICAL DOCUMENT ONLY
+>
+> **The local TurboQuant / QJL KV-cache path described below is retired
+> from the active product surface (May 2026).** This document is kept
+> in-tree for architecture archaeology, not as a description of a
+> currently-active implementation.
+>
+> **Read first:** [`CTM_plus/TURBOQUANT_RETIREMENT.md`](TURBOQUANT_RETIREMENT.md)
+> for the durable retirement record (measured failure summary, why
+> protected-K INT4 replaces it, and code disposition).
+>
+> **Replacement:** the active low-bit KV-cache path is
+> **protected-K INT4** — see `INT4_PROTECTED_VC_BRIEF.md` and
+> `KVPolicy/INT4_PROTECTED_README.md`.
+>
+> **The body of this document is preserved unchanged below**, including
+> its own May 2026 "Validation status" callout. Treat any forward-
+> looking language ("will land", "deferred follow-on", "v4 GPU kernel
+> pending") as **historical intent, not active roadmap**.
+
 > ## ⚠ Validation status (May 2026 — read first)
 >
 > **This document describes the architecture and the design intent.

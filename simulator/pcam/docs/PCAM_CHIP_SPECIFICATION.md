@@ -61,8 +61,8 @@ PCAM systems:
 | Metric | Target | Rationale |
 |--------|--------|-----------|
 | Attention compute reduction | 4-8x | Sparse attention via Top-K guidance |
-| KV cache efficiency | 2-4x | Better eviction via attention signals |
-| Quality preservation | >95% | At 50% memory budget |
+| KV cache efficiency (eviction quality) | 2-4x | Better eviction decisions via attention signals; stacks **on top of** int4_protected's 2× storage savings (see §1.6) |
+| Quality preservation | >95% | At 50% memory budget. Reference: int4_protected ships today at **100% needle retrieval** (15/15 == bf16); PCAM target should match or exceed for combined-stack credibility. |
 | Latency overhead | <5% | PCAM lookup + update cost |
 | Context length | 128K+ | Scalable compressed state |
 
@@ -72,6 +72,76 @@ PCAM systems:
 - **Not full attention persistence** - O(n²) is intractable; PCAM stores compressed state
 - **Not neuromorphic** - PCAM is continuous-valued, not spiking
 - **Not inference-only** - PCAM state can be updated during training
+- **Not a substitute for KV-cache quantization (int4_protected)** - PCAM addresses *which* KV blocks to keep and *how to attend sparsely*; the encoding of the bits inside each kept block is independent and complementary (see §1.6)
+
+### 1.6 Relationship to int4_protected
+
+The Cognade Labs project ships a software KV-cache quantization
+backend through vLLM called **int4_protected** (see
+[`CTM_plus/KVPolicy/INT4_PROTECTED_README.md`](../../../CTM_plus/KVPolicy/INT4_PROTECTED_README.md)
+and [`INT4_PROTECTED_VC_BRIEF.md`](../../../INT4_PROTECTED_VC_BRIEF.md)).
+PCAM and int4_protected operate at **different layers** of the
+serving stack and are designed to compound, not compete.
+
+| Layer | What it decides | Status |
+|---|---|---|
+| **int4_protected** *(software)* | How to encode the KV bits inside each retained block (4-bit nibbles + per-block scale/xmin + ~4% bf16 protected channels) | Shipped: 4 models validated, 15/15 needle retrieval == stock bf16, 2× max concurrency at quality parity |
+| **PCAM** *(hardware)* | Which KV blocks to retain, and which subset to attend to sparsely (Top-K) | Chip spec + RTL draft; this document |
+
+**Stacked savings:**
+
+```
+Stock vLLM (bf16, LRU, full attention):
+  100% KV memory · 100% attention compute · 100% quality
+
++ int4_protected:
+   50% KV memory · 100% attention compute · 100% quality
+                  (memory savings, no compute savings)
+
++ PCAM eviction:
+   50% KV memory · 100% attention compute · 100% quality
+                  (smarter blocks kept; fewer wasted evictions
+                   → effectively MORE usable cache per GB)
+
++ PCAM sparse-attention (K=64 of ~thousands):
+   50% KV memory · 12.5–25% attention compute · ≥95% quality
+                  (sparse-Top-K guided by PCAM's edge graph)
+
++ PCAM in-silicon latency:
+   50% KV memory · 12.5–25% attention compute · ≥95% quality ·
+   <100ns ATTEND lookup
+                  (hardware acceleration of the sparse-attention
+                   decision; software equivalent would cost 10-100µs
+                   per ATTEND in user space)
+```
+
+**Why PCAM is still novel after int4_protected ships:**
+
+int4_protected solves the *storage format* problem at 4-bit
+quality parity. It does not address:
+
+1. **Eviction quality** — int4_protected uses vLLM's stock LRU /
+   paged-attention block manager. PCAM provides a learned-importance
+   eviction signal that is uncorrelated with int4_protected's
+   contribution. Compounds multiplicatively.
+2. **Attention compute** — int4_protected preserves full
+   `Q · K^T` over the full retained context. PCAM provides the
+   Top-K candidate set that makes sparse-attention viable.
+   Compounds multiplicatively.
+3. **Hardware acceleration** — int4_protected runs in the GPU's
+   main attention path (still O(n) memory traffic per decode step).
+   PCAM moves the eviction + Top-K decision into dedicated silicon
+   at <100ns, off the GPU's critical path.
+4. **Context scaling** — int4_protected's per-token savings are
+   constant (~2×). PCAM's edge-graph compression is **31,000×**
+   over the full attention matrix at 128K context — the savings
+   *scale* with context length, which is exactly where int4_protected
+   alone runs out of headroom.
+
+The complementary positioning means int4_protected being shipped is
+**evidence in PCAM's favor**, not competition: PCAM acceleration
+multiplies the per-token savings that int4_protected already
+delivers, against a measured-not-projected software baseline.
 
 ---
 

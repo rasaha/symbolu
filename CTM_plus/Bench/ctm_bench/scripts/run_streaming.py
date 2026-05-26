@@ -109,6 +109,20 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--phase3-capture-every-n", type=int, default=4,
+        help=(
+            "Phase 3 layer subsampling factor. The per-layer "
+            "attention capture costs ~2ms per decode step (the "
+            ".tolist() + Python aggregation at "
+            "vllm_evictor.py:2134-2143). Day 5b May 2026 measured "
+            "82%% wall on Qwen2.5-7B chat_32k. Capture from every "
+            "Nth Attention layer instead of every one to cut the "
+            "overhead. Default 4 (matches the Phase 4 path's "
+            "--phase4-capture-every-n production default); set "
+            "to 1 for the legacy 'every layer' ablation."
+        ),
+    )
+    parser.add_argument(
         "--phase4-trig-calibration",
         type=Path, default=None,
         help=(
@@ -277,13 +291,8 @@ def main(argv: Sequence[str]) -> int:
         "--turboquant-kv",
         action="store_true",
         help=(
-            "Track B Tier 1: construct a TurboQuantKVStore alongside "
-            "the CTM+ evictor. **Tier 1 does NOT install a real "
-            "vLLM hook** — it constructs the wrapper so its stats "
-            "are visible in the streaming summary, and reserves the "
-            "CLI surface for Tier 2's actual cache_kv monkey-patch. "
-            "See kv_policy.turboquant_kvstore module docstring and "
-            "PHASE4_GPU_FINDINGS §14 for the integration plan."
+            "RETIRED. Selecting this flag will exit with an error. "
+            "See CTM_plus/TURBOQUANT_RETIREMENT.md."
         ),
     )
     parser.add_argument(
@@ -291,6 +300,12 @@ def main(argv: Sequence[str]) -> int:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
     args = parser.parse_args(argv)
+
+    if getattr(args, "turboquant_kv", False):
+        raise SystemExit(
+            "TurboQuant/QJL KV path retired after failed local validation; "
+            "see TURBOQUANT_RETIREMENT.md"
+        )
 
     logging.basicConfig(
         level=args.log_level,
@@ -348,6 +363,7 @@ def main(argv: Sequence[str]) -> int:
         ctm_plus_evictor=args.ctm_plus,
         enable_prefix_caching=args.enable_prefix_caching,
         phase3_attention_capture=args.phase3_attention,
+        phase3_capture_every_n=args.phase3_capture_every_n,
         phase4_trig_calibration_path=args.phase4_trig_calibration,
         phase4_window_interval=args.phase4_window_interval,
         phase4_future_offsets=phase4_offsets,

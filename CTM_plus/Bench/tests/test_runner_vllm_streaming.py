@@ -1867,7 +1867,7 @@ def test_install_attention_capture_finds_attention_modules():
     )
 
     # Build a fake model with two "Attention" modules + non-attention.
-    class FakeAttention:
+    class Attention:  # exact name match required by _is_vllm_attention_module
         def __init__(self, name):
             self._name = name
             self.head_size = 64
@@ -1885,8 +1885,8 @@ def test_install_attention_capture_finds_attention_modules():
 
     class FakeModel:
         def __init__(self):
-            self.layer0 = FakeAttention("layer0")
-            self.layer1 = FakeAttention("layer1")
+            self.layer0 = Attention("layer0")
+            self.layer1 = Attention("layer1")
             self.mlp = FakeMLP()
 
     model = FakeModel()
@@ -2337,7 +2337,7 @@ def test_install_attention_capture_records_capture_time_per_layer():
         install_attention_capture, AttentionAggregator,
     )
 
-    class FakeAttention:
+    class Attention:  # exact name match required by _is_vllm_attention_module
         head_size = 4
         num_heads = 2
 
@@ -2346,7 +2346,7 @@ def test_install_attention_capture_records_capture_time_per_layer():
 
     class FakeModel:
         def __init__(self):
-            self.layer0 = FakeAttention()
+            self.layer0 = Attention()
 
     class FakeAttnMeta:
         num_decode_tokens = 1
