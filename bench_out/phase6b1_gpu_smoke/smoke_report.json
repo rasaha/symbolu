@@ -1,0 +1,71 @@
+{
+  "verdict": "GREEN",
+  "legacy_cell": "/workspace/symbolu/bench_out/phase6b1_gpu_smoke/cell_legacy.json",
+  "refactored_cell": "/workspace/symbolu/bench_out/phase6b1_gpu_smoke/cell_refactored.json",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "n_prompts": 2,
+  "max_tokens": 32,
+  "checks": [
+    {
+      "name": "completion_token_ids_byte_equal",
+      "passed": true,
+      "detail": "all prompts byte-equal"
+    },
+    {
+      "name": "refactored_cell_used_write_decode_batched",
+      "passed": true,
+      "detail": "write_decode_batched_calls=868"
+    },
+    {
+      "name": "legacy_cell_used_only_legacy_loop",
+      "passed": true,
+      "detail": "write_decode_batched_calls=0, write_legacy_loop_calls=896"
+    },
+    {
+      "name": "legacy_zero_fallbacks",
+      "passed": true,
+      "detail": "write_path_fallback=0, decode_calls_fallback=0"
+    },
+    {
+      "name": "refactored_zero_fallbacks",
+      "passed": true,
+      "detail": "write_path_fallback=0, decode_calls_fallback=0"
+    }
+  ],
+  "legacy_call_stats": {
+    "prefill_calls": 28,
+    "decode_calls_packed": 868,
+    "decode_calls_fallback": 0,
+    "write_path_calls": 896,
+    "write_path_fallback": 0,
+    "write_decode_batched_calls": 0,
+    "write_legacy_loop_calls": 896,
+    "spec_decode_calls": 0
+  },
+  "refactored_call_stats": {
+    "prefill_calls": 28,
+    "decode_calls_packed": 868,
+    "decode_calls_fallback": 0,
+    "write_path_calls": 896,
+    "write_path_fallback": 0,
+    "write_decode_batched_calls": 868,
+    "write_legacy_loop_calls": 28,
+    "spec_decode_calls": 0
+  },
+  "per_prompt_diffs": [
+    {
+      "prompt_idx": 0,
+      "prompt_preview": "Below is a paragraph about a small fictional town. After it,",
+      "legacy_text": "  founded year:The oldest in 1 library is the oldest 17 is founded in 1 1  oldest is nestled is nestled between two rivers",
+      "refactored_text": "  founded year:The oldest in 1 library is the oldest 17 is founded in 1 1  oldest is nestled is nestled between two rivers",
+      "tokens_byte_equal": true
+    },
+    {
+      "prompt_idx": 1,
+      "prompt_preview": "Translate to French and explain briefly:\nEnglish: The quick ",
+      "legacy_text": " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+      "refactored_text": " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+      "tokens_byte_equal": true
+    }
+  ]
+}
