@@ -29,7 +29,8 @@
 | **Phase 6B.1 — Write-path preflight** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + Mistral-7B + A100) | `PHASE_6B1_WRITE_PREFLIGHT_FINDINGS.md` |
 | **Phase 6B.2 — Pre-capture seq_id resolution hook** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + A100; 28× host-sync amortization) | `PHASE_6B2_PRECAPTURE_HOOK_FINDINGS.md` |
 | **Phase 6B.3 — enforce_eager=False flip + capture-enable** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + A100; 35/35 captured shapes; 20/20 G_CAPTURE checks; semantic-equal gate after empirically demonstrating CUDA-graph kernel FP noise is fundamental, not specific to int4_protected) | `PHASE_6B3_CAPTURE_FINDINGS.md` + `bench_phase6_b3_capture_gpu_smoke.py` |
-| Throughput bench + finding doc (Phase 6B.4) | NOT STARTED — gated on 6B.3 GREEN ✅ ready to launch | this plan |
+| **Phase 6B.4 — Throughput re-measurement + finding doc** | ✅ **CLOSED, GATE GREEN** (captured B=8 = 149.5 tok/s, 3.51× the 42.6 baseline; gate ≥ 1.88×). ⚠️ **vs stock vLLM bf16: 0.44× → 0.15× across B∈[1,32]**; identified root cause = `_bf16_k_backing_pool` oversize (128× larger than needed). | `PHASE_6B_CUDA_GRAPHS_FINDINGS.md` + `bench_phase6_b4_throughput_gpu.py` |
+| Phase 6C — backing pool redesign | NOT STARTED — scoped in 6B finding's "Phase 6C scope" section | `PHASE_6B_CUDA_GRAPHS_FINDINGS.md` |
 
 The read path is **graph-capturable today**. The write path runs
 BEFORE the read path inside vLLM's captured forward, and it still

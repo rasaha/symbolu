@@ -232,12 +232,19 @@ def run_worker(cell: str, output_path: Path, *, model: str,
     # Bump the writer's per-layer SeqState pool to cover the largest B
     # in the sweep. Default is 8; B=16/32 exhausts it. Set this BEFORE
     # any kv_policy import so _max_active_slots() reads the new value
-    # at PagedKVWriter construction.
+    # at PagedKVWriter construction. Respect a user-provided value (if
+    # the operator set PHASE6_MAX_ACTIVE_SLOTS explicitly, don't
+    # override).
     if cell != CELL_BF16:
-        required_slots = max(BATCH_SIZES) * 2  # headroom for cross-step churn
-        os.environ["PHASE6_MAX_ACTIVE_SLOTS"] = str(required_slots)
-        print(f"[cell={cell}] PHASE6_MAX_ACTIVE_SLOTS={required_slots} "
-              f"(max(BATCH_SIZES)={max(BATCH_SIZES)} x 2)")
+        user_provided = os.environ.get("PHASE6_MAX_ACTIVE_SLOTS")
+        if user_provided is not None and user_provided.strip():
+            print(f"[cell={cell}] PHASE6_MAX_ACTIVE_SLOTS={user_provided} "
+                  f"(user-provided, respected)")
+        else:
+            required_slots = max(BATCH_SIZES) * 2  # headroom for cross-step churn
+            os.environ["PHASE6_MAX_ACTIVE_SLOTS"] = str(required_slots)
+            print(f"[cell={cell}] PHASE6_MAX_ACTIVE_SLOTS={required_slots} "
+                  f"(auto: max(BATCH_SIZES)={max(BATCH_SIZES)} x 2)")
 
     require_int4 = (cell != CELL_BF16)
     ok, diag = _check_environment(require_int4=require_int4)
