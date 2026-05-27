@@ -443,10 +443,19 @@ class PagedKVWriter:
             # the freed slot so a future sequence allocated to this slot
             # starts from a clean device-side state. Idempotent before
             # _lazy_alloc (pools are None).
+            #
+            # Phase 6B.3 fix: pool tensors carry the "inference tensor"
+            # attribute (allocated inside _lazy_alloc which fires during
+            # the first forward pass — inside vLLM's @torch.inference_
+            # mode() decorator). External callers (e.g., the GPU smoke
+            # driver resetting state between generate() calls) run
+            # OUTSIDE inference_mode and would be rejected. Same pattern
+            # as the 6B.2 hook's pool mutations in _resolve_and_stash.
             if self._seq_pos_pool is not None:
-                self._seq_pos_pool[slot] = 0
-                self._k_stage_count_pool[slot] = 0
-                self._k_stage_block_id_pool[slot] = -1
+                with torch.inference_mode():
+                    self._seq_pos_pool[slot] = 0
+                    self._k_stage_count_pool[slot] = 0
+                    self._k_stage_block_id_pool[slot] = -1
 
     # ------------------------------------------------------------------
     # Phase 6 v2 Option B pre-flight (B-pre-1): slot-tensor-based read
