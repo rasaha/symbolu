@@ -183,6 +183,13 @@ def main() -> int:
     p.add_argument("--n-warmup-runs",  type=int,   default=2,
                    help="Number of full generate() calls before the profiled one. "
                         "Pre-warms vLLM's compiled kernels + the CUDA graph capture pool.")
+    p.add_argument("--torch-profile-csv", type=str, default=None,
+                   help="If set, wraps the profiled generate() in torch.profiler and "
+                        "writes a per-kernel CSV (name,total_ns,instances) to this path. "
+                        "Use this when nsys is not installed on the pod.")
+    p.add_argument("--torch-profile-trace", type=str, default=None,
+                   help="If set (with --torch-profile-csv), also exports a Chrome "
+                        "trace JSON for timeline inspection in chrome://tracing.")
     args = p.parse_args()
 
     import torch
@@ -214,14 +221,73 @@ def main() -> int:
     # Profiled run.
     _reset_writers(inner)
     torch.cuda.synchronize()
-    # NVTX range that nsys / ncu look for. The captured-graph replay and
-    # the surrounding Python all sit inside this range.
-    nvtx.range_push("phase6d_step")
-    t0 = time.time()
-    outs = llm.generate(prompts, sampling)
-    torch.cuda.synchronize()
-    elapsed = time.time() - t0
-    nvtx.range_pop()
+
+    if args.torch_profile_csv:
+        # torch.profiler-based capture. Records every CUDA kernel launched
+        # during the profiled generate() call, with name + total time.
+        from torch.profiler import profile, ProfilerActivity
+        with profile(
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            record_shapes=False, profile_memory=False, with_stack=False,
+        ) as prof:
+            nvtx.range_push("phase6d_step")
+            t0 = time.time()
+            outs = llm.generate(prompts, sampling)
+            torch.cuda.synchronize()
+            elapsed = time.time() - t0
+            nvtx.range_pop()
+
+        # Write per-kernel CSV in the same format analyze_phase6d_profile.py
+        # expects from nsys: header row "Time(%),Total Time,Instances,Avg,Min,Max,StdDev,Name"
+        import csv as _csv
+        from pathlib import Path as _Path
+        out_path = _Path(args.torch_profile_csv)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        events = prof.key_averages()
+        # Each event has name, count, cuda_time_total (microseconds), etc.
+        rows_out = []
+        total_cuda_us = sum(e.cuda_time_total for e in events)
+        for e in events:
+            if e.cuda_time_total <= 0:
+                continue
+            rows_out.append({
+                "Time(%)":    f"{(e.cuda_time_total/total_cuda_us)*100:.2f}" if total_cuda_us else "0",
+                "Total Time": f"{int(e.cuda_time_total * 1000)}",  # us -> ns
+                "Instances":  str(e.count),
+                "Avg":        f"{int(e.cuda_time_total * 1000 / max(1, e.count))}",
+                "Min":        "0",
+                "Max":        "0",
+                "StdDev":     "0",
+                "Name":       e.key,
+            })
+        rows_out.sort(key=lambda r: -float(r["Total Time"]))
+        with out_path.open("w", newline="") as f:
+            w = _csv.DictWriter(f, fieldnames=[
+                "Time(%)", "Total Time", "Instances", "Avg", "Min", "Max", "StdDev", "Name"
+            ])
+            w.writeheader()
+            for r in rows_out:
+                w.writerow(r)
+        print(f"[profile cell={args.cell}] wrote torch.profiler CSV: {out_path} "
+              f"({len(rows_out)} kernels; total CUDA time = {total_cuda_us/1000:.1f} ms)")
+
+        if args.torch_profile_trace:
+            trace_path = _Path(args.torch_profile_trace)
+            trace_path.parent.mkdir(parents=True, exist_ok=True)
+            prof.export_chrome_trace(str(trace_path))
+            print(f"[profile cell={args.cell}] wrote chrome trace: {trace_path}")
+
+        # Also print the top-20 kernels for stdout visibility.
+        print(f"\n[profile cell={args.cell}] Top kernels by CUDA time:")
+        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+    else:
+        # No-op profile mode: just NVTX-wrap, for external nsys / ncu.
+        nvtx.range_push("phase6d_step")
+        t0 = time.time()
+        outs = llm.generate(prompts, sampling)
+        torch.cuda.synchronize()
+        elapsed = time.time() - t0
+        nvtx.range_pop()
 
     n_out = sum(len(o.outputs[0].token_ids) for o in outs)
     print(f"[profile cell={args.cell}] PROFILED run: {elapsed:.3f}s  out_tok={n_out}  "
