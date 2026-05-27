@@ -30,7 +30,8 @@
 | **Phase 6B.2 — Pre-capture seq_id resolution hook** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + A100; 28× host-sync amortization) | `PHASE_6B2_PRECAPTURE_HOOK_FINDINGS.md` |
 | **Phase 6B.3 — enforce_eager=False flip + capture-enable** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + A100; 35/35 captured shapes; 20/20 G_CAPTURE checks; semantic-equal gate after empirically demonstrating CUDA-graph kernel FP noise is fundamental, not specific to int4_protected) | `PHASE_6B3_CAPTURE_FINDINGS.md` + `bench_phase6_b3_capture_gpu_smoke.py` |
 | **Phase 6B.4 — Throughput re-measurement + finding doc** | ✅ **CLOSED, GATE GREEN** (captured B=8 = 149.5 tok/s, 3.51× the 42.6 baseline; gate ≥ 1.88×). ⚠️ **vs stock vLLM bf16: 0.44× → 0.15× across B∈[1,32]**; identified root cause = `_bf16_k_backing_pool` oversize (128× larger than needed). | `PHASE_6B_CUDA_GRAPHS_FINDINGS.md` + `bench_phase6_b4_throughput_gpu.py` |
-| Phase 6C — backing pool redesign | NOT STARTED — scoped in 6B finding's "Phase 6C scope" section | `PHASE_6B_CUDA_GRAPHS_FINDINGS.md` |
+| **Phase 6C — Backing pool skip** | ✅ **CLOSED, MEASURED** — int4 captured HBM 61.7 GB → **45.83 GB** (−15.85 GB); cap/bf16 ratio 0.26 → 0.30× at B=8, 0.15 → 0.19× at B=32. 6B.3 semantic-eq gate still GREEN. **Still 19% MORE memory and ~3× slower than stock bf16** — remaining gap is in the int4 kernel itself. | `PHASE_6C_BACKING_POOL_FINDINGS.md` + `verify_phase6c_bf16_backing_skip.py` |
+| Phase 6D — int4 kernel-level throughput | NOT STARTED — scoped in 6C finding's "Phase 6D candidates" section | `PHASE_6C_BACKING_POOL_FINDINGS.md` |
 
 The read path is **graph-capturable today**. The write path runs
 BEFORE the read path inside vLLM's captured forward, and it still
