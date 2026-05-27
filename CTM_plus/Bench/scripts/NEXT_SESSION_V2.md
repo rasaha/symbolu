@@ -97,6 +97,36 @@ Phase 5B remains its own design + CPU prototype + GPU smoke +
 finding-doc cycle; do NOT start it without explicit per-phase
 approval.
 
+**CLOSED, POSITIVE:** Phase 6B.1 write-path preflight. See
+`PHASE_6B1_WRITE_PREFLIGHT_FINDINGS.md` for the measured finding.
+
+History (branch `claude/phase-6b1-write-preflight-fjYee`):
+* 6B.1 design doc: ✅ commit `433c4a4`
+* 6B.1 Day 1 (pool counters + write_decode_batched + dispatch): ✅ commit `4a73f47`
+* 6B.1 Day 2+3 (verifies + audit + G5c regen + plan update): ✅ commit `83a3b7e`
+* 6B.1 GPU smoke driver + runbook + env override + counters: ✅ commit `4e840d2`
+* 6B.1 diagnostic script (TIER5A-style): ✅ commit `90ef674`
+* 6B.1 GPU smoke + closure docs: GREEN on Qwen-2.5-7B-Instruct + A100
+* **Phase 6B.1 CLOSED, positive measured finding.** Refactored
+  `PagedKVWriter.write_decode_batched` produces byte-identical
+  generated tokens vs the legacy partition+loop path on real
+  Qwen-7B + forked vllm-flash-attn. All 5 G_PRE-WRITE checks
+  GREEN; orthogonality G5a/G5b/G5c/G6a/G6b all PASS on the pod.
+
+GPU spend: ≈ $0.05 across iterations (single A100 pod, ~3 min live:
+orthogonality gate + inspect-only diagnostic + smoke driver two-cell run).
+
+VC brief: **unchanged.** Phase 6B.1 is STRUCTURAL PREP for CUDA Graphs
+capture (6B.3); it does not move any measured number. Brief edits wait
+for Phase 6B.4 (post-capture aggregate throughput re-measurement).
+
+Implication: Phase 6B.2 (vLLM pre-capture seq_id hook) is **unblocked**
+by the 6B.1 positive finding. The write path is structurally ready for
+capture inside its captured region; what 6B.2 must add is the hook that
+hoists the pre-capture host syncs OUT of the captured graph. Phase 6B.2
+remains its own design + CPU prototype + GPU smoke + finding-doc cycle;
+do NOT start without explicit per-phase approval.
+
 ## Five pending v2 items (the brief's Tier 1 list)
 
 Each has effort + cost from `INT4_PROTECTED_VC_BRIEF.md` page 5

@@ -367,6 +367,16 @@ class PagedKVWriter:
         self._bf16_k_backing_pool: Optional["torch.Tensor"] = None
         self._bf16_v_backing_pool: Optional["torch.Tensor"] = None
 
+        # Phase 6B.1 — device-side per-slot counter pools for the
+        # graph-capture-friendly write_decode_batched path. These shadow
+        # the Python ints on SeqState (which stay in place for the
+        # legacy per-seq write path). Sync from SeqState happens at
+        # write_decode_batched entry; after that, the captured region
+        # operates exclusively on these device tensors.
+        self._seq_pos_pool: Optional["torch.Tensor"] = None         # (max_slots,) int32
+        self._k_stage_count_pool: Optional["torch.Tensor"] = None   # (max_slots,) int32
+        self._k_stage_block_id_pool: Optional["torch.Tensor"] = None  # (max_slots,) int64; -1 sentinel
+
     # ------------------------------------------------------------------
     # Phase 5B.6 step 1: per-sequence state lookups + lifecycle.
     # ------------------------------------------------------------------
@@ -429,6 +439,14 @@ class PagedKVWriter:
         slot = self._slot_map.pop(seq_id, None)
         if slot is not None:
             self._free_slots.append(slot)
+            # Phase 6B.1 — also reset the device-side pool counters for
+            # the freed slot so a future sequence allocated to this slot
+            # starts from a clean device-side state. Idempotent before
+            # _lazy_alloc (pools are None).
+            if self._seq_pos_pool is not None:
+                self._seq_pos_pool[slot] = 0
+                self._k_stage_count_pool[slot] = 0
+                self._k_stage_block_id_pool[slot] = -1
 
     # ------------------------------------------------------------------
     # Phase 6 v2 Option B pre-flight (B-pre-1): slot-tensor-based read
@@ -638,6 +656,19 @@ class PagedKVWriter:
         )
         self._bf16_v_backing_pool = torch.zeros(
             (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
+        )
+        # Phase 6B.1 — per-slot counter pools (device-side; ~160 B total).
+        # Sentinel: k_stage_block_id_pool starts at -1 so the FIRST
+        # write_decode_batched call for a slot detects "new block"
+        # (matching legacy SeqState.k_stage_block_id = -1 init).
+        self._seq_pos_pool = torch.zeros(
+            (n_slots,), dtype=torch.int32, device=device,
+        )
+        self._k_stage_count_pool = torch.zeros(
+            (n_slots,), dtype=torch.int32, device=device,
+        )
+        self._k_stage_block_id_pool = torch.full(
+            (n_slots,), -1, dtype=torch.int64, device=device,
         )
         # Slots are handed out via ensure_seq_state. ALL slots are free
         # at alloc time — the default seq is no longer pre-reserved
@@ -881,6 +912,300 @@ class PagedKVWriter:
                 unique_blocks=unique_blocks,
                 full_mask=full_mask,
             )
+
+    # ------------------------------------------------------------------
+    # Phase 6B.1 — graph-capture-friendly decode write path.
+    # ------------------------------------------------------------------
+
+    def _sync_pool_counters_from_states(self, slot_idx_list: list) -> None:
+        """Phase 6B.1 — copy per-slot SeqState Python int counters into
+        the device-side counter pools. Idempotent: legacy path keeps
+        SeqState ints in sync each write, and we re-copy them in here
+        so the new path sees current values.
+
+        Pre-capture-hoistable. Runs OUTSIDE the captured region of
+        write_decode_batched; 6B.2's vLLM hook will move it earlier.
+        """
+        if self._seq_pos_pool is None:
+            raise RuntimeError(
+                "_sync_pool_counters_from_states before _lazy_alloc"
+            )
+        # Resolve slot -> seq_state by scanning the dict (slot count
+        # is bounded by _max_active_slots ~ 8, so this is cheap).
+        slot_to_state = {}
+        for sid, st in self._seq_states.items():
+            slot_to_state[st.slot_idx] = st
+        for slot in slot_idx_list:
+            st = slot_to_state.get(int(slot))
+            if st is None:
+                # Slot pool entry without a SeqState shouldn't happen for
+                # a valid decode call (the impl resolved slot from a live
+                # seq_id). Defensive: skip; the next legacy write would
+                # repopulate.
+                continue
+            self._seq_pos_pool[slot] = int(st.seq_pos)
+            self._k_stage_count_pool[slot] = int(st.k_stage_count)
+            self._k_stage_block_id_pool[slot] = int(st.k_stage_block_id)
+
+    def _writeback_pool_counters_to_states(self, slot_idx_list: list) -> None:
+        """Phase 6B.1 — opposite direction: pull device-side counters
+        BACK to SeqState Python ints, so legacy paths (verify scripts,
+        introspection) read up-to-date values.
+
+        Pre-capture-hoistable. The captured region writes to the pool
+        tensors in-place; this just exposes those updates to legacy
+        callers. For graph-capture (6B.3) this can be moved into a
+        post-capture hook or skipped entirely if no legacy read fires.
+        """
+        if self._seq_pos_pool is None:
+            return
+        slot_to_state = {}
+        for sid, st in self._seq_states.items():
+            slot_to_state[st.slot_idx] = st
+        # Single CPU sync per pool tensor (one .cpu().tolist() each),
+        # not per slot.
+        seq_pos_cpu = self._seq_pos_pool.cpu().tolist()
+        k_stage_count_cpu = self._k_stage_count_pool.cpu().tolist()
+        k_stage_block_id_cpu = self._k_stage_block_id_pool.cpu().tolist()
+        for slot in slot_idx_list:
+            st = slot_to_state.get(int(slot))
+            if st is None:
+                continue
+            st.seq_pos = int(seq_pos_cpu[int(slot)])
+            st.k_stage_count = int(k_stage_count_cpu[int(slot)])
+            st.k_stage_block_id = int(k_stage_block_id_cpu[int(slot)])
+
+    def write_decode_batched(
+        self,
+        key: "torch.Tensor",            # (B, H, D) bf16
+        value: "torch.Tensor",          # (B, H, D) bf16
+        kv_cache: "torch.Tensor",       # (2, NB, BS, H, D) uint8
+        slot_mapping: "torch.Tensor",   # (B,) long — global slots
+        slot_idx_t: "torch.Tensor",     # (B,) long — pool slots, pre-resolved
+    ) -> None:
+        """Phase 6B.1 — graph-capture-friendly decode write.
+
+        Processes ALL B sequences uniformly. ONE new token per sequence
+        (the standard decode shape). No `.item()` calls in the captured
+        region. No per-call dict lookups. Pool counters live on device.
+
+        Pipeline:
+          1. (PRE-CAPTURE) Sync per-slot SeqState ints -> device pools.
+          2. (CAPTURED) BF16 K/V backing scatter via advance indexing.
+          3. (CAPTURED) V quantization vectorized over B.
+          4. (CAPTURED) K protect channel gather + scatter.
+          5. (CAPTURED) K staging unconditional update + re-quantize.
+             Block-full mask gates kv_cache + k_scale/k_xmin scatter
+             via torch.where read-modify-write.
+          6. (PRE-CAPTURE) Sync device pools -> SeqState ints for
+             legacy introspection.
+
+        Math is bit-equivalent to looped `writer.write(seq_id=...)` for
+        the decode shape. Verified by
+        verify_phase6_b_pre5_write_equiv.py.
+        """
+        if not self._allocated:
+            self._lazy_alloc(kv_cache)
+        if key.shape != value.shape:
+            raise ValueError(
+                f"key shape {tuple(key.shape)} != value shape {tuple(value.shape)}"
+            )
+        if key.ndim != 3 or key.shape[1:] != (self.H, self.D):
+            raise ValueError(
+                f"key shape {tuple(key.shape)} != expected (B, {self.H}, {self.D})"
+            )
+        B = key.shape[0]
+        if slot_mapping.shape != (B,):
+            raise ValueError(
+                f"slot_mapping shape {tuple(slot_mapping.shape)} != ({B},)"
+            )
+        if slot_idx_t.shape != (B,):
+            raise ValueError(
+                f"slot_idx_t shape {tuple(slot_idx_t.shape)} != ({B},)"
+            )
+
+        # =============== PRE-CAPTURE REGION (host-sync OK) ================
+        # The pre-capture region performs Python-side resolution (seq_id ->
+        # slot, overflow guard) and is HOISTABLE OUTSIDE the captured
+        # graph by 6B.2's vLLM hook. The AST + runtime capture-safety
+        # checker treats this region as exempt from the "no host sync"
+        # rule.
+        # CAPTURE-EXEMPT: pre-capture-hoistable slot-idx materialization.
+        slot_idx_list = slot_idx_t.cpu().tolist()  # B small ints; coalesced
+        self._sync_pool_counters_from_states(slot_idx_list)
+
+        # Overflow guard runs Python-side from the synced SeqState ints
+        # (cheap dict lookup; no captured-region access). Pre-capture-
+        # hoistable.
+        max_S = self._bf16_k_backing_pool.shape[1]
+        for _slot in slot_idx_list:
+            # CAPTURE-EXEMPT: pre-capture overflow guard.
+            if int(self._seq_pos_pool[_slot].item()) >= max_S:
+                raise RuntimeError(
+                    f"bf16 backing overflow at slot={_slot}: "
+                    f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
+                    f">= max_seqlen={max_S}. Bump "
+                    f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
+                )
+
+        # ================ CAPTURED REGION (no host sync) =================
+        # Every op below this marker MUST be device-only. The AST + runtime
+        # capture-safety verifier asserts zero .item() / .cpu() / .tolist()
+        # / Python dict-lookup occurrences in this region.
+        # CAPTURED-REGION-START
+        dtype = self.sidecar_dtype
+        BS = self.BS
+        D = self.D
+        H = self.H
+        half_D = D // 2
+
+        if key.dtype != dtype:
+            key = key.to(dtype)
+        if value.dtype != dtype:
+            value = value.to(dtype)
+
+        slot_mapping = slot_mapping.long()
+        active_mask_t = (slot_mapping >= 0)                       # (B,) bool device
+
+        # For inactive (-1) slots, we still need valid indices for the
+        # advance-indexed scatters to not crash; we clamp the slot/pos
+        # to 0 and rely on torch.where masking to make the writes no-ops.
+        # In practice decode never has -1 padding in V0 (block_tables
+        # has one row per active seq), but this preserves graph safety.
+        safe_slot_mapping = torch.where(
+            active_mask_t, slot_mapping, torch.zeros_like(slot_mapping),
+        )
+        block_ids = safe_slot_mapping // BS                       # (B,) long
+        positions = safe_slot_mapping %  BS                       # (B,) long
+
+        # ===== BF16 K/V backing scatter (per-seq, indexed by slot_idx + seq_pos) =====
+        seq_pos_t = self._seq_pos_pool[slot_idx_t].long()         # (B,) long
+        # Advance-indexed scatter — same bytes as legacy
+        # state.bf16_k_backing[0, seq_pos] = real_key for each slot.
+        # Inactive rows still write but to position 0 of slot 0 (harmless
+        # under matched active_mask gating on the read side).
+        self._bf16_k_backing_pool[slot_idx_t, seq_pos_t] = key
+        self._bf16_v_backing_pool[slot_idx_t, seq_pos_t] = value
+        # Update seq_pos counter (active mask gates inactive seqs).
+        self._seq_pos_pool.index_add_(
+            0, slot_idx_t, active_mask_t.to(torch.int32),
+        )
+
+        # ===== V quantization vectorized over B (same math as legacy) =====
+        if _bf16_v_mode():
+            if getattr(self, "_v_bf16_ext", None) is None:
+                self._v_bf16_ext = torch.zeros(
+                    (self.NB, BS, H, D), dtype=dtype, device=kv_cache.device,
+                )
+            self._v_bf16_ext[block_ids, positions] = value
+        else:
+            v_grouped = value.float().view(
+                B, H, self.v_n_groups, self.v_group_size,
+            )
+            v_max = v_grouped.amax(dim=-1)
+            v_min = v_grouped.amin(dim=-1)
+            v_scale = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+            q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale.unsqueeze(-1)) \
+                .round().clamp(0, 15).to(torch.uint8)
+            q_v_flat = q_v.view(B, H, D)
+            v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
+            kv_cache[1, block_ids, positions, :, :half_D] = v_packed
+            self.v_scale_ext[block_ids, positions] = v_scale.to(dtype)
+            self.v_xmin_ext [block_ids, positions] = v_min.to(dtype)
+
+        # ===== K protect gather + scatter (same as legacy) =====
+        protect_idx = self.protected_d_per_head.unsqueeze(0).expand(B, -1, -1)
+        k_protect = torch.gather(key, dim=-1, index=protect_idx)
+        self.k_protect_ext[block_ids, positions] = k_protect
+
+        # ===== K staging: unconditional update + conditional finalize =====
+        # Detect block boundary via device tensor compare.
+        prior_block_id = self._k_stage_block_id_pool[slot_idx_t]   # (B,) long
+        is_new_block = (block_ids != prior_block_id)               # (B,) bool
+
+        # Unconditional masked-zero of the staging slice on new-block
+        # transition. keep_mask = ~is_new_block; where keep_mask is
+        # True, preserve current k_stage; else zero.
+        keep_mask = (~is_new_block).view(B, 1, 1, 1)               # (B,1,1,1)
+        current_k_stage = self._k_stage_pool[slot_idx_t]           # (B, BS, H, D)
+        cleared_k_stage = torch.where(
+            keep_mask, current_k_stage, torch.zeros_like(current_k_stage),
+        )
+        # Place new token at this seq's position within the block.
+        batch_arange = torch.arange(B, device=kv_cache.device)
+        cleared_k_stage[batch_arange, positions] = key
+        # Scatter back to the pool — pool now reflects the new state.
+        self._k_stage_pool[slot_idx_t] = cleared_k_stage
+
+        # Update bookkeeping (in-place, device-side).
+        # For inactive slots, keep prior values via masked update.
+        new_block_id = torch.where(
+            active_mask_t, block_ids, self._k_stage_block_id_pool[slot_idx_t],
+        )
+        self._k_stage_block_id_pool[slot_idx_t] = new_block_id
+        new_count = (positions + 1).to(torch.int32)
+        cur_count = self._k_stage_count_pool[slot_idx_t]
+        self._k_stage_count_pool[slot_idx_t] = torch.where(
+            active_mask_t, new_count, cur_count,
+        )
+
+        # Unconditional re-quantize the staging pool for all B slots.
+        # For partial blocks: scale/xmin include the unfilled zeros
+        # (matching legacy _splice_k_partial_tail_batched_*).
+        # For full blocks (positions == BS-1, count==BS after write):
+        # the staging pool holds all BS real tokens accumulated over
+        # BS decode steps; scale/xmin equal what legacy
+        # _finalize_k_group_from_state would compute.
+        buf_f = cleared_k_stage.float()                            # (B, BS, H, D)
+        x_max = buf_f.amax(dim=1)                                  # (B, H, D)
+        x_min = buf_f.amin(dim=1)
+        scale = ((x_max - x_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+        q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+            .round().clamp(0, 15).to(torch.uint8)                  # (B, BS, H, D)
+        packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)  # (B, BS, H, half_D)
+
+        # Block-full detection: this write completed the block iff
+        # positions[i] == BS-1 AND active. Only on full do we commit
+        # to kv_cache + k_scale_ext + k_xmin_ext.
+        block_full_mask = ((positions + 1) == BS) & active_mask_t  # (B,) bool
+
+        # Read-modify-write under block_full_mask. Inactive / partial:
+        # writes back current value (no-op). Full: writes packed.
+        full_mask_kv = block_full_mask.view(B, 1, 1, 1)            # for kv_cache packed
+        full_mask_ext = block_full_mask.view(B, 1, 1)              # for (H, D) externals
+
+        current_kv_packed = kv_cache[0, block_ids][..., :half_D]   # (B, BS, H, half_D) uint8
+        new_kv_packed = torch.where(full_mask_kv, packed, current_kv_packed)
+        kv_cache[0, block_ids, :, :, :half_D] = new_kv_packed
+
+        current_k_scale = self.k_scale_ext[block_ids]              # (B, H, D)
+        current_k_xmin  = self.k_xmin_ext [block_ids]
+        scale_dt = scale.to(dtype)
+        xmin_dt  = x_min.to(dtype)
+        self.k_scale_ext[block_ids] = torch.where(
+            full_mask_ext, scale_dt, current_k_scale,
+        )
+        self.k_xmin_ext [block_ids] = torch.where(
+            full_mask_ext, xmin_dt,  current_k_xmin,
+        )
+
+        # When the block fills, legacy sets state.k_stage_count = 0.
+        # The pool counter equivalent: set to 0 for slots whose
+        # block_full_mask fired.
+        self._k_stage_count_pool[slot_idx_t] = torch.where(
+            block_full_mask,
+            torch.zeros_like(self._k_stage_count_pool[slot_idx_t]),
+            self._k_stage_count_pool[slot_idx_t],
+        )
+
+        # CAPTURED-REGION-END
+        # ============== POST-CAPTURE REGION (host-sync OK) ===============
+        # Writeback pool counters to SeqState Python ints so legacy
+        # introspection (verify scripts, prefill mid-decode) reads
+        # consistent state. Post-capture-hoistable; the captured region
+        # has already written to the device-side pool tensors in place.
+        # CAPTURE-EXEMPT: post-capture writeback.
+        self._writeback_pool_counters_to_states(slot_idx_list)
 
     def _finalize_k_full_blocks_batched(
         self,
