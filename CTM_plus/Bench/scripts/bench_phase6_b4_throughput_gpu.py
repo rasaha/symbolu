@@ -88,7 +88,7 @@ CELL_BF16     = "bf16"      # stock vLLM (no int4_protected), graphs enabled by 
 
 CELLS = [CELL_EAGER, CELL_CAPTURED, CELL_BF16]
 
-BATCH_SIZES = [1, 2, 4, 8]
+BATCH_SIZES = [1, 2, 4, 8, 16, 32]
 DEFAULT_N_RUNS = 5
 
 # Acceptance gate (per Phase 6B plan): captured B=8 agg_tps >= 80 tok/s.
@@ -313,11 +313,47 @@ def run_worker(cell: str, output_path: Path, *, model: str,
     per_b_results = {}
     for B in BATCH_SIZES:
         print(f"[cell={cell}] Running B={B} x {n_runs} runs...")
-        r = _bench_one_B(llm, inner, B, sampling, n_runs=n_runs)
-        per_b_results[B] = r
-        print(f"[cell={cell}] B={B}: median wall {r['wall_s']:.3f}s  "
-              f"out_tok={r['n_output_tokens']}  "
-              f"agg_tps={r['agg_tps']:.1f}  per_seq_tps={r['per_seq_tps']:.1f}")
+        try:
+            r = _bench_one_B(llm, inner, B, sampling, n_runs=n_runs)
+            per_b_results[B] = r
+            print(f"[cell={cell}] B={B}: median wall {r['wall_s']:.3f}s  "
+                  f"out_tok={r['n_output_tokens']}  "
+                  f"agg_tps={r['agg_tps']:.1f}  per_seq_tps={r['per_seq_tps']:.1f}")
+        except torch.cuda.OutOfMemoryError as exc:
+            # Defensive: at high B the bf16 cell can outrun the KV
+            # cache budget while int4 still fits. Record the OOM and
+            # continue so the bf16 wall-vs-int4 picture stays clean
+            # for the lower-B rows.
+            per_b_results[B] = {
+                "B":               B,
+                "n_runs":          0,
+                "wall_s":          float("inf"),
+                "n_output_tokens": 0,
+                "wall_s_per_seq":  float("inf"),
+                "agg_tps":         0.0,
+                "per_seq_tps":     0.0,
+                "sample_output":   "",
+                "oom_error":       str(exc)[:200],
+            }
+            print(f"[cell={cell}] B={B}: OOM ({str(exc)[:100]})")
+            # Reset the allocator so subsequent B's get a clean slate.
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
+        except Exception as exc:  # noqa: BLE001
+            per_b_results[B] = {
+                "B":               B,
+                "n_runs":          0,
+                "wall_s":          float("inf"),
+                "n_output_tokens": 0,
+                "wall_s_per_seq":  float("inf"),
+                "agg_tps":         0.0,
+                "per_seq_tps":     0.0,
+                "sample_output":   "",
+                "error":           f"{type(exc).__name__}: {str(exc)[:200]}",
+            }
+            print(f"[cell={cell}] B={B}: ERROR {type(exc).__name__}: {str(exc)[:120]}")
 
     hbm_final = _hbm_snapshot()
     payload = {
@@ -366,25 +402,32 @@ def compare(eager_path: Path, captured_path: Path,
         e_tps = eb["agg_tps"]
         c_tps = cb["agg_tps"]
         b_tps = bb["agg_tps"] if bb else None
-        speedup = (c_tps / e_tps) if e_tps > 0 else 0.0
+        # OOM/error sentinels are agg_tps == 0; preserve that as None in
+        # the comparison diffs so the report can show "OOM" rather than
+        # a misleading 0.0x ratio.
+        speedup = (c_tps / e_tps) if (e_tps > 0 and c_tps > 0) else 0.0
         diff = {
             "B": B,
-            "eager_agg_tps":    e_tps,
-            "captured_agg_tps": c_tps,
-            "speedup_x":        speedup,
+            "eager_agg_tps":    e_tps if e_tps > 0 else None,
+            "captured_agg_tps": c_tps if c_tps > 0 else None,
+            "speedup_x":        speedup if speedup > 0 else None,
             "eager_wall_s":     eb["wall_s"],
             "captured_wall_s":  cb["wall_s"],
             "eager_output_tokens":    eb["n_output_tokens"],
             "captured_output_tokens": cb["n_output_tokens"],
             "eager_sample":     eb["sample_output"],
             "captured_sample":  cb["sample_output"],
+            "eager_oom":        eb.get("oom_error") or eb.get("error"),
+            "captured_oom":     cb.get("oom_error") or cb.get("error"),
         }
         if bb:
-            diff["bf16_agg_tps"]      = b_tps
+            diff["bf16_agg_tps"]      = b_tps if (b_tps and b_tps > 0) else None
             diff["bf16_wall_s"]       = bb["wall_s"]
             diff["bf16_output_tokens"] = bb["n_output_tokens"]
             diff["bf16_sample"]       = bb["sample_output"]
-            diff["captured_vs_bf16_x"] = (c_tps / b_tps) if (b_tps and b_tps > 0) else 0.0
+            diff["bf16_oom"]          = bb.get("oom_error") or bb.get("error")
+            cvb = (c_tps / b_tps) if (b_tps and b_tps > 0 and c_tps > 0) else 0.0
+            diff["captured_vs_bf16_x"] = cvb if cvb > 0 else None
         per_b_diffs.append(diff)
 
     # G_THROUGHPUT primary gate: captured B=8 agg_tps >= 80 tok/s.
@@ -465,6 +508,17 @@ def compare(eager_path: Path, captured_path: Path,
         mark = "PASS" if c["passed"] else ("INFO" if c["name"].startswith("info_") else "FAIL")
         lines.append(f"  [{mark}] {c['name']:<52s} {c['detail']}")
     lines.append("")
+    def _fmt_tps(v):
+        # Helper: show "OOM" for the inf/0 sentinel; otherwise tps.
+        if v is None or v <= 0.0:
+            return "   OOM "
+        return f"{v:7.1f}"
+
+    def _fmt_x(v):
+        if v is None or v <= 0.0:
+            return "   --- "
+        return f"{v:6.2f}x"
+
     lines.append("Per-B throughput (tok/s):")
     if bf16:
         lines.append(f"  {'B':>3} | {'eager':>8} | {'captured':>9} | {'bf16':>8} | "
@@ -472,11 +526,11 @@ def compare(eager_path: Path, captured_path: Path,
         lines.append("  " + "-" * 70)
         for d in report["per_b_diffs"]:
             lines.append(
-                f"  {d['B']:>3} | {d['eager_agg_tps']:>8.1f} | "
-                f"{d['captured_agg_tps']:>9.1f} | "
-                f"{d.get('bf16_agg_tps', float('nan')):>8.1f} | "
-                f"{d['speedup_x']:>9.2f}x | "
-                f"{d.get('captured_vs_bf16_x', float('nan')):>8.2f}x"
+                f"  {d['B']:>3} | {_fmt_tps(d.get('eager_agg_tps'))} | "
+                f"{_fmt_tps(d.get('captured_agg_tps'))}  | "
+                f"{_fmt_tps(d.get('bf16_agg_tps'))} | "
+                f"{_fmt_x(d.get('speedup_x'))}  | "
+                f"{_fmt_x(d.get('captured_vs_bf16_x'))}"
             )
     else:
         lines.append(f"  {'B':>3} | {'eager_tps':>10} | {'cap_tps':>10} | "
@@ -484,9 +538,11 @@ def compare(eager_path: Path, captured_path: Path,
         lines.append("  " + "-" * 70)
         for d in report["per_b_diffs"]:
             lines.append(
-                f"  {d['B']:>3} | {d['eager_agg_tps']:>10.1f} | "
-                f"{d['captured_agg_tps']:>10.1f} | {d['speedup_x']:>7.2f}x | "
-                f"{d['eager_wall_s']:>8.3f} | {d['captured_wall_s']:>8.3f}"
+                f"  {d['B']:>3} | {_fmt_tps(d.get('eager_agg_tps'))}    | "
+                f"{_fmt_tps(d.get('captured_agg_tps'))}    | "
+                f"{_fmt_x(d.get('speedup_x'))}  | "
+                f"{d.get('eager_wall_s', float('inf')):>8.3f} | "
+                f"{d.get('captured_wall_s', float('inf')):>8.3f}"
             )
     lines.append("")
     if overall_ok:
