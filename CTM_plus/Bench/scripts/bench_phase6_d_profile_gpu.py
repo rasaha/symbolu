@@ -88,17 +88,22 @@ PROMPT = (
 )
 
 
-def _load_llm(cell, model, max_model_len, gpu_memory_utilization):
+def _load_llm(cell, model, max_model_len, gpu_memory_utilization,
+              enforce_eager_bf16=False):
     import torch
     from vllm import LLM
 
     if cell == CELL_BF16_STOCK:
-        # Stock vLLM, bf16 KV cache, default graphs ON.
+        # Stock vLLM, bf16 KV cache. enforce_eager_bf16=True forces
+        # eager mode so torch.profiler can see every kernel; otherwise
+        # vLLM uses CUDA graphs by default (faster, but the graph
+        # replays are opaque to torch.profiler).
         llm = LLM(
             model=model,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
             dtype="bfloat16",
+            enforce_eager=enforce_eager_bf16,
         )
         torch.cuda.synchronize()
         return llm, None, None, None
@@ -190,16 +195,22 @@ def main() -> int:
     p.add_argument("--torch-profile-trace", type=str, default=None,
                    help="If set (with --torch-profile-csv), also exports a Chrome "
                         "trace JSON for timeline inspection in chrome://tracing.")
+    p.add_argument("--bf16-eager", action="store_true",
+                   help="(With --cell bf16_stock) force the bf16 stock cell into "
+                        "enforce_eager=True so torch.profiler can see every kernel. "
+                        "Apples-to-apples vs --cell int4_eager.")
     args = p.parse_args()
 
     import torch
     import torch.cuda.nvtx as nvtx
     from vllm import SamplingParams
 
-    print(f"[profile cell={args.cell}] Loading {args.model}...")
+    print(f"[profile cell={args.cell}] Loading {args.model}"
+          f"{' (eager mode forced)' if args.bf16_eager and args.cell == CELL_BF16_STOCK else ''}...")
     t0 = time.time()
     llm, inner, impls, hook = _load_llm(
         args.cell, args.model, args.max_model_len, args.gpu_memory_utilization,
+        enforce_eager_bf16=args.bf16_eager,
     )
     torch.cuda.synchronize()
     print(f"[profile cell={args.cell}] Loaded in {time.time() - t0:.1f}s.")
