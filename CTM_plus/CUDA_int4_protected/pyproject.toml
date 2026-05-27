@@ -1,20 +1,19 @@
-# Phase 6E — build-system metadata so `pip install -e .` works with
-# default build isolation.
+# Phase 6E — build-system metadata.
 #
-# Without this, pip's isolated build environment doesn't see the venv's
-# torch installation and setup.py fails at `from torch.utils.cpp_extension`.
-# Either fix this by listing torch as a build requirement here, OR use
-# `pip install --no-build-isolation -e .` (cheaper, uses the venv's torch).
+# Use:   pip install --no-build-isolation -e .
+#
+# Why --no-build-isolation: torch's cpp_extension must be the SAME
+# version + CUDA build that the runtime uses. If pip's isolated build
+# env downloads a fresh torch from PyPI, it may not match the pod's
+# CUDA driver and the build fails with a CUDA version mismatch.
+# --no-build-isolation reuses the venv's torch (matched to the pod's
+# CUDA toolchain) and the build succeeds.
+#
+# We intentionally do NOT list torch as a build requirement here, so
+# that `pip install -e .` without --no-build-isolation fails fast with
+# a clear error rather than silently downloading an incompatible torch.
 [build-system]
-requires = [
-    "setuptools>=61",
-    "wheel",
-    # Torch must be installed in the build env to import cpp_extension.
-    # The version pin is loose so any compatible torch already in the
-    # venv satisfies it. If you'd rather use the venv's torch directly,
-    # invoke `pip install --no-build-isolation -e .` instead.
-    "torch>=2.0",
-]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
