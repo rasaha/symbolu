@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.2 Day 1 \u2014 pre-capture seq_id resolution hook. Add phase6b2_precapture_hook.py to G5c pin set (new module, partner-credible). G5a class fingerprint preserved; G5b/G6a unchanged. Backed by 27 new CPU tests + 36-cell equivalence + AST/runtime capture-safe + 15/15 pointer stability all GREEN.",
+  "note": "Phase 6B.2 GPU fix \u2014 wrap pool mutations in _resolve_and_stash in torch.inference_mode(). The hook fires from vLLM's worker.execute_model OUTSIDE the model_runner's @torch.inference_mode() decorator; pool tensors were allocated inside inference_mode and carry the 'inference tensor' attribute. PyTorch rejects in-place writes to inference tensors outside inference_mode. Wrap (a) ensure_seq_state calls (writes _slot_map etc. \u2014 harmless on cpu but matches the contract) and (b) _sync_pool_counters_from_states (the actual mutation site) and (c) torch.tensor build inside the context. The wrapped original_fn re-enters inference_mode on its own; nested context is a no-op there. 27 CPU tests + 36-cell hook-equiv still GREEN post-fix.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -11,6 +11,6 @@
     "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "d0abeb6cc9c046daee7d5deeb34cd38fdb2467556d383582c366bc5ff5b19670",
     "KVPolicy/kv_policy/phase5b_backend_install.py": "2459374b0961e5e61c7460ad1ddc8dcf2246d8e115bf1f311615e97e62ae816c",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
-    "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "87d2962e050f0122e4d2967be6b11e31ec0e33238ba25328772eab6cdaa71aba"
+    "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "ca2221225bb3941875437c49fa7de3f66f67af1134ce120670ba4ae1f76871f1"
   }
 }

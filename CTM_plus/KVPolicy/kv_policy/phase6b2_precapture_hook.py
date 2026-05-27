@@ -209,35 +209,49 @@ def _resolve_and_stash(
     # captured region never sees it.
     seq_ids = block_tables[:, 0].cpu().tolist()
 
-    # Step 1: ensure SeqState exists on EVERY writer for each seq_id.
-    # All writers see seq_ids in the same order; each writer's
-    # _free_slots is popped in the same order; so the _slot_map
-    # mappings align deterministically.
-    for sid in seq_ids:
+    # The hook fires from `worker.execute_model` -> our wrap, which
+    # runs OUTSIDE vLLM's `@torch.inference_mode()` decorator (that
+    # decorator sits on `model_runner.execute_model`, downstream of
+    # our wrap). The writer's pool tensors were allocated INSIDE
+    # inference_mode during the first forward pass and so carry the
+    # "inference tensor" attribute. PyTorch rejects in-place writes
+    # to inference tensors outside inference_mode (see
+    # https://github.com/pytorch/rfcs/pull/17), so we enter inference_
+    # mode explicitly here for the pool mutations + the device tensor
+    # build. The wrapped original_fn re-enters inference_mode on its
+    # own; the nested context is a no-op there.
+    with torch.inference_mode():
+        # Step 1: ensure SeqState exists on EVERY writer for each
+        # seq_id. All writers see seq_ids in the same order; each
+        # writer's _free_slots is popped in the same order; so the
+        # _slot_map mappings align deterministically.
+        for sid in seq_ids:
+            for w in writers:
+                if w._allocated:
+                    w.ensure_seq_state(sid, device)
+
+        # Step 2: resolve slot_idx_list once. All writers have the
+        # same mapping after step 1 (verified by Day 1's CPU tests).
+        primary = writers[0] if writers else None
+        if primary is None or not primary._allocated:
+            # Defensive: nothing to resolve. Caller will fall back to
+            # self-resolve.
+            return {}
+        slot_idx_list = primary.slot_indices_for(seq_ids)
+
+        # Step 3: sync every writer's pool counters once (sentinel-
+        # gated; only fires on slots whose decode-side state is still
+        # pristine).
         for w in writers:
             if w._allocated:
-                w.ensure_seq_state(sid, device)
+                w._sync_pool_counters_from_states(slot_idx_list)
 
-    # Step 2: resolve slot_idx_list once. All writers have the same
-    # mapping after step 1 (verified by Day 1's CPU tests).
-    primary = writers[0] if writers else None
-    if primary is None or not primary._allocated:
-        # Defensive: nothing to resolve. Caller will fall back to
-        # self-resolve.
-        return {}
-    slot_idx_list = primary.slot_indices_for(seq_ids)
-
-    # Step 3: sync every writer's pool counters once.
-    for w in writers:
-        if w._allocated:
-            w._sync_pool_counters_from_states(slot_idx_list)
-
-    # Step 4: build the device tensor once.
-    slot_idx_t = torch.tensor(
-        slot_idx_list,
-        dtype=torch.long,
-        device=device,
-    )
+        # Step 4: build the device tensor once.
+        slot_idx_t = torch.tensor(
+            slot_idx_list,
+            dtype=torch.long,
+            device=device,
+        )
 
     payload: Dict[str, Any] = {
         "slot_idx_t":   slot_idx_t,
