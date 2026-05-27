@@ -155,6 +155,56 @@ The 28-vs-868 split on `write_legacy_loop_calls` for the refactored
 cell is exactly the design contract: prefill stays eager (legacy),
 decode goes graph-capture-friendly (`write_decode_batched`).
 
+### Cross-family extension — Mistral-7B-Instruct-v0.3 (same pod, same session)
+
+After the Qwen-7B GREEN, the smoke was re-run opportunistically on
+`mistralai/Mistral-7B-Instruct-v0.3` (32 layers vs Qwen-7B's 28) with
+the same driver + same shape (B=2, max_tokens=32, two prompts):
+
+```
+Model:      mistralai/Mistral-7B-Instruct-v0.3
+Prompts:    2    max_tokens: 32
+Verdict:    GREEN
+
+Checks:
+  [PASS] completion_token_ids_byte_equal                  all prompts byte-equal
+  [PASS] refactored_cell_used_write_decode_batched        write_decode_batched_calls=992
+  [PASS] legacy_cell_used_only_legacy_loop                write_decode_batched_calls=0, write_legacy_loop_calls=1024
+  [PASS] legacy_zero_fallbacks                            write_path_fallback=0, decode_calls_fallback=0
+  [PASS] refactored_zero_fallbacks                        write_path_fallback=0, decode_calls_fallback=0
+
+Call stats:
+  legacy:     {"decode_calls_fallback": 0, "decode_calls_packed": 992, "prefill_calls": 32,
+               "write_decode_batched_calls": 0, "write_legacy_loop_calls": 1024,
+               "write_path_calls": 1024, "write_path_fallback": 0}
+  refactored: {"decode_calls_fallback": 0, "decode_calls_packed": 992, "prefill_calls": 32,
+               "write_decode_batched_calls": 992, "write_legacy_loop_calls": 32,
+               "write_path_calls": 1024, "write_path_fallback": 0}
+```
+
+The split scales linearly with layer count:
+
+| Stat | Qwen-7B (28 layers) | Mistral-7B (32 layers) | Ratio |
+|---|---:|---:|---:|
+| `prefill_calls`                            | 28  | 32   | 32/28 ≈ 1.143 |
+| `decode_calls_packed`                      | 868 | 992  | 992/868 ≈ 1.143 |
+| `write_decode_batched_calls` (refactored)  | 868 | 992  | 992/868 ≈ 1.143 |
+| `write_legacy_loop_calls` (refactored)     | 28  | 32   | 32/28 ≈ 1.143 |
+
+Both ratios equal the layer-count ratio — same per-layer per-step
+write-path execution count in both models, just scaled by depth.
+
+**Implication:** the dispatch fork + `write_decode_batched` are
+genuinely model-agnostic across the D=128 GQA architecture family
+(at minimum across Qwen + Mistral, which is the two of the three
+validated portfolio families exercised this session). The third
+family (Llama, also D=128 GQA) and the fourth model (Qwen-14B, also
+D=128) should hold trivially; not in this session's scope.
+
+GPU spend for the cross-family addendum: ≈ $0.02 (one extra
+two-cell run on the still-warm pod; total Phase 6B.1 GPU spend now
+≈ $0.07).
+
 ### Pre-flight gate state (Step 1 of the runbook)
 
 ```
