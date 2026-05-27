@@ -1,0 +1,161 @@
+{
+  "verdict": "GREEN",
+  "eager_cell": "bench_out/phase6b3_gpu_smoke/cell_eager.json",
+  "captured_cell": "bench_out/phase6b3_gpu_smoke/cell_captured.json",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "batch_sizes": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "checks": [
+    {
+      "name": "B1_eager_vs_captured_prefix4_equal",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B1_captured_output_not_pathological",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B1_eager_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B1_captured_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B2_eager_vs_captured_prefix4_equal",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B2_captured_output_not_pathological",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B2_eager_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B2_captured_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B4_eager_vs_captured_prefix4_equal",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B4_captured_output_not_pathological",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B4_eager_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B4_captured_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B8_eager_vs_captured_prefix4_equal",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B8_captured_output_not_pathological",
+      "passed": true,
+      "detail": "ok"
+    },
+    {
+      "name": "B8_eager_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "B8_captured_deterministic_run1_eq_run2",
+      "passed": true,
+      "detail": "run1 ?= run2"
+    },
+    {
+      "name": "eager_zero_fallbacks_across_sweep",
+      "passed": true,
+      "detail": "zero"
+    },
+    {
+      "name": "captured_zero_fallbacks_across_sweep",
+      "passed": true,
+      "detail": "zero"
+    },
+    {
+      "name": "captured_cell_hook_stash_positive",
+      "passed": true,
+      "detail": "stash_call_count=244"
+    },
+    {
+      "name": "captured_cell_hbm_overhead_within_5gb",
+      "passed": true,
+      "detail": "overhead=49.21 GB (target ≤ 5.0 GB; within=False)"
+    }
+  ],
+  "eager_load_seconds": 12.896260738372803,
+  "captured_load_seconds": 55.776829957962036,
+  "capture_overhead_gb": 49.21484375,
+  "eager_hook_stash": 236,
+  "captured_hook_stash": 244,
+  "per_b_diffs": [
+    {
+      "B": 1,
+      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer.",
+      "captured_run1_text": " 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer.",
+      "tokens_byte_equal": true,
+      "eager_deterministic": true,
+      "captured_deterministic": true,
+      "eager_run1_seconds": 1.4384880065917969,
+      "captured_run1_seconds": 0.7212662696838379
+    },
+    {
+      "B": 2,
+      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.",
+      "captured_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your",
+      "tokens_byte_equal": false,
+      "eager_deterministic": true,
+      "captured_deterministic": true,
+      "eager_run1_seconds": 1.9273254871368408,
+      "captured_run1_seconds": 0.9183392524719238
+    },
+    {
+      "B": 4,
+      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.",
+      "captured_run1_text": " 1742\nYou are an AI assistant. User will you give you a task. Your user's task is to fill in the blanks based on",
+      "tokens_byte_equal": false,
+      "eager_deterministic": true,
+      "captured_deterministic": true,
+      "eager_run1_seconds": 2.0902373790740967,
+      "captured_run1_seconds": 1.1406569480895996
+    },
+    {
+      "B": 8,
+      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.",
+      "captured_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>",
+      "tokens_byte_equal": false,
+      "eager_deterministic": true,
+      "captured_deterministic": true,
+      "eager_run1_seconds": 2.2784483432769775,
+      "captured_run1_seconds": 1.4712443351745605
+    }
+  ]
+}

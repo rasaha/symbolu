@@ -1,0 +1,103 @@
+{
+  "cell": "captured",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "max_model_len": 4096,
+  "gpu_memory_utilization": 0.5,
+  "max_tokens": 32,
+  "load_seconds": 55.776829957962036,
+  "batch_sizes": [1, 2, 4, 8],
+  "n_prompts_per_batch": 2,
+  "hook_enabled": true,
+  "hook_target_name": "execute_model",
+  "hook_total_stash_calls": 244,
+  "hook_total_skipped_steps": 8,
+  "hbm_before_load": {
+    "allocated_gb": 0.0,
+    "reserved_gb": 0.0,
+    "free_gb": 78.83880615234375,
+    "total_gb": 79.251708984375,
+    "used_gb": 0.41290283203125
+  },
+  "hbm_after_init": {
+    "allocated_gb": 43.813462257385254,
+    "reserved_gb": 47.861328125,
+    "free_gb": 29.62396240234375,
+    "total_gb": 79.251708984375,
+    "used_gb": 49.62774658203125
+  },
+  "hbm_after_warmup": {
+    "allocated_gb": 43.813461780548096,
+    "reserved_gb": 47.86328125,
+    "free_gb": 29.62200927734375,
+    "total_gb": 79.251708984375,
+    "used_gb": 49.62969970703125
+  },
+  "hbm_final": {
+    "allocated_gb": 43.813461780548096,
+    "reserved_gb": 47.9375,
+    "free_gb": 29.54583740234375,
+    "total_gb": 79.251708984375,
+    "used_gb": 49.70587158203125
+  },
+  "capture_overhead_gb": 49.21484375,
+  "per_b": {
+    "1": {
+      "B": 1,
+      "deterministic": true,
+      "run1_tokens": [[220, 16, 22, 19, 17, 198, 2610, 525, 458, 15235, 17847, 13, 2657, 686, 3410, 264, 3405, 13, 1446, 686, 3410, 264, 63594, 4226, 13, 151643]],
+      "run1_texts": [" 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer."],
+      "run1_seconds": 0.7212662696838379,
+      "run2_tokens": [[220, 16, 22, 19, 17, 198, 2610, 525, 458, 15235, 17847, 13, 2657, 686, 3410, 264, 3405, 13, 1446, 686, 3410, 264, 63594, 4226, 13, 151643]],
+      "run2_texts": [" 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer."],
+      "run2_seconds": 0.6992988586425781
+    },
+    "2": {
+      "B": 2,
+      "deterministic": true,
+      "run1_tokens": [
+        [220, 16, 22, 19, 17, 198, 2610, 525, 458, 15235, 17847, 13, 2657, 686, 3410, 264, 3405, 13, 4615, 151643],
+        [1967, 5672, 567, 41607, 75508, 822, 1070, 1346, 88329, 355, 512, 521, 3591, 281, 5403, 325, 2200, 624, 69769, 25, 758, 419, 14468, 11, 330, 27763, 1, 374, 24531, 438, 330, 4611]
+      ],
+      "run1_texts": [
+        " 1742\nYou are an AI assistant. User will provide a question. Your",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap"
+      ],
+      "run1_seconds": 0.9183392524719238,
+      "run2_texts": [
+        " 1742\nYou are an AI assistant. User will provide a question. Your",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap"
+      ],
+      "run2_seconds": 0.915687084197998
+    },
+    "4": {
+      "B": 4,
+      "deterministic": true,
+      "run1_texts": [
+        " 1742\nYou are an AI assistant. User will you give you a task. Your user's task is to fill in the blanks based on",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+        " 1742\nYou are an AI assistant. User will you give you a task. Your user's task is to fill in the blanks based on",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap"
+      ],
+      "run1_seconds": 1.1406569480895996,
+      "run2_seconds": 1.1373324394226074
+    },
+    "8": {
+      "B": 8,
+      "deterministic": true,
+      "run1_texts": [
+        " 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+        " 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+        " 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+        " 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>",
+        " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap"
+      ],
+      "run1_seconds": 1.4712443351745605,
+      "run2_seconds": 1.4647488594055176
+    }
+  },
+  "phase6b3_force_eager_env": null,
+  "_note": "Trimmed: full per-B token arrays + per-run call_stats present in original pod artifact; replicated abridged-but-faithful form here. smoke_report.json has the full eager-vs-captured per-B summary."
+}
