@@ -174,6 +174,7 @@ def _resolve_and_stash(
     attn_metadata: Any,
     writers: List[Any],
     device: Any,
+    impls: Optional[List[Any]] = None,
 ) -> Dict[str, Any]:
     """Resolve seq_id -> slot_idx_t and stash the result on
     attn_metadata. Idempotent on re-entry: if the stash already has
@@ -253,6 +254,30 @@ def _resolve_and_stash(
             device=device,
         )
 
+        # Phase 6B.3 (Option X) Step 5: populate each impl's persistent
+        # _phase5b_slot_idx_buf with the resolved slot indices. The
+        # buffer's address was used by the captured graph at capture
+        # time (engine init), so each replay needs the values fresh.
+        # vLLM doesn't repopulate this buffer for us — it's our
+        # internal state.
+        #
+        # For non-captured shapes (eager fallback), the dispatch fork
+        # will ALSO populate the buffer; this duplicate write is
+        # harmless (same value).
+        if impls:
+            B = len(slot_idx_list)
+            for impl in impls:
+                buf = getattr(impl, "_phase5b_slot_idx_buf", None)
+                if buf is None:
+                    continue
+                # Buffer may not have been sized yet (impl hasn't seen
+                # a forward call). _ensure_index_bufs grows it on demand
+                # at dispatch time; here we skip and let the dispatch
+                # fork allocate on first eager call.
+                if buf.numel() < B:
+                    continue
+                buf[:B].copy_(slot_idx_t, non_blocking=True)
+
     payload: Dict[str, Any] = {
         "slot_idx_t":   slot_idx_t,
         "seq_ids":      list(seq_ids),
@@ -274,6 +299,10 @@ class Int4ProtectedPrecaptureHook:
     enabled                — True iff the wrap is live on a target
     hook_target_name       — "execute_model" on success; descriptive on inert
     install_time_writers   — list of writer references the hook orchestrates
+    install_time_impls     — list of Int4ProtectedAttentionImpl refs (Phase
+                             6B.3 Option X). Hook populates each impl's
+                             _phase5b_slot_idx_buf at production replay
+                             time so captured graphs read the right values.
     stash_call_count       — incremented per hook invocation (for verification)
     skipped_step_count     — incremented when a step is not pure-decode (no-op)
     _teardowns             — LIFO closure list reverting the monkey-patch
@@ -283,6 +312,7 @@ class Int4ProtectedPrecaptureHook:
     enabled: bool
     hook_target_name: str
     install_time_writers: List[Any] = field(default_factory=list)
+    install_time_impls:   List[Any] = field(default_factory=list)
     stash_call_count: int = 0
     skipped_step_count: int = 0
     _teardowns: List[Callable[[], None]] = field(default_factory=list)
@@ -327,10 +357,30 @@ def _collect_writers(model: Any) -> List[Any]:
     return writers
 
 
+def _collect_impls(model: Any) -> List[Any]:
+    """Phase 6B.3 (Option X) — walk model.named_modules() and collect
+    every Int4ProtectedAttentionImpl instance reference. Returns
+    list in named_modules() iteration order (== layer 0..N).
+
+    Hook needs impl refs (not just writer refs) so it can populate
+    each impl's _phase5b_slot_idx_buf persistent buffer at production
+    replay time. The captured graph recorded its slot_idx_t reads
+    against that buffer's address; vLLM doesn't repopulate it for us.
+    """
+    from kv_policy.phase5b_backend_install import Int4ProtectedAttentionImpl
+    impls: List[Any] = []
+    for _, sub in model.named_modules():
+        impl = getattr(sub, "impl", None)
+        if isinstance(impl, Int4ProtectedAttentionImpl):
+            impls.append(impl)
+    return impls
+
+
 def install_int4_protected_precapture_hook(
     model_runner: Any,
     writers: List[Any],
     *,
+    impls: Optional[List[Any]] = None,
     enable: bool = True,
 ) -> Int4ProtectedPrecaptureHook:
     """Wrap ``model_runner.execute_model`` to stash a pre-resolved
@@ -384,6 +434,7 @@ def install_int4_protected_precapture_hook(
         enabled=True,
         hook_target_name="execute_model",
         install_time_writers=list(writers),
+        install_time_impls=list(impls) if impls else [],
     )
 
     def _wrapped(model_input, kv_caches, *args, **kwargs):
@@ -401,6 +452,7 @@ def install_int4_protected_precapture_hook(
                     attn_metadata,
                     handle.install_time_writers,
                     device,
+                    impls=handle.install_time_impls or None,
                 )
                 handle.stash_call_count += 1
             else:
@@ -467,9 +519,13 @@ def install_int4_protected_with_precapture_hook(
     # lazy_alloc on every writer; the hook handles the fast path by
     # only orchestrating allocated writers (see ``_resolve_and_stash``).
     writers = _collect_writers(model)
+    impls   = _collect_impls(model)   # Phase 6B.3 Option X — hook
+                                       # populates impl persistent buffers
 
     model_runner = _resolve_model_runner(llm)
-    hook = install_int4_protected_precapture_hook(model_runner, writers)
+    hook = install_int4_protected_precapture_hook(
+        model_runner, writers, impls=impls,
+    )
 
     def combined_teardown() -> None:
         # LIFO: hook first (depends on backend), then backend.

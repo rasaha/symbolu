@@ -91,6 +91,30 @@ def _max_active_slots() -> int:
     except ValueError:
         return _DEFAULT_MAX_ACTIVE_SLOTS
 
+
+def _in_cuda_graph_capture() -> bool:
+    """Phase 6B.3 (Option X) — detect whether the current CUDA stream
+    is in graph capture. Returns False if CUDA isn't available or
+    there is no current stream.
+
+    Capture-safe code paths must skip ALL host syncs (.cpu(), .item(),
+    .tolist()) and Python dict lookups when this is True. The captured
+    graph records ops as data-flow over device tensors; the host work
+    can fire at production-eager runtime instead (via the 6B.2 pre-
+    capture hook for captured shapes; or in-line for non-captured
+    shapes that fall back to eager).
+    """
+    if torch is None:
+        return False
+    try:
+        if not torch.cuda.is_available():
+            return False
+        return bool(torch.cuda.is_current_stream_capturing())
+    except (RuntimeError, AssertionError):
+        # is_current_stream_capturing can raise on platforms without
+        # a current stream (e.g., cold-boot CPU PyTorch).
+        return False
+
 # Env var for the per-model protect mask artifact (calibration output
 # from Phase 5B.0). Override via PROTECT_MASK_PATH=...
 _PROTECT_MASK_ENV = "PROTECT_MASK_PATH"
@@ -1078,24 +1102,43 @@ class PagedKVWriter:
         # still need slot_idx_list for the overflow guard, but the
         # _sync_pool_counters_from_states + _writeback calls are skipped.
         # The captured region's op chain is unchanged.
-        # CAPTURE-EXEMPT: pre-capture-hoistable slot-idx materialization.
-        slot_idx_list = slot_idx_t.cpu().tolist()  # B small ints; coalesced
-        if not pre_synced:
-            self._sync_pool_counters_from_states(slot_idx_list)
+        #
+        # Phase 6B.3 (Option X) — Capture-safe gating:
+        # vLLM 0.7.3 V0's `model_runner.capture_model` captures the
+        # ENTIRE forward inside graph context, bypassing our 6B.2 hook
+        # which only wraps `execute_model` (the production-runtime
+        # entry point). During the V0 capture phase, this code runs
+        # INSIDE the captured stream, so host syncs are forbidden.
+        # We gate ALL pre-capture / post-capture host work on
+        # `_in_cuda_graph_capture()`:
+        #   - capture mode (engine init synthetic forwards):
+        #     skip slot_idx_list materialization; skip sync; skip
+        #     overflow guard; skip writeback. Persistent buffer
+        #     addresses are stable; values populated by the hook
+        #     at production replay time.
+        #   - production-eager mode: full pre/post host work as
+        #     before. Bit-equivalent to 6B.1 + 6B.2 production.
+        in_capture = _in_cuda_graph_capture()
+        slot_idx_list = None  # only used in non-capture path
+        if not in_capture:
+            # CAPTURE-EXEMPT: pre-capture-hoistable slot-idx materialization.
+            slot_idx_list = slot_idx_t.cpu().tolist()  # B small ints; coalesced
+            if not pre_synced:
+                self._sync_pool_counters_from_states(slot_idx_list)
 
-        # Overflow guard runs Python-side from the synced SeqState ints
-        # (cheap dict lookup; no captured-region access). Pre-capture-
-        # hoistable.
-        max_S = self._bf16_k_backing_pool.shape[1]
-        for _slot in slot_idx_list:
-            # CAPTURE-EXEMPT: pre-capture overflow guard.
-            if int(self._seq_pos_pool[_slot].item()) >= max_S:
-                raise RuntimeError(
-                    f"bf16 backing overflow at slot={_slot}: "
-                    f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
-                    f">= max_seqlen={max_S}. Bump "
-                    f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
-                )
+            # Overflow guard runs Python-side from the synced SeqState ints
+            # (cheap dict lookup; no captured-region access). Pre-capture-
+            # hoistable.
+            max_S = self._bf16_k_backing_pool.shape[1]
+            for _slot in slot_idx_list:
+                # CAPTURE-EXEMPT: pre-capture overflow guard.
+                if int(self._seq_pos_pool[_slot].item()) >= max_S:
+                    raise RuntimeError(
+                        f"bf16 backing overflow at slot={_slot}: "
+                        f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
+                        f">= max_seqlen={max_S}. Bump "
+                        f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
+                    )
 
         # ================ CAPTURED REGION (no host sync) =================
         # Every op below this marker MUST be device-only. The AST + runtime
@@ -1256,8 +1299,12 @@ class PagedKVWriter:
         #
         # Phase 6B.2: when pre_synced=True the caller will do its own
         # writeback (or skip it entirely if no introspection is needed).
+        # Phase 6B.3 (Option X): SKIP entirely during capture; no host
+        # syncs allowed in capture stream. SeqState ints stay stale
+        # during capture; production replay's hook updates them via
+        # the post-execute_model path if needed.
         # CAPTURE-EXEMPT: post-capture writeback.
-        if not pre_synced:
+        if not in_capture and not pre_synced:
             self._writeback_pool_counters_to_states(slot_idx_list)
 
     def _finalize_k_full_blocks_batched(

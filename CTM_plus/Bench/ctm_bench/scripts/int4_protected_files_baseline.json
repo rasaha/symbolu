@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.3 GPU fix #2 \u2014 wrap evict_sequence's pool counter mutations in torch.inference_mode(). Same root cause as the 6B.2 hook fix: pool tensors are inference tensors (allocated during first forward inside vLLM's inference_mode); external callers (e.g., GPU smoke driver _reset_all_writers calling reset_sequence('all')) are outside inference_mode and PyTorch rejects in-place mutations. Wrap the 3 pool[slot] = ... lines in 'with torch.inference_mode():'. 76 pytest tests + 36+36 equivalence verifiers all GREEN post-fix. G5c regen for the authorized writer edit.",
+  "note": "Phase 6B.3 Option X \u2014 full V0 capture-safe refactor of write path. Three stages landed: (1) write_decode_batched gates ALL host-sync ops on torch.cuda.is_current_stream_capturing(); pre/post-capture work skipped during capture stream. (2) Dispatch fork detects capture phase via _in_cuda_graph_capture(); lazy-allocs writer if needed during synthetic capture forwards; uses persistent _phase5b_slot_idx_buf for slot_idx_t (stable address required so production replay reads from same address capture wrote to); skips ensure_seq_state during capture. (3) 6B.2 hook now accepts impls= list; _resolve_and_stash populates each impl's _phase5b_slot_idx_buf via .copy_() at production replay time (captured graph reads from this address; vLLM doesn't repopulate our internal state). New _call_stats counter write_decode_batched_via_capture_calls. CPU regression sweep all GREEN (36+36 equivalence + 99 pytest + AST capture-safe). G5c regen for the authorized writer + dispatch + hook edits. Awaiting GPU smoke to validate capture phase actually proceeds.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -8,9 +8,9 @@
     "KVPolicy/kv_policy/int4_protected.py": "ee2d1c6bfdb8731c66aa837831b6c3494d46f046ea9d906b1402be8a33d6b5f0",
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
-    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "712bb0500d87bac428addbd077aefc1a3f3da7e598f880e239791df8a3f64c58",
-    "KVPolicy/kv_policy/phase5b_backend_install.py": "2459374b0961e5e61c7460ad1ddc8dcf2246d8e115bf1f311615e97e62ae816c",
+    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "11c37d54340b014b2461025f41885dc79a3f1fa82cd09de81f4b2d6a6f6bf755",
+    "KVPolicy/kv_policy/phase5b_backend_install.py": "2850340cc3341cd4293ec372b7f7248d8238f010c439ffb2a745025aa1fe222d",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
-    "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "ca2221225bb3941875437c49fa7de3f66f67af1134ce120670ba4ae1f76871f1"
+    "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "066f757051d5a961e4148ade55537da7c59d218ed3d342944a7a1592fe4db954"
   }
 }

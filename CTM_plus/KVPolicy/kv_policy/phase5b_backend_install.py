@@ -199,15 +199,16 @@ if _VLLM_FA_AVAILABLE:
         # Class-level call counters (aggregate across all layer instances).
         # Reset via Int4ProtectedAttentionImpl.reset_call_stats().
         _call_stats: Dict[str, int] = {
-            "prefill_calls":                       0,
-            "decode_calls_packed":                 0,
-            "decode_calls_fallback":               0,
-            "write_path_calls":                    0,
-            "write_path_fallback":                 0,
-            "write_decode_batched_calls":          0,  # Phase 6B.1 — refactored decode write path fired
-            "write_decode_batched_via_hook_calls": 0,  # Phase 6B.2 — slot_idx_t came from pre-capture hook stash
-            "write_legacy_loop_calls":             0,  # Phase 6B.1 — legacy partition+loop path fired
-            "spec_decode_calls":                   0,
+            "prefill_calls":                          0,
+            "decode_calls_packed":                    0,
+            "decode_calls_fallback":                  0,
+            "write_path_calls":                       0,
+            "write_path_fallback":                    0,
+            "write_decode_batched_calls":             0,  # Phase 6B.1 — refactored decode write path fired
+            "write_decode_batched_via_hook_calls":    0,  # Phase 6B.2 — slot_idx_t came from pre-capture hook stash
+            "write_decode_batched_via_capture_calls": 0,  # Phase 6B.3 Option X — call fired inside torch.cuda.graph() capture
+            "write_legacy_loop_calls":                0,  # Phase 6B.1 — legacy partition+loop path fired
+            "spec_decode_calls":                      0,
         }
 
         @classmethod
@@ -755,36 +756,97 @@ if _VLLM_FA_AVAILABLE:
                             from kv_policy.phase6b2_precapture_hook import (
                                 read_stash as _read_precapture_stash,
                             )
-                            _stash = _read_precapture_stash(attn_metadata)
-                            if _stash is not None and "slot_idx_t" in _stash:
-                                # Hook is installed. Use the stashed
-                                # slot_idx_t; the hook also already
-                                # synced pool counters across ALL
-                                # writers for this step.
-                                slot_idx_t = _stash["slot_idx_t"]
+                            from kv_policy.phase5b_4c_paged_writer import (
+                                _in_cuda_graph_capture,
+                            )
+                            # Phase 6B.3 (Option X) — capture-phase handling:
+                            # vLLM 0.7.3 V0's capture_model runs synthetic
+                            # decode forwards INSIDE graph context, bypassing
+                            # the 6B.2 execute_model hook. During capture,
+                            # we must NOT host-sync; we must NOT consume real
+                            # slot pool entries (capture B can exceed
+                            # max_active_slots); we must lazy-alloc the
+                            # writer because no prior writer.write() has
+                            # fired to trigger it.
+                            _in_capture = _in_cuda_graph_capture()
+                            if _in_capture:
+                                if not writer._allocated:
+                                    # Synthetic capture forward needs the
+                                    # writer allocated to size sidecars +
+                                    # pool tensors. Triggers _lazy_alloc
+                                    # against the gpu_cache that vLLM is
+                                    # ALSO going to use at production
+                                    # replay (so sidecar shapes are
+                                    # production-correct).
+                                    writer._lazy_alloc(kv_cache)
+                                # Use the persistent slot-idx buffer from
+                                # B-pre-4 (already at stable address +
+                                # initialized to zeros). Captured ops
+                                # index into pool tensors at addresses
+                                # that match production replay; the
+                                # production-runtime hook populates the
+                                # buffer's values before each captured
+                                # graph replay.
+                                slot_idx_t, _, _ = self._ensure_index_bufs(
+                                    B_decode, kv_cache.device,
+                                    dtype_long=torch.long,
+                                    dtype_i32=torch.int32,
+                                )
+                                # Skip pool counter sync; pre_synced=True
+                                # tells write_decode_batched to skip
+                                # ALL host-sync work too (it also detects
+                                # in_capture independently).
                                 _pre_synced = True
                                 Int4ProtectedAttentionImpl._call_stats[
-                                    "write_decode_batched_via_hook_calls"
+                                    "write_decode_batched_via_capture_calls"
                                 ] += 1
                             else:
-                                # Hook NOT installed (CPU tests, pre-
-                                # hook deployments). Self-resolve as
-                                # in 6B.1. The seq_id derivation
-                                # mirrors _derive_write_partitions's
-                                # decode branch (block_tables[i, 0]).
-                                seq_ids = dec_meta.block_tables[:, 0] \
-                                    .cpu().tolist()
-                                # Ensure SeqState exists for each decode
-                                # seq (allocates a pool slot lazily on
-                                # first write).
-                                for sid in seq_ids:
-                                    writer.ensure_seq_state(sid, kv_cache.device)
-                                slot_idx_list = writer.slot_indices_for(seq_ids)
-                                slot_idx_t = torch.tensor(
-                                    slot_idx_list, dtype=torch.long,
-                                    device=kv_cache.device,
-                                )
-                                _pre_synced = False
+                                _stash = _read_precapture_stash(attn_metadata)
+                                if _stash is not None and "slot_idx_t" in _stash:
+                                    # Hook is installed. Use the stashed
+                                    # slot_idx_t; the hook also already
+                                    # synced pool counters across ALL
+                                    # writers for this step.
+                                    slot_idx_t = _stash["slot_idx_t"]
+                                    _pre_synced = True
+                                    Int4ProtectedAttentionImpl._call_stats[
+                                        "write_decode_batched_via_hook_calls"
+                                    ] += 1
+                                else:
+                                    # Hook NOT installed (CPU tests, pre-
+                                    # hook deployments). Self-resolve as
+                                    # in 6B.1. The seq_id derivation
+                                    # mirrors _derive_write_partitions's
+                                    # decode branch (block_tables[i, 0]).
+                                    seq_ids = dec_meta.block_tables[:, 0] \
+                                        .cpu().tolist()
+                                    # Ensure SeqState exists for each decode
+                                    # seq (allocates a pool slot lazily on
+                                    # first write).
+                                    for sid in seq_ids:
+                                        writer.ensure_seq_state(sid, kv_cache.device)
+                                    slot_idx_list = writer.slot_indices_for(seq_ids)
+                                    # Phase 6B.3 (Option X): use the
+                                    # persistent buffer (stable address)
+                                    # instead of fresh torch.tensor(...)
+                                    # allocation. Required so the
+                                    # captured-graph replay reads
+                                    # slot_idx_t from the SAME address
+                                    # the eager calls wrote to.
+                                    _slot_idx_buf, _, _ = self._ensure_index_bufs(
+                                        B_decode, kv_cache.device,
+                                        dtype_long=torch.long,
+                                        dtype_i32=torch.int32,
+                                    )
+                                    _slot_idx_buf.copy_(
+                                        torch.tensor(
+                                            slot_idx_list, dtype=torch.long,
+                                            device=kv_cache.device,
+                                        ),
+                                        non_blocking=True,
+                                    )
+                                    slot_idx_t = _slot_idx_buf
+                                    _pre_synced = False
                             writer.write_decode_batched(
                                 key=key,
                                 value=value,

@@ -240,15 +240,19 @@ def run_worker(cell: str, output_path: Path, *, model: str,
         print(f"FAIL: cannot locate inner model or model_runner")
         return 2
     writers = []
+    impls   = []
     for _, sub in inner.named_modules():
         impl = getattr(sub, "impl", None)
         if isinstance(impl, Int4ProtectedAttentionImpl):
+            impls.append(impl)
             w = getattr(impl, "_phase5b_paged_writer", None)
             if w is not None:
                 writers.append(w)
-    print(f"[cell={cell}] Collected {len(writers)} writers.")
+    print(f"[cell={cell}] Collected {len(writers)} writers + {len(impls)} impls.")
 
-    hook = install_int4_protected_precapture_hook(model_runner, writers)
+    hook = install_int4_protected_precapture_hook(
+        model_runner, writers, impls=impls,
+    )
     print(f"[cell={cell}] Hook: enabled={hook.enabled}, target={hook.hook_target_name}")
 
     # Per-B sweep: 2 runs each, assert token-equality.
