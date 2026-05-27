@@ -338,7 +338,13 @@ if _VLLM_FA_AVAILABLE:
             cache_seqlens_orig = decode_meta.seq_lens_tensor # (B,) int
             B = block_table.shape[0]
 
-            if B == 1:
+            from kv_policy.phase5b_4c_paged_writer import _in_cuda_graph_capture
+            if B == 1 and not _in_cuda_graph_capture():
+                # B=1 fast path (eager only): avoids the batched gather +
+                # pad machinery for the common single-sequence case.
+                # During capture the batched path handles B=1 too (it's a
+                # degenerate case); `_read_decode_packed_one` has .item()
+                # calls that are forbidden inside torch.cuda.graph context.
                 return self._read_decode_packed_one(
                     query_q, kv_cache, layer, writer,
                     bt=block_table[0],
