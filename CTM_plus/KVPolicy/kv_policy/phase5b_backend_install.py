@@ -389,14 +389,35 @@ if _VLLM_FA_AVAILABLE:
                 # cheap fused ops that don't add a sync, and they're
                 # what the unconditional splice path (below) consumes
                 # without any data-dependent indexing.
-                _seqlens_and_seqids = torch.stack([
-                    cache_seqlens_orig.long(),
-                    block_table[:, 0].long(),
-                ], dim=0).cpu().tolist()                 # one sync, two rows
-                seqlens_cpu = _seqlens_and_seqids[0]
-                seq_ids     = _seqlens_and_seqids[1]
-                n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
-                n_blocks_max = max(n_blocks_per_seq)
+                #
+                # Phase 6B.3 (Option X) — capture-safe gating:
+                # .cpu().tolist() is a host sync forbidden inside a
+                # CUDA graph capture stream. During capture, use
+                # block_table.shape[1] as n_blocks_max (the full
+                # block budget width that vLLM allocates; padded
+                # positions are masked to 0 by pad_mask below, which
+                # uses only device-side tensor ops). seqlens_cpu and
+                # seq_ids are only used for n_blocks_max derivation
+                # and slot resolution; both are skipped during capture.
+                from kv_policy.phase5b_4c_paged_writer import (
+                    _in_cuda_graph_capture,
+                )
+                _in_capture_read = _in_cuda_graph_capture()
+                if not _in_capture_read:
+                    # CAPTURE-EXEMPT: pre-capture host sync.
+                    _seqlens_and_seqids = torch.stack([
+                        cache_seqlens_orig.long(),
+                        block_table[:, 0].long(),
+                    ], dim=0).cpu().tolist()             # one sync, two rows
+                    seqlens_cpu = _seqlens_and_seqids[0]
+                    seq_ids     = _seqlens_and_seqids[1]
+                    n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
+                    n_blocks_max = max(n_blocks_per_seq)
+                else:
+                    # Capture path: use full block budget width. Padded
+                    # positions are zeroed by pad_mask (device op below).
+                    n_blocks_max = block_table.shape[1]
+                    seq_ids      = None   # not used in captured ops
                 S_padded = n_blocks_max * BS
 
                 # Device-side metadata for the unconditional splice. No
@@ -425,13 +446,19 @@ if _VLLM_FA_AVAILABLE:
                 self._ensure_index_bufs(
                     B, device, dtype_long=torch.long, dtype_i32=torch.int32,
                 )
-            slot_idx_list = writer.slot_indices_for(seq_ids)
-            # In-place .copy_() from a small fresh tensor — the destination
-            # buffer's address is preserved.
-            slot_idx_t.copy_(
-                torch.tensor(slot_idx_list, dtype=torch.long, device=device),
-                non_blocking=True,
-            )
+            if not _in_capture_read:
+                # CAPTURE-EXEMPT: pre-capture slot resolution + buffer
+                # population. During capture the buffer address is stable
+                # (it's the persistent buffer from _ensure_index_bufs);
+                # the 6B.2 hook populates its values at production replay
+                # time. Skip the dict lookup and .copy_() here.
+                slot_idx_list = writer.slot_indices_for(seq_ids)
+                # In-place .copy_() from a small fresh tensor — the
+                # destination buffer's address is preserved.
+                slot_idx_t.copy_(
+                    torch.tensor(slot_idx_list, dtype=torch.long, device=device),
+                    non_blocking=True,
+                )
 
             with _maybe_region("batched.splice"):
                 # Phase 6 v2 Option B pre-flight (B-pre-3): unconditional

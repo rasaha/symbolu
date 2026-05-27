@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.3 Option X follow-up \u2014 hoist writer._lazy_alloc to top of dispatch fork. vLLM 0.7.3 V0's graph_runner.capture() runs the model once eagerly to populate state BEFORE entering torch.cuda.graph() context. That warmup forward hit the self-resolve path (is_current_stream_capturing returned False, correctly), tried ensure_seq_state, and crashed because writer wasn't allocated. Fix: lazy_alloc the writer at top of dispatch fork regardless of in_capture branch. Synthetic warmup block_tables are all zeros, so ensure_seq_state(0) consumes one slot total, then captured forward (with allocated writer) goes through capture branch with persistent buffer.",
+  "note": "Phase 6B.3 Option X Stage 4 \u2014 read-path capture-safe gating. _read_decode_packed_batched had a .cpu().tolist() host sync at line 395 (seqlens + seq_ids materialization) and a writer.slot_indices_for() Python dict lookup at line 428. Both crash inside torch.cuda.graph() capture stream. Fix: gate on _in_cuda_graph_capture(). Capture path uses block_table.shape[1] as n_blocks_max (full budget width; padded positions zeroed by device-side pad_mask). Slot resolution skipped during capture; persistent buffer populated by 6B.2 hook at replay time. CPU regression 36+36+99 GREEN.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -9,7 +9,7 @@
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
     "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "11c37d54340b014b2461025f41885dc79a3f1fa82cd09de81f4b2d6a6f6bf755",
-    "KVPolicy/kv_policy/phase5b_backend_install.py": "4f646c1a91d8b7dcddff8a01817a710757038219e3463fc90d8db81b9b67a171",
+    "KVPolicy/kv_policy/phase5b_backend_install.py": "3870fe4663a82e52072638cd1ff66be136989026090d661758ea35502de00488",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
     "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "066f757051d5a961e4148ade55537da7c59d218ed3d342944a7a1592fe4db954"
   }
