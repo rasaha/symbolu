@@ -140,6 +140,35 @@ def _find_model_runner(llm):
     return None
 
 
+def _reset_all_writers(inner_model) -> int:
+    """Reset every Int4ProtectedAttentionImpl's writer back to fresh
+    (slot pool fully free; SeqState dict cleared; counter pools at
+    sentinel). Returns the number of writers reset.
+
+    Required between generate() calls in the multi-run sweep because
+    the writer's _slot_map accumulates seq_ids across requests — vLLM
+    doesn't auto-emit a sequence-finish callback that would let the
+    writer evict completed seqs. Without this reset, the slot pool
+    fills up at moderate cumulative seq counts AND new requests get
+    contaminated slots when their first block_id collides with a
+    recycled block from a prior request.
+
+    See PHASE_6B3_CAPTURE_FINDINGS.md (when landed) for the deferred-
+    investigation item: production auto-eviction hook.
+    """
+    from kv_policy.phase5b_backend_install import Int4ProtectedAttentionImpl
+    n = 0
+    for _, sub in inner_model.named_modules():
+        impl = getattr(sub, "impl", None)
+        if not isinstance(impl, Int4ProtectedAttentionImpl):
+            continue
+        w = getattr(impl, "_phase5b_paged_writer", None)
+        if w is not None and getattr(w, "_allocated", False):
+            w.reset_sequence("all")
+            n += 1
+    return n
+
+
 def _hbm_snapshot() -> dict:
     """Capture GB-level HBM stats. Used for capture-overhead reporting."""
     import torch
@@ -223,6 +252,15 @@ def run_worker(cell: str, output_path: Path, *, model: str,
     print(f"[cell={cell}] Hook: enabled={hook.enabled}, target={hook.hook_target_name}")
 
     # Per-B sweep: 2 runs each, assert token-equality.
+    # We reset writer state BEFORE EACH generate() call so each run
+    # starts with a fresh slot pool. Without this, the writer's
+    # _slot_map accumulates seq_ids across the sweep (vLLM doesn't
+    # auto-emit a request-finish callback that would evict completed
+    # seqs), and (a) the slot pool exhausts at moderate cumulative
+    # B counts, (b) new requests get contaminated slots when their
+    # first block_id collides with a recycled block from a prior
+    # request. The pre-existing bug is a Phase 6B.x deferred-
+    # investigation item (production-grade fix: auto-eviction hook).
     Int4ProtectedAttentionImpl.reset_call_stats()
     per_b_results = {}
     for B in BATCH_SIZES:
@@ -230,6 +268,7 @@ def run_worker(cell: str, output_path: Path, *, model: str,
         sampling = SamplingParams(temperature=0.0, max_tokens=max_tokens)
 
         # Run 1
+        n_reset_pre_run1 = _reset_all_writers(inner)
         Int4ProtectedAttentionImpl.reset_call_stats()
         hook_stash_pre_run1 = hook.stash_call_count
         t0 = time.time()
@@ -241,7 +280,8 @@ def run_worker(cell: str, output_path: Path, *, model: str,
         run1_texts  = [o.outputs[0].text for o in outs1]
         hook_stash_run1 = hook.stash_call_count - hook_stash_pre_run1
 
-        # Run 2 (same prompts, same sampling, same engine state)
+        # Run 2 (same prompts, same sampling, FRESH writer slot pool)
+        n_reset_pre_run2 = _reset_all_writers(inner)
         Int4ProtectedAttentionImpl.reset_call_stats()
         hook_stash_pre_run2 = hook.stash_call_count
         t0 = time.time()
@@ -262,14 +302,17 @@ def run_worker(cell: str, output_path: Path, *, model: str,
             "run1_seconds":       t_gen1,
             "run1_call_stats":    stats_run1,
             "run1_hook_stash":    hook_stash_run1,
+            "run1_writers_reset": n_reset_pre_run1,
             "run2_tokens":        run2_tokens,
             "run2_texts":         run2_texts,
             "run2_seconds":       t_gen2,
             "run2_call_stats":    stats_run2,
             "run2_hook_stash":    hook_stash_run2,
+            "run2_writers_reset": n_reset_pre_run2,
         }
         print(f"[cell={cell}] B={B}: run1={t_gen1:.2f}s run2={t_gen2:.2f}s "
-              f"deterministic={deterministic} stash_run1={hook_stash_run1} stash_run2={hook_stash_run2}")
+              f"deterministic={deterministic} stash_run1={hook_stash_run1} "
+              f"stash_run2={hook_stash_run2} writers_reset={n_reset_pre_run1}/{n_reset_pre_run2}")
 
     hbm_final = _hbm_snapshot()
     payload = {
