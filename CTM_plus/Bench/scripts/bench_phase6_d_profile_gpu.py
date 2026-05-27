@@ -241,20 +241,34 @@ def main() -> int:
         # expects from nsys: header row "Time(%),Total Time,Instances,Avg,Min,Max,StdDev,Name"
         import csv as _csv
         from pathlib import Path as _Path
+
+        def _event_device_time(e):
+            """Compat shim: PyTorch renamed cuda_time_total -> device_time_total
+            in newer releases. Try both, then self-* variants as a final fallback."""
+            for attr in (
+                "device_time_total", "cuda_time_total",
+                "self_device_time_total", "self_cuda_time_total",
+            ):
+                v = getattr(e, attr, None)
+                if v is not None:
+                    return v
+            return 0
+
         out_path = _Path(args.torch_profile_csv)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         events = prof.key_averages()
-        # Each event has name, count, cuda_time_total (microseconds), etc.
+        # Each event has name, count, device_time_total (microseconds).
         rows_out = []
-        total_cuda_us = sum(e.cuda_time_total for e in events)
+        total_cuda_us = sum(_event_device_time(e) for e in events)
         for e in events:
-            if e.cuda_time_total <= 0:
+            t_us = _event_device_time(e)
+            if t_us <= 0:
                 continue
             rows_out.append({
-                "Time(%)":    f"{(e.cuda_time_total/total_cuda_us)*100:.2f}" if total_cuda_us else "0",
-                "Total Time": f"{int(e.cuda_time_total * 1000)}",  # us -> ns
+                "Time(%)":    f"{(t_us/total_cuda_us)*100:.2f}" if total_cuda_us else "0",
+                "Total Time": f"{int(t_us * 1000)}",  # us -> ns
                 "Instances":  str(e.count),
-                "Avg":        f"{int(e.cuda_time_total * 1000 / max(1, e.count))}",
+                "Avg":        f"{int(t_us * 1000 / max(1, e.count))}",
                 "Min":        "0",
                 "Max":        "0",
                 "StdDev":     "0",
@@ -277,9 +291,16 @@ def main() -> int:
             prof.export_chrome_trace(str(trace_path))
             print(f"[profile cell={args.cell}] wrote chrome trace: {trace_path}")
 
-        # Also print the top-20 kernels for stdout visibility.
-        print(f"\n[profile cell={args.cell}] Top kernels by CUDA time:")
-        print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+        # Also print the top-20 kernels for stdout visibility. Use sort_by
+        # that exists on this PyTorch version.
+        try:
+            print(f"\n[profile cell={args.cell}] Top kernels by CUDA time:")
+            print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
+        except (TypeError, ValueError):
+            try:
+                print(prof.key_averages().table(sort_by="device_time_total", row_limit=20))
+            except Exception as _exc:
+                print(f"(table print skipped: {_exc})")
     else:
         # No-op profile mode: just NVTX-wrap, for external nsys / ncu.
         nvtx.range_push("phase6d_step")
