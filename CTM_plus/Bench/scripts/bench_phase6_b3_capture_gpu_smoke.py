@@ -169,6 +169,60 @@ def _reset_all_writers(inner_model) -> int:
     return n
 
 
+def _dump_writer_state(inner_model, impls, cell: str, B: int, tag: str) -> None:
+    """Print writer + impl state for root-cause debugging of B>=2 divergence."""
+    import torch
+    from kv_policy.phase5b_backend_install import Int4ProtectedAttentionImpl
+
+    # Only inspect writer 0 (same slot-map across all layers).
+    first_impl = impls[0] if impls else None
+    first_writer = None
+    for _, sub in inner_model.named_modules():
+        impl = getattr(sub, "impl", None)
+        if isinstance(impl, Int4ProtectedAttentionImpl):
+            w = getattr(impl, "_phase5b_paged_writer", None)
+            if w is not None and getattr(w, "_allocated", False):
+                first_writer = w
+                first_impl = impl
+                break
+
+    print(f"\n[DEBUG cell={cell} B={B} {tag}]")
+    if first_writer is None:
+        print("  no allocated writer found")
+        return
+
+    slot_map = dict(first_writer._slot_map)
+    free_slots = list(first_writer._free_slots)
+    print(f"  slot_map={slot_map}  free_slots={free_slots}")
+
+    if first_writer._seq_pos_pool is not None:
+        n_slots = first_writer._max_active_slots
+        pos = first_writer._seq_pos_pool[:n_slots].cpu().tolist()
+        sentinel = first_writer._k_stage_block_id_pool[:n_slots].cpu().tolist()
+        print(f"  seq_pos_pool[:n_slots]={pos}")
+        print(f"  k_stage_block_id_pool[:n_slots]={sentinel}")
+        # Check bf16 backing norms for ALL active slots.
+        for seq_id, slot in sorted(slot_map.items()):
+            pool = first_writer._bf16_k_backing_pool
+            if pool is not None:
+                seq_pos = int(first_writer._seq_pos_pool[slot].item())
+                if seq_pos > 0:
+                    norm = float(pool[slot, :seq_pos].norm().item())
+                    # First token's key norm across heads (shape H, D -> scalar)
+                    tok0_norm = float(pool[slot, 0].norm().item())
+                else:
+                    norm = 0.0
+                    tok0_norm = 0.0
+                print(f"  slot={slot} seq_id={seq_id} seq_pos={seq_pos} "
+                      f"bf16k_norm={norm:.4f} tok0_norm={tok0_norm:.4f}")
+
+    if first_impl is not None:
+        buf = getattr(first_impl, "_phase5b_slot_idx_buf", None)
+        if buf is not None:
+            vals = buf[:min(B, buf.numel())].cpu().tolist()
+            print(f"  impl0._phase5b_slot_idx_buf[:{B}]={vals}")
+
+
 def _hbm_snapshot() -> dict:
     """Capture GB-level HBM stats. Used for capture-overhead reporting."""
     import torch
@@ -283,6 +337,9 @@ def run_worker(cell: str, output_path: Path, *, model: str,
         run1_tokens = [list(o.outputs[0].token_ids) for o in outs1]
         run1_texts  = [o.outputs[0].text for o in outs1]
         hook_stash_run1 = hook.stash_call_count - hook_stash_pre_run1
+        for i, txt in enumerate(run1_texts):
+            print(f"[cell={cell} B={B} run1 seq{i}] {repr(txt[:80])}")
+        _dump_writer_state(inner, impls, cell, B, "after_run1")
 
         # Run 2 (same prompts, same sampling, FRESH writer slot pool)
         n_reset_pre_run2 = _reset_all_writers(inner)
