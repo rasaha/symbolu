@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.3 Option X \u2014 full V0 capture-safe refactor of write path. Three stages landed: (1) write_decode_batched gates ALL host-sync ops on torch.cuda.is_current_stream_capturing(); pre/post-capture work skipped during capture stream. (2) Dispatch fork detects capture phase via _in_cuda_graph_capture(); lazy-allocs writer if needed during synthetic capture forwards; uses persistent _phase5b_slot_idx_buf for slot_idx_t (stable address required so production replay reads from same address capture wrote to); skips ensure_seq_state during capture. (3) 6B.2 hook now accepts impls= list; _resolve_and_stash populates each impl's _phase5b_slot_idx_buf via .copy_() at production replay time (captured graph reads from this address; vLLM doesn't repopulate our internal state). New _call_stats counter write_decode_batched_via_capture_calls. CPU regression sweep all GREEN (36+36 equivalence + 99 pytest + AST capture-safe). G5c regen for the authorized writer + dispatch + hook edits. Awaiting GPU smoke to validate capture phase actually proceeds.",
+  "note": "Phase 6B.3 Option X follow-up \u2014 hoist writer._lazy_alloc to top of dispatch fork. vLLM 0.7.3 V0's graph_runner.capture() runs the model once eagerly to populate state BEFORE entering torch.cuda.graph() context. That warmup forward hit the self-resolve path (is_current_stream_capturing returned False, correctly), tried ensure_seq_state, and crashed because writer wasn't allocated. Fix: lazy_alloc the writer at top of dispatch fork regardless of in_capture branch. Synthetic warmup block_tables are all zeros, so ensure_seq_state(0) consumes one slot total, then captured forward (with allocated writer) goes through capture branch with persistent buffer.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -9,7 +9,7 @@
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
     "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "11c37d54340b014b2461025f41885dc79a3f1fa82cd09de81f4b2d6a6f6bf755",
-    "KVPolicy/kv_policy/phase5b_backend_install.py": "2850340cc3341cd4293ec372b7f7248d8238f010c439ffb2a745025aa1fe222d",
+    "KVPolicy/kv_policy/phase5b_backend_install.py": "4f646c1a91d8b7dcddff8a01817a710757038219e3463fc90d8db81b9b67a171",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
     "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "066f757051d5a961e4148ade55537da7c59d218ed3d342944a7a1592fe4db954"
   }

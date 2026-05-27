@@ -759,6 +759,25 @@ if _VLLM_FA_AVAILABLE:
                             from kv_policy.phase5b_4c_paged_writer import (
                                 _in_cuda_graph_capture,
                             )
+                            # Phase 6B.3 (Option X) — lazy-alloc writer
+                            # BEFORE any path that might call
+                            # ensure_seq_state OR rely on the persistent
+                            # _phase5b_slot_idx_buf. vLLM 0.7.3 V0's
+                            # graph_runner.capture() runs the model ONCE
+                            # eagerly (outside torch.cuda.graph()) to
+                            # populate state, THEN re-runs inside capture
+                            # context. The eager warmup hits the self-
+                            # resolve path (is_current_stream_capturing
+                            # is False) and would crash on
+                            # ensure_seq_state if the writer wasn't
+                            # allocated. Synthetic warmup inputs have
+                            # block_tables = zeros, so seq_ids resolves
+                            # to all zeros — ensure_seq_state(0) consumes
+                            # one slot total. Production decode calls
+                            # would also already have the writer allocated
+                            # by prefill, so this guard is a no-op there.
+                            if not writer._allocated:
+                                writer._lazy_alloc(kv_cache)
                             # Phase 6B.3 (Option X) — capture-phase handling:
                             # vLLM 0.7.3 V0's capture_model runs synthetic
                             # decode forwards INSIDE graph context, bypassing
@@ -770,15 +789,10 @@ if _VLLM_FA_AVAILABLE:
                             # fired to trigger it.
                             _in_capture = _in_cuda_graph_capture()
                             if _in_capture:
-                                if not writer._allocated:
-                                    # Synthetic capture forward needs the
-                                    # writer allocated to size sidecars +
-                                    # pool tensors. Triggers _lazy_alloc
-                                    # against the gpu_cache that vLLM is
-                                    # ALSO going to use at production
-                                    # replay (so sidecar shapes are
-                                    # production-correct).
-                                    writer._lazy_alloc(kv_cache)
+                                # Writer was lazy-alloc'd by the hoisted
+                                # guard above (warmup forward fired
+                                # eagerly first; capture forward sees an
+                                # allocated writer).
                                 # Use the persistent slot-idx buffer from
                                 # B-pre-4 (already at stable address +
                                 # initialized to zeros). Captured ops
