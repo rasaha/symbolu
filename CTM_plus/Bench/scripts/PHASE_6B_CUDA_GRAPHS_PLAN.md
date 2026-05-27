@@ -26,11 +26,10 @@
 | B-pre-2 + B-pre-3: device metadata + unconditional splice | ✅ DONE (bundled) | commit `7f1a168` |
 | B-pre-4: pointer stability audit + persistent buffers | ✅ DONE | commits `54e4fc3`, `4b18fd8` |
 | B-1 capture-enable smoke (first attempt) | ❌ FAILED at write-path `.item()` | commit `c2be606` |
-| **Write-path preflight (Phase 6B.1) — CPU verification** | ✅ DONE (G_PRE-WRITE CPU portion) | `PHASE_6B1_WRITE_PREFLIGHT_DESIGN.md` + `verify_phase6_b_pre5_*.py` |
-| Phase 6B.1 — GPU smoke (B=2 eager-mode decode) | pending (small ~$0.02) | this plan |
-| vLLM integration (Phase 6B.2 pre-capture seq_id resolution hook) | NOT STARTED | this plan |
-| Capture-enable smoke + correctness gates (Phase 6B.3) | NOT STARTED | this plan |
-| Throughput bench + finding doc (Phase 6B.4) | NOT STARTED | this plan |
+| **Phase 6B.1 — Write-path preflight** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + A100) | `PHASE_6B1_WRITE_PREFLIGHT_FINDINGS.md` |
+| vLLM integration (Phase 6B.2 pre-capture seq_id resolution hook) | NOT STARTED — gated on user approval | this plan |
+| Capture-enable smoke + correctness gates (Phase 6B.3) | NOT STARTED — gated on 6B.2 GREEN | this plan |
+| Throughput bench + finding doc (Phase 6B.4) | NOT STARTED — gated on 6B.3 GREEN | this plan |
 
 The read path is **graph-capturable today**. The write path runs
 BEFORE the read path inside vLLM's captured forward, and it still
