@@ -381,49 +381,42 @@ if _VLLM_FA_AVAILABLE:
             device = block_table.device
 
             with _maybe_region("batched.seqids_blockids"):
-                # Phase 6 v2 Option B pre-flight (B-pre-2 + B-pre-3
-                # bundled): keep the working coalesced CPU sync for
-                # seqlens + seq_ids (n_blocks_max stays a Python int
-                # for the slice; n_blocks_per_seq stays a Python list
-                # for the n_blocks_max derivation). The lesson from
-                # the reverted B-pre-2 attempt: splitting these into
-                # separate .item() / .tolist() calls costs ~50 µs
-                # per layer at B=8 because PyTorch can't pipeline them.
+                # Phase 6B.3 (Option X) — byte_eq fix:
+                # ALWAYS use block_table.shape[1] as n_blocks_max
+                # (both eager AND captured paths). Without this, eager's
+                # n_blocks_max = max(n_blocks_per_seq) yields S_padded
+                # ~ 4·BS while captured's = block_table.shape[1] yields
+                # S_padded ~ 128·BS. The flash-attention kernel does a
+                # bf16 tile-level reduction whose summation order varies
+                # with S_padded — masked positions correctly contribute
+                # 0 to the result, but the reduction tree differs, so
+                # output bits differ. Over a long-sequence decode, the
+                # tiny per-step FP noise compounds and eventually flips
+                # tokens. Aligning the two paths to the same S_padded
+                # eliminates the divergence (eager and captured become
+                # byte-equal again).
                 #
-                # In addition, compute device-side metadata
-                # (last_block_indices_t, active_mask_t) — these are
-                # cheap fused ops that don't add a sync, and they're
-                # what the unconditional splice path (below) consumes
-                # without any data-dependent indexing.
+                # Cost: eager mode now gathers a (B, n_blocks_max·BS,
+                # H, D) view even when actual seq_lens are short. The
+                # extra positions are masked out by pad_mask + cache_
+                # seqlens, so output stays correct; the cost is only
+                # gather bandwidth. Production target is captured-graph
+                # mode, which already does this — the regression is
+                # confined to eager-mode runs (CPU tests + slow path).
                 #
-                # Phase 6B.3 (Option X) — capture-safe gating:
-                # .cpu().tolist() is a host sync forbidden inside a
-                # CUDA graph capture stream. During capture, use
-                # block_table.shape[1] as n_blocks_max (the full
-                # block budget width that vLLM allocates; padded
-                # positions are masked to 0 by pad_mask below, which
-                # uses only device-side tensor ops). seqlens_cpu and
-                # seq_ids are only used for n_blocks_max derivation
-                # and slot resolution; both are skipped during capture.
+                # The seq_ids .cpu().tolist() sync is still needed in
+                # the non-capture path for writer.slot_indices_for()
+                # below; we just no longer need the seqlens row.
                 from kv_policy.phase5b_4c_paged_writer import (
                     _in_cuda_graph_capture,
                 )
                 _in_capture_read = _in_cuda_graph_capture()
+                n_blocks_max = block_table.shape[1]
                 if not _in_capture_read:
-                    # CAPTURE-EXEMPT: pre-capture host sync.
-                    _seqlens_and_seqids = torch.stack([
-                        cache_seqlens_orig.long(),
-                        block_table[:, 0].long(),
-                    ], dim=0).cpu().tolist()             # one sync, two rows
-                    seqlens_cpu = _seqlens_and_seqids[0]
-                    seq_ids     = _seqlens_and_seqids[1]
-                    n_blocks_per_seq = [(s + BS - 1) // BS for s in seqlens_cpu]
-                    n_blocks_max = max(n_blocks_per_seq)
+                    # CAPTURE-EXEMPT: pre-capture host sync for seq_ids.
+                    seq_ids = block_table[:, 0].cpu().tolist()
                 else:
-                    # Capture path: use full block budget width. Padded
-                    # positions are zeroed by pad_mask (device op below).
-                    n_blocks_max = block_table.shape[1]
-                    seq_ids      = None   # not used in captured ops
+                    seq_ids = None   # not used in captured ops
                 S_padded = n_blocks_max * BS
 
                 # Device-side metadata for the unconditional splice. No
