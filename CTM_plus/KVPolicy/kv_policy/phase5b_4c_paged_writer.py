@@ -67,9 +67,52 @@ _DEFAULT_MAX_ACTIVE_SLOTS = 8
 # V packed-path correctness vs K packed-path correctness.
 _BF16_V_ENV = "PHASE5B_4C_BF16_V"
 
+# Phase 6C: skip the full-history bf16 K/V backing pool. The
+# int4_packed kernel (Is_int4kv_packed=true) verified to never read
+# from bf16_k_batch / bf16_v_batch — it loads int4 directly via
+# int4_packed_load_{K,V}_block in flash_fwd_kernel.h. The bf16 backing
+# was therefore dead memory + bandwidth. When this flag is set, we
+# allocate a tiny (1, 1, H, D) stub pool and skip all writes; the
+# read path returns a stride-0 broadcast view of the stub that the
+# kernel sees as logical shape (B, S_padded, H, D) at near-zero memory
+# cost. Set PHASE6C_BF16_BACKING_SKIP=0 to revert to the legacy
+# full-history pool for A/B comparison.
+_BF16_BACKING_SKIP_ENV = "PHASE6C_BF16_BACKING_SKIP"
+_BF16_BACKING_SKIP_DEFAULT = "1"   # NEW default — skip the pool.
+
+# Phase 6E: switch the writer's per-decode-step captured region from
+# the current Python op chain (~30 small CUDA kernel launches per
+# layer per step) to a future fused CUDA kernel. While the CUDA
+# kernel is under development, PHASE6E_FUSED_WRITER=1 routes through
+# the byte-identical Python reference (_phase6e_fused_decode_write_
+# python_ref) that defines the contract any CUDA implementation must
+# satisfy. Default is 0 (off) until the CUDA kernel is GPU-verified;
+# the CPU verifier (verify_phase6e_fused_byte_eq.py) proves the
+# Python ref is byte-equivalent to the current inline op chain.
+_FUSED_WRITER_ENV     = "PHASE6E_FUSED_WRITER"
+_FUSED_WRITER_DEFAULT = "0"   # OFF by default until CUDA kernel ships.
+
 
 def _bf16_v_mode() -> bool:
     return os.environ.get(_BF16_V_ENV, "").strip() in ("1", "true", "True", "yes")
+
+
+def _bf16_backing_skip() -> bool:
+    """Phase 6C: when True, the writer allocates a tiny stub for the
+    bf16 backing pool and skips all writes (kernel doesn't read it).
+    Default is True; set PHASE6C_BF16_BACKING_SKIP=0 to opt out.
+    """
+    raw = os.environ.get(_BF16_BACKING_SKIP_ENV, _BF16_BACKING_SKIP_DEFAULT)
+    return raw.strip() in ("1", "true", "True", "yes")
+
+
+def _fused_writer_enabled() -> bool:
+    """Phase 6E: when True, route write_decode_batched's captured
+    region through the fused entry point. Returns False until the
+    CUDA kernel is GPU-verified."""
+    raw = os.environ.get(_FUSED_WRITER_ENV, _FUSED_WRITER_DEFAULT)
+    return raw.strip() in ("1", "true", "True", "yes")
+
 
 
 def _bf16_backing_max_seqlen() -> int:
@@ -218,6 +261,175 @@ def _slice_mask_for_layer(mask: "torch.Tensor", layer_idx: int, path: str) -> "t
 
 
 # ----------------------------------------------------------------------
+# Phase 6E — fused decode write reference implementation.
+#
+# This is the EXACT Python op chain currently in
+# write_decode_batched's captured region (lines starting after
+# "CAPTURED-REGION-START"), packaged as a standalone function. It is
+# byte-equivalent to the inline code by construction.
+#
+# Purpose:
+#   1. Define the BEHAVIORAL CONTRACT that a future fused CUDA kernel
+#      must satisfy. The CPU verifier (verify_phase6e_fused_byte_eq.py)
+#      asserts byte-equality between the inline path and this reference;
+#      when the CUDA kernel replaces this function's body, the same
+#      verifier catches any divergence.
+#
+#   2. Provide a single point of integration. The dispatch fork in
+#      write_decode_batched checks _fused_writer_enabled() and routes
+#      to this function instead of the inline code. Today both paths
+#      produce identical state mutations; when the CUDA kernel ships,
+#      enabling PHASE6E_FUSED_WRITER=1 flips production to the
+#      fused implementation atomically.
+#
+#   3. Document the input/output contract for the CUDA implementation:
+#        - Inputs (read-only): key, value, slot_idx_t, slot_mapping,
+#          writer-side per-layer sidecars and pool tensors.
+#        - Outputs (in-place mutations): kv_cache, k/v_scale_ext,
+#          k/v_xmin_ext, k_protect_ext, _k_stage_pool,
+#          _k_stage_block_id_pool, _k_stage_count_pool, _seq_pos_pool,
+#          (and _bf16_k/v_backing_pool unless 6C-skipped).
+#
+# Phase 6E will replace this function's body with two CUDA kernel
+# calls (fused_decode_write_v + fused_decode_write_k). The function
+# signature, mutation contract, and semantic correctness invariants
+# stay the same — only the implementation changes.
+# ----------------------------------------------------------------------
+
+
+def _phase6e_fused_decode_write_python_ref(
+    writer,
+    key,           # (B, H, D) bf16 -- new K tokens this step
+    value,         # (B, H, D) bf16 -- new V tokens this step
+    slot_idx_t,    # (B,) long      -- pool slot per batch position (from hook or self-resolve)
+    slot_mapping,  # (B,) long      -- vLLM cache slot per batch position
+    kv_cache,      # (2, NB, BS, H, D) uint8 (in-place writeback)
+):
+    """Phase 6E Python reference for the fused decode write.
+
+    Byte-equivalent to write_decode_batched's captured region (lines
+    1217-1372 in this file as of Phase 6C). Future CUDA kernel will
+    replace this with 2 fused kernel calls.
+
+    Returns nothing; all state mutations are in-place on the writer's
+    pool tensors and the kv_cache.
+    """
+    dtype = writer.sidecar_dtype
+    BS = writer.BS
+    D = writer.D
+    H = writer.H
+    half_D = D // 2
+    B = key.shape[0]
+
+    if key.dtype != dtype:
+        key = key.to(dtype)
+    if value.dtype != dtype:
+        value = value.to(dtype)
+
+    slot_mapping = slot_mapping.long()
+    active_mask_t = (slot_mapping >= 0)                       # (B,) bool device
+
+    safe_slot_mapping = torch.where(
+        active_mask_t, slot_mapping, torch.zeros_like(slot_mapping),
+    )
+    block_ids = safe_slot_mapping // BS                       # (B,) long
+    positions = safe_slot_mapping %  BS                       # (B,) long
+
+    # ===== BF16 K/V backing scatter (skipped in 6C default) =====
+    if not writer._bf16_backing_skipped:
+        seq_pos_t = writer._seq_pos_pool[slot_idx_t].long()   # (B,) long
+        writer._bf16_k_backing_pool[slot_idx_t, seq_pos_t] = key
+        writer._bf16_v_backing_pool[slot_idx_t, seq_pos_t] = value
+    writer._seq_pos_pool.index_add_(
+        0, slot_idx_t, active_mask_t.to(torch.int32),
+    )
+
+    # ===== V quantization vectorized over B (same math as legacy) =====
+    if _bf16_v_mode():
+        if getattr(writer, "_v_bf16_ext", None) is None:
+            writer._v_bf16_ext = torch.zeros(
+                (writer.NB, BS, H, D), dtype=dtype, device=kv_cache.device,
+            )
+        writer._v_bf16_ext[block_ids, positions] = value
+    else:
+        v_grouped = value.float().view(
+            B, H, writer.v_n_groups, writer.v_group_size,
+        )
+        v_max = v_grouped.amax(dim=-1)
+        v_min = v_grouped.amin(dim=-1)
+        v_scale = ((v_max - v_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+        q_v = ((v_grouped - v_min.unsqueeze(-1)) / v_scale.unsqueeze(-1)) \
+            .round().clamp(0, 15).to(torch.uint8)
+        q_v_flat = q_v.view(B, H, D)
+        v_packed = (q_v_flat[..., 0::2] & 0x0F) | ((q_v_flat[..., 1::2] & 0x0F) << 4)
+        kv_cache[1, block_ids, positions, :, :half_D] = v_packed
+        writer.v_scale_ext[block_ids, positions] = v_scale.to(dtype)
+        writer.v_xmin_ext [block_ids, positions] = v_min.to(dtype)
+
+    # ===== K protect gather + scatter =====
+    protect_idx = writer.protected_d_per_head.unsqueeze(0).expand(B, -1, -1)
+    k_protect = torch.gather(key, dim=-1, index=protect_idx)
+    writer.k_protect_ext[block_ids, positions] = k_protect
+
+    # ===== K staging: unconditional update + conditional finalize =====
+    prior_block_id = writer._k_stage_block_id_pool[slot_idx_t]
+    is_new_block = (block_ids != prior_block_id)
+
+    keep_mask = (~is_new_block).view(B, 1, 1, 1)
+    current_k_stage = writer._k_stage_pool[slot_idx_t]
+    cleared_k_stage = torch.where(
+        keep_mask, current_k_stage, torch.zeros_like(current_k_stage),
+    )
+    batch_arange = torch.arange(B, device=kv_cache.device)
+    cleared_k_stage[batch_arange, positions] = key
+    writer._k_stage_pool[slot_idx_t] = cleared_k_stage
+
+    new_block_id = torch.where(
+        active_mask_t, block_ids, writer._k_stage_block_id_pool[slot_idx_t],
+    )
+    writer._k_stage_block_id_pool[slot_idx_t] = new_block_id
+    new_count = (positions + 1).to(torch.int32)
+    cur_count = writer._k_stage_count_pool[slot_idx_t]
+    writer._k_stage_count_pool[slot_idx_t] = torch.where(
+        active_mask_t, new_count, cur_count,
+    )
+
+    # ===== Re-quantize the staging pool for all B slots =====
+    buf_f = cleared_k_stage.float()
+    x_max = buf_f.amax(dim=1)
+    x_min = buf_f.amin(dim=1)
+    scale = ((x_max - x_min) / _ASYM_DIV).clamp(min=_SCALE_CLAMP)
+    q = ((buf_f - x_min.unsqueeze(1)) / scale.unsqueeze(1)) \
+        .round().clamp(0, 15).to(torch.uint8)
+    packed = (q[..., 0::2] & 0x0F) | ((q[..., 1::2] & 0x0F) << 4)
+
+    block_full_mask = ((positions + 1) == BS) & active_mask_t
+    full_mask_kv = block_full_mask.view(B, 1, 1, 1)
+    full_mask_ext = block_full_mask.view(B, 1, 1)
+
+    current_kv_packed = kv_cache[0, block_ids][..., :half_D]
+    new_kv_packed = torch.where(full_mask_kv, packed, current_kv_packed)
+    kv_cache[0, block_ids, :, :, :half_D] = new_kv_packed
+
+    current_k_scale = writer.k_scale_ext[block_ids]
+    current_k_xmin  = writer.k_xmin_ext [block_ids]
+    scale_dt = scale.to(dtype)
+    xmin_dt  = x_min.to(dtype)
+    writer.k_scale_ext[block_ids] = torch.where(
+        full_mask_ext, scale_dt, current_k_scale,
+    )
+    writer.k_xmin_ext [block_ids] = torch.where(
+        full_mask_ext, xmin_dt,  current_k_xmin,
+    )
+
+    writer._k_stage_count_pool[slot_idx_t] = torch.where(
+        block_full_mask,
+        torch.zeros_like(writer._k_stage_count_pool[slot_idx_t]),
+        writer._k_stage_count_pool[slot_idx_t],
+    )
+
+
+# ----------------------------------------------------------------------
 # Phase 5B.6 step 1: per-sequence state container.
 # ----------------------------------------------------------------------
 
@@ -270,14 +482,21 @@ class SeqState:
         return self._writer._k_stage_pool[self.slot_idx]
 
     @property
-    def bf16_k_backing(self) -> "torch.Tensor":
+    def bf16_k_backing(self) -> Optional["torch.Tensor"]:
         # (1, max_S, H, D) — preserves the historical leading-1 batch
         # dim that callers slice as state.bf16_k_backing[0, :S, ...].
+        # Phase 6C: returns None when the writer is in skip mode (the
+        # backing pool is a (1, 1, H, D) stub; callers must guard via
+        # `if state.bf16_k_backing is not None:`).
+        if getattr(self._writer, "_bf16_backing_skipped", False):
+            return None
         s = self.slot_idx
         return self._writer._bf16_k_backing_pool[s:s + 1]
 
     @property
-    def bf16_v_backing(self) -> "torch.Tensor":
+    def bf16_v_backing(self) -> Optional["torch.Tensor"]:
+        if getattr(self._writer, "_bf16_backing_skipped", False):
+            return None
         s = self.slot_idx
         return self._writer._bf16_v_backing_pool[s:s + 1]
 
@@ -508,13 +727,33 @@ class PagedKVWriter:
         S_padded: int,
     ):
         """Device-indexed gather of bf16 K/V backings for the batched
-        decode read. Replaces the per-seq Python copy loop in
-        `get_bf16_backing_batched` with a single CUDA gather.
+        decode read.
+
+        Phase 6C: kernel verification confirmed the int4_packed
+        flash_attn template never reads from these tensors — they're
+        accepted as positional args for shape inference only. In skip
+        mode we return a stride-0 broadcast view of a (1,1,H,D) stub,
+        so the kernel sees logical shape (B, S_padded, H, D) with the
+        right contiguous-last-dim invariant, at ~1KB total memory cost.
 
         Returns (B, S_padded, H, D), (B, S_padded, H, D) — both bf16.
         """
         if not self._allocated:
             raise RuntimeError("get_bf16_backing_batched_by_slots before _lazy_alloc")
+        B = slot_idx_tensor.shape[0]
+        H = self.H
+        D = self.D
+        if self._bf16_backing_skipped:
+            # Stub pool is (1, 1, H, D). Broadcast to (B, S_padded, H, D)
+            # via expand — last-dim stride stays 1 (passes the kernel's
+            # contiguous-last-dim assert); seq/batch dims have stride 0.
+            # The int4_packed kernel only uses these args for stride
+            # parameter setup; never dereferences the underlying memory.
+            stub_k = self._bf16_k_backing_pool                 # (1, 1, H, D)
+            stub_v = self._bf16_v_backing_pool                 # (1, 1, H, D)
+            bf16_k = stub_k.expand(B, S_padded, H, D)
+            bf16_v = stub_v.expand(B, S_padded, H, D)
+            return bf16_k, bf16_v
         max_S = self._bf16_k_backing_pool.shape[1]
         if S_padded > max_S:
             raise RuntimeError(f"S_padded={S_padded} > max_seqlen={max_S}")
@@ -684,12 +923,28 @@ class PagedKVWriter:
         self._k_stage_pool = torch.zeros(
             (n_slots, BS, H, D), dtype=dtype, device=device,
         )
-        self._bf16_k_backing_pool = torch.zeros(
-            (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
-        )
-        self._bf16_v_backing_pool = torch.zeros(
-            (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
-        )
+        # Phase 6C: kernel verification (vllm-flash-attn-dev, packed
+        # path, flash_fwd_kernel.h L962-985 / L1073-1100) confirmed
+        # bf16_k_batch / bf16_v_batch are not read in the int4_packed
+        # kernel template. Allocate a (1, 1, H, D) stub when skipping
+        # (~1KB/layer/pool vs ~500MB/layer/pool at max_S=4096); the
+        # read path broadcasts to (B, S_padded, H, D) via stride-0
+        # expand for kernel shape compatibility, at no extra memory.
+        self._bf16_backing_skipped = _bf16_backing_skip()
+        if self._bf16_backing_skipped:
+            self._bf16_k_backing_pool = torch.zeros(
+                (1, 1, H, D), dtype=torch.bfloat16, device=device,
+            )
+            self._bf16_v_backing_pool = torch.zeros(
+                (1, 1, H, D), dtype=torch.bfloat16, device=device,
+            )
+        else:
+            self._bf16_k_backing_pool = torch.zeros(
+                (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
+            )
+            self._bf16_v_backing_pool = torch.zeros(
+                (n_slots, max_S, H, D), dtype=torch.bfloat16, device=device,
+            )
         # Phase 6B.1 — per-slot counter pools (device-side; ~160 B total).
         # Sentinel: k_stage_block_id_pool starts at -1 so the FIRST
         # write_decode_batched call for a slot detects "new block"
@@ -859,6 +1114,10 @@ class PagedKVWriter:
 
         # ===== BF16 K/V backing (Phase 5B.4c.3 fix-a; per-seq) =====
         # `state` is THIS sequence's SeqState; bf16 backing is per-seq.
+        # Phase 6C: when bf16_k_backing returns None (skip mode), don't
+        # write to the (deallocated) backing pool — the int4_packed
+        # kernel doesn't read it. seq_pos still advances so the rest
+        # of the writer state (k_stage, sentinel pools) stays correct.
         if state.bf16_k_backing is not None:
             if state.seq_pos + n_real > state.bf16_k_backing.shape[1]:
                 raise RuntimeError(
@@ -869,7 +1128,7 @@ class PagedKVWriter:
                 )
             state.bf16_k_backing[0, state.seq_pos:state.seq_pos + n_real] = real_key
             state.bf16_v_backing[0, state.seq_pos:state.seq_pos + n_real] = real_value
-            state.seq_pos += n_real
+        state.seq_pos += n_real
 
         block_ids = real_slots // BS                     # (n_real,) long
         positions = real_slots %  BS
@@ -1129,22 +1388,74 @@ class PagedKVWriter:
             # Overflow guard runs Python-side from the synced SeqState ints
             # (cheap dict lookup; no captured-region access). Pre-capture-
             # hoistable.
-            max_S = self._bf16_k_backing_pool.shape[1]
-            for _slot in slot_idx_list:
-                # CAPTURE-EXEMPT: pre-capture overflow guard.
-                if int(self._seq_pos_pool[_slot].item()) >= max_S:
-                    raise RuntimeError(
-                        f"bf16 backing overflow at slot={_slot}: "
-                        f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
-                        f">= max_seqlen={max_S}. Bump "
-                        f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
-                    )
+            # Phase 6C: skip mode has a (1,1,H,D) stub pool — the overflow
+            # check would always fire. The kernel doesn't read the pool
+            # anyway, so there's nothing to overflow. Skip the guard.
+            if not self._bf16_backing_skipped:
+                max_S = self._bf16_k_backing_pool.shape[1]
+                for _slot in slot_idx_list:
+                    # CAPTURE-EXEMPT: pre-capture overflow guard.
+                    if int(self._seq_pos_pool[_slot].item()) >= max_S:
+                        raise RuntimeError(
+                            f"bf16 backing overflow at slot={_slot}: "
+                            f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
+                            f">= max_seqlen={max_S}. Bump "
+                            f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
+                        )
 
         # ================ CAPTURED REGION (no host sync) =================
         # Every op below this marker MUST be device-only. The AST + runtime
         # capture-safety verifier asserts zero .item() / .cpu() / .tolist()
         # / Python dict-lookup occurrences in this region.
         # CAPTURED-REGION-START
+
+        # Phase 6E dispatch: when PHASE6E_FUSED_WRITER=1, route to the
+        # fused implementation (currently a byte-identical Python
+        # reference; future a custom CUDA kernel) and skip the inline
+        # op chain. Both paths produce identical state mutations on
+        # kv_cache + writer pools — verified in
+        # verify_phase6e_fused_byte_eq.py.
+        _phase6e_use_fused = _fused_writer_enabled()
+        if _phase6e_use_fused:
+            _phase6e_fused_decode_write_python_ref(
+                self, key, value, slot_idx_t, slot_mapping, kv_cache,
+            )
+
+        dtype = self.sidecar_dtype
+        BS = self.BS
+        D = self.D
+        H = self.H
+        half_D = D // 2
+
+        if _phase6e_use_fused:
+            # Fused path already wrote everything — skip the inline op chain.
+            pass
+        else:
+            self._write_decode_batched_captured_inline_body(
+                key, value, slot_idx_t, slot_mapping, kv_cache, B,
+            )
+
+        # CAPTURED-REGION-END
+        # ============== POST-CAPTURE REGION (host-sync OK) ===============
+        # (continued below; unchanged)
+
+        # CAPTURE-EXEMPT: post-capture writeback.
+        if not in_capture and not pre_synced:
+            self._writeback_pool_counters_to_states(slot_idx_list)
+        return
+
+    def _write_decode_batched_captured_inline_body(
+        self, key, value, slot_idx_t, slot_mapping, kv_cache, B,
+    ):
+        """Phase 6E factor: the original inline captured region body
+        (lines 1217-1372 in this file as of Phase 6C). Kept verbatim
+        for the PHASE6E_FUSED_WRITER=0 fallback path and as the
+        byte-equality reference the CPU verifier compares against.
+
+        State mutations are identical to
+        _phase6e_fused_decode_write_python_ref. The two functions
+        should produce byte-equal results for identical inputs.
+        """
         dtype = self.sidecar_dtype
         BS = self.BS
         D = self.D
@@ -1171,13 +1482,19 @@ class PagedKVWriter:
         positions = safe_slot_mapping %  BS                       # (B,) long
 
         # ===== BF16 K/V backing scatter (per-seq, indexed by slot_idx + seq_pos) =====
-        seq_pos_t = self._seq_pos_pool[slot_idx_t].long()         # (B,) long
-        # Advance-indexed scatter — same bytes as legacy
-        # state.bf16_k_backing[0, seq_pos] = real_key for each slot.
-        # Inactive rows still write but to position 0 of slot 0 (harmless
-        # under matched active_mask gating on the read side).
-        self._bf16_k_backing_pool[slot_idx_t, seq_pos_t] = key
-        self._bf16_v_backing_pool[slot_idx_t, seq_pos_t] = value
+        # Phase 6C: kernel-verified that the int4_packed flash_attn path
+        # never reads bf16_k_batch / bf16_v_batch; the pool was dead
+        # memory + scatter-bandwidth on every decode step. Skip the
+        # scatters in skip mode; seq_pos_pool still increments so the
+        # rest of the state stays correct.
+        if not self._bf16_backing_skipped:
+            seq_pos_t = self._seq_pos_pool[slot_idx_t].long()     # (B,) long
+            # Advance-indexed scatter — same bytes as legacy
+            # state.bf16_k_backing[0, seq_pos] = real_key for each slot.
+            # Inactive rows still write but to position 0 of slot 0
+            # (harmless under matched active_mask gating on the read side).
+            self._bf16_k_backing_pool[slot_idx_t, seq_pos_t] = key
+            self._bf16_v_backing_pool[slot_idx_t, seq_pos_t] = value
         # Update seq_pos counter (active mask gates inactive seqs).
         self._seq_pos_pool.index_add_(
             0, slot_idx_t, active_mask_t.to(torch.int32),
@@ -1289,23 +1606,8 @@ class PagedKVWriter:
             torch.zeros_like(self._k_stage_count_pool[slot_idx_t]),
             self._k_stage_count_pool[slot_idx_t],
         )
-
-        # CAPTURED-REGION-END
-        # ============== POST-CAPTURE REGION (host-sync OK) ===============
-        # Writeback pool counters to SeqState Python ints so legacy
-        # introspection (verify scripts, prefill mid-decode) reads
-        # consistent state. Post-capture-hoistable; the captured region
-        # has already written to the device-side pool tensors in place.
-        #
-        # Phase 6B.2: when pre_synced=True the caller will do its own
-        # writeback (or skip it entirely if no introspection is needed).
-        # Phase 6B.3 (Option X): SKIP entirely during capture; no host
-        # syncs allowed in capture stream. SeqState ints stay stale
-        # during capture; production replay's hook updates them via
-        # the post-execute_model path if needed.
-        # CAPTURE-EXEMPT: post-capture writeback.
-        if not in_capture and not pre_synced:
-            self._writeback_pool_counters_to_states(slot_idx_list)
+        # End of inline body. Post-capture writeback is handled by the
+        # caller (write_decode_batched) outside this function.
 
     def _finalize_k_full_blocks_batched(
         self,
@@ -1486,9 +1788,17 @@ class PagedKVWriter:
         Positions [0..seq_pos-1] hold the real bf16 K/V values written
         so far in this sequence. Positions [seq_pos..S-1] are zeros
         (initialized) and unattended (cache_seqlens masks them).
+
+        Phase 6C: skip mode returns a stride-0 broadcast view of the
+        (1, 1, H, D) stub — kernel sees logical (1, S, H, D); never
+        reads since Is_int4kv_packed=true.
         """
         if seq_id is None:
             seq_id = self.DEFAULT_SEQ_ID
+        if self._bf16_backing_skipped:
+            stub_k = self._bf16_k_backing_pool                # (1, 1, H, D)
+            stub_v = self._bf16_v_backing_pool                # (1, 1, H, D)
+            return stub_k.expand(1, S, self.H, self.D), stub_v.expand(1, S, self.H, self.D)
         state = self._seq_states.get(seq_id)
         if state is None or state.bf16_k_backing is None:
             raise RuntimeError(

@@ -1,0 +1,23 @@
+# Phase 6E — build-system metadata.
+#
+# Use:   pip install --no-build-isolation -e .
+#
+# Why --no-build-isolation: torch's cpp_extension must be the SAME
+# version + CUDA build that the runtime uses. If pip's isolated build
+# env downloads a fresh torch from PyPI, it may not match the pod's
+# CUDA driver and the build fails with a CUDA version mismatch.
+# --no-build-isolation reuses the venv's torch (matched to the pod's
+# CUDA toolchain) and the build succeeds.
+#
+# We intentionally do NOT list torch as a build requirement here, so
+# that `pip install -e .` without --no-build-isolation fails fast with
+# a clear error rather than silently downloading an incompatible torch.
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "int4_protected_C"
+version = "0.1.0"
+description = "Phase 6E fused decode-write CUDA kernels for int4_protected backend"
+requires-python = ">=3.10"
