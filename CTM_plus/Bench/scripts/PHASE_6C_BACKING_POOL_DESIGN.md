@@ -1,8 +1,28 @@
 # Phase 6C — `PagedKVWriter` backing pool redesign
 
-> **Status:** Plan-of-record only. No code shall land on this plan
-> until the kernel-side verification step is done and the gate is
-> approved.
+> **Status:** **Implemented and CPU-verified.** Kernel verification
+> (reading `vllm-flash-attn-dev/csrc/flash_attn/src/flash_fwd_kernel.h`
+> L962-985 and L1073-1100) confirmed the int4_packed kernel template
+> NEVER reads `bf16_k_batch` / `bf16_v_batch` when `Is_int4kv_packed=true`
+> is selected — both args are accepted positionally for shape inference
+> but the GEMM loads K via `int4_packed_load_K_block` (and V via
+> `int4_packed_load_V_block`) directly from the int4-packed HBM
+> tensors. The bf16 backing was therefore dead memory + dead bandwidth.
+>
+> **The shipped design:** allocate a `(1, 1, H, D)` stub instead of
+> `(n_slots, max_S, H, D)`; skip all writes; the read path returns a
+> stride-0 broadcast view of the stub so the kernel sees logical
+> `(B, S_padded, H, D)` with `stride(-1)==1` at ~1 KB total memory
+> cost per pool per layer. Env flag `PHASE6C_BF16_BACKING_SKIP=0`
+> reverts to legacy for A/B verification.
+>
+> **Awaiting:** GPU re-bench on the existing
+> `bench_phase6_b4_throughput_gpu.py` to confirm:
+>   - int4 captured cell HBM drops by ~30 GB
+>   - `cap/bf16` ratio at high B improves (the 0.15× at B=32 should
+>     improve substantially as the per-decode-step ~128 MB/layer gather
+>     of the dead bf16 backing is eliminated)
+>   - No correctness regression (the 6B.3 semantic-eq gate re-passes)
 >
 > **One-sentence goal:** Shrink `_bf16_k_backing_pool` /
 > `_bf16_v_backing_pool` from `(n_slots, max_S=4096, H, D)` to
