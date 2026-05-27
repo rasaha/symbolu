@@ -137,6 +137,30 @@ def _drive_write_sequence(writer, kv_cache, B: int, n_steps: int, seed: int):
        - calls write_decode_batched directly with pre_synced=True
          (skip the post-capture writeback that would touch seq_state
          python ints — we're testing the captured region in isolation)
+
+    IMPORTANT: this test mirrors vLLM's actual production allocation,
+    where each active sequence lives in non-overlapping cache blocks.
+    Specifically, base[s] = s * BS so block_ids[s] are all distinct
+    across the batch at every step. This matters because the captured
+    region's K-side does
+
+        kv_cache[0, block_ids, :, :, :half_D] = new_kv_packed
+
+    where block_ids has shape (B,) and may contain duplicates. When
+    block_full_mask fires for ONE slot in a duplicated block but not
+    its siblings, the scatter writes B different values to the same
+    block — PyTorch's behavior under duplicate scatter indices is
+    NON-DETERMINISTIC (the "winning" write depends on internal
+    iteration order). Two fresh runs of the same code can produce
+    different state — making the byte-equality test inherently
+    unstable.
+
+    Production vLLM never creates duplicate block_ids in decode (each
+    active sequence has its own block_table row pointing at distinct
+    blocks). At CUDA graph replay the captured ops execute
+    deterministically regardless. So the duplicate-index scenario
+    isn't a real correctness concern — but our CPU verifier needs to
+    AVOID it to test the refactor cleanly.
     """
     torch.manual_seed(seed)
     # Allocate B slots; the writer pops them from the free pool.
@@ -152,18 +176,17 @@ def _drive_write_sequence(writer, kv_cache, B: int, n_steps: int, seed: int):
         [writer._slot_map[s] for s in slot_ids], dtype=torch.long,
     )
 
-    # Walk each slot forward through positions: start at slot s × 5
-    # so different slots hit block boundaries at different steps.
+    # Each slot starts in its own block (s * BS) so block_ids stays
+    # distinct across the batch at every step. See the docstring above.
     base_positions = torch.tensor(
-        [s * 5 for s in range(B)], dtype=torch.long,
+        [s * BS for s in range(B)], dtype=torch.long,
     )
 
     for step in range(n_steps):
-        # Each step: slot_mapping[i] = (slot's current absolute position)
         # absolute position = base + step;  block_id = abs // BS;  pos = abs % BS
         # vLLM-style slot_mapping packs block × BS + pos.
         abs_pos = base_positions + step
-        slot_mapping = abs_pos  # contiguous integer slots into kv_cache.
+        slot_mapping = abs_pos
         key   = torch.randn((B, H, D), dtype=torch.bfloat16)
         value = torch.randn((B, H, D), dtype=torch.bfloat16)
         writer.write_decode_batched(
