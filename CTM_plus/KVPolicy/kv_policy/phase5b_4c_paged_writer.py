@@ -91,6 +91,30 @@ def _max_active_slots() -> int:
     except ValueError:
         return _DEFAULT_MAX_ACTIVE_SLOTS
 
+
+def _in_cuda_graph_capture() -> bool:
+    """Phase 6B.3 (Option X) — detect whether the current CUDA stream
+    is in graph capture. Returns False if CUDA isn't available or
+    there is no current stream.
+
+    Capture-safe code paths must skip ALL host syncs (.cpu(), .item(),
+    .tolist()) and Python dict lookups when this is True. The captured
+    graph records ops as data-flow over device tensors; the host work
+    can fire at production-eager runtime instead (via the 6B.2 pre-
+    capture hook for captured shapes; or in-line for non-captured
+    shapes that fall back to eager).
+    """
+    if torch is None:
+        return False
+    try:
+        if not torch.cuda.is_available():
+            return False
+        return bool(torch.cuda.is_current_stream_capturing())
+    except (RuntimeError, AssertionError):
+        # is_current_stream_capturing can raise on platforms without
+        # a current stream (e.g., cold-boot CPU PyTorch).
+        return False
+
 # Env var for the per-model protect mask artifact (calibration output
 # from Phase 5B.0). Override via PROTECT_MASK_PATH=...
 _PROTECT_MASK_ENV = "PROTECT_MASK_PATH"
@@ -443,10 +467,19 @@ class PagedKVWriter:
             # the freed slot so a future sequence allocated to this slot
             # starts from a clean device-side state. Idempotent before
             # _lazy_alloc (pools are None).
+            #
+            # Phase 6B.3 fix: pool tensors carry the "inference tensor"
+            # attribute (allocated inside _lazy_alloc which fires during
+            # the first forward pass — inside vLLM's @torch.inference_
+            # mode() decorator). External callers (e.g., the GPU smoke
+            # driver resetting state between generate() calls) run
+            # OUTSIDE inference_mode and would be rejected. Same pattern
+            # as the 6B.2 hook's pool mutations in _resolve_and_stash.
             if self._seq_pos_pool is not None:
-                self._seq_pos_pool[slot] = 0
-                self._k_stage_count_pool[slot] = 0
-                self._k_stage_block_id_pool[slot] = -1
+                with torch.inference_mode():
+                    self._seq_pos_pool[slot] = 0
+                    self._k_stage_count_pool[slot] = 0
+                    self._k_stage_block_id_pool[slot] = -1
 
     # ------------------------------------------------------------------
     # Phase 6 v2 Option B pre-flight (B-pre-1): slot-tensor-based read
@@ -918,13 +951,28 @@ class PagedKVWriter:
     # ------------------------------------------------------------------
 
     def _sync_pool_counters_from_states(self, slot_idx_list: list) -> None:
-        """Phase 6B.1 — copy per-slot SeqState Python int counters into
-        the device-side counter pools. Idempotent: legacy path keeps
-        SeqState ints in sync each write, and we re-copy them in here
-        so the new path sees current values.
+        """Phase 6B.1 / 6B.2 — copy per-slot SeqState Python int counters
+        into the device-side counter pools, but ONLY for slots that
+        haven't been touched by the decode write path yet (sentinel:
+        `_k_stage_block_id_pool[slot] == -1`).
+
+        Why sentinel-gated:
+        * In the 6B.1 self-resolve path, this sync runs BEFORE each
+          captured-region invocation paired with a post-writeback that
+          flushes the pool back to SeqState. Sync + writeback are
+          symmetrical; sync runs once and subsequent calls have no-op
+          values because SeqState was just updated.
+        * In the 6B.2 hook path, the writer's pool is the source of
+          truth and SeqState ints may go stale (writeback skipped).
+          Re-syncing unconditionally would REGRESS the pool to the
+          stale SeqState value. Sentinel-gating restricts the sync to
+          the one-time prefill->decode transition (when the pool is
+          still at its initial -1 sentinel) and skips it on subsequent
+          decode steps where the pool is the canonical state.
 
         Pre-capture-hoistable. Runs OUTSIDE the captured region of
-        write_decode_batched; 6B.2's vLLM hook will move it earlier.
+        write_decode_batched; 6B.2's vLLM hook calls it on every writer
+        at step entry (sentinel-gated; cheap when no slots are pristine).
         """
         if self._seq_pos_pool is None:
             raise RuntimeError(
@@ -936,16 +984,23 @@ class PagedKVWriter:
         for sid, st in self._seq_states.items():
             slot_to_state[st.slot_idx] = st
         for slot in slot_idx_list:
-            st = slot_to_state.get(int(slot))
+            slot_int = int(slot)
+            st = slot_to_state.get(slot_int)
             if st is None:
                 # Slot pool entry without a SeqState shouldn't happen for
                 # a valid decode call (the impl resolved slot from a live
                 # seq_id). Defensive: skip; the next legacy write would
                 # repopulate.
                 continue
-            self._seq_pos_pool[slot] = int(st.seq_pos)
-            self._k_stage_count_pool[slot] = int(st.k_stage_count)
-            self._k_stage_block_id_pool[slot] = int(st.k_stage_block_id)
+            # Sentinel gate: only sync when the slot's decode-side state
+            # is pristine. -1 in k_stage_block_id_pool == "decode hasn't
+            # written this slot yet"; we copy the prefill state in once
+            # at the transition.
+            if int(self._k_stage_block_id_pool[slot_int].item()) != -1:
+                continue
+            self._seq_pos_pool[slot_int] = int(st.seq_pos)
+            self._k_stage_count_pool[slot_int] = int(st.k_stage_count)
+            self._k_stage_block_id_pool[slot_int] = int(st.k_stage_block_id)
 
     def _writeback_pool_counters_to_states(self, slot_idx_list: list) -> None:
         """Phase 6B.1 — opposite direction: pull device-side counters
@@ -982,6 +1037,8 @@ class PagedKVWriter:
         kv_cache: "torch.Tensor",       # (2, NB, BS, H, D) uint8
         slot_mapping: "torch.Tensor",   # (B,) long — global slots
         slot_idx_t: "torch.Tensor",     # (B,) long — pool slots, pre-resolved
+        *,
+        pre_synced: bool = False,
     ) -> None:
         """Phase 6B.1 — graph-capture-friendly decode write.
 
@@ -990,7 +1047,8 @@ class PagedKVWriter:
         region. No per-call dict lookups. Pool counters live on device.
 
         Pipeline:
-          1. (PRE-CAPTURE) Sync per-slot SeqState ints -> device pools.
+          1. (PRE-CAPTURE) Sync per-slot SeqState ints -> device pools
+             — SKIPPED when pre_synced=True (Phase 6B.2 hook owns it).
           2. (CAPTURED) BF16 K/V backing scatter via advance indexing.
           3. (CAPTURED) V quantization vectorized over B.
           4. (CAPTURED) K protect channel gather + scatter.
@@ -998,11 +1056,19 @@ class PagedKVWriter:
              Block-full mask gates kv_cache + k_scale/k_xmin scatter
              via torch.where read-modify-write.
           6. (PRE-CAPTURE) Sync device pools -> SeqState ints for
-             legacy introspection.
+             legacy introspection — SKIPPED when pre_synced=True
+             (callers that want introspection trigger it explicitly).
 
         Math is bit-equivalent to looped `writer.write(seq_id=...)` for
         the decode shape. Verified by
         verify_phase6_b_pre5_write_equiv.py.
+
+        Args:
+          pre_synced: Phase 6B.2 — when True, the caller (the install_
+            int4_protected_precapture_hook) has already synced this
+            writer's pool counters from SeqState ints for this step.
+            The method skips its own pre/post sync. Captured region
+            is the same op chain; only the bookkeeping wrappers differ.
         """
         if not self._allocated:
             self._lazy_alloc(kv_cache)
@@ -1030,23 +1096,49 @@ class PagedKVWriter:
         # graph by 6B.2's vLLM hook. The AST + runtime capture-safety
         # checker treats this region as exempt from the "no host sync"
         # rule.
-        # CAPTURE-EXEMPT: pre-capture-hoistable slot-idx materialization.
-        slot_idx_list = slot_idx_t.cpu().tolist()  # B small ints; coalesced
-        self._sync_pool_counters_from_states(slot_idx_list)
+        #
+        # Phase 6B.2: when pre_synced=True the caller has already synced
+        # this writer's pool counters AND ensured SeqStates exist. We
+        # still need slot_idx_list for the overflow guard, but the
+        # _sync_pool_counters_from_states + _writeback calls are skipped.
+        # The captured region's op chain is unchanged.
+        #
+        # Phase 6B.3 (Option X) — Capture-safe gating:
+        # vLLM 0.7.3 V0's `model_runner.capture_model` captures the
+        # ENTIRE forward inside graph context, bypassing our 6B.2 hook
+        # which only wraps `execute_model` (the production-runtime
+        # entry point). During the V0 capture phase, this code runs
+        # INSIDE the captured stream, so host syncs are forbidden.
+        # We gate ALL pre-capture / post-capture host work on
+        # `_in_cuda_graph_capture()`:
+        #   - capture mode (engine init synthetic forwards):
+        #     skip slot_idx_list materialization; skip sync; skip
+        #     overflow guard; skip writeback. Persistent buffer
+        #     addresses are stable; values populated by the hook
+        #     at production replay time.
+        #   - production-eager mode: full pre/post host work as
+        #     before. Bit-equivalent to 6B.1 + 6B.2 production.
+        in_capture = _in_cuda_graph_capture()
+        slot_idx_list = None  # only used in non-capture path
+        if not in_capture:
+            # CAPTURE-EXEMPT: pre-capture-hoistable slot-idx materialization.
+            slot_idx_list = slot_idx_t.cpu().tolist()  # B small ints; coalesced
+            if not pre_synced:
+                self._sync_pool_counters_from_states(slot_idx_list)
 
-        # Overflow guard runs Python-side from the synced SeqState ints
-        # (cheap dict lookup; no captured-region access). Pre-capture-
-        # hoistable.
-        max_S = self._bf16_k_backing_pool.shape[1]
-        for _slot in slot_idx_list:
-            # CAPTURE-EXEMPT: pre-capture overflow guard.
-            if int(self._seq_pos_pool[_slot].item()) >= max_S:
-                raise RuntimeError(
-                    f"bf16 backing overflow at slot={_slot}: "
-                    f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
-                    f">= max_seqlen={max_S}. Bump "
-                    f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
-                )
+            # Overflow guard runs Python-side from the synced SeqState ints
+            # (cheap dict lookup; no captured-region access). Pre-capture-
+            # hoistable.
+            max_S = self._bf16_k_backing_pool.shape[1]
+            for _slot in slot_idx_list:
+                # CAPTURE-EXEMPT: pre-capture overflow guard.
+                if int(self._seq_pos_pool[_slot].item()) >= max_S:
+                    raise RuntimeError(
+                        f"bf16 backing overflow at slot={_slot}: "
+                        f"seq_pos={int(self._seq_pos_pool[_slot].item())} "
+                        f">= max_seqlen={max_S}. Bump "
+                        f"${_BF16_BACKING_MAX_SEQLEN_ENV}."
+                    )
 
         # ================ CAPTURED REGION (no host sync) =================
         # Every op below this marker MUST be device-only. The AST + runtime
@@ -1204,8 +1296,16 @@ class PagedKVWriter:
         # introspection (verify scripts, prefill mid-decode) reads
         # consistent state. Post-capture-hoistable; the captured region
         # has already written to the device-side pool tensors in place.
+        #
+        # Phase 6B.2: when pre_synced=True the caller will do its own
+        # writeback (or skip it entirely if no introspection is needed).
+        # Phase 6B.3 (Option X): SKIP entirely during capture; no host
+        # syncs allowed in capture stream. SeqState ints stay stale
+        # during capture; production replay's hook updates them via
+        # the post-execute_model path if needed.
         # CAPTURE-EXEMPT: post-capture writeback.
-        self._writeback_pool_counters_to_states(slot_idx_list)
+        if not in_capture and not pre_synced:
+            self._writeback_pool_counters_to_states(slot_idx_list)
 
     def _finalize_k_full_blocks_batched(
         self,

@@ -67,6 +67,7 @@ KERNEL_6C3C_PHASE5B4C_DESIGN.md for the locked design.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Optional
 
 from kv_policy.phase5b_backend_install import (
@@ -96,6 +97,33 @@ enable_int4_protected_backend()
 _REQUIRED_BLOCK_SIZE = 32
 
 
+# Phase 6B.3 — env-controlled kill-switch that forces enforce_eager=True
+# even when the caller defaults / passes False. Set
+# PHASE6B3_FORCE_EAGER=1 to disable CUDA Graphs capture in production.
+# Same bisection-primitive pattern as PHASE6B1_USE_DECODE_BATCHED and
+# PHASE6B2_INSTALL_HOOK.
+_FORCE_EAGER_ENV = "PHASE6B3_FORCE_EAGER"
+
+
+def _resolve_enforce_eager(requested: Optional[bool]) -> bool:
+    """Resolve the effective enforce_eager value, honoring the
+    PHASE6B3_FORCE_EAGER env kill-switch.
+
+    Priority order:
+      1. If PHASE6B3_FORCE_EAGER=1 (or 'true', 'yes'): force True regardless.
+      2. Else if caller passed an explicit value: honor it.
+      3. Else: default to False (post-6B.3, captures CUDA Graphs).
+
+    Returns the resolved bool.
+    """
+    raw = os.environ.get(_FORCE_EAGER_ENV, "").strip()
+    if raw in ("1", "true", "True", "yes", "Yes"):
+        return True
+    if requested is not None:
+        return requested
+    return False
+
+
 def Int4ProtectedLLM(
     model: str,
     *,
@@ -103,7 +131,7 @@ def Int4ProtectedLLM(
     kv_cache_dtype: str = "int4_protected",
     max_model_len: int = 4096,
     gpu_memory_utilization: float = 0.5,
-    enforce_eager: bool = True,
+    enforce_eager: Optional[bool] = None,
     **kwargs: Any,
 ):
     """Phase 5C one-step factory: returns a configured `vllm.LLM` ready
@@ -121,8 +149,15 @@ def Int4ProtectedLLM(
         kv_cache_dtype: "int4_protected" (default). Override only for
             testing — passing "auto" returns a stock LLM via this
             factory (also useful for side-by-side reference runs).
-        max_model_len, gpu_memory_utilization, enforce_eager: forwarded
-            to LLM with v1-recommended defaults.
+        max_model_len, gpu_memory_utilization: forwarded to LLM with
+            v1-recommended defaults.
+        enforce_eager: Phase 6B.3 — defaults to None (meaning "let the
+            factory decide"). When None, the factory uses False (CUDA
+            Graphs capture enabled). When explicit True/False, the
+            caller's value is honored. The PHASE6B3_FORCE_EAGER env
+            kill-switch overrides EITHER path and forces eager mode
+            (used by the 6B.3 GPU smoke's eager cell + by operators
+            who need to bisect a capture regression in production).
         **kwargs: anything else accepted by `vllm.LLM`.
 
     Raises:
@@ -142,6 +177,9 @@ def Int4ProtectedLLM(
             f"(kernel kInt4GroupSize is a compile-time constexpr). "
             f"Got block_size={block_size}."
         )
+
+    # Phase 6B.3 — resolve enforce_eager with env-override priority.
+    effective_enforce_eager = _resolve_enforce_eager(enforce_eager)
 
     # Lazy import so the kv_policy package remains importable in
     # environments without vLLM (eg. CPU-only dev).
@@ -164,7 +202,7 @@ def Int4ProtectedLLM(
         kv_cache_dtype=kv_cache_dtype,
         max_model_len=max_model_len,
         gpu_memory_utilization=gpu_memory_utilization,
-        enforce_eager=enforce_eager,
+        enforce_eager=effective_enforce_eager,
         **kwargs,
     )
 

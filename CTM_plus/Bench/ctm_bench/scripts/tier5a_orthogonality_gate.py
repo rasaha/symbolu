@@ -139,6 +139,7 @@ def _int4_protected_python_files() -> List[Path]:
         _KV_POLICY_DIR / "phase5b_4c_paged_writer.py",
         _KV_POLICY_DIR / "phase5b_streaming_quantizer.py",
         _KV_POLICY_DIR / "phase5a_native_install.py",
+        _KV_POLICY_DIR / "phase6b2_precapture_hook.py",  # Phase 6B.2 hook module
         _KV_POLICY_DIR / "int4_protected.py",
         _KV_POLICY_DIR / "int4_protected_k_cache.py",
         _KV_POLICY_DIR / "int4_per_channel_kv.py",

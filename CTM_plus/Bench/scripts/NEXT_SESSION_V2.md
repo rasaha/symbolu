@@ -97,6 +97,39 @@ Phase 5B remains its own design + CPU prototype + GPU smoke +
 finding-doc cycle; do NOT start it without explicit per-phase
 approval.
 
+**CLOSED, POSITIVE:** Phase 6B.2 pre-capture seq_id resolution hook.
+See `PHASE_6B2_PRECAPTURE_HOOK_FINDINGS.md` for the measured finding.
+
+History (branch `claude/phase-6b1-write-preflight-fjYee`):
+* 6B.2 design doc: ✅ commit `d2071ee`
+* 6B.2 Day 1 (hook module + dispatch + pre_synced + sentinel sync + 27 tests + G5c regen): ✅ commit `02aeaac`
+* 6B.2 Day 2 (36-cell hook-on vs hook-off equiv): ✅ commit `458350d`
+* 6B.2 Day 3 (GPU smoke driver + runbook): ✅ commit `1f65595`
+* 6B.2 inference_mode fix (pool tensors are inference tensors): ✅ commit `e4c322e`
+* 6B.2 GPU smoke + closure: GREEN on Qwen-2.5-7B-Instruct + A100
+* **Phase 6B.2 CLOSED, positive measured finding.** Hook-driven
+  slot_idx resolution produces byte-identical generated tokens
+  vs the dispatch-fork's 6B.1 self-resolve path. **28× host-sync
+  amortization** — the hook resolves once per `execute_model`
+  call (31 syncs on the smoke workload) vs 6B.1's 28 layers ×
+  31 steps = 868 per-layer host syncs.
+
+GPU spend: ≈ $0.10 across iterations (one A100 pod session
+including the inference_mode crash + fix + green re-run).
+
+VC brief: **unchanged.** Phase 6B.2 is STRUCTURAL PREP for CUDA
+Graphs capture (6B.3); like 6B.1 it doesn't move any throughput
+number. Brief edits wait for Phase 6B.4 (post-capture aggregate
+throughput re-measurement).
+
+Implication: Phase 6B.3 (`enforce_eager=False` flip) is **unblocked**
+by the 6B.2 positive finding. The write path's captured region is
+host-sync-free; pool tensors stable + inference-mode-compatible;
+bit-equivalence holds across both dispatch paths. All four
+structural prerequisites for graph capture are met. 6B.3 remains
+its own design + CPU prototype + GPU smoke + finding-doc cycle;
+do NOT start without explicit per-phase approval.
+
 **CLOSED, POSITIVE:** Phase 6B.1 write-path preflight. See
 `PHASE_6B1_WRITE_PREFLIGHT_FINDINGS.md` for the measured finding.
 

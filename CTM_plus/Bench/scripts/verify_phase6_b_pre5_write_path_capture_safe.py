@@ -262,8 +262,13 @@ def check_runtime() -> tuple[bool, dict]:
         "cpu":    1 + 3,
         # .tolist(): same 1 + 3
         "tolist": 1 + 3,
-        # .item(): B from overflow guard
-        "item":   B,
+        # .item(): B from overflow guard + B from the Phase 6B.2
+        # sentinel-gate inside _sync_pool_counters_from_states (checks
+        # `_k_stage_block_id_pool[slot]` per slot to decide whether
+        # the prefill->decode transition sync should fire). Both are
+        # PRE-CAPTURE host syncs; the AST verifier's CAPTURED-REGION
+        # span sees zero forbidden calls.
+        "item":   2 * B,
     }
     n_steps = 4
     expected_total = {k: v * n_steps for k, v in expected_per_step.items()}

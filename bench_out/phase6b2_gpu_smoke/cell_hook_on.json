@@ -1,0 +1,58 @@
+{
+  "cell": "hook-on",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "max_model_len": 4096,
+  "gpu_memory_utilization": 0.5,
+  "max_tokens": 32,
+  "n_prompts": 2,
+  "call_stats": {
+    "prefill_calls": 28,
+    "decode_calls_packed": 868,
+    "decode_calls_fallback": 0,
+    "write_path_calls": 896,
+    "write_path_fallback": 0,
+    "write_decode_batched_calls": 868,
+    "write_decode_batched_via_hook_calls": 868,
+    "write_legacy_loop_calls": 28,
+    "spec_decode_calls": 0
+  },
+  "hook_enabled": true,
+  "hook_target_name": "execute_model",
+  "hook_stash_call_count": 31,
+  "hook_skipped_step_count": 1,
+  "load_seconds": 13.489424228668213,
+  "generate_seconds": 2.0251100063323975,
+  "per_prompt": [
+    {
+      "prompt_idx": 0,
+      "prompt_preview": "Below is a paragraph about a small fictional town. After it,",
+      "prompt_token_ids": [
+        38214, 374, 264, 14311, 911, 264, 2613, 43582, 6290, 13, 4636, 432, 11, 4226, 279, 3405, 3529, 285, 974, 382,
+        64747, 408, 613, 374, 88677, 1948, 1378, 35517, 323, 702, 264, 7042, 315, 1101, 916, 3040, 16183, 13, 11445, 1887,
+        19102, 525, 82663, 11, 25744, 5670, 11, 323, 279, 35799, 38540, 6559, 13, 576, 9775, 23429, 18780, 304, 4124,
+        41674, 26643, 15255, 504, 3941, 279, 5537, 13, 576, 23513, 4752, 304, 6290, 374, 264, 9798, 6733, 18047, 304,
+        220, 16, 22, 19, 17, 382, 14582, 25, 3555, 1042, 572, 279, 23513, 4752, 304, 13532, 408, 613, 18047, 5267,
+        16141, 25
+      ],
+      "completion_text": " 1742. The oldest building in Greendell, which is a stone library, was founded in 1742. The library is",
+      "completion_token_ids": [
+        220, 16, 22, 19, 17, 13, 576, 23513, 4752, 304, 13532, 408, 613, 11, 892, 374, 264, 9798, 6733, 11, 572, 18047,
+        304, 220, 16, 22, 19, 17, 13, 576, 6733, 374
+      ]
+    },
+    {
+      "prompt_idx": 1,
+      "prompt_preview": "Translate to French and explain briefly:\nEnglish: The quick ",
+      "prompt_token_ids": [
+        27473, 311, 8585, 323, 10339, 26753, 510, 22574, 25, 576, 3974, 13876, 38835, 34208, 916, 279, 15678, 5562, 624,
+        43197, 25
+      ],
+      "completion_text": " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+      "completion_token_ids": [
+        1967, 5672, 567, 41607, 75508, 822, 1070, 1346, 88329, 355, 512, 521, 3591, 281, 5403, 325, 2200, 624, 69769, 25,
+        758, 419, 14468, 11, 330, 27763, 1, 374, 24531, 438, 330, 4611
+      ]
+    }
+  ],
+  "phase6b2_install_hook_env": "1"
+}

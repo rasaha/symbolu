@@ -1,0 +1,52 @@
+{
+  "verdict": "GREEN",
+  "hook_off_cell": "/workspace/symbolu/bench_out/phase6b2_gpu_smoke/cell_hook_off.json",
+  "hook_on_cell": "/workspace/symbolu/bench_out/phase6b2_gpu_smoke/cell_hook_on.json",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "n_prompts": 2,
+  "max_tokens": 32,
+  "checks": [
+    {"name": "completion_token_ids_byte_equal",      "passed": true, "detail": "all prompts byte-equal"},
+    {"name": "hook_on_cell_used_hook_path",          "passed": true, "detail": "write_decode_batched_via_hook_calls=868"},
+    {"name": "hook_off_cell_self_resolved",          "passed": true, "detail": "write_decode_batched_via_hook_calls=0"},
+    {"name": "both_cells_used_write_decode_batched", "passed": true, "detail": "hook-off=868, hook-on=868"},
+    {"name": "hook-off_zero_fallbacks",              "passed": true, "detail": "write_path_fallback=0, decode_calls_fallback=0"},
+    {"name": "hook-on_zero_fallbacks",               "passed": true, "detail": "write_path_fallback=0, decode_calls_fallback=0"},
+    {"name": "hook_on_stash_call_count_positive",    "passed": true, "detail": "stash_call_count=31"}
+  ],
+  "hook_off_call_stats": {
+    "prefill_calls": 28, "decode_calls_packed": 868, "decode_calls_fallback": 0,
+    "write_path_calls": 896, "write_path_fallback": 0,
+    "write_decode_batched_calls": 868, "write_decode_batched_via_hook_calls": 0,
+    "write_legacy_loop_calls": 28, "spec_decode_calls": 0
+  },
+  "hook_on_call_stats": {
+    "prefill_calls": 28, "decode_calls_packed": 868, "decode_calls_fallback": 0,
+    "write_path_calls": 896, "write_path_fallback": 0,
+    "write_decode_batched_calls": 868, "write_decode_batched_via_hook_calls": 868,
+    "write_legacy_loop_calls": 28, "spec_decode_calls": 0
+  },
+  "hook_on_handle": {
+    "enabled": true, "hook_target_name": "execute_model",
+    "stash_call_count": 31, "skipped_step_count": 1
+  },
+  "hook_off_handle": {
+    "enabled": false, "hook_target_name": "disabled"
+  },
+  "per_prompt_diffs": [
+    {
+      "prompt_idx": 0,
+      "prompt_preview": "Below is a paragraph about a small fictional town. After it,",
+      "hook_off_text": " 1742. The oldest building in Greendell, which is a stone library, was founded in 1742. The library is",
+      "hook_on_text":  " 1742. The oldest building in Greendell, which is a stone library, was founded in 1742. The library is",
+      "tokens_byte_equal": true
+    },
+    {
+      "prompt_idx": 1,
+      "prompt_preview": "Translate to French and explain briefly:\nEnglish: The quick ",
+      "hook_off_text": " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+      "hook_on_text":  " Le renard brun rapide saute par-dessus le chien paresseux.\nExplanation: In this translation, \"quick\" is translated as \"rap",
+      "tokens_byte_equal": true
+    }
+  ]
+}
