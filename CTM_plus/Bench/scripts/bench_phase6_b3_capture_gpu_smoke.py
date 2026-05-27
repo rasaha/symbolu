@@ -201,26 +201,56 @@ def _dump_writer_state(inner_model, impls, cell: str, B: int, tag: str) -> None:
         sentinel = first_writer._k_stage_block_id_pool[:n_slots].cpu().tolist()
         print(f"  seq_pos_pool[:n_slots]={pos}")
         print(f"  k_stage_block_id_pool[:n_slots]={sentinel}")
-        # Check bf16 backing norms for ALL active slots.
+        # Check bf16 backing norms for ALL active slots, with tok0 sample.
+        slot_tok0_tensors = {}
         for seq_id, slot in sorted(slot_map.items()):
             pool = first_writer._bf16_k_backing_pool
             if pool is not None:
                 seq_pos = int(first_writer._seq_pos_pool[slot].item())
                 if seq_pos > 0:
                     norm = float(pool[slot, :seq_pos].norm().item())
-                    # First token's key norm across heads (shape H, D -> scalar)
-                    tok0_norm = float(pool[slot, 0].norm().item())
+                    tok0 = pool[slot, 0]      # (H, D) first token's key
+                    tok0_norm = float(tok0.norm().item())
+                    # Print first head's first 4 dims for fingerprinting.
+                    tok0_sample = tok0[0, :4].cpu().tolist() if tok0.ndim >= 2 else []
+                    slot_tok0_tensors[slot] = tok0.detach().clone()
                 else:
                     norm = 0.0
                     tok0_norm = 0.0
+                    tok0_sample = []
                 print(f"  slot={slot} seq_id={seq_id} seq_pos={seq_pos} "
-                      f"bf16k_norm={norm:.4f} tok0_norm={tok0_norm:.4f}")
+                      f"bf16k_norm={norm:.4f} tok0_norm={tok0_norm:.4f} "
+                      f"tok0_h0_d0:3={tok0_sample[:3]}")
+
+        # If B>=2: compare tok0 of the first two slots to detect
+        # accidental aliasing (both slots using the same backing data).
+        if len(slot_tok0_tensors) >= 2:
+            slotlist = sorted(slot_tok0_tensors.keys())
+            t0a = slot_tok0_tensors[slotlist[0]]
+            t0b = slot_tok0_tensors[slotlist[1]]
+            same = bool((t0a == t0b).all().item())
+            diff_norm = float((t0a.float() - t0b.float()).norm().item())
+            print(f"  tok0_alias_check: slot{slotlist[0]} vs slot{slotlist[1]}"
+                  f" identical={same} diff_norm={diff_norm:.4f}")
 
     if first_impl is not None:
         buf = getattr(first_impl, "_phase5b_slot_idx_buf", None)
         if buf is not None:
             vals = buf[:min(B, buf.numel())].cpu().tolist()
             print(f"  impl0._phase5b_slot_idx_buf[:{B}]={vals}")
+
+    # Check ALL impls' slot_idx_buf to catch per-layer divergence.
+    if B >= 2 and impls:
+        bufs_set = set()
+        for impl in impls[:6]:   # sample first 6 layers
+            b = getattr(impl, "_phase5b_slot_idx_buf", None)
+            if b is not None and b.numel() >= B:
+                v = tuple(b[:B].cpu().tolist())
+                bufs_set.add(v)
+        if len(bufs_set) > 1:
+            print(f"  WARNING: slot_idx_buf DISAGREES across impls: {bufs_set}")
+        else:
+            print(f"  slot_idx_buf consistent across sampled impls: {bufs_set}")
 
 
 def _hbm_snapshot() -> dict:
