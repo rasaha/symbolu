@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.3 Option X Stage 5 \u2014 route B=1 through batched path during capture. _read_decode_packed B==1 shortcut has .item() calls forbidden during capture. Fix: guard with not _in_cuda_graph_capture(); capture falls through to batched path which already handles B=1 as degenerate case.",
+  "note": "Phase 6B.3 CLOSED GREEN \u2014 align eager n_blocks_max with captured (block_table.shape[1]) so both paths feed identical S_padded to the int4 flash-attn kernel. Eliminates one source of eager-vs-captured numerical divergence; remaining divergence is kernel-launch FP noise (semantic-equal gate accepts).",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -9,7 +9,7 @@
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
     "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "11c37d54340b014b2461025f41885dc79a3f1fa82cd09de81f4b2d6a6f6bf755",
-    "KVPolicy/kv_policy/phase5b_backend_install.py": "5923c22716088752fd7916efa3ab6ac8c72b60fd1ecbd940ea3a72e49434c503",
+    "KVPolicy/kv_policy/phase5b_backend_install.py": "43f1c714b1c582e01c59b7749c61e96e807e5ee382f0ffdca1a1cc1fdc8a5072",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
     "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "066f757051d5a961e4148ade55537da7c59d218ed3d342944a7a1592fe4db954"
   }
