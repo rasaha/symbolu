@@ -43,7 +43,13 @@ setup(
             ],
             extra_compile_args={
                 "cxx":  ["-O3", "-std=c++17"],
-                "nvcc": ["-O3", "--use_fast_math",
+                # NOTE: do NOT pass --use_fast_math. The byte-equivalence
+                # contract requires IEEE-compliant single-precision
+                # division so the kernels match PyTorch's CPU/CUDA
+                # arithmetic exactly. --use_fast_math enables an
+                # approximate reciprocal divide that differs in the
+                # last ULP and breaks `verify_phase6e_fused_byte_eq.py`.
+                "nvcc": ["-O3",
                          "-gencode=arch=compute_80,code=sm_80",     # A100
                          "-gencode=arch=compute_90,code=sm_90"],    # H100
             },
