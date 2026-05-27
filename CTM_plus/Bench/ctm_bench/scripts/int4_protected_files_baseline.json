@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.1 GPU smoke prep \u2014 add PHASE6B1_USE_DECODE_BATCHED env override in _is_pure_decode_write (forces legacy path when set to '0'); add write_decode_batched_calls + write_legacy_loop_calls counters to Int4ProtectedAttentionImpl._call_stats so GPU smoke can verify which path fired. G5a class fingerprint unchanged (no class method additions). 49-test CPU suite + 36-cell equivalence + AST+runtime capture-safe all GREEN post-change.",
+  "note": "Phase 6B.2 Day 1 \u2014 pre-capture seq_id resolution hook. Add phase6b2_precapture_hook.py to G5c pin set (new module, partner-credible). G5a class fingerprint preserved; G5b/G6a unchanged. Backed by 27 new CPU tests + 36-cell equivalence + AST/runtime capture-safe + 15/15 pointer stability all GREEN.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -8,8 +8,9 @@
     "KVPolicy/kv_policy/int4_protected.py": "710b222b4cb2977eedc11a7c536f0685a127bbfaebee657a7c8fa2f2089697b5",
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
-    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "75c25ae0cdd762785b6c5a359475145c271a363ad26617294da3418fd74e0ae2",
-    "KVPolicy/kv_policy/phase5b_backend_install.py": "089e57e00dfc6de8c190e3c36a9c0b1780a5df2b31e0e4468084ff4f49e42d92",
-    "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299"
+    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "d0abeb6cc9c046daee7d5deeb34cd38fdb2467556d383582c366bc5ff5b19670",
+    "KVPolicy/kv_policy/phase5b_backend_install.py": "2459374b0961e5e61c7460ad1ddc8dcf2246d8e115bf1f311615e97e62ae816c",
+    "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
+    "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "87d2962e050f0122e4d2967be6b11e31ec0e33238ba25328772eab6cdaa71aba"
   }
 }

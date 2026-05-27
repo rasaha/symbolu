@@ -199,14 +199,15 @@ if _VLLM_FA_AVAILABLE:
         # Class-level call counters (aggregate across all layer instances).
         # Reset via Int4ProtectedAttentionImpl.reset_call_stats().
         _call_stats: Dict[str, int] = {
-            "prefill_calls":              0,
-            "decode_calls_packed":        0,
-            "decode_calls_fallback":      0,
-            "write_path_calls":           0,
-            "write_path_fallback":        0,
-            "write_decode_batched_calls": 0,   # Phase 6B.1 — refactored decode write path fired
-            "write_legacy_loop_calls":    0,   # Phase 6B.1 — legacy partition+loop path fired
-            "spec_decode_calls":          0,
+            "prefill_calls":                       0,
+            "decode_calls_packed":                 0,
+            "decode_calls_fallback":               0,
+            "write_path_calls":                    0,
+            "write_path_fallback":                 0,
+            "write_decode_batched_calls":          0,  # Phase 6B.1 — refactored decode write path fired
+            "write_decode_batched_via_hook_calls": 0,  # Phase 6B.2 — slot_idx_t came from pre-capture hook stash
+            "write_legacy_loop_calls":             0,  # Phase 6B.1 — legacy partition+loop path fired
+            "spec_decode_calls":                   0,
         }
 
         @classmethod
@@ -741,32 +742,56 @@ if _VLLM_FA_AVAILABLE:
                         if _pure_decode:
                             dec_meta = attn_metadata.decode_metadata
                             B_decode = int(dec_meta.block_tables.shape[0])
-                            # Resolve seq_ids -> slot_idx ONCE, then call
-                            # the batched write. The seq_id derivation
-                            # mirrors _derive_write_partitions's decode
-                            # branch (block_tables[i, 0]); same identifier
-                            # the read path uses. This is the ONE pre-
-                            # capture-hoistable Python step in the write
-                            # path (analogous to the read path's coalesced
-                            # seqlens+seq_ids sync); 6B.2's vLLM hook moves
-                            # it out of the captured region entirely.
-                            seq_ids = dec_meta.block_tables[:, 0] \
-                                .cpu().tolist()
-                            # Ensure SeqState exists for each decode seq
-                            # (allocates a pool slot lazily on first write).
-                            for sid in seq_ids:
-                                writer.ensure_seq_state(sid, kv_cache.device)
-                            slot_idx_list = writer.slot_indices_for(seq_ids)
-                            slot_idx_t = torch.tensor(
-                                slot_idx_list, dtype=torch.long,
-                                device=kv_cache.device,
+                            # Phase 6B.2: prefer the hook-stashed
+                            # slot_idx_t if present. The hook resolves
+                            # seq_id -> slot ONCE per step BEFORE the
+                            # captured forward (vs once-per-layer here);
+                            # when installed, the captured region runs
+                            # with zero host syncs. When NOT installed,
+                            # the dispatch falls back to 6B.1's per-
+                            # layer self-resolve path below (strictly
+                            # additive — CPU tests + pre-hook
+                            # deployments stay unchanged).
+                            from kv_policy.phase6b2_precapture_hook import (
+                                read_stash as _read_precapture_stash,
                             )
+                            _stash = _read_precapture_stash(attn_metadata)
+                            if _stash is not None and "slot_idx_t" in _stash:
+                                # Hook is installed. Use the stashed
+                                # slot_idx_t; the hook also already
+                                # synced pool counters across ALL
+                                # writers for this step.
+                                slot_idx_t = _stash["slot_idx_t"]
+                                _pre_synced = True
+                                Int4ProtectedAttentionImpl._call_stats[
+                                    "write_decode_batched_via_hook_calls"
+                                ] += 1
+                            else:
+                                # Hook NOT installed (CPU tests, pre-
+                                # hook deployments). Self-resolve as
+                                # in 6B.1. The seq_id derivation
+                                # mirrors _derive_write_partitions's
+                                # decode branch (block_tables[i, 0]).
+                                seq_ids = dec_meta.block_tables[:, 0] \
+                                    .cpu().tolist()
+                                # Ensure SeqState exists for each decode
+                                # seq (allocates a pool slot lazily on
+                                # first write).
+                                for sid in seq_ids:
+                                    writer.ensure_seq_state(sid, kv_cache.device)
+                                slot_idx_list = writer.slot_indices_for(seq_ids)
+                                slot_idx_t = torch.tensor(
+                                    slot_idx_list, dtype=torch.long,
+                                    device=kv_cache.device,
+                                )
+                                _pre_synced = False
                             writer.write_decode_batched(
                                 key=key,
                                 value=value,
                                 kv_cache=kv_cache,
                                 slot_mapping=slot_mapping_flat,
                                 slot_idx_t=slot_idx_t,
+                                pre_synced=_pre_synced,
                             )
                             Int4ProtectedAttentionImpl._call_stats[
                                 "write_decode_batched_calls"
