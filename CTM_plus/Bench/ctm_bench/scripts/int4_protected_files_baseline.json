@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "note": "Phase 6B.2 GPU fix \u2014 wrap pool mutations in _resolve_and_stash in torch.inference_mode(). The hook fires from vLLM's worker.execute_model OUTSIDE the model_runner's @torch.inference_mode() decorator; pool tensors were allocated inside inference_mode and carry the 'inference tensor' attribute. PyTorch rejects in-place writes to inference tensors outside inference_mode. Wrap (a) ensure_seq_state calls (writes _slot_map etc. \u2014 harmless on cpu but matches the contract) and (b) _sync_pool_counters_from_states (the actual mutation site) and (c) torch.tensor build inside the context. The wrapped original_fn re-enters inference_mode on its own; nested context is a no-op there. 27 CPU tests + 36-cell hook-equiv still GREEN post-fix.",
+  "note": "Phase 6B.3 Day 1 \u2014 Int4ProtectedLLM constructor flip + PHASE6B3_FORCE_EAGER env kill-switch. Default enforce_eager changed from True -> Optional[bool] with factory-side resolution: None means False (capture enabled); explicit value honored; PHASE6B3_FORCE_EAGER=1 overrides EITHER path to force True. Bisection primitive for 6B.3 GPU smoke (eager vs captured cells in same process tree). G5a class fingerprint unchanged; G5b/G6a unchanged; G5c regenerated for the authorized int4_protected.py edit. 14-case CPU regression on the resolver function PASS; 99 pytest tests + 36+36 equivalence verifiers + AST capture-safe all GREEN.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
     "KVPolicy/kv_policy/int4_per_channel_kv.py": "32c2a6bd85e98af6bdc4538f07c8eb41e145097b4024f5124ced0ba4d640fbb6",
-    "KVPolicy/kv_policy/int4_protected.py": "710b222b4cb2977eedc11a7c536f0685a127bbfaebee657a7c8fa2f2089697b5",
+    "KVPolicy/kv_policy/int4_protected.py": "ee2d1c6bfdb8731c66aa837831b6c3494d46f046ea9d906b1402be8a33d6b5f0",
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
     "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "d0abeb6cc9c046daee7d5deeb34cd38fdb2467556d383582c366bc5ff5b19670",

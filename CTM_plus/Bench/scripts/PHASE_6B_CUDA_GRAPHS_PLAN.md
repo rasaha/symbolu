@@ -28,7 +28,7 @@
 | B-1 capture-enable smoke (first attempt) | ❌ FAILED at write-path `.item()` | commit `c2be606` |
 | **Phase 6B.1 — Write-path preflight** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + Mistral-7B + A100) | `PHASE_6B1_WRITE_PREFLIGHT_FINDINGS.md` |
 | **Phase 6B.2 — Pre-capture seq_id resolution hook** | ✅ **CLOSED, GREEN** (GPU smoke Qwen-7B + A100; 28× host-sync amortization) | `PHASE_6B2_PRECAPTURE_HOOK_FINDINGS.md` |
-| Capture-enable smoke + correctness gates (Phase 6B.3) | NOT STARTED — gated on user approval | this plan |
+| **Phase 6B.3 — enforce_eager=False flip + capture-enable — CPU prep DONE** | CPU regression GREEN; GPU smoke awaiting operator on A100 | `PHASE_6B3_CAPTURE_DESIGN.md` + `bench_phase6_b3_capture_gpu_smoke.py` + `PHASE_6B3_CAPTURE_GPU_SMOKE_RUNBOOK.md` |
 | Throughput bench + finding doc (Phase 6B.4) | NOT STARTED — gated on 6B.3 GREEN | this plan |
 
 The read path is **graph-capturable today**. The write path runs
