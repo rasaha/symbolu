@@ -1,0 +1,24 @@
+# Phase 6E — build-system metadata so `pip install -e .` works with
+# default build isolation.
+#
+# Without this, pip's isolated build environment doesn't see the venv's
+# torch installation and setup.py fails at `from torch.utils.cpp_extension`.
+# Either fix this by listing torch as a build requirement here, OR use
+# `pip install --no-build-isolation -e .` (cheaper, uses the venv's torch).
+[build-system]
+requires = [
+    "setuptools>=61",
+    "wheel",
+    # Torch must be installed in the build env to import cpp_extension.
+    # The version pin is loose so any compatible torch already in the
+    # venv satisfies it. If you'd rather use the venv's torch directly,
+    # invoke `pip install --no-build-isolation -e .` instead.
+    "torch>=2.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "int4_protected_C"
+version = "0.1.0"
+description = "Phase 6E fused decode-write CUDA kernels for int4_protected backend"
+requires-python = ">=3.10"
