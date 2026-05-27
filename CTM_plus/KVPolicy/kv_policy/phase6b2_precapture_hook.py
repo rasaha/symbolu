@@ -276,10 +276,7 @@ def _resolve_and_stash(
                 # fork allocate on first eager call.
                 if buf.numel() < B:
                     continue
-                # Phase 6B.3 debug: use BLOCKING copy to rule out an
-                # async race between this populating write and the
-                # captured graph's gather read of the same buffer.
-                buf[:B].copy_(slot_idx_t, non_blocking=False)
+                buf[:B].copy_(slot_idx_t, non_blocking=True)
 
     payload: Dict[str, Any] = {
         "slot_idx_t":   slot_idx_t,

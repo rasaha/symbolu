@@ -81,6 +81,16 @@ PROMPTS = [
         "French:"
     ),
 ]
+# Phase 6B.3 debug: short-prompt-only variant. Set env
+# PHASE6B3_SHORT_PROMPTS=1 to use these instead of the default mix.
+# Used to isolate whether the captured B>=2 divergence scales with
+# prefill length (both prompts ~12-20 tokens here).
+SHORT_PROMPTS = [
+    "Translate to French: The cat sat on the mat. French:",
+    "Translate to French: I like ice cream. French:",
+]
+if os.environ.get("PHASE6B3_SHORT_PROMPTS", "0").strip() == "1":
+    PROMPTS = SHORT_PROMPTS
 
 
 CELL_EAGER    = "eager"
