@@ -1,0 +1,38 @@
+--- csrc/flash_attn/src/flash_fwd_kernel.h.phase6j_backup       2026-05-28 09:13:09.534112701 +0000
++++ csrc/flash_attn/src/flash_fwd_kernel.h      2026-05-28 09:14:31.454470624 +0000
+@@ -966,7 +966,7 @@
+                 gmem_k_packed_base, gmem_k_scale_base, gmem_k_xmin_base,
+                 gmem_k_protect_base, gmem_protect_slot_base,
+                 bidh, params.seqlen_k, params.h_k, packed_n_protect,
+-                n_block * Kernel_traits::kBlockN, params.seqlen_k);
++                n_block * Kernel_traits::kBlockN, binfo.actual_seqlen_k);
+             __syncthreads();
+         } else if constexpr (Is_int4kv && (Kernel_traits::kBlockN % kInt4GroupSize == 0)) {
+             // 6c.3C Phase 2.5/4: in-register quant on cp.async-loaded BF16 K.
+@@ -1017,7 +1017,7 @@
+                 tVsV, tKVcKV, smem_packed_box,
+                 gmem_v_packed_base, gmem_v_scale_base, gmem_v_xmin_base,
+                 bidh, params.seqlen_k, params.h_k,
+-                n_block * Kernel_traits::kBlockN, params.seqlen_k);
++                n_block * Kernel_traits::kBlockN, binfo.actual_seqlen_k);
+             __syncthreads();
+         } else if constexpr (Is_int4kv && (Kernel_traits::kHeadDim % kInt4GroupSize == 0)) {
+             // 6c.3C Phase 3: in-register V transform (legacy non-packed path).
+@@ -1077,7 +1077,7 @@
+                 gmem_k_packed_base, gmem_k_scale_base, gmem_k_xmin_base,
+                 gmem_k_protect_base, gmem_protect_slot_base,
+                 bidh, params.seqlen_k, params.h_k, packed_n_protect,
+-                n_block * Kernel_traits::kBlockN, params.seqlen_k);
++                n_block * Kernel_traits::kBlockN, binfo.actual_seqlen_k);
+             __syncthreads();
+         } else if constexpr (Is_int4kv && (Kernel_traits::kBlockN % kInt4GroupSize == 0)) {
+             FLASH_NAMESPACE::int4_quant_dequant_K_block_inplace<
+@@ -1112,7 +1112,7 @@
+                 tVsV, tKVcKV, smem_packed_box,
+                 gmem_v_packed_base, gmem_v_scale_base, gmem_v_xmin_base,
+                 bidh, params.seqlen_k, params.h_k,
+-                n_block * Kernel_traits::kBlockN, params.seqlen_k);
++                n_block * Kernel_traits::kBlockN, binfo.actual_seqlen_k);
+             __syncthreads();
+         } else if constexpr (Is_int4kv && (Kernel_traits::kHeadDim % kInt4GroupSize == 0)) {
+             FLASH_NAMESPACE::int4_quant_dequant_V_block_inplace<
