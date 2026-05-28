@@ -353,6 +353,7 @@ def run_worker(
     gpu_memory_utilization: float,
     n_runs: int,
     batch_sizes: List[int],
+    max_num_seqs: int,
 ) -> int:
     if cell not in CELLS:
         print(f"FAIL: unknown cell {cell!r}")
@@ -398,6 +399,12 @@ def run_worker(
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
             dtype="bfloat16",
+            # Bound captured batch shapes to the actual workload.
+            # vLLM's default (256) captures many shapes we don't need
+            # and the captured-graph intermediate at long context can
+            # OOM at high B. The bench only sweeps B<=8, so 16 is
+            # plenty.
+            max_num_seqs=max_num_seqs,
         )
         torch.cuda.synchronize()
     else:
@@ -411,6 +418,7 @@ def run_worker(
             model=model,
             max_model_len=max_model_len,
             gpu_memory_utilization=gpu_memory_utilization,
+            max_num_seqs=max_num_seqs,
         )
         torch.cuda.synchronize()
 
@@ -852,10 +860,19 @@ def main() -> int:
     p.add_argument("--batch-sizes", default=",".join(str(x) for x in DEFAULT_BATCH_SIZES),
                    help="Comma-separated, e.g. '1,2,4,8'.")
     p.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
-    p.add_argument("--gpu-memory-utilization", type=float, default=0.85,
-                   help="Higher default than the throughput bench (0.5). "
-                        "Long-context KV cache is the whole point of this "
-                        "bench; we want vLLM to grab a big budget.")
+    p.add_argument("--gpu-memory-utilization", type=float, default=0.5,
+                   help="vLLM's KV cache budget = total HBM * this. "
+                        "Default 0.5 matches the throughput bench's "
+                        "proven-safe value; 0.85 OOMs during graph "
+                        "capture at long max_model_len because the "
+                        "int4 read path materializes a large gather "
+                        "intermediate at captured shapes.")
+    p.add_argument("--max-num-seqs", type=int, default=16,
+                   help="Bounds vLLM's captured batch shapes. The "
+                        "long-context bench only sweeps B<=8; setting "
+                        "max_num_seqs=16 (2x headroom) avoids capturing "
+                        "huge shapes whose gather intermediates OOM at "
+                        "long max_model_len.")
     p.add_argument("--n-runs", type=int, default=DEFAULT_N_RUNS)
     args = p.parse_args()
 
@@ -873,6 +890,7 @@ def main() -> int:
             gpu_memory_utilization=args.gpu_memory_utilization,
             n_runs=args.n_runs,
             batch_sizes=batch_sizes,
+            max_num_seqs=args.max_num_seqs,
         )
 
     cells_to_run = [c.strip() for c in args.cells.split(",") if c.strip()]
@@ -900,6 +918,7 @@ def main() -> int:
         "--model", args.model,
         "--max-tokens", str(args.max_tokens),
         "--gpu-memory-utilization", str(args.gpu_memory_utilization),
+        "--max-num-seqs", str(args.max_num_seqs),
         "--n-runs", str(args.n_runs),
         "--batch-sizes", ",".join(str(x) for x in batch_sizes),
     ]
