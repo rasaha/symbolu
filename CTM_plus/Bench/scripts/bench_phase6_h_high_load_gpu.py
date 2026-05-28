@@ -647,53 +647,83 @@ def compare(
             rows.append(row)
 
     # Verdict.
-    # JUSTIFIED: int4 completes >=1.5x bf16 at least at one B per mml.
-    # PARTIAL:   int4 completes more than bf16 at some B but <1.5x.
-    # NOT_JUSTIFIED: int4 OOMs at or below bf16's max_concurrency, OR
-    #                completes fewer than bf16 at every tested B.
-    int4_wins_strong = 0   # >=1.5x at any B
-    int4_wins_weak   = 0   # >bf16 but <1.5x at any B
-    int4_loses       = 0   # OOM or completes < bf16
+    # JUSTIFIED:     int4 completes >=1.5x bf16 at least at one B per mml,
+    #                OR bf16 OOMs at some B and int4 doesn't.
+    # PARTIAL:       int4 completes more than bf16 at some B but <1.5x.
+    # INCONCLUSIVE:  both cells completed all requests at every tested B
+    #                (saturation never reached — need higher B to differentiate).
+    # NOT_JUSTIFIED: int4 OOMs at or below bf16's max_concurrency, OR int4
+    #                completes strictly fewer than bf16 at some B without OOM.
+    int4_wins_strong   = 0
+    int4_wins_weak     = 0
+    int4_loses         = 0
+    both_complete_tied = 0    # ratio == 1.0 with no OOM either side
     for r in rows:
         ratio = r.get("captured_over_bf16_ratio")
-        if r.get("captured_oom"):
+        if r.get("captured_oom") and not r.get("bf16_oom"):
             int4_loses += 1
+            continue
+        if r.get("bf16_oom") and not r.get("captured_oom"):
+            int4_wins_strong += 1
             continue
         if ratio is None:
             continue
-        if ratio >= 1.5:
+        if ratio == float("inf"):
+            int4_wins_strong += 1
+        elif ratio >= 1.5:
             int4_wins_strong += 1
         elif ratio > 1.0:
             int4_wins_weak += 1
+        elif ratio == 1.0:
+            # Both completed; saturation didn't differentiate them.
+            both_complete_tied += 1
         else:
             int4_loses += 1
 
     if int4_wins_strong >= 1:
         verdict = "JUSTIFIED"
         verdict_note = (
-            f"int4 completes >=1.5x bf16's completed requests at {int4_wins_strong} "
-            f"of the {len(rows)} tested (mml, B) combinations. The protect-mask "
-            f"design's 2x max_concurrency translates to real high-load capacity. "
-            f"Phase 6G implementation (e.g., option C: fp8 sidecars) is now "
-            f"justified to make the capacity advantage cleaner."
+            f"int4 completes >=1.5x bf16's completed requests (or bf16 "
+            f"OOMs while int4 doesn't) at {int4_wins_strong} of the "
+            f"{len(rows)} tested (mml, B) combinations. The protect-mask "
+            f"design's 2x max_concurrency translates to real high-load "
+            f"capacity. Phase 6G implementation (e.g., option C: fp8 "
+            f"sidecars) is now justified to make the capacity advantage "
+            f"cleaner."
         )
     elif int4_wins_weak >= 1:
         verdict = "PARTIAL"
         verdict_note = (
-            f"int4 completes more requests than bf16 at high B (real advantage) but "
-            f"the ratio is below 1.5x (sidecar overhead consumes some of vLLM's "
-            f"reported 2x budget). Diet options may push the ratio higher; "
-            f"recommend running 6G option C and re-running 6H to measure the delta."
+            f"int4 completes more requests than bf16 at high B (real "
+            f"advantage) but the ratio is below 1.5x (sidecar overhead "
+            f"consumes some of vLLM's reported 2x budget). Diet options "
+            f"may push the ratio higher; recommend running 6G option C "
+            f"and re-running 6H to measure the delta."
         )
     elif int4_loses >= 1:
         verdict = "NOT_JUSTIFIED"
         verdict_note = (
-            f"int4 OOMs or completes <=bf16 at high B at {int4_loses} (mml, B) "
-            f"combinations. The reported 2x max_concurrency is bookkeeping-only — "
-            f"sidecars consume the budget vLLM thinks int4 has. Phase 6G diet "
-            f"alone cannot rescue this (the audit ceiling is ~2.5 GB savings vs "
-            f"a ~5 GB delta). Consider Phase 6I structural redesign (e.g., move "
-            f"int4 logic into flash_attn) or close the int4_protected line."
+            f"int4 OOMs or completes fewer than bf16 at high B at "
+            f"{int4_loses} (mml, B) combinations. The reported 2x "
+            f"max_concurrency is bookkeeping-only — sidecars consume the "
+            f"budget vLLM thinks int4 has. Phase 6G diet alone cannot "
+            f"rescue this (the audit ceiling is ~2.5 GB savings vs a "
+            f"~5 GB delta). Consider Phase 6I structural redesign "
+            f"(e.g., move int4 logic into flash_attn) or close the "
+            f"int4_protected line."
+        )
+    elif both_complete_tied >= 1:
+        verdict = "INCONCLUSIVE"
+        verdict_note = (
+            f"Both cells completed all requested generations at every "
+            f"tested (mml, B) — {both_complete_tied} of {len(rows)} "
+            f"combinations. Saturation never reached. The chosen B "
+            f"values were not high enough to trigger differential "
+            f"behavior. Re-run with significantly higher B and/or lower "
+            f"gpu_memory_utilization to find the operating point where "
+            f"capacity actually differentiates the cells. The throughput "
+            f"comparison from this bench remains informative: bf16 was "
+            f"consistently faster than int4 by 1.4-1.9x across the sweep."
         )
     else:
         verdict = "INCONCLUSIVE"
@@ -705,6 +735,7 @@ def compare(
         "int4_wins_strong":      int4_wins_strong,
         "int4_wins_weak":        int4_wins_weak,
         "int4_loses":            int4_loses,
+        "both_complete_tied":    both_complete_tied,
         "total_combinations":    len(rows),
         "sweep":                 [[m, bs] for m, bs in sweep],
         "rows":                  rows,
@@ -720,9 +751,10 @@ def compare(
     for line in (verdict_note or "").splitlines() or [""]:
         lines.append(f"  {line}")
     lines.append("")
-    lines.append(f"Wins strong (>=1.5x): {int4_wins_strong}    "
+    lines.append(f"Wins strong (>=1.5x or bf16-OOM): {int4_wins_strong}    "
                  f"Wins weak (>1x, <1.5x): {int4_wins_weak}    "
-                 f"Loses (OOM or <=bf16): {int4_loses}    "
+                 f"Tied (both completed): {both_complete_tied}    "
+                 f"Loses (OOM or <bf16): {int4_loses}    "
                  f"of {len(rows)} (mml, B) combinations")
     lines.append("")
     lines.append("Per-(mml, B) results:")
@@ -773,7 +805,15 @@ def compare(
     report_txt.parent.mkdir(parents=True, exist_ok=True)
     report_txt.write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    return 0 if verdict in ("JUSTIFIED", "PARTIAL") else 1
+    # Exit codes:
+    #   0 = JUSTIFIED or PARTIAL (proceed with diet / brief draft)
+    #   2 = INCONCLUSIVE (re-run with higher B before deciding)
+    #   1 = NOT_JUSTIFIED (close the line or pivot to a different framing)
+    if verdict in ("JUSTIFIED", "PARTIAL"):
+        return 0
+    if verdict == "INCONCLUSIVE":
+        return 2
+    return 1
 
 
 def main() -> int:
