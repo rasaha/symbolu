@@ -89,18 +89,16 @@ __global__ void fused_decode_write_k_kernel(
     int64_t*             __restrict__ k_stage_block_id_pool,     // (n_slots,)
     int32_t*             __restrict__ k_stage_count_pool,        // (n_slots,)
     int32_t*             __restrict__ seq_pos_pool,              // (n_slots,)
-    uint8_t*             __restrict__ kv_cache_k,                // (NB, BS, H, D/2)
+    uint8_t*             __restrict__ kv_cache_k,                // (NB, BS, H, kv_last)
     __nv_bfloat16*       __restrict__ k_scale_ext,               // (NB, H, D)
     __nv_bfloat16*       __restrict__ k_xmin_ext,                // (NB, H, D)
     __nv_bfloat16*       __restrict__ k_protect_ext,             // (NB, BS, H, n_protect)
-    int B, int H, int D, int n_protect
+    int B, int H, int D, int n_protect, int kv_last
 ) {
     const int b = blockIdx.x;
     const int h = blockIdx.y;
     const int d = threadIdx.x;
     if (d >= D) return;
-
-    const int half_D = D >> 1;
 
     // -------- 1. Resolve active / safe slot / block_id / position --------
     const int64_t sm = slot_mapping[b];
@@ -173,7 +171,11 @@ __global__ void fused_decode_write_k_kernel(
             const unsigned int partner_q = __shfl_xor_sync(0xffffffffu, q, 1, 32);
             if ((d & 1) == 0) {
                 const uint8_t byte = (uint8_t)((q & 0x0Fu) | ((partner_q & 0x0Fu) << 4));
-                const int64_t off = ((((int64_t)block_id * BS_FIXED + r) * H + h) * half_D)
+                // kv_cache_k last-dim stride is `kv_last` — D for the
+                // production unified-layout cache, D/2 for a pure-packed
+                // cache. Either works; the packed bytes live in the
+                // first D/2 of the last dim either way.
+                const int64_t off = ((((int64_t)block_id * BS_FIXED + r) * H + h) * kv_last)
                                     + (d >> 1);
                 kv_cache_k[off] = byte;
             }
@@ -300,7 +302,12 @@ void fused_decode_write_k(
     TORCH_CHECK(protected_d_per_head.size(0)   == H,        "protected_d_per_head H mismatch");
     TORCH_CHECK(kv_cache_k.size(1)             == BS,       "kv_cache_k BS mismatch");
     TORCH_CHECK(kv_cache_k.size(2)             == H,        "kv_cache_k head mismatch");
-    TORCH_CHECK(kv_cache_k.size(3)             == D / 2,    "kv_cache_k packed dim mismatch");
+    // kv_cache_k last dim must hold at least D/2 packed bytes per (block, pos, h).
+    // Production cache uses last dim == D (packed bytes occupy first half).
+    TORCH_CHECK(kv_cache_k.size(3)             >= D / 2,
+                "kv_cache_k packed dim must be >= D/2 (got ",
+                kv_cache_k.size(3), ", D/2=", D/2, ")");
+    const int kv_last_k = (int)kv_cache_k.size(3);
     TORCH_CHECK(k_scale_ext.size(0)            == NB,       "k_scale_ext NB mismatch");
     TORCH_CHECK(k_scale_ext.size(1)            == H,        "k_scale_ext H mismatch");
     TORCH_CHECK(k_scale_ext.size(2)            == D,        "k_scale_ext D mismatch");
@@ -335,7 +342,7 @@ void fused_decode_write_k(
         reinterpret_cast<__nv_bfloat16*>(k_scale_ext.data_ptr<at::BFloat16>()),
         reinterpret_cast<__nv_bfloat16*>(k_xmin_ext.data_ptr<at::BFloat16>()),
         reinterpret_cast<__nv_bfloat16*>(k_protect_ext.data_ptr<at::BFloat16>()),
-        (int)B, (int)H, (int)D, (int)n_protect
+        (int)B, (int)H, (int)D, (int)n_protect, kv_last_k
     );
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }

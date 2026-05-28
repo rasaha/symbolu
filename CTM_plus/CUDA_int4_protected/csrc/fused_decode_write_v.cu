@@ -66,10 +66,10 @@ template <int BS_FIXED>
 __global__ void fused_decode_write_v_kernel(
     const __nv_bfloat16* __restrict__ value,        // (B, H, D)
     const int64_t*       __restrict__ slot_mapping, // (B,)
-    uint8_t*             __restrict__ kv_cache_v,   // (NB, BS, H, D/2)
+    uint8_t*             __restrict__ kv_cache_v,   // (NB, BS, H, kv_last)
     __nv_bfloat16*       __restrict__ v_scale_ext,  // (NB, BS, H, n_groups)
     __nv_bfloat16*       __restrict__ v_xmin_ext,   // (NB, BS, H, n_groups)
-    int B, int H, int D, int n_groups
+    int B, int H, int D, int n_groups, int kv_last
 ) {
     const int b = blockIdx.x;
     const int h = blockIdx.y;
@@ -77,7 +77,6 @@ __global__ void fused_decode_write_v_kernel(
     if (d >= D) return;
 
     constexpr int GROUP_SIZE = 32;
-    const int half_D = D >> 1;
 
     // Inactive-row safe slot: matches Python's torch.where(active_mask, sm, 0).
     const int64_t sm = slot_mapping[b];
@@ -108,10 +107,13 @@ __global__ void fused_decode_write_v_kernel(
 
     // Pack: byte = q[d] | (q[d+1] << 4). All pairs (2k, 2k+1) live in
     // the same warp because group_size aligns to warp size.
+    // Stride between (h) rows in kv_cache_v is `kv_last` — typically D
+    // (full-uint8 cache layout where packed bytes occupy the first D/2)
+    // but the kernel also supports a pure-packed cache (kv_last == D/2).
     unsigned int partner_q = __shfl_xor_sync(0xffffffffu, q, 1, 32);
     if ((d & 1) == 0) {
         const uint8_t byte = (uint8_t)((q & 0x0Fu) | ((partner_q & 0x0Fu) << 4));
-        const int64_t off = ((((int64_t)block_id * BS_FIXED + position) * H + h) * half_D)
+        const int64_t off = ((((int64_t)block_id * BS_FIXED + position) * H + h) * kv_last)
                             + (d >> 1);
         kv_cache_v[off] = byte;
     }
@@ -160,7 +162,14 @@ void fused_decode_write_v(
     const auto BS = kv_cache_v.size(1);
     TORCH_CHECK(slot_mapping.size(0) == B,   "slot_mapping shape mismatch");
     TORCH_CHECK(kv_cache_v.size(2) == H,     "kv_cache_v head dim mismatch");
-    TORCH_CHECK(kv_cache_v.size(3) == D / 2, "kv_cache_v packed dim mismatch (expected D/2)");
+    // kv_cache_v last dim must hold at least D/2 packed bytes per (block, pos, h).
+    // Production vLLM allocates the int4_packed cache with last dim == D
+    // (the bf16 backing area in the second half is unused after Phase 6C
+    // but kept for layout uniformity). Either D/2 or D is accepted.
+    TORCH_CHECK(kv_cache_v.size(3) >= D / 2,
+                "kv_cache_v packed dim must be >= D/2 (got ",
+                kv_cache_v.size(3), ", D/2=", D/2, ")");
+    const int kv_last_v = (int)kv_cache_v.size(3);
     TORCH_CHECK(v_scale_ext.size(0) == kv_cache_v.size(0), "v_scale_ext NB mismatch");
     TORCH_CHECK(v_xmin_ext.size(0)  == kv_cache_v.size(0), "v_xmin_ext NB mismatch");
 
@@ -189,7 +198,7 @@ void fused_decode_write_v(
         kv_cache_v.data_ptr<uint8_t>(),
         reinterpret_cast<__nv_bfloat16*>(v_scale_ext.data_ptr<at::BFloat16>()),
         reinterpret_cast<__nv_bfloat16*>(v_xmin_ext.data_ptr<at::BFloat16>()),
-        (int)B, (int)H, (int)D, n_groups
+        (int)B, (int)H, (int)D, n_groups, kv_last_v
     );
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 }
