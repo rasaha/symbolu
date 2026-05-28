@@ -94,14 +94,21 @@ __global__ void fused_decode_write_v_kernel(
     const float v_max = warp_reduce_max(v_f);
     const float v_min = warp_reduce_min(v_f);
 
-    float v_scale = (v_max - v_min) / 15.0f;
+    // Use __fdiv_rn (IEEE round-to-nearest single-precision division)
+    // explicitly — bypasses any fast-math / approximate-divide path the
+    // compiler might choose. PyTorch's tensor `/` is IEEE-rne, and the
+    // quantization step rintf((v - xmin)/scale) sits on rounding
+    // boundaries; a 1-2 ulp difference in the divide flips q by ±1 and
+    // breaks byte equality with the Python reference (max_abs_diff=16
+    // shows up as the high-nibble bit flipping).
+    float v_scale = __fdiv_rn(v_max - v_min, 15.0f);
     if (v_scale < 1e-8f) v_scale = 1e-8f;
 
     // Quantize. PyTorch's .round() is half-to-even (banker's rounding);
     // rintf() matches in the default FP rounding mode (FE_TONEAREST).
     // roundf() is half-away-from-zero and would diverge from the
     // Python ref at exact half-integers — keep rintf for byte parity.
-    float q_f = rintf((v_f - v_min) / v_scale);
+    float q_f = rintf(__fdiv_rn(v_f - v_min, v_scale));
     q_f = fmaxf(0.0f, fminf(15.0f, q_f));
     unsigned int q = (unsigned int)q_f;
 

@@ -151,7 +151,10 @@ __global__ void fused_decode_write_k_kernel(
     }
 
     // -------- 5. scale --------------------------------------------------
-    float scale = (x_max - x_min) / 15.0f;
+    // Use __fdiv_rn (IEEE round-to-nearest division) explicitly; PyTorch's
+    // tensor `/` is IEEE-rne and the quantization rintf((v-xmin)/scale)
+    // sits on rounding boundaries — a 1-2 ulp divide error flips q by ±1.
+    float scale = __fdiv_rn(x_max - x_min, 15.0f);
     if (scale < 1e-8f) scale = 1e-8f;
 
     // -------- 6. block_full detection ----------------------------------
@@ -165,7 +168,8 @@ __global__ void fused_decode_write_k_kernel(
         #pragma unroll
         for (int r = 0; r < BS_FIXED; ++r) {
             // rintf = half-to-even (banker's), matching PyTorch's .round().
-            float q_f = rintf((col[r] - x_min) / scale);
+            // __fdiv_rn forces IEEE round-to-nearest divide (see note above).
+            float q_f = rintf(__fdiv_rn(col[r] - x_min, scale));
             q_f = fmaxf(0.0f, fminf(15.0f, q_f));
             const unsigned int q = (unsigned int)q_f;
             const unsigned int partner_q = __shfl_xor_sync(0xffffffffu, q, 1, 32);
