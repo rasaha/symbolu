@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "note": "Phase 6C \u2014 skip the full-history bf16 K/V backing pool by default. Kernel verification (vllm-flash-attn-dev flash_fwd_kernel.h L962-985/L1073-1100) confirmed the int4_packed template never reads bf16_k_batch / bf16_v_batch; both were dead memory + per-decode-step bandwidth. PHASE6C_BF16_BACKING_SKIP=1 (default) allocates a (1,1,H,D) stub and broadcasts to the kernel's expected shape via stride-0 expand. PHASE6C_BF16_BACKING_SKIP=0 reverts to legacy. Only phase5b_4c_paged_writer.py changed.",
+  "note": "Phase 6E \u2014 fused decode-write CUDA kernels. Replaces the writer's per-decode-step Python op chain (~30 small CUDA kernel launches per layer per step) with two fused custom CUDA kernels (fused_decode_write_v + fused_decode_write_k) under the PHASE6E_FUSED_WRITER=1 env flag. Default is OFF; FUSED=0 retains the original inline op chain bit-for-bit. Byte equivalence verified by verify_phase6e_fused_byte_eq.py (15 tests across B=1..32, multi-block boundaries, inactive masks, non-contiguous QKV view). Only phase5b_4c_paged_writer.py changed in the existing 10-file set; new CUDA package at CTM_plus/CUDA_int4_protected/ is additive.",
   "files": {
     "KVPolicy/kv_policy/int4_fused_attention_kernel.py": "a9c6a7b6248ae99bd34a201c5c63de2f73a969a8df11b6d72eef03e8383fd7b4",
     "KVPolicy/kv_policy/int4_fused_attention_sketch.py": "804e517c7f1df1dc11b6e57d4aba257b56ea06c9cef6483d6d9c58cc435a4769",
@@ -8,7 +8,7 @@
     "KVPolicy/kv_policy/int4_protected.py": "ee2d1c6bfdb8731c66aa837831b6c3494d46f046ea9d906b1402be8a33d6b5f0",
     "KVPolicy/kv_policy/int4_protected_k_cache.py": "79c4ec461bc635b4c7dce72bffd8052983b9d32f812eadcff56744fe28f013ac",
     "KVPolicy/kv_policy/phase5a_native_install.py": "f3ec69a2f14d7978a233a9b273786b98b216fda274323ad65dea68933de23615",
-    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "356d9e085f30c0a594f2b7a9c628b6226a4351dc833d71df4551a5897687d10d",
+    "KVPolicy/kv_policy/phase5b_4c_paged_writer.py": "ab5b881af010f551d10c7476cbc53454e9e44855ab229f1f24c66debeef6f1d0",
     "KVPolicy/kv_policy/phase5b_backend_install.py": "43f1c714b1c582e01c59b7749c61e96e807e5ee382f0ffdca1a1cc1fdc8a5072",
     "KVPolicy/kv_policy/phase5b_streaming_quantizer.py": "4ab26ffca6c02ba54a6d13081e058c04d08cb1ad46dd30e03c65db7eb3b84299",
     "KVPolicy/kv_policy/phase6b2_precapture_hook.py": "066f757051d5a961e4148ade55537da7c59d218ed3d342944a7a1592fe4db954"
