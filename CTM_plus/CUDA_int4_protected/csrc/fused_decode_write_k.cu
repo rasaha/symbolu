@@ -151,10 +151,16 @@ __global__ void fused_decode_write_k_kernel(
     }
 
     // -------- 5. scale --------------------------------------------------
-    // Use __fdiv_rn (IEEE round-to-nearest division) explicitly; PyTorch's
-    // tensor `/` is IEEE-rne and the quantization rintf((v-xmin)/scale)
-    // sits on rounding boundaries — a 1-2 ulp divide error flips q by ±1.
-    float scale = __fdiv_rn(x_max - x_min, 15.0f);
+    // PyTorch's `tensor / python_scalar` is implemented as
+    // tensor * float32(1/scalar) where 1/scalar is precomputed.
+    // For scalar=15.0f, float32(1/15) = 0.06666667014 (one ulp above
+    // 1/15 mathematically), so PyTorch's scale and a true IEEE divide
+    // differ by up to 1 ulp. That 1-ulp difference can push the
+    // quantization rintf((v - xmin)/scale) across half-integer
+    // rounding boundaries and break byte-equality with the Python ref.
+    // See fused_decode_write_v.cu for the full root-cause analysis.
+    constexpr float INV_ASYM_DIV = 1.0f / 15.0f;
+    float scale = (x_max - x_min) * INV_ASYM_DIV;
     if (scale < 1e-8f) scale = 1e-8f;
 
     // -------- 6. block_full detection ----------------------------------

@@ -109,14 +109,24 @@ __global__ void fused_decode_write_v_kernel(
     }
 #endif
 
-    // Use __fdiv_rn (IEEE round-to-nearest single-precision division)
-    // explicitly — bypasses any fast-math / approximate-divide path the
-    // compiler might choose. PyTorch's tensor `/` is IEEE-rne, and the
-    // quantization step rintf((v - xmin)/scale) sits on rounding
-    // boundaries; a 1-2 ulp difference in the divide flips q by ±1 and
-    // breaks byte equality with the Python reference (max_abs_diff=16
-    // shows up as the high-nibble bit flipping).
-    float v_scale = __fdiv_rn(v_max - v_min, 15.0f);
+    // PyTorch's `tensor / python_scalar` codegen does NOT emit a true
+    // IEEE divide — it precomputes (1 / scalar) in float32 and emits a
+    // tensor * reciprocal multiply. For scalar=15.0f, the reciprocal
+    // is float32(1.0/15.0) = 0x3d888889 = 0.06666667014..., which is
+    // one ulp above the mathematical 1/15. So PyTorch's scale =
+    // (v_max - v_min) * 0.06666667014 differs from a true IEEE divide
+    // by up to ±1 ulp at the float32 level. That 1-ulp difference is
+    // critical: when (v_max - v_min) is a clean dyadic value like
+    // 4.6875, the true divide gives exactly 0.3125 and the kernel's
+    // (v_f - v_min)/scale lands EXACTLY on a half-integer (7.5),
+    // which rintf rounds to 8 via banker's rule. PyTorch's reciprocal
+    // multiply gives scale = 0.3125 + 1 ulp, the normalized value
+    // lands just below 7.5, and round-to-nearest gives 7. To match
+    // PyTorch byte-for-byte, the kernel MUST use the reciprocal-
+    // multiply form. (verify_phase6e_fused_byte_eq.py is the test of
+    // record for this.)
+    constexpr float INV_ASYM_DIV = 1.0f / 15.0f;
+    float v_scale = (v_max - v_min) * INV_ASYM_DIV;
     if (v_scale < 1e-8f) v_scale = 1e-8f;
 
     // Quantize. PyTorch's .round() is half-to-even (banker's rounding);
