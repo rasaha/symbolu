@@ -162,6 +162,7 @@ def _drive_write_sequence(
     n_steps: int,
     seed: int,
     inactive_pattern: str = "none",
+    non_contiguous: bool = False,
 ):
     """Drive `n_steps` simulated decode writes. Each step:
        - chooses a unique slot per batch position
@@ -228,8 +229,22 @@ def _drive_write_sequence(
         elif inactive_pattern == "rotating" and B >= 1:
             slot_mapping[step % B] = -1
 
-        key   = torch.randn((B, H, D), dtype=torch.bfloat16, device=DEVICE)
-        value = torch.randn((B, H, D), dtype=torch.bfloat16, device=DEVICE)
+        if non_contiguous:
+            # Production vLLM's QKV split hands the writer non-contiguous
+            # (B, H, D) views. Reproduce that here: allocate a (B, 2*H, D)
+            # tensor and slice the first H heads; the resulting view has
+            # stride (2*H*D, D, 1), which fails the kernel's contig check
+            # unless the dispatch wrapper calls .contiguous(). Without
+            # this case the verifier silently misses regressions on the
+            # production path.
+            big_k = torch.randn((B, 2 * H, D), dtype=torch.bfloat16, device=DEVICE)
+            big_v = torch.randn((B, 2 * H, D), dtype=torch.bfloat16, device=DEVICE)
+            key   = big_k[:, :H, :]
+            value = big_v[:, :H, :]
+            assert not key.is_contiguous() and not value.is_contiguous()
+        else:
+            key   = torch.randn((B, H, D), dtype=torch.bfloat16, device=DEVICE)
+            value = torch.randn((B, H, D), dtype=torch.bfloat16, device=DEVICE)
         writer.write_decode_batched(
             key=key,
             value=value,
@@ -240,7 +255,8 @@ def _drive_write_sequence(
         )
 
 
-def _run_pair(B: int, n_steps: int, seed: int, inactive_pattern: str = "none"):
+def _run_pair(B: int, n_steps: int, seed: int, inactive_pattern: str = "none",
+              non_contiguous: bool = False):
     """Run the same write sequence twice — once with fused OFF, once
     ON — and return both end-state snapshots."""
     # ---- INLINE PATH (PHASE6E_FUSED_WRITER=0) ----
@@ -248,7 +264,7 @@ def _run_pair(B: int, n_steps: int, seed: int, inactive_pattern: str = "none"):
     w_inline, kv_inline, *_ = _build_writer(seed=seed)
     _drive_write_sequence(
         w_inline, kv_inline, B, n_steps, seed=seed,
-        inactive_pattern=inactive_pattern,
+        inactive_pattern=inactive_pattern, non_contiguous=non_contiguous,
     )
     snap_inline = _snapshot_writer_state(w_inline, kv_inline)
 
@@ -257,7 +273,7 @@ def _run_pair(B: int, n_steps: int, seed: int, inactive_pattern: str = "none"):
     w_fused, kv_fused, *_ = _build_writer(seed=seed)
     _drive_write_sequence(
         w_fused, kv_fused, B, n_steps, seed=seed,
-        inactive_pattern=inactive_pattern,
+        inactive_pattern=inactive_pattern, non_contiguous=non_contiguous,
     )
     snap_fused = _snapshot_writer_state(w_fused, kv_fused)
     return snap_inline, snap_fused
@@ -265,13 +281,16 @@ def _run_pair(B: int, n_steps: int, seed: int, inactive_pattern: str = "none"):
 
 class Phase6EFusedWriterByteEq(unittest.TestCase):
     def _check(self, B: int, n_steps: int, seed: int = 0,
-               inactive_pattern: str = "none"):
-        snap_inline, snap_fused = _run_pair(B, n_steps, seed, inactive_pattern)
+               inactive_pattern: str = "none",
+               non_contiguous: bool = False):
+        snap_inline, snap_fused = _run_pair(
+            B, n_steps, seed, inactive_pattern, non_contiguous,
+        )
         diffs = _diff_snapshots(snap_inline, snap_fused)
         if diffs:
             msg = (f"B={B} n_steps={n_steps} seed={seed} "
-                   f"inactive={inactive_pattern} device={DEVICE}: "
-                   f"state diverged on:\n"
+                   f"inactive={inactive_pattern} non_contig={non_contiguous} "
+                   f"device={DEVICE}: state diverged on:\n"
                    + "\n".join(f"    {k}: max_abs_diff={d}" for k, d in diffs))
             self.fail(msg)
 
@@ -319,6 +338,18 @@ class Phase6EFusedWriterByteEq(unittest.TestCase):
         Verifies the active-mask gating doesn't accumulate drift
         across many steps and varies which row is masked."""
         self._check(B=8, n_steps=35, seed=88, inactive_pattern="rotating")
+
+    def test_B8_noncontig_key_value(self):
+        """Production vLLM passes the writer (B, H, D) views sliced from
+        a wider tensor (the QKV projection output), which are NOT
+        contiguous. The CUDA kernels require contig inputs; the dispatch
+        wrapper in phase5b_4c_paged_writer.py calls .contiguous() before
+        the kernel launch. If that .contiguous() is removed, the kernel
+        TORCH_CHECK fires at the very first decode step — the original
+        verifier missed this because it always allocates contig tensors."""
+        if DEVICE.type != "cuda":
+            self.skipTest("Non-contig regression matters only on CUDA path.")
+        self._check(B=8, n_steps=3, seed=99, non_contiguous=True)
 
     def test_default_env_is_off(self):
         """The Phase 6E default is OFF — fused writer is opt-in until

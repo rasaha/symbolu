@@ -422,8 +422,12 @@ def _phase6e_fused_decode_write_python_ref(
             )
         writer._v_bf16_ext[block_ids, positions] = value
     elif _use_cuda:
+        # Production vLLM passes views (e.g. from the QKV split) that are
+        # not always contiguous; the CUDA kernel requires contig inputs.
+        # A no-op when value is already contiguous (the verifier case).
+        v_ctg = value.contiguous() if not value.is_contiguous() else value
         _ext.fused_decode_write_v(
-            value,
+            v_ctg,
             slot_mapping,
             kv_cache[1],
             writer.v_scale_ext,
@@ -448,9 +452,11 @@ def _phase6e_fused_decode_write_python_ref(
     if _use_cuda:
         # The K CUDA kernel handles protect gather + stage update +
         # block-full finalize + bookkeeping (incl. seq_pos increment)
-        # in one launch.
+        # in one launch. Contig-guard same as for value above; vLLM
+        # sometimes passes a non-contig key/value view.
+        k_ctg = key.contiguous() if not key.is_contiguous() else key
         _ext.fused_decode_write_k(
-            key,
+            k_ctg,
             slot_idx_t.long(),
             slot_mapping,
             writer.protect_mask,
