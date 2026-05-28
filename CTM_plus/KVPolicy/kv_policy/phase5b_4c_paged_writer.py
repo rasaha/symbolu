@@ -114,6 +114,55 @@ def _fused_writer_enabled() -> bool:
     return raw.strip() in ("1", "true", "True", "yes")
 
 
+# Phase 6E: optional CUDA-only acceleration. When PHASE6E_FUSED_WRITER=1
+# AND the int4_protected_C extension is built AND the tensors live on
+# CUDA, route through the fused custom CUDA kernels instead of the
+# Python op chain. Falls back to the byte-identical Python reference
+# silently when the extension is missing or tensors are on CPU.
+_FUSED_CUDA_DISABLE_ENV     = "PHASE6E_FUSED_WRITER_DISABLE_CUDA"
+_FUSED_CUDA_DISABLE_DEFAULT = "0"
+
+# Module-level cache for the imported extension. Populated lazily on
+# first call so import errors don't blow up Python startup.
+_int4_protected_C = None       # type: Any
+_int4_protected_C_probed = False
+
+
+def _fused_cuda_disabled() -> bool:
+    """When True, force the Python fallback even if the CUDA extension
+    is available. Lets the CPU verifier exercise the Python reference
+    explicitly without rebuilding."""
+    raw = os.environ.get(_FUSED_CUDA_DISABLE_ENV, _FUSED_CUDA_DISABLE_DEFAULT)
+    return raw.strip() in ("1", "true", "True", "yes")
+
+
+def _try_load_int4_protected_C():
+    """Import the CUDA extension lazily, exactly once. Returns the
+    module or None if it can't be loaded (e.g., extension not built,
+    no CUDA runtime).
+
+    IMPORT ORDER: `import torch` MUST come first because the .so
+    depends on libc10.so. The caller of this function is in this
+    module, which already imports torch at the top, so the order is
+    guaranteed.
+    """
+    global _int4_protected_C, _int4_protected_C_probed
+    if _int4_protected_C_probed:
+        return _int4_protected_C
+    _int4_protected_C_probed = True
+    try:
+        import int4_protected_C as _mod   # type: ignore
+        _int4_protected_C = _mod
+    except Exception as exc:               # noqa: BLE001
+        logger.debug(
+            "Phase 6E CUDA extension not available (%s: %s); "
+            "fused writer will use the Python reference.",
+            type(exc).__name__, exc,
+        )
+        _int4_protected_C = None
+    return _int4_protected_C
+
+
 
 def _bf16_backing_max_seqlen() -> int:
     raw = os.environ.get(_BF16_BACKING_MAX_SEQLEN_ENV, "").strip()
@@ -308,8 +357,10 @@ def _phase6e_fused_decode_write_python_ref(
     """Phase 6E Python reference for the fused decode write.
 
     Byte-equivalent to write_decode_batched's captured region (lines
-    1217-1372 in this file as of Phase 6C). Future CUDA kernel will
-    replace this with 2 fused kernel calls.
+    1217-1372 in this file as of Phase 6C). Now also routes through
+    the custom CUDA kernels (`fused_decode_write_v`, `fused_decode_write_k`)
+    when the int4_protected_C extension is built and the tensors live
+    on CUDA — falling back to the Python op chain otherwise.
 
     Returns nothing; all state mutations are in-place on the writer's
     pool tensors and the kv_cache.
@@ -335,14 +386,33 @@ def _phase6e_fused_decode_write_python_ref(
     block_ids = safe_slot_mapping // BS                       # (B,) long
     positions = safe_slot_mapping %  BS                       # (B,) long
 
+    # Decide CUDA-kernel eligibility ONCE per call. The CUDA kernels
+    # don't model bf16_v_mode (an artifact of an old fallback path) or
+    # the bf16 backing pool (Phase 6C made it dead memory by default).
+    # Whenever either Python-only mode is active we keep the full
+    # Python path so byte equivalence is preserved.
+    _ext = _try_load_int4_protected_C() if not _fused_cuda_disabled() else None
+    _use_cuda = (
+        _ext is not None
+        and key.is_cuda
+        and value.is_cuda
+        and kv_cache.is_cuda
+        and writer._bf16_backing_skipped      # CUDA path assumes skip mode.
+        and not _bf16_v_mode()                # CUDA V kernel handles int4 only.
+    )
+
     # ===== BF16 K/V backing scatter (skipped in 6C default) =====
     if not writer._bf16_backing_skipped:
         seq_pos_t = writer._seq_pos_pool[slot_idx_t].long()   # (B,) long
         writer._bf16_k_backing_pool[slot_idx_t, seq_pos_t] = key
         writer._bf16_v_backing_pool[slot_idx_t, seq_pos_t] = value
-    writer._seq_pos_pool.index_add_(
-        0, slot_idx_t, active_mask_t.to(torch.int32),
-    )
+    if not _use_cuda:
+        # Python path owns the seq_pos increment. CUDA path defers the
+        # increment to fused_decode_write_k so the K kernel can update
+        # all four pool tensors atomically.
+        writer._seq_pos_pool.index_add_(
+            0, slot_idx_t, active_mask_t.to(torch.int32),
+        )
 
     # ===== V quantization vectorized over B (same math as legacy) =====
     if _bf16_v_mode():
@@ -351,6 +421,19 @@ def _phase6e_fused_decode_write_python_ref(
                 (writer.NB, BS, H, D), dtype=dtype, device=kv_cache.device,
             )
         writer._v_bf16_ext[block_ids, positions] = value
+    elif _use_cuda:
+        # Production vLLM passes views (e.g. from the QKV split) that are
+        # not always contiguous; the CUDA kernel requires contig inputs.
+        # A no-op when value is already contiguous (the verifier case).
+        v_ctg = value.contiguous() if not value.is_contiguous() else value
+        _ext.fused_decode_write_v(
+            v_ctg,
+            slot_mapping,
+            kv_cache[1],
+            writer.v_scale_ext,
+            writer.v_xmin_ext,
+            int(writer.v_group_size),
+        )
     else:
         v_grouped = value.float().view(
             B, H, writer.v_n_groups, writer.v_group_size,
@@ -365,6 +448,29 @@ def _phase6e_fused_decode_write_python_ref(
         kv_cache[1, block_ids, positions, :, :half_D] = v_packed
         writer.v_scale_ext[block_ids, positions] = v_scale.to(dtype)
         writer.v_xmin_ext [block_ids, positions] = v_min.to(dtype)
+
+    if _use_cuda:
+        # The K CUDA kernel handles protect gather + stage update +
+        # block-full finalize + bookkeeping (incl. seq_pos increment)
+        # in one launch. Contig-guard same as for value above; vLLM
+        # sometimes passes a non-contig key/value view.
+        k_ctg = key.contiguous() if not key.is_contiguous() else key
+        _ext.fused_decode_write_k(
+            k_ctg,
+            slot_idx_t.long(),
+            slot_mapping,
+            writer.protect_mask,
+            writer.protected_d_per_head,
+            writer._k_stage_pool,
+            writer._k_stage_block_id_pool,
+            writer._k_stage_count_pool,
+            writer._seq_pos_pool,
+            kv_cache[0],
+            writer.k_scale_ext,
+            writer.k_xmin_ext,
+            writer.k_protect_ext,
+        )
+        return
 
     # ===== K protect gather + scatter =====
     protect_idx = writer.protected_d_per_head.unsqueeze(0).expand(B, -1, -1)
