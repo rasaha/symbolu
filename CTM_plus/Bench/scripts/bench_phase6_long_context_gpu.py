@@ -74,7 +74,9 @@ CELLS = [CELL_BF16, CELL_CAPTURED]
 DEFAULT_MAX_MODEL_LENS = [8192, 16384, 32768]
 DEFAULT_BATCH_SIZES   = [1, 2, 4, 8]
 DEFAULT_N_RUNS        = 3       # fewer than the throughput bench; load time dominates
-DEFAULT_MAX_TOKENS    = 16      # decode work but small so wall is mostly prompt-pass
+DEFAULT_MAX_TOKENS    = 32      # enough decode steps that greedy can reach "1742"
+                                # (16 was too tight; bf16 got 0/3 quality at every B
+                                # because the model elaborates before stating the year).
 
 # Quality-sanity check: the long prompt embeds this string as the
 # answer; we check the output contains it. Greedy decode + 16 output
