@@ -493,6 +493,7 @@ def compare(
     max_model_lens: List[int],
     report_json: Path,
     report_txt: Path,
+    smoke_mode: bool = False,
 ) -> int:
     loaded: Dict[Tuple[str, int], Dict[str, Any]] = {}
     for k, p in cell_paths.items():
@@ -584,7 +585,44 @@ def compare(
             if p is not None and n is not None:
                 agreement_pass = (p >= 0.85 and (p - n) >= 0.10)
 
-    if needle_pass and agreement_pass:
+    # Smoke mode: the acceptance thresholds were designed for the full
+    # sweep (mml in {16K, 32K}, 25 needle items per cell, 20 prompts).
+    # A smoke run hits 8K only with 4 needle items + 5 prompts — sample
+    # sizes are below the noise floor for the design's thresholds.
+    # Report SMOKE_OK / SMOKE_FAILED based on whether the cells executed,
+    # NOT on whether the acceptance criteria pass. Use the full-sweep
+    # verdict tree only for non-smoke runs.
+    if smoke_mode:
+        # Smoke passes if all expected (cell, mml) outputs exist + have
+        # non-empty needle_records.
+        n_expected = len(CELLS) * len(max_model_lens)
+        n_present  = sum(1 for v in loaded.values()
+                         if v.get("needle_records"))
+        if n_present == n_expected:
+            verdict = "SMOKE_OK"
+            verdict_note = (
+                f"Smoke mode: all {n_expected} expected (cell, mml) "
+                f"runs produced output. Sample size is too small "
+                f"({len(loaded[next(iter(loaded))]['needle_records']) if loaded else 0} "
+                f"needle items, "
+                f"{len(loaded[next(iter(loaded))]['agreement_records']) if loaded else 0} "
+                f"agreement prompts) for the design's acceptance "
+                f"thresholds, which target mml in {{16K, 32K}} with "
+                f"25 items / 20 prompts. The needle 'protected-minus-"
+                f"naive' gap and the token-agreement rates below are "
+                f"INFORMATIONAL; do NOT treat them as a verdict on "
+                f"the protect-mask design. Proceed to the full sweep "
+                f"(remove --smoke) for the dispositive measurement."
+            )
+        else:
+            verdict = "SMOKE_FAILED"
+            verdict_note = (
+                f"Smoke mode: {n_present} of {n_expected} expected "
+                f"(cell, mml) runs produced output. The bench scaffold "
+                f"didn't run cleanly. Inspect per-cell logs before "
+                f"running the full sweep."
+            )
+    elif needle_pass and agreement_pass:
         verdict = "PROTECT_MASK_VALIDATED"
         verdict_note = (
             "BOTH primary metrics pass: needle-in-haystack accuracy "
@@ -666,7 +704,7 @@ def compare(
     report_txt.parent.mkdir(parents=True, exist_ok=True)
     report_txt.write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    if verdict == "PROTECT_MASK_VALIDATED":
+    if verdict in ("PROTECT_MASK_VALIDATED", "SMOKE_OK"):
         return 0
     if verdict == "MIXED":
         return 2
@@ -769,6 +807,7 @@ def main() -> int:
         max_model_lens=max_model_lens,
         report_json=out_dir / "quality_report.json",
         report_txt=out_dir / "quality_report.txt",
+        smoke_mode=args.smoke,
     )
 
 
