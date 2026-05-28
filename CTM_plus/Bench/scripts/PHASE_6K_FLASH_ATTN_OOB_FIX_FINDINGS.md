@@ -1,9 +1,12 @@
 # Phase 6K — int4_packed_load OOB mask fix in vllm-flash-attn-dev
 
-> **Status:** PATCH WRITTEN + DOCUMENTED. Awaiting GPU pod session for
-> rebuild + verification. Patch saved at
-> `PHASE_6K_FLASH_ATTN_OOB_FIX.patch`; apply script at
-> `apply_phase6k_flash_attn_oob_fix.sh`.
+> **Status (Phase 6K.1):** APPLIED. 4 call-site fixes in `flash_fwd_kernel.h`
+> confirmed present on pod. Necessary but not sufficient — bisection showed
+> N=8 and N=30 still garbage in CUDA graph mode; ALL N garbage in eager mode.
+>
+> **Status (Phase 6K.2):** SCRIPT WRITTEN. Apply script at
+> `apply_phase6k2_int4_load_oob_fix.sh`. Awaiting rebuild + re-bisection.
+> The apply script is idempotent and self-verifying.
 >
 > **Discovery:** This bug was uncovered during Phase 6J's quality A/B
 > bench. The int4_protected captured cell produced incoherent output
@@ -223,3 +226,135 @@ throughput conclusion is unchanged.
   the int4_packed read path consumes.
 * `KERNEL_6C3C_PHASE12_CODEREAD.md` — original code-read of the
   vllm-flash-attn-dev fork at `/workspace/dev/vllm-flash-attn-dev/`.
+
+---
+
+## Phase 6K.2 — Additional bugs in int4_packed_load.h
+
+Bisection after applying Phase 6K.1 (correct `s_curr` argument):
+
+```
+N=8  (actual=8):  GARBAGE in CUDA graph mode; GARBAGE in eager mode
+N=17 (actual=17): COHERENT in CUDA graph mode; GARBAGE in eager mode
+N=30 (actual=30): GARBAGE in CUDA graph mode;  GARBAGE in eager mode
+N=44 (actual=44): COHERENT in CUDA graph mode; GARBAGE in eager mode
+```
+
+### Root cause A — K Phase B/C: unguarded group scale/xmin loads
+
+`int4_packed_load_K_block` Phase B loops over `kNGroupsPerBlock = kBlockN/kGroupSize`
+groups and loads scale (Phase B) and xmin (Phase C) from HBM for each group:
+
+```c
+// BUGGY (Phase B):
+if (global_g >= 0 && global_g < n_groups_total) {
+    val = gmem_k_scale_base[global_g * H_kv * kHeadDim + bidh * kHeadDim + d];
+}
+```
+
+This checks that the group index is within the buffer dimension but does NOT
+check whether the group's tokens are within `s_curr`. For N=8 with
+`kGroupSize=32`, groups 1..3 (covering tokens 32..127) were never written by
+the fused writer. In eager mode their HBM locations contain stale data from a
+previous request — potentially including NaN bit patterns. NaN K values corrupt
+the QK GEMM and cannot be corrected by -inf masking (`nan + (-inf) = nan`).
+
+**Fix**: Add `global_g * kGroupSize < s_curr` to each guard:
+```c
+if (global_g >= 0 && global_g < n_groups_total &&
+        global_g * kGroupSize < s_curr) {
+    val = gmem_k_scale_base[...];
+}
+```
+
+### Root cause B — K Phase F: xmin written for OOB tail positions
+
+After Phase A zeroes the packed nibbles for positions `t >= s_curr`, Phase F
+computes:
+```c
+float x = static_cast<float>(nibble) * scale + xmin;
+//      = 0              * scale + xmin
+//      = xmin                         ← non-zero!
+```
+for positions `n` in the range `[s_curr, group_boundary)` (the OOB tail of the
+last valid group). These positions get K = xmin (the minimum quantized value)
+instead of 0.
+
+When flash attention's masking loop does not fire for the block — which occurs
+when `ceil_div(kBlockM + s_curr - n_block_max * kBlockN, kBlockN) == 0` for
+short sequences — those non-zero K values enter the QK GEMM without -inf
+correction, producing garbage attention scores.
+
+**Fix**: Explicitly zero and skip any position where
+`n_block_token_start + n >= s_curr`:
+```c
+if (n < 0 || n >= kBlockN || d < 0 || d >= kHeadDim) continue;
+{
+    const int global_n = n_block_token_start + n;
+    if (global_n < 0 || global_n >= s_curr) {
+        tKsK(i0, i1, i2) = Element(0);
+        continue;
+    }
+}
+```
+
+### Root cause C — V Phase D: no OOB guard (belt-and-suspenders)
+
+V Phase B/C already zero per-token scales for positions `global_t >= s_curr`,
+so V[OOB] = `0 * 0 + 0 = 0`. However, adding the same explicit guard in
+Phase D provides a second line of defence and makes the intent clear:
+```c
+{
+    const int global_t = n_block_token_start + n;
+    if (global_t < 0 || global_t >= s_curr) {
+        tVsV(i0, i1, i2) = Element(0);
+        continue;
+    }
+}
+```
+
+### Files
+
+* `apply_phase6k2_int4_load_oob_fix.sh` — idempotent apply script (4 fixes,
+  self-verifying, creates `.phase6k2_backup` before modifying).
+
+### Verification plan
+
+```bash
+# 1. Apply fixes.
+bash CTM_plus/Bench/scripts/apply_phase6k2_int4_load_oob_fix.sh
+
+# 2. Rebuild (~1 h).
+cd /workspace/dev/vllm-flash-attn-dev
+TMPDIR=/workspace/tmp MAX_JOBS=4 pip install --no-build-isolation -e .
+
+# 3. Eager bisection (must pass first).
+cd /workspace/symbolu
+export PYTHONPATH=/workspace/symbolu/CTM_plus/KVPolicy:$PYTHONPATH
+PHASE6E_FUSED_WRITER=0 python -c "
+from kv_policy.int4_protected import Int4ProtectedLLM
+from vllm import SamplingParams
+llm = Int4ProtectedLLM(model='Qwen/Qwen2.5-7B-Instruct', max_model_len=8192,
+    gpu_memory_utilization=0.5, max_num_seqs=8, enforce_eager=True)
+sp = SamplingParams(temperature=0.0, max_tokens=24)
+tests = [
+    ('N=8',  'List three primary colors and their names.'),
+    ('N=17', 'Please write me a short list of three primary colors, with each color clearly named.'),
+    ('N=30', 'Could you please write me a short detailed list of three primary colors that are typically used in additive color models, with each color clearly named for me?'),
+    ('N=44', 'Could you please write me a short detailed list of three primary colors that are typically used in additive color models with each color clearly named for me, and also briefly explain in one sentence what additive color mixing means in practice?'),
+]
+for label, prompt in tests:
+    out = llm.generate([prompt], sp)
+    print(f'{label}: {out[0].outputs[0].text!r}')
+"
+
+# 4. CUDA graph bisection (after eager passes).
+bash CTM_plus/Bench/scripts/verify_phase6k_bisection.sh
+```
+
+**Pass condition for both modes:**
+- No `pérdida` / `性价` repetition loops
+- No topic hallucination at N=30
+- All four N values produce a coherent list-of-colors response
+
+**If all 4 N values pass in both modes:** proceed to Phase 6J smoke bench.
