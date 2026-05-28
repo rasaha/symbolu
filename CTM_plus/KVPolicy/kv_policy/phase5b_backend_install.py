@@ -154,6 +154,63 @@ class _TimedRegion:
 _DECODE_PROFILER: Optional[DecodeProfiler] = None
 
 
+# ----------------------------------------------------------------------
+# Phase 6J — naive-mask force-zero toggle.
+#
+# When PHASE6J_NAIVE_FORCE_ZERO=1, the read path substitutes a zeros
+# tensor for `k_packed_protect_bf16` before the flash_attn call. This
+# is the Phase 6J "int4_naive" cell's mechanism for disabling the
+# protected-channel contribution to attention without any kernel or
+# writer changes. The writer still allocates k_protect_ext and writes
+# real values to it; the read substitution is what removes the
+# protect-mask effect.
+#
+# Strict scope:
+#   * default OFF: production / int4_protected behavior unchanged.
+#   * env=1: read substitution active. No writer/kernel changes.
+#   * the calibrated protect-mask still loads normally regardless of
+#     this flag; the flag is purely a read-time effect.
+#
+# Tested by tests/test_phase6j_naive_flag.py (CPU-only; no CUDA needed).
+# ----------------------------------------------------------------------
+
+_PHASE6J_NAIVE_FORCE_ZERO_ENV = "PHASE6J_NAIVE_FORCE_ZERO"
+
+# One-shot announcement when the flag fires; we want it in the bench
+# logs so the operator can confirm the naive cell is actually naive.
+_phase6j_naive_force_zero_announced = False
+
+
+def _phase6j_naive_force_zero_enabled() -> bool:
+    """Phase 6J: True iff PHASE6J_NAIVE_FORCE_ZERO env is set to a
+    truthy value. Production / int4_protected default is OFF."""
+    raw = os.environ.get(_PHASE6J_NAIVE_FORCE_ZERO_ENV, "0")
+    return raw.strip() in ("1", "true", "True", "yes")
+
+
+def _resolve_k_protect_bf16(raw_tensor: "torch.Tensor") -> "torch.Tensor":
+    """Phase 6J: returns either the real `k_protect_bf16` view (for
+    int4_protected) or a zeros tensor of the same shape (for the
+    int4_naive cell when PHASE6J_NAIVE_FORCE_ZERO=1).
+
+    The returned tensor is always contiguous (required by flash_attn).
+    """
+    global _phase6j_naive_force_zero_announced
+    if _phase6j_naive_force_zero_enabled():
+        if not _phase6j_naive_force_zero_announced:
+            logger.info(
+                "Phase 6J: PHASE6J_NAIVE_FORCE_ZERO=1 active. "
+                "k_packed_protect_bf16 will be substituted with zeros "
+                "for every flash_attn read call. The writer's "
+                "k_protect_ext still receives real protected-channel "
+                "values; only the kernel sees zeros."
+            )
+            _phase6j_naive_force_zero_announced = True
+        # zeros_like preserves dtype + device + shape + contiguity.
+        return torch.zeros_like(raw_tensor)
+    return raw_tensor.contiguous()
+
+
 def _maybe_region(name: str):
     """Return either a real timed region (profiling on) or the singleton
     no-op (profiling off). One attribute load + one None check on the
@@ -531,7 +588,10 @@ if _VLLM_FA_AVAILABLE:
                     k_packed_int4=view["k_int4"].contiguous(),
                     k_packed_scale=view["k_scale"].contiguous(),
                     k_packed_xmin=view["k_xmin"].contiguous(),
-                    k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                    # Phase 6J naive-cell toggle: substitutes zeros when
+                    # PHASE6J_NAIVE_FORCE_ZERO=1, otherwise passes the
+                    # real protected-channel values. Default OFF.
+                    k_packed_protect_bf16=_resolve_k_protect_bf16(view["k_protect_bf16"]),
                     k_packed_protect_slot=view["protect_slot"].contiguous(),
                     packed_group_size=BS,
                     packed_n_protect=writer.n_protect,
@@ -609,7 +669,10 @@ if _VLLM_FA_AVAILABLE:
                     k_packed_int4=view["k_int4"].contiguous(),
                     k_packed_scale=view["k_scale"].contiguous(),
                     k_packed_xmin=view["k_xmin"].contiguous(),
-                    k_packed_protect_bf16=view["k_protect_bf16"].contiguous(),
+                    # Phase 6J naive-cell toggle: substitutes zeros when
+                    # PHASE6J_NAIVE_FORCE_ZERO=1, otherwise passes the
+                    # real protected-channel values. Default OFF.
+                    k_packed_protect_bf16=_resolve_k_protect_bf16(view["k_protect_bf16"]),
                     k_packed_protect_slot=view["protect_slot"].contiguous(),
                     packed_group_size=BS,
                     packed_n_protect=writer.n_protect,
