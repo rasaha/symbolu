@@ -150,6 +150,39 @@ def report_first_diffs(name, t_inline, t_fused, sources_per_step, n=10):
             print(f"  [{i}] {tuple(idx)}: inline={inline_v}  fused={fused_v}")
 
 
+def dump_pytorch_intermediates(values):
+    """Dump bit-exact intermediate floats for the (b=0, h=1, d∈{14,15})
+    positions the diagnostic flagged. Matches what the kernel's debug
+    printf reports — direct bit-level comparison reveals any divergence
+    in v_min/v_max/scale at the float32 level (NOT just bf16-equal)."""
+    import struct
+    print("\n=== PyTorch intermediates (b=0, h=1, group 0, step=1) ===")
+    # Step 1 → pos=1; verifier diff at pos=1 uses values[1] (since
+    # _drive_write_sequence's torch.manual_seed(seed) is called once and
+    # then randn is invoked per step).
+    v = values[1][0, 1].float()           # (D,) float32 on CUDA
+    group = v[0:32]                       # group 0 of head 1
+    v_min = group.min()
+    v_max = group.max()
+    scale = (v_max - v_min) / 15.0
+    scale = torch.clamp(scale, min=1e-8)
+    def bits(x):
+        return struct.unpack("<I", struct.pack("<f", float(x.item())))[0]
+    print(f"  v_min  = 0x{bits(v_min):08x}  ({v_min.item():.10f})")
+    print(f"  v_max  = 0x{bits(v_max):08x}  ({v_max.item():.10f})")
+    print(f"  scale  = 0x{bits(scale):08x}  ({scale.item():.10f})")
+    for d in (14, 15):
+        v_d = v[d]
+        numer = v_d - v_min
+        normalized = numer / scale
+        q = torch.round(normalized).clamp(0, 15)
+        print(f"  d={d}:")
+        print(f"    v_f        = 0x{bits(v_d):08x}  ({v_d.item():.10f})")
+        print(f"    numer      = 0x{bits(numer):08x}  ({numer.item():.10f})")
+        print(f"    normalized = 0x{bits(normalized):08x}  ({normalized.item():.10f})")
+        print(f"    q          = {int(q.item())}")
+
+
 def main():
     keys, values = build_fixed_inputs()
     inline = run_one(fused=False, keys=keys, values=values)
@@ -178,6 +211,8 @@ def main():
         "kv_cache_k", inline["kv_cache"][0], fused["kv_cache"][0],
         sources_per_step=keys, n=10,
     )
+
+    dump_pytorch_intermediates(values)
 
 
 if __name__ == "__main__":

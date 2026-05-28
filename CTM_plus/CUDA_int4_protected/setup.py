@@ -1,5 +1,12 @@
 """Phase 6E — build script for the fused decode-write CUDA extension.
 
+Diagnostic mode:
+    PHASE6E_KERNEL_DEBUG=1 pip install --no-build-isolation -e .
+enables in-kernel printf instrumentation for the specific (b, h, d)
+positions the byte-eq diagnostic flagged as diverging. Use only for
+debugging — the printfs serialize all warps and tank perf.
+
+
 Build:
     cd CTM_plus/CUDA_int4_protected
     pip install --no-build-isolation -e .       # uses venv's torch (faster)
@@ -27,8 +34,12 @@ import order correctly when the fused path is enabled. The CPU
 verifier (verify_phase6e_fused_byte_eq.py) uses the Python
 reference and doesn't need the .so at all.
 """
+import os
 from setuptools import setup
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+
+_DEBUG = os.environ.get("PHASE6E_KERNEL_DEBUG", "0").strip() in ("1", "true", "True", "yes")
+_debug_flags = ["-DPHASE6E_KERNEL_DEBUG"] if _DEBUG else []
 
 setup(
     name="int4_protected_C",
@@ -42,7 +53,7 @@ setup(
                 "csrc/fused_decode_write_k.cu",
             ],
             extra_compile_args={
-                "cxx":  ["-O3", "-std=c++17"],
+                "cxx":  ["-O3", "-std=c++17"] + _debug_flags,
                 # NOTE: do NOT pass --use_fast_math. The byte-equivalence
                 # contract requires IEEE-compliant single-precision
                 # division so the kernels match PyTorch's CPU/CUDA
@@ -51,7 +62,8 @@ setup(
                 # last ULP and breaks `verify_phase6e_fused_byte_eq.py`.
                 "nvcc": ["-O3",
                          "-gencode=arch=compute_80,code=sm_80",     # A100
-                         "-gencode=arch=compute_90,code=sm_90"],    # H100
+                         "-gencode=arch=compute_90,code=sm_90"]     # H100
+                         + _debug_flags,
             },
             # Embed an rpath to torch's lib directory so the loader can
             # find libc10.so / libtorch_cuda.so etc. without requiring

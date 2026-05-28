@@ -94,6 +94,21 @@ __global__ void fused_decode_write_v_kernel(
     const float v_max = warp_reduce_max(v_f);
     const float v_min = warp_reduce_min(v_f);
 
+#ifdef PHASE6E_KERNEL_DEBUG
+    // Diagnostic: dump intermediate floats as raw bit patterns for the
+    // exact (b, h, d) positions the verifier diagnostic flagged as
+    // diverging. Lets us compare bit-for-bit against PyTorch's intermediate
+    // floats. Build with -DPHASE6E_KERNEL_DEBUG to enable.
+    if (b == 0 && h == 1 && (d == 14 || d == 15)) {
+        const unsigned int u_vf    = __float_as_uint(v_f);
+        const unsigned int u_vmin  = __float_as_uint(v_min);
+        const unsigned int u_vmax  = __float_as_uint(v_max);
+        printf("[V_KERNEL] b=0 h=1 d=%d  v_f=0x%08x (%.10f)  "
+               "v_min=0x%08x (%.10f)  v_max=0x%08x (%.10f)\n",
+               d, u_vf, v_f, u_vmin, v_min, u_vmax, v_max);
+    }
+#endif
+
     // Use __fdiv_rn (IEEE round-to-nearest single-precision division)
     // explicitly — bypasses any fast-math / approximate-divide path the
     // compiler might choose. PyTorch's tensor `/` is IEEE-rne, and the
@@ -108,9 +123,22 @@ __global__ void fused_decode_write_v_kernel(
     // rintf() matches in the default FP rounding mode (FE_TONEAREST).
     // roundf() is half-away-from-zero and would diverge from the
     // Python ref at exact half-integers — keep rintf for byte parity.
-    float q_f = rintf(__fdiv_rn(v_f - v_min, v_scale));
+    const float numer = v_f - v_min;
+    const float normalized = __fdiv_rn(numer, v_scale);
+    float q_f = rintf(normalized);
     q_f = fmaxf(0.0f, fminf(15.0f, q_f));
     unsigned int q = (unsigned int)q_f;
+
+#ifdef PHASE6E_KERNEL_DEBUG
+    if (b == 0 && h == 1 && (d == 14 || d == 15)) {
+        const unsigned int u_scale = __float_as_uint(v_scale);
+        const unsigned int u_numer = __float_as_uint(numer);
+        const unsigned int u_norm  = __float_as_uint(normalized);
+        printf("[V_KERNEL] b=0 h=1 d=%d  v_scale=0x%08x (%.10f)  "
+               "numer=0x%08x (%.10f)  normalized=0x%08x (%.10f)  q=%u\n",
+               d, u_scale, v_scale, u_numer, numer, u_norm, normalized, q);
+    }
+#endif
 
     // Pack: byte = q[d] | (q[d+1] << 4). All pairs (2k, 2k+1) live in
     // the same warp because group_size aligns to warp size.
