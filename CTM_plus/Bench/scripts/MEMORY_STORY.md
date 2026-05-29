@@ -105,6 +105,13 @@ feature, not a memory feature**. Keep it; don't pitch memory savings.
   ~free over naive (same sidecars), so always prefer protected to naive.
 - ❌ **Capacity-negative:** +4.7 GB HBM vs bf16 (sidecars dominate, overwhelming
   the int4 KV savings) and ~1.5–1.9× slower. The ~2× concurrency is bookkeeping.
+- ❌ **Concurrency cap (6K.13 live demo):** the writer keeps a per-slot staging
+  pool sized to `PHASE6_MAX_ACTIVE_SLOTS` (default **8**); at B≥9 without
+  bumping it the protected cell errors `PagedKVWriter slot pool exhausted`
+  (bf16 ran B=128 clean). Bumping it costs *more* memory on top of +4.7 GB, and
+  `evict_sequence` is still **not wired to sequence completion** → slots leak in
+  a long server. A valid capacity test must set `PHASE6_MAX_ACTIVE_SLOTS ≥ B`
+  AND wire evict-on-completion; until then high-concurrency serving is unproven.
 - ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
   reach HBM parity without option D (or accept it as a quality feature).
 
