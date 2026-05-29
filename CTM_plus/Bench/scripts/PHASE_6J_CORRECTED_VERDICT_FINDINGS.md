@@ -13,12 +13,18 @@
 >   protected retrieval **0.964 vs naive 0.915 (+0.049)**; genuine misses drop
 >   **5 → 2** (protect removes the K-bound miss, halves V-bound).
 >
-> **Decision language: keep / reframe — protected int4 is NOT a failed line.**
-> It provides a large general-fidelity gain and a modest hard-retrieval gain, at
-> a sidecar-memory cost. The remaining decision is whether the fidelity-per-GB
-> (plus any perplexity / downstream improvement) justifies the protected
-> sidecars. See `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` for the three
-> correctness fixes that unblocked this measurement.
+> * **Capacity is NEGATIVE in the current implementation**: protected int4 uses
+>   **~+4.7 GB *more* HBM than bf16** at equal `gpu_util` and runs **~1.5–1.9×
+>   slower** (see §1b). The ~2× max-concurrency is vLLM bookkeeping, not a
+>   footprint win.
+>
+> **Precise verdict: protected int4 is QUALITY-POSITIVE (vs naive) but
+> CAPACITY-NEGATIVE (vs bf16) — a quality feature, not a memory feature, today.**
+> Do not close it (the +20.4 pt fidelity gain is real and protect is near-free
+> over naive), but do not pitch it as memory savings. The open path is the
+> **sidecar diet** (§1b). See `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` for the
+> correctness fixes that unblocked this; full scorecard:
+> `phase6k13_capacity_demo.py` / `MEMORY_STORY.md`.
 
 ---
 
@@ -89,6 +95,54 @@ advantage. Do not overclaim. Confirm at 16K/32K with more items. The PRIMARY
 validation remains token-agreement (+20.4 pt); hard-retrieval is the secondary
 benefit. **Frame protected int4 as fidelity-first, with a modest stressed-
 retrieval bonus.**
+
+## 1b. Capacity & memory — CAPACITY-NEGATIVE (current implementation)
+
+HBM after init with KV allocated (A100-80GB, `gpu_util=0.5`):
+
+| mml | bf16 HBM | int4-protected HBM | Δ HBM | bf16 conc | int4 conc |
+|---|---|---|---|---|---|
+| 8192 | 39.13 | 43.82 | **+4.68** | 55.3 | 110.6 |
+| 16384 | 38.04 | 42.72 | **+4.68** | 26.4 | 52.8 |
+| 32768 | 35.85 | 40.51 | **+4.66** | 12.0 | 23.9 |
+
+Long-context bench verdict: **`NOT_JUSTIFIED`** — protected int4 does **not**
+beat bf16 on HBM at any mml. Throughput: int4 ≈ **0.56–0.68×** bf16 in the
+crossover bench; 6H high-load was **`INCONCLUSIVE`** (both cells completed every
+batch — saturation never reached) but bf16 was still **1.4–1.9× faster**.
+
+Sidecar breakdown (mml=32K, fixed 16.4% of KV cache): `k_protect_ext` 0.818 GB
+(23.8%), `v_scale_ext`/`v_xmin_ext`/`k_scale_ext`/`k_xmin_ext` 0.654 GB ea
+(19.0%), `_k_stage_pool` 0.007 GB (0.2%).
+
+**Why quality improved:** protected K channels preserve bf16-like behavior →
+token-agreement jumps +20.4 pt and hard-needle misses shrink 5→2.
+**Why capacity did not:** the sidecars (k_protect_ext + scale/xmin) dominate the
+footprint and overwhelm the int4 KV savings, so protected int4 currently
+consumes **more** HBM than bf16.
+
+**What must change before protect can be justified as a capacity feature:**
+reduce sidecar memory (diet), re-run the HBM crossover, re-run high-load to
+**actual saturation**, and re-measure fidelity after each diet step.
+
+Diet options (audit recommendation only — no implementation):
+
+| id | save | risk | targets | kernel? |
+|---|---|---|---|---|
+| A | ~0.65 GB | moderate | v_scale_ext, v_xmin_ext (V groups 4→2) | yes (V kernel) |
+| C | ~1.72 GB | high | all scale/xmin + k_protect_ext (bf16→fp8) | yes (read+write) |
+| F | ~0.33 GB | moderate | k_protect_ext (n_protect 5→3) | no (recalibration) |
+| D | ~0.82 GB | low semantic / high impl | k_protect_ext (inline into kv_cache) | yes (layout change) |
+
+**A+F+C stacked ≈ 3.19 GB < the ~4.7 GB delta** → A+F+C alone **probably does
+not** close the gap. Either **D** is also needed, or accept protected int4 as a
+**quality feature, not a capacity feature.**
+
+**Recommendation:** *Proceed only with sidecar-diet experiments and
+scorecarding. Do NOT start heavy Phase 6F kernel work until a dieted
+protected-int4 config demonstrates an HBM advantage — or at least near-parity
+with bf16 — while preserving most of the +20.4 token-agreement gain.*
+Scorecard generator: `phase6k13_capacity_demo.py`; one-pager: `MEMORY_STORY.md`.
 
 ## 2. Corrected verdict / validation language
 

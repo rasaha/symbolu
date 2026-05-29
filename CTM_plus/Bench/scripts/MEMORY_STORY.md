@@ -33,8 +33,18 @@
 | k_scale_ext / k_xmin_ext | per_block | 0.65 ea | 19.0% ea |
 | _k_stage_pool + counters | per_slot | <0.01 | <0.2% |
 
-Diet ceiling (options A+F+C, fp8 sidecars + fewer V groups + n_protect 5→3) =
-**3.19 GB — cannot close the +4.7 GB delta.** No single tensor dominates.
+Diet options (audit recommendation only — **no implementation**):
+
+| id | save | risk | targets | kernel? |
+|---|---|---|---|---|
+| A | ~0.65 GB | moderate | v_scale_ext, v_xmin_ext (V groups 4→2) | yes (V kernel) |
+| C | ~1.72 GB | high | all scale/xmin + k_protect_ext (bf16→fp8 e4m3) | yes (read+write) |
+| F | ~0.33 GB | moderate | k_protect_ext (n_protect 5→3) | no (recalibration) |
+| D | ~0.82 GB | low semantic / high impl | k_protect_ext (inline into kv_cache) | yes (layout change) |
+
+**A+F+C stacked ≈ 3.19 GB < the ~4.7 GB delta** → diet alone likely can't reach
+HBM parity; either add **D** too, or accept protected int4 as a quality feature.
+No single tensor dominates.
 
 ## 2. Throughput (median agg_tps, long-context bench)
 
@@ -69,10 +79,13 @@ scored `NOT_JUSTIFIED` on **total HBM** (the wrong axis) and 6H was
 know** whether int4 actually serves ~2× concurrent long-context requests before
 saturating, given its +4.7 GB overhead.
 
-`phase6k13_capacity_demo.py` settles it: fill prompts to ≈mml and ramp B until a
-cell saturates (preempt/OOM). If protected sustains a clean ~2×-higher B than
-bf16 → real capacity story. If it saturates near bf16's B → bookkeeping, drop
-the capacity claim. **Run before selling any capacity number.**
+**Settling it requires a true-saturation re-run** — fill prompts to ≈mml and
+ramp B until a cell saturates (preempt/OOM). If protected sustains a clean
+~2×-higher B than bf16 → real capacity story; if it saturates near bf16's B →
+bookkeeping, drop the capacity claim. This is a **post-diet** step (see §5
+recommendation): not worth running until a dieted config first reaches HBM
+parity. `phase6k13_capacity_demo.py` is the audit **scorecard** (this page);
+the live saturation runner is a separate future bench.
 
 ## 5. Recommendation matrix
 
@@ -84,15 +97,23 @@ the capacity claim. **Run before selling any capacity number.**
 
 ## 6. Honest verdict
 
-**Keep / reframe — not a failed line, and not a memory-savings line.**
-- ✅ Protected int4 = a **fidelity-first** improvement: +20.4 pt token-agreement, modest hard-retrieval gain, decode now correct in both modes.
-- ❌ It does **not** reduce HBM (it costs +4.7 GB) and is ~1.7× slower.
-- ⚠️ The "2× capacity per budget" is **audited only**; confirm net-real with
-  `phase6k13` before pitching it.
+**Precise verdict: protected int4 is QUALITY-POSITIVE (vs naive) but
+CAPACITY-NEGATIVE (vs bf16) in the current implementation** — a **quality
+feature, not a memory feature**. Keep it; don't pitch memory savings.
+- ✅ **Quality-positive:** +20.4 pt token-agreement over naive, modest
+  hard-retrieval gain (misses 5→2), decode now correct in both modes. Protect is
+  ~free over naive (same sidecars), so always prefer protected to naive.
+- ❌ **Capacity-negative:** +4.7 GB HBM vs bf16 (sidecars dominate, overwhelming
+  the int4 KV savings) and ~1.5–1.9× slower. The ~2× concurrency is bookkeeping.
+- ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
+  reach HBM parity without option D (or accept it as a quality feature).
 
-The remaining decision is **economic**: is the fidelity gain (and a possibly-net
-2× capacity) worth the sidecar memory + throughput cost — ideally priced as
-**fidelity-per-GB** with a perplexity / small downstream check.
+**Recommendation (Phase 6F gate):** *Proceed only with sidecar-diet experiments
+and scorecarding. Do NOT start heavy Phase 6F kernel work until a dieted
+protected-int4 config demonstrates an HBM advantage — or at least near-parity
+with bf16 — while preserving most of the +20.4 token-agreement gain.* Price it as
+**fidelity-per-GB** (+~25 token-agreement pts per GB of protect sidecar) with a
+perplexity / small downstream check after each diet step.
 
 ## Sources
 `audit_phase6g_sidecar_overhead.py`, `bench_phase6_long_context_gpu.py`,

@@ -1,245 +1,135 @@
 #!/usr/bin/env python3
-# Phase 6K.13 — capacity SATURATION demo (settle: net-real 2x or bookkeeping?).
+# Phase 6K.13 — int4_protected scorecard (AUDIT-ONLY; no model, no kernel work).
 #
-# Clean post-fix facts (gpu_util=0.5, A100-80GB; 6G + long-context):
-#   * int4_protected TOTAL HBM = bf16 + ~4.68 GB (sidecar+graph TAX). It does
-#     NOT save memory at equal util.
-#   * vLLM-reported max_concurrency is ~2x (8K: 110 vs 55) — within the KV
-#     budget int4 packs ~4x tokens/block. BUT that's bookkeeping.
-#   * 6H was INCONCLUSIVE (short prompts never filled the budget); long-context
-#     scored NOT_JUSTIFIED *on total HBM* (wrong axis for capacity).
+# Pulls the clean post-fix measurements into one scorecard: HBM, concurrency,
+# throughput, sidecar ranking, quality, memory delta, fidelity-per-GB, and the
+# diet options as audit recommendations. CPU-only (no torch/vllm) — runs
+# anywhere, instantly.
 #
-# The ONLY way to know if the 2x is a NET win is to FILL prompts to ~mml and
-# ramp B until a cell saturates (heavy preemption / OOM). If int4 sustains a
-# clean ~2x-higher B than bf16, the capacity story is demonstrated; if int4
-# saturates at a similar/lower B (the +4.7 GB overhead eats it), the 2x is
-# bookkeeping and the capacity claim should be dropped.
+# Precise verdict: protected int4 is QUALITY-POSITIVE (vs naive) but
+# CAPACITY-NEGATIVE (vs bf16) in the current implementation — it uses MORE HBM
+# than bf16, so it is a quality feature, not a memory feature, today.
 #
-# worker(cell, mml, B): B copies of a ~0.85*mml-token prompt, max_num_seqs=B;
-#   record completed / OOM / preemption / HBM / agg_tps + vLLM max_concurrency.
-# driver: sweep B per cell, find the largest B that completes with no OOM and
-#   ~no preemption, and report int4/bf16 ratio.
+# Numbers are the measured post-fix values (A100-80GB, gpu_util=0.5); update the
+# constants if you re-run the benches. Sources: audit_phase6g_sidecar_overhead,
+# bench_phase6_long_context_gpu, bench_phase6_h_high_load_gpu,
+# bench_phase6j_quality_gpu, phase6k12_hard_needle.
 #
-# Usage:
-#   python CTM_plus/Bench/scripts/phase6k13_capacity_demo.py --selftest         # CPU
-#   CELL=protected python CTM_plus/Bench/scripts/phase6k13_capacity_demo.py \
-#     --worker --mml 8192 --batch 110
-#   python CTM_plus/Bench/scripts/phase6k13_capacity_demo.py --mml 8192 2>&1 | tee /tmp/phase6k13.log
+# Usage:  python CTM_plus/Bench/scripts/phase6k13_capacity_demo.py
 
-import argparse
-import json
-import os
-import subprocess
-import sys
-import time
-from pathlib import Path
-
-CELLS = ["bf16", "protected"]        # add "naive" via --cells if wanted
-NAIVE_MASK_DEFAULT = "/workspace/dev/build-logs/qwen2_5_7b_protect_mask_naive.pt"
-
-# Default B sweeps per mml, straddling bf16(≈55/26/12) and int4(≈110/53/24) conc.
-DEFAULT_B = {
-    8192:  [48, 56, 72, 96, 112, 128],
-    16384: [24, 28, 40, 52, 60, 72],
-    32768: [12, 16, 24, 28, 36],
+# ---- measured data (post-fix) -------------------------------------------------
+HBM = {  # mml: (bf16_GB, int4prot_GB, bf16_conc, int4_conc)
+    8192:  (39.13, 43.82, 55.3, 110.6),
+    16384: (38.04, 42.72, 26.4, 52.8),
+    32768: (35.85, 40.51, 12.0, 23.9),
 }
+THROUGHPUT = {  # mml: (bf16_tps, int4_tps) at B=8 (long-context bench)
+    8192:  (131.9, 74.4),
+    16384: (70.9, 46.3),
+    32768: (34.7, 23.1),
+}
+SIDECARS = [  # (tensor, scaling, GB@32K, pct)
+    ("k_protect_ext", "per_token", 0.818, 23.8),
+    ("v_scale_ext",   "per_token", 0.654, 19.0),
+    ("v_xmin_ext",    "per_token", 0.654, 19.0),
+    ("k_scale_ext",   "per_block", 0.654, 19.0),
+    ("k_xmin_ext",    "per_block", 0.654, 19.0),
+    ("_k_stage_pool", "per_slot",  0.007, 0.2),
+]
+QUALITY = {  # metric: (naive, protected, bf16)
+    "token_agreement_vs_bf16": (0.533, 0.737, 1.000),
+    "hard_needle_retrieval@8K": (0.915, 0.964, 1.000),
+}
+HARD_NEEDLE_MISSES = {"naive": "5 (4 V-bound + 1 K-bound)", "protected": "2 (2 V-bound, 0 K-bound)"}
+
+DIET = [  # (id, desc, save_GB, risk, targets, kernel?)
+    ("A", "Halve V quant groups (v_n_groups 4->2)", 0.65, "moderate",
+     "v_scale_ext, v_xmin_ext", "yes (V kernel)"),
+    ("C", "Quantize sidecars bf16 -> fp8 (e4m3)", 1.72, "high",
+     "all scale/xmin + k_protect_ext", "yes (read+write)"),
+    ("F", "Reduce protected channels (n_protect 5->3)", 0.33, "moderate",
+     "k_protect_ext", "no (recalibration only)"),
+    ("D", "Eliminate k_protect_ext (inline into kv_cache)", 0.82, "low semantic / high impl",
+     "k_protect_ext", "yes (layout change)"),
+]
+DIET_STACK_AFC = 3.19   # A+F+C stacked (audit estimate; interactions accounted)
 
 
-def _long_prompt(target_tokens):
-    # ~16 tokens/sentence; the worker also truncates to fit under mml.
-    n = max(20, target_tokens // 16)
-    return "Document: " + " ".join(
-        f"Fact {i}: the town ledger recorded routine activity that week."
-        for i in range(n)
-    ) + "\n\nSummarize the document in one sentence."
-
-
-def _sched_counters(llm):
-    """Best-effort cumulative preemption count from the vLLM scheduler."""
-    try:
-        sched = llm.llm_engine.scheduler[0]
-        for attr in ("num_cumulative_preemption", "num_preempted", "preemption_count"):
-            v = getattr(sched, attr, None)
-            if isinstance(v, int):
-                return v
-    except Exception:
-        pass
-    return 0
-
-
-def _max_concurrency(llm, mml):
-    try:
-        cc = llm.llm_engine.cache_config
-        nb = getattr(cc, "num_gpu_blocks", None)
-        bs = getattr(cc, "block_size", None)
-        if nb and bs:
-            return round(nb * bs / mml, 1)
-    except Exception:
-        pass
-    return None
-
-
-def run_worker(mml, batch):
-    import torch
-    cell = os.environ.get("CELL", "protected")
-    eager = os.environ.get("ENFORCE_EAGER", "0").strip() in ("1", "true", "yes")
-    os.environ.pop("PHASE6B3_FORCE_EAGER", None)
-    if cell == "naive":
-        os.environ["PHASE6J_NAIVE_FORCE_ZERO"] = "1"
-        os.environ["PROTECT_MASK_PATH"] = os.environ.get("NAIVE_MASK_PATH", NAIVE_MASK_DEFAULT)
-    elif cell == "protected":
-        os.environ["PHASE6J_NAIVE_FORCE_ZERO"] = "0"
-        os.environ.pop("PROTECT_MASK_PATH", None)
-    # int4 cells: bench-style hook ownership — disable the factory auto-hook.
-    os.environ.setdefault("PHASE6E_FUSED_WRITER", "1")
-
-    util = float(os.environ.get("GPU_UTIL", "0.5"))
-    out = os.environ.get("OUTPUT", f"/tmp/phase6k13_{cell}_mml{mml}_B{batch}.json")
-    rec = {"cell": cell, "mml": mml, "batch": batch, "gpu_util": util,
-           "oom": False, "completed": 0, "preempts": 0, "hbm_gb": None,
-           "agg_tps": None, "max_concurrency": None, "error": None}
-
-    from vllm import SamplingParams
-    try:
-        if cell == "bf16":
-            from vllm import LLM
-            llm = LLM(model="Qwen/Qwen2.5-7B-Instruct", max_model_len=mml,
-                      gpu_memory_utilization=util, dtype="bfloat16",
-                      max_num_seqs=batch, enforce_eager=eager)
-        else:
-            os.environ["PHASE6K10_AUTO_HOOK"] = "0"   # bench installs its own hook
-            from kv_policy.int4_protected import Int4ProtectedLLM
-            from kv_policy.phase6b2_precapture_hook import (
-                install_int4_protected_precapture_hook, _collect_writers,
-                _collect_impls, _resolve_inner_model, _resolve_model_runner)
-            llm = Int4ProtectedLLM(model="Qwen/Qwen2.5-7B-Instruct", max_model_len=mml,
-                                   gpu_memory_utilization=util, max_num_seqs=batch,
-                                   enforce_eager=eager)
-            try:
-                m = _resolve_inner_model(llm)
-                install_int4_protected_precapture_hook(
-                    _resolve_model_runner(llm), _collect_writers(m), impls=_collect_impls(m))
-            except Exception as e:
-                rec["error"] = f"hook: {type(e).__name__}: {e}"
-    except Exception as exc:
-        rec["oom"] = "out of memory" in str(exc).lower()
-        rec["error"] = f"init: {str(exc)[:120]}"
-        Path(out).write_text(json.dumps(rec, indent=2))
-        print(f"[6k13 {cell} mml{mml} B{batch}] INIT FAIL oom={rec['oom']} {rec['error']}", flush=True)
-        return 0
-
-    rec["max_concurrency"] = _max_concurrency(llm, mml)
-    sp = SamplingParams(temperature=0.0, max_tokens=8)
-    prompt = _long_prompt(int(mml * 0.8))
-    # Guard: truncate the prompt to fit (prompt + gen) under mml regardless of
-    # the token estimate — vLLM errors on over-length prompts otherwise.
-    try:
-        tk = llm.get_tokenizer()
-        ids = tk.encode(prompt)
-        cap = mml - sp.max_tokens - 64
-        if len(ids) > cap:
-            prompt = tk.decode(ids[:cap])
-            ids = ids[:cap]
-        rec["prompt_tokens"] = len(ids)
-    except Exception:
-        rec["prompt_tokens"] = None
-    pre = _sched_counters(llm)
-    try:
-        torch.cuda.reset_peak_memory_stats()
-        t0 = time.time()
-        outs = llm.generate([prompt] * batch, sp)
-        dt = time.time() - t0
-        rec["completed"] = sum(1 for o in outs if o.outputs and o.outputs[0].text)
-        n_out = sum(len(o.outputs[0].token_ids) for o in outs if o.outputs)
-        rec["agg_tps"] = round(n_out / dt, 1) if dt > 0 else None
-        rec["hbm_gb"] = round(torch.cuda.max_memory_allocated() / 1e9, 2)
-        rec["preempts"] = _sched_counters(llm) - pre
-    except Exception as exc:
-        rec["oom"] = "out of memory" in str(exc).lower()
-        rec["error"] = f"gen: {str(exc)[:120]}"
-
-    Path(out).write_text(json.dumps(rec, indent=2))
-    print(f"[6k13 {cell} mml{mml} B{batch}] prompt_tok={rec.get('prompt_tokens')} "
-          f"completed={rec['completed']}/{batch} oom={rec['oom']} "
-          f"preempts={rec['preempts']} hbm={rec['hbm_gb']} tps={rec['agg_tps']} "
-          f"max_conc={rec['max_concurrency']}", flush=True)
-    return 0
-
-
-def run_driver(mml, cells, b_list):
-    rows = []
-    for cell in cells:
-        for B in b_list:
-            out = f"/tmp/phase6k13_{cell}_mml{mml}_B{B}.json"
-            env = dict(os.environ)
-            env.update({"CELL": cell, "OUTPUT": out})
-            env.setdefault("PHASE6E_FUSED_WRITER", "1")
-            env.pop("PHASE6B3_FORCE_EAGER", None)
-            print(f"\n=== 6k13: cell={cell} mml={mml} B={B} ===", flush=True)
-            subprocess.run([sys.executable, __file__, "--worker",
-                            "--mml", str(mml), "--batch", str(B)], env=env, check=False)
-            try:
-                rows.append(json.loads(Path(out).read_text()))
-            except Exception as e:
-                rows.append({"cell": cell, "batch": B, "error": str(e)[:60]})
-
-    print("\n" + "=" * 96)
-    print(f"PHASE 6K.13 — capacity saturation demo (mml={mml}, prompt≈0.85*mml, "
-          f"gpu_util={os.environ.get('GPU_UTIL','0.5')})")
-    print("=" * 96)
-    print(f"  {'cell':>10} {'B':>5} | {'completed':>9} {'oom':>5} {'preempts':>8} "
-          f"{'HBM GB':>7} {'agg_tps':>8} {'max_conc':>8}")
-    print("  " + "-" * 80)
-    clean_maxB = {}   # largest B with no OOM and ~no preemption
-    for r in rows:
-        if r.get("error") and r.get("completed", 0) == 0 and not r.get("oom"):
-            print(f"  {r.get('cell','?'):>10} {r.get('batch','?'):>5} | ERROR {r['error']}")
-            continue
-        cell, B = r["cell"], r["batch"]
-        clean = (not r.get("oom")) and r.get("completed") == B and (r.get("preempts") or 0) == 0
-        if clean:
-            clean_maxB[cell] = max(clean_maxB.get(cell, 0), B)
-        tag = "  <-- OOM" if r.get("oom") else ("  <-- preempt" if (r.get("preempts") or 0) > 0 else "")
-        print(f"  {cell:>10} {B:>5} | {str(r.get('completed'))+'/'+str(B):>9} "
-              f"{str(r.get('oom')):>5} {r.get('preempts') or 0:>8} "
-              f"{(r.get('hbm_gb') or 0):>7} {(r.get('agg_tps') or 0):>8} "
-              f"{(r.get('max_concurrency') or 0):>8}{tag}")
-    print("\n  clean max-B (all complete, no OOM, no preempt):", clean_maxB)
-    if "bf16" in clean_maxB and "protected" in clean_maxB and clean_maxB["bf16"]:
-        ratio = clean_maxB["protected"] / clean_maxB["bf16"]
-        print(f"  DEMONSTRATED capacity ratio (protected/bf16) = {ratio:.2f}x")
-        print("   ~2x => the audited 2x is a NET win (real capacity story).")
-        print("   ~1x => bookkeeping; the +4.7GB sidecar tax eats the budget (drop the capacity claim).")
-    print("=" * 96, flush=True)
-    return 0
-
-
-def _selftest():
-    for mml in (8192, 16384):
-        p = _long_prompt(int(mml * 0.85))
-        chars = len(p); est = chars // 4
-        assert "Summarize" in p
-        print(f"  long_prompt(mml={mml}): chars={chars} ~tok={est} "
-              f"(target≈{int(mml*0.85)}; headroom@util-dependent)")
-    print("SELFTEST PASS")
-    return 0
+def _bar():
+    print("-" * 92)
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--worker", action="store_true")
-    ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--mml", type=int, default=8192)
-    ap.add_argument("--batch", type=int, default=64)
-    ap.add_argument("--cells", default=",".join(CELLS))
-    ap.add_argument("--b-list", default="", help="comma list; default per-mml sweep")
-    args = ap.parse_args()
-    if args.selftest:
-        return _selftest()
-    if args.worker:
-        return run_worker(args.mml, args.batch)
-    b_list = [int(x) for x in args.b_list.split(",")] if args.b_list else DEFAULT_B.get(args.mml, [32, 48, 64])
-    return run_driver(args.mml, args.cells.split(","), b_list)
+    print("=" * 92)
+    print("PHASE 6K.13 — int4_protected SCORECARD (audit-only, clean post-fix)")
+    print("  VERDICT: QUALITY-POSITIVE (vs naive) but CAPACITY-NEGATIVE (vs bf16).")
+    print("  Protected int4 is a QUALITY feature, not a memory feature, in the current impl.")
+    print("=" * 92)
+
+    print("\n[1] HBM & concurrency (A100-80GB, gpu_util=0.5)")
+    print(f"  {'mml':>6} | {'bf16 GB':>8} {'int4 GB':>8} {'ΔHBM':>8} | "
+          f"{'bf16 conc':>9} {'int4 conc':>9} {'conc x':>6}")
+    _bar()
+    for mml, (b, i, bc, ic) in HBM.items():
+        print(f"  {mml:>6} | {b:>8.2f} {i:>8.2f} {i-b:>+8.2f} | "
+              f"{bc:>9.1f} {ic:>9.1f} {ic/bc:>6.2f}")
+    print("  -> int4 uses MORE total HBM (+~4.7 GB sidecar+graph tax); conc ~2x is")
+    print("     vLLM bookkeeping within the budget, NOT a footprint reduction.")
+
+    print("\n[2] Decode throughput (B=8; int4/bf16)")
+    print(f"  {'mml':>6} | {'bf16 tps':>8} {'int4 tps':>8} {'int4/bf16':>9}")
+    _bar()
+    for mml, (b, i) in THROUGHPUT.items():
+        print(f"  {mml:>6} | {b:>8.1f} {i:>8.1f} {i/b:>9.2f}x")
+    print("  -> int4 decode is ~1.5-1.9x SLOWER. 6H high-load was INCONCLUSIVE")
+    print("     (short prompts never saturated; bf16 still 1.4-1.9x faster).")
+
+    print("\n[3] Sidecar inventory (mml=32K; fixed 16.4% of KV cache)")
+    print(f"  {'tensor':>16} | {'scaling':>10} {'GB':>6} {'% sidecar':>9}")
+    _bar()
+    for name, sc, gb, pct in SIDECARS:
+        print(f"  {name:>16} | {sc:>10} {gb:>6.3f} {pct:>8.1f}%")
+    tot = sum(g for _, _, g, _ in SIDECARS)
+    print(f"  total sidecars ~= {tot:.2f} GB. No single tensor dominates.")
+
+    print("\n[4] Quality (clean post-fix)")
+    print(f"  {'metric':>26} | {'naive':>6} {'protected':>9} {'bf16':>6} {'prot-naive':>10}")
+    _bar()
+    for k, (n, p, b) in QUALITY.items():
+        print(f"  {k:>26} | {n:>6.3f} {p:>9.3f} {b:>6.3f} {p-n:>+10.3f}")
+    print(f"  hard-needle genuine misses: naive {HARD_NEEDLE_MISSES['naive']} -> "
+          f"protected {HARD_NEEDLE_MISSES['protected']}")
+    print("  easy needle saturated (both int4 ~= bf16). Remaining misses V-bound.")
+
+    print("\n[5] Fidelity-per-GB (what the PROTECT sidecar buys)")
+    ta_gain = QUALITY["token_agreement_vs_bf16"][1] - QUALITY["token_agreement_vs_bf16"][0]
+    kpe = SIDECARS[0][2]   # k_protect_ext GB
+    print(f"  protect token-agreement gain = +{ta_gain*100:.1f} pts for k_protect_ext={kpe:.2f} GB")
+    print(f"  -> ~{ta_gain*100/kpe:.1f} token-agreement pts per GB of protect sidecar.")
+    print("  NOTE: protected vs naive is ~SAME total memory (both allocate sidecars),")
+    print("  so PROTECT is near-free fidelity over naive — always prefer protected to naive.")
+    print("  The +4.7 GB cost is the int4 PATH vs bf16, and it BUYS 0.737 (< bf16 1.0)")
+    print("  fidelity + 2x conc, NOT memory savings.")
+
+    print("\n[6] Diet options (audit recommendation only — NO implementation)")
+    print(f"  {'id':>2} | {'save GB':>7} {'risk':>22} | targets / kernel")
+    _bar()
+    for did, desc, save, risk, targets, kern in DIET:
+        print(f"  {did:>2} | {save:>7.2f} {risk:>22} | {targets}  [{kern}]")
+        print(f"       {desc}")
+    print(f"\n  Stacked A+F+C ~= {DIET_STACK_AFC:.2f} GB  <  ~4.7 GB delta to bf16.")
+    print("  => A+F+C ALONE does NOT close the gap. Either add D (eliminate")
+    print("     k_protect_ext) too, or accept protected int4 as a QUALITY feature.")
+
+    print("\n[7] RECOMMENDATION")
+    print("  Proceed only with sidecar-diet experiments and scorecarding. Do NOT start")
+    print("  heavy Phase 6F kernel work until a dieted protected-int4 config demonstrates")
+    print("  an HBM advantage (or at least near-parity with bf16) while preserving most")
+    print("  of the +20.4 token-agreement gain. Next: pick diet option(s), re-run the")
+    print("  6G audit + long-context HBM crossover + a TRUE-saturation high-load test,")
+    print("  and re-score fidelity after each diet step.")
+    print("=" * 92)
+    return 0
 
 
 if __name__ == "__main__":
