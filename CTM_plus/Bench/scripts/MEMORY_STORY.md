@@ -121,17 +121,20 @@ feature, not a memory feature**. Keep it; don't pitch memory savings.
 - ✅ **6K.14 Run 1 (mml=8192, gen=8): fix validated on GPU.** protected ran
   B=48→128 with `slots`=B, **zero slot-exhaustion / OOM / preempt** (vs the
   pre-fix B≥9 crash). The bookkeeping bug is gone.
-- 🔁 **Capacity still unproven — that run didn't saturate.** With gen=8 both
-  cells queue-drain to B=128 in waves (no memory pressure), so clean-max-B
-  pinned at the ceiling for both → the 1.0× "ratio" is an artifact, not parity.
-  **Real signal:** concurrency density (vLLM `max_conc` ÷ total HBM) = bf16
-  55.3/42.15=1.31 vs protected 110.6/46.55=2.38 → **~1.8× more concurrent
-  max-len seqs per GB** even after the +4.4 GB sidecar tax — capacity-*dense*
-  but throughput-*slower* (agg_tps 17 vs 21 ≈ 0.8×). This **softens** the
-  "capacity-negative" call (which used absolute footprint, the wrong axis). To
-  *demonstrate* it, re-run with `--max-tokens 256` so admitted batches grow and
-  preemption triggers at B>max_conc (clean-max-B ≈ conc ≈ 2×; the harness only
-  marks a ratio `demonstrated` once the sweep actually saturates).
+- 🔁 **Capacity NOT yet demonstrated — Runs 1–2 didn't saturate.** gen=8 and
+  gen=256 both queue-drain to B=128 in waves (root cause: prompts under-fill at
+  0.8·mml, so the admitted set never exceeds the pool → no preemption). The
+  harness correctly flags CEILING-NOT-REACHED and refuses the bogus 1.0×.
+  **Estimated** signals only: (a) concurrency density (vLLM `max_conc` ÷ total
+  HBM) = bf16 1.31 vs protected 2.38 → **~1.8× concurrent max-len seqs per GB**
+  net of the +4.4 GB tax; (b) at gen=256 protected agg_tps **78–80 vs bf16 66
+  (~1.2×)** — a throughput *reversal* (the gen=8 "0.8×" was prefill-dominated;
+  density → fewer waves → faster under load). Both **soften** the
+  "capacity-negative" call (which used absolute footprint, the wrong axis), but
+  neither is a *demonstrated sustained* result. Run 3 forces saturation via
+  `--prompt-frac 0.95 --max-tokens 512 --b-list 32,48,56,72,96,112,128,144,160`
+  (saturates near `max_conc`); the harness marks `demonstrated=True` only once a
+  cell actually preempts/OOMs.
 - ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
   reach HBM parity without option D (or accept it as a quality feature).
 

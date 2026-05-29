@@ -159,16 +159,43 @@ after the +4.4 GB sidecar tax — capacity-**dense** but throughput-**slower**
 verdict, which was on the wrong axis (absolute footprint, not density). It is
 still a budget estimate, not a demonstrated sustained load.
 
-**To DEMONSTRATE it (Run 2):** long generation so admitted batches grow and
-preemption actually triggers at B > max_concurrency:
+## Run 2 — mml=8192, gpu_util=0.5, gen=256 (pod)
+
+Still CEILING-NOT-REACHED (harness flagged it; refused the bogus 1.0×). Both
+cells clean to B=128. **Root cause: the prompts under-fill.** At `0.8*mml`
+(~6500 tok) each admitted seq grows only ~205→221 blocks, leaving pool headroom,
+so vLLM keeps queue-draining in waves and the admitted set never exceeds the
+pool → no preemption. Longer gen alone doesn't fix this; **prompt fill** does.
+
+But Run 2 surfaced a **new estimated signal: a throughput reversal.** With real
+generation, protected's aggregate tps now *exceeds* bf16 — **78–80 vs 66 (~1.2×)**
+— the inverse of gen=8 (17 vs 21). The 2× concurrency density means protected
+clears the same B in fewer waves. So the "protected is ~0.8× slower" line was a
+prefill-dominated artifact of the 8-token run; under decode-substantial
+concurrent load protected is *faster* in aggregate (per-seq latency still higher).
+
+**Disciplined status:** Runs 1–2 validate the lifecycle fix and the *estimated*
+density (~1.8× seq/GB) + an *estimated* aggregate-throughput edge (~1.2×). They
+do **not** demonstrate sustained capacity (nothing saturated). A wider/longer,
+higher-fill saturation run is required.
+
+## Run 3 — forcing saturation (knobs added)
+
+`--prompt-frac` (default now **0.95**, was effectively 0.8), `--gpu-util`, plus
+the existing `--max-tokens` / `--b-list`. High fill makes concurrency the
+binding constraint, so the sweep saturates near `max_concurrency` (≈55 bf16 /
+≈110 protected) — bracketed by a sweep around those values rather than out at
+320. Recommended:
 ```bash
 PHASE6K10_AUTO_HOOK=0 python CTM_plus/Bench/scripts/phase6k14_saturation.py \
-  --mml 8192 --max-tokens 256 2>&1 | tee /tmp/phase6k14_gen256.log
+  --mml 8192 --max-tokens 512 --prompt-frac 0.95 \
+  --b-list 32,48,56,72,96,112,128,144,160 2>&1 | tee /tmp/phase6k14_sat.log
 ```
-Expect clean-max-B ≈ max_concurrency per cell (bf16 ~55, protected ~110) →
-clean-max-B ratio ≈ 2× with `demonstrated=True`. (The harness only calls a
-ratio `demonstrated` when the sweep actually saturated.) Widen `--b-list` if a
-cell is still flagged CEILING-NOT-REACHED.
+Expect bf16 to start preempting around B≈48–56 and protected around B≈96–112 →
+`demonstrated=True` with clean-max-B ratio ≈ 2×. If a cell is still
+CEILING-NOT-REACHED, drop `--gpu-util 0.4` (smaller pool) and/or raise
+`--prompt-frac 0.98`. Do NOT read the clean-max-B ratio as a capacity verdict
+while CEILING-NOT-REACHED holds.
 
 ## Files
 
