@@ -50,23 +50,28 @@ generation fidelity, not long-context-specific.)
 ### Hard needle (6K.12) — de-saturated retrieval, mml=8192
 
 The easy needle saturates (naive ≈ bf16), so 6K.12 stresses it (multi-needle,
-look-alike distractors, conflicting facts, QA-over-context). Retrieval =
-`HIT + FORMAT` (FORMAT = retrieved but verbose; not a miss):
+look-alike distractors, conflicting facts, QA-over-context). Two metrics bracket
+the FORMAT ambiguity (FORMAT = answer present but verbose / leaked the other
+field — the eval logs raw `qa` outputs to adjudicate it):
+`strict = HIT / total` (FORMAT counts against) and
+`retrieval = HIT / (total − FORMAT)` (FORMAT excluded).
 
-| cell | retrieval acc | genuine misses |
-|---|---|---|
-| bf16 | 1.000 (24/24) | 0 |
-| naive int4 | 0.917 (22/24) | 1 `NEAR_V` (V-bound) + 1 `MISS_K` (K-bound) |
-| protected int4 | **1.000 (24/24)** | 0 |
+| cell | strict | retrieval | genuine misses |
+|---|---|---|---|
+| bf16 | 0.833 | 1.000 | 0 |
+| naive int4 | 0.792 | 0.905 | 1 `NEAR_V` (V-bound) + 1 `MISS_K` (K-bound) |
+| protected int4 | 0.833 | 1.000 | 0 |
+| **prot − naive** | **+0.041** | **+0.095** | protect recovers both |
 
-**Under stress the gap reappears: naive drops below bf16 (0.92) and protected
-recovers it to bf16 level (`prot − naive = +0.083`)**, fixing both a V-bound and
-a K-bound miss. Sample is thin (24 items / 6 per mode), so treat as
-**directional**: it supports a *small real* protect retrieval advantage when
-int4 is actually stressed — to be confirmed with more items and higher mml
-(16K/32K). This strengthens the "reframe, don't close" case: protect helps
-**both** general fidelity (+20.4 pt) **and** stressed long-context retrieval
-(modestly).
+The bf16 row (strict 0.833 / retrieval 1.000, all 4 non-HITs are `FORMAT`)
+confirms the FORMAT spread is **verbosity, not retrieval failure** — bf16
+retrieves everything. **Under stress the gap reappears:** on retrieval, naive
+drops below bf16 (0.905) and protected recovers it to bf16 level (1.000),
+fixing both a V-bound and a K-bound miss. Sample is thin (24 items / 6 per
+mode) → **directional**: a *small real* protect retrieval advantage when int4
+is actually stressed, to confirm with more items and higher mml (16K/32K).
+Strengthens "reframe, don't close": protect helps **both** general fidelity
+(+20.4 pt) **and** stressed long-context retrieval (modestly).
 
 ## 2. Corrected verdict / validation language
 
@@ -114,9 +119,9 @@ a long-context retrieval advantage** that the saturated easy-needle hides?
 - [x] clean post-fix needle (above)
 - [x] clean token-agreement (above)
 - [x] failure-mode buckets (`phase6k11`: K_BOUND / NEAR_V / COLLAPSE)
-- [x] **HARD needle** (`phase6k12_hard_needle.py`): de-saturated — naive 0.92
-      vs protected 1.0 (=bf16), `+0.083`, thin sample (see §1). **TODO: confirm
-      at higher mml (16K/32K) with more items/mode.**
+- [x] **HARD needle** (`phase6k12_hard_needle.py`): de-saturated — retrieval
+      naive 0.905 vs protected 1.000 (=bf16), gap **+0.095** (strict gap
+      +0.041); thin sample (see §1). **TODO: confirm at 16K/32K, more items.**
 - [ ] **perplexity** on a held-out set (cheap, directly prices the fidelity gain)
 - [ ] small **downstream eval** (e.g. a few MMLU/GSM8K items) if cheap
 - [ ] **sidecar memory overhead** measured (naive vs protected delta) →

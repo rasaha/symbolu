@@ -188,6 +188,7 @@ def run_worker(mml, items_per_mode):
     rng = random.Random(1234)
     buckets = defaultdict(lambda: defaultdict(int))
     samples = []
+    qa_outputs = []
     try:
         tok = llm.get_tokenizer()
     except Exception:
@@ -215,31 +216,47 @@ def run_worker(mml, items_per_mode):
                 continue
             b = classify(text, expected, distractors, mode)
             buckets[mode][b] += 1
+            if mode == "qa":
+                # Full raw output so FORMAT can be adjudicated: was the answer
+                # present-but-unformatted, or semantically wrong?
+                qa_outputs.append({"expected": expected, "distractors": distractors,
+                                   "bucket": b, "output": text})
             if len(samples) < 8:
                 samples.append({"mode": mode, "expected": expected,
                                 "bucket": b, "out": text[:60]})
 
     n_total = items_per_mode * len(MODES)
-    n_hit = sum(buckets[m]["HIT"] for m in MODES)
-    # RETRIEVAL accuracy counts HIT + FORMAT: FORMAT means the expected answer
-    # WAS retrieved but the model was verbose / also echoed the other field —
-    # a format nit, not a retrieval miss. acc_strict is clean-format-only.
-    n_retr = sum(buckets[m]["HIT"] + buckets[m]["FORMAT"] for m in MODES)
+    tot = {k: sum(buckets[m].get(k, 0) for m in MODES)
+           for k in ("HIT", "NEAR_V", "MISS_K", "COLLAPSE", "FORMAT", "ERROR")}
+    n_hit = tot["HIT"]
+    n_format = tot["FORMAT"]
+    # Two metrics (per request):
+    #   strict_accuracy    = HIT / total            (FORMAT counts AGAINST)
+    #   retrieval_accuracy = HIT / (total - FORMAT)  (FORMAT EXCLUDED as ambiguous
+    #     = HIT / (HIT + NEAR_V + MISS_K + COLLAPSE + ERROR))
+    # Adjudicate FORMAT via qa_outputs below: present-but-unformatted vs wrong.
     summary = {
         "cell": cell, "mml": mml, "eager": eager, "items_per_mode": items_per_mode,
-        "acc": round(n_retr / max(1, n_total), 3),
-        "acc_strict": round(n_hit / max(1, n_total), 3),
+        "n_total": n_total,
+        "strict_accuracy": round(n_hit / max(1, n_total), 3),
+        "retrieval_accuracy": round(n_hit / max(1, n_total - n_format), 3),
         "buckets": {m: dict(buckets[m]) for m in MODES},
-        "totals": {k: sum(buckets[m].get(k, 0) for m in MODES)
-                   for k in ("HIT", "NEAR_V", "MISS_K", "COLLAPSE", "FORMAT", "ERROR")},
+        "totals": tot,
+        "qa_outputs": qa_outputs,
         "samples": samples,
     }
     out = os.environ.get("OUTPUT", f"/tmp/phase6k12_{cell}_mml{mml}.json")
     Path(out).write_text(json.dumps(summary, indent=2))
-    print(f"\n[6k12 {cell} mml{mml}] acc(retrieval=HIT+FORMAT)={summary['acc']} "
-          f"acc(strict HIT)={summary['acc_strict']} totals={summary['totals']}")
+    print(f"\n[6k12 {cell} mml{mml}] strict_accuracy={summary['strict_accuracy']} "
+          f"(HIT/total) | retrieval_accuracy={summary['retrieval_accuracy']} "
+          f"(HIT/(total-FORMAT)) | totals={summary['totals']}")
     for m in MODES:
         print(f"    {m:10s}: {dict(buckets[m])}")
+    _fmt = [q for q in qa_outputs if q["bucket"] == "FORMAT"]
+    if _fmt:
+        print("    qa FORMAT raw outputs (is the answer present? -> retrieved-but-unformatted):")
+        for q in _fmt[:5]:
+            print(f"      expected={q['expected']!r}  out={q['output']!r}")
     print(f"[6k12] wrote {out}", flush=True)
     return 0
 
@@ -264,30 +281,45 @@ def run_driver(mml, items_per_mode):
         except Exception as e:
             rows.append({"cell": cell, "error": str(e)[:60]})
 
-    print("\n" + "=" * 90)
+    print("\n" + "=" * 96)
     print(f"PHASE 6K.12 — HARD needle (mml={mml}, {items_per_mode}/mode, {len(MODES)} modes)")
-    print("=" * 90)
-    print("  acc = retrieval (HIT+FORMAT; FORMAT=retrieved-but-verbose). "
-          "NEAR_V/MISS_K/COLLAPSE = genuine misses.")
-    print(f"  {'cell':>10} | {'acc(retr)':>9} | {'HIT':>4} {'NEAR_V':>6} {'MISS_K':>6} "
-          f"{'COLLAPSE':>8} {'FORMAT':>6} {'ERROR':>5}")
-    print("  " + "-" * 78)
-    accs = {}
+    print("=" * 96)
+    print("  strict   = HIT / total                 (FORMAT counts AGAINST)")
+    print("  retrieval= HIT / (total - FORMAT)       (FORMAT EXCLUDED as ambiguous)")
+    print("  FORMAT = answer present but verbose/leaked other field (adjudicate via qa raw below)")
+    print(f"  {'cell':>10} | {'strict':>6} {'retr':>6} | {'HIT':>4} {'NEAR_V':>6} "
+          f"{'MISS_K':>6} {'COLLAPSE':>8} {'FORMAT':>6} {'ERROR':>5}")
+    print("  " + "-" * 84)
+    strict_a, retr_a = {}, {}
     for r in rows:
         if "error" in r:
             print(f"  {r.get('cell','?'):>10} | ERROR {r['error']}")
             continue
         t = r["totals"]
-        accs[r["cell"]] = r["acc"]
-        print(f"  {r['cell']:>10} | {r['acc']:>9.3f} | {t['HIT']:>4} {t['NEAR_V']:>6} "
-              f"{t['MISS_K']:>6} {t['COLLAPSE']:>8} {t['FORMAT']:>6} {t.get('ERROR',0):>5}")
-    if "naive" in accs and "protected" in accs:
-        gap = accs["protected"] - accs["naive"]
-        print(f"\n  HARD-needle prot-naive gap = {gap:+.3f}  "
-              f"({'protect helps under stress' if gap >= 0.05 else 'still ~saturated / no protect advantage'})")
-    print("  Per-mode buckets are in the per-cell JSON. NEAR_V-heavy => V-bound;")
-    print("  MISS_K-heavy => K-bound. This de-saturates the easy-needle ceiling.")
-    print("=" * 90, flush=True)
+        strict_a[r["cell"]] = r["strict_accuracy"]
+        retr_a[r["cell"]] = r["retrieval_accuracy"]
+        print(f"  {r['cell']:>10} | {r['strict_accuracy']:>6.3f} {r['retrieval_accuracy']:>6.3f} | "
+              f"{t['HIT']:>4} {t['NEAR_V']:>6} {t['MISS_K']:>6} {t['COLLAPSE']:>8} "
+              f"{t['FORMAT']:>6} {t.get('ERROR',0):>5}")
+    if "naive" in retr_a and "protected" in retr_a:
+        print(f"\n  prot-naive gap:  strict {strict_a['protected']-strict_a['naive']:+.3f}   "
+              f"retrieval {retr_a['protected']-retr_a['naive']:+.3f}")
+    # qa raw outputs so FORMAT can be adjudicated (present-but-unformatted vs wrong)
+    print("\n  --- qa FORMAT raw outputs (answer present => retrieved-but-unformatted) ---")
+    any_fmt = False
+    for r in rows:
+        if "error" in r:
+            continue
+        fmt = [q for q in r.get("qa_outputs", []) if q["bucket"] == "FORMAT"][:3]
+        if fmt:
+            any_fmt = True
+            print(f"  [{r['cell']}]")
+            for q in fmt:
+                print(f"     expected={q['expected']!r}  out={q['output']!r}")
+    if not any_fmt:
+        print("  (no FORMAT items)")
+    print("  NEAR_V-heavy => V-bound; MISS_K-heavy => K-bound.")
+    print("=" * 96, flush=True)
     return 0
 
 
