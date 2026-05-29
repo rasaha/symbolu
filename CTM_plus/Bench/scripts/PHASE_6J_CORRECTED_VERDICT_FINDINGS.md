@@ -5,13 +5,19 @@
 > built on **collapse-corrupted** data (the 6K.9/6K.10 decode bugs). On clean
 > post-fix data the story inverts:
 >
-> * **Needle is solved by *naive* int4 already** (≈ bf16) → the needle gate is
+> * **Easy needle is solved by *naive* int4 already** (≈ bf16) → that gate is
 >   **saturated** and no longer discriminates the protect mask.
-> * **Protected int4 delivers a real, large fidelity gain**: **+20.4 points**
->   of bf16 token-agreement over naive (0.533 → 0.737).
+> * **Protected int4 delivers a real, large fidelity gain** (PRIMARY signal):
+>   **+20.4 points** of bf16 token-agreement over naive (0.533 → 0.737).
+> * **Hard needle shows a modest, real stressed-retrieval gain** (60 items):
+>   protected retrieval **0.964 vs naive 0.915 (+0.049)**; genuine misses drop
+>   **5 → 2** (protect removes the K-bound miss, halves V-bound).
 >
-> So this is a **sidecar-memory-cost vs fidelity-gain tradeoff**, not a failed
-> research line. See `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` for the three
+> **Decision language: keep / reframe — protected int4 is NOT a failed line.**
+> It provides a large general-fidelity gain and a modest hard-retrieval gain, at
+> a sidecar-memory cost. The remaining decision is whether the fidelity-per-GB
+> (plus any perplexity / downstream improvement) justifies the protected
+> sidecars. See `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` for the three
 > correctness fixes that unblocked this measurement.
 
 ---
@@ -47,31 +53,42 @@ all non-HIT items are `NEAR_V` (2–3 total), zero `MISS_K`, zero `COLLAPSE`.
 (mml-independent — the agreement prompts are short, so this is *general*
 generation fidelity, not long-context-specific.)
 
-### Hard needle (6K.12) — de-saturated retrieval, mml=8192
+### Hard needle (6K.12) — de-saturated retrieval, mml=8192, 60 items (15/mode)
 
 The easy needle saturates (naive ≈ bf16), so 6K.12 stresses it (multi-needle,
-look-alike distractors, conflicting facts, QA-over-context). Two metrics bracket
-the FORMAT ambiguity (FORMAT = answer present but verbose / leaked the other
-field — the eval logs raw `qa` outputs to adjudicate it):
-`strict = HIT / total` (FORMAT counts against) and
-`retrieval = HIT / (total − FORMAT)` (FORMAT excluded).
+look-alike distractors, conflicting facts, QA-over-context). Three metrics keep
+`FORMAT` honest. `FORMAT` = the expected answer **is present** but the model
+continued / echoed the other field — adjudicated from the raw `qa` outputs the
+eval logs, e.g. `' Olga\n\nQuestion: What is the vault door code? GBII2W'`
+(answer **Olga** is correct; the trailing code is just continuation):
 
-| cell | strict | retrieval | genuine misses |
-|---|---|---|---|
-| bf16 | 0.833 | 1.000 | 0 |
-| naive int4 | 0.792 | 0.905 | 1 `NEAR_V` (V-bound) + 1 `MISS_K` (K-bound) |
-| protected int4 | 0.833 | 1.000 | 0 |
-| **prot − naive** | **+0.041** | **+0.095** | protect recovers both |
+* `strict` = HIT / total — exact requested format only (FORMAT counts against)
+* `retrieval` = HIT / (total − FORMAT) — FORMAT excluded as ambiguous
+* `retrieved_or_present` = (HIT + FORMAT) / total — FORMAT = retrieved (post-adjudication)
 
-The bf16 row (strict 0.833 / retrieval 1.000, all 4 non-HITs are `FORMAT`)
-confirms the FORMAT spread is **verbosity, not retrieval failure** — bf16
-retrieves everything. **Under stress the gap reappears:** on retrieval, naive
-drops below bf16 (0.905) and protected recovers it to bf16 level (1.000),
-fixing both a V-bound and a K-bound miss. Sample is thin (24 items / 6 per
-mode) → **directional**: a *small real* protect retrieval advantage when int4
-is actually stressed, to confirm with more items and higher mml (16K/32K).
-Strengthens "reframe, don't close": protect helps **both** general fidelity
-(+20.4 pt) **and** stressed long-context retrieval (modestly).
+| cell | strict | retrieval | ret_or_present | misses (NEAR_V / MISS_K) |
+|---|---|---|---|---|
+| bf16 | 0.917 | 1.000 | 1.000 | 0 / 0 |
+| naive int4 | 0.900 | 0.915 | 0.917 | 4 / 1 |
+| protected int4 | 0.883 | 0.964 | 0.967 | 2 / 0 |
+| **prot − naive** | **−0.017** | **+0.049** | **+0.050** | protect: −2 V-bound, −1 K-bound |
+
+**Read `strict` with care — it is misleading here.** Protected's strict is
+*lower* (−0.017) only because it (like bf16) produced FORMAT=5 verbose-correct
+`qa` answers vs naive's 1; FORMAT is **not** a retrieval miss (bf16 has 5 too
+and retrieves everything). On the honest metrics **protected leads:
+`retrieval +0.049`, `retrieved_or_present +0.050`.** Genuine misses drop
+**naive 5 (4 V-bound + 1 K-bound) → protected 2 (2 V-bound, 0 K-bound)**:
+protect **eliminates the K-bound miss and halves the V-bound** near-misses; the
+remainder is V-bound, so **int8-V / protect-V** is the next retrieval lever if
+needed.
+
+**Directional, not a breakthrough.** The thin 24-item run showed +0.083; this
+larger 60-item run shows **+0.049** — a *modest, real* stressed-retrieval
+advantage. Do not overclaim. Confirm at 16K/32K with more items. The PRIMARY
+validation remains token-agreement (+20.4 pt); hard-retrieval is the secondary
+benefit. **Frame protected int4 as fidelity-first, with a modest stressed-
+retrieval bonus.**
 
 ## 2. Corrected verdict / validation language
 
@@ -110,18 +127,21 @@ over naive int4.
 | decode correctness (post-fix) | ✓ | ✓ | ✓ |
 | **use when** | quality is paramount, memory is free | max KV capacity, fidelity secondary | **want most of bf16 fidelity at int4-ish memory** |
 
-The open decision: **is +20.4 pts of bf16 token-agreement worth the protect
-sidecar memory** for the target workload — and **do harder needle tests reveal
-a long-context retrieval advantage** that the saturated easy-needle hides?
+Harder needle answered (6K.12, 60 items): yes, a **modest** stressed-retrieval
+advantage (retrieval +0.049, misses 5→2). So the remaining open decision is the
+**economic** one: **is the protect sidecar memory worth the gains** —
++20.4 pt token-agreement (large) plus a modest hard-retrieval bump — measured
+as **fidelity-per-GB**, ideally backed by perplexity / a small downstream eval?
 
 ## 5. Next-eval checklist
 
 - [x] clean post-fix needle (above)
 - [x] clean token-agreement (above)
 - [x] failure-mode buckets (`phase6k11`: K_BOUND / NEAR_V / COLLAPSE)
-- [x] **HARD needle** (`phase6k12_hard_needle.py`): de-saturated — retrieval
-      naive 0.905 vs protected 1.000 (=bf16), gap **+0.095** (strict gap
-      +0.041); thin sample (see §1). **TODO: confirm at 16K/32K, more items.**
+- [x] **HARD needle** (`phase6k12_hard_needle.py`): 60 items — retrieval naive
+      0.915 vs protected 0.964, gap **+0.049** (`retrieved_or_present` +0.050;
+      strict −0.017 is a FORMAT artifact, see §1); misses 5→2. **TODO: confirm
+      at 16K/32K with more items.**
 - [ ] **perplexity** on a held-out set (cheap, directly prices the fidelity gain)
 - [ ] small **downstream eval** (e.g. a few MMLU/GSM8K items) if cheap
 - [ ] **sidecar memory overhead** measured (naive vs protected delta) →

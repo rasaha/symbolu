@@ -240,6 +240,9 @@ def run_worker(mml, items_per_mode):
         "n_total": n_total,
         "strict_accuracy": round(n_hit / max(1, n_total), 3),
         "retrieval_accuracy": round(n_hit / max(1, n_total - n_format), 3),
+        # retrieved_or_present: FORMAT adjudicated as a retrieval HIT (the
+        # expected answer IS present; the model just continued/echoed).
+        "retrieved_or_present_accuracy": round((n_hit + n_format) / max(1, n_total), 3),
         "buckets": {m: dict(buckets[m]) for m in MODES},
         "totals": tot,
         "qa_outputs": qa_outputs,
@@ -247,9 +250,10 @@ def run_worker(mml, items_per_mode):
     }
     out = os.environ.get("OUTPUT", f"/tmp/phase6k12_{cell}_mml{mml}.json")
     Path(out).write_text(json.dumps(summary, indent=2))
-    print(f"\n[6k12 {cell} mml{mml}] strict_accuracy={summary['strict_accuracy']} "
-          f"(HIT/total) | retrieval_accuracy={summary['retrieval_accuracy']} "
-          f"(HIT/(total-FORMAT)) | totals={summary['totals']}")
+    print(f"\n[6k12 {cell} mml{mml}] strict={summary['strict_accuracy']} (HIT/total) "
+          f"| retrieval={summary['retrieval_accuracy']} (HIT/(total-FORMAT)) "
+          f"| ret_or_present={summary['retrieved_or_present_accuracy']} ((HIT+FORMAT)/total) "
+          f"| totals={summary['totals']}")
     for m in MODES:
         print(f"    {m:10s}: {dict(buckets[m])}")
     _fmt = [q for q in qa_outputs if q["bucket"] == "FORMAT"]
@@ -286,11 +290,12 @@ def run_driver(mml, items_per_mode):
     print("=" * 96)
     print("  strict   = HIT / total                 (FORMAT counts AGAINST)")
     print("  retrieval= HIT / (total - FORMAT)       (FORMAT EXCLUDED as ambiguous)")
+    print("  ret+p    = (HIT+FORMAT) / total         (FORMAT adjudicated as retrieved)")
     print("  FORMAT = answer present but verbose/leaked other field (adjudicate via qa raw below)")
-    print(f"  {'cell':>10} | {'strict':>6} {'retr':>6} | {'HIT':>4} {'NEAR_V':>6} "
+    print(f"  {'cell':>10} | {'strict':>6} {'retr':>6} {'ret+p':>6} | {'HIT':>4} {'NEAR_V':>6} "
           f"{'MISS_K':>6} {'COLLAPSE':>8} {'FORMAT':>6} {'ERROR':>5}")
-    print("  " + "-" * 84)
-    strict_a, retr_a = {}, {}
+    print("  " + "-" * 92)
+    strict_a, retr_a, rp_a = {}, {}, {}
     for r in rows:
         if "error" in r:
             print(f"  {r.get('cell','?'):>10} | ERROR {r['error']}")
@@ -298,12 +303,15 @@ def run_driver(mml, items_per_mode):
         t = r["totals"]
         strict_a[r["cell"]] = r["strict_accuracy"]
         retr_a[r["cell"]] = r["retrieval_accuracy"]
-        print(f"  {r['cell']:>10} | {r['strict_accuracy']:>6.3f} {r['retrieval_accuracy']:>6.3f} | "
+        rp_a[r["cell"]] = r.get("retrieved_or_present_accuracy")
+        print(f"  {r['cell']:>10} | {r['strict_accuracy']:>6.3f} {r['retrieval_accuracy']:>6.3f} "
+              f"{(r.get('retrieved_or_present_accuracy') or 0):>6.3f} | "
               f"{t['HIT']:>4} {t['NEAR_V']:>6} {t['MISS_K']:>6} {t['COLLAPSE']:>8} "
               f"{t['FORMAT']:>6} {t.get('ERROR',0):>5}")
     if "naive" in retr_a and "protected" in retr_a:
         print(f"\n  prot-naive gap:  strict {strict_a['protected']-strict_a['naive']:+.3f}   "
-              f"retrieval {retr_a['protected']-retr_a['naive']:+.3f}")
+              f"retrieval {retr_a['protected']-retr_a['naive']:+.3f}   "
+              f"ret+p {(rp_a['protected'] or 0)-(rp_a['naive'] or 0):+.3f}")
     # qa raw outputs so FORMAT can be adjudicated (present-but-unformatted vs wrong)
     print("\n  --- qa FORMAT raw outputs (answer present => retrieved-but-unformatted) ---")
     any_fmt = False
