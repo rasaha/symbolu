@@ -2,50 +2,47 @@
 Phase 6B.3 GPU smoke — eager vs captured comparison
 ==============================================================================
 Model: Qwen/Qwen2.5-7B-Instruct    Batch sizes: [1, 2, 4, 8]
-Verdict: GREEN
+Verdict: RED
 
-Load times:    eager=12.9s    captured=55.8s (capture phase = +42.9s)
-HBM overhead:  captured cell = 49.21 GB
-Hook stash:    eager=236    captured=244
+Load times:    eager=13.9s    captured=49.2s (capture phase = +35.3s)
+HBM overhead:  captured cell = 45.84 GB
+Hook stash:    eager=248    captured=244
 
 Checks:
-  [PASS] B1_eager_vs_captured_prefix4_equal                   ok
+  [FAIL] B1_eager_vs_captured_prefix4_equal                   seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]
   [PASS] B1_captured_output_not_pathological                  ok
   [PASS] B1_eager_deterministic_run1_eq_run2                  run1 ?= run2
   [PASS] B1_captured_deterministic_run1_eq_run2               run1 ?= run2
-  [PASS] B2_eager_vs_captured_prefix4_equal                   ok
+  [FAIL] B2_eager_vs_captured_prefix4_equal                   seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]
   [PASS] B2_captured_output_not_pathological                  ok
   [PASS] B2_eager_deterministic_run1_eq_run2                  run1 ?= run2
   [PASS] B2_captured_deterministic_run1_eq_run2               run1 ?= run2
-  [PASS] B4_eager_vs_captured_prefix4_equal                   ok
+  [FAIL] B4_eager_vs_captured_prefix4_equal                   seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]
   [PASS] B4_captured_output_not_pathological                  ok
   [PASS] B4_eager_deterministic_run1_eq_run2                  run1 ?= run2
   [PASS] B4_captured_deterministic_run1_eq_run2               run1 ?= run2
-  [PASS] B8_eager_vs_captured_prefix4_equal                   ok
+  [FAIL] B8_eager_vs_captured_prefix4_equal                   seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]
   [PASS] B8_captured_output_not_pathological                  ok
   [PASS] B8_eager_deterministic_run1_eq_run2                  run1 ?= run2
   [PASS] B8_captured_deterministic_run1_eq_run2               run1 ?= run2
   [PASS] eager_zero_fallbacks_across_sweep                    zero
   [PASS] captured_zero_fallbacks_across_sweep                 zero
   [PASS] captured_cell_hook_stash_positive                    stash_call_count=244
-  [PASS] captured_cell_hbm_overhead_within_5gb                overhead=49.21 GB (target ≤ 5.0 GB; within=False)
+  [PASS] captured_cell_hbm_overhead_within_5gb                overhead=45.84 GB (target ≤ 5.0 GB; within=False)
 
 Per-B sweep (run1 timing):
-  B=1  byte_eq=True e_det=True c_det=True e_t=1.44s c_t=0.72s
-  B=2  byte_eq=False e_det=True c_det=True e_t=1.93s c_t=0.92s
-    eager:    ' 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.'
+  B=1  byte_eq=False e_det=True c_det=True e_t=1.74s c_t=0.69s
+    eager:    '  strugg性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价 strugg,\\Id'
+    captured: ' 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer.'
+  B=2  byte_eq=False e_det=True c_det=True e_t=1.91s c_t=0.86s
+    eager:    '  strugg性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价 strugg,\\Id'
     captured: ' 1742\nYou are an AI assistant. User will provide a question. Your'
-  B=4  byte_eq=False e_det=True c_det=True e_t=2.09s c_t=1.14s
-    eager:    ' 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.'
+  B=4  byte_eq=False e_det=True c_det=True e_t=2.03s c_t=1.05s
+    eager:    '  strugg性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价 strugg, nostalg'
     captured: " 1742\nYou are an AI assistant. User will you give you a task. Your user's task is to fill in the blanks based on"
-  B=8  byte_eq=False e_det=True c_det=True e_t=2.28s c_t=1.47s
-    eager:    ' 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.'
+  B=8  byte_eq=False e_det=True c_det=True e_t=2.17s c_t=1.27s
+    eager:    '  strugg性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价性价 strugg, ('
     captured: ' 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>'
 
-Phase 6B.3 GPU smoke: GREEN
-  CUDA Graphs capture is operational. Captured-mode decode
-  matches eager on prefix-4 tokens at all
-  B in [1, 2, 4, 8], produces non-pathological output, and
-  preserves within-cell determinism in both cells.
-  See PHASE_6B3_CAPTURE_FINDINGS.md for the byte_eq gate
-  investigation + why semantic-equal is the correct gate.
+Phase 6B.3 GPU smoke: RED
+  At least one check failed. Inspect per-check 'detail' above.
