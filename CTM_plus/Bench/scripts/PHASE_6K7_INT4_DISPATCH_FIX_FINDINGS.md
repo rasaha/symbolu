@@ -18,10 +18,15 @@
 > The Phase 6K/6K.1/6K.2 OOB patches were never the all-zero bug — they are
 > valid correctness patches that were simply never reached.
 >
-> **Phase 6J quality:** the pre-fix verdict was confounded by the collapse
-> (token-agreement floored ~0.04 for both cells). Re-run post-fix for a
-> trustworthy protect-vs-naive verdict; use `phase6k11` for the needle
-> failure-mode (K-bound vs V-bound) breakdown.
+> **Phase 6J quality — CORRECTED (clean post-fix):** the pre-fix
+> `NOT_VALIDATED` → "close the line" verdict was a **collapse confound**. Clean
+> data flips it: needle is **saturated** (naive int4 ≈ bf16, 0.96–1.00, so it
+> can't discriminate protect), while protected int4 gives a **real +20.4 pt
+> token-agreement gain** (0.533 → 0.737). **Do not close the line — reframe as
+> a sidecar-memory vs fidelity tradeoff.** Full corrected verdict, revised
+> validation gates, and recommendation table:
+> **`PHASE_6J_CORRECTED_VERDICT_FINDINGS.md`**. Harder needle (to de-saturate):
+> `phase6k12_hard_needle.py`; needle K/V failure modes: `phase6k11`.
 
 ---
 

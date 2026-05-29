@@ -1,5 +1,14 @@
 # Phase 6J — int4_protected vs int4_naive quality comparison (design)
 
+> ⚠️ **STALE GATE — superseded.** The acceptance thresholds below (esp.
+> `needle gap ≥ 0.20`) are **no longer valid**: on clean post-collapse-fix data
+> naive int4 needle is already ≈ bf16 (0.96–1.00), so the needle gate is
+> saturated and can't discriminate the protect mask. The `NOT_VALIDATED`
+> verdict this doc defines is **not** a negative research result. See the
+> corrected verdict, revised gates, and recommendation table in
+> **`PHASE_6J_CORRECTED_VERDICT_FINDINGS.md`** (protect gives a real +20.4 pt
+> token-agreement gain; decision = sidecar-memory vs fidelity tradeoff).
+
 > **Status:** DESIGN ONLY. No code changes, no bench runs until
 > the cell definitions + metric thresholds in this doc are
 > approved.
