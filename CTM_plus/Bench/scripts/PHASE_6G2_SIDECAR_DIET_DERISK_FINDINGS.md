@@ -1,10 +1,10 @@
 # Phase 6G.2 — sidecar-diet DE-RISK analyzer (measure before you cut)
 
-> **Status:** code + CPU regression landed and green. **The GPU capture run
-> is pending on the pod** (this work was done in a CPU-only container — no
-> torch/vllm/numpy). This is a **screen**, not the final quality verdict: it
-> tells us, per model, whether two sidecar-*elimination* ideas are even
-> plausible before we spend kernel-engineering or GPU-A/B time on them.
+> **Status:** code + CPU regression green; **Qwen-7B GPU capture done →
+> RED on all three options** (see the verdict section below). This is a
+> **screen**, not the final quality verdict: it tells us, per model, whether
+> three sidecar-*elimination* ideas are even plausible before we spend
+> kernel-engineering or GPU-A/B time on them. On Qwen-7B, none are.
 
 ## Why this exists (the 6G ceiling)
 
@@ -118,19 +118,54 @@ load-bearing logic.
   dead synthetic data, n_protect unit verdicts, and a full `analyze_model` on a
   2-layer synthetic model with all three options (B, A, C).
 
-## What is NOT yet validated (needs the GPU pod)
+## Qwen-7B verdict (GPU capture, 2026-05-29 — RED on all three)
 
-1. **The capture run** — hook attention over the calibration corpus and
-   accumulate the real per-unit statistics. Mirrors
-   `calibrate_phase5b_protect_mask.py`'s hook (same corpus + leaf-attention
-   heuristic) but captures **both K and V** and accumulates quant sufficient
-   stats instead of max-abs.
-2. **The actual per-model verdict** — whether predicted-xmin / symmetric-V are
-   GREEN on Qwen-7B / Mistral-7B / Llama-3.1-8B / Qwen-14B.
-3. **The downstream A/B (the real gate)** — even a GREEN screen only earns a
-   real implementation + a token-agreement + hard-needle A/B vs the current
-   asymmetric sidecars. The screen bounds the *quantization* error it adds; it
-   does **not** prove the *model output* is preserved. That's the GPU A/B's job.
+Captured on an A100-80GB: `Qwen/Qwen2.5-7B-Instruct`, 28 attention layers,
+55 calibration prompts, block_size=32, v_group_size=32. The capture path ran
+clean (no errors), which also validates the GPU hook + accumulator end-to-end.
+
+| option | recovers | verdict | the number that killed it |
+|---|---|---|---|
+| **(B) predicted-xmin** | 1.30 GB | **RED** | median R²=**0.417** (need 0.98); median residual=**1.83 LSB** (need ≤0.25). 14779/14784 units RED. |
+| **(A) symmetric-V** | 0.65 GB | **RED** | median inflation=**1.16**, p90=1.22 (GREEN ≤1.05). 363/448 units RED, 0 GREEN. |
+| **(C) n_protect 5→3** | 0.33 GB | **RED** | median top-3/top-5 mass=**0.668** (need ≥0.90); p10=0.632. 111/112 heads RED. |
+
+**Screen result: ~0.00 GB of the +4.7 GB delta is recoverable by elimination
+on Qwen-7B.** The weakest layers were the early ones (layers 1–3, green_frac 0.0).
+
+### Why each is RED (the physical reading)
+
+- **(B) xmin is not a function of scale.** The hypothesis was `min ≈ α·range + β`
+  (self-similar block shape). R²=0.42 says range explains <half of min's variance:
+  the per-channel **mean drifts independently of the spread** across 32-token
+  blocks. min and range are two genuine degrees of freedom, so the xmin tensor
+  carries real information — reconstructing it would inject ~1.8 LSB of bias into
+  *every* dequantized value, ~3.6× the existing ~0.5-LSB quant floor.
+- **(A) V groups are offset, not centered.** A 16% median quant-step inflation
+  means symmetric V would coarsen every V value by ~16% (worse on the tail) — and
+  V is the *un*-protected path, so it would erode the +20.4 pt quality margin for
+  only 0.65 GB. Even the "least RED" option isn't near-GREEN.
+- **(C) the protected channels are a plateau, not a spike.** top-3/top-5 ≈ 0.67 is
+  barely above the 0.60 you'd get from five *equal* channels: the 4th/5th heavy
+  hitters are nearly as large as the top-3, so dropping them removes real overflow
+  protection. This is consistent with why the protect mask exists at all.
+
+**Conclusion: the sidecar metadata is information-dense, not redundant.** The
++4.7 GB is not recoverable by elimination on this model. Per the run-order
+discipline ("if Qwen-7B is GREEN or near-GREEN … then write the spec"), **no
+implementation spec is written and no A/B is earned** — RED means stop.
+
+## Still pending (deferred — gated off by the RED verdict)
+
+- **Mistral-7B / Llama-3.1-8B / Qwen-14B captures** — the run-order only repeats
+  "if promising." Qwen-7B is decisively not, and these are architectural
+  properties of asymmetric per-block quant, so corroboration is **optional**, not
+  required. (One confirmation run is cheap if you want to prove it's not
+  Qwen-specific — same command, swap `--model`.)
+- **The downstream A/B (the real gate)** — moot for elimination on Qwen-7B, since
+  nothing passed the screen. Recorded for completeness: even a GREEN screen only
+  earns a token-agreement + hard-needle A/B vs the current asymmetric sidecars;
+  the screen bounds *quant* error, not *model output*.
 
 ```bash
 cd /workspace/symbolu
@@ -146,7 +181,10 @@ python CTM_plus/Bench/scripts/phase6g2_sidecar_diet_derisk.py \
   --analyze /tmp/diet_Qwen2.5-7B-Instruct.json
 ```
 
-## How to read the result
+## How to read the result (reference — what GREEN would have meant)
+
+Qwen-7B came back RED on all three (above); this is the decision table the screen
+applies, kept for the remaining models and as the threshold rationale:
 
 - **Predicted-xmin GREEN** (R² ≥ 0.98, p90 norm_resid ≤ 0.25 LSB across units):
   implement scale-only storage + in-kernel `α·scale+β`, run the A/B. Recovers
@@ -156,8 +194,10 @@ python CTM_plus/Bench/scripts/phase6g2_sidecar_diet_derisk.py \
 - **n_protect 5→3 GREEN** (median top3_mass_frac ≥ 0.90): reduce protected
   channels from 5 to 3, shrinking `k_protect_ext` by 40%. Recovers **~0.33 GB**,
   independent of (B)/(A). Stack with predicted-xmin for **~1.63 GB** combined.
-- **RED on a model for any option**: skip that idea on that model; fall back to the
-  *shrink* diet (fp8 scale, 6G option C/F) or accept the density framing.
+- **RED on a model for any option** (← Qwen-7B, all three): skip that idea on that
+  model; fall back to the *shrink* diet (fp8 scale, 6G option C/F) or accept the
+  density framing. **For Qwen-7B the disposition is the density framing** — the
+  shrink diet is capacity-negative per 6G, and elimination is off the table.
 
 Stacking (with the 6G shrink options, accounting for overlap — B drops xmin so
 C only fp8s the remaining scale tensors):
