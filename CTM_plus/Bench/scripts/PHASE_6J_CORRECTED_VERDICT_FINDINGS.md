@@ -47,6 +47,27 @@ all non-HIT items are `NEAR_V` (2–3 total), zero `MISS_K`, zero `COLLAPSE`.
 (mml-independent — the agreement prompts are short, so this is *general*
 generation fidelity, not long-context-specific.)
 
+### Hard needle (6K.12) — de-saturated retrieval, mml=8192
+
+The easy needle saturates (naive ≈ bf16), so 6K.12 stresses it (multi-needle,
+look-alike distractors, conflicting facts, QA-over-context). Retrieval =
+`HIT + FORMAT` (FORMAT = retrieved but verbose; not a miss):
+
+| cell | retrieval acc | genuine misses |
+|---|---|---|
+| bf16 | 1.000 (24/24) | 0 |
+| naive int4 | 0.917 (22/24) | 1 `NEAR_V` (V-bound) + 1 `MISS_K` (K-bound) |
+| protected int4 | **1.000 (24/24)** | 0 |
+
+**Under stress the gap reappears: naive drops below bf16 (0.92) and protected
+recovers it to bf16 level (`prot − naive = +0.083`)**, fixing both a V-bound and
+a K-bound miss. Sample is thin (24 items / 6 per mode), so treat as
+**directional**: it supports a *small real* protect retrieval advantage when
+int4 is actually stressed — to be confirmed with more items and higher mml
+(16K/32K). This strengthens the "reframe, don't close" case: protect helps
+**both** general fidelity (+20.4 pt) **and** stressed long-context retrieval
+(modestly).
+
 ## 2. Corrected verdict / validation language
 
 * The bench still prints `PROTECT_MASK_NOT_VALIDATED`. **Interpret it strictly
@@ -93,9 +114,9 @@ a long-context retrieval advantage** that the saturated easy-needle hides?
 - [x] clean post-fix needle (above)
 - [x] clean token-agreement (above)
 - [x] failure-mode buckets (`phase6k11`: K_BOUND / NEAR_V / COLLAPSE)
-- [ ] **HARD needle** (`phase6k12_hard_needle.py`): multi-needle, look-alike
-      distractors, conflicting earlier/later facts, QA-over-context, deeper
-      depths → de-saturate so needle can discriminate again.
+- [x] **HARD needle** (`phase6k12_hard_needle.py`): de-saturated — naive 0.92
+      vs protected 1.0 (=bf16), `+0.083`, thin sample (see §1). **TODO: confirm
+      at higher mml (16K/32K) with more items/mode.**
 - [ ] **perplexity** on a held-out set (cheap, directly prices the fidelity gain)
 - [ ] small **downstream eval** (e.g. a few MMLU/GSM8K items) if cheap
 - [ ] **sidecar memory overhead** measured (naive vs protected delta) →

@@ -221,9 +221,14 @@ def run_worker(mml, items_per_mode):
 
     n_total = items_per_mode * len(MODES)
     n_hit = sum(buckets[m]["HIT"] for m in MODES)
+    # RETRIEVAL accuracy counts HIT + FORMAT: FORMAT means the expected answer
+    # WAS retrieved but the model was verbose / also echoed the other field —
+    # a format nit, not a retrieval miss. acc_strict is clean-format-only.
+    n_retr = sum(buckets[m]["HIT"] + buckets[m]["FORMAT"] for m in MODES)
     summary = {
         "cell": cell, "mml": mml, "eager": eager, "items_per_mode": items_per_mode,
-        "acc": round(n_hit / max(1, n_total), 3),
+        "acc": round(n_retr / max(1, n_total), 3),
+        "acc_strict": round(n_hit / max(1, n_total), 3),
         "buckets": {m: dict(buckets[m]) for m in MODES},
         "totals": {k: sum(buckets[m].get(k, 0) for m in MODES)
                    for k in ("HIT", "NEAR_V", "MISS_K", "COLLAPSE", "FORMAT", "ERROR")},
@@ -231,7 +236,8 @@ def run_worker(mml, items_per_mode):
     }
     out = os.environ.get("OUTPUT", f"/tmp/phase6k12_{cell}_mml{mml}.json")
     Path(out).write_text(json.dumps(summary, indent=2))
-    print(f"\n[6k12 {cell} mml{mml}] acc={summary['acc']} totals={summary['totals']}")
+    print(f"\n[6k12 {cell} mml{mml}] acc(retrieval=HIT+FORMAT)={summary['acc']} "
+          f"acc(strict HIT)={summary['acc_strict']} totals={summary['totals']}")
     for m in MODES:
         print(f"    {m:10s}: {dict(buckets[m])}")
     print(f"[6k12] wrote {out}", flush=True)
@@ -261,7 +267,9 @@ def run_driver(mml, items_per_mode):
     print("\n" + "=" * 90)
     print(f"PHASE 6K.12 — HARD needle (mml={mml}, {items_per_mode}/mode, {len(MODES)} modes)")
     print("=" * 90)
-    print(f"  {'cell':>10} | {'acc':>5} | {'HIT':>4} {'NEAR_V':>6} {'MISS_K':>6} "
+    print("  acc = retrieval (HIT+FORMAT; FORMAT=retrieved-but-verbose). "
+          "NEAR_V/MISS_K/COLLAPSE = genuine misses.")
+    print(f"  {'cell':>10} | {'acc(retr)':>9} | {'HIT':>4} {'NEAR_V':>6} {'MISS_K':>6} "
           f"{'COLLAPSE':>8} {'FORMAT':>6} {'ERROR':>5}")
     print("  " + "-" * 78)
     accs = {}
@@ -271,7 +279,7 @@ def run_driver(mml, items_per_mode):
             continue
         t = r["totals"]
         accs[r["cell"]] = r["acc"]
-        print(f"  {r['cell']:>10} | {r['acc']:>5.3f} | {t['HIT']:>4} {t['NEAR_V']:>6} "
+        print(f"  {r['cell']:>10} | {r['acc']:>9.3f} | {t['HIT']:>4} {t['NEAR_V']:>6} "
               f"{t['MISS_K']:>6} {t['COLLAPSE']:>8} {t['FORMAT']:>6} {t.get('ERROR',0):>5}")
     if "naive" in accs and "protected" in accs:
         gap = accs["protected"] - accs["naive"]
