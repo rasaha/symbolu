@@ -107,11 +107,22 @@ feature, not a memory feature**. Keep it; don't pitch memory savings.
   the int4 KV savings) and ~1.5–1.9× slower. The ~2× concurrency is bookkeeping.
 - ❌ **Concurrency cap (6K.13 live demo):** the writer keeps a per-slot staging
   pool sized to `PHASE6_MAX_ACTIVE_SLOTS` (default **8**); at B≥9 without
-  bumping it the protected cell errors `PagedKVWriter slot pool exhausted`
+  bumping it the protected cell errored `PagedKVWriter slot pool exhausted`
   (bf16 ran B=128 clean). Bumping it costs *more* memory on top of +4.7 GB, and
-  `evict_sequence` is still **not wired to sequence completion** → slots leak in
-  a long server. A valid capacity test must set `PHASE6_MAX_ACTIVE_SLOTS ≥ B`
-  AND wire evict-on-completion; until then high-concurrency serving is unproven.
+  `evict_sequence` was **not wired to sequence completion** → slots leaked in a
+  long server.
+- 🔧 **Slot lifecycle FIXED (6K.14):** both pieces are now wired —
+  (1) `PHASE6_MAX_ACTIVE_SLOTS` **auto-bumps** to vLLM `max_num_seqs` when unset
+  (explicit env still wins; `PHASE6K14_AUTOBUMP_SLOTS=0` reverts), and
+  (2) `gc_completed_slots()` runs each pure-decode step (precapture hook + eager
+  path) to free slots of finished/recompute-preempted sequences
+  (`PHASE6K14_EVICT_ON_DECODE=0` reverts). CPU regression
+  `test_phase6k14_slot_gc.py` reproduces the wave-leak and proves the fix; the
+  full GPU saturation run via `phase6k14_saturation.py` is **pending on the pod**
+  — until those numbers land, whether the ~2× concurrency is a NET win or
+  bookkeeping (the +4.7 GB tax eating it) is still open. The harness now sets
+  `PHASE6_MAX_ACTIVE_SLOTS=B` per worker and flags any residual slot-exhaustion
+  as an invalid (mis-sized) run distinct from real OOM/preempt saturation.
 - ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
   reach HBM parity without option D (or accept it as a quality feature).
 
@@ -126,5 +137,7 @@ perplexity / small downstream check after each diet step.
 `audit_phase6g_sidecar_overhead.py`, `bench_phase6_long_context_gpu.py`,
 `bench_phase6_h_high_load_gpu.py`, `bench_phase6j_quality_gpu.py`,
 `phase6k11_needle_failuremode.py`, `phase6k12_hard_needle.py`,
-`phase6k13_capacity_demo.py`; verdict context in
-`PHASE_6J_CORRECTED_VERDICT_FINDINGS.md` + `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md`.
+`phase6k13_capacity_demo.py`, `phase6k14_saturation.py` (pending GPU run); verdict
+context in `PHASE_6J_CORRECTED_VERDICT_FINDINGS.md`,
+`PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` +
+`PHASE_6K14_SLOT_LIFECYCLE_FINDINGS.md`.
