@@ -1,21 +1,27 @@
 # Phase 6K.7 — int4 dispatch fix: route int4kv_packed decode to the split-KV kernel
 
-> **Status: dispatch fix landed (NECESSARY, not sufficient). Residual
-> decode-collapse bug OPEN.** The one-line dispatch fix in
-> `flash_api.cpp::run_mha_fwd` eliminated the **all-zero attention output**
-> (kernel norm `0.0 → 6.47`, matching bf16 ground truth) — without it every
-> int4 decode produced nothing. But a **deeper, non-deterministic
-> pérdida-collapse bug remains** (see 6K.7b): it hits *some* prompts in
-> **both eager and graph**, on **both naive and protected**, and accumulates
-> across requests within a process. The Phase 6K/6K.1/6K.2 OOB patches were
-> never the all-zero bug — they are valid correctness patches that were never
-> reached because the kernel containing them was never launched for decode.
+> **Status: ALL THREE BUGS FIXED — int4 decode correct in both modes.**
+> Three independent faults were chained behind the garbage output:
+>   1. **Dispatch** (`flash_api.cpp::run_mha_fwd`): int4 decode fell into the
+>      non-split branch (no int4 loaders) → **all-zero attention output**.
+>      Fixed (kernel norm `0.0 → 6.47`).
+>   2. **Eager stale-state** (6K.9): recycled-`seq_id` collisions reused a
+>      stale `SeqState`; `seq_pos` accumulated across requests → `pérdida`
+>      collapse. Fixed by `evict_sequence` at the prefill boundary.
+>   3. **Graph capture** (6K.10): the public `Int4ProtectedLLM` factory never
+>      installed the Phase 6B.2 precapture hook, so CUDA-graph replay had no
+>      device-pool sync → first-request collapse. Fixed by auto-installing the
+>      hook in the factory for graph mode.
 >
-> **Phase 6J verdict (`PROTECT_MASK_NOT_VALIDATED`) is defensible on the
-> NEEDLE metric only** (prot−naive `+0.04…+0.08` « `+0.20` threshold,
-> consistent across 3 mml × 2 modes). The token-agreement column (`~0.04–0.11`
-> for *both* cells, both modes) is **confounded by the collapse bug** and must
-> not be cited as a quality measurement.
+> Confirmed by `phase6k9`: the full matrix
+> `{protected,naive} × {FUSED 0,1} × {eager,graph}` is **all `A_rate=0.0`**.
+> The Phase 6K/6K.1/6K.2 OOB patches were never the all-zero bug — they are
+> valid correctness patches that were simply never reached.
+>
+> **Phase 6J quality:** the pre-fix verdict was confounded by the collapse
+> (token-agreement floored ~0.04 for both cells). Re-run post-fix for a
+> trustworthy protect-vs-naive verdict; use `phase6k11` for the needle
+> failure-mode (K-bound vs V-bound) breakdown.
 
 ---
 
@@ -278,12 +284,32 @@ The unbounded `max_seq_pos` drift (fix OFF) → bounded (fix ON) is the
 stale-state mechanism made visible. Bonus: the prefill evict also recycles
 slots, removing the latent slot-pool-exhaustion risk.
 
-**Status: EAGER FIXED & CONFIRMED (A/B).** The dispositive eager 6J quality
-re-run (`PHASE6B3_FORCE_EAGER=1`, fix in place) gives the first trustworthy
-protect-vs-naive verdict on both metrics. **CUDA-graph first-request collapse
-(`A_1st=0`, `eager=False`) is a SEPARATE open item** — capture-time init, not
-helped by the prefill reset (zeroing pools mid-replay corrupts the captured
-graph). Production-on-graph still blocked until that is fixed; eager is usable.
+**Status: EAGER FIXED & CONFIRMED (A/B).**
+
+### 6K.10 fix — graph CONFIRMED FIXED
+
+The graph first-request collapse (`A_1st=0`, front-loaded `h1=0.8→h2=0.4`) was a
+SEPARATE capture-time bug. `phase6k10` localized it: the writer pools were clean
+after capture and a post-capture reset did nothing, but `_sync_pool_counters_
+from_states` fired **0× during real requests**. Root cause: the public
+`Int4ProtectedLLM` factory **never installed the Phase 6B.2 precapture hook**
+(only bench scripts did). That hook performs the per-step SeqState→device-pool
+sync by wrapping `execute_model` *outside* the captured graph; under graph
+replay the captured `write_decode_batched` can't run the host-side sync (it's
+gated to the non-capture path), so without the hook the pools were never synced
+→ the captured decode read unsynced pools → collapse.
+
+Fix (`int4_protected.py`): the factory auto-installs the precapture hook for
+graph mode (eager skips it — syncs inline). Best-effort, gated by
+`PHASE6K10_AUTO_HOOK`.
+
+Confirmed: after pulling `int4_protected.py`, the `phase6k9` matrix is **all
+`A_rate=0.0`** including the four `eager=False` rows (protected graph `0.6→0.0`,
+both FUSED). int4 decode is now correct in **both modes**.
+
+**Status: FIXED in eager AND graph.** Remaining work is quality, not
+correctness: re-run the 6J sweep for the trustworthy protect-vs-naive verdict
+and `phase6k11` for the needle K-vs-V failure-mode breakdown.
 
 ## Cross-references
 
