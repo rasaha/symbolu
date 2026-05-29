@@ -62,6 +62,20 @@ _DEFAULT_BF16_BACKING_MAX_SEQLEN = 4096
 _MAX_ACTIVE_SLOTS_ENV = "PHASE6_MAX_ACTIVE_SLOTS"
 _DEFAULT_MAX_ACTIVE_SLOTS = 8
 
+# Phase 6K.14: slot lifecycle. The B-pre-1 pool gave the writer a fixed
+# slot cap but two pieces were never wired:
+#   1. The cap defaulted to 8 and was only bumpable via env, so high
+#      concurrency (B>=9) hit "slot pool exhausted" before any work ran.
+#   2. evict_sequence (which frees a slot) was only called at the prefill
+#      boundary / on hard reset — never when a sequence COMPLETES. So slots
+#      leaked one-per-distinct-seq_id across decode waves until exhaustion,
+#      even when only a few sequences were ever concurrently active.
+# Fixed by (1) auto-bumping the cap to vLLM's max_num_seqs when the env is
+# unset, and (2) gc_completed_slots(), called each pure-decode step with the
+# running set so finished sequences' slots return to the pool.
+_AUTOBUMP_SLOTS_ENV = "PHASE6K14_AUTOBUMP_SLOTS"   # 0 -> keep fixed default
+_EVICT_ON_DECODE_ENV = "PHASE6K14_EVICT_ON_DECODE"  # 0 -> disable GC (A/B)
+
 # Debug flag to bypass V packing (writer stashes bf16 V in a parallel
 # sidecar; read path passes it as v_cache positional). Used to isolate
 # V packed-path correctness vs K packed-path correctness.
@@ -174,14 +188,83 @@ def _bf16_backing_max_seqlen() -> int:
         return _DEFAULT_BF16_BACKING_MAX_SEQLEN
 
 
-def _max_active_slots() -> int:
-    raw = os.environ.get(_MAX_ACTIVE_SLOTS_ENV, "").strip()
-    if not raw:
-        return _DEFAULT_MAX_ACTIVE_SLOTS
+def _autobump_slots_enabled() -> bool:
+    """Phase 6K.14: whether to auto-bump the slot cap to vLLM's
+    max_num_seqs when $PHASE6_MAX_ACTIVE_SLOTS is unset. Default on."""
+    raw = os.environ.get(_AUTOBUMP_SLOTS_ENV, "1").strip().lower()
+    return raw not in ("0", "false", "no")
+
+
+def _evict_on_decode_enabled() -> bool:
+    """Phase 6K.14: whether gc_completed_slots actually evicts. Default
+    on; set $PHASE6K14_EVICT_ON_DECODE=0 to reproduce the pre-fix leak
+    for A/B comparison."""
+    raw = os.environ.get(_EVICT_ON_DECODE_ENV, "1").strip().lower()
+    return raw not in ("0", "false", "no")
+
+
+def _vllm_max_num_seqs() -> Optional[int]:
+    """Best-effort read of vLLM's scheduler ``max_num_seqs`` — the upper
+    bound on concurrently-running sequences, hence the largest decode
+    batch and the right slot-pool size.
+
+    Returns None when vLLM isn't importable, no config is active, or the
+    value can't be read. Fully guarded so CPU tests (no vLLM) and any
+    non-vLLM caller never break.
+    """
+    if torch is None:
+        return None
     try:
-        return max(1, int(raw))
-    except ValueError:
-        return _DEFAULT_MAX_ACTIVE_SLOTS
+        from vllm.config import get_current_vllm_config  # type: ignore
+    except Exception:
+        return None
+    try:
+        cfg = get_current_vllm_config()
+    except Exception:
+        return None
+    if cfg is None:
+        return None
+    try:
+        n = int(cfg.scheduler_config.max_num_seqs)
+    except Exception:
+        return None
+    return n if n > 0 else None
+
+
+def _max_active_slots() -> int:
+    """Resolve the active-slot pool cap.
+
+    Precedence (Phase 6K.14):
+      1. Explicit $PHASE6_MAX_ACTIVE_SLOTS — always wins (pins the cap,
+         disables auto-bump). Saturation/bench runs set this to B.
+      2. Auto-bump to vLLM's max_num_seqs (best-effort) when the env is
+         unset and $PHASE6K14_AUTOBUMP_SLOTS != 0 — keeps the pool large
+         enough for the max concurrent decode batch in production.
+      3. Legacy fixed default (8).
+    """
+    raw = os.environ.get(_MAX_ACTIVE_SLOTS_ENV, "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    if _autobump_slots_enabled():
+        auto = _vllm_max_num_seqs()
+        if auto is not None and auto > 0:
+            return auto
+    return _DEFAULT_MAX_ACTIVE_SLOTS
+
+
+def _leaked_seq_ids(assigned_seq_ids: "Any", active_seq_ids: "Any") -> list:
+    """Pure decision helper for gc_completed_slots (torch-free, unit-
+    testable on CPU): the seq_ids that currently hold a slot but are
+    ABSENT from the active (current pure-decode) set — i.e. completed or
+    recompute-preempted, hence safe to evict. Order-preserving over
+    ``assigned_seq_ids`` so eviction order is deterministic.
+    """
+    active = active_seq_ids if isinstance(active_seq_ids, (set, frozenset)) \
+        else set(active_seq_ids)
+    return [sid for sid in assigned_seq_ids if sid not in active]
 
 
 def _in_cuda_graph_capture() -> bool:
@@ -806,6 +889,41 @@ class PagedKVWriter:
                     self._k_stage_count_pool[slot] = 0
                     self._k_stage_block_id_pool[slot] = -1
 
+    def gc_completed_slots(self, active_seq_ids: "Any") -> int:
+        """Phase 6K.14: free slots whose seq_id is no longer running.
+
+        ``active_seq_ids`` is the set of seq_ids in the CURRENT pure-decode
+        batch. In vLLM V0 the decode batch contains exactly the running
+        sequences, so any assigned slot whose seq_id is absent here has
+        either completed or been recompute-preempted — in both cases the
+        next time we see that seq_id it must start from fresh state, so
+        evicting now is correct AND returns the slot to ``_free_slots``.
+
+        Without this call, ``ensure_seq_state`` leaks one slot per distinct
+        seq_id across decode waves / completed requests until the pool
+        exhausts ("slot pool exhausted" at high B) — the Phase 6K.13
+        finding. Returns the number of slots freed.
+
+        MUST be called only on PURE-DECODE steps. On a prefill-only step
+        the batch is just the newly-added sequences and the running decode
+        seqs are absent, so GC there would wrongly evict live sequences.
+        (The prefill boundary has its own 6K.9 evict for stale recycled
+        state.)
+
+        Caveat: assumes recompute-style preemption (KV dropped and
+        re-prefilled), not swap-to-CPU. This backend doesn't migrate its
+        sidecars on swap, so swap preemption must stay off regardless.
+
+        Self-gated by $PHASE6K14_EVICT_ON_DECODE so an A/B run can
+        reproduce the pre-fix leak without touching call sites.
+        """
+        if not _evict_on_decode_enabled():
+            return 0
+        leaked = _leaked_seq_ids(list(self._slot_map.keys()), active_seq_ids)
+        for sid in leaked:
+            self.evict_sequence(sid)
+        return len(leaked)
+
     # ------------------------------------------------------------------
     # Phase 6 v2 Option B pre-flight (B-pre-1): slot-tensor-based read
     # API for the captured-graph-friendly read path. Resolves seq_id ->
@@ -957,6 +1075,13 @@ class PagedKVWriter:
         """
         if self._allocated:
             return
+
+        # Phase 6K.14: re-resolve the pool cap now that we're inside a real
+        # forward — vLLM's config is live here, so the auto-bump path can
+        # read max_num_seqs (it may have been unavailable at __init__ time).
+        # An explicit $PHASE6_MAX_ACTIVE_SLOTS still wins; the env-set tests
+        # see the same value they set.
+        self._max_active_slots = _max_active_slots()
 
         if kv_cache.ndim != 5 or kv_cache.shape[0] != 2:
             raise ValueError(
