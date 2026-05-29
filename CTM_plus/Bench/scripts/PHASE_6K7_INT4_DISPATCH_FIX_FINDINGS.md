@@ -6,6 +6,11 @@
 > OOB patches were never the bug — they are valid correctness patches that
 > were simply never reached, because the kernel containing them was never
 > launched for decode.
+>
+> **Update — EAGER only (see 6K.7b below).** CUDA-graph mode
+> (`enforce_eager=False`) still collapses protected decode on short/medium
+> prompts, **non-deterministically**. The graph-mode Phase 6J sweep verdict
+> is therefore INVALID; use `PHASE6B3_FORCE_EAGER=1` for the quality verdict.
 
 ---
 
@@ -124,9 +129,9 @@ N=44  ' Sure! Here are the three primary colors typically used in additive color
 (Pre-fix expectation from `PHASE_6K_FLASH_ATTN_OOB_FIX_FINDINGS.md`:
 N=8 `pérdida` garbage, N=30 degraded.)
 
-**Still TODO:** confirm in **CUDA-graph mode** (drop `enforce_eager`); the
-dispatch fix applies to both paths but the captured-graph decode hasn't
-been re-run post-fix.
+**CUDA-graph mode: still broken — see 6K.7b (OPEN).** Confirmed post-fix:
+protected decode collapses (pérdida-style) **non-deterministically** under
+`enforce_eager=False` on short/medium prompts. Eager is fully fixed.
 
 ---
 
@@ -171,11 +176,61 @@ attention. Therefore:
 
 ---
 
+## Phase 6K.7b — residual CUDA-graph protect collapse (OPEN)
+
+The dispatch fix closed the **eager** path completely. **CUDA-graph mode
+(`enforce_eager=False`) is still broken** for the protected cell, and it is
+**non-deterministic**.
+
+Evidence (same `.so`, protected, default 4pct mask, `PHASE6E_FUSED_WRITER=1`):
+
+```
+                                            eager           graph
+"List three primary colors…" (N≈9)   ' …Red, Blue…' ✓   ' The pérdida pérdida…' ✗
+"What is the capital of France?" (N≈13) ' …Paris.'   ✓   run A: ' …Paris.' ✓ / run B: ' pérdida…' ✗
+```
+
+The **same prompt** produced `'Paris'` on one graph run and a `pérdida`
+collapse on the next → output depends on run-to-run state, i.e.
+**uninitialized / stale memory or a capture-replay race**, not a quality
+limitation.
+
+**The graph-mode Phase 6J full sweep verdict is INVALID.** Run in graph mode it
+returned `PROTECT_MASK_NOT_VALIDATED`, but the token-agreement column was
+`~0.05` for **both** naive and protected, **identical across all three mml**
+(naive `33/570`, protected `21/570` at 8K/16K/32K) — that is the collapse, not
+a quality measurement. Needle stayed high (0.86–0.94) only because the secret
+code is emitted before the collapse, so needle is not a coherence signal here
+and the small `prot−naive` needle gap (+0.02…+0.08) from a collapsed run is
+meaningless. **Do not act on that verdict / do not close the line on it.** The
+dispositive quality A/B must run with `PHASE6B3_FORCE_EAGER=1` (int4 cells
+eager, where protected is verified correct).
+
+Localization (in progress): graph capture forces the int4 read down the
+capture-only **batched** path — `_read_decode_packed_batched` +
+`_splice_k_partial_tail_batched_unconditional` + the captured
+`write_decode_batched` + the precapture-hook one-time pool sync
+(`_sync_pool_counters_from_states`, sentinel-gated on
+`_k_stage_block_id_pool == -1`) — all of which the verified **eager B=1** path
+(`_read_decode_packed_one` + `_splice_k_partial_tail`) bypasses. naive (mask all
+zeros → no protected channels) survives graph mode; protected (5 channels/head
+via the bf16 sidecar) does not → the fault is in the protect-sidecar handling
+of that capture-only path. Non-determinism ⇒ a read-before-init / stale-pool
+issue is the leading hypothesis.
+
+Probe: `phase6k8_graph_state_probe.py` (behavioral — first-vs-warm,
+within/cross-process determinism, prompt-length map; the kernel can't be
+intercepted under graph replay).
+
+**Status: OPEN. Production blocker for captured-graph decode; independent of
+the (eager) quality verdict.**
+
 ## Cross-references
 
 * `apply_phase6k7_int4_dispatch_fix.sh` — the fix (idempotent apply script).
 * `phase6k4_attention_localizer.py`, `phase6k5_ground_truth.py`,
-  `phase6k6_zero_output_probe.py` — the localization probes.
+  `phase6k6_zero_output_probe.py` — the dispatch-bug localization probes.
+* `phase6k8_graph_state_probe.py` — 6K.7b CUDA-graph collapse characterizer.
 * `PHASE_6K_FLASH_ATTN_OOB_FIX_FINDINGS.md` — 6K/6K.1/6K.2 OOB patches
   (valid correctness patches; not the bug).
 * `install_dev_vllm_flash_attn.sh` / `vc_brief_tier_a_install_int4_kernel.sh`
