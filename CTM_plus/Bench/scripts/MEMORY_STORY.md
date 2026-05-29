@@ -121,20 +121,25 @@ feature, not a memory feature**. Keep it; don't pitch memory savings.
 - ✅ **6K.14 Run 1 (mml=8192, gen=8): fix validated on GPU.** protected ran
   B=48→128 with `slots`=B, **zero slot-exhaustion / OOM / preempt** (vs the
   pre-fix B≥9 crash). The bookkeeping bug is gone.
-- 🔁 **Capacity NOT yet demonstrated — Runs 1–2 didn't saturate.** gen=8 and
-  gen=256 both queue-drain to B=128 in waves (root cause: prompts under-fill at
-  0.8·mml, so the admitted set never exceeds the pool → no preemption). The
-  harness correctly flags CEILING-NOT-REACHED and refuses the bogus 1.0×.
+- 🔁 **Capacity NOT yet demonstrated — Runs 1–3 didn't saturate.** gen=8/256/512
+  all queue-drain to the sweep ceiling. **Why:** offline `generate([prompt]*B)`
+  admits only what fits and drains the rest in waves, always completing — B is
+  *submitted*, not *resident*, so B-ramp can't cliff. (Compounded by prompts
+  under-filling and a preempt counter that read 0 always.) The harness correctly
+  flags CEILING-NOT-REACHED and refuses the bogus 1.0×.
   **Estimated** signals only: (a) concurrency density (vLLM `max_conc` ÷ total
   HBM) = bf16 1.31 vs protected 2.38 → **~1.8× concurrent max-len seqs per GB**
-  net of the +4.4 GB tax; (b) at gen=256 protected agg_tps **78–80 vs bf16 66
-  (~1.2×)** — a throughput *reversal* (the gen=8 "0.8×" was prefill-dominated;
-  density → fewer waves → faster under load). Both **soften** the
-  "capacity-negative" call (which used absolute footprint, the wrong axis), but
-  neither is a *demonstrated sustained* result. Run 3 forces saturation via
-  `--prompt-frac 0.95 --max-tokens 512 --b-list 32,48,56,72,96,112,128,144,160`
-  (saturates near `max_conc`); the harness marks `demonstrated=True` only once a
-  cell actually preempts/OOMs.
+  net of the +4.4 GB tax; (b) protected agg_tps **78–115 vs bf16 51–87** at
+  mid/high B (gen 256–512) — a throughput *reversal* (gen=8's "0.8×" was
+  prefill-dominated). Both **soften** the "capacity-negative" call (wrong axis:
+  absolute footprint), but neither is *demonstrated sustained*.
+- 🧪 **Pivot to direct observation (`--resident-pressure`).** New per-step probe
+  records peak LIVE resident seqs + peak KV-block utilization;
+  `saturation_observed = peak_util≥0.90 OR preempt OR oom`. Demonstrated max live
+  concurrency = `peak_live` at saturation; `live_ratio` (protected/bf16) is the
+  real number, `live_demonstrated=True` only when BOTH cells hit the block limit.
+  Run 4: `--resident-pressure --max-tokens 2048 --prompt-frac 0.98
+  --b-list 32,…,192`. Expect bf16 `peak_live≈55`, protected `≈110` → ~2×.
 - ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
   reach HBM parity without option D (or accept it as a quality feature).
 

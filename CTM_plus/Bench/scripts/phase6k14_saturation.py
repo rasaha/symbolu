@@ -64,16 +64,31 @@ def _long_prompt(target_tokens):
 
 
 def _sched_counters(llm):
-    """Best-effort cumulative preemption count from the vLLM scheduler."""
+    """Cumulative preemption count + the source attribute(s) used (or None).
+
+    Robust across vLLM builds: scans every scheduler's __dict__ for int
+    attributes whose name contains 'preempt' and sums them. Returns
+    (total, source) — source is a comma-joined list of the attrs found, or
+    None if the counter is UNAVAILABLE (in which case 'preempts=0' is
+    meaningless and saturation cannot be inferred from it)."""
     try:
-        sched = llm.llm_engine.scheduler[0]
-        for attr in ("num_cumulative_preemption", "num_preempted", "preemption_count"):
-            v = getattr(sched, attr, None)
-            if isinstance(v, int):
-                return v
+        scheds = llm.llm_engine.scheduler
+        if not isinstance(scheds, (list, tuple)):
+            scheds = [scheds]
     except Exception:
-        pass
-    return 0
+        return 0, None
+    total, srcs = 0, []
+    for sched in scheds:
+        try:
+            d = vars(sched)
+        except Exception:
+            continue
+        for k, v in d.items():
+            if "preempt" in k.lower() and isinstance(v, int) and not isinstance(v, bool):
+                total += v
+                if k not in srcs:
+                    srcs.append(k)
+    return total, (",".join(srcs) if srcs else None)
 
 
 def _max_concurrency(llm, mml):
@@ -113,7 +128,127 @@ def _classify_error(msg):
     }
 
 
-def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None):
+class _StepProbe:
+    """Per-step scheduler instrumentation. Wraps ``LLMEngine.step`` to sample,
+    after every engine step, the LIVE (running) sequence count, the waiting
+    queue, and KV-block usage — so we OBSERVE resident concurrency and block
+    utilization directly instead of inferring saturation from submitted B
+    (which offline generate() never reveals: it queue-drains in waves).
+
+    Best-effort + fully guarded (vLLM internals vary by build); whatever it
+    can't read stays None and is reported as such."""
+
+    def __init__(self, llm):
+        self.llm = llm
+        self.peak_live = 0
+        self.sum_live = 0
+        self.n_steps = 0
+        self.max_waiting = 0
+        self.total_blocks = None
+        self.peak_used_blocks = None
+        self.block_src = None
+        self._orig = None
+        self._scheds = []
+
+    def _scheds_list(self):
+        try:
+            s = self.llm.llm_engine.scheduler
+            return list(s) if isinstance(s, (list, tuple)) else [s]
+        except Exception:
+            return []
+
+    def _free_blocks(self, scheds):
+        free, got = 0, False
+        for s in scheds:
+            bm = getattr(s, "block_manager", None)
+            if bm is None:
+                continue
+            fn = getattr(bm, "get_num_free_gpu_blocks", None)
+            if callable(fn):
+                try:
+                    free += int(fn()); got = True
+                    self.block_src = "block_manager.get_num_free_gpu_blocks"
+                    continue
+                except Exception:
+                    pass
+            alloc = getattr(bm, "gpu_allocator", None) or getattr(bm, "block_allocator", None)
+            g = getattr(alloc, "get_num_free_blocks", None)
+            if callable(g):
+                try:
+                    free += int(g()); got = True
+                    self.block_src = "gpu_allocator.get_num_free_blocks"
+                except Exception:
+                    pass
+        return free if got else None
+
+    def _sample(self):
+        live = waiting = 0
+        for s in self._scheds:
+            try:
+                live += len(s.running)
+            except Exception:
+                pass
+            try:
+                waiting += len(s.waiting)
+            except Exception:
+                pass
+        self.peak_live = max(self.peak_live, live)
+        self.sum_live += live
+        self.n_steps += 1
+        self.max_waiting = max(self.max_waiting, waiting)
+        if self.total_blocks:
+            free = self._free_blocks(self._scheds)
+            if free is not None:
+                used = self.total_blocks - free
+                self.peak_used_blocks = used if self.peak_used_blocks is None \
+                    else max(self.peak_used_blocks, used)
+
+    def install(self):
+        eng = getattr(self.llm, "llm_engine", None)
+        if eng is None or not hasattr(eng, "step"):
+            return self
+        self._scheds = self._scheds_list()
+        try:
+            self.total_blocks = int(eng.cache_config.num_gpu_blocks)
+        except Exception:
+            self.total_blocks = None
+        self._orig = eng.step
+
+        def _wrapped(*a, **k):
+            out = self._orig(*a, **k)
+            try:
+                self._sample()
+            except Exception:
+                pass
+            return out
+
+        try:
+            eng.step = _wrapped
+        except Exception:
+            self._orig = None
+        return self
+
+    def teardown(self):
+        if self._orig is not None:
+            try:
+                self.llm.llm_engine.step = self._orig
+            except Exception:
+                pass
+            self._orig = None
+
+    @property
+    def avg_live(self):
+        return round(self.sum_live / self.n_steps, 1) if self.n_steps else None
+
+    @property
+    def peak_util(self):
+        if self.total_blocks and self.peak_used_blocks is not None:
+            return round(self.peak_used_blocks / self.total_blocks, 3)
+        return None
+
+
+def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
+               resident_pressure=False):
     import torch
     cell = os.environ.get("CELL", "protected")
     eager = os.environ.get("ENFORCE_EAGER", "0").strip() in ("1", "true", "yes")
@@ -142,9 +277,15 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None):
     out = os.environ.get("OUTPUT", f"/tmp/phase6k14_{cell}_mml{mml}_B{batch}.json")
     rec = {"cell": cell, "mml": mml, "batch": batch, "gpu_util": util,
            "max_tokens": max_tokens, "prompt_frac": prompt_frac,
-           "oom": False, "slot_exhausted": False, "completed": 0, "preempts": 0,
+           "resident_pressure": resident_pressure,
+           "oom": False, "slot_exhausted": False, "completed": 0,
+           "preempts": 0, "preempt_src": None,
            "hbm_gb": None, "agg_tps": None, "max_concurrency": None,
            "max_active_slots": None, "prompt_tokens": None,
+           # live-concurrency instrumentation (resident-pressure mode):
+           "peak_live": None, "avg_live": None, "n_steps": None,
+           "max_waiting": None, "total_blocks": None, "peak_used_blocks": None,
+           "peak_util": None, "resident_fit": None, "saturation_observed": None,
            "evict_on_decode": os.environ.get("PHASE6K14_EVICT_ON_DECODE", "1")
            if cell != "bf16" else None,
            "error": None}
@@ -187,28 +328,37 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None):
     # decode, forcing real preemption/OOM at B>max_concurrency -> a DEMONSTRATED
     # max-B. Use a long value to actually answer the capacity question.
     sp = SamplingParams(temperature=0.0, max_tokens=max_tokens)
-    # Fill prompts toward mml so CONCURRENCY is the binding constraint: with
-    # under-filled prompts (the old 0.8) admitted seqs have headroom and vLLM
-    # just queue-drains in waves without ever exceeding the pool -> nothing
-    # saturates (Runs 1-2). At prompt_frac ~0.95 the admitted set nearly fills
-    # the pool, so once B passes what fits, decode-time growth forces real
-    # preemption -> a demonstrated clean-max-B near max_concurrency. The
-    # truncation below still guarantees prompt + gen <= mml.
-    prompt = _long_prompt(int(mml * prompt_frac))
-    # Truncate the prompt to fit (prompt + gen) under mml regardless of the
-    # token estimate — vLLM errors on over-length prompts otherwise.
+    # Fill prompts to EXACTLY the cap so the admitted set really fills the KV
+    # pool (the template tokenizes shorter than the rough estimate, so a bare
+    # target under-fills and leaves growth headroom -> never saturates, Runs
+    # 1-3). Over-request then truncate down to the cap. cap also guarantees
+    # prompt + gen <= mml.
+    cap = min(mml - sp.max_tokens - 64, int(mml * prompt_frac))
+    prompt = _long_prompt(int(cap * 1.4))
     try:
         tk = llm.get_tokenizer()
         ids = tk.encode(prompt)
-        cap = mml - sp.max_tokens - 64
         if len(ids) > cap:
             ids = ids[:cap]
             prompt = tk.decode(ids)
         rec["prompt_tokens"] = len(ids)
     except Exception:
         pass
+    # resident_fit: how many of THESE prompts vLLM can hold resident at once
+    # (the real concurrency limit for this workload). B beyond it must queue or
+    # preempt -> the saturation signal.
+    try:
+        import math
+        bs = int(llm.llm_engine.cache_config.block_size)
+        nb = int(llm.llm_engine.cache_config.num_gpu_blocks)
+        rec["total_blocks"] = nb
+        if rec["prompt_tokens"]:
+            rec["resident_fit"] = int(nb // math.ceil(rec["prompt_tokens"] / bs))
+    except Exception:
+        pass
 
-    pre = _sched_counters(llm)
+    probe = _StepProbe(llm).install() if resident_pressure else None
+    pre, _ = _sched_counters(llm)
     try:
         torch.cuda.reset_peak_memory_stats()
         t0 = time.time()
@@ -218,18 +368,40 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None):
         n_out = sum(len(o.outputs[0].token_ids) for o in outs if o.outputs)
         rec["agg_tps"] = round(n_out / dt, 1) if dt > 0 else None
         rec["hbm_gb"] = round(torch.cuda.max_memory_allocated() / 1e9, 2)
-        rec["preempts"] = _sched_counters(llm) - pre
+        post, src = _sched_counters(llm)
+        rec["preempts"] = post - pre
+        rec["preempt_src"] = src
     except Exception as exc:
         rec.update(_classify_error(str(exc)))
         rec["error"] = f"gen: {str(exc)[:160]}"
+    finally:
+        if probe is not None:
+            probe.teardown()
+            rec["peak_live"] = probe.peak_live
+            rec["avg_live"] = probe.avg_live
+            rec["n_steps"] = probe.n_steps
+            rec["max_waiting"] = probe.max_waiting
+            rec["peak_used_blocks"] = probe.peak_used_blocks
+            rec["peak_util"] = probe.peak_util
+            if not rec.get("total_blocks"):
+                rec["total_blocks"] = probe.total_blocks
+
+    # Saturation OBSERVED iff the scheduler actually hit the block limit (peak
+    # util high) OR preempted OR OOM'd — NOT merely "B was large". peak_live <
+    # submitted B with high util means the cell could not hold all B resident:
+    # peak_live IS the demonstrated max live concurrency.
+    pu = rec.get("peak_util") or 0
+    rec["saturation_observed"] = bool(
+        pu >= 0.90 or (rec.get("preempts") or 0) > 0 or rec.get("oom"))
 
     Path(out).write_text(json.dumps(rec, indent=2))
     print(f"[6k14 {cell} mml{mml} B{batch} gen{max_tokens} pf{prompt_frac} "
-          f"util{util}] prompt_tok={rec['prompt_tokens']} "
-          f"completed={rec['completed']}/{batch} oom={rec['oom']} "
-          f"slot_exhausted={rec['slot_exhausted']} preempts={rec['preempts']} "
-          f"hbm={rec['hbm_gb']} tps={rec['agg_tps']} max_conc={rec['max_concurrency']} "
-          f"slots={rec['max_active_slots']}", flush=True)
+          f"util{util}] ptok={rec['prompt_tokens']} fit={rec['resident_fit']} "
+          f"done={rec['completed']}/{batch} oom={rec['oom']} "
+          f"slotX={rec['slot_exhausted']} preempt={rec['preempts']}"
+          f"({rec['preempt_src']}) live={rec['peak_live']} util={rec['peak_util']} "
+          f"sat={rec['saturation_observed']} hbm={rec['hbm_gb']} "
+          f"tps={rec['agg_tps']} conc={rec['max_concurrency']}", flush=True)
     return 0
 
 
@@ -281,20 +453,43 @@ def _analyze(rows):
                 }
                 break
 
+    # Resident-pressure (DIRECT) capacity proof: peak LIVE sequences the cell
+    # held resident, and whether the KV block limit was actually reached. This
+    # does NOT depend on an OOM cliff — peak_live at high peak_util is the
+    # demonstrated max live concurrency. peak_live[cell] = max over rows that
+    # saturated (block limit hit / preempt / oom); falls back to overall max.
+    peak_live, saturated, counter_seen = {}, {}, False
+    for c, rs in by_cell.items():
+        if any(r.get("preempt_src") for r in rs):
+            counter_seen = True
+        sat_rows = [r for r in rs if r.get("saturation_observed")]
+        saturated[c] = bool(sat_rows)
+        pls = [r.get("peak_live") for r in (sat_rows or rs) if r.get("peak_live")]
+        if pls:
+            peak_live[c] = max(pls)
+
     out = {"clean_maxB": clean_maxB, "slot_exhausted_at": slot_exhausted_at,
            "ceiling_not_reached": ceiling_not_reached, "density": density,
            "ratio": None, "density_ratio": None,
+           "peak_live": peak_live, "saturated": saturated,
+           "live_ratio": None,
+           "preempt_counter_available": counter_seen,
            "valid": not slot_exhausted_at,
-           "demonstrated": not ceiling_not_reached and not slot_exhausted_at}
+           "demonstrated": not ceiling_not_reached and not slot_exhausted_at,
+           # DIRECT demonstration: both cells actually hit the block limit.
+           "live_demonstrated": bool(saturated.get("bf16") and saturated.get("protected"))}
     if clean_maxB.get("bf16") and clean_maxB.get("protected"):
         out["ratio"] = round(clean_maxB["protected"] / clean_maxB["bf16"], 2)
     if density.get("bf16") and density.get("protected"):
         out["density_ratio"] = round(
             density["protected"]["conc_per_gb"] / density["bf16"]["conc_per_gb"], 2)
+    if peak_live.get("bf16") and peak_live.get("protected"):
+        out["live_ratio"] = round(peak_live["protected"] / peak_live["bf16"], 2)
     return out
 
 
-def run_driver(mml, cells, b_list, max_tokens=8, prompt_frac=0.95, gpu_util=None):
+def run_driver(mml, cells, b_list, max_tokens=8, prompt_frac=0.95,
+               gpu_util=None, resident_pressure=False):
     rows = []
     for cell in cells:
         for B in b_list:
@@ -304,13 +499,16 @@ def run_driver(mml, cells, b_list, max_tokens=8, prompt_frac=0.95, gpu_util=None
             env.setdefault("PHASE6E_FUSED_WRITER", "1")
             env.pop("PHASE6B3_FORCE_EAGER", None)
             print(f"\n=== 6k14: cell={cell} mml={mml} B={B} gen={max_tokens} "
-                  f"pf={prompt_frac} util={gpu_util or 'env'} ===", flush=True)
+                  f"pf={prompt_frac} util={gpu_util or 'env'} "
+                  f"resident_pressure={resident_pressure} ===", flush=True)
             cmd = [sys.executable, __file__, "--worker",
                    "--mml", str(mml), "--batch", str(B),
                    "--max-tokens", str(max_tokens),
                    "--prompt-frac", str(prompt_frac)]
             if gpu_util is not None:
                 cmd += ["--gpu-util", str(gpu_util)]
+            if resident_pressure:
+                cmd += ["--resident-pressure"]
             subprocess.run(cmd, env=env, check=False)
             try:
                 rows.append(json.loads(Path(out).read_text()))
@@ -318,13 +516,15 @@ def run_driver(mml, cells, b_list, max_tokens=8, prompt_frac=0.95, gpu_util=None
                 rows.append({"cell": cell, "batch": B, "error": str(e)[:60]})
 
     a = _analyze(rows)
-    print("\n" + "=" * 100)
+    print("\n" + "=" * 104)
     print(f"PHASE 6K.14 — capacity saturation (mml={mml}, prompt~{prompt_frac}*mml, "
-          f"gen={max_tokens}, gpu_util={gpu_util or os.environ.get('GPU_UTIL','0.5')})")
-    print("=" * 100)
-    print(f"  {'cell':>10} {'B':>5} | {'done':>7} {'oom':>5} {'slotX':>5} "
-          f"{'preempt':>7} {'HBM GB':>7} {'tps':>7} {'conc':>6} {'slots':>6}")
-    print("  " + "-" * 90)
+          f"gen={max_tokens}, gpu_util={gpu_util or os.environ.get('GPU_UTIL','0.5')}, "
+          f"resident_pressure={resident_pressure})")
+    print("=" * 104)
+    print(f"  {'cell':>10} {'B':>5} | {'done':>7} {'oom':>4} {'preempt':>7} "
+          f"{'fit':>5} {'live':>5} {'util':>5} {'sat':>5} {'HBMGB':>6} "
+          f"{'tps':>6} {'conc':>6}")
+    print("  " + "-" * 92)
     for r in rows:
         cell, B = r.get("cell", "?"), r.get("batch", "?")
         if r.get("error") and r.get("completed", 0) == 0 and not (
@@ -333,43 +533,57 @@ def run_driver(mml, cells, b_list, max_tokens=8, prompt_frac=0.95, gpu_util=None
             continue
         tag = ("  <-- OOM" if r.get("oom")
                else "  <-- SLOT-EXHAUSTED (6K.14 regression!)" if r.get("slot_exhausted")
-               else "  <-- preempt" if (r.get("preempts") or 0) > 0 else "")
+               else "  <-- preempt" if (r.get("preempts") or 0) > 0
+               else "  <-- SATURATED" if r.get("saturation_observed") else "")
         print(f"  {cell:>10} {B:>5} | {str(r.get('completed'))+'/'+str(B):>7} "
-              f"{str(bool(r.get('oom'))):>5} {str(bool(r.get('slot_exhausted'))):>5} "
-              f"{r.get('preempts') or 0:>7} {(r.get('hbm_gb') or 0):>7} "
-              f"{(r.get('agg_tps') or 0):>7} {(r.get('max_concurrency') or 0):>6} "
-              f"{(r.get('max_active_slots') or 0):>6}{tag}")
+              f"{str(bool(r.get('oom'))):>4} {r.get('preempts') or 0:>7} "
+              f"{(r.get('resident_fit') or 0):>5} {(r.get('peak_live') or 0):>5} "
+              f"{(r.get('peak_util') or 0):>5} {str(bool(r.get('saturation_observed'))):>5} "
+              f"{(r.get('hbm_gb') or 0):>6} {(r.get('agg_tps') or 0):>6} "
+              f"{(r.get('max_concurrency') or 0):>6}{tag}")
 
-    print("\n  clean max-B (all complete, no OOM/preempt/slot-exhaustion):", a["clean_maxB"])
     if a["slot_exhausted_at"]:
-        print("  !! SLOT-EXHAUSTED at:", a["slot_exhausted_at"])
-        print("  !! INVALID capacity test — cap < B. Re-run on the 6K.14 fix "
-              "(PHASE6_MAX_ACTIVE_SLOTS auto-bump / set to B).")
-    if a["ceiling_not_reached"]:
-        print(f"  !! CEILING NOT REACHED for {a['ceiling_not_reached']} — the "
-              "largest tried B was still clean, so NOTHING saturated.")
-        print("  !! The clean-max-B ratio is UNRELIABLE here. Raise --b-list "
-              "and/or --max-tokens (short gen queue-drains in waves with no "
-              "memory pressure; use --max-tokens 512+ to force preemption).")
+        print("\n  !! SLOT-EXHAUSTED at:", a["slot_exhausted_at"],
+              "— INVALID (cap < B; a 6K.14 regression).")
 
+    # --- DIRECT capacity proof (resident-pressure): peak live + block util ---
+    if a["peak_live"]:
+        print("\n  DEMONSTRATED max live concurrency (peak resident seqs; "
+              "saturation = block-limit hit / preempt / OOM):")
+        for c in ("bf16", "protected", "naive"):
+            if c in a["peak_live"]:
+                print(f"     {c:>10}: peak_live={a['peak_live'][c]} "
+                      f"saturated={a['saturated'].get(c)}")
+        if a["live_ratio"] is not None:
+            verdict = "DEMONSTRATED" if a["live_demonstrated"] else "NOT yet demonstrated"
+            print(f"   live-concurrency ratio (protected/bf16) = {a['live_ratio']}x "
+                  f"[{verdict}]")
+            if not a["live_demonstrated"]:
+                print("   (a cell never hit the block limit — raise B / "
+                      "--max-tokens / --prompt-frac, or lower --gpu-util.)")
+    if a["peak_live"] and not a.get("preempt_counter_available"):
+        print("  note: preempt counter was UNREADABLE this run (preempt_src=None) "
+              "— saturation judged by peak block utilization, not preempts.")
+
+    # --- ESTIMATED density (always available; from vLLM block budget) ---
     if a["density"]:
-        print("\n  concurrency density (vLLM max_conc / total HBM) — budget "
-              "estimate, net of sidecar tax:")
+        print("\n  ESTIMATED concurrency density (vLLM max_conc / total HBM, "
+              "net of sidecar tax):")
         for c, d in a["density"].items():
             print(f"     {c:>10}: conc={d['conc']} / {d['hbm_gb']}GB "
                   f"= {d['conc_per_gb']} seq/GB")
         if a["density_ratio"] is not None:
-            print(f"   density ratio (protected/bf16) = {a['density_ratio']}x "
-                  "(estimated concurrent max-len seqs per GB)")
+            print(f"   density ratio (protected/bf16) = {a['density_ratio']}x (estimate)")
 
-    if a["ratio"] is not None:
-        caveat = "" if a["demonstrated"] else "   [NOT saturated -> unreliable]"
-        print(f"\n  clean-max-B ratio (protected/bf16) = {a['ratio']}x{caveat}")
-        if a["demonstrated"]:
-            print("   ~2x  => DEMONSTRATED net capacity win (real capacity story).")
-            print("   ~1x  => bookkeeping; the +4.7 GB sidecar tax eats the budget "
-                  "(drop the capacity claim; keep the fidelity story).")
-    print("=" * 100, flush=True)
+    # --- clean-max-B (only meaningful once saturated) ---
+    print("\n  clean max-B (no OOM/preempt/slot-exhaustion):", a["clean_maxB"])
+    if a["ceiling_not_reached"]:
+        print(f"  !! CEILING NOT REACHED for {a['ceiling_not_reached']} — largest "
+              "tried B still clean. Offline generate() queue-drains in waves, so "
+              "B-ramp alone can't cliff; use --resident-pressure + peak_live above.")
+    if a["ratio"] is not None and a["demonstrated"]:
+        print(f"  clean-max-B ratio (protected/bf16) = {a['ratio']}x [demonstrated]")
+    print("=" * 104, flush=True)
     return 0
 
 
@@ -435,6 +649,44 @@ def _selftest():
     assert a3["density"]["protected"]["conc_per_gb"] == round(110.6 / 46.55, 3)
     assert abs(a3["density_ratio"] - 1.81) < 0.02, a3["density_ratio"]  # the real signal
     print("  analysis core (ceiling-not-reached + density): PASS")
+
+    # 5. Resident-pressure DIRECT proof: peak_live at block saturation. bf16
+    # held ~55 resident at util~0.97 (saturated); protected ~110 -> live ratio
+    # 2.0x, demonstrated because BOTH actually hit the block limit. completed==B
+    # throughout (offline generate always finishes) — saturation comes from
+    # peak_util, not from completion failure.
+    rows_live = [
+        {"cell": "bf16", "batch": 96, "completed": 96, "preempts": 3,
+         "preempt_src": "num_cumulative_preemption", "peak_live": 55,
+         "peak_util": 0.97, "saturation_observed": True},
+        {"cell": "bf16", "batch": 160, "completed": 160, "preempts": 20,
+         "preempt_src": "num_cumulative_preemption", "peak_live": 55,
+         "peak_util": 0.98, "saturation_observed": True},
+        {"cell": "protected", "batch": 96, "completed": 96, "preempts": 0,
+         "preempt_src": "num_cumulative_preemption", "peak_live": 96,
+         "peak_util": 0.82, "saturation_observed": False},
+        {"cell": "protected", "batch": 160, "completed": 160, "preempts": 12,
+         "preempt_src": "num_cumulative_preemption", "peak_live": 110,
+         "peak_util": 0.97, "saturation_observed": True},
+    ]
+    a4 = _analyze(rows_live)
+    assert a4["peak_live"] == {"bf16": 55, "protected": 110}, a4["peak_live"]
+    assert a4["saturated"] == {"bf16": True, "protected": True}, a4["saturated"]
+    assert a4["live_ratio"] == 2.0, a4["live_ratio"]
+    assert a4["live_demonstrated"] is True
+    assert a4["preempt_counter_available"] is True
+    # Counter-unavailable variant: saturation still detectable via peak_util.
+    rows_noctr = [
+        {"cell": "bf16", "batch": 96, "completed": 96, "peak_live": 55,
+         "peak_util": 0.95, "saturation_observed": True},
+        {"cell": "protected", "batch": 96, "completed": 96, "peak_live": 110,
+         "peak_util": 0.96, "saturation_observed": True},
+    ]
+    a5 = _analyze(rows_noctr)
+    assert a5["preempt_counter_available"] is False
+    assert a5["live_demonstrated"] is True            # peak_util carried it
+    assert a5["live_ratio"] == 2.0
+    print("  analysis core (resident-pressure live proof): PASS")
     print("SELFTEST PASS")
     return 0
 
@@ -459,16 +711,23 @@ def main():
                     help="gpu_memory_utilization override (else $GPU_UTIL or "
                          "0.5). Lower (0.35-0.4) shrinks the pool to force "
                          "saturation at smaller B if needed.")
+    ap.add_argument("--resident-pressure", action="store_true",
+                    help="capacity-PROOF mode: instrument vLLM per-step to "
+                         "record peak LIVE (resident) sequences + peak KV-block "
+                         "utilization, so saturation is OBSERVED directly "
+                         "(block limit hit) rather than inferred from submitted "
+                         "B. Pair with long --max-tokens + high --prompt-frac.")
     args = ap.parse_args()
     if args.selftest:
         return _selftest()
     if args.worker:
         return run_worker(args.mml, args.batch, args.max_tokens,
-                          args.prompt_frac, args.gpu_util)
+                          args.prompt_frac, args.gpu_util, args.resident_pressure)
     b_list = [int(x) for x in args.b_list.split(",")] if args.b_list \
         else DEFAULT_B.get(args.mml, [32, 48, 64])
     return run_driver(args.mml, args.cells.split(","), b_list,
-                      args.max_tokens, args.prompt_frac, args.gpu_util)
+                      args.max_tokens, args.prompt_frac, args.gpu_util,
+                      args.resident_pressure)
 
 
 if __name__ == "__main__":

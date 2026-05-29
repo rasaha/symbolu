@@ -179,23 +179,56 @@ density (~1.8× seq/GB) + an *estimated* aggregate-throughput edge (~1.2×). The
 do **not** demonstrate sustained capacity (nothing saturated). A wider/longer,
 higher-fill saturation run is required.
 
-## Run 3 — forcing saturation (knobs added)
+## Run 3 — gen=512, prompt-frac=0.95, B→160 (pod): still no saturation
 
-`--prompt-frac` (default now **0.95**, was effectively 0.8), `--gpu-util`, plus
-the existing `--max-tokens` / `--b-list`. High fill makes concurrency the
-binding constraint, so the sweep saturates near `max_concurrency` (≈55 bf16 /
-≈110 protected) — bracketed by a sweep around those values rather than out at
-320. Recommended:
+CEILING-NOT-REACHED again; both cells clean to B=160. Two compounding reasons:
+1. **Prompts still under-filled.** The sentence template tokenizes to ~13 tok
+   but `_long_prompt` assumed 16, and the 0.95·mml target sat *below* the
+   truncation cap — so the encoded prompt fell short and was never trimmed *up*
+   to the cap. Residents kept block headroom → no overflow.
+2. **The preempt counter was almost certainly never read.** `_sched_counters`
+   guessed 3 attribute names; if none matched this build it returns 0 *always*
+   — and offline `generate()` always *completes* the batch — so even real
+   preemption was invisible. With both masked, B-ramp had **no** saturation
+   signal at all.
+
+The throughput reversal grew clearer: protected agg_tps 78–115 vs bf16 51–87 at
+mid/high B — workload-dependent (long-gen/high-concurrency favors protected;
+short-gen/prefill favors bf16).
+
+## Methodology pivot — `--resident-pressure` (direct observation)
+
+The deeper truth: **offline `generate([prompt]*B)` cannot produce an OOM cliff
+from B** — vLLM admits only what fits, queue-drains the rest in waves, and always
+completes. B is *submitted*, not *resident*. So we stop inferring saturation and
+**observe it**: a per-step probe (`_StepProbe`, wraps `LLMEngine.step`) records,
+each step, the LIVE (running) seq count, the waiting queue, and KV-block usage →
+`peak_live`, `peak_util`, `avg_live`. Plus a robust preempt counter that scans
+the scheduler for any `*preempt*` int and reports the source (or flags it
+UNREADABLE), and full-fill prompts (over-request, truncate to the cap exactly).
+
+`saturation_observed = peak_util ≥ 0.90 OR preempts > 0 OR oom` — the block
+limit was actually hit, independent of any OOM cliff. The **demonstrated max
+live concurrency = `peak_live`** at saturation; the protected/bf16 `peak_live`
+ratio is the real capacity number, `live_demonstrated=True` only when BOTH cells
+actually saturate.
+
+**Run 4 (capacity proof):**
 ```bash
 PHASE6K10_AUTO_HOOK=0 python CTM_plus/Bench/scripts/phase6k14_saturation.py \
-  --mml 8192 --max-tokens 512 --prompt-frac 0.95 \
-  --b-list 32,48,56,72,96,112,128,144,160 2>&1 | tee /tmp/phase6k14_sat.log
+  --mml 8192 --max-tokens 2048 --prompt-frac 0.98 --gpu-util 0.5 \
+  --resident-pressure \
+  --b-list 32,48,56,64,72,96,112,128,160,192 2>&1 | tee /tmp/phase6k14_resident.log
 ```
-Expect bf16 to start preempting around B≈48–56 and protected around B≈96–112 →
-`demonstrated=True` with clean-max-B ratio ≈ 2×. If a cell is still
-CEILING-NOT-REACHED, drop `--gpu-util 0.4` (smaller pool) and/or raise
-`--prompt-frac 0.98`. Do NOT read the clean-max-B ratio as a capacity verdict
-while CEILING-NOT-REACHED holds.
+Read `peak_live` + `peak_util` per cell: once `peak_util≈1.0` the cell is at its
+block limit and `peak_live` is its true resident concurrency. Expect bf16
+`peak_live≈55`, protected `≈110` → `live_ratio≈2×` `[DEMONSTRATED]`. If a cell
+never reaches `peak_util≈0.9`, raise B / lower `--gpu-util`. Do **not** claim
+demonstrated capacity until `peak_util` (or preempts) shows the limit was hit.
+
+Known gap: aggregate tps mixes prefill + decode; a clean prefill-vs-decode TPS
+split needs per-phase step timing (a future probe extension). For now the
+throughput edge is reported as workload-dependent, not final.
 
 ## Files
 
