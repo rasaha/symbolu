@@ -24,6 +24,13 @@
 #       (free), >1 when offset (symmetric clips / coarsens). (Predicted-xmin (B)
 #       subsumes symmetric-V (A) for xmin; A is the cheaper no-regression route.)
 #
+#   (C) N_PROTECT 5→3  — shrink k_protect_ext (~0.33 GB at mml=32K).
+#       Hypothesis: per (layer, head) the 4th/5th highest-max-abs channels carry
+#       negligible "protection mass" vs the top-3. Decision metric: per-head
+#       top3_mass_frac = sum(top-3 max-abs) / sum(top-5 max-abs). If nearly 1.0
+#       the 4th/5th channels are "dead weight"; if well below 1.0 they cover real
+#       overflow risk and must be kept.
+#
 # Both decision metrics are CLOSED FORM over per-group (min, max, absmax) +
 # (scale, xmin) regression sufficient statistics — accumulable online in the
 # capture hook, no raw-activation dump. The quant convention matches the writer
@@ -63,6 +70,7 @@ from pathlib import Path
 SAVE_GB = {
     "predicted_xmin": 1.30,   # k_xmin_ext (0.65) + v_xmin_ext (0.65)
     "symmetric_v": 0.65,      # v_xmin_ext only
+    "n_protect_3": 0.33,      # k_protect_ext 5→3: 2/5 × 0.82 GB
 }
 
 # Quant convention (must match phase5b_4c_paged_writer.py).
@@ -77,6 +85,11 @@ PX_GREEN = {"r2": 0.98, "norm_resid": 0.25}
 PX_YELLOW = {"r2": 0.90, "norm_resid": 0.50}
 SV_GREEN = {"mean": 1.05, "max": 1.15}   # error-inflation factor
 SV_YELLOW = {"mean": 1.30, "max": 1.60}
+
+# n_protect 5→3 thresholds: per-head top3_mass_frac = sum(top-3 max-abs)/sum(top-5).
+# 1.0 = 4th/5th channels are dead; < 1.0 = they carry real overflow risk.
+NP_GREEN = {"mass_frac": 0.90}
+NP_YELLOW = {"mass_frac": 0.80}
 
 # Model-level rollup: an idea is GREEN only if nearly all units are GREEN AND
 # the worst unit is no worse than YELLOW (one RED channel can dominate quality).
@@ -156,6 +169,26 @@ def symmetric_v_unit(infl_sum, infl_sq, infl_max, n):
     return {"mean": mean, "max": infl_max, "verdict": v}
 
 
+def n_protect_unit(top5_vals):
+    """Per-head verdict for n_protect 5→3 reduction.
+    top5_vals: list of 5 max-abs values sorted descending [v1>=v2>=...>=v5].
+    mass_frac = (v1+v2+v3)/(v1+...+v5): fraction of protection mass in top-3.
+    GREEN if >=0.90; YELLOW if >=0.80; RED otherwise."""
+    if not top5_vals or len(top5_vals) < 5:
+        return {"mass_frac": None, "verdict": "RED"}
+    total = sum(top5_vals)
+    if total <= _EPS:
+        return {"mass_frac": 1.0, "verdict": "GREEN", "dead": True}
+    mf = sum(top5_vals[:3]) / total
+    if mf >= NP_GREEN["mass_frac"]:
+        v = "GREEN"
+    elif mf >= NP_YELLOW["mass_frac"]:
+        v = "YELLOW"
+    else:
+        v = "RED"
+    return {"mass_frac": round(mf, 4), "verdict": v}
+
+
 def _pct(sorted_vals, q):
     """Linear-interpolated percentile q in [0,1] of an already-sorted list."""
     if not sorted_vals:
@@ -200,13 +233,14 @@ def analyze_model(stats):
                                      [n,Sx,Sy,Sxx,Sxy,Syy, infl_sum,infl_sq,infl_max]
     """
     layers = stats.get("layers", {})
-    px_units, sv_units = [], []          # predicted-xmin (K∪V), symmetric-V (V)
+    px_units, sv_units, np_units = [], [], []   # predicted-xmin (K∪V), sym-V (V), n_protect
     px_r2, px_nr = [], []
     sv_mean = []
+    np_mf = []
     per_layer = {}
 
     for name, ld in layers.items():
-        lpx, lsv = [], []
+        lpx, lsv, lnp = [], [], []
         for row in ld.get("k", []):
             u = predicted_xmin_unit(row[:6])
             px_units.append(u); lpx.append(u)
@@ -223,12 +257,19 @@ def analyze_model(stats):
             sv_units.append(sv); lsv.append(sv)
             if sv["mean"] is not None:
                 sv_mean.append(sv["mean"])
+        # n_protect 5→3: one entry per head (each row = top-5 max-abs values).
+        for head_top5 in ld.get("k_protect", []):
+            u = n_protect_unit(head_top5)
+            np_units.append(u); lnp.append(u)
+            if u.get("mass_frac") is not None:
+                np_mf.append(u["mass_frac"])
         per_layer[name] = {
             "predicted_xmin": _rollup(lpx),
             "symmetric_v": _rollup(lsv),
+            "n_protect_3": _rollup(lnp),
         }
 
-    px_r2.sort(); px_nr.sort(); sv_mean.sort()
+    px_r2.sort(); px_nr.sort(); sv_mean.sort(); np_mf.sort()
     report = {
         "model": stats.get("model"),
         "n_prompts": stats.get("n_prompts"),
@@ -247,6 +288,12 @@ def analyze_model(stats):
             "median_inflation": round(_pct(sv_mean, 0.5), 4) if sv_mean else None,
             "p90_inflation": round(_pct(sv_mean, 0.90), 4) if sv_mean else None,
             "save_gb": SAVE_GB["symmetric_v"],
+        },
+        "n_protect_3": {
+            **_rollup(np_units),
+            "median_mass_frac": round(_pct(np_mf, 0.5), 4) if np_mf else None,
+            "p10_mass_frac": round(_pct(np_mf, 0.10), 4) if np_mf else None,
+            "save_gb": SAVE_GB["n_protect_3"],
         },
         "per_layer": per_layer,
     }
@@ -278,9 +325,22 @@ def format_report(report):
     L.append(f"    inflation factor: median={sv['median_inflation']} "
              f"p90(worst)={sv['p90_inflation']}  (1.0 = free, >1 = quality cost)")
 
-    # Stacked saving estimate (B subsumes A's xmin, so they don't add).
-    best = px['save_gb'] if px['verdict'] in ("GREEN", "YELLOW") else (
+    np_ = report.get("n_protect_3", {})
+    if np_.get("n_units", 0) > 0:
+        L.append(f"\n(C) N_PROTECT 5→3  — shrink k_protect_ext (~{np_['save_gb']} GB)")
+        L.append(f"    verdict: {np_['verdict']}   units={np_['n_units']} "
+                 f"green_frac={np_.get('green_frac')}  counts={np_.get('counts')}")
+        L.append(f"    top-3/top-5 mass: median={np_['median_mass_frac']} "
+                 f"p10(worst)={np_['p10_mass_frac']}  "
+                 f"(1.0 = 4th/5th carry nothing, <0.8 = must keep them)")
+    else:
+        L.append("\n(C) N_PROTECT 5→3  — no k_protect data captured (re-run with GPU)")
+
+    # Stacked saving estimate: (B) and (C) are independent tensors; B subsumes A.
+    xmin_save = px['save_gb'] if px['verdict'] in ("GREEN", "YELLOW") else (
         sv['save_gb'] if sv['verdict'] in ("GREEN", "YELLOW") else 0.0)
+    np_save = np_.get('save_gb', 0.0) if np_.get('verdict') in ("GREEN", "YELLOW") else 0.0
+    best = xmin_save + np_save
     L.append("\n" + "-" * 78)
     L.append(f"  Screen result: up to ~{best:.2f} GB of the ~4.7 GB delta is "
              "plausibly recoverable on this model")
@@ -323,9 +383,10 @@ def capture(model, out_path, protect_irrelevant=True, max_model_len=2048,
         raise RuntimeError("could not detect num_kv_heads")
 
     # Per-layer accumulators (built lazily on first prefill once D is known).
-    # k_acc[name]: (H, D, 6)  sums [n,Sx,Sy,Sxx,Sxy,Syy], x=scale y=xmin
-    # v_acc[name]: (H, ng, 9) sums [...6..., infl_sum, infl_sq, infl_max]
-    k_acc, v_acc = {}, {}
+    # k_acc[name]:  (H, D, 6)  sums [n,Sx,Sy,Sxx,Sxy,Syy], x=scale y=xmin
+    # v_acc[name]:  (H, ng, 9) sums [...6..., infl_sum, infl_sq, infl_max]
+    # kp_acc[name]: (H, D)     running max-abs per channel (for n_protect screen)
+    k_acc, v_acc, kp_acc = {}, {}, {}
     order = []
 
     def _accum_block_stats(x_blocks):
@@ -389,6 +450,12 @@ def capture(model, out_path, protect_irrelevant=True, max_model_len=2048,
             kb = K3[:nblk * block_size].reshape(nblk, block_size, H, D)
             ks, kx = _accum_block_stats(kb)
             _accum_into(k_acc, lname, ks, kx, (H, D))
+        # K max-abs per channel (running max for n_protect 5→3 screen).
+        kabsmax = K3.abs().amax(dim=0).float()   # (H, D)
+        if lname not in kp_acc:
+            kp_acc[lname] = kabsmax
+        else:
+            kp_acc[lname] = torch.maximum(kp_acc[lname], kabsmax)
         # --- V: per-token over 32-channel groups ---
         ng = D // v_group_size
         if ng >= 1:
@@ -437,6 +504,10 @@ def capture(model, out_path, protect_irrelevant=True, max_model_len=2048,
             entry["k"] = k_acc[name].reshape(-1, 6).cpu().tolist()
         if name in v_acc:
             entry["v"] = v_acc[name].reshape(-1, 9).cpu().tolist()
+        if name in kp_acc and kp_acc[name].shape[-1] >= 5:
+            # Top-5 max-abs per head (H, 5), sorted descending — enough for any top-k ratio.
+            top5 = kp_acc[name].topk(5, dim=-1).values  # (H, 5)
+            entry["k_protect"] = top5.cpu().tolist()
         layers[name] = entry
 
     stats = {"model": model, "n_prompts": len(corpus),
@@ -507,21 +578,41 @@ def _selftest():
     assert abs(2.0 * 2.0 / 4.0 - 1.0) < 1e-12
     print("  inflation closed-form identity: PASS")
 
-    # 6. Model rollup + full analyze on a synthetic 2-layer model.
+    # 6. n_protect 5→3 unit verdicts.
+    # Concentrated: top-3 dominates (mass_frac > 0.90) -> GREEN.
+    u_np_g = n_protect_unit([1.0, 0.8, 0.6, 0.02, 0.01])
+    assert u_np_g["verdict"] == "GREEN", u_np_g
+    # Uniform: evenly spread (mass_frac ≈ 0.60) -> RED.
+    u_np_r = n_protect_unit([1.0, 0.9, 0.8, 0.7, 0.6])
+    assert u_np_r["verdict"] == "RED", u_np_r
+    # Border YELLOW: mass_frac ≈ 0.84 (sum top3=2.7, total=3.2).
+    u_np_y = n_protect_unit([1.0, 0.9, 0.8, 0.3, 0.2])
+    assert u_np_y["verdict"] == "YELLOW", u_np_y
+    # Dead channel: all zero -> GREEN.
+    u_np_d = n_protect_unit([0.0, 0.0, 0.0, 0.0, 0.0])
+    assert u_np_d["verdict"] == "GREEN" and u_np_d.get("dead"), u_np_d
+    print("  n_protect_unit (concentrated/uniform/yellow/dead): PASS")
+
+    # 7. Model rollup + full analyze on a synthetic 2-layer model.
     def k_row_green():
         return _sums(scales, xmins_tight)
     def v_row_green():
         return _sums(scales, xmins_tight) + [1.0 * 40, 1.0 * 40, 1.03]
     def v_row_red():
         return _sums(scales, xmins_noise) + [1.9 * 40, 3.7 * 40, 2.1]
+    # k_protect: per head, top-5 max-abs. Green head: concentrated; red head: uniform.
+    np_head_green = [1.0, 0.8, 0.6, 0.02, 0.01]
+    np_head_red   = [1.0, 0.9, 0.8, 0.7, 0.6]
     stats = {
         "model": "synthetic-test", "n_prompts": 10,
         "block_size": 32, "v_group_size": 32,
         "layers": {
             "layer0": {"k": [k_row_green() for _ in range(8)],
-                       "v": [v_row_green() for _ in range(4)]},
+                       "v": [v_row_green() for _ in range(4)],
+                       "k_protect": [np_head_green for _ in range(4)]},
             "layer1": {"k": [k_row_green() for _ in range(8)],
-                       "v": [v_row_red() for _ in range(4)]},
+                       "v": [v_row_red() for _ in range(4)],
+                       "k_protect": [np_head_red for _ in range(4)]},
         },
     }
     rep = analyze_model(stats)
@@ -532,9 +623,14 @@ def _selftest():
     assert rep["per_layer"]["layer1"]["symmetric_v"]["verdict"] == "RED"
     assert rep["predicted_xmin"]["save_gb"] == 1.30
     assert rep["symmetric_v"]["save_gb"] == 0.65
+    assert rep["n_protect_3"]["save_gb"] == 0.33
     # Mixed V (half green, half red) -> model symmetric_v not GREEN.
     assert rep["symmetric_v"]["verdict"] in ("YELLOW", "RED")
-    print("  analyze_model rollup (2-layer synthetic): PASS")
+    # n_protect: layer0 all GREEN, layer1 all RED -> model-level not GREEN.
+    assert rep["per_layer"]["layer0"]["n_protect_3"]["verdict"] == "GREEN"
+    assert rep["per_layer"]["layer1"]["n_protect_3"]["verdict"] == "RED"
+    assert rep["n_protect_3"]["verdict"] in ("YELLOW", "RED")
+    print("  analyze_model rollup (2-layer synthetic + n_protect): PASS")
     print(format_report(rep))
     print("\nSELFTEST PASS")
     return 0

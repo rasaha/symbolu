@@ -91,10 +91,36 @@ def test_percentile_interpolation():
     assert abs(m._pct(s, 0.5) - 2.5) < 1e-12
 
 
+def test_n_protect_unit_green_and_red():
+    # Concentrated: top-3 covers >90% -> GREEN.
+    assert m.n_protect_unit([1.0, 0.8, 0.6, 0.02, 0.01])["verdict"] == "GREEN"
+    # Uniform: evenly spread, mass_frac ≈ 0.60 -> RED.
+    assert m.n_protect_unit([1.0, 0.9, 0.8, 0.7, 0.6])["verdict"] == "RED"
+
+
+def test_n_protect_unit_yellow():
+    # sum top-3 = 2.7, total = 3.2 -> mass_frac = 0.84375 (YELLOW range 0.80-0.90).
+    u = m.n_protect_unit([1.0, 0.9, 0.8, 0.3, 0.2])
+    assert u["verdict"] == "YELLOW"
+    assert abs(u["mass_frac"] - round(2.7 / 3.2, 4)) < 1e-9
+
+
+def test_n_protect_unit_dead():
+    u = m.n_protect_unit([0.0, 0.0, 0.0, 0.0, 0.0])
+    assert u["verdict"] == "GREEN"
+    assert u.get("dead") is True
+
+
+def test_n_protect_unit_too_short():
+    # Fewer than 5 values -> RED (not enough data).
+    assert m.n_protect_unit([1.0, 0.5, 0.1])["verdict"] == "RED"
+
+
 def test_save_gb_constants():
     # Tie the recovered-GB claims to the Phase 6G inventory.
     assert m.SAVE_GB["predicted_xmin"] == 1.30   # k_xmin + v_xmin
     assert m.SAVE_GB["symmetric_v"] == 0.65      # v_xmin only
+    assert m.SAVE_GB["n_protect_3"] == 0.33      # k_protect_ext 5→3: 2/5 × 0.82 GB
 
 
 def test_selftest_passes():

@@ -23,7 +23,7 @@ dependent and per-model** — which is exactly what a cheap CPU screen should
 answer before any GPU/kernel spend (the same audit→measure→implement discipline
 6G/6H used).
 
-## The two ideas this screens
+## The three ideas this screens
 
 The quant convention is the writer's (`phase5b_4c_paged_writer.py`):
 **asymmetric**, `scale = (max − min)/15`, `xmin = min`; **K** per-channel over a
@@ -72,23 +72,51 @@ offset (symmetric clips/coarsens, raising every V quant error by that factor).
 > is the fallback if (B) is GREEN on K but not V (or you want to avoid the
 > in-kernel α·scale+β multiply on the V path).
 
-Both metrics are **closed form over per-group `(min, max, absmax)` + the
-`(scale, xmin)` regression sufficient statistics** — accumulable online in the
-capture hook, so **no raw-activation dump** is needed.
+### (C) n_protect 5→3 — shrink `k_protect_ext` (~0.33 GB)
+
+**Hypothesis:** the 4th and 5th highest-max-abs channels per (layer, head) carry
+negligible overflow risk versus the top-3. If so, reduce `n_protect` from 5 to 3,
+saving 2/5 of `k_protect_ext` (~0.82 GB × 40% ≈ **0.33 GB**).
+
+**Decision metric (closed form, exact):** `top3_mass_frac = Σ top-3 max-abs / Σ top-5
+max-abs` per head, where max-abs is the running max over the calibration corpus. If
+the 4th/5th channels carry near-zero mass their activation range is small → int4 can
+absorb it without a bf16 escape lane.
+
+| `top3_mass_frac` (median / p10 worst) | verdict |
+|---|---|
+| median ≥ 0.90, p10 ≥ 0.85 | **GREEN** (4th/5th are dead weight) |
+| median ≥ 0.80, p10 ≥ 0.75 | **YELLOW** |
+| else | **RED** (4th/5th cover real overflow risk) |
+
+**(C) is independent of (B)/(A)** — it addresses a different tensor (`k_protect_ext`)
+so savings stack. If both (B) and (C) are GREEN, the combined recovery is
+**~1.30 + 0.33 = ~1.63 GB**.
+
+The capture uses the same prefill hook: per (layer, head, channel), the running
+max-abs over the calibration corpus is already computed for the K quant pass; the
+top-5 per head are serialized into `k_protect` in the stats JSON (< 1 KB/layer extra).
+
+All metrics are **closed form** — accumulable online in the capture hook, no
+raw-activation dump needed:
+- (B)/(A): per-group `(min, max, absmax)` + regression sufficient statistics
+- (C): per-channel running max-abs → top-5 per head at serialization
 
 ## What's validated (CPU, this container)
 
 No GPU/torch/numpy here, so only the pure-Python decision core — but that's the
 load-bearing logic.
 
-- `test_phase6g2_diet_derisk.py` (torch-free, 10/10 PASS): linear regression
+- `test_phase6g2_diet_derisk.py` (torch-free, 14/14 PASS): linear regression
   from sufficient statistics vs hand-computed α/β/R²; the closed-form inflation
   identity; per-unit GREEN/YELLOW/RED thresholds; the dead-channel guard; the
   model rollup (one RED unit downgrades GREEN→YELLOW; 10% RED→RED); percentile
-  interpolation; the recovered-GB constants tied to the 6G inventory.
+  interpolation; n_protect_unit (concentrated/uniform/yellow/dead); the
+  recovered-GB constants tied to the 6G inventory (including n_protect_3=0.33).
 - `phase6g2_sidecar_diet_derisk.py --selftest` (PASS): regression core
   (exact-fit, const-x, const-y degenerate cases), unit verdicts on tight/noisy/
-  dead synthetic data, and a full `analyze_model` on a 2-layer synthetic model.
+  dead synthetic data, n_protect unit verdicts, and a full `analyze_model` on a
+  2-layer synthetic model with all three options (B, A, C).
 
 ## What is NOT yet validated (needs the GPU pod)
 
@@ -125,16 +153,19 @@ python CTM_plus/Bench/scripts/phase6g2_sidecar_diet_derisk.py \
   **~1.30 GB** → brings the ~4.7 GB delta to ~3.4 GB before any other diet step.
 - **Symmetric-V GREEN** (inflation ≈ 1.0): the cheaper xmin drop on V alone,
   **~0.65 GB**. Useful if predicted-xmin is GREEN on K but not V.
-- **RED on a model**: skip that idea on that model; the xmin really does carry
-  independent information there. Fall back to the *shrink* diet (fp8 scale,
-  6G option C/F) or accept the density framing.
+- **n_protect 5→3 GREEN** (median top3_mass_frac ≥ 0.90): reduce protected
+  channels from 5 to 3, shrinking `k_protect_ext` by 40%. Recovers **~0.33 GB**,
+  independent of (B)/(A). Stack with predicted-xmin for **~1.63 GB** combined.
+- **RED on a model for any option**: skip that idea on that model; fall back to the
+  *shrink* diet (fp8 scale, 6G option C/F) or accept the density framing.
 
 Stacking (with the 6G shrink options, accounting for overlap — B drops xmin so
 C only fp8s the remaining scale tensors):
 
 | stack | recovers | int4 vs bf16 after |
 |---|---|---|
-| light: **B** (pred-xmin) + fp8-scale + n_protect 5→3 | ~2.3 GB | ~2.4 GB over |
+| **B** (pred-xmin) + **n_protect 5→3 (C)** | ~1.63 GB | ~3.1 GB over |
+| light: **B** + **C** + fp8-scale | ~2.3 GB | ~2.4 GB over |
 | aggressive: + **D** (inline k_protect, deep kernel) | ~3.1 GB | **~1.5 GB over** |
 
 A **~1 GB floor** (CUDA-graph private pools ~0.62 + misc buffers ~0.4) is **not
