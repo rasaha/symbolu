@@ -113,7 +113,7 @@ def _classify_error(msg):
     }
 
 
-def run_worker(mml, batch, max_tokens=8):
+def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None):
     import torch
     cell = os.environ.get("CELL", "protected")
     eager = os.environ.get("ENFORCE_EAGER", "0").strip() in ("1", "true", "yes")
@@ -138,10 +138,10 @@ def run_worker(mml, batch, max_tokens=8):
         os.environ["PHASE6K10_AUTO_HOOK"] = "0"
         os.environ.setdefault("PHASE6E_FUSED_WRITER", "1")
 
-    util = float(os.environ.get("GPU_UTIL", "0.5"))
+    util = gpu_util if gpu_util is not None else float(os.environ.get("GPU_UTIL", "0.5"))
     out = os.environ.get("OUTPUT", f"/tmp/phase6k14_{cell}_mml{mml}_B{batch}.json")
     rec = {"cell": cell, "mml": mml, "batch": batch, "gpu_util": util,
-           "max_tokens": max_tokens,
+           "max_tokens": max_tokens, "prompt_frac": prompt_frac,
            "oom": False, "slot_exhausted": False, "completed": 0, "preempts": 0,
            "hbm_gb": None, "agg_tps": None, "max_concurrency": None,
            "max_active_slots": None, "prompt_tokens": None,
@@ -187,7 +187,14 @@ def run_worker(mml, batch, max_tokens=8):
     # decode, forcing real preemption/OOM at B>max_concurrency -> a DEMONSTRATED
     # max-B. Use a long value to actually answer the capacity question.
     sp = SamplingParams(temperature=0.0, max_tokens=max_tokens)
-    prompt = _long_prompt(int(mml * 0.8))
+    # Fill prompts toward mml so CONCURRENCY is the binding constraint: with
+    # under-filled prompts (the old 0.8) admitted seqs have headroom and vLLM
+    # just queue-drains in waves without ever exceeding the pool -> nothing
+    # saturates (Runs 1-2). At prompt_frac ~0.95 the admitted set nearly fills
+    # the pool, so once B passes what fits, decode-time growth forces real
+    # preemption -> a demonstrated clean-max-B near max_concurrency. The
+    # truncation below still guarantees prompt + gen <= mml.
+    prompt = _long_prompt(int(mml * prompt_frac))
     # Truncate the prompt to fit (prompt + gen) under mml regardless of the
     # token estimate — vLLM errors on over-length prompts otherwise.
     try:
@@ -217,8 +224,8 @@ def run_worker(mml, batch, max_tokens=8):
         rec["error"] = f"gen: {str(exc)[:160]}"
 
     Path(out).write_text(json.dumps(rec, indent=2))
-    print(f"[6k14 {cell} mml{mml} B{batch} gen{max_tokens}] "
-          f"prompt_tok={rec['prompt_tokens']} "
+    print(f"[6k14 {cell} mml{mml} B{batch} gen{max_tokens} pf{prompt_frac} "
+          f"util{util}] prompt_tok={rec['prompt_tokens']} "
           f"completed={rec['completed']}/{batch} oom={rec['oom']} "
           f"slot_exhausted={rec['slot_exhausted']} preempts={rec['preempts']} "
           f"hbm={rec['hbm_gb']} tps={rec['agg_tps']} max_conc={rec['max_concurrency']} "
@@ -287,7 +294,7 @@ def _analyze(rows):
     return out
 
 
-def run_driver(mml, cells, b_list, max_tokens=8):
+def run_driver(mml, cells, b_list, max_tokens=8, prompt_frac=0.95, gpu_util=None):
     rows = []
     for cell in cells:
         for B in b_list:
@@ -296,10 +303,15 @@ def run_driver(mml, cells, b_list, max_tokens=8):
             env.update({"CELL": cell, "OUTPUT": out})
             env.setdefault("PHASE6E_FUSED_WRITER", "1")
             env.pop("PHASE6B3_FORCE_EAGER", None)
-            print(f"\n=== 6k14: cell={cell} mml={mml} B={B} gen={max_tokens} ===", flush=True)
-            subprocess.run([sys.executable, __file__, "--worker",
-                            "--mml", str(mml), "--batch", str(B),
-                            "--max-tokens", str(max_tokens)], env=env, check=False)
+            print(f"\n=== 6k14: cell={cell} mml={mml} B={B} gen={max_tokens} "
+                  f"pf={prompt_frac} util={gpu_util or 'env'} ===", flush=True)
+            cmd = [sys.executable, __file__, "--worker",
+                   "--mml", str(mml), "--batch", str(B),
+                   "--max-tokens", str(max_tokens),
+                   "--prompt-frac", str(prompt_frac)]
+            if gpu_util is not None:
+                cmd += ["--gpu-util", str(gpu_util)]
+            subprocess.run(cmd, env=env, check=False)
             try:
                 rows.append(json.loads(Path(out).read_text()))
             except Exception as e:
@@ -307,8 +319,8 @@ def run_driver(mml, cells, b_list, max_tokens=8):
 
     a = _analyze(rows)
     print("\n" + "=" * 100)
-    print(f"PHASE 6K.14 — capacity saturation (mml={mml}, prompt~0.8*mml, "
-          f"gpu_util={os.environ.get('GPU_UTIL','0.5')})")
+    print(f"PHASE 6K.14 — capacity saturation (mml={mml}, prompt~{prompt_frac}*mml, "
+          f"gen={max_tokens}, gpu_util={gpu_util or os.environ.get('GPU_UTIL','0.5')})")
     print("=" * 100)
     print(f"  {'cell':>10} {'B':>5} | {'done':>7} {'oom':>5} {'slotX':>5} "
           f"{'preempt':>7} {'HBM GB':>7} {'tps':>7} {'conc':>6} {'slots':>6}")
@@ -362,10 +374,12 @@ def run_driver(mml, cells, b_list, max_tokens=8):
 
 
 def _selftest():
-    # 1. Prompt sizing stays under mml.
+    # 1. Prompt sizing + the fill lever (higher frac -> longer prompt -> tighter
+    #    KV budget so concurrency binds and the sweep can saturate).
     for mml in (8192, 16384):
-        p = _long_prompt(int(mml * 0.8))
+        p = _long_prompt(int(mml * 0.95))
         assert "Summarize" in p
+        assert len(_long_prompt(int(mml * 0.95))) > len(_long_prompt(int(mml * 0.8)))
         print(f"  long_prompt(mml={mml}): chars={len(p)} ~tok={len(p)//4}")
 
     # 2. Error classification.
@@ -435,15 +449,26 @@ def main():
     ap.add_argument("--b-list", default="", help="comma list; default per-mml sweep")
     ap.add_argument("--max-tokens", type=int, default=8,
                     help="gen length per seq. 8=throughput probe (won't "
-                         "saturate); 512+ forces preemption for a real max-B.")
+                         "saturate); 256-512 forces preemption for a real max-B.")
+    ap.add_argument("--prompt-frac", type=float, default=0.95,
+                    help="fill prompts to this fraction of mml (default 0.95). "
+                         "High fill makes concurrency the binding constraint so "
+                         "the sweep saturates near max_concurrency; the old 0.8 "
+                         "under-filled and queue-drained without saturating.")
+    ap.add_argument("--gpu-util", type=float, default=None,
+                    help="gpu_memory_utilization override (else $GPU_UTIL or "
+                         "0.5). Lower (0.35-0.4) shrinks the pool to force "
+                         "saturation at smaller B if needed.")
     args = ap.parse_args()
     if args.selftest:
         return _selftest()
     if args.worker:
-        return run_worker(args.mml, args.batch, args.max_tokens)
+        return run_worker(args.mml, args.batch, args.max_tokens,
+                          args.prompt_frac, args.gpu_util)
     b_list = [int(x) for x in args.b_list.split(",")] if args.b_list \
         else DEFAULT_B.get(args.mml, [32, 48, 64])
-    return run_driver(args.mml, args.cells.split(","), b_list, args.max_tokens)
+    return run_driver(args.mml, args.cells.split(","), b_list,
+                      args.max_tokens, args.prompt_frac, args.gpu_util)
 
 
 if __name__ == "__main__":
