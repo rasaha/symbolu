@@ -196,7 +196,7 @@ def Int4ProtectedLLM(
         # import, but in pathological reload scenarios call it again.
         enable_int4_protected_backend()
 
-    return LLM(
+    llm = LLM(
         model=model,
         block_size=block_size,
         kv_cache_dtype=kv_cache_dtype,
@@ -205,6 +205,56 @@ def Int4ProtectedLLM(
         enforce_eager=effective_enforce_eager,
         **kwargs,
     )
+
+    # Phase 6K.10 fix: auto-install the Phase 6B.2 precapture hook for
+    # CUDA-graph mode. The hook performs the per-step SeqState->device-pool
+    # sync by wrapping execute_model OUTSIDE the captured graph. Under graph
+    # replay the captured decode region cannot run that host-side sync
+    # (write_decode_batched only syncs on the non-capture path), so WITHOUT
+    # the hook the device pools are never synced from the prefill SeqState
+    # and the captured decode reads unsynced pools -> pérdida collapse
+    # (phase6k10: "sync fired 0x during requests"). The hook was only ever
+    # installed by bench scripts, so the PUBLIC factory's graph decode was
+    # silently broken. Install it here so graph mode works out of the box.
+    # Eager doesn't need it (write_decode_batched syncs inline) -> skip.
+    # Best-effort: never fail the factory on a hook-install error. A/B
+    # toggle: PHASE6K10_AUTO_HOOK=0.
+    _auto_hook = os.environ.get(
+        "PHASE6K10_AUTO_HOOK", "1"
+    ).strip().lower() not in ("0", "false", "no")
+    if (kv_cache_dtype == "int4_protected"
+            and not effective_enforce_eager
+            and _auto_hook):
+        try:
+            from kv_policy.phase6b2_precapture_hook import (
+                install_int4_protected_precapture_hook,
+                _collect_writers,
+                _collect_impls,
+                _resolve_inner_model,
+                _resolve_model_runner,
+            )
+            _model = _resolve_inner_model(llm)
+            _hook = install_int4_protected_precapture_hook(
+                _resolve_model_runner(llm),
+                _collect_writers(_model),
+                impls=_collect_impls(_model),
+            )
+            # Retain a reference so the hook isn't GC'd (its teardown would
+            # revert the execute_model wrap).
+            setattr(llm, "_int4_protected_precapture_hook", _hook)
+            logger.info(
+                "Int4ProtectedLLM: precapture hook auto-installed for "
+                "CUDA-graph decode."
+            )
+        except Exception as e:  # pragma: no cover - environment dependent
+            logger.warning(
+                "Int4ProtectedLLM: precapture hook auto-install FAILED "
+                "(%s: %s). CUDA-graph decode may collapse; pass "
+                "enforce_eager=True or install the hook manually.",
+                type(e).__name__, e,
+            )
+
+    return llm
 
 
 # ----------------------------------------------------------------------
