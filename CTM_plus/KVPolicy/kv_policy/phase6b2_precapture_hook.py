@@ -222,6 +222,21 @@ def _resolve_and_stash(
     # build. The wrapped original_fn re-enters inference_mode on its
     # own; the nested context is a no-op there.
     with torch.inference_mode():
+        # Phase 6K.14: GC first. Free slots held by sequences that are no
+        # longer in the running set (completed or recompute-preempted)
+        # BEFORE allocating slots for this step. The decode batch in vLLM
+        # V0 is exactly the running set, so any assigned slot whose seq_id
+        # is absent from `seq_ids` has finished. Without this, the
+        # ensure_seq_state loop below leaks one slot per distinct seq_id
+        # across decode waves until the pool exhausts ("slot pool
+        # exhausted" at high B — the Phase 6K.13 finding). gc_completed_
+        # slots self-gates on $PHASE6K14_EVICT_ON_DECODE. This is the
+        # graph/hook path; the eager self-resolve path mirrors it.
+        _active_set = set(seq_ids)
+        for w in writers:
+            if w._allocated:
+                w.gc_completed_slots(_active_set)
+
         # Step 1: ensure SeqState exists on EVERY writer for each
         # seq_id. All writers see seq_ids in the same order; each
         # writer's _free_slots is popped in the same order; so the

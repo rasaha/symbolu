@@ -107,11 +107,39 @@ feature, not a memory feature**. Keep it; don't pitch memory savings.
   the int4 KV savings) and ~1.5–1.9× slower. The ~2× concurrency is bookkeeping.
 - ❌ **Concurrency cap (6K.13 live demo):** the writer keeps a per-slot staging
   pool sized to `PHASE6_MAX_ACTIVE_SLOTS` (default **8**); at B≥9 without
-  bumping it the protected cell errors `PagedKVWriter slot pool exhausted`
+  bumping it the protected cell errored `PagedKVWriter slot pool exhausted`
   (bf16 ran B=128 clean). Bumping it costs *more* memory on top of +4.7 GB, and
-  `evict_sequence` is still **not wired to sequence completion** → slots leak in
-  a long server. A valid capacity test must set `PHASE6_MAX_ACTIVE_SLOTS ≥ B`
-  AND wire evict-on-completion; until then high-concurrency serving is unproven.
+  `evict_sequence` was **not wired to sequence completion** → slots leaked in a
+  long server.
+- 🔧 **Slot lifecycle FIXED (6K.14):** both pieces are now wired —
+  (1) `PHASE6_MAX_ACTIVE_SLOTS` **auto-bumps** to vLLM `max_num_seqs` when unset
+  (explicit env still wins; `PHASE6K14_AUTOBUMP_SLOTS=0` reverts), and
+  (2) `gc_completed_slots()` runs each pure-decode step (precapture hook + eager
+  path) to free slots of finished/recompute-preempted sequences
+  (`PHASE6K14_EVICT_ON_DECODE=0` reverts). CPU regression
+  `test_phase6k14_slot_gc.py` reproduces the wave-leak and proves the fix.
+- ✅ **6K.14 Run 1 (mml=8192, gen=8): fix validated on GPU.** protected ran
+  B=48→128 with `slots`=B, **zero slot-exhaustion / OOM / preempt** (vs the
+  pre-fix B≥9 crash). The bookkeeping bug is gone.
+- 🔁 **Capacity NOT yet demonstrated — Runs 1–3 didn't saturate.** gen=8/256/512
+  all queue-drain to the sweep ceiling. **Why:** offline `generate([prompt]*B)`
+  admits only what fits and drains the rest in waves, always completing — B is
+  *submitted*, not *resident*, so B-ramp can't cliff. (Compounded by prompts
+  under-filling and a preempt counter that read 0 always.) The harness correctly
+  flags CEILING-NOT-REACHED and refuses the bogus 1.0×.
+  **Estimated** signals only: (a) concurrency density (vLLM `max_conc` ÷ total
+  HBM) = bf16 1.31 vs protected 2.38 → **~1.8× concurrent max-len seqs per GB**
+  net of the +4.4 GB tax; (b) protected agg_tps **78–115 vs bf16 51–87** at
+  mid/high B (gen 256–512) — a throughput *reversal* (gen=8's "0.8×" was
+  prefill-dominated). Both **soften** the "capacity-negative" call (wrong axis:
+  absolute footprint), but neither is *demonstrated sustained*.
+- 🧪 **Pivot to direct observation (`--resident-pressure`).** New per-step probe
+  records peak LIVE resident seqs + peak KV-block utilization;
+  `saturation_observed = peak_util≥0.90 OR preempt OR oom`. Demonstrated max live
+  concurrency = `peak_live` at saturation; `live_ratio` (protected/bf16) is the
+  real number, `live_demonstrated=True` only when BOTH cells hit the block limit.
+  Run 4: `--resident-pressure --max-tokens 2048 --prompt-frac 0.98
+  --b-list 32,…,192`. Expect bf16 `peak_live≈55`, protected `≈110` → ~2×.
 - ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
   reach HBM parity without option D (or accept it as a quality feature).
 
@@ -126,5 +154,7 @@ perplexity / small downstream check after each diet step.
 `audit_phase6g_sidecar_overhead.py`, `bench_phase6_long_context_gpu.py`,
 `bench_phase6_h_high_load_gpu.py`, `bench_phase6j_quality_gpu.py`,
 `phase6k11_needle_failuremode.py`, `phase6k12_hard_needle.py`,
-`phase6k13_capacity_demo.py`; verdict context in
-`PHASE_6J_CORRECTED_VERDICT_FINDINGS.md` + `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md`.
+`phase6k13_capacity_demo.py`, `phase6k14_saturation.py` (pending GPU run); verdict
+context in `PHASE_6J_CORRECTED_VERDICT_FINDINGS.md`,
+`PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` +
+`PHASE_6K14_SLOT_LIFECYCLE_FINDINGS.md`.

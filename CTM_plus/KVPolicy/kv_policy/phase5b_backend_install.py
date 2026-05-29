@@ -923,6 +923,15 @@ if _VLLM_FA_AVAILABLE:
                                     # decode branch (block_tables[i, 0]).
                                     seq_ids = dec_meta.block_tables[:, 0] \
                                         .cpu().tolist()
+                                    # Phase 6K.14: GC slots held by
+                                    # completed / recompute-preempted seqs
+                                    # (absent from this pure-decode batch)
+                                    # before allocating new ones — prevents
+                                    # the slot leak across decode waves that
+                                    # exhausts the pool at high B. Mirrors the
+                                    # precapture-hook path; self-gated by
+                                    # $PHASE6K14_EVICT_ON_DECODE.
+                                    writer.gc_completed_slots(seq_ids)
                                     # Ensure SeqState exists for each decode
                                     # seq (allocates a pool slot lazily on
                                     # first write).
