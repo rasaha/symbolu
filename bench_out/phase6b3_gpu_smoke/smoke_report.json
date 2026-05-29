@@ -1,5 +1,5 @@
 {
-  "verdict": "GREEN",
+  "verdict": "RED",
   "eager_cell": "bench_out/phase6b3_gpu_smoke/cell_eager.json",
   "captured_cell": "bench_out/phase6b3_gpu_smoke/cell_captured.json",
   "model": "Qwen/Qwen2.5-7B-Instruct",
@@ -12,8 +12,8 @@
   "checks": [
     {
       "name": "B1_eager_vs_captured_prefix4_equal",
-      "passed": true,
-      "detail": "ok"
+      "passed": false,
+      "detail": "seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]"
     },
     {
       "name": "B1_captured_output_not_pathological",
@@ -32,8 +32,8 @@
     },
     {
       "name": "B2_eager_vs_captured_prefix4_equal",
-      "passed": true,
-      "detail": "ok"
+      "passed": false,
+      "detail": "seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]"
     },
     {
       "name": "B2_captured_output_not_pathological",
@@ -52,8 +52,8 @@
     },
     {
       "name": "B4_eager_vs_captured_prefix4_equal",
-      "passed": true,
-      "detail": "ok"
+      "passed": false,
+      "detail": "seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]"
     },
     {
       "name": "B4_captured_output_not_pathological",
@@ -72,8 +72,8 @@
     },
     {
       "name": "B8_eager_vs_captured_prefix4_equal",
-      "passed": true,
-      "detail": "ok"
+      "passed": false,
+      "detail": "seq0 prefix differs: eager=[220, 7930, 106897, 106897] captured=[220, 16, 22, 19]"
     },
     {
       "name": "B8_captured_output_not_pathological",
@@ -108,54 +108,54 @@
     {
       "name": "captured_cell_hbm_overhead_within_5gb",
       "passed": true,
-      "detail": "overhead=49.21 GB (target ≤ 5.0 GB; within=False)"
+      "detail": "overhead=45.84 GB (target \u2264 5.0 GB; within=False)"
     }
   ],
-  "eager_load_seconds": 12.896260738372803,
-  "captured_load_seconds": 55.776829957962036,
-  "capture_overhead_gb": 49.21484375,
-  "eager_hook_stash": 236,
+  "eager_load_seconds": 13.877466917037964,
+  "captured_load_seconds": 49.16634464263916,
+  "capture_overhead_gb": 45.83984375,
+  "eager_hook_stash": 248,
   "captured_hook_stash": 244,
   "per_b_diffs": [
     {
       "B": 1,
-      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer.",
+      "eager_run1_text": "  strugg\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7 strugg,\\Id",
       "captured_run1_text": " 1742\nYou are an AI assistant. User will provide a question. You will provide a concise answer.",
-      "tokens_byte_equal": true,
+      "tokens_byte_equal": false,
       "eager_deterministic": true,
       "captured_deterministic": true,
-      "eager_run1_seconds": 1.4384880065917969,
-      "captured_run1_seconds": 0.7212662696838379
+      "eager_run1_seconds": 1.7427868843078613,
+      "captured_run1_seconds": 0.6898880004882812
     },
     {
       "B": 2,
-      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.",
+      "eager_run1_text": "  strugg\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7 strugg,\\Id",
       "captured_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your",
       "tokens_byte_equal": false,
       "eager_deterministic": true,
       "captured_deterministic": true,
-      "eager_run1_seconds": 1.9273254871368408,
-      "captured_run1_seconds": 0.9183392524719238
+      "eager_run1_seconds": 1.9128837585449219,
+      "captured_run1_seconds": 0.8624649047851562
     },
     {
       "B": 4,
-      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.",
+      "eager_run1_text": "  strugg\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7 strugg, nostalg",
       "captured_run1_text": " 1742\nYou are an AI assistant. User will you give you a task. Your user's task is to fill in the blanks based on",
       "tokens_byte_equal": false,
       "eager_deterministic": true,
       "captured_deterministic": true,
-      "eager_run1_seconds": 2.0902373790740967,
-      "captured_run1_seconds": 1.1406569480895996
+      "eager_run1_seconds": 2.0260403156280518,
+      "captured_run1_seconds": 1.054142713546753
     },
     {
       "B": 8,
-      "eager_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your task is to provide a concise answer.",
+      "eager_run1_text": "  strugg\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7\u6027\u4ef7 strugg, (",
       "captured_run1_text": " 1742\nYou are an AI assistant. User will provide a question. Your sourceMappingURL>",
       "tokens_byte_equal": false,
       "eager_deterministic": true,
       "captured_deterministic": true,
-      "eager_run1_seconds": 2.2784483432769775,
-      "captured_run1_seconds": 1.4712443351745605
+      "eager_run1_seconds": 2.170121431350708,
+      "captured_run1_seconds": 1.2713184356689453
     }
   ]
 }
