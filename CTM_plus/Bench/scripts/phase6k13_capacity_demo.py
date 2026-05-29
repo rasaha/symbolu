@@ -60,6 +60,15 @@ def _bar():
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="int4_protected audit scorecard (CPU-only).")
+    ap.add_argument("--mml", type=int, help="(ignored) scorecard covers all measured mml")
+    ap.add_argument("--worker", action="store_true", help="(ignored) audit-only, no model")
+    args, _unknown = ap.parse_known_args()
+    if args.mml is not None or args.worker or _unknown:
+        print("[6k13] NOTE: this is the AUDIT-ONLY scorecard (CPU; no model loaded). "
+              "CLI args are ignored. The live saturation runner is a separate, "
+              "post-diet bench (see [7] RECOMMENDATION).\n")
     print("=" * 92)
     print("PHASE 6K.13 — int4_protected SCORECARD (audit-only, clean post-fix)")
     print("  VERDICT: QUALITY-POSITIVE (vs naive) but CAPACITY-NEGATIVE (vs bf16).")
