@@ -252,8 +252,38 @@ Probes: `phase6k8_graph_state_probe.py` (behavioral first-vs-warm /
 determinism / length map), `phase6k9_slot_reuse_probe.py` (does collapse
 accumulate across sequential requests; does a writer-state reset clear it).
 
-**Status: OPEN. Production blocker for the int4 backend; the protect-mask
-research verdict (needle-based) stands independently.**
+### 6K.9 fix — eager CONFIRMED FIXED
+
+Root cause (confirmed): `evict_sequence()` (the per-slot reset) was **never
+wired** to sequence completion, so a new sequence whose `seq_id`
+(`_seq_id_from_block_table_row`, derived from the RECYCLED block table)
+collides with a finished one inherits its stale `SeqState`
+(`seq_pos`/`k_stage_block_id`/`k_stage_count`). `seq_pos` then **accumulates
+across requests** and once it drifts past ~60–80 the decode partial-block
+requant breaks → `pérdida`.
+
+Fix (`phase5b_backend_install.py`, prefill write branch): at the prefill
+boundary, `evict_sequence(seq_id)` before `write()` → frees the stale slot,
+zeroes its pool counters, and `ensure_seq_state` hands the new sequence fresh
+state. Gated to prefill-only forwards; toggle `PHASE6K9_RESET_ON_PREFILL=0`.
+
+A/B (`phase6k9`, protected, eager, FUSED=1) — causally pinned, same `.so`:
+
+```
+PHASE6K9_RESET_ON_PREFILL=1 (fix ON):  A_collapse=0.0  accum=False  max_seq_pos bounded (~19–37)  ALL coherent
+PHASE6K9_RESET_ON_PREFILL=0 (fix OFF): A_collapse=0.4  accum=True   max_seq_pos GROWS 31→38→61→84→107→124  collapse@#5
+```
+
+The unbounded `max_seq_pos` drift (fix OFF) → bounded (fix ON) is the
+stale-state mechanism made visible. Bonus: the prefill evict also recycles
+slots, removing the latent slot-pool-exhaustion risk.
+
+**Status: EAGER FIXED & CONFIRMED (A/B).** The dispositive eager 6J quality
+re-run (`PHASE6B3_FORCE_EAGER=1`, fix in place) gives the first trustworthy
+protect-vs-naive verdict on both metrics. **CUDA-graph first-request collapse
+(`A_1st=0`, `eager=False`) is a SEPARATE open item** — capture-time init, not
+helped by the prefill reset (zeroing pools mid-replay corrupts the captured
+graph). Production-on-graph still blocked until that is fixed; eager is usable.
 
 ## Cross-references
 
