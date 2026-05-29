@@ -966,6 +966,40 @@ if _VLLM_FA_AVAILABLE:
                             partitions = _derive_write_partitions(
                                 attn_metadata, slot_mapping_flat, BS,
                             )
+                            # Phase 6K.9 fix: clear stale per-sequence writer
+                            # state at the PREFILL boundary. seq_id is derived
+                            # from the RECYCLED block table, so a new sequence
+                            # can collide with a finished one's seq_id and
+                            # inherit its stale SeqState (seq_pos /
+                            # k_stage_block_id / k_stage_count) — corrupting the
+                            # decode partial-block requant → pérdida collapse
+                            # that ACCUMULATES across requests (phase6k9:
+                            # protected-eager A_rate 0.4→0.0 once these pools
+                            # are reset; reset_helps=True). evict_sequence()
+                            # frees the stale slot AND zeroes its device pool
+                            # counters, so write()→ensure_seq_state below hands
+                            # the new sequence FRESH state (and the first
+                            # decode's sentinel-gated pool sync then fires off a
+                            # clean -1 block-id). Gated to prefill-only forwards
+                            # (no decode metadata) so a mid-flight decode
+                            # sequence is never reset; assumes non-chunked
+                            # prefill (chunked_prefill is off for this backend).
+                            # A/B toggle: PHASE6K9_RESET_ON_PREFILL=0.
+                            if os.environ.get(
+                                "PHASE6K9_RESET_ON_PREFILL", "1"
+                            ).strip().lower() not in ("0", "false", "no"):
+                                _dm = getattr(attn_metadata, "decode_metadata", None)
+                                _prefill_only = (
+                                    getattr(attn_metadata, "prefill_metadata", None) is not None
+                                    and (
+                                        _dm is None
+                                        or getattr(_dm, "block_tables", None) is None
+                                        or _dm.block_tables.numel() == 0
+                                    )
+                                )
+                                if _prefill_only:
+                                    for _sid, _sl in partitions:
+                                        writer.evict_sequence(_sid)
                             for seq_id, sl in partitions:
                                 writer.write(
                                     key=key[sl],
