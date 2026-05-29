@@ -131,6 +131,45 @@ A/B control (optional): set `EVICT_ON_DECODE=0` for a protected sweep to confirm
 the pre-fix leak reappears (slot-exhaustion across waves) while the fixed sweep
 is clean.
 
+## Run 1 — mml=8192, gpu_util=0.5, gen=8 (pod)
+
+**Fix validated end-to-end.** protected ran B=48→128 with `slots`=B on every
+cell, **zero slot-exhaustion, zero OOM, zero preempt**. The 6K.13 leak is gone;
+the pool sizes to B as designed.
+
+**Capacity verdict: inconclusive — nothing saturated.** Both cells completed
+every B up to the sweep ceiling (128) cleanly, so clean-max-B=128 for both and
+the naive ratio is 1.0x — an artifact: with gen=8, sequences finish before they
+grow, so vLLM admits what fits (~55 bf16 / ~110 protected) and **queue-drains
+the rest in waves** (no preemption, no memory pressure). clean-max-B can't trip.
+The harness now flags this as CEILING-NOT-REACHED instead of reporting the
+misleading 1.0x.
+
+**Real signal — concurrency density (vLLM block-budget estimate, net of the
+sidecar tax, which sits in the GB denominator):**
+
+| cell | max_conc | total HBM | conc/GB |
+|---|---|---|---|
+| bf16 | 55.3 | 42.15 GB | 1.31 |
+| protected | 110.6 | 46.55 GB | **2.38** |
+
+protected fits ~2.0× the concurrent max-len sequences, **~1.8× per GB** even
+after the +4.4 GB sidecar tax — capacity-**dense** but throughput-**slower**
+(agg_tps 17 vs 21 ≈ 0.8×). This *softens* the earlier "capacity-negative"
+verdict, which was on the wrong axis (absolute footprint, not density). It is
+still a budget estimate, not a demonstrated sustained load.
+
+**To DEMONSTRATE it (Run 2):** long generation so admitted batches grow and
+preemption actually triggers at B > max_concurrency:
+```bash
+PHASE6K10_AUTO_HOOK=0 python CTM_plus/Bench/scripts/phase6k14_saturation.py \
+  --mml 8192 --max-tokens 256 2>&1 | tee /tmp/phase6k14_gen256.log
+```
+Expect clean-max-B ≈ max_concurrency per cell (bf16 ~55, protected ~110) →
+clean-max-B ratio ≈ 2× with `demonstrated=True`. (The harness only calls a
+ratio `demonstrated` when the sweep actually saturated.) Widen `--b-list` if a
+cell is still flagged CEILING-NOT-REACHED.
+
 ## Files
 
 - `CTM_plus/KVPolicy/kv_policy/phase5b_4c_paged_writer.py` — auto-bump,

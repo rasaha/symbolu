@@ -117,12 +117,21 @@ feature, not a memory feature**. Keep it; don't pitch memory savings.
   (2) `gc_completed_slots()` runs each pure-decode step (precapture hook + eager
   path) to free slots of finished/recompute-preempted sequences
   (`PHASE6K14_EVICT_ON_DECODE=0` reverts). CPU regression
-  `test_phase6k14_slot_gc.py` reproduces the wave-leak and proves the fix; the
-  full GPU saturation run via `phase6k14_saturation.py` is **pending on the pod**
-  — until those numbers land, whether the ~2× concurrency is a NET win or
-  bookkeeping (the +4.7 GB tax eating it) is still open. The harness now sets
-  `PHASE6_MAX_ACTIVE_SLOTS=B` per worker and flags any residual slot-exhaustion
-  as an invalid (mis-sized) run distinct from real OOM/preempt saturation.
+  `test_phase6k14_slot_gc.py` reproduces the wave-leak and proves the fix.
+- ✅ **6K.14 Run 1 (mml=8192, gen=8): fix validated on GPU.** protected ran
+  B=48→128 with `slots`=B, **zero slot-exhaustion / OOM / preempt** (vs the
+  pre-fix B≥9 crash). The bookkeeping bug is gone.
+- 🔁 **Capacity still unproven — that run didn't saturate.** With gen=8 both
+  cells queue-drain to B=128 in waves (no memory pressure), so clean-max-B
+  pinned at the ceiling for both → the 1.0× "ratio" is an artifact, not parity.
+  **Real signal:** concurrency density (vLLM `max_conc` ÷ total HBM) = bf16
+  55.3/42.15=1.31 vs protected 110.6/46.55=2.38 → **~1.8× more concurrent
+  max-len seqs per GB** even after the +4.4 GB sidecar tax — capacity-*dense*
+  but throughput-*slower* (agg_tps 17 vs 21 ≈ 0.8×). This **softens** the
+  "capacity-negative" call (which used absolute footprint, the wrong axis). To
+  *demonstrate* it, re-run with `--max-tokens 256` so admitted batches grow and
+  preemption triggers at B>max_conc (clean-max-B ≈ conc ≈ 2×; the harness only
+  marks a ratio `demonstrated` once the sweep actually saturates).
 - ⚠️ **Diet ceiling A+F+C ≈ 3.19 GB < 4.7 GB delta** → diet alone likely can't
   reach HBM parity without option D (or accept it as a quality feature).
 
