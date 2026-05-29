@@ -80,9 +80,14 @@ def _filler(n):
 
 
 def build_item(mode, target_tokens, rng):
-    """Returns (prompt, expected, distractors, question_tag)."""
-    # ~4 chars/token; reserve room for injected sentences.
-    n_fill = max(40, target_tokens * 4 // 60)
+    """Returns (prompt, expected, distractors, question_tag).
+
+    target_tokens is the desired TOTAL prompt size; keep it well under
+    max_model_len so there is room to generate. ~12 tokens/filler-sentence,
+    split across 3 depth bands.
+    """
+    _EST_TOK_PER_SENT = 12
+    n_fill = max(20, target_tokens // (3 * _EST_TOK_PER_SENT))
     seg = _filler(n_fill)
     segs = [seg, _filler(n_fill), _filler(n_fill)]  # 3 depth bands
 
@@ -183,10 +188,31 @@ def run_worker(mml, items_per_mode):
     rng = random.Random(1234)
     buckets = defaultdict(lambda: defaultdict(int))
     samples = []
+    try:
+        tok = llm.get_tokenizer()
+    except Exception:
+        tok = None
+    _logged = False
     for mode in MODES:
         for _ in range(items_per_mode):
             prompt, expected, distractors, _ = build_item(mode, mml // 2, rng)
-            text = llm.generate([prompt], sp)[0].outputs[0].text
+            if not _logged and tok is not None:
+                try:
+                    plen = len(tok.encode(prompt))
+                    print(f"[6k12 {cell}] first prompt ~= {plen} tok "
+                          f"(max_model_len={mml}, gen={sp.max_tokens}, "
+                          f"headroom={mml - plen - sp.max_tokens})", flush=True)
+                except Exception:
+                    pass
+                _logged = True
+            try:
+                text = llm.generate([prompt], sp)[0].outputs[0].text
+            except Exception as e:
+                buckets[mode]["ERROR"] += 1
+                if len(samples) < 8:
+                    samples.append({"mode": mode, "expected": expected,
+                                    "bucket": "ERROR", "out": str(e)[:70]})
+                continue
             b = classify(text, expected, distractors, mode)
             buckets[mode][b] += 1
             if len(samples) < 8:
@@ -200,7 +226,7 @@ def run_worker(mml, items_per_mode):
         "acc": round(n_hit / max(1, n_total), 3),
         "buckets": {m: dict(buckets[m]) for m in MODES},
         "totals": {k: sum(buckets[m].get(k, 0) for m in MODES)
-                   for k in ("HIT", "NEAR_V", "MISS_K", "COLLAPSE", "FORMAT")},
+                   for k in ("HIT", "NEAR_V", "MISS_K", "COLLAPSE", "FORMAT", "ERROR")},
         "samples": samples,
     }
     out = os.environ.get("OUTPUT", f"/tmp/phase6k12_{cell}_mml{mml}.json")
@@ -236,8 +262,8 @@ def run_driver(mml, items_per_mode):
     print(f"PHASE 6K.12 — HARD needle (mml={mml}, {items_per_mode}/mode, {len(MODES)} modes)")
     print("=" * 90)
     print(f"  {'cell':>10} | {'acc':>5} | {'HIT':>4} {'NEAR_V':>6} {'MISS_K':>6} "
-          f"{'COLLAPSE':>8} {'FORMAT':>6}")
-    print("  " + "-" * 70)
+          f"{'COLLAPSE':>8} {'FORMAT':>6} {'ERROR':>5}")
+    print("  " + "-" * 78)
     accs = {}
     for r in rows:
         if "error" in r:
@@ -246,7 +272,7 @@ def run_driver(mml, items_per_mode):
         t = r["totals"]
         accs[r["cell"]] = r["acc"]
         print(f"  {r['cell']:>10} | {r['acc']:>5.3f} | {t['HIT']:>4} {t['NEAR_V']:>6} "
-              f"{t['MISS_K']:>6} {t['COLLAPSE']:>8} {t['FORMAT']:>6}")
+              f"{t['MISS_K']:>6} {t['COLLAPSE']:>8} {t['FORMAT']:>6} {t.get('ERROR',0):>5}")
     if "naive" in accs and "protected" in accs:
         gap = accs["protected"] - accs["naive"]
         print(f"\n  HARD-needle prot-naive gap = {gap:+.3f}  "
