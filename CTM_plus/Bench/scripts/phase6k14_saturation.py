@@ -113,7 +113,7 @@ def _classify_error(msg):
     }
 
 
-def run_worker(mml, batch):
+def run_worker(mml, batch, max_tokens=8):
     import torch
     cell = os.environ.get("CELL", "protected")
     eager = os.environ.get("ENFORCE_EAGER", "0").strip() in ("1", "true", "yes")
@@ -141,6 +141,7 @@ def run_worker(mml, batch):
     util = float(os.environ.get("GPU_UTIL", "0.5"))
     out = os.environ.get("OUTPUT", f"/tmp/phase6k14_{cell}_mml{mml}_B{batch}.json")
     rec = {"cell": cell, "mml": mml, "batch": batch, "gpu_util": util,
+           "max_tokens": max_tokens,
            "oom": False, "slot_exhausted": False, "completed": 0, "preempts": 0,
            "hbm_gb": None, "agg_tps": None, "max_concurrency": None,
            "max_active_slots": None, "prompt_tokens": None,
@@ -180,7 +181,12 @@ def run_worker(mml, batch):
     rec["max_concurrency"] = _max_concurrency(llm, mml)
     if cell != "bf16":
         rec["max_active_slots"] = _writer_max_active_slots(llm)
-    sp = SamplingParams(temperature=0.0, max_tokens=8)
+    # max_tokens drives saturation: short gen (8) is throughput-only and lets
+    # vLLM queue-drain B in waves WITHOUT memory pressure (so nothing ever
+    # saturates); long gen (e.g. 512-1024) makes admitted batches GROW during
+    # decode, forcing real preemption/OOM at B>max_concurrency -> a DEMONSTRATED
+    # max-B. Use a long value to actually answer the capacity question.
+    sp = SamplingParams(temperature=0.0, max_tokens=max_tokens)
     prompt = _long_prompt(int(mml * 0.8))
     # Truncate the prompt to fit (prompt + gen) under mml regardless of the
     # token estimate — vLLM errors on over-length prompts otherwise.
@@ -211,7 +217,8 @@ def run_worker(mml, batch):
         rec["error"] = f"gen: {str(exc)[:160]}"
 
     Path(out).write_text(json.dumps(rec, indent=2))
-    print(f"[6k14 {cell} mml{mml} B{batch}] prompt_tok={rec['prompt_tokens']} "
+    print(f"[6k14 {cell} mml{mml} B{batch} gen{max_tokens}] "
+          f"prompt_tok={rec['prompt_tokens']} "
           f"completed={rec['completed']}/{batch} oom={rec['oom']} "
           f"slot_exhausted={rec['slot_exhausted']} preempts={rec['preempts']} "
           f"hbm={rec['hbm_gb']} tps={rec['agg_tps']} max_conc={rec['max_concurrency']} "
@@ -220,17 +227,27 @@ def run_worker(mml, batch):
 
 
 def _analyze(rows):
-    """Pure analysis (CPU-testable): clean-max-B per cell + protected/bf16
-    ratio + a validity flag. A row is 'clean' iff all sequences completed
-    with no OOM, no preemption, and no slot-exhaustion. slot_exhausted on
-    ANY protected row means the cap was mis-sized -> the run is INVALID as a
-    capacity test (a 6K.14 regression), reported separately from real
-    saturation."""
-    clean_maxB, slot_exhausted_at = {}, {}
+    """Pure analysis (CPU-testable). Reports:
+      * clean_maxB[cell] — largest B that completed fully with no OOM, no
+        preemption, no slot-exhaustion.
+      * ceiling_not_reached — cells whose LARGEST tried B was still clean, i.e.
+        the sweep never saturated them (e.g. short-gen workloads queue-drain
+        without memory pressure). For those, clean-max-B is only a floor, so the
+        clean-max-B ratio is unreliable and the run is NOT 'demonstrated'.
+      * density[cell] — vLLM max_concurrency / total HBM (seq/GB). An ESTIMATE
+        from vLLM's block budget (not a demonstrated load) but apples-to-apples
+        across cells and net of the sidecar tax (it's in the GB denominator).
+      * ratio (clean-max-B) + density_ratio (conc/GB), protected/bf16.
+      * valid — no slot-exhaustion anywhere (else the cap was mis-sized: a
+        6K.14 regression, reported separately).
+      * demonstrated — saturated AND valid (i.e. the clean-max-B ratio means
+        something)."""
+    clean_maxB, slot_exhausted_at, by_cell = {}, {}, {}
     for r in rows:
         cell, B = r.get("cell"), r.get("batch")
         if cell is None or B is None:
             continue
+        by_cell.setdefault(cell, []).append(r)
         if r.get("slot_exhausted"):
             slot_exhausted_at.setdefault(cell, []).append(B)
         clean = (
@@ -242,14 +259,35 @@ def _analyze(rows):
         )
         if clean:
             clean_maxB[cell] = max(clean_maxB.get(cell, 0), B)
+
+    max_B_tried = {c: max(r["batch"] for r in rs) for c, rs in by_cell.items()}
+    ceiling_not_reached = sorted(
+        c for c, mb in clean_maxB.items() if mb == max_B_tried.get(c))
+
+    density = {}
+    for c, rs in by_cell.items():
+        for r in sorted(rs, key=lambda x: x["batch"], reverse=True):
+            if r.get("max_concurrency") and r.get("hbm_gb"):
+                density[c] = {
+                    "conc": r["max_concurrency"], "hbm_gb": r["hbm_gb"],
+                    "conc_per_gb": round(r["max_concurrency"] / r["hbm_gb"], 3),
+                }
+                break
+
     out = {"clean_maxB": clean_maxB, "slot_exhausted_at": slot_exhausted_at,
-           "ratio": None, "valid": not slot_exhausted_at}
+           "ceiling_not_reached": ceiling_not_reached, "density": density,
+           "ratio": None, "density_ratio": None,
+           "valid": not slot_exhausted_at,
+           "demonstrated": not ceiling_not_reached and not slot_exhausted_at}
     if clean_maxB.get("bf16") and clean_maxB.get("protected"):
         out["ratio"] = round(clean_maxB["protected"] / clean_maxB["bf16"], 2)
+    if density.get("bf16") and density.get("protected"):
+        out["density_ratio"] = round(
+            density["protected"]["conc_per_gb"] / density["bf16"]["conc_per_gb"], 2)
     return out
 
 
-def run_driver(mml, cells, b_list):
+def run_driver(mml, cells, b_list, max_tokens=8):
     rows = []
     for cell in cells:
         for B in b_list:
@@ -258,9 +296,10 @@ def run_driver(mml, cells, b_list):
             env.update({"CELL": cell, "OUTPUT": out})
             env.setdefault("PHASE6E_FUSED_WRITER", "1")
             env.pop("PHASE6B3_FORCE_EAGER", None)
-            print(f"\n=== 6k14: cell={cell} mml={mml} B={B} ===", flush=True)
+            print(f"\n=== 6k14: cell={cell} mml={mml} B={B} gen={max_tokens} ===", flush=True)
             subprocess.run([sys.executable, __file__, "--worker",
-                            "--mml", str(mml), "--batch", str(B)], env=env, check=False)
+                            "--mml", str(mml), "--batch", str(B),
+                            "--max-tokens", str(max_tokens)], env=env, check=False)
             try:
                 rows.append(json.loads(Path(out).read_text()))
             except Exception as e:
@@ -294,11 +333,30 @@ def run_driver(mml, cells, b_list):
         print("  !! SLOT-EXHAUSTED at:", a["slot_exhausted_at"])
         print("  !! INVALID capacity test — cap < B. Re-run on the 6K.14 fix "
               "(PHASE6_MAX_ACTIVE_SLOTS auto-bump / set to B).")
+    if a["ceiling_not_reached"]:
+        print(f"  !! CEILING NOT REACHED for {a['ceiling_not_reached']} — the "
+              "largest tried B was still clean, so NOTHING saturated.")
+        print("  !! The clean-max-B ratio is UNRELIABLE here. Raise --b-list "
+              "and/or --max-tokens (short gen queue-drains in waves with no "
+              "memory pressure; use --max-tokens 512+ to force preemption).")
+
+    if a["density"]:
+        print("\n  concurrency density (vLLM max_conc / total HBM) — budget "
+              "estimate, net of sidecar tax:")
+        for c, d in a["density"].items():
+            print(f"     {c:>10}: conc={d['conc']} / {d['hbm_gb']}GB "
+                  f"= {d['conc_per_gb']} seq/GB")
+        if a["density_ratio"] is not None:
+            print(f"   density ratio (protected/bf16) = {a['density_ratio']}x "
+                  "(estimated concurrent max-len seqs per GB)")
+
     if a["ratio"] is not None:
-        print(f"  DEMONSTRATED capacity ratio (protected/bf16) = {a['ratio']}x")
-        print("   ~2x  => the audited 2x is a NET win (real capacity story).")
-        print("   ~1x  => bookkeeping; the +4.7 GB sidecar tax eats the budget "
-              "(drop the capacity claim; keep the fidelity story).")
+        caveat = "" if a["demonstrated"] else "   [NOT saturated -> unreliable]"
+        print(f"\n  clean-max-B ratio (protected/bf16) = {a['ratio']}x{caveat}")
+        if a["demonstrated"]:
+            print("   ~2x  => DEMONSTRATED net capacity win (real capacity story).")
+            print("   ~1x  => bookkeeping; the +4.7 GB sidecar tax eats the budget "
+                  "(drop the capacity claim; keep the fidelity story).")
     print("=" * 100, flush=True)
     return 0
 
@@ -328,6 +386,8 @@ def _selftest():
     assert a["clean_maxB"] == {"bf16": 48, "protected": 96}, a["clean_maxB"]
     assert a["ratio"] == 2.0, a["ratio"]
     assert a["valid"] is True
+    assert a["ceiling_not_reached"] == [], a["ceiling_not_reached"]
+    assert a["demonstrated"] is True            # both cells saturated
 
     rows_invalid = [
         {"cell": "protected", "batch": 9, "completed": 0, "slot_exhausted": True,
@@ -338,7 +398,29 @@ def _selftest():
     assert a2["valid"] is False
     assert a2["slot_exhausted_at"] == {"protected": [9]}, a2["slot_exhausted_at"]
     assert "protected" not in a2["clean_maxB"]
+    assert a2["demonstrated"] is False
     print("  analysis core (valid + invalid): PASS")
+
+    # 4. Ceiling-not-reached (the actual mml=8192 short-gen run): every tried B
+    # was clean for both cells -> ratio is 1.0x but NOT demonstrated, and the
+    # real signal is the concurrency density (~1.8x).
+    rows_ceiling = [
+        {"cell": "bf16", "batch": 96, "completed": 96, "preempts": 0,
+         "max_concurrency": 55.3, "hbm_gb": 42.15},
+        {"cell": "bf16", "batch": 128, "completed": 128, "preempts": 0,
+         "max_concurrency": 55.3, "hbm_gb": 42.15},
+        {"cell": "protected", "batch": 96, "completed": 96, "preempts": 0,
+         "max_concurrency": 110.6, "hbm_gb": 46.55},
+        {"cell": "protected", "batch": 128, "completed": 128, "preempts": 0,
+         "max_concurrency": 110.6, "hbm_gb": 46.55},
+    ]
+    a3 = _analyze(rows_ceiling)
+    assert a3["ceiling_not_reached"] == ["bf16", "protected"], a3["ceiling_not_reached"]
+    assert a3["demonstrated"] is False
+    assert a3["ratio"] == 1.0, a3["ratio"]                       # the misleading number
+    assert a3["density"]["protected"]["conc_per_gb"] == round(110.6 / 46.55, 3)
+    assert abs(a3["density_ratio"] - 1.81) < 0.02, a3["density_ratio"]  # the real signal
+    print("  analysis core (ceiling-not-reached + density): PASS")
     print("SELFTEST PASS")
     return 0
 
@@ -351,14 +433,17 @@ def main():
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--cells", default=",".join(CELLS))
     ap.add_argument("--b-list", default="", help="comma list; default per-mml sweep")
+    ap.add_argument("--max-tokens", type=int, default=8,
+                    help="gen length per seq. 8=throughput probe (won't "
+                         "saturate); 512+ forces preemption for a real max-B.")
     args = ap.parse_args()
     if args.selftest:
         return _selftest()
     if args.worker:
-        return run_worker(args.mml, args.batch)
+        return run_worker(args.mml, args.batch, args.max_tokens)
     b_list = [int(x) for x in args.b_list.split(",")] if args.b_list \
         else DEFAULT_B.get(args.mml, [32, 48, 64])
-    return run_driver(args.mml, args.cells.split(","), b_list)
+    return run_driver(args.mml, args.cells.split(","), b_list, args.max_tokens)
 
 
 if __name__ == "__main__":
