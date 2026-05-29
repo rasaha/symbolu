@@ -1,16 +1,21 @@
 # Phase 6K.7 — int4 dispatch fix: route int4kv_packed decode to the split-KV kernel
 
-> **Status: FIXED & VERIFIED (eager).** One-line dispatch fix in
-> `flash_api.cpp::run_mha_fwd`. Decode attention now matches bf16 ground
-> truth; all prompt lengths generate coherently. The Phase 6K/6K.1/6K.2
-> OOB patches were never the bug — they are valid correctness patches that
-> were simply never reached, because the kernel containing them was never
-> launched for decode.
+> **Status: dispatch fix landed (NECESSARY, not sufficient). Residual
+> decode-collapse bug OPEN.** The one-line dispatch fix in
+> `flash_api.cpp::run_mha_fwd` eliminated the **all-zero attention output**
+> (kernel norm `0.0 → 6.47`, matching bf16 ground truth) — without it every
+> int4 decode produced nothing. But a **deeper, non-deterministic
+> pérdida-collapse bug remains** (see 6K.7b): it hits *some* prompts in
+> **both eager and graph**, on **both naive and protected**, and accumulates
+> across requests within a process. The Phase 6K/6K.1/6K.2 OOB patches were
+> never the all-zero bug — they are valid correctness patches that were never
+> reached because the kernel containing them was never launched for decode.
 >
-> **Update — EAGER only (see 6K.7b below).** CUDA-graph mode
-> (`enforce_eager=False`) still collapses protected decode on short/medium
-> prompts, **non-deterministically**. The graph-mode Phase 6J sweep verdict
-> is therefore INVALID; use `PHASE6B3_FORCE_EAGER=1` for the quality verdict.
+> **Phase 6J verdict (`PROTECT_MASK_NOT_VALIDATED`) is defensible on the
+> NEEDLE metric only** (prot−naive `+0.04…+0.08` « `+0.20` threshold,
+> consistent across 3 mml × 2 modes). The token-agreement column (`~0.04–0.11`
+> for *both* cells, both modes) is **confounded by the collapse bug** and must
+> not be cited as a quality measurement.
 
 ---
 
@@ -94,7 +99,8 @@ valid scores dominate), and masked == unmasked attention.
 | 6K.5 | bf16 ground-truth 3-way | `INT4 dequant cos 0.987 vs TRUE`, K-fidelity 1%; **kernel output ⟂ both** | **writer correct**; kernel misreads/ignores |
 | 6K.6 | zero-output probe (+ `softmax_lse`) | `out norm = 0`, **no NaN**, `lse = ln(9)` uniform; zero for all `cache_seqlens` & `causal` | not masking, not epilogue: **K/V tiles zero in-kernel** |
 | source read | flash_fwd_kernel.h + flash_api.cpp | split-KV kernel is wired; `run_mha_fwd` non-split branch isn't | **dispatch ladder, one branch** |
-| 6K.7 | the fix + rebuild | see verification below | **closed** |
+| 6K.7 | the fix + rebuild | all-zero output gone (norm 0→6.47) | **all-zero closed** |
+| 6K.8 | graph/eager collapse probe | pérdida collapse on *some* prompts, both modes, naive+protected, non-deterministic, accumulates across requests | **residual collapse OPEN** |
 
 Scripts: `phase6k4_attention_localizer.py`, `phase6k5_ground_truth.py`,
 `phase6k6_zero_output_probe.py`.
@@ -116,8 +122,8 @@ Output text: ' The three primary colors'   (was ' The strugg性价性价')
 `TRUE=6.3464`) — **the kernel now agrees with bf16 ground truth.** The
 varied, finite `softmax_lse` confirms `Q·K` is real (K loaded, not zero).
 
-N-bisection (`max_tokens=24`, eager) — **all coherent**, non-monotonic
-garbage gone:
+N-bisection (`max_tokens=24`, eager) — these four are coherent, and the
+all-zero output is gone:
 
 ```
 N=8   ' The three primary colors are Red, Blue, and Yellow. These are the fundamental colors...'
@@ -126,12 +132,10 @@ N=30  ' Certainly! In additive color models, which are commonly used in electron
 N=44  ' Sure! Here are the three primary colors typically used in additive color models:\n\n1. **Red**...'
 ```
 
-(Pre-fix expectation from `PHASE_6K_FLASH_ATTN_OOB_FIX_FINDINGS.md`:
-N=8 `pérdida` garbage, N=30 degraded.)
-
-**CUDA-graph mode: still broken — see 6K.7b (OPEN).** Confirmed post-fix:
-protected decode collapses (pérdida-style) **non-deterministically** under
-`enforce_eager=False` on short/medium prompts. Eager is fully fixed.
+> ⚠️ **This was a non-collapsing sample, NOT proof of "eager fixed."** 6K.8
+> later showed eager *also* collapses on other prompts (e.g. "photosynthesis",
+> "machine learning" → `pérdida`). The dispatch fix removed the all-zero
+> output; it did not remove the residual collapse. See 6K.7b.
 
 ---
 
@@ -165,9 +169,12 @@ Pre-fix, **every int4_protected decode ran the stock non-split bf16 kernel
 over a zero stub** — not the int4 split kernel — and produced zero
 attention. Therefore:
 
-* **Phase 6J quality:** the `pérdida`/`性价` garbage was this bug. Re-run
-  the 6J quality A/B now that decode actually works; protected-vs-naive
-  agreement should finally be meaningful.
+* **Phase 6J quality:** the all-zero output was this bug, but the
+  `pérdida`/`性价` collapse is a *separate* residual bug (6K.7b) that the
+  dispatch fix did NOT close. The full 6J sweep (both graph and forced-eager)
+  returned `PROTECT_MASK_NOT_VALIDATED`; its token-agreement column is
+  confounded by the collapse, so the verdict rests on the **needle** metric
+  (prot−naive `+0.04…+0.08` « `+0.20`) → protect does not materially help.
 * **Phase 6E/6H throughput:** the decode kernel that was timed was the
   *stock non-split* kernel over a tiny zero stub, **not** the int4 dequant
   kernel. Those decode-throughput numbers do **not** reflect the int4 path
@@ -176,54 +183,77 @@ attention. Therefore:
 
 ---
 
-## Phase 6K.7b — residual CUDA-graph protect collapse (OPEN)
+## Phase 6K.7b / 6K.8 — residual non-deterministic decode collapse (OPEN, BOTH modes)
 
-The dispatch fix closed the **eager** path completely. **CUDA-graph mode
-(`enforce_eager=False`) is still broken** for the protected cell, and it is
-**non-deterministic**.
+The dispatch fix removed the **all-zero** output. It did **not** remove a
+deeper `pérdida`-style collapse that is **non-deterministic** and present in
+**both eager and graph**, on **both naive and protected**. My earlier
+"eager fixed" claim was wrong — it came from a non-collapsing prompt sample.
 
-Evidence (same `.so`, protected, default 4pct mask, `PHASE6E_FUSED_WRITER=1`):
+6K.8 evidence (`phase6k8_graph_state_probe.py`, protected, default 4pct mask,
+`PHASE6E_FUSED_WRITER=1`):
 
 ```
-                                            eager           graph
-"List three primary colors…" (N≈9)   ' …Red, Blue…' ✓   ' The pérdida pérdida…' ✗
-"What is the capital of France?" (N≈13) ' …Paris.'   ✓   run A: ' …Paris.' ✓ / run B: ' pérdida…' ✗
+EAGER (enforce_eager=True, confirmed in engine config):
+  TEST 1  "capital of France" ×6   → all 'Paris'  (clean, identical)
+  TEST 2  "photosynthesis…"        → ' Photos pérdida pérdida …'   ✗ COLLAPSE
+          "machine learning…"      → ' Machine pérdida pérdida …'  ✗ COLLAPSE
+          (other 4 prompts coherent)
+
+GRAPH (enforce_eager=False):
+  TEST 1  "capital of France" ×6   → req#1 pérdida ✗, req#2 degraded, req#3–6 'Paris' ✓
+          (first-only-collapse = True)
+  TEST 2  mixed: "programming"→'1111111…' , "machine learning"→'the the,,,' (degraded)
 ```
 
-The **same prompt** produced `'Paris'` on one graph run and a `pérdida`
-collapse on the next → output depends on run-to-run state, i.e.
-**uninitialized / stale memory or a capture-replay race**, not a quality
-limitation.
+Key observations:
+* **Eager collapses too** → not a graph-only / capture-only bug.
+* **Accumulates across requests in ONE eager process** (TEST 1 clean → TEST 2
+  collapses) → points at **writer slot-reuse / staging-buffer reset state not
+  cleared on sequence eviction**, which is mode-independent (eager has no graph
+  capture).
+* **Graph adds a first-request init layer on top** (`first-only-collapse=True`)
+  — likely the precapture-hook one-time pool sync
+  (`_sync_pool_counters_from_states`, sentinel-gated on
+  `_k_stage_block_id_pool == -1`).
+* **Non-deterministic**: same prompt/config gives different output across runs
+  (graph "capital" → Paris one run, pérdida the next; naive token-agree 0.568
+  in the smoke vs 0.058 in the sweep) ⇒ read-before-init / stale state.
+* **naive collapses too** (the smoke-vs-sweep naive swing) → it's an int4-path
+  bug, **not** protect-specific.
 
-**The graph-mode Phase 6J full sweep verdict is INVALID.** Run in graph mode it
-returned `PROTECT_MASK_NOT_VALIDATED`, but the token-agreement column was
-`~0.05` for **both** naive and protected, **identical across all three mml**
-(naive `33/570`, protected `21/570` at 8K/16K/32K) — that is the collapse, not
-a quality measurement. Needle stayed high (0.86–0.94) only because the secret
-code is emitted before the collapse, so needle is not a coherence signal here
-and the small `prot−naive` needle gap (+0.02…+0.08) from a collapsed run is
-meaningless. **Do not act on that verdict / do not close the line on it.** The
-dispositive quality A/B must run with `PHASE6B3_FORCE_EAGER=1` (int4 cells
-eager, where protected is verified correct).
+### Phase 6J verdict — what it does and does NOT support
 
-Localization (in progress): graph capture forces the int4 read down the
-capture-only **batched** path — `_read_decode_packed_batched` +
-`_splice_k_partial_tail_batched_unconditional` + the captured
-`write_decode_batched` + the precapture-hook one-time pool sync
-(`_sync_pool_counters_from_states`, sentinel-gated on
-`_k_stage_block_id_pool == -1`) — all of which the verified **eager B=1** path
-(`_read_decode_packed_one` + `_splice_k_partial_tail`) bypasses. naive (mask all
-zeros → no protected channels) survives graph mode; protected (5 channels/head
-via the bf16 sidecar) does not → the fault is in the protect-sidecar handling
-of that capture-only path. Non-determinism ⇒ a read-before-init / stale-pool
-issue is the leading hypothesis.
+Both the graph sweep and the forced-eager sweep returned
+`PROTECT_MASK_NOT_VALIDATED`. Read it carefully:
 
-Probe: `phase6k8_graph_state_probe.py` (behavioral — first-vs-warm,
-within/cross-process determinism, prompt-length map; the kernel can't be
-intercepted under graph replay).
+* **Token-agreement (`~0.04–0.11`, both cells, both modes) is CONFOUNDED** by
+  the collapse — it measures broken decode, not quality. **Do not cite it** as
+  evidence for or against the design.
+* **Needle is the clean signal** (retrieval survives an occasional collapse
+  because the code is copied early): `prot − naive = +0.04…+0.08`, consistent
+  across 3 mml × 2 modes (6 measurements) — that's 1–2 items / 25, within noise
+  and far below the `+0.20` acceptance bar.
 
-**Status: OPEN. Production blocker for captured-graph decode; independent of
-the (eager) quality verdict.**
+So `PROTECT_MASK_NOT_VALIDATED` **is defensible on the needle metric**: the
+protect mask does not materially improve long-context retrieval quality on this
+model + workload. It is **not** a clean dual-metric refutation.
+
+### Two separable conclusions
+
+1. **Protect-mask research question:** answered — no material needle benefit.
+   Closing / shelving the protect-mask line is justified on this evidence.
+2. **int4 backend usability:** the residual non-deterministic collapse affects
+   *all* int4 decode (naive + protected, both modes) → the int4 KV backend is
+   **not production-usable** until it is fixed, independent of the mask. Leading
+   hypothesis: stale writer/slot/staging state across sequence reuse.
+
+Probes: `phase6k8_graph_state_probe.py` (behavioral first-vs-warm /
+determinism / length map), `phase6k9_slot_reuse_probe.py` (does collapse
+accumulate across sequential requests; does a writer-state reset clear it).
+
+**Status: OPEN. Production blocker for the int4 backend; the protect-mask
+research verdict (needle-based) stands independently.**
 
 ## Cross-references
 
