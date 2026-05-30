@@ -62,86 +62,31 @@ def _bytes_to_gb(b) -> float:
     return round(b / 1e9, 4) if b else 0.0
 
 
-# ─── GPU-side sidecar discovery (called by the worker; lazy torch) ────────────
+# GPU-side sidecar discovery lives in the worker (phase6k14_saturation.py
+# ``_discover_sidecar_bytes``), not here: it needs torch + the live writers, and
+# keeping it there lets the worker record the per-tensor bytes WITHOUT importing
+# this analysis module back (phase6l stays a pure-CPU consumer). This module
+# only reads the recorded ``sidecar_bytes_by_tensor`` from the per-cell JSONs
+# (or, as a fallback, from a Phase 6G audit JSON via --sidecar-audit).
 
-def discover_sidecar_bytes(llm) -> dict:
-    """Enumerate int4_protected sidecar tensors on a live LLM and sum bytes per
-    canonical name. Also best-effort model-weight bytes. GPU-side — the worker
-    calls this and stuffs the result into its JSON so the CPU analyzer can do
-    the GB math. Fully guarded: returns empty breakdown on any failure (the
-    headline density numbers do NOT depend on this — they come from hbm_gb).
 
-    Returns: {"sidecar_bytes_by_tensor": {name: bytes}, "model_weights_gb": .. ,
-              "kv_cache_budget_gb": ..}."""
-    out = {"sidecar_bytes_by_tensor": {}, "model_weights_gb": None,
-           "kv_cache_budget_gb": None}
-
-    def _canon(attr: str):
-        for nm in SIDECAR_NAMES:
-            if nm in attr:
-                return nm
-        if "_ext" in attr or "stage_pool" in attr:
-            return attr            # capture under its real name if unrecognized
-        return None
-
-    def _is_tensor(v) -> bool:
-        return hasattr(v, "numel") and hasattr(v, "element_size")
-
+def _audit_sidecar_bytes(audit_path: str) -> dict:
+    """Fallback source of EXACT per-tensor sidecar BYTES from a Phase 6G
+    sidecar-audit JSON (audit_phase6g_sidecar_overhead.py output), for capacity
+    runs whose per-cell JSONs predate the live worker-side discovery (their
+    ``sidecar_bytes_by_tensor`` is empty). Restricted to the canonical
+    SIDECAR_NAMES so the total matches the printed breakdown; the audit's raw
+    byte counts are used directly, keeping the decimal-GB unit consistent with
+    hbm_gb. Returns {} on any failure (caller then estimates from the delta)."""
     try:
-        from kv_policy.phase6b2_precapture_hook import (
-            _collect_writers, _resolve_inner_model)
+        payload = json.loads(Path(audit_path).read_text())
     except Exception:
-        return out
-
-    # --- sidecar tensors live on the writer objects (per int4 layer) ---
-    try:
-        inner = _resolve_inner_model(llm)
-        writers = _collect_writers(inner) or []
-    except Exception:
-        writers = []
-        inner = None
-
-    by_name: dict[str, int] = {}
-    seen: set[int] = set()
-    for w in writers:
-        try:
-            attrs = vars(w)
-        except Exception:
-            continue
-        for attr, val in list(attrs.items()):
-            vals = (val.values() if isinstance(val, dict)
-                    else val if isinstance(val, (list, tuple)) else [val])
-            for v in vals:
-                if not _is_tensor(v) or id(v) in seen:
-                    continue
-                key = _canon(attr)
-                if key is None:
-                    continue
-                seen.add(id(v))
-                try:
-                    by_name[key] = by_name.get(key, 0) + v.numel() * v.element_size()
-                except Exception:
-                    pass
-    out["sidecar_bytes_by_tensor"] = by_name
-
-    # --- model weights: sum parameter bytes (reliable; matches the init log) ---
-    try:
-        if inner is not None:
-            mw = sum(p.numel() * p.element_size() for p in inner.parameters())
-            out["model_weights_gb"] = round(mw / 1e9, 3)
-    except Exception:
-        pass
-
-    # --- KV cache budget: best-effort from the cache config (often None) ---
-    try:
-        cc = llm.llm_engine.cache_config
-        nb = getattr(cc, "num_gpu_blocks", None)
-        cbytes = getattr(cc, "cache_block_size_bytes", None) or getattr(
-            cc, "block_size_bytes", None)
-        if nb and cbytes:
-            out["kv_cache_budget_gb"] = round(nb * cbytes / 1e9, 3)
-    except Exception:
-        pass
+        return {}
+    out: dict[str, int] = {}
+    for r in payload.get("sidecar_ranked") or []:
+        name, b = r.get("tensor"), r.get("total_bytes")
+        if name in SIDECAR_NAMES and b:
+            out[name] = out.get(name, 0) + int(b)
     return out
 
 
@@ -230,10 +175,13 @@ def _cell_accounting(rep: dict, sc_by_tensor: dict, sc_total: Optional[float]) -
     }
 
 
-def _phase6l_analyze(rows: list[dict]) -> dict:
+def _phase6l_analyze(rows: list[dict], audit_path: Optional[str] = None) -> dict:
     """Extend phase6k14's analysis with seq_per_kblock and demonstrated_density_ratio.
 
     Inputs are the per-cell×B JSON dicts written by phase6k14 run_worker.
+    `audit_path` optionally points at a Phase 6G sidecar-audit JSON used as a
+    fallback source of exact per-tensor sidecar bytes when the per-cell JSONs
+    don't embed them (older runs that predate the live worker-side discovery).
     Returns an analysis dict that can drive format_table."""
     by_cell: dict[str, list[dict]] = {}
     for r in rows:
@@ -308,7 +256,17 @@ def _phase6l_analyze(rows: list[dict]) -> dict:
     prot_live = _demonstrated_live(prot_rows)
 
     # Per-tensor sidecar breakdown (protected only; bf16 has none by definition).
+    # Primary source: live worker-side discovery embedded in the per-cell JSON.
+    # Fallback: a Phase 6G sidecar-audit JSON (--sidecar-audit) for older runs.
     sc_by_tensor = _sidecar_gb_by_tensor(prot_rep)
+    sc_source_label = "live tensor introspection (writer sidecar tensors)"
+    if not sc_by_tensor and audit_path:
+        audit_bytes = _audit_sidecar_bytes(audit_path)
+        if audit_bytes:
+            sc_by_tensor = {k: _bytes_to_gb(v) for k, v in audit_bytes.items()}
+            sc_source_label = (
+                f"Phase 6G sidecar audit ({Path(audit_path).name}) — measured on "
+                "a separate run, not this capacity run")
     breakdown_available = bool(sc_by_tensor)
     sc_total = round(sum(sc_by_tensor.values()), 3) if breakdown_available else None
 
@@ -330,8 +288,7 @@ def _phase6l_analyze(rows: list[dict]) -> dict:
             "measured_sidecar_tax_gb": measured,
             "sidecar_tax_estimated": estimated,
             "sidecar_tax_source": (
-                "live tensor introspection (writer sidecar tensors)"
-                if not estimated else
+                sc_source_label if not estimated else
                 "UNAVAILABLE — per-tensor discovery returned nothing; "
                 "absolute HBM delta is reported instead (it also includes "
                 "CUDA-graph pools + misc, so it is an upper bound on the tax)"),
@@ -682,10 +639,35 @@ def _selftest() -> int:
     assert ad["claim_status"] == "DEMONSTRATED"                    # headline survives
     print("  graceful degradation (no breakdown, headline survives): PASS")
 
+    # 11. --sidecar-audit fallback: a run with NO embedded sidecar bytes can
+    #     still get an EXACT per-tensor tax from a Phase 6G audit JSON (for runs
+    #     that predate the live worker-side discovery). Non-canonical tensors in
+    #     the audit (e.g. protect_mask) are dropped so the total matches the
+    #     printed breakdown.
+    import tempfile
+    with tempfile.TemporaryDirectory() as _d:
+        _audit = Path(_d) / "audit_mml8192.json"
+        _audit.write_text(json.dumps({"sidecar_ranked": [
+            {"tensor": "k_protect_ext", "total_bytes": int(0.82e9)},
+            {"tensor": "k_scale_ext",   "total_bytes": int(0.65e9)},
+            {"tensor": "k_xmin_ext",    "total_bytes": int(0.65e9)},
+            {"tensor": "v_scale_ext",   "total_bytes": int(0.65e9)},
+            {"tensor": "v_xmin_ext",    "total_bytes": int(0.65e9)},
+            {"tensor": "protect_mask",  "total_bytes": 800000},   # dropped
+        ]}))
+        aa = _phase6l_analyze(rows_nodisc, audit_path=str(_audit))
+    sx = aa["sidecar_tax"]
+    assert sx["sidecar_breakdown_available"] is True, sx
+    assert sx["sidecar_tax_estimated"] is False, sx
+    assert abs(sx["measured_sidecar_tax_gb"] - 3.42) < 0.01, sx
+    assert "Phase 6G sidecar audit" in sx["sidecar_tax_source"], sx
+    assert abs(aa["density"]["net_density_ratio"] - 1.83) < 0.02
+    print("  --sidecar-audit fallback (exact tax for older runs): PASS")
+
     # Smoke: format_table renders the new sections without error.
     _ = format_table(ar, mml=8192, max_tokens=512, prompt_frac=0.95)
 
-    print("\nSELFTEST PASS (10/10)")
+    print("\nSELFTEST PASS (11/11)")
     return 0
 
 
@@ -718,7 +700,8 @@ def _run_worker(cell: str, mml: int, b: int, max_tokens: int,
 
 
 def run_compare(model: str, mml: int, b_list: list[int], max_tokens: int,
-                prompt_frac: float, gpu_util: float, out_dir: Path) -> dict:
+                prompt_frac: float, gpu_util: float, out_dir: Path,
+                audit_path: Optional[str] = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     cells = ["bf16", "protected"]
     env = dict(os.environ)
@@ -735,7 +718,7 @@ def run_compare(model: str, mml: int, b_list: list[int], max_tokens: int,
             rows.append(r)
             # Early stop per cell: if OOM at this B, smaller B will be clean; keep going.
             # If saturation already observed at high B, still run lower B for the table.
-    a = _phase6l_analyze(rows)
+    a = _phase6l_analyze(rows, audit_path=audit_path)
     report = {
         "model": model, "mml": mml, "max_tokens": max_tokens,
         "prompt_frac": prompt_frac, "gpu_util": gpu_util,
@@ -771,6 +754,12 @@ def main() -> int:
     ap.add_argument("--gpu-util", type=float, default=0.5)
     ap.add_argument("--out-dir", default="/tmp/phase6l",
                     help="Directory for per-cell×B JSON results and report.json")
+    ap.add_argument("--sidecar-audit", default=None, metavar="JSON",
+                    help="Optional Phase 6G sidecar-audit JSON "
+                         "(audit_phase6g_sidecar_overhead.py output) used as a "
+                         "fallback source of exact per-tensor sidecar bytes when "
+                         "the per-cell JSONs predate the live worker-side "
+                         "discovery (their sidecar_bytes_by_tensor is empty).")
     args = ap.parse_args()
 
     if args.selftest:
@@ -785,7 +774,7 @@ def main() -> int:
                 rows.append(json.loads(Path(p).read_text()))
             except Exception as e:
                 print(f"[6L] skip {p}: {e}", file=sys.stderr)
-        a = _phase6l_analyze(rows)
+        a = _phase6l_analyze(rows, audit_path=args.sidecar_audit)
         print(format_table(a))
         return 0 if a.get("claim_demonstrated") else 1
 
@@ -793,6 +782,7 @@ def main() -> int:
         report = run_compare(
             args.model, args.mml, b_list, args.max_tokens,
             args.prompt_frac, args.gpu_util, Path(args.out_dir),
+            audit_path=args.sidecar_audit,
         )
         a = report["analysis"]
         return 0 if a.get("claim_demonstrated") else 1

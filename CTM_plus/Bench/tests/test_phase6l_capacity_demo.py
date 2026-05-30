@@ -218,6 +218,55 @@ def test_falsified_claim_when_net_ratio_below_window():
     assert not a["claim_demonstrated"]
 
 
+def test_sidecar_audit_json_fallback_gives_exact_tax():
+    # A run whose per-cell JSON has no embedded sidecar bytes (older run) can
+    # still get an EXACT per-tensor tax from a Phase 6G sidecar-audit JSON.
+    import json as _json
+    import tempfile
+    rows = [
+        _row("bf16", 128, peak_live=58, peak_util_pct=100.0, preempts=8,
+             total_blocks=28310, hbm_gb=42.44),
+        _row("protected", 128, peak_live=117, peak_util_pct=100.0, preempts=6,
+             total_blocks=28310, hbm_gb=46.83),       # no sidecar_bytes
+    ]
+    with tempfile.TemporaryDirectory() as d:
+        audit = Path(d) / "audit_mml8192.json"
+        audit.write_text(_json.dumps({"sidecar_ranked": [
+            {"tensor": "k_protect_ext", "total_bytes": int(0.82 * _GB)},
+            {"tensor": "k_scale_ext",   "total_bytes": int(0.65 * _GB)},
+            {"tensor": "k_xmin_ext",    "total_bytes": int(0.65 * _GB)},
+            {"tensor": "v_scale_ext",   "total_bytes": int(0.65 * _GB)},
+            {"tensor": "v_xmin_ext",    "total_bytes": int(0.65 * _GB)},
+            {"tensor": "protect_mask",  "total_bytes": 800_000},   # non-canonical
+        ]}))
+        # Without the audit: tax UNAVAILABLE/estimated.
+        a0 = m._phase6l_analyze(rows)
+        assert a0["sidecar_tax"]["sidecar_tax_estimated"] is True
+        # With the audit: exact per-tensor tax, breakdown available.
+        a1 = m._phase6l_analyze(rows, audit_path=str(audit))
+    st = a1["sidecar_tax"]
+    assert st["sidecar_tax_estimated"] is False
+    assert st["sidecar_breakdown_available"] is True
+    assert abs(st["measured_sidecar_tax_gb"] - 3.42) < 0.01   # protect_mask dropped
+    assert "Phase 6G sidecar audit" in st["sidecar_tax_source"]
+    pc = a1["hbm_accounting"]["protected"]["sidecar_gb_by_tensor"]
+    assert "protect_mask" not in pc and abs(pc["k_protect_ext"] - 0.82) < 0.01
+    # Headline net density is identical either way (it comes from hbm_gb).
+    assert abs(a1["density"]["net_density_ratio"]
+               - a0["density"]["net_density_ratio"]) < 1e-9
+
+
+def test_worker_owns_sidecar_walk_and_does_not_import_phase6l():
+    # Extra: the saturation worker is self-contained — it discovers sidecars
+    # itself and must NOT import the analysis layer back (avoids the
+    # phase6k14 -> phase6l runtime coupling).
+    worker_src = (_SCR / "phase6k14_saturation.py").read_text()
+    assert "import phase6l_capacity_demo" not in worker_src
+    assert "def _discover_sidecar_bytes" in worker_src
+    # And the GPU-side discovery no longer lives in the analysis module.
+    assert not hasattr(m, "discover_sidecar_bytes")
+
+
 def test_selftest_passes():
     assert m._selftest() == 0
 
