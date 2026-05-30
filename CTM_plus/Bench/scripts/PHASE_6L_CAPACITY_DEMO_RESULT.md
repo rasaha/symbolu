@@ -32,12 +32,15 @@
 
 ### The honest per-GB number (net of the sidecar tax): 1.83×
 
-The script's headline `seq_per_kblock` ratio is **2.02×**, but note both cells
-report the **same `total_blocks` (28,310)** — vLLM allocated an equal number of
-blocks, with protected's blocks each holding ~2× the tokens (4-bit packing). So
-`seq_per_kblock` is effectively the **raw live-concurrency ratio** (117/58 =
-2.02×) and does **not** subtract the +4.4 GB sidecar tax — the tax lands in
-`hbm_gb` (46.83 vs 42.44), not in the block count.
+> **Now computed and printed directly by the script** (`sidecar_tax` + `density`
+> sections in stdout and `report.json`) — no manual post-calc. The `net_density_
+> ratio` is the headline; the raw `seq_per_kblock` ratio is kept as a secondary.
+
+Both cells report the **same `total_blocks` (28,310)** — vLLM allocated an equal
+number of blocks, with protected's blocks each holding ~2× the tokens (4-bit
+packing). So `seq_per_kblock` is effectively the **raw live-concurrency ratio**
+(117/58 = 2.02×) and does **not** subtract the +4.4 GB sidecar tax — the tax
+lands in `hbm_gb` (46.83 vs 42.44), not in the block count.
 
 The claim says "per GB, net of tax", so the honest denominator is actual HBM:
 
@@ -49,6 +52,26 @@ The claim says "per GB, net of tax", so the honest denominator is actual HBM:
 exactly on the original ~1.8× block-budget estimate. The two numbers bracket the
 truth: **2.02× raw concurrency, 1.83× per real GB.** Both inside the window;
 the claim holds on either reading.
+
+### Sidecar tax breakdown (script-measured, from live tensor bytes)
+
+The script now enumerates the protected writer's sidecar tensors and sums their
+bytes. Of the **+4.39 GB** absolute HBM delta vs bf16:
+
+| component | GB | share of delta |
+|---|---:|---:|
+| `k_protect_ext` | 0.82 | |
+| `k_scale_ext` | 0.65 | |
+| `k_xmin_ext` | 0.65 | |
+| `v_scale_ext` | 0.65 | |
+| `v_xmin_ext` | 0.65 | |
+| **measured sidecar tax** | **3.42** | **77.9%** |
+| non-sidecar residual (CUDA-graph pools + misc) | 0.97 | 22.1% |
+
+The measured 3.42 GB matches the Phase 6G audit inventory exactly, confirming the
+discovery path. The script also emits a **counterfactual** "no-sidecar" density
+ratio (1.97×) but explicitly labels it NOT a serving number — sidecars are
+mandatory for int4 dequant, so it can never be the headline.
 
 ## 3. The major caveat: throughput collapses at saturation
 

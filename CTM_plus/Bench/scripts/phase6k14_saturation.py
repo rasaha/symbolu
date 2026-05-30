@@ -286,6 +286,9 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
            "peak_live": None, "avg_live": None, "n_steps": None,
            "max_waiting": None, "total_blocks": None, "peak_used_blocks": None,
            "peak_util": None, "resident_fit": None, "saturation_observed": None,
+           # Phase 6L: per-tensor sidecar HBM accounting (filled post-generate).
+           "sidecar_bytes_by_tensor": {}, "model_weights_gb": None,
+           "kv_cache_budget_gb": None,
            "evict_on_decode": os.environ.get("PHASE6K14_EVICT_ON_DECODE", "1")
            if cell != "bf16" else None,
            "error": None}
@@ -385,6 +388,19 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
             rec["peak_util"] = probe.peak_util
             if not rec.get("total_blocks"):
                 rec["total_blocks"] = probe.total_blocks
+        # Phase 6L: discover sidecar tensor bytes + model weights now that the
+        # KV cache (and its paged sidecars) is fully allocated. Best-effort; the
+        # headline density numbers do not depend on it.
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import phase6l_capacity_demo as _p6l
+            _disc = _p6l.discover_sidecar_bytes(llm)
+            rec["sidecar_bytes_by_tensor"] = _disc.get("sidecar_bytes_by_tensor") or {}
+            rec["model_weights_gb"] = _disc.get("model_weights_gb")
+            rec["kv_cache_budget_gb"] = _disc.get("kv_cache_budget_gb")
+        except Exception as _e:
+            print(f"[6L] sidecar discovery skipped: {type(_e).__name__}: {_e}",
+                  flush=True)
 
     # Saturation OBSERVED iff the scheduler actually hit the block limit (peak
     # util high) OR preempted OR OOM'd — NOT merely "B was large". peak_live <
