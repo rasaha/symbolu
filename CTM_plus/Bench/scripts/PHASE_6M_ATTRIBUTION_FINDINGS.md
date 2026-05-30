@@ -13,9 +13,11 @@
 At the Phase 6L saturation batch (B=128), the int4_protected decode-throughput
 tax is the **eager KV gather/scatter + host syncs — the int4 read/write
 *orchestration* — NOT the attention or dequant kernel** (which is **2–6%**). The
-path is **host/dispatch/sync-bound** (GPU idle **58–77%** of wall). CUDA graphs
-currently make it **worse**, not better. **Recommended path: de-eager + de-sync
-the int4 KV orchestration.**
+path is **host/dispatch/sync-bound at short context** (GPU idle **58–77%**). CUDA
+graphs are **~neutral at the real long-context saturation** (the short-context
+"eager is faster" was an artifact — see 6M.3 in Finding 2). **Leading recommended
+path: de-eager + de-sync the int4 KV orchestration — gated on the long-context
+bucket profile.**
 
 ## Operating point & method
 
@@ -60,34 +62,44 @@ is implemented as 100k+ small eager aten ops with host syncs; at B=128 × 28 lay
 it dominates. The fused attention + in-kernel dequant are already cheap (2–6%). The
 path is host/dispatch/sync-bound, serialized by the per-layer `.item()`/`nonzero`.
 
-**2. CUDA graphs are currently net-NEGATIVE for int4** (captured 147 < eager 223).
-The captured path runs a **4.5 s static-shape `index_elementwise` gather** that
-eager avoids (likely a full-size paged gather forced by graph capture's static
-shapes). Consequences:
-- the project's "write-path CUDA-graph capture → ~2× throughput" projection is
-  **not supported** for the decode path at this config;
-- **Phase 6L's 0.22× was measured on the captured (slower) path** — eager is
-  ~1.5× faster here, so the headline may improve for free (verify at long context).
+**2. CUDA graphs are ~neutral at the real operating point** (graph capture is
+*not* a throughput lever for protected). At **short** context, captured (147) <
+eager (223) — the captured path wastes ~4.5 s on a static-shape `index_elementwise`
+gather over a near-empty KV. But the **6M.3 long-context check** (mml=8192, B=128,
+gen=512, `ENFORCE_EAGER=1`) shows that advantage **evaporates**: protected **eager
+125.5 ≈ captured 130.4** tok/s (eager marginally *slower*) — at full context the
+static gather does real work, so there's no penalty. Consequences:
+- the "write-path CUDA-graph capture → ~2× throughput" projection is **not
+  supported** — graphs are neither a 2× win nor a regression at saturation;
+- **there is no free eager win** — the 0.22× headline holds in both modes;
+- graph-safety (a "6P") is therefore **low priority** — launch/graph is not the
+  saturation bottleneck.
 
 ## Recommended path (one)
 
 **De-eager + de-sync the int4 KV orchestration:** collapse the per-layer
 gather/scatter/splice/pool-bookkeeping into a few fused custom ops with **no
-`.item()`/`nonzero` host syncs**. This single lever (a) cuts the dominant gather
-cost, (b) frees the GPU from 58–77% idle, (c) removes the syncs that block graph
-capture, and (d) fixes the captured-path regression. It is **NOT** "fuse the
-dequant" (kernel is 2–6%) and **NOT** "optimize the attention kernel."
+`.item()`/`nonzero` host syncs**. This lever (a) cuts the dominant gather cost and
+(b) frees the GPU from host-stall idle. It is **NOT** "fuse the dequant" (kernel
+is 2–6%), **NOT** "optimize the attention kernel," and **NOT** graph capture
+(neutral at saturation, per 6M.3).
 
-**Interim, near-free:** run int4 **eager**, not captured (~1.5× here) — pending
-verification at long-context saturation.
+**Confidence: leading hypothesis, NOT yet confirmed at the operating point.** The
+58–77% host-idle is a **short-context** measurement; at full context the GPU does
+more genuine KV-read/dequant work, so the host-sync *share* is likely smaller and
+the gather/dequant *share* larger. **The gating measurement before any 6N/6O
+investment is the long-context bucket profile** (see Next) — the `.item()`×107k /
+`nonzero`×25k syncs are real in both modes, but how much they cost *at saturation*
+is unmeasured. (The interim "run eager" win is **withdrawn** — 6M.3 shows eager
+does not help at long-context saturation.)
 
 ## What this revises
 
 - "Fuse dequant into attention" (ChatGPT #1): already fused; kernel is 2–6%.
 - Prior B=8 finding "~73–83% in the int4 kernel": at saturation (B=128) the
   bottleneck **shifted** to the orchestration.
-- Codebase projection "graphs unlock ~2× throughput": currently the **opposite**
-  for the decode path.
+- Codebase projection "graphs unlock ~2× throughput": **not supported** — graphs
+  are ~neutral at saturation (neither a 2× win nor the short-context regression).
 
 ## Caveats
 
@@ -131,9 +143,13 @@ python CTM_plus/Bench/scripts/analyze_phase6d_profile.py \
 
 ## Next (to firm up from PRELIMINARY → final)
 
-1. **Long-context re-profile** (1-line driver tweak to fill the prompt to
-   ~0.95×mml) for the exact bucket split at the true operating point.
-2. **Eager win at saturation**: `ENFORCE_EAGER=1` Phase 6L `--compare` at
-   mml=8192 — does the ~1.5× hold under real long context?
-3. **ncu within-kernel split**: only if a path needs it (it doesn't — kernel is
-   2–6%); requires a pod with `NVreg_RestrictProfilingToAdminUsers=0`.
+1. **Long-context bucket profile — THE gating measurement.** A 1-line driver
+   tweak to fill the profiled prompt to ~0.95×mml, then re-run M.1 at mml=8192.
+   This is the decision input: does the orchestration (syncs + gather) still
+   dominate at saturation, or does genuine KV-read/dequant work? The 6N/6O
+   investment should be gated on this — short-context alone is not enough.
+2. ✅ **Eager at saturation (6M.3 — DONE):** `ENFORCE_EAGER=1` Phase 6L at mml=8192
+   → protected **125.5 ≈ captured 130.4**. Eager does **not** help; graphs are
+   neutral. (Eager-win hypothesis withdrawn.)
+3. **ncu within-kernel split**: not needed (kernel is 2–6%); blocked on this pod
+   anyway (`ERR_NVGPUCTRPERM`).
