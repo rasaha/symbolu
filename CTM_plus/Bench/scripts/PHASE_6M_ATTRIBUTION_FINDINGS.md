@@ -72,10 +72,12 @@ int4-vs-bf16 split is **part measured, part estimated**:
   does not reach parity.
 
 The Phase 6L **capacity** artifacts (captured + eager) ARE committed under
-`bench_out/phase6l_result/` (`report_captured.json` / `report_eager.json` +
-per-cell JSONs) and back 6M.3 + the throughput headline (captured 1.83×/0.22×/130.4,
-eager 1.81×/0.21×/125.5). Only the per-kernel attribution CSVs remain uncommitted
-(pod stopped), so Q2 + the exact ceiling stay estimates.
+`bench_out/phase6l_result/captured/` and `…/eager/` (each: per-cell JSONs +
+`report.json` + log) and back 6M.3 + the throughput headline (captured
+1.83×/0.22×/130.4, eager 1.81×/0.21×/125.5; re-derive via `--from-jsons
+bench_out/phase6l_result/captured/phase6l_*.json`). Only the per-kernel
+attribution CSVs remain uncommitted (pod stopped), so Q2 + the exact ceiling
+stay estimates.
 
 ---
 

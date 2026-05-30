@@ -129,11 +129,11 @@ problem for interactive serving until the decode kernel is optimized.
   32,768 would show the ratio holds as context (and the tax's amortization) grows.
 - **The throughput/density tradeoff curve**: a non-saturated sweep (B below each
   ceiling) would show whether protected throughput recovers off-saturation.
-- **Raw artifacts (committed)**: `bench_out/phase6l_result/` now holds the
-  per-cell JSONs + `report.json`, plus the `_captured` and `_eager`
-  reproductions (`report_captured.json` / `report_eager.json`). The
-  `ENFORCE_EAGER=1` reproduction confirms CUDA graphs are ~neutral at
-  saturation: protected **125.5 tok/s / 1.81×** (eager) vs **130.4 / 1.83×**
-  (captured) — the headline holds in both modes. Re-derive any table with
-  `phase6l_capacity_demo.py --from-jsons bench_out/phase6l_result/*_captured.json`
-  (or `*_eager.json`).
+- **Raw artifacts (committed)**: `bench_out/phase6l_result/` holds the original
+  run + `captured/` and `eager/` subdirs (each with per-cell JSONs + `report.json`
+  + the run log). The `ENFORCE_EAGER=1` reproduction confirms CUDA graphs are
+  ~neutral at saturation: protected **125.5 tok/s / 1.81×** (eager) vs
+  **130.4 / 1.83×** (captured) — the headline holds in both modes. Re-derive any
+  table with
+  `phase6l_capacity_demo.py --from-jsons bench_out/phase6l_result/captured/phase6l_*.json`
+  (or `eager/phase6l_*.json`).
