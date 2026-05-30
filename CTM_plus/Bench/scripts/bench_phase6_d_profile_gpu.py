@@ -88,6 +88,18 @@ PROMPT = (
 )
 
 
+def _long_prompt(target_tokens):
+    """Filler prompt ~target_tokens long (mirrors phase6k14_saturation). Used by
+    --prompt-frac to profile decode at realistic (long) context so the per-token
+    KV read/gather/dequant is representative, not over-weighted by the fixed
+    per-step orchestration. ~16 tokens/sentence; the caller truncates to fit."""
+    n = max(20, target_tokens // 16)
+    return "Document: " + " ".join(
+        f"Fact {i}: the town ledger recorded routine activity that week."
+        for i in range(n)
+    ) + "\n\nSummarize the document in one sentence."
+
+
 def _load_llm(cell, model, max_model_len, gpu_memory_utilization,
               enforce_eager_bf16=False):
     import torch
@@ -184,6 +196,12 @@ def main() -> int:
                         "is what's wrapped in NVTX; earlier tokens are warmup.")
     p.add_argument("--batch-size",     type=int,   default=8,
                    help="B for the workload. Default 8 matches the Phase 6B.4 gate row.")
+    p.add_argument("--prompt-frac",    type=float, default=0.0,
+                   help="If >0, fill each prompt to ~prompt_frac*max_model_len "
+                        "tokens (long-context profile matching the Phase 6L "
+                        "operating point). 0 (default) uses the short built-in "
+                        "prompt. Use ~0.95 to expose the context-scaling KV "
+                        "read/dequant vs the fixed per-step orchestration.")
     p.add_argument("--gpu-memory-utilization", type=float, default=0.5)
     p.add_argument("--n-warmup-runs",  type=int,   default=2,
                    help="Number of full generate() calls before the profiled one. "
@@ -216,7 +234,26 @@ def main() -> int:
     print(f"[profile cell={args.cell}] Loaded in {time.time() - t0:.1f}s.")
 
     sampling = SamplingParams(temperature=0.0, max_tokens=args.max_tokens)
-    prompts = [PROMPT] * args.batch_size
+    if args.prompt_frac and args.prompt_frac > 0.0:
+        # Long-context profile: fill each prompt to ~prompt_frac*mml tokens so the
+        # decode reads a realistic (long) KV per token — matches Phase 6L. The
+        # short built-in prompt over-weights the fixed per-step orchestration;
+        # this exposes the context-scaling KV read/gather/dequant.
+        cap = min(args.max_model_len - args.max_tokens - 64,
+                  int(args.max_model_len * args.prompt_frac))
+        prompt = _long_prompt(int(cap * 1.4))
+        try:
+            tk = llm.get_tokenizer()
+            ids = tk.encode(prompt)
+            if len(ids) > cap:
+                prompt = tk.decode(ids[:cap])
+            print(f"[profile cell={args.cell}] long-context prompt ~{min(len(ids), cap)} tok "
+                  f"(prompt_frac={args.prompt_frac}, mml={args.max_model_len})")
+        except Exception as _e:
+            print(f"[profile cell={args.cell}] prompt tokenization fallback: {_e}")
+        prompts = [prompt] * args.batch_size
+    else:
+        prompts = [PROMPT] * args.batch_size
 
     # Warmup runs (NOT profiled — these populate compiled kernels, graph
     # capture pool, etc.).
