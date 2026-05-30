@@ -651,11 +651,15 @@ def _selftest() -> int:
     assert not a4["claim_demonstrated"]
     print("  INVALID_SLOT_EXHAUSTION detected: PASS")
 
-    # 8. Sidecar tax + net-of-tax density (the real Phase 6L numbers).
+    # 8. Sidecar tax + net-of-tax density — LIVE-measured Phase 6L numbers
+    #    (mml=8192, B=128; worker tensor introspection). The +4.39 GB HBM delta
+    #    is ~99.8% sidecars within max_memory_allocated (CUDA-graph pools are
+    #    non-PyTorch, so the tracked residual is ~0.01 GB). NB: the old "3.42 GB"
+    #    was the 6G audit at mml=32K (binary GiB) — a different config.
     GB = 1e9
-    sc = {"k_protect_ext": 0.82 * GB, "k_scale_ext": 0.65 * GB,
-          "k_xmin_ext": 0.65 * GB, "v_scale_ext": 0.65 * GB,
-          "v_xmin_ext": 0.65 * GB}                       # total 3.42 GB
+    sc = {"k_protect_ext": 1.015 * GB, "k_scale_ext": 0.812 * GB,
+          "k_xmin_ext": 0.812 * GB, "v_scale_ext": 0.812 * GB,
+          "v_xmin_ext": 0.812 * GB, "_k_stage_pool": 0.117 * GB}   # total 4.38 GB
     rows_real = [
         row("bf16", 128, peak_live=58, peak_util=100.0, preempts=8,
             total_blocks=28310, hbm_gb=42.44, agg_tps=597.3,
@@ -667,9 +671,10 @@ def _selftest() -> int:
     ar = _phase6l_analyze(rows_real)
     stx = ar["sidecar_tax"]
     assert abs(stx["absolute_hbm_delta_gb"] - 4.39) < 0.01, stx
-    assert abs(stx["measured_sidecar_tax_gb"] - 3.42) < 0.01, stx
+    assert abs(stx["measured_sidecar_tax_gb"] - 4.38) < 0.01, stx
     assert stx["sidecar_tax_estimated"] is False
-    assert abs(stx["non_sidecar_residual_delta_gb"] - 0.97) < 0.01, stx
+    assert abs(stx["non_sidecar_residual_delta_gb"] - 0.01) < 0.01, stx
+    assert abs(stx["sidecar_tax_pct_of_delta"] - 99.77) < 0.1, stx
     assert stx["sidecar_breakdown_available"] is True
     dn = ar["density"]
     assert dn["bf16_demonstrated_live"] == 58 and dn["protected_demonstrated_live"] == 117
@@ -712,9 +717,11 @@ def _selftest() -> int:
 
     # 11. --sidecar-audit fallback: a run with NO embedded sidecar bytes can
     #     still get an EXACT per-tensor tax from a Phase 6G audit JSON (for runs
-    #     that predate the live worker-side discovery). Non-canonical tensors in
-    #     the audit (e.g. protect_mask) are dropped so the total matches the
-    #     printed breakdown.
+    #     that predate the live worker-side discovery). The numbers below are the
+    #     OLD 6G audit inventory (mml=32K, ~3.42 GB) — deliberately a DIFFERENT
+    #     config than the live 8K tax (~4.38 GB), which is exactly what the audit
+    #     fallback represents. Non-canonical tensors (protect_mask) are dropped so
+    #     the total matches the printed breakdown.
     import tempfile
     with tempfile.TemporaryDirectory() as _d:
         _audit = Path(_d) / "audit_mml8192.json"
