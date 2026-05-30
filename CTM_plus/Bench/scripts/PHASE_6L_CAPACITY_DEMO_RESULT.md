@@ -53,25 +53,37 @@ exactly on the original ~1.8× block-budget estimate. The two numbers bracket th
 truth: **2.02× raw concurrency, 1.83× per real GB.** Both inside the window;
 the claim holds on either reading.
 
-### Sidecar tax breakdown (script-measured, from live tensor bytes)
+### Sidecar tax breakdown (live-measured this run, mml=8192, B=128)
 
-The script now enumerates the protected writer's sidecar tensors and sums their
-bytes. Of the **+4.39 GB** absolute HBM delta vs bf16:
+The worker enumerates the protected writer's sidecar tensors and sums their bytes
+live during the run. Of the **+4.39 GB** absolute HBM delta vs bf16:
 
 | component | GB | share of delta |
 |---|---:|---:|
-| `k_protect_ext` | 0.82 | |
-| `k_scale_ext` | 0.65 | |
-| `k_xmin_ext` | 0.65 | |
-| `v_scale_ext` | 0.65 | |
-| `v_xmin_ext` | 0.65 | |
-| **measured sidecar tax** | **3.42** | **77.9%** |
-| non-sidecar residual (CUDA-graph pools + misc) | 0.97 | 22.1% |
+| `k_protect_ext` | 1.015 | |
+| `k_scale_ext` | 0.812 | |
+| `k_xmin_ext` | 0.812 | |
+| `v_scale_ext` | 0.812 | |
+| `v_xmin_ext` | 0.812 | |
+| `_k_stage_pool` | 0.117 | |
+| **measured sidecar tax** | **4.38** | **99.8%** |
+| non-sidecar residual (PyTorch-tracked) | 0.01 | 0.2% |
 
-The measured 3.42 GB matches the Phase 6G audit inventory exactly, confirming the
-discovery path. The script also emits a **counterfactual** "no-sidecar" density
-ratio (1.97×) but explicitly labels it NOT a serving number — sidecars are
-mandatory for int4 dequant, so it can never be the headline.
+So the +4.39 GB delta is **~99.8% sidecars** within `max_memory_allocated`. CUDA-
+graph private pools live OUTSIDE PyTorch's caching allocator and so do not appear
+in this delta (they are a separate ~0.6 GB per the 6G audit).
+
+> **Do not confuse with the old "3.42 GB" figure.** 3.42 GB is the **Phase 6G
+> audit inventory at mml=32K, in binary GiB** — a *different config*, NOT the live
+> 8K Phase 6L result. At 8K there are more KV blocks and bytes are decimal GB, so
+> e.g. `k_protect_ext` is **1.015 GB (8K)** vs 0.82 GiB (32K). The live 8K sidecar
+> tax is **4.38 GB** (= ~99.8% of the +4.39 GB delta).
+
+The script also emits a **counterfactual** "no-sidecar" density ratio (2.02×) but
+explicitly labels it NOT a serving number — sidecars are mandatory for int4
+dequant, so it can never be the headline. (The headline stays **1.83× net seq/GB**
+and **2.02× raw** concurrency — both unchanged by this correction, since they come
+from `hbm_gb` + `peak_live`, not the tax decomposition.)
 
 ## 3. The major caveat: throughput collapses at saturation
 

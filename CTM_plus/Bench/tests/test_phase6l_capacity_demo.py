@@ -38,10 +38,12 @@ def _row(cell, B, completed=None, oom=False, preempts=0, slot_x=False,
 
 
 _GB = 1e9
-# Real Phase 6G per-tensor sidecar inventory (~3.42 GB total).
-_SIDECARS = {"k_protect_ext": 0.82 * _GB, "k_scale_ext": 0.65 * _GB,
-             "k_xmin_ext": 0.65 * _GB, "v_scale_ext": 0.65 * _GB,
-             "v_xmin_ext": 0.65 * _GB}
+# Live-measured per-tensor sidecar inventory at mml=8192, B=128 (~4.38 GB total).
+# NB: the old "3.42 GB" was the Phase 6G audit at mml=32K in binary GiB — a
+# DIFFERENT config, not this 8K live result (see PHASE_6L_CAPACITY_DEMO_RESULT.md).
+_SIDECARS = {"k_protect_ext": 1.015 * _GB, "k_scale_ext": 0.812 * _GB,
+             "k_xmin_ext": 0.812 * _GB, "v_scale_ext": 0.812 * _GB,
+             "v_xmin_ext": 0.812 * _GB, "_k_stage_pool": 0.117 * _GB}
 
 
 def _real_rows():
@@ -141,19 +143,21 @@ def test_invalid_slot_exhaustion():
 
 
 def test_sidecar_tax_measured_from_tensor_bytes():
+    # Live-measured at mml=8192, B=128 (worker tensor introspection).
     a = m._phase6l_analyze(_real_rows())
     st = a["sidecar_tax"]
     assert abs(st["absolute_hbm_delta_gb"] - 4.39) < 0.01
-    assert abs(st["measured_sidecar_tax_gb"] - 3.42) < 0.01
+    assert abs(st["measured_sidecar_tax_gb"] - 4.38) < 0.01
     assert st["sidecar_tax_estimated"] is False
     assert st["sidecar_breakdown_available"] is True
-    # tax is 77.9% of the delta; the rest (~0.97 GB) is non-sidecar overhead.
-    assert abs(st["sidecar_tax_pct_of_delta"] - 77.9) < 0.5
-    assert abs(st["non_sidecar_residual_delta_gb"] - 0.97) < 0.01
+    # Tax is ~99.8% of the +4.39 GB delta; the PyTorch-tracked residual is
+    # ~0.01 GB (CUDA-graph pools are non-PyTorch, outside max_memory_allocated).
+    assert abs(st["sidecar_tax_pct_of_delta"] - 99.77) < 0.1
+    assert abs(st["non_sidecar_residual_delta_gb"] - 0.01) < 0.01
     # per-tensor breakdown surfaced in hbm_accounting.
     pc = a["hbm_accounting"]["protected"]["sidecar_gb_by_tensor"]
-    assert abs(pc["k_protect_ext"] - 0.82) < 0.01
-    assert abs(pc["k_scale_ext"] - 0.65) < 0.01
+    assert abs(pc["k_protect_ext"] - 1.015) < 0.01
+    assert abs(pc["k_scale_ext"] - 0.812) < 0.01
 
 
 def test_net_density_is_headline_and_net_of_tax():
