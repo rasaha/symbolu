@@ -12,7 +12,7 @@
   "preempts": 0,
   "preempt_src": "artificial_preempt_cnt,num_cumulative_preemption",
   "hbm_gb": 46.73,
-  "agg_tps": 134.8,
+  "agg_tps": 134.4,
   "max_concurrency": 110.6,
   "max_active_slots": 96,
   "prompt_tokens": 7616,
@@ -25,6 +25,16 @@
   "peak_util": 0.851,
   "resident_fit": 118,
   "saturation_observed": false,
+  "sidecar_bytes_by_tensor": {
+    "k_scale_ext": 811704320,
+    "k_xmin_ext": 811704320,
+    "k_protect_ext": 1014630400,
+    "v_scale_ext": 811704320,
+    "v_xmin_ext": 811704320,
+    "_k_stage_pool": 88080384
+  },
+  "model_weights_gb": 15.231,
+  "kv_cache_budget_gb": null,
   "evict_on_decode": "1",
   "error": null
 }

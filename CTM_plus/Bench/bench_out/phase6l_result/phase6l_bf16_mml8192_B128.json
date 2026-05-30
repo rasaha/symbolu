@@ -12,7 +12,7 @@
   "preempts": 5,
   "preempt_src": "artificial_preempt_cnt,num_cumulative_preemption",
   "hbm_gb": 42.44,
-  "agg_tps": 597.3,
+  "agg_tps": 600.3,
   "max_concurrency": 55.3,
   "max_active_slots": null,
   "prompt_tokens": 7616,
@@ -25,6 +25,9 @@
   "peak_util": 1.0,
   "resident_fit": 59,
   "saturation_observed": true,
+  "sidecar_bytes_by_tensor": {},
+  "model_weights_gb": 15.231,
+  "kv_cache_budget_gb": null,
   "evict_on_decode": null,
   "error": null
 }
