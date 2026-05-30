@@ -51,6 +51,99 @@ CLAIM_LO, CLAIM_HI = 1.5, 2.5
 PRESSURE_PCT = 90.0
 _EPS = 1e-9
 
+# Canonical int4_protected sidecar tensors (PHASE_6G_SIDECAR_DIET_FINDINGS.md).
+# Discovery matches these names as substrings of writer attributes; ordering
+# here drives the printed breakdown.
+SIDECAR_NAMES = ["k_protect_ext", "k_scale_ext", "k_xmin_ext",
+                 "v_scale_ext", "v_xmin_ext", "_k_stage_pool"]
+
+
+def _bytes_to_gb(b) -> float:
+    return round(b / 1e9, 4) if b else 0.0
+
+
+# ─── GPU-side sidecar discovery (called by the worker; lazy torch) ────────────
+
+def discover_sidecar_bytes(llm) -> dict:
+    """Enumerate int4_protected sidecar tensors on a live LLM and sum bytes per
+    canonical name. Also best-effort model-weight bytes. GPU-side — the worker
+    calls this and stuffs the result into its JSON so the CPU analyzer can do
+    the GB math. Fully guarded: returns empty breakdown on any failure (the
+    headline density numbers do NOT depend on this — they come from hbm_gb).
+
+    Returns: {"sidecar_bytes_by_tensor": {name: bytes}, "model_weights_gb": .. ,
+              "kv_cache_budget_gb": ..}."""
+    out = {"sidecar_bytes_by_tensor": {}, "model_weights_gb": None,
+           "kv_cache_budget_gb": None}
+
+    def _canon(attr: str):
+        for nm in SIDECAR_NAMES:
+            if nm in attr:
+                return nm
+        if "_ext" in attr or "stage_pool" in attr:
+            return attr            # capture under its real name if unrecognized
+        return None
+
+    def _is_tensor(v) -> bool:
+        return hasattr(v, "numel") and hasattr(v, "element_size")
+
+    try:
+        from kv_policy.phase6b2_precapture_hook import (
+            _collect_writers, _resolve_inner_model)
+    except Exception:
+        return out
+
+    # --- sidecar tensors live on the writer objects (per int4 layer) ---
+    try:
+        inner = _resolve_inner_model(llm)
+        writers = _collect_writers(inner) or []
+    except Exception:
+        writers = []
+        inner = None
+
+    by_name: dict[str, int] = {}
+    seen: set[int] = set()
+    for w in writers:
+        try:
+            attrs = vars(w)
+        except Exception:
+            continue
+        for attr, val in list(attrs.items()):
+            vals = (val.values() if isinstance(val, dict)
+                    else val if isinstance(val, (list, tuple)) else [val])
+            for v in vals:
+                if not _is_tensor(v) or id(v) in seen:
+                    continue
+                key = _canon(attr)
+                if key is None:
+                    continue
+                seen.add(id(v))
+                try:
+                    by_name[key] = by_name.get(key, 0) + v.numel() * v.element_size()
+                except Exception:
+                    pass
+    out["sidecar_bytes_by_tensor"] = by_name
+
+    # --- model weights: sum parameter bytes (reliable; matches the init log) ---
+    try:
+        if inner is not None:
+            mw = sum(p.numel() * p.element_size() for p in inner.parameters())
+            out["model_weights_gb"] = round(mw / 1e9, 3)
+    except Exception:
+        pass
+
+    # --- KV cache budget: best-effort from the cache config (often None) ---
+    try:
+        cc = llm.llm_engine.cache_config
+        nb = getattr(cc, "num_gpu_blocks", None)
+        cbytes = getattr(cc, "cache_block_size_bytes", None) or getattr(
+            cc, "block_size_bytes", None)
+        if nb and cbytes:
+            out["kv_cache_budget_gb"] = round(nb * cbytes / 1e9, 3)
+    except Exception:
+        pass
+    return out
+
 
 # ─── Pure-Python analysis core (no torch/vllm; selftest-able) ─────────────────
 
@@ -102,6 +195,39 @@ def _total_blocks_for_cell(cell_rows: list[dict]) -> Optional[int]:
         if v:
             return int(v)
     return None
+
+
+def _rep_row(cell_rows: list[dict]) -> dict:
+    """Representative row for STATIC HBM/sidecar accounting: prefer the highest-B
+    saturated row that has hbm_gb (the real saturated operating point), else the
+    highest-B row with hbm_gb, else the highest-B row."""
+    sat = [r for r in cell_rows if r.get("saturation_observed") and r.get("hbm_gb")]
+    pool = sat or [r for r in cell_rows if r.get("hbm_gb")] or cell_rows
+    return max(pool, key=lambda r: r.get("batch", 0)) if pool else {}
+
+
+def _sidecar_gb_by_tensor(row: dict) -> dict:
+    """Convert a row's raw sidecar byte counts to GB per canonical tensor."""
+    raw = (row or {}).get("sidecar_bytes_by_tensor") or {}
+    return {k: _bytes_to_gb(v) for k, v in raw.items()}
+
+
+def _cell_accounting(rep: dict, sc_by_tensor: dict, sc_total: Optional[float]) -> dict:
+    """Per-cell HBM accounting block."""
+    hbm = rep.get("hbm_gb")
+    mw = rep.get("model_weights_gb")
+    kvb = rep.get("kv_cache_budget_gb")
+    nonsc = None
+    if None not in (hbm, mw, kvb) and sc_total is not None:
+        nonsc = round(hbm - mw - kvb - sc_total, 3)
+    return {
+        "hbm_gb_total": hbm,
+        "model_weights_gb": mw,
+        "kv_cache_budget_gb": kvb,
+        "sidecar_gb_total": sc_total if sc_total is not None else 0.0,
+        "sidecar_gb_by_tensor": sc_by_tensor,
+        "non_sidecar_overhead_gb": nonsc,
+    }
 
 
 def _phase6l_analyze(rows: list[dict]) -> dict:
@@ -165,12 +291,98 @@ def _phase6l_analyze(rows: list[dict]) -> dict:
         if slot_x:
             result["slot_exhausted_at"][cell] = slot_x
 
-    # Density ratio — only when both cells observed saturation.
+    # ── block-budget (raw) ratio: kept as the "raw" number for backward compat ──
     bf16 = result["by_cell"].get("bf16", {})
     prot = result["by_cell"].get("protected", {})
     bf16_spkb = bf16.get("seq_per_kblock")
     prot_spkb = prot.get("seq_per_kblock")
+    if bf16_spkb and prot_spkb and bf16_spkb > _EPS:
+        result["demonstrated_density_ratio"] = round(prot_spkb / bf16_spkb, 3)
 
+    # ── HBM accounting + sidecar tax + net-of-tax density (the real numbers) ──
+    bf16_rows = by_cell.get("bf16", [])
+    prot_rows = by_cell.get("protected", [])
+    bf16_rep, prot_rep = _rep_row(bf16_rows), _rep_row(prot_rows)
+    bf16_hbm, prot_hbm = bf16_rep.get("hbm_gb"), prot_rep.get("hbm_gb")
+    bf16_live = _demonstrated_live(bf16_rows)
+    prot_live = _demonstrated_live(prot_rows)
+
+    # Per-tensor sidecar breakdown (protected only; bf16 has none by definition).
+    sc_by_tensor = _sidecar_gb_by_tensor(prot_rep)
+    breakdown_available = bool(sc_by_tensor)
+    sc_total = round(sum(sc_by_tensor.values()), 3) if breakdown_available else None
+
+    result["hbm_accounting"] = {
+        "bf16": _cell_accounting(bf16_rep, {}, 0.0),
+        "protected": _cell_accounting(prot_rep, sc_by_tensor, sc_total),
+    }
+
+    # Sidecar-tax comparison.
+    sidecar_tax = None
+    if bf16_hbm is not None and prot_hbm is not None:
+        abs_delta = round(prot_hbm - bf16_hbm, 3)
+        measured = sc_total                 # None if discovery failed
+        estimated = measured is None
+        sidecar_tax = {
+            "protected_hbm_gb": prot_hbm,
+            "bf16_hbm_gb": bf16_hbm,
+            "absolute_hbm_delta_gb": abs_delta,
+            "measured_sidecar_tax_gb": measured,
+            "sidecar_tax_estimated": estimated,
+            "sidecar_tax_source": (
+                "live tensor introspection (writer sidecar tensors)"
+                if not estimated else
+                "UNAVAILABLE — per-tensor discovery returned nothing; "
+                "absolute HBM delta is reported instead (it also includes "
+                "CUDA-graph pools + misc, so it is an upper bound on the tax)"),
+            "sidecar_tax_pct_of_protected_hbm": (
+                round(100.0 * measured / prot_hbm, 2)
+                if measured and prot_hbm else None),
+            "sidecar_tax_pct_of_delta": (
+                round(100.0 * measured / abs_delta, 2)
+                if measured and abs(abs_delta) > _EPS else None),
+            "non_sidecar_residual_delta_gb": (
+                round(abs_delta - measured, 3) if measured is not None else None),
+            "sidecar_breakdown_available": breakdown_available,
+            "sidecar_gb_by_tensor": sc_by_tensor or None,
+        }
+    result["sidecar_tax"] = sidecar_tax
+
+    # Capacity-density: real net-of-tax (HEADLINE) + clearly-labeled counterfactual.
+    density = None
+    if bf16_live and prot_live and bf16_hbm and prot_hbm and bf16_hbm > _EPS:
+        bf16_spg = round(bf16_live / bf16_hbm, 3)
+        prot_spg = round(prot_live / prot_hbm, 3)
+        net_ratio = round(prot_spg / bf16_spg, 3) if bf16_spg > _EPS else None
+        cf_spg = cf_ratio = None
+        if sc_total and (prot_hbm - sc_total) > _EPS:
+            cf_spg = round(prot_live / (prot_hbm - sc_total), 3)
+            cf_ratio = round(cf_spg / bf16_spg, 3) if bf16_spg > _EPS else None
+        density = {
+            "bf16_demonstrated_live": bf16_live,
+            "protected_demonstrated_live": prot_live,
+            "raw_live_ratio": round(prot_live / bf16_live, 3),
+            "bf16_hbm_gb": bf16_hbm,
+            "protected_hbm_gb": prot_hbm,
+            "bf16_seq_per_gb": bf16_spg,
+            "protected_seq_per_gb": prot_spg,
+            "net_density_ratio": net_ratio,        # <-- HEADLINE (real, net of tax)
+            "headline_metric": "net_density_ratio",
+            # Counterfactual — NOT a serving number (sidecars are required for
+            # int4 dequant; you cannot run protected without them).
+            "protected_seq_per_gb_without_sidecars": cf_spg,
+            "net_density_ratio_without_sidecars": cf_ratio,
+            "counterfactual_note": (
+                "without_sidecars is a COUNTERFACTUAL upper bound (sidecars are "
+                "mandatory for int4 dequant); it is NOT the real serving density"),
+            "claim_window": [CLAIM_LO, CLAIM_HI],
+            "net_density_in_window": (
+                net_ratio is not None and CLAIM_LO <= net_ratio <= CLAIM_HI),
+        }
+    result["density"] = density
+
+    # ── Claim gating: prefer the real net-of-tax ratio; fall back to block-budget ──
+    net_ratio = density["net_density_ratio"] if density else None
     if result["slot_exhausted_at"]:
         result["claim_status"] = "INVALID_SLOT_EXHAUSTION"
     elif result["ceiling_not_reached"]:
@@ -178,15 +390,27 @@ def _phase6l_analyze(rows: list[dict]) -> dict:
         result["claim_status_detail"] = (
             f"cells {result['ceiling_not_reached']} never hit the block limit — "
             "raise B or --max-tokens to force pressure")
-    elif bf16_spkb and prot_spkb and bf16_spkb > _EPS:
-        ratio = round(prot_spkb / bf16_spkb, 3)
-        result["demonstrated_density_ratio"] = ratio
-        in_window = CLAIM_LO <= ratio <= CLAIM_HI
+    elif net_ratio is not None:
+        in_window = CLAIM_LO <= net_ratio <= CLAIM_HI
+        result["headline_density_ratio"] = net_ratio
+        result["headline_metric"] = "net_density_ratio"
         result["claim_demonstrated"] = in_window
         result["claim_status"] = "DEMONSTRATED" if in_window else "MEASURED_OUTSIDE_WINDOW"
         result["claim_status_detail"] = (
-            f"ratio={ratio:.2f}× "
-            f"({'within' if in_window else 'outside'} [{CLAIM_LO}–{CLAIM_HI}] window)")
+            f"net_density_ratio={net_ratio:.2f}× (live seqs per actual HBM GB, "
+            f"net of sidecar tax) {'within' if in_window else 'outside'} "
+            f"[{CLAIM_LO}–{CLAIM_HI}] window")
+    elif result["demonstrated_density_ratio"] is not None:
+        # No HBM data (e.g. unit tests) — fall back to block-budget seq_per_kblock.
+        r = result["demonstrated_density_ratio"]
+        in_window = CLAIM_LO <= r <= CLAIM_HI
+        result["headline_density_ratio"] = r
+        result["headline_metric"] = "seq_per_kblock (HBM unavailable; block-budget)"
+        result["claim_demonstrated"] = in_window
+        result["claim_status"] = "DEMONSTRATED" if in_window else "MEASURED_OUTSIDE_WINDOW"
+        result["claim_status_detail"] = (
+            f"ratio={r:.2f}× (block-budget seq_per_kblock; HBM data unavailable) "
+            f"{'within' if in_window else 'outside'} [{CLAIM_LO}–{CLAIM_HI}] window")
     else:
         result["claim_status"] = "NO_DATA"
 
@@ -237,7 +461,54 @@ def format_table(analysis: dict, mml: int = 0,
 
     L.append("  " + "-" * (34 + 16 * len(cells_in_order)))
     ratio = analysis.get("demonstrated_density_ratio")
-    L.append(f"  {'demonstrated_density_ratio':<34}  {str(ratio) + 'x':>14}")
+    L.append(f"  {'raw seq_per_kblock ratio':<34}  {str(ratio) + 'x':>14}")
+
+    # ── Sidecar / HBM accounting ──
+    st = analysis.get("sidecar_tax")
+    acc = analysis.get("hbm_accounting", {})
+    if st:
+        L.append("")
+        L.append("  Sidecar / HBM accounting:")
+        L.append(f"    bf16 total HBM:        {st['bf16_hbm_gb']:.2f} GB")
+        L.append(f"    protected total HBM:   {st['protected_hbm_gb']:.2f} GB")
+        L.append(f"    absolute HBM delta:    +{st['absolute_hbm_delta_gb']:.2f} GB")
+        if st.get("measured_sidecar_tax_gb") is not None:
+            L.append(f"    measured sidecar tax:  {st['measured_sidecar_tax_gb']:.2f} GB "
+                     f"({st['sidecar_tax_pct_of_protected_hbm']:.1f}% of protected HBM, "
+                     f"{st['sidecar_tax_pct_of_delta']:.1f}% of delta)")
+            pc = acc.get("protected", {}).get("sidecar_gb_by_tensor", {})
+            if pc:
+                L.append("    sidecar tensor breakdown:")
+                for nm in SIDECAR_NAMES:
+                    if nm in pc:
+                        L.append(f"      {nm:<16} {pc[nm]:.3f} GB")
+                for nm in sorted(k for k in pc if k not in SIDECAR_NAMES):
+                    L.append(f"      {nm:<16} {pc[nm]:.3f} GB")
+            if st.get("non_sidecar_residual_delta_gb") is not None:
+                L.append(f"    non-sidecar residual delta: "
+                         f"{st['non_sidecar_residual_delta_gb']:.2f} GB "
+                         "(CUDA-graph pools + misc)")
+        else:
+            L.append("    measured sidecar tax:  UNAVAILABLE "
+                     "(per-tensor discovery failed)")
+            L.append(f"      source: {st.get('sidecar_tax_source')}")
+
+    # ── Demonstrated density (net of sidecar tax) ──
+    dn = analysis.get("density")
+    if dn:
+        L.append("")
+        L.append("  Demonstrated density (net of sidecar tax):")
+        L.append(f"    bf16 live seqs:        {dn['bf16_demonstrated_live']}")
+        L.append(f"    protected live seqs:   {dn['protected_demonstrated_live']}")
+        L.append(f"    raw live ratio:        {dn['raw_live_ratio']:.2f}x")
+        L.append(f"    bf16 seq/GB:           {dn['bf16_seq_per_gb']:.3f}")
+        L.append(f"    protected seq/GB:      {dn['protected_seq_per_gb']:.3f}")
+        L.append(f"    NET density ratio:     {dn['net_density_ratio']:.2f}x"
+                 "   <-- HEADLINE (VC-safe, net of tax)")
+        if dn.get("net_density_ratio_without_sidecars") is not None:
+            L.append(f"    [counterfactual] no-sidecar ratio: "
+                     f"{dn['net_density_ratio_without_sidecars']:.2f}x "
+                     "(NOT a serving number — sidecars are mandatory for dequant)")
     L.append("")
 
     status = analysis.get("claim_status", "NO_DATA")
@@ -260,7 +531,8 @@ def _selftest() -> int:
     # Shorthand: build a fake phase6k14 result row.
     def row(cell, B, completed=None, oom=False, preempts=0, slot_x=False,
             peak_live=None, peak_util=None, saturation=None, total_blocks=1000,
-            max_concurrency=None, hbm_gb=None, agg_tps=None, error=None):
+            max_concurrency=None, hbm_gb=None, agg_tps=None, error=None,
+            sidecar_bytes=None, model_weights_gb=None, kv_cache_budget_gb=None):
         pu_frac = (peak_util / 100.0) if peak_util is not None else None
         sat = saturation if saturation is not None else bool(
             (pu_frac or 0) >= 0.90 or preempts > 0 or oom)
@@ -271,6 +543,9 @@ def _selftest() -> int:
             "saturation_observed": sat, "total_blocks": total_blocks,
             "max_concurrency": max_concurrency, "hbm_gb": hbm_gb,
             "agg_tps": agg_tps, "error": error,
+            "sidecar_bytes_by_tensor": sidecar_bytes or {},
+            "model_weights_gb": model_weights_gb,
+            "kv_cache_budget_gb": kv_cache_budget_gb,
         }
 
     # 1. CEILING_NOT_REACHED when largest B was still clean (low util, no preempt).
@@ -348,7 +623,69 @@ def _selftest() -> int:
     assert not a4["claim_demonstrated"]
     print("  INVALID_SLOT_EXHAUSTION detected: PASS")
 
-    print("\nSELFTEST PASS (7/7)")
+    # 8. Sidecar tax + net-of-tax density (the real Phase 6L numbers).
+    GB = 1e9
+    sc = {"k_protect_ext": 0.82 * GB, "k_scale_ext": 0.65 * GB,
+          "k_xmin_ext": 0.65 * GB, "v_scale_ext": 0.65 * GB,
+          "v_xmin_ext": 0.65 * GB}                       # total 3.42 GB
+    rows_real = [
+        row("bf16", 128, peak_live=58, peak_util=100.0, preempts=8,
+            total_blocks=28310, hbm_gb=42.44, agg_tps=597.3,
+            model_weights_gb=14.25),
+        row("protected", 128, peak_live=117, peak_util=100.0, preempts=6,
+            total_blocks=28310, hbm_gb=46.83, agg_tps=130.4,
+            sidecar_bytes=sc, model_weights_gb=14.25),
+    ]
+    ar = _phase6l_analyze(rows_real)
+    stx = ar["sidecar_tax"]
+    assert abs(stx["absolute_hbm_delta_gb"] - 4.39) < 0.01, stx
+    assert abs(stx["measured_sidecar_tax_gb"] - 3.42) < 0.01, stx
+    assert stx["sidecar_tax_estimated"] is False
+    assert abs(stx["non_sidecar_residual_delta_gb"] - 0.97) < 0.01, stx
+    assert stx["sidecar_breakdown_available"] is True
+    dn = ar["density"]
+    assert dn["bf16_demonstrated_live"] == 58 and dn["protected_demonstrated_live"] == 117
+    assert abs(dn["raw_live_ratio"] - 2.017) < 0.01, dn
+    assert abs(dn["bf16_seq_per_gb"] - 1.367) < 0.01, dn
+    assert abs(dn["protected_seq_per_gb"] - 2.498) < 0.01, dn
+    assert abs(dn["net_density_ratio"] - 1.83) < 0.02, dn          # HEADLINE
+    # net (1.83) must differ from raw (2.02): the tax is subtracted via HBM.
+    assert abs(dn["net_density_ratio"] - dn["raw_live_ratio"]) > 0.1, dn
+    assert ar["claim_status"] == "DEMONSTRATED"
+    assert ar["headline_metric"] == "net_density_ratio"
+    assert abs(ar["headline_density_ratio"] - 1.83) < 0.02
+    print(f"  sidecar tax {stx['measured_sidecar_tax_gb']:.2f}GB -> "
+          f"net density {dn['net_density_ratio']:.2f}x (HEADLINE): PASS")
+
+    # 9. Guardrail: counterfactual no-sidecar ratio is computed, labeled, and is
+    #    NOT the headline (headline stays the real net-of-tax ratio).
+    assert dn["net_density_ratio_without_sidecars"] is not None
+    assert dn["net_density_ratio_without_sidecars"] > dn["net_density_ratio"]
+    assert ar["headline_density_ratio"] == dn["net_density_ratio"]
+    assert ar["headline_density_ratio"] != dn["net_density_ratio_without_sidecars"]
+    print("  counterfactual labeled, NOT headline (guardrail): PASS")
+
+    # 10. Graceful degradation: no per-tensor discovery -> breakdown unavailable,
+    #     but absolute delta + net density + raw ratio + claim still computed.
+    rows_nodisc = [
+        row("bf16", 128, peak_live=58, peak_util=100.0, preempts=8,
+            total_blocks=28310, hbm_gb=42.44),
+        row("protected", 128, peak_live=117, peak_util=100.0, preempts=6,
+            total_blocks=28310, hbm_gb=46.83),       # sidecar_bytes empty
+    ]
+    ad = _phase6l_analyze(rows_nodisc)
+    assert ad["sidecar_tax"]["measured_sidecar_tax_gb"] is None
+    assert ad["sidecar_tax"]["sidecar_tax_estimated"] is True
+    assert ad["sidecar_tax"]["sidecar_breakdown_available"] is False
+    assert abs(ad["sidecar_tax"]["absolute_hbm_delta_gb"] - 4.39) < 0.01
+    assert abs(ad["density"]["net_density_ratio"] - 1.83) < 0.02   # still computes
+    assert ad["claim_status"] == "DEMONSTRATED"                    # headline survives
+    print("  graceful degradation (no breakdown, headline survives): PASS")
+
+    # Smoke: format_table renders the new sections without error.
+    _ = format_table(ar, mml=8192, max_tokens=512, prompt_frac=0.95)
+
+    print("\nSELFTEST PASS (10/10)")
     return 0
 
 
@@ -402,7 +739,12 @@ def run_compare(model: str, mml: int, b_list: list[int], max_tokens: int,
     report = {
         "model": model, "mml": mml, "max_tokens": max_tokens,
         "prompt_frac": prompt_frac, "gpu_util": gpu_util,
-        "b_list": b_list, "analysis": a,
+        "b_list": b_list,
+        # Surface the three accounting sections at the top level for easy audit.
+        "hbm_accounting": a.get("hbm_accounting"),
+        "sidecar_tax": a.get("sidecar_tax"),
+        "density": a.get("density"),
+        "analysis": a,
     }
     report_path = out_dir / "report.json"
     report_path.write_text(json.dumps(report, indent=2))
