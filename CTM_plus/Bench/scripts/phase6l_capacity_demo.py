@@ -51,6 +51,14 @@ CLAIM_LO, CLAIM_HI = 1.5, 2.5
 PRESSURE_PCT = 90.0
 _EPS = 1e-9
 
+# Product-framing input (Phase 6L (b)): the density win is paid for in decode
+# latency. Per-sequence decode throughput must reach at least this fraction of
+# bf16's to be a candidate for live/interactive serving; below it, the
+# demonstrated density win is a BATCH/OFFLINE story until the int4 decode kernel
+# is optimized. A framing threshold to classify the run, NOT a hard SLA and NOT
+# a funding decision (that is surfaced to the user).
+INTERACTIVE_TPS_RATIO_MIN = 0.7
+
 # Canonical int4_protected sidecar tensors (PHASE_6G_SIDECAR_DIET_FINDINGS.md).
 # Discovery matches these names as substrings of writer attributes; ordering
 # here drives the printed breakdown.
@@ -338,6 +346,51 @@ def _phase6l_analyze(rows: list[dict], audit_path: Optional[str] = None) -> dict
         }
     result["density"] = density
 
+    # ── Throughput tax (Phase 6L (b)): the latency cost of the density win ──
+    # Density is not free: int4's UNoptimized decode path runs far fewer tok/s.
+    # Quantify it BOTH ways — aggregate (cluster tok/s) and per-live-sequence
+    # (per-user streaming rate) — so the product-positioning call is data-backed.
+    throughput = None
+    bf16_tps, prot_tps = bf16_rep.get("agg_tps"), prot_rep.get("agg_tps")
+    if bf16_tps and prot_tps and bf16_live and prot_live:
+        agg_ratio = round(prot_tps / bf16_tps, 3)
+        bf16_tps_seq = round(bf16_tps / bf16_live, 3)
+        prot_tps_seq = round(prot_tps / prot_live, 3)
+        per_seq_ratio = (round(prot_tps_seq / bf16_tps_seq, 3)
+                         if bf16_tps_seq > _EPS else None)
+        per_seq_slowdown = (round(1.0 / per_seq_ratio, 2)
+                            if per_seq_ratio and per_seq_ratio > _EPS else None)
+        interactive_viable = (per_seq_ratio is not None
+                              and per_seq_ratio >= INTERACTIVE_TPS_RATIO_MIN)
+        net_ratio_d = density["net_density_ratio"] if density else None
+        if interactive_viable:
+            fit = ("interactive-capable — per-seq decode throughput is within the "
+                   f"{INTERACTIVE_TPS_RATIO_MIN:.0%} live-serving bar")
+        else:
+            fit = ("BATCH/OFFLINE density play — fits throughput-insensitive, "
+                   "density-bound workloads (offline eval, bulk summarization, "
+                   "agentic batch). Interactive serving would need int4 "
+                   "decode-kernel optimization to close the per-user gap")
+        throughput = {
+            "bf16_agg_tps": bf16_tps,
+            "protected_agg_tps": prot_tps,
+            "aggregate_tps_ratio": agg_ratio,            # cluster tok/s (≈0.22x)
+            "bf16_tps_per_live_seq": bf16_tps_seq,
+            "protected_tps_per_live_seq": prot_tps_seq,
+            "per_seq_tps_ratio": per_seq_ratio,          # per-user tok/s (≈0.11x)
+            "per_seq_slowdown_x": per_seq_slowdown,      # ≈9x slower per user
+            "interactive_tps_ratio_min": INTERACTIVE_TPS_RATIO_MIN,
+            "interactive_viable": interactive_viable,
+            "workload_fit": fit,
+            "framing_note": (
+                f"DENSITY +{net_ratio_d}x net seq/GB  vs  THROUGHPUT {agg_ratio}x "
+                f"aggregate / {per_seq_ratio}x per-user tok/s. The density win is "
+                "real and paid for in latency; positioning depends on whether the "
+                "target workload is throughput-insensitive (batch/offline) or "
+                "latency-sensitive (interactive)."),
+        }
+    result["throughput"] = throughput
+
     # ── Claim gating: prefer the real net-of-tax ratio; fall back to block-budget ──
     net_ratio = density["net_density_ratio"] if density else None
     if result["slot_exhausted_at"]:
@@ -466,6 +519,24 @@ def format_table(analysis: dict, mml: int = 0,
             L.append(f"    [counterfactual] no-sidecar ratio: "
                      f"{dn['net_density_ratio_without_sidecars']:.2f}x "
                      "(NOT a serving number — sidecars are mandatory for dequant)")
+
+    # ── Throughput tax (latency cost of the density win) — product framing ──
+    tp = analysis.get("throughput")
+    if tp:
+        L.append("")
+        L.append("  Throughput tax (latency cost of the density win):")
+        L.append(f"    bf16 agg tok/s:        {tp['bf16_agg_tps']}")
+        L.append(f"    protected agg tok/s:   {tp['protected_agg_tps']}")
+        L.append(f"    aggregate tps ratio:   {tp['aggregate_tps_ratio']:.2f}x "
+                 "(cluster throughput)")
+        L.append(f"    bf16 tok/s per seq:    {tp['bf16_tps_per_live_seq']:.2f}")
+        L.append(f"    protected tok/s/seq:   {tp['protected_tps_per_live_seq']:.2f}")
+        L.append(f"    per-user tps ratio:    {tp['per_seq_tps_ratio']:.2f}x"
+                 + (f"  (~{tp['per_seq_slowdown_x']:.1f}x slower per user)"
+                    if tp.get("per_seq_slowdown_x") else ""))
+        L.append(f"    interactive-viable:    {tp['interactive_viable']} "
+                 f"(bar: per-user >= {tp['interactive_tps_ratio_min']:.0%} of bf16)")
+        L.append(f"    -> {tp['workload_fit']}")
     L.append("")
 
     status = analysis.get("claim_status", "NO_DATA")
@@ -664,10 +735,24 @@ def _selftest() -> int:
     assert abs(aa["density"]["net_density_ratio"] - 1.83) < 0.02
     print("  --sidecar-audit fallback (exact tax for older runs): PASS")
 
+    # 12. Throughput tax (Phase 6L (b) product-framing input): the density win
+    #     is paid for in decode latency — quantify it aggregate AND per-user.
+    tp = ar["throughput"]                       # ar = rows_real analysis (597.3/130.4)
+    assert abs(tp["aggregate_tps_ratio"] - 0.218) < 0.005, tp      # ~0.22x cluster
+    assert abs(tp["per_seq_tps_ratio"] - 0.108) < 0.005, tp        # ~0.11x per user
+    assert tp["per_seq_slowdown_x"] > 8.5, tp                      # ~9x slower/user
+    assert tp["interactive_viable"] is False, tp                  # below the 0.7 bar
+    assert "BATCH/OFFLINE" in tp["workload_fit"], tp
+    # density still the claim headline; throughput is the cost companion, not the claim.
+    assert ar["headline_metric"] == "net_density_ratio"
+    print(f"  throughput tax {tp['aggregate_tps_ratio']:.2f}x agg / "
+          f"{tp['per_seq_tps_ratio']:.2f}x per-user "
+          f"(~{tp['per_seq_slowdown_x']:.0f}x slower/user): PASS")
+
     # Smoke: format_table renders the new sections without error.
     _ = format_table(ar, mml=8192, max_tokens=512, prompt_frac=0.95)
 
-    print("\nSELFTEST PASS (11/11)")
+    print("\nSELFTEST PASS (12/12)")
     return 0
 
 
@@ -723,10 +808,11 @@ def run_compare(model: str, mml: int, b_list: list[int], max_tokens: int,
         "model": model, "mml": mml, "max_tokens": max_tokens,
         "prompt_frac": prompt_frac, "gpu_util": gpu_util,
         "b_list": b_list,
-        # Surface the three accounting sections at the top level for easy audit.
+        # Surface the accounting sections at the top level for easy audit.
         "hbm_accounting": a.get("hbm_accounting"),
         "sidecar_tax": a.get("sidecar_tax"),
         "density": a.get("density"),
+        "throughput": a.get("throughput"),
         "analysis": a,
     }
     report_path = out_dir / "report.json"

@@ -256,6 +256,40 @@ def test_sidecar_audit_json_fallback_gives_exact_tax():
                - a0["density"]["net_density_ratio"]) < 1e-9
 
 
+def test_throughput_tax_quantifies_latency_cost():
+    # Phase 6L (b): the density win is paid for in decode latency. Quantify it
+    # aggregate (cluster tok/s) AND per-user (per-live-seq tok/s) from agg_tps.
+    a = m._phase6l_analyze(_real_rows())
+    tp = a["throughput"]
+    # aggregate 130.4/597.3 = 0.218x; per-user (130.4/117)/(597.3/58) = 0.108x.
+    assert abs(tp["aggregate_tps_ratio"] - 0.218) < 0.005
+    assert abs(tp["per_seq_tps_ratio"] - 0.108) < 0.005
+    assert tp["per_seq_slowdown_x"] > 8.5            # ~9x slower per user
+    assert tp["interactive_viable"] is False         # below the 0.7 interactive bar
+    assert "BATCH/OFFLINE" in tp["workload_fit"]
+    # The claim headline stays density; throughput is the cost companion, not the claim.
+    assert a["headline_metric"] == "net_density_ratio"
+
+
+def test_throughput_interactive_viable_when_per_seq_tps_close():
+    # If a future optimized decode kernel brings per-user tok/s within the bar,
+    # the run flips to interactive-capable (proves the threshold is wired, not
+    # hardcoded to BATCH).
+    rows = [
+        _row("bf16", 128, peak_live=58, peak_util_pct=100.0, preempts=8,
+             total_blocks=28310, hbm_gb=42.44, agg_tps=580.0),
+        _row("protected", 128, peak_live=117, peak_util_pct=100.0, preempts=6,
+             total_blocks=28310, hbm_gb=46.83, agg_tps=900.0,  # hypothetical fast kernel
+             sidecar_bytes=_SIDECARS),
+    ]
+    a = m._phase6l_analyze(rows)
+    tp = a["throughput"]
+    # per-user = (900/117)/(580/58) = 7.69/10.0 = 0.769x >= 0.7 -> viable.
+    assert tp["per_seq_tps_ratio"] >= 0.7
+    assert tp["interactive_viable"] is True
+    assert "interactive-capable" in tp["workload_fit"]
+
+
 def test_worker_owns_sidecar_walk_and_does_not_import_phase6l():
     # Extra: the saturation worker is self-contained — it discovers sidecars
     # itself and must NOT import the analysis layer back (avoids the
