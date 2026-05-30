@@ -88,6 +88,10 @@ def _gather_copy_share(rows: List[Dict[str, object]],
 def analyze(before_csv: Path, after_csv: Path,
             include: Tuple[str, ...], exclude: Tuple[str, ...],
             accept_fraction: float, regress_tol: float) -> Dict[str, object]:
+    if not Path(before_csv).exists():
+        return {"error": f"file not found: {before_csv}"}
+    if not Path(after_csv).exists():
+        return {"error": f"file not found: {after_csv}"}
     before_rows = p6d._parse_nsys_csv(before_csv)
     after_rows = p6d._parse_nsys_csv(after_csv)
     if not before_rows:
