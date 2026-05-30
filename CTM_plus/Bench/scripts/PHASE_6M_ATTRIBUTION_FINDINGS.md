@@ -5,19 +5,61 @@
 > Paranoid Level 4 — and `ncu` GPU counters are blocked — `ERR_NVGPUCTRPERM`).
 > Short context (the 6D driver's built-in prompt), B=128, gen=128, mml=8192,
 > gpu_util=0.5. Both `captured` and `eager` int4 cells profiled. A long-context
-> re-profile would sharpen the exact percentages; the **qualitative finding is
-> robust across both modes**. Companion to `PHASE_6M_THROUGHPUT_ATTRIBUTION_PLAN.md`.
+> re-profile would sharpen the exact percentages — and it did: see the
+> **Long-context profile (6M.4)** section, which **overturns** the short-context
+> headline (at the real operating point the bottleneck is GPU-work-bound, not
+> host-sync-bound). Companion to `PHASE_6M_THROUGHPUT_ATTRIBUTION_PLAN.md`.
 
-## TL;DR
+## TL;DR (updated by the long-context profile, 6M.4 — DECISIVE)
 
-At the Phase 6L saturation batch (B=128), the int4_protected decode-throughput
-tax is the **eager KV gather/scatter + host syncs — the int4 read/write
-*orchestration* — NOT the attention or dequant kernel** (which is **2–6%**). The
-path is **host/dispatch/sync-bound at short context** (GPU idle **58–77%**). CUDA
-graphs are **~neutral at the real long-context saturation** (the short-context
-"eager is faster" was an artifact — see 6M.3 in Finding 2). **Leading recommended
-path: de-eager + de-sync the int4 KV orchestration — gated on the long-context
-bucket profile.**
+At the **real mml=8192 operating point**, int4_protected decode is
+**GPU-work-bound (~77% GPU-busy), NOT host/sync-bound** — the *opposite* of the
+short-context profile. The host syncs (`.item`/`nonzero`/DtoH) **amortize to <1%**
+at long context (a fixed per-step cost dwarfed by ~15× larger GPU work). The
+int4-specific tax is **genuine reconstruction work**: the **decode attention
+kernel (~29%**, reads + dequants the long int4 KV) **+ the paged gather (~15%)**.
+So **6N (host-sync removal) has a low ceiling**; the only real lever is **6O-style
+kernel/gather fusion**, which is **bounded** — int4 inherently reads more per token
+(packed KV + scale + xmin + protected) and must dequant. The short-context
+"orchestration-bound / kernel is 2–6%" picture (Findings 1–2 below) was an artifact
+of a near-empty KV; **6M.4 supersedes it.**
+
+## Long-context profile (6M.4) — DECISIVE; overturns the short-context headline
+
+Profile at the real operating point (mml=8192, ~0.95×mml prompt, B=48,
+`int4_eager` vs `bf16` eager — both fit without preemption):
+
+- **GPU-busy ~77%** (CUDA 51.4 s / wall 67.0 s) vs **23%** at short context →
+  **GPU-work-bound, not host/sync-bound.**
+- Host syncs (`.item`/`nonzero`/DtoH) **amortize to <1%** — they fall out of the
+  top-20 entirely (fixed cost, dwarfed by the long-KV GPU work).
+- int4 self-CUDA: GEMMs ~66% (the model, shared with bf16) · **`fwd_kvcache_int4`
+  decode attention ~29%** · **paged gather (`index`/`index_elementwise`) ~15%** ·
+  copy/contiguous ~6%.
+
+**Conclusion (revises Findings 1–2):** the saturation throughput tax is **genuine
+int4 reconstruction** (decode attention + paged gather), **not** removable
+host-sync orchestration.
+
+**Revised path:** **6N (host-sync removal) → low ceiling** (already amortized).
+**6P (graph) → neutral** (6M.3). The only real lever is **6O-style fusion of the
+paged gather + sidecar + protected read into the attention kernel** (attack the
+~15% gather + ~6% copy; tighten the 29% dequant kernel) — **bounded + multi-week**:
+int4 fundamentally reads more per token and must dequant, so it cannot reach a
+bf16 contiguous-read cost.
+
+**Revised gate (part-(b)):** the gap is **algorithmic, not plumbing** — no cheap
+interactive win. Funding the interactive arm buys a *bounded* gain (~0.22× →
+maybe ~0.3–0.4×, not parity) for weeks of high-risk CUDA work behind the
+byte-equivalence + COLLAPSE=0 bar. This **strengthens the batch/offline density
+positioning.** (Exact int4-vs-bf16 removable headroom = the `bf16_LONG` analyzer
+diff — pending.)
+
+---
+
+> ⚠️ **The sections below are the SHORT-CONTEXT profile, now superseded by 6M.4
+> above for the verdict.** Retained for the audit trail (they correctly describe
+> the short-context behavior, which over-weights the fixed per-step orchestration).
 
 ## Operating point & method
 
