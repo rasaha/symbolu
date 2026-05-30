@@ -45,6 +45,14 @@ from pathlib import Path
 CELLS = ["bf16", "protected"]        # add "naive" via --cells if wanted
 NAIVE_MASK_DEFAULT = "/workspace/dev/build-logs/qwen2_5_7b_protect_mask_naive.pt"
 
+# Canonical int4_protected sidecar tensors (PHASE_6G_SIDECAR_DIET_FINDINGS.md).
+# Discovery matches these names as substrings of the writer's attributes. Kept
+# here (not imported from phase6l_capacity_demo) so the worker stays the sole
+# owner of the GPU-side walk and the analysis layer never has to import back
+# into the worker — phase6l is a pure-CPU consumer of the recorded bytes.
+SIDECAR_NAMES = ["k_protect_ext", "k_scale_ext", "k_xmin_ext",
+                 "v_scale_ext", "v_xmin_ext", "_k_stage_pool"]
+
 # Default B sweeps per mml, straddling bf16(~55/26/12) and int4(~110/53/24)
 # reported concurrency, so the clean-max-B for each cell lands inside the sweep.
 DEFAULT_B = {
@@ -117,6 +125,86 @@ def _writer_max_active_slots(llm):
     except Exception:
         pass
     return None
+
+
+def _discover_sidecar_bytes(llm):
+    """Enumerate int4_protected sidecar tensors on a live LLM and sum bytes per
+    canonical name. Also best-effort model-weight bytes + KV-cache budget. Runs
+    GPU-side at the end of the worker (once the KV cache and its paged sidecars
+    are fully allocated) and stuffs the result into the per-cell JSON so the
+    CPU analyzer (phase6l) can do the GB math without importing back into this
+    worker. Fully guarded: returns an empty breakdown on any failure — the
+    headline density numbers do NOT depend on it (they come from hbm_gb).
+
+    Returns: {"sidecar_bytes_by_tensor": {name: bytes}, "model_weights_gb": .. ,
+              "kv_cache_budget_gb": ..}."""
+    out = {"sidecar_bytes_by_tensor": {}, "model_weights_gb": None,
+           "kv_cache_budget_gb": None}
+
+    def _canon(attr):
+        for nm in SIDECAR_NAMES:
+            if nm in attr:
+                return nm
+        if "_ext" in attr or "stage_pool" in attr:
+            return attr            # capture under its real name if unrecognized
+        return None
+
+    def _is_tensor(v):
+        return hasattr(v, "numel") and hasattr(v, "element_size")
+
+    try:
+        from kv_policy.phase6b2_precapture_hook import (
+            _collect_writers, _resolve_inner_model)
+    except Exception:
+        return out
+
+    try:
+        inner = _resolve_inner_model(llm)
+        writers = _collect_writers(inner) or []
+    except Exception:
+        writers = []
+        inner = None
+
+    by_name = {}
+    seen = set()
+    for w in writers:
+        try:
+            attrs = vars(w)
+        except Exception:
+            continue
+        for attr, val in list(attrs.items()):
+            vals = (val.values() if isinstance(val, dict)
+                    else val if isinstance(val, (list, tuple)) else [val])
+            for v in vals:
+                if not _is_tensor(v) or id(v) in seen:
+                    continue
+                key = _canon(attr)
+                if key is None:
+                    continue
+                seen.add(id(v))
+                try:
+                    by_name[key] = by_name.get(key, 0) + v.numel() * v.element_size()
+                except Exception:
+                    pass
+    out["sidecar_bytes_by_tensor"] = by_name
+
+    try:
+        if inner is not None:
+            mw = sum(p.numel() * p.element_size() for p in inner.parameters())
+            out["model_weights_gb"] = round(mw / 1e9, 3)
+    except Exception:
+        pass
+
+    try:
+        cc = llm.llm_engine.cache_config
+        nb = getattr(cc, "num_gpu_blocks", None)
+        cbytes = getattr(cc, "cache_block_size_bytes", None) or getattr(
+            cc, "block_size_bytes", None)
+        if nb and cbytes:
+            out["kv_cache_budget_gb"] = round(nb * cbytes / 1e9, 3)
+    except Exception:
+        pass
+    return out
 
 
 def _classify_error(msg):
@@ -389,12 +477,11 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
             if not rec.get("total_blocks"):
                 rec["total_blocks"] = probe.total_blocks
         # Phase 6L: discover sidecar tensor bytes + model weights now that the
-        # KV cache (and its paged sidecars) is fully allocated. Best-effort; the
-        # headline density numbers do not depend on it.
+        # KV cache (and its paged sidecars) is fully allocated. Self-contained
+        # (no import of the phase6l analysis layer); best-effort — the headline
+        # density numbers do not depend on it.
         try:
-            sys.path.insert(0, str(Path(__file__).resolve().parent))
-            import phase6l_capacity_demo as _p6l
-            _disc = _p6l.discover_sidecar_bytes(llm)
+            _disc = _discover_sidecar_bytes(llm)
             rec["sidecar_bytes_by_tensor"] = _disc.get("sidecar_bytes_by_tensor") or {}
             rec["model_weights_gb"] = _disc.get("model_weights_gb")
             rec["kv_cache_budget_gb"] = _disc.get("kv_cache_budget_gb")
