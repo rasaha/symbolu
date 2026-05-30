@@ -52,8 +52,30 @@ bf16 contiguous-read cost.
 interactive win. Funding the interactive arm buys a *bounded* gain (~0.22× →
 maybe ~0.3–0.4×, not parity) for weeks of high-risk CUDA work behind the
 byte-equivalence + COLLAPSE=0 bar. This **strengthens the batch/offline density
-positioning.** (Exact int4-vs-bf16 removable headroom = the `bf16_LONG` analyzer
-diff — pending.)
+positioning.**
+
+**Quantified headroom (Q1–Q5).** From the int4 long-context profile. The
+`bf16_LONG` *kernel* diff was **not committed before the pod was stopped**, so the
+int4-vs-bf16 split is **part measured, part estimated**:
+- **Shared with bf16** (model GEMM/MLP): **~35–37%** of int4 GPU time — identical
+  projections; not the tax. *(Q1)*
+- **int4-extra attention / dequant**: a portion of the **29%** decode-attention
+  kernel (dequant + scale/xmin + protected splice), fused/opaque → **estimated**;
+  needs the bf16 diff or ncu to split exactly. *(Q2)*
+- **int4-only gather + copy/assembly** (`index_elementwise` + `copy_`): **~19.5%**
+  — **measured**; the clean, removable **6O target**. *(Q3)*
+- **Realistic 6O ceiling: ~0.22× → ~0.27–0.30×** (recover most of the 19.5% +
+  tighten the dequant). **Not bf16 parity** — int4 must read packed KV + scale +
+  xmin + protected and dequant every token, by design. *(Q4)*
+- **Verdict: position primarily as batch/offline density.** *(Q5)* The interactive
+  arm is a bounded (~+30% relative), multi-week, correctness-gated investment that
+  does not reach parity.
+
+The Phase 6L **capacity** artifacts (captured + eager) ARE committed under
+`bench_out/phase6l_result/` (`report_captured.json` / `report_eager.json` +
+per-cell JSONs) and back 6M.3 + the throughput headline (captured 1.83×/0.22×/130.4,
+eager 1.81×/0.21×/125.5). Only the per-kernel attribution CSVs remain uncommitted
+(pod stopped), so Q2 + the exact ceiling stay estimates.
 
 ---
 
@@ -185,11 +207,12 @@ python CTM_plus/Bench/scripts/analyze_phase6d_profile.py \
 
 ## Next (to firm up from PRELIMINARY → final)
 
-1. **Long-context bucket profile — THE gating measurement.** A 1-line driver
-   tweak to fill the profiled prompt to ~0.95×mml, then re-run M.1 at mml=8192.
-   This is the decision input: does the orchestration (syncs + gather) still
-   dominate at saturation, or does genuine KV-read/dequant work? The 6N/6O
-   investment should be gated on this — short-context alone is not enough.
+1. ✅ **Long-context bucket profile (6M.4 — DONE):** ran M.1 at mml=8192 (B=48,
+   `--prompt-frac 0.95`). Answer: at saturation the path is GPU-work-bound and
+   genuine int4 reconstruction (decode attention + gather) dominates; syncs are
+   amortized. See the **Long-context profile (6M.4)** section above. (The bf16-side
+   kernel CSV for the exact int4-vs-bf16 split was not committed before the pod
+   stopped, so Q2 stays estimated.)
 2. ✅ **Eager at saturation (6M.3 — DONE):** `ENFORCE_EAGER=1` Phase 6L at mml=8192
    → protected **125.5 ≈ captured 130.4**. Eager does **not** help; graphs are
    neutral. (Eager-win hypothesis withdrawn.)
