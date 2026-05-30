@@ -1,0 +1,49 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "mml": 8192,
+  "max_tokens": 512,
+  "prompt_frac": 0.95,
+  "gpu_util": 0.5,
+  "b_list": [
+    96,
+    128
+  ],
+  "analysis": {
+    "by_cell": {
+      "bf16": {
+        "ceiling_not_reached": false,
+        "saturation_observed": true,
+        "demonstrated_live": 58,
+        "total_blocks": 28310,
+        "seq_per_kblock": 2.049,
+        "slot_exhausted_at": [],
+        "max_concurrency": 55.3,
+        "hbm_gb": 42.44,
+        "peak_util_pct": 100.0,
+        "agg_tps": 597.3,
+        "submitted_b_max": 128,
+        "n_preemptions": 8
+      },
+      "protected": {
+        "ceiling_not_reached": false,
+        "saturation_observed": true,
+        "demonstrated_live": 117,
+        "total_blocks": 28310,
+        "seq_per_kblock": 4.133,
+        "slot_exhausted_at": [],
+        "max_concurrency": 110.6,
+        "hbm_gb": 46.83,
+        "peak_util_pct": 100.0,
+        "agg_tps": 130.4,
+        "submitted_b_max": 128,
+        "n_preemptions": 6
+      }
+    },
+    "ceiling_not_reached": [],
+    "slot_exhausted_at": {},
+    "demonstrated_density_ratio": 2.017,
+    "claim_demonstrated": true,
+    "claim_status": "DEMONSTRATED",
+    "claim_status_detail": "ratio=2.02\u00d7 (within [1.5\u20132.5] window)"
+  }
+}

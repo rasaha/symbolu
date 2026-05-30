@@ -1,8 +1,9 @@
 # Phase 6L — KV block capacity instrumentation and live-concurrency demo
 
 > **Status:** instrumentation implemented in `phase6l_capacity_demo.py`;
-> selftest 7/7 PASS. GPU capture pending — this is the only open claim in the
-> VC brief. Everything else (quality, correctness, slot lifecycle) is locked.
+> selftest 7/7 PASS. **GPU run DONE (Qwen-7B / A100, mml=8192) → claim
+> DEMONSTRATED at 2.02× raw / 1.83× per-GB-net-of-tax.** See
+> `PHASE_6L_CAPACITY_DEMO_RESULT.md` for the result + the throughput caveat.
 
 ## Claim under test
 
