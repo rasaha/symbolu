@@ -60,7 +60,7 @@ protected). So `seq_per_kblock` is proportional to `seq / GB of KV capacity`
 without needing per-quant-type byte arithmetic. It accounts for the sidecar tax
 through `total_blocks` alone.
 
-### `demonstrated_density_ratio`
+### `demonstrated_density_ratio` (raw, secondary)
 
 ```
 demonstrated_density_ratio = prot_seq_per_kblock / bf16_seq_per_kblock
@@ -68,7 +68,35 @@ demonstrated_density_ratio = prot_seq_per_kblock / bf16_seq_per_kblock
 
 Computed only when **both** cells have `saturation_observed=True` (both hit the
 block limit). If either has `CEILING_NOT_REACHED`, the ratio is None and the
-claim is inconclusive.
+claim is inconclusive. This is the **raw** block-budget ratio; it is kept but is
+NOT the headline (see below).
+
+### Sidecar tax + net-of-tax density (the HEADLINE numbers)
+
+The worker discovers the protected writer's sidecar tensors via live
+introspection (`discover_sidecar_bytes`) and records their bytes + model-weight
+bytes in each cell JSON. The analyzer then emits three top-level sections in
+`report.json` and stdout:
+
+- **`hbm_accounting`** (per cell): `hbm_gb_total`, `model_weights_gb`,
+  `kv_cache_budget_gb`, `sidecar_gb_total`, `sidecar_gb_by_tensor`
+  (`k_protect_ext`, `k_scale_ext`, `k_xmin_ext`, `v_scale_ext`, `v_xmin_ext`,
+  `_k_stage_pool`), `non_sidecar_overhead_gb`.
+- **`sidecar_tax`**: `protected_hbm_gb`, `bf16_hbm_gb`, `absolute_hbm_delta_gb`,
+  `measured_sidecar_tax_gb`, `sidecar_tax_pct_of_protected_hbm`,
+  `sidecar_tax_pct_of_delta`, `non_sidecar_residual_delta_gb`,
+  `sidecar_tax_estimated` (true if discovery failed), `sidecar_tax_source`.
+- **`density`**: `bf16/protected_demonstrated_live`, `raw_live_ratio`,
+  `bf16/protected_seq_per_gb`, **`net_density_ratio`** ← HEADLINE (live seqs per
+  actual HBM GB, net of tax), plus the clearly-labeled counterfactual
+  `net_density_ratio_without_sidecars` (NOT a serving number).
+
+**Claim gating uses `net_density_ratio`** when HBM data is present, falling back
+to the raw `seq_per_kblock` ratio only when HBM is unavailable (e.g. unit tests).
+
+**Guardrails:** the counterfactual no-sidecar ratio is never the headline; if
+per-tensor discovery fails, the absolute HBM delta, real net density, raw live
+ratio, and claim status are still computed (breakdown marked unavailable).
 
 ### Acceptance criteria
 
