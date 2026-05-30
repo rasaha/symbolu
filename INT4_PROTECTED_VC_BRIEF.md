@@ -58,10 +58,13 @@ near-bf16 fidelity over naive int4 — **+20.4 points token-agreement,
 hard-needle retrieval 0.964 vs naive 0.915** — at the same 4-bit KV
 density.
 
-**The honest trade-off**: int4_protected costs +4.7 GB total HBM
-vs bf16 (protection sidecars) and runs ~1.5–1.9× slower per-seq
-decode than bf16 at matched context lengths. The win is
-**fidelity-at-density**, not raw memory savings vs bf16.
+**The honest trade-off**: int4_protected costs ~+4.4 GB total HBM
+vs bf16 (protection sidecars; Phase 6L live-measured the tax at
+**4.38 GB** at mml=8K) and is **decode-throughput-negative**: ~1.5–1.9×
+slower per-seq at low load, and at saturation Phase 6L measured **0.22×
+bf16 aggregate tok/s** (~9× slower per user) on the as-yet-unoptimized
+int4 decode path (see the capacity section). The win is
+**fidelity-at-density**, not raw memory savings or throughput vs bf16.
 
 This brief documents the int4_protected backend: the calibration
 methodology, the validated 4-model portfolio, the integration
@@ -212,59 +215,80 @@ superseded.
 
 **What these numbers mean:**
 - **Total HBM is +4.7 GB higher** for int4_protected at equal
-  `gpu_memory_utilization`. This is the sidecar overhead (protection
-  tensors for scale, xmin, and protected channels) — int4_protected
-  does **not** shrink the absolute HBM footprint; it costs more.
+  `gpu_memory_utilization` (this long-context bench's total-HBM figure;
+  Phase 6L's saturated run measured the delta at **+4.39 GB**, of which
+  **4.38 GB is sidecars** — the bench's larger figure also includes the
+  CUDA-graph private pools). This is the sidecar overhead (protection
+  tensors for scale, xmin, and protected channels) — int4_protected does
+  **not** shrink the absolute HBM footprint; it costs more.
 - **max_concurrency is 2×** because int4 packs ~4× tokens per block
   (block_size=32, groups of 32 with 4-bit nibbles), so the same KV
   budget holds ~2× the full-context sequences. This is the
   **concurrency density** win — 2× more sequences per fixed KV
   allocation.
-- **Net capacity density** (accounting for the sidecar overhead):
-  protected fits ~**1.8× concurrent max-len seqs per GB** of total
-  HBM, vs bf16 1.31 seq/GB. This is the real high-load story: at
-  saturation, int4_protected serves more users per GPU than bf16,
-  even after paying the +4.7 GB sidecar tax.
+- **Net capacity density** (accounting for the sidecar overhead) —
+  **now DEMONSTRATED under sustained saturation (Phase 6L)**: at
+  mml=8K, B=128, both cells hit 100% KV-block utilization with
+  preemption (genuine saturation); protected held **117 live seqs vs
+  bf16 58** (2.02× raw), which net of the measured HBM tax is
+  protected **2.498 seq/GB vs bf16 1.367 seq/GB = 1.83× per GB** of
+  total HBM. This is the real high-load story: at saturation,
+  int4_protected serves ~1.83× more concurrent users per GPU than
+  bf16, even after paying the 4.38 GB sidecar tax.
 
-> ⚠️ The 2× concurrency is a **vLLM block-budget estimate** (not
-> yet demonstrated under sustained load). Capacity demonstration
-> (Run 4 with `--resident-pressure` direct observation) is pending
-> on the GPU pod; see Page 6 for status.
+> ✅ **DEMONSTRATED (Phase 6L, mml=8K, B=128):** the 2× concurrency is
+> no longer a block-budget estimate — under sustained `--resident-pressure`
+> load both cells reached the KV block limit and protected sustained
+> 1.83× live seqs/GB net of the sidecar tax. One caveat surfaced at the
+> same operating point: **aggregate decode throughput collapses to 0.22×
+> bf16 at saturation** (the unoptimized int4 decode path) — density-
+> positive, throughput-negative; see the Throughput section + Page 6.
 
-**Sidecar memory breakdown** (mml=8K; fixed 16.4% of KV cache):
+**Sidecar memory breakdown** (mml=8K, B=128, Phase 6L live-measured):
 
 | Tensor | Role | Overhead |
 |---|---|---|
-| `k_protect_ext` | protected channels at bf16 | 0.82 GB |
-| `v_scale_ext` / `v_xmin_ext` | V reconstruction | 0.65 GB each |
-| `k_scale_ext` / `k_xmin_ext` | K reconstruction | 0.65 GB each |
-| `_k_stage_pool` | decode staging | < 0.01 GB |
-| CUDA graph private pools | graph capture overhead | 0.62 GB |
+| `k_protect_ext` | protected channels at bf16 | 1.015 GB |
+| `v_scale_ext` / `v_xmin_ext` | V reconstruction | 0.812 GB each |
+| `k_scale_ext` / `k_xmin_ext` | K reconstruction | 0.812 GB each |
+| `_k_stage_pool` | decode staging (scales with B) | 0.117 GB |
+| **measured sidecar tax (sum)** | — | **4.38 GB** |
+| CUDA graph private pools *(non-PyTorch, separate)* | graph capture | ~0.62 GB |
 
-No single tensor dominates; the overhead is structural (invariant
-to context length as a fraction of KV cache).
+No single tensor dominates; the overhead is structural (scales with the
+KV block count). The +4.39 GB HBM delta vs bf16 at saturation is **~99.8%
+sidecars** (CUDA-graph pools sit outside `max_memory_allocated`). NB: the
+earlier 0.82 / 0.65 GB figures were the Phase 6G audit at **mml=32K in
+binary GiB** — a different config, not the live 8K numbers above.
 
 ### Throughput (Qwen-7B, A100-80GB, post-fix)
 
-Throughput is **workload-dependent** — int4_protected's relative
-speed depends on concurrency and generation length:
+int4_protected's decode throughput is **below bf16 at every measured
+operating point** — the size of the gap depends on concurrency and
+generation length:
 
 | Workload | bf16 agg_tps | int4 agg_tps | ratio |
 |---|---|---|---|
 | mml=8K, B=8, gen=32 (short-gen, low-B) | 131.9 | 74.4 | **0.56×** |
 | mml=16K, B=8, gen=32 | 70.9 | 46.3 | **0.65×** |
 | mml=32K, B=8, gen=32 | 34.7 | 23.1 | **0.67×** |
-| mml=8K, high-B, gen=256–512 (decode-substantial) | 51–87 | 78–115 | **~1.2–1.5×** |
+| **mml=8K, B=128, gen=512 — SATURATION (Phase 6L)** | **597.3** | **130.4** | **0.22×** |
 
-**The throughput reversal**: at low-B short-gen, int4 is slower
-(extra dequant + protect blend). At high-B decode-substantial
-workloads, int4's 2× concurrency density means it clears the same
-submitted batch in fewer vLLM waves → **aggregate TPS overtakes
-bf16**. Per-sequence latency is always ~1.5–1.9× higher than bf16;
-aggregate throughput is workload-dependent.
+**Throughput is decode-throughput-NEGATIVE.** At low-B short-gen int4
+is ~0.56–0.67× bf16 (extra dequant + protect blend). At the **saturated**
+operating point that actually realizes the density win (mml=8K, B=128,
+gen=512), Phase 6L measured int4 at **0.22× bf16 aggregate tok/s** — it
+serves ~2× the users but each user's tokens arrive **~9× slower**
+(per-seq ~10.3 → ~1.1 tok/s). An earlier *non-saturated* high-B run had
+suggested ~1.2–1.5× in int4's favor, but that did **not** hold under real
+saturation; the Phase 6L saturated number supersedes it.
 
-The target use case (high concurrency, long-context serving) is the
-workload where int4_protected is competitive or faster in aggregate.
+This is the **as-yet-unoptimized** int4 decode path (throughput
+optimization was explicitly out of scope for Phase 6L). The current
+story is **quality-positive, density-positive, throughput-negative at
+saturation** — a fit for throughput-insensitive, density-bound workloads
+(offline eval, bulk summarization, agentic batch); interactive serving
+needs decode-kernel optimization first.
 
 ### Bit-identical and prefix-overlap detail (Qwen-7B, 6 prompts, max_model_len=4096)
 
@@ -286,7 +310,7 @@ workload where int4_protected is competitive or faster in aggregate.
 | **AWQ / GPTQ** (weight-only quantization) | weights only, not KV | high | does NOT compress KV-cache; orthogonal solution |
 | **naive int4 (KIVI-style)** | 0.5× KV | degraded — token-agreement vs bf16: 0.533 (53%); easy needle deceptively OK but general fidelity substantially reduced | research-grade; our measurements confirm fidelity degradation |
 | **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 *(competitor's reported figure)* | W4A4 not KV; complementary, not competitive |
-| **int4_protected** *(this work)* | **0.5× KV + ~4.7 GB sidecar overhead** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
+| **int4_protected** *(this work)* | **0.5× KV + ~4.4 GB sidecar overhead (4.38 GB live)** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
 
 ### The relevant comparison
 
@@ -300,18 +324,21 @@ There are two distinct comparisons:
   reason to ship naive int4 over protected.
 
 **int4_protected vs bf16** (the capacity story):
-- int4 packs 2× the sequences in the same KV block budget.
-- int4 costs +4.7 GB total HBM (sidecar tax).
-- **Net**: ~1.8× concurrent max-len seqs per GB — density-positive
-  but not footprint-positive. For workloads that hit the KV block
-  limit (many concurrent long-context users), int4 serves more
-  users per GPU at near-bf16 quality. For workloads with slack KV
-  headroom, bf16 is simpler and faster per-seq.
+- int4 packs 2× the sequences in the same KV block budget (Phase 6L:
+  117 vs 58 live at saturation = 2.02× raw).
+- int4 costs **4.38 GB** sidecar tax (Phase 6L live-measured; ~+4.4 GB HBM).
+- **Net (DEMONSTRATED, Phase 6L)**: **1.83× concurrent max-len seqs per
+  GB** — density-positive but not footprint-positive, and
+  **throughput-negative at saturation (0.22× bf16 agg tok/s)**. For
+  workloads that hit the KV block limit (many concurrent long-context
+  users) and are throughput-insensitive, int4 serves ~1.83× more users
+  per GPU at near-bf16 quality. For workloads with slack KV headroom or
+  latency sensitivity, bf16 is simpler and faster per-seq.
 
 **int4_protected vs fp8** (the quality-at-density story):
 - Both deliver ~2× KV concurrency density vs bf16.
-- fp8 costs less total HBM (no sidecars); int4_protected costs +4.7 GB
-  more than bf16 while fp8 costs less.
+- fp8 costs less total HBM (no sidecars); int4_protected costs ~4.4 GB
+  more than bf16 (Phase 6L: 4.38 GB sidecars) while fp8 costs less.
 - int4_protected wins decisively on quality: 0.737 token-agreement
   vs fp8's degraded output (0/6 bit-identical, 12% prefix overlap,
   1/15 needle). For quality-sensitive workloads, fp8 is not a viable
@@ -378,7 +405,7 @@ recompile, not a methodology change.
 
 | Item | Status | Impact |
 |---|---|---|
-| **Capacity demonstration** (sustained high-B saturation) | Pending (Run 4: `--resident-pressure` direct observation) | Validates the ~2× concurrency density claim under real load; the ~1.8× seq/GB estimate is from vLLM's block budget |
+| **Capacity demonstration** (sustained high-B saturation) | ✅ DONE (Phase 6L: `--resident-pressure`, mml=8K B=128, both cells 100% KV-block util) | Validated the density claim under real load: **1.83× seq/GB** net of tax (2.02× raw live). Caveat: aggregate throughput **0.22× bf16** at saturation (unoptimized decode path) |
 | **Write-path CUDA-graph capture** | Read-path preflight (B-pre-1..4) complete; write-path capture is the remaining item (~4-7 days) | Full CUDA-graph throughput benefit; graph mode is already correct (Phase 6K.10), performance measurement pending |
 | **Tensor parallelism** (TP) for 70B-class models | Not yet validated | Unlocks 70B Llama / Qwen-72B where memory savings move the dollar economics |
 | **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | 2-3 days | De-risks customer adoption — token-agreement + needle are necessary but not sufficient for enterprise deployment |
@@ -451,11 +478,11 @@ every cell × mml.
 | **Token-agreement vs bf16 (post-fix, Qwen-7B, 8K-32K mml):** naive int4 = 0.533, protected int4 = **0.737 (+20.4 pt)** | `phase6j_quality_comparison.py` on clean post-fix data (6K.7/6K.9/6K.10); 295/553 naive vs 420/570 protected |
 | **Easy needle saturated (post-fix):** naive int4 ≈ bf16 (0.96–1.00 at 8K–32K mml) — this gate no longer discriminates protect | `phase6k11_needle_failuremode.py`; COLLAPSE=0 confirmed |
 | **Hard-needle retrieval (post-fix, mml=8192, 60 items):** bf16 1.000, protected **0.964**, naive 0.915 (+0.049); genuine misses 5→2 (K-bound miss eliminated by protect, V-bound halved) | `phase6k12_hard_needle.py`; adjudicated FORMAT items; `retrieved_or_present` metric |
-| **Memory (A100-80GB, gpu_util=0.5):** int4_protected uses +4.7 GB HBM vs bf16 at every tested mml (8K/16K/32K) | `bench_phase6_long_context_gpu.py` post-fix; `MEMORY_STORY.md` Table 1 |
-| **vLLM max_concurrency 2× bf16** at all tested mml (block-budget estimate, not demonstrated load) | Same bench; vLLM engine-init log |
-| **Concurrency density:** protected ~2.38 seq/GB vs bf16 ~1.31 seq/GB (≈1.8× net of +4.7 GB sidecar tax) | Computed from block budget + total HBM; `MEMORY_STORY.md` |
+| **Memory (A100-80GB, gpu_util=0.5):** int4_protected uses ~+4.4 GB HBM vs bf16; Phase 6L live-measured the sidecar tax at **4.38 GB** (mml=8K, B=128) = ~99.8% of the +4.39 GB delta | `bench_phase6_long_context_gpu.py`; Phase 6L `report.json`; `MEMORY_STORY.md` Table 1 |
+| **vLLM max_concurrency 2× bf16** at all tested mml; **DEMONSTRATED under load (Phase 6L):** 117 vs 58 live at saturation = 2.02× raw | Long-context bench + Phase 6L `--resident-pressure` |
+| **Concurrency density (DEMONSTRATED, Phase 6L):** protected **2.498 seq/GB** vs bf16 **1.367 seq/GB** = **1.83× net** of the 4.38 GB sidecar tax | Phase 6L live: peak_live / hbm_gb at saturation; `PHASE_6L_CAPACITY_DEMO_RESULT.md` |
 | **Throughput (post-fix), mml=8K B=8 short-gen:** int4 0.56× bf16 agg_tps; mml=16K 0.65×; mml=32K 0.67× | `bench_phase6_long_context_gpu.py` post-fix; `MEMORY_STORY.md` Table 2 |
-| **Throughput reversal at high-B decode-substantial:** protected 78–115 agg_tps vs bf16 51–87 (gen=256–512, mml=8K, B=48–128) | `phase6k14_saturation.py` Runs 2–3; `PHASE_6K14_SLOT_LIFECYCLE_FINDINGS.md` |
+| **Throughput at saturation (DEMONSTRATED, Phase 6L):** int4 **0.22× bf16** agg tok/s (130.4 vs 597.3) at mml=8K B=128 gen=512 — ~9× slower per user; unoptimized decode path | Phase 6L `report.json`; `PHASE_6L_CAPACITY_DEMO_RESULT.md` §3 |
 | **Slot lifecycle fix (6K.14):** auto-bump to `max_num_seqs` + evict-on-completion; protected ran B=48–128 with `slots=B`, zero slot-exhaustion / OOM / preempt | GPU Run 1; `PHASE_6K14_SLOT_LIFECYCLE_FINDINGS.md` |
 | 2.01× total-slot ratio at same memory budget (Qwen-7B, gpu_util=0.5, max_model_len=4096): bf16 27,934 / int4_protected 28,060 cuda blocks at block_size=16 and block_size=32 respectively | Tier A `bench_phase5c_v1.py` three-way bench; `PHASE5C_USAGE.md` |
 | 219× max concurrency vs stock 109× (Qwen-7B at max_model_len=4096) | Tier A three-way bench; vLLM engine-init log |
@@ -470,8 +497,8 @@ every cell × mml.
 
 | Item | Result |
 |---|---|
-| **int4_protected total HBM vs bf16** | CAPACITY-NEGATIVE at equal `gpu_memory_utilization`: +4.7 GB more at every mml. The 2× max_concurrency is a block-budget estimate; the net capacity density is ~1.8× seq/GB, which requires running **closer to the KV block limit** to realize (not a savings at low B). Capacity demonstration under sustained load is pending. |
-| **Per-seq decode latency** | ~1.5–1.9× slower than bf16 at matched context (dequant + protect blend). Aggregate TPS is workload-dependent: slower at short-gen/low-B, competitive or faster at high-B decode-substantial. |
+| **int4_protected total HBM vs bf16** | CAPACITY-NEGATIVE at equal `gpu_memory_utilization`: ~+4.4 GB more (Phase 6L live-measured 4.38 GB sidecar tax). The net capacity density is **1.83× seq/GB (DEMONSTRATED, Phase 6L)**, which requires running **at the KV block limit** to realize (not a savings at low B). |
+| **Decode throughput** | Per-seq ~1.5–1.9× slower than bf16 at low load; **at saturation Phase 6L measured 0.22× bf16 aggregate tok/s (~9× slower per user)** on the unoptimized int4 decode path. Density-positive, throughput-negative at saturation — fine for batch/offline, needs decode-kernel optimization for interactive serving. |
 | **Sidecar diet ceiling** | A+F+C stack (fp8 sidecars + fewer protect channels + coarser V groups) saves ~2.5 GB realistically — leaving int4 still ~2.5 GB above bf16. Diet alone likely can't reach HBM parity; option D (inline protect into KV layout) is an additional lever. |
 | **Pure int4 KIVI on K + V** | Token-agreement vs bf16 = 0.533 (53%); hard-needle misses = 5 (4 V-bound + 1 K-bound) vs bf16's 0. The K channel is the dominant failure; protected-K eliminates K-bound misses. |
 | **Higher protect_fractions (6%, 8%, 16%)** | 4% holds for Mistral-7B / Llama-3.1-8B / Qwen-14B (2-of-2 seeds). Qwen-7B shows seed-level variance at L1200 under 4%; 6%/8% is the documented safety knob. |
@@ -481,9 +508,9 @@ every cell × mml.
 
 | Item | Status |
 |---|---|
-| **Per-seq decode ~1.5–1.9× slower than bf16** | Real cost (post-fix measured); write-path CUDA-graph capture is the closer (Tier 1 v2 work) |
-| **+4.7 GB total HBM vs bf16** | Structural (sidecar overhead); diet options can reduce by ~2.5 GB but cannot reach HBM parity without option D or a different KV layout |
-| **Capacity not yet demonstrated under sustained load** | Block-budget estimate is ~2×; `--resident-pressure` direct observation (Run 4) is the live test; cannot claim demonstrated until both cells hit the block limit |
+| **Decode throughput negative at saturation: 0.22× bf16 agg (~9× slower/user)** | Real cost (Phase 6L measured, mml=8K B=128); the int4 decode kernel is unoptimized — decode-kernel optimization is the closer (Tier 1 v2 work) |
+| **~+4.4 GB total HBM vs bf16 (4.38 GB sidecars)** | Structural (sidecar overhead); diet options can reduce by ~2.5 GB but cannot reach HBM parity without option D or a different KV layout |
+| **Capacity now DEMONSTRATED (Phase 6L) — residual: single-mml** | Was a block-budget estimate; Phase 6L confirmed it under sustained `--resident-pressure` load at mml=8K B=128 (1.83× seq/GB net, 2.02× raw live). Residual: only mml=8K tested; 16K/32K robustness pending |
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
 | **vLLM 0.7.3 V0 fork vendored at SHA `720c948`** | Upstream vLLM has moved to V1; forward-port is 1-2 weeks of maintenance (Tier 2 v2) |
 | **Only D=128 head dim supported** | Kernel constraint; Phi-3.5 (D=96) and similar need a kernel recompile (Tier 2 v2) |
@@ -494,7 +521,7 @@ every cell × mml.
 | Item | Confidence |
 |---|---|
 | Write-path CUDA graph capture unlocks 2× aggregate throughput | Medium-high — launch overhead is dominant; graphs eliminate it. Phase 6E writer fusion already improved throughput substantially; graphs are the remaining lever |
-| ~2× net capacity under sustained high-concurrency load | Medium — block-budget estimate gives ~1.8× seq/GB; direct observation (Run 4) will confirm or revise |
+| ~2× net capacity under sustained high-concurrency load | ✅ **CONFIRMED (Phase 6L)** — the block-budget estimate (~1.8× seq/GB) was confirmed by direct `--resident-pressure` observation: 1.83× net seq/GB, 2.02× raw live at saturation |
 | TP enables 70B-class serving | Medium — code structure looks TP-compatible; risk is in vLLM-side plumbing |
 | Sidecar diet option C (~1.7 GB savings) + option F preserves token-agreement gain | Medium — no quality re-bench yet after diet |
 | Methodology extends to Phi (D=96) | Medium — calibration math is architecture-agnostic; kernel constraint is the only barrier |
@@ -533,21 +560,23 @@ decisions earned through this quarter's measurement work.
 The serving economics for long-context workloads are governed by
 **concurrent users per GPU**. int4_protected delivers:
 
-- **~1.8× concurrent max-len sequences per GB of HBM** at near-bf16
-  quality (0.737 token-agreement vs naive's 0.533, both at 4-bit
-  density). The density advantage is real and net of the +4.7 GB
-  sidecar overhead.
-- **Aggregate throughput advantage at high-B decode-substantial
-  workloads** (~1.2–1.5× vs bf16): at sustained concurrency near the
-  KV block limit, int4's 2× block density means fewer waves and
-  higher throughput. This is the workload that matters for serving
-  providers running long-context traffic.
+- **1.83× concurrent max-len sequences per GB of HBM** (DEMONSTRATED,
+  Phase 6L) at near-bf16 quality (0.737 token-agreement vs naive's
+  0.533, both at 4-bit density). The density advantage is real and net
+  of the 4.38 GB sidecar tax.
+- **But throughput-negative at saturation**: the same Phase 6L run
+  measured int4 at **0.22× bf16 aggregate tok/s (~9× slower per user)**
+  on the unoptimized decode path. The density win is real; it currently
+  costs per-user latency at the saturated operating point.
 
 Translated to operator economics: a serving deployment at the KV
 block limit (the common case for production serving at peak load)
-can serve ~1.8× more concurrent long-context users per GPU at
-near-bf16 output quality, paying a per-seq latency premium of
-~1.5–1.9×. At peak throughput this premium disappears in aggregate.
+can serve **~1.83× more concurrent long-context users per GPU** at
+near-bf16 output quality — but at ~0.22× the aggregate token rate until
+the int4 decode kernel is optimized. That makes the current demonstrated
+fit **throughput-insensitive, density-bound workloads** (offline eval,
+bulk summarization, agentic batch); interactive serving is gated on
+decode-kernel optimization.
 
 **The quality story is the differentiator.** int4_protected is the
 only 4-bit KV scheme with a published validated quality story: +20.4
