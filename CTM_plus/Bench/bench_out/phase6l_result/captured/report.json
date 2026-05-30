@@ -1,0 +1,205 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "mml": 8192,
+  "max_tokens": 512,
+  "prompt_frac": 0.95,
+  "gpu_util": 0.5,
+  "b_list": [
+    96,
+    128
+  ],
+  "hbm_accounting": {
+    "bf16": {
+      "hbm_gb_total": 42.44,
+      "model_weights_gb": 15.231,
+      "kv_cache_budget_gb": null,
+      "sidecar_gb_total": 0.0,
+      "sidecar_gb_by_tensor": {},
+      "non_sidecar_overhead_gb": null
+    },
+    "protected": {
+      "hbm_gb_total": 46.83,
+      "model_weights_gb": 15.231,
+      "kv_cache_budget_gb": null,
+      "sidecar_gb_total": 4.379,
+      "sidecar_gb_by_tensor": {
+        "k_scale_ext": 0.8117,
+        "k_xmin_ext": 0.8117,
+        "k_protect_ext": 1.0146,
+        "v_scale_ext": 0.8117,
+        "v_xmin_ext": 0.8117,
+        "_k_stage_pool": 0.1174
+      },
+      "non_sidecar_overhead_gb": null
+    }
+  },
+  "sidecar_tax": {
+    "protected_hbm_gb": 46.83,
+    "bf16_hbm_gb": 42.44,
+    "absolute_hbm_delta_gb": 4.39,
+    "measured_sidecar_tax_gb": 4.379,
+    "sidecar_tax_estimated": false,
+    "sidecar_tax_source": "live tensor introspection (writer sidecar tensors)",
+    "sidecar_tax_pct_of_protected_hbm": 9.35,
+    "sidecar_tax_pct_of_delta": 99.75,
+    "non_sidecar_residual_delta_gb": 0.011,
+    "sidecar_breakdown_available": true,
+    "sidecar_gb_by_tensor": {
+      "k_scale_ext": 0.8117,
+      "k_xmin_ext": 0.8117,
+      "k_protect_ext": 1.0146,
+      "v_scale_ext": 0.8117,
+      "v_xmin_ext": 0.8117,
+      "_k_stage_pool": 0.1174
+    }
+  },
+  "density": {
+    "bf16_demonstrated_live": 58,
+    "protected_demonstrated_live": 117,
+    "raw_live_ratio": 2.017,
+    "bf16_hbm_gb": 42.44,
+    "protected_hbm_gb": 46.83,
+    "bf16_seq_per_gb": 1.367,
+    "protected_seq_per_gb": 2.498,
+    "net_density_ratio": 1.827,
+    "headline_metric": "net_density_ratio",
+    "protected_seq_per_gb_without_sidecars": 2.756,
+    "net_density_ratio_without_sidecars": 2.016,
+    "counterfactual_note": "without_sidecars is a COUNTERFACTUAL upper bound (sidecars are mandatory for int4 dequant); it is NOT the real serving density",
+    "claim_window": [
+      1.5,
+      2.5
+    ],
+    "net_density_in_window": true
+  },
+  "throughput": {
+    "bf16_agg_tps": 600.3,
+    "protected_agg_tps": 129.9,
+    "aggregate_tps_ratio": 0.216,
+    "bf16_tps_per_live_seq": 10.35,
+    "protected_tps_per_live_seq": 1.11,
+    "per_seq_tps_ratio": 0.107,
+    "per_seq_slowdown_x": 9.35,
+    "interactive_tps_ratio_min": 0.7,
+    "interactive_viable": false,
+    "workload_fit": "BATCH/OFFLINE density play \u2014 fits throughput-insensitive, density-bound workloads (offline eval, bulk summarization, agentic batch). Interactive serving would need int4 decode-kernel optimization to close the per-user gap",
+    "framing_note": "DENSITY +1.827x net seq/GB  vs  THROUGHPUT 0.216x aggregate / 0.107x per-user tok/s. The density win is real and paid for in latency; positioning depends on whether the target workload is throughput-insensitive (batch/offline) or latency-sensitive (interactive)."
+  },
+  "analysis": {
+    "by_cell": {
+      "bf16": {
+        "ceiling_not_reached": false,
+        "saturation_observed": true,
+        "demonstrated_live": 58,
+        "total_blocks": 28310,
+        "seq_per_kblock": 2.049,
+        "slot_exhausted_at": [],
+        "max_concurrency": 55.3,
+        "hbm_gb": 42.44,
+        "peak_util_pct": 100.0,
+        "agg_tps": 600.3,
+        "submitted_b_max": 128,
+        "n_preemptions": 8
+      },
+      "protected": {
+        "ceiling_not_reached": false,
+        "saturation_observed": true,
+        "demonstrated_live": 117,
+        "total_blocks": 28310,
+        "seq_per_kblock": 4.133,
+        "slot_exhausted_at": [],
+        "max_concurrency": 110.6,
+        "hbm_gb": 46.83,
+        "peak_util_pct": 100.0,
+        "agg_tps": 129.9,
+        "submitted_b_max": 128,
+        "n_preemptions": 6
+      }
+    },
+    "ceiling_not_reached": [],
+    "slot_exhausted_at": {},
+    "demonstrated_density_ratio": 2.017,
+    "claim_demonstrated": true,
+    "claim_status": "DEMONSTRATED",
+    "hbm_accounting": {
+      "bf16": {
+        "hbm_gb_total": 42.44,
+        "model_weights_gb": 15.231,
+        "kv_cache_budget_gb": null,
+        "sidecar_gb_total": 0.0,
+        "sidecar_gb_by_tensor": {},
+        "non_sidecar_overhead_gb": null
+      },
+      "protected": {
+        "hbm_gb_total": 46.83,
+        "model_weights_gb": 15.231,
+        "kv_cache_budget_gb": null,
+        "sidecar_gb_total": 4.379,
+        "sidecar_gb_by_tensor": {
+          "k_scale_ext": 0.8117,
+          "k_xmin_ext": 0.8117,
+          "k_protect_ext": 1.0146,
+          "v_scale_ext": 0.8117,
+          "v_xmin_ext": 0.8117,
+          "_k_stage_pool": 0.1174
+        },
+        "non_sidecar_overhead_gb": null
+      }
+    },
+    "sidecar_tax": {
+      "protected_hbm_gb": 46.83,
+      "bf16_hbm_gb": 42.44,
+      "absolute_hbm_delta_gb": 4.39,
+      "measured_sidecar_tax_gb": 4.379,
+      "sidecar_tax_estimated": false,
+      "sidecar_tax_source": "live tensor introspection (writer sidecar tensors)",
+      "sidecar_tax_pct_of_protected_hbm": 9.35,
+      "sidecar_tax_pct_of_delta": 99.75,
+      "non_sidecar_residual_delta_gb": 0.011,
+      "sidecar_breakdown_available": true,
+      "sidecar_gb_by_tensor": {
+        "k_scale_ext": 0.8117,
+        "k_xmin_ext": 0.8117,
+        "k_protect_ext": 1.0146,
+        "v_scale_ext": 0.8117,
+        "v_xmin_ext": 0.8117,
+        "_k_stage_pool": 0.1174
+      }
+    },
+    "density": {
+      "bf16_demonstrated_live": 58,
+      "protected_demonstrated_live": 117,
+      "raw_live_ratio": 2.017,
+      "bf16_hbm_gb": 42.44,
+      "protected_hbm_gb": 46.83,
+      "bf16_seq_per_gb": 1.367,
+      "protected_seq_per_gb": 2.498,
+      "net_density_ratio": 1.827,
+      "headline_metric": "net_density_ratio",
+      "protected_seq_per_gb_without_sidecars": 2.756,
+      "net_density_ratio_without_sidecars": 2.016,
+      "counterfactual_note": "without_sidecars is a COUNTERFACTUAL upper bound (sidecars are mandatory for int4 dequant); it is NOT the real serving density",
+      "claim_window": [
+        1.5,
+        2.5
+      ],
+      "net_density_in_window": true
+    },
+    "throughput": {
+      "bf16_agg_tps": 600.3,
+      "protected_agg_tps": 129.9,
+      "aggregate_tps_ratio": 0.216,
+      "bf16_tps_per_live_seq": 10.35,
+      "protected_tps_per_live_seq": 1.11,
+      "per_seq_tps_ratio": 0.107,
+      "per_seq_slowdown_x": 9.35,
+      "interactive_tps_ratio_min": 0.7,
+      "interactive_viable": false,
+      "workload_fit": "BATCH/OFFLINE density play \u2014 fits throughput-insensitive, density-bound workloads (offline eval, bulk summarization, agentic batch). Interactive serving would need int4 decode-kernel optimization to close the per-user gap",
+      "framing_note": "DENSITY +1.827x net seq/GB  vs  THROUGHPUT 0.216x aggregate / 0.107x per-user tok/s. The density win is real and paid for in latency; positioning depends on whether the target workload is throughput-insensitive (batch/offline) or latency-sensitive (interactive)."
+    },
+    "headline_density_ratio": 1.827,
+    "headline_metric": "net_density_ratio",
+    "claim_status_detail": "net_density_ratio=1.83\u00d7 (live seqs per actual HBM GB, net of sidecar tax) within [1.5\u20132.5] window"
+  }
+}

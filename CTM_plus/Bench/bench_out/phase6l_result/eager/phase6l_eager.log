@@ -1,0 +1,167 @@
+
+[6L] bf16 mml=8192 B=128 gen=512 pf=0.95 util=0.5
+INFO 05-30 04:04:09 __init__.py:207] Automatically detected platform cuda.
+INFO 05-30 04:04:15 config.py:549] This model supports multiple tasks: {'reward', 'score', 'embed', 'classify', 'generate'}. Defaulting to 'generate'.
+WARNING 05-30 04:04:15 cuda.py:95] To see benefits of async output processing, enable CUDA graph. Since, enforce-eager is enabled, async output processor cannot be used
+WARNING 05-30 04:04:15 config.py:685] Async output processing is not supported on the current platform type cuda.
+INFO 05-30 04:04:15 llm_engine.py:234] Initializing a V0 LLM engine (v0.7.3) with config: model='Qwen/Qwen2.5-7B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-7B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-7B-Instruct, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=False, chunked_prefill_enabled=False, use_async_output_proc=False, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[],"max_capture_size":0}, use_cached_outputs=False, 
+INFO 05-30 04:04:16 cuda.py:229] Using Flash Attention backend.
+INFO 05-30 04:04:17 model_runner.py:1110] Starting to load model Qwen/Qwen2.5-7B-Instruct...
+INFO 05-30 04:04:18 weight_utils.py:254] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:00<00:01,  1.82it/s]
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:01<00:01,  1.81it/s]
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:01<00:00,  1.72it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:02<00:00,  1.69it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:02<00:00,  1.72it/s]
+
+INFO 05-30 04:04:20 model_runner.py:1115] Loading model weights took 14.2487 GB
+INFO 05-30 04:04:21 worker.py:267] Memory profiling takes 0.82 seconds
+INFO 05-30 04:04:21 worker.py:267] the current vLLM instance can use total_gpu_memory (79.25GiB) x gpu_memory_utilization (0.50) = 39.63GiB
+INFO 05-30 04:04:21 worker.py:267] model weights take 14.25GiB; non_torch_memory takes 0.09GiB; PyTorch activation peak memory takes 1.09GiB; the rest of the memory reserved for KV Cache is 24.19GiB.
+INFO 05-30 04:04:21 executor_base.py:111] # cuda blocks: 28310, # CPU blocks: 4681
+INFO 05-30 04:04:21 executor_base.py:116] Maximum concurrency for 8192 tokens per request: 55.29x
+INFO 05-30 04:04:28 llm_engine.py:436] init engine (profile, create kv cache, warmup model) took 7.50 seconds
+Processed prompts:   0%|                                                                                                                         | 0/128 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]WARNING 05-30 04:05:05 scheduler.py:1754] Sequence group 57 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=1
+Processed prompts:   1%|▊                                                                                                           | 1/128 [00:46<1:38:34, 46.57s/it, est. speed input: 163.54 toks/s, output: 10.99 toks/s]Processed prompts:  44%|██████████████████████████████████████████████▊                                                            | 56/128 [01:15<01:19,  1.10s/it, est. speed input: 5679.72 toks/s, output: 381.83 toks/s]Processed prompts:  45%|███████████████████████████████████████████████▋                                                           | 57/128 [01:21<01:26,  1.22s/it, est. speed input: 5353.25 toks/s, output: 359.88 toks/s]Processed prompts:  45%|████████████████████████████████████████████████▍                                                          | 58/128 [01:26<01:36,  1.37s/it, est. speed input: 5089.03 toks/s, output: 342.12 toks/s]Processed prompts:  46%|█████████████████████████████████████████████████▎                                                         | 59/128 [01:34<01:54,  1.65s/it, est. speed input: 4775.21 toks/s, output: 321.02 toks/s]Processed prompts:  89%|██████████████████████████████████████████████████████████████████████████████████████████████▍           | 114/128 [01:42<00:06,  2.09it/s, est. speed input: 8441.90 toks/s, output: 567.52 toks/s]Processed prompts:  90%|███████████████████████████████████████████████████████████████████████████████████████████████▏          | 115/128 [01:49<00:07,  1.64it/s, est. speed input: 7965.46 toks/s, output: 535.49 toks/s]Processed prompts: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████| 128/128 [01:49<00:00,  1.16it/s, est. speed input: 8865.86 toks/s, output: 596.02 toks/s]
+[6k14 bf16 mml8192 B128 gen512 pf0.95 util0.5] ptok=7616 fit=59 done=128/128 oom=False slotX=False preempt=5(artificial_preempt_cnt,num_cumulative_preemption) live=58 util=1.0 sat=True hbm=42.43 tps=584.3 conc=55.3
+[rank0]:[W530 04:06:21.856573344 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+[6L] bf16 mml=8192 B=96 gen=512 pf=0.95 util=0.5
+INFO 05-30 04:06:27 __init__.py:207] Automatically detected platform cuda.
+INFO 05-30 04:06:33 config.py:549] This model supports multiple tasks: {'classify', 'score', 'embed', 'generate', 'reward'}. Defaulting to 'generate'.
+WARNING 05-30 04:06:33 cuda.py:95] To see benefits of async output processing, enable CUDA graph. Since, enforce-eager is enabled, async output processor cannot be used
+WARNING 05-30 04:06:33 config.py:685] Async output processing is not supported on the current platform type cuda.
+INFO 05-30 04:06:33 llm_engine.py:234] Initializing a V0 LLM engine (v0.7.3) with config: model='Qwen/Qwen2.5-7B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-7B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-7B-Instruct, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=False, chunked_prefill_enabled=False, use_async_output_proc=False, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[],"max_capture_size":0}, use_cached_outputs=False, 
+INFO 05-30 04:06:35 cuda.py:229] Using Flash Attention backend.
+INFO 05-30 04:06:35 model_runner.py:1110] Starting to load model Qwen/Qwen2.5-7B-Instruct...
+INFO 05-30 04:06:35 weight_utils.py:254] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:00<00:02,  1.38it/s]
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:01<00:01,  1.38it/s]
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:02<00:00,  1.34it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:03<00:00,  1.31it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:03<00:00,  1.33it/s]
+
+INFO 05-30 04:06:39 model_runner.py:1115] Loading model weights took 14.2487 GB
+INFO 05-30 04:06:40 worker.py:267] Memory profiling takes 0.85 seconds
+INFO 05-30 04:06:40 worker.py:267] the current vLLM instance can use total_gpu_memory (79.25GiB) x gpu_memory_utilization (0.50) = 39.63GiB
+INFO 05-30 04:06:40 worker.py:267] model weights take 14.25GiB; non_torch_memory takes 0.09GiB; PyTorch activation peak memory takes 1.09GiB; the rest of the memory reserved for KV Cache is 24.19GiB.
+INFO 05-30 04:06:40 executor_base.py:111] # cuda blocks: 28310, # CPU blocks: 4681
+INFO 05-30 04:06:40 executor_base.py:116] Maximum concurrency for 8192 tokens per request: 55.29x
+INFO 05-30 04:06:43 llm_engine.py:436] init engine (profile, create kv cache, warmup model) took 4.34 seconds
+Processed prompts:   0%|                                                                                                                          | 0/96 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]WARNING 05-30 04:07:19 scheduler.py:1754] Sequence group 57 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=1
+Processed prompts:   1%|█▏                                                                                                           | 1/96 [00:46<1:13:10, 46.21s/it, est. speed input: 164.81 toks/s, output: 11.08 toks/s]Processed prompts:  58%|███████████████████████████████████████████████████████████████                                             | 56/96 [01:06<00:37,  1.06it/s, est. speed input: 6425.92 toks/s, output: 431.99 toks/s]Processed prompts:  59%|████████████████████████████████████████████████████████████████▏                                           | 57/96 [01:10<00:39,  1.02s/it, est. speed input: 6172.77 toks/s, output: 414.98 toks/s]Processed prompts:  60%|█████████████████████████████████████████████████████████████████▎                                          | 58/96 [01:13<00:41,  1.10s/it, est. speed input: 5983.44 toks/s, output: 402.25 toks/s]Processed prompts:  61%|██████████████████████████████████████████████████████████████████▍                                         | 59/96 [01:19<00:48,  1.30s/it, est. speed input: 5683.80 toks/s, output: 382.10 toks/s]Processed prompts: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 96/96 [01:19<00:00,  1.21it/s, est. speed input: 9248.14 toks/s, output: 621.72 toks/s]
+[6k14 bf16 mml8192 B96 gen512 pf0.95 util0.5] ptok=7616 fit=59 done=96/96 oom=False slotX=False preempt=3(artificial_preempt_cnt,num_cumulative_preemption) live=58 util=1.0 sat=True hbm=42.43 tps=612.9 conc=55.3
+[rank0]:[W530 04:08:04.292425641 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+[6L] protected mml=8192 B=128 gen=512 pf=0.95 util=0.5
+INFO 05-30 04:08:10 __init__.py:207] Automatically detected platform cuda.
+INFO 05-30 04:08:20 config.py:549] This model supports multiple tasks: {'score', 'generate', 'embed', 'classify', 'reward'}. Defaulting to 'generate'.
+WARNING 05-30 04:08:20 cuda.py:95] To see benefits of async output processing, enable CUDA graph. Since, enforce-eager is enabled, async output processor cannot be used
+WARNING 05-30 04:08:20 config.py:685] Async output processing is not supported on the current platform type cuda.
+INFO 05-30 04:08:20 llm_engine.py:234] Initializing a V0 LLM engine (v0.7.3) with config: model='Qwen/Qwen2.5-7B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-7B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=int4_protected,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-7B-Instruct, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=False, chunked_prefill_enabled=False, use_async_output_proc=False, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[],"max_capture_size":0}, use_cached_outputs=False, 
+INFO 05-30 04:08:22 model_runner.py:1110] Starting to load model Qwen/Qwen2.5-7B-Instruct...
+INFO 05-30 04:08:22 weight_utils.py:254] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:00<00:02,  1.38it/s]
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:01<00:01,  1.38it/s]
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:02<00:00,  1.31it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:03<00:00,  1.30it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:03<00:00,  1.31it/s]
+
+INFO 05-30 04:08:26 model_runner.py:1115] Loading model weights took 14.2487 GB
+INFO 05-30 04:08:27 worker.py:267] Memory profiling takes 0.83 seconds
+INFO 05-30 04:08:27 worker.py:267] the current vLLM instance can use total_gpu_memory (79.25GiB) x gpu_memory_utilization (0.50) = 39.63GiB
+INFO 05-30 04:08:27 worker.py:267] model weights take 14.25GiB; non_torch_memory takes 0.09GiB; PyTorch activation peak memory takes 1.09GiB; the rest of the memory reserved for KV Cache is 24.19GiB.
+INFO 05-30 04:08:27 executor_base.py:111] # cuda blocks: 28310, # CPU blocks: 4681
+INFO 05-30 04:08:27 executor_base.py:116] Maximum concurrency for 8192 tokens per request: 110.59x
+INFO 05-30 04:08:31 llm_engine.py:436] init engine (profile, create kv cache, warmup model) took 4.97 seconds
+Processed prompts:   0%|                                                                                                                         | 0/128 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]WARNING 05-30 04:10:45 scheduler.py:1754] Sequence group 116 is preempted by PreemptionMode.RECOMPUTE mode because there is not enough KV cache space. This can affect the end-to-end performance. Increase gpu_memory_utilization or tensor_parallel_size to provide more KV cache memory. total_num_cumulative_preemption=1
+Processed prompts:   1%|▊                                                                                                           | 1/128 [07:24<15:39:49, 444.01s/it, est. speed input: 17.15 toks/s, output: 1.15 toks/s]Processed prompts:  88%|████████████████████████████████████████████████████████████████████████████████████████████▊             | 112/128 [07:41<00:47,  2.94s/it, est. speed input: 1846.44 toks/s, output: 124.13 toks/s]Processed prompts:  88%|█████████████████████████████████████████████████████████████████████████████████████████████▌            | 113/128 [07:51<00:45,  3.02s/it, est. speed input: 1826.42 toks/s, output: 122.78 toks/s]Processed prompts:  89%|██████████████████████████████████████████████████████████████████████████████████████████████▍           | 114/128 [07:59<00:43,  3.12s/it, est. speed input: 1810.05 toks/s, output: 121.68 toks/s]Processed prompts:  90%|███████████████████████████████████████████████████████████████████████████████████████████████▏          | 115/128 [08:08<00:42,  3.26s/it, est. speed input: 1792.37 toks/s, output: 120.50 toks/s]Processed prompts:  91%|████████████████████████████████████████████████████████████████████████████████████████████████          | 116/128 [08:09<00:38,  3.19s/it, est. speed input: 1803.87 toks/s, output: 120.96 toks/s]Processed prompts:  91%|████████████████████████████████████████████████████████████████████████████████████████████████▉         | 117/128 [08:16<00:36,  3.34s/it, est. speed input: 1795.63 toks/s, output: 120.41 toks/s]Processed prompts:  92%|█████████████████████████████████████████████████████████████████████████████████████████████████▋        | 118/128 [08:38<00:44,  4.49s/it, est. speed input: 1734.74 toks/s, output: 116.33 toks/s]Processed prompts: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████| 128/128 [08:38<00:00,  4.05s/it, est. speed input: 1881.75 toks/s, output: 126.21 toks/s]
+[6k14 protected mml8192 B128 gen512 pf0.95 util0.5] ptok=7616 fit=118 done=128/128 oom=False slotX=False preempt=6(artificial_preempt_cnt,num_cumulative_preemption) live=117 util=1.0 sat=True hbm=47.21 tps=125.5 conc=110.6
+[rank0]:[W530 04:17:13.728551945 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+[6L] protected mml=8192 B=96 gen=512 pf=0.95 util=0.5
+INFO 05-30 04:17:19 __init__.py:207] Automatically detected platform cuda.
+INFO 05-30 04:17:25 config.py:549] This model supports multiple tasks: {'classify', 'generate', 'embed', 'score', 'reward'}. Defaulting to 'generate'.
+WARNING 05-30 04:17:25 cuda.py:95] To see benefits of async output processing, enable CUDA graph. Since, enforce-eager is enabled, async output processor cannot be used
+WARNING 05-30 04:17:25 config.py:685] Async output processing is not supported on the current platform type cuda.
+INFO 05-30 04:17:25 llm_engine.py:234] Initializing a V0 LLM engine (v0.7.3) with config: model='Qwen/Qwen2.5-7B-Instruct', speculative_config=None, tokenizer='Qwen/Qwen2.5-7B-Instruct', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, kv_cache_dtype=int4_protected,  device_config=cuda, decoding_config=DecodingConfig(guided_decoding_backend='xgrammar'), observability_config=ObservabilityConfig(otlp_traces_endpoint=None, collect_model_forward_time=False, collect_model_execute_time=False), seed=0, served_model_name=Qwen/Qwen2.5-7B-Instruct, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=False, chunked_prefill_enabled=False, use_async_output_proc=False, disable_mm_preprocessor_cache=False, mm_processor_kwargs=None, pooler_config=None, compilation_config={"splitting_ops":[],"compile_sizes":[],"cudagraph_capture_sizes":[],"max_capture_size":0}, use_cached_outputs=False, 
+INFO 05-30 04:17:27 model_runner.py:1110] Starting to load model Qwen/Qwen2.5-7B-Instruct...
+INFO 05-30 04:17:27 weight_utils.py:254] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/4 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  25% Completed | 1/4 [00:00<00:01,  1.52it/s]
+Loading safetensors checkpoint shards:  50% Completed | 2/4 [00:01<00:01,  1.55it/s]
+Loading safetensors checkpoint shards:  75% Completed | 3/4 [00:01<00:00,  1.49it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:02<00:00,  1.41it/s]
+Loading safetensors checkpoint shards: 100% Completed | 4/4 [00:02<00:00,  1.44it/s]
+
+INFO 05-30 04:17:30 model_runner.py:1115] Loading model weights took 14.2487 GB
+INFO 05-30 04:17:31 worker.py:267] Memory profiling takes 0.84 seconds
+INFO 05-30 04:17:31 worker.py:267] the current vLLM instance can use total_gpu_memory (79.25GiB) x gpu_memory_utilization (0.50) = 39.63GiB
+INFO 05-30 04:17:31 worker.py:267] model weights take 14.25GiB; non_torch_memory takes 0.09GiB; PyTorch activation peak memory takes 1.09GiB; the rest of the memory reserved for KV Cache is 24.19GiB.
+INFO 05-30 04:17:31 executor_base.py:111] # cuda blocks: 28310, # CPU blocks: 4681
+INFO 05-30 04:17:31 executor_base.py:116] Maximum concurrency for 8192 tokens per request: 110.59x
+INFO 05-30 04:17:34 llm_engine.py:436] init engine (profile, create kv cache, warmup model) took 4.33 seconds
+Processed prompts:   0%|                                                                                                                          | 0/96 [00:00<?, ?it/s, est. speed input: 0.00 toks/s, output: 0.00 toks/s]Processed prompts:   1%|█▏                                                                                                            | 1/96 [04:57<7:51:17, 297.66s/it, est. speed input: 25.59 toks/s, output: 1.36 toks/s]Processed prompts: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████| 96/96 [04:57<00:00,  3.10s/it, est. speed input: 2456.30 toks/s, output: 130.62 toks/s]
+[6k14 protected mml8192 B96 gen512 pf0.95 util0.5] ptok=7616 fit=118 done=96/96 oom=False slotX=False preempt=0(artificial_preempt_cnt,num_cumulative_preemption) live=96 util=0.851 sat=False hbm=46.95 tps=130.1 conc=110.6
+[rank0]:[W530 04:22:34.962046557 ProcessGroupNCCL.cpp:1250] Warning: WARNING: process group has NOT been destroyed before we destruct ProcessGroupNCCL. On normal program exit, the application should call destroy_process_group to ensure that any pending NCCL operations have finished in this process. In rare cases this process can exit before this point and block the progress of another member of the process group. This constraint has always been present,  but this warning has only been added since PyTorch 2.4 (function operator())
+
+[6L] report -> /tmp/phase6l_eager/report.json
+====================================================================================
+PHASE 6L — live concurrency capacity demo
+  mml=8192  max_tokens=512  prompt_frac=0.95
+====================================================================================
+  metric                                        bf16       protected
+  ------------------------------------------------------------------
+  submitted_b_max                                128             128
+  total_blocks                                 28310           28310
+  est_max_conc (vLLM)                           55.3           110.6
+  peak_kv_util_%                              100.0%          100.0%
+  saturation_observed                           True            True
+  ceiling_not_reached                          False           False
+  n_preemptions                                    8               6
+  demonstrated_live                               58             117
+  seq_per_kblock                               2.049           4.133
+  hbm_gb                                       42.43           47.21
+  tokens/sec                                   584.3           125.5
+  ------------------------------------------------------------------
+  raw seq_per_kblock ratio                    2.017x
+
+  Sidecar / HBM accounting:
+    bf16 total HBM:        42.43 GB
+    protected total HBM:   47.21 GB
+    absolute HBM delta:    +4.78 GB
+    measured sidecar tax:  4.38 GB (9.3% of protected HBM, 91.6% of delta)
+    sidecar tensor breakdown:
+      k_protect_ext    1.015 GB
+      k_scale_ext      0.812 GB
+      k_xmin_ext       0.812 GB
+      v_scale_ext      0.812 GB
+      v_xmin_ext       0.812 GB
+      _k_stage_pool    0.117 GB
+    non-sidecar residual delta: 0.40 GB (CUDA-graph pools + misc)
+
+  Demonstrated density (net of sidecar tax):
+    bf16 live seqs:        58
+    protected live seqs:   117
+    raw live ratio:        2.02x
+    bf16 seq/GB:           1.367
+    protected seq/GB:      2.478
+    NET density ratio:     1.81x   <-- HEADLINE (VC-safe, net of tax)
+    [counterfactual] no-sidecar ratio: 2.00x (NOT a serving number — sidecars are mandatory for dequant)
+
+  Throughput tax (latency cost of the density win):
+    bf16 agg tok/s:        584.3
+    protected agg tok/s:   125.5
+    aggregate tps ratio:   0.21x (cluster throughput)
+    bf16 tok/s per seq:    10.07
+    protected tok/s/seq:   1.07
+    per-user tps ratio:    0.11x  (~9.3x slower per user)
+    interactive-viable:    False (bar: per-user >= 70% of bf16)
+    -> BATCH/OFFLINE density play — fits throughput-insensitive, density-bound workloads (offline eval, bulk summarization, agentic batch). Interactive serving would need int4 decode-kernel optimization to close the per-user gap
+
+  CLAIM (~1.8× seq/GB): DEMONSTRATED
+  net_density_ratio=1.81× (live seqs per actual HBM GB, net of sidecar tax) within [1.5–2.5] window
+====================================================================================
