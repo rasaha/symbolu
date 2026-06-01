@@ -1,7 +1,7 @@
 # int4_protected — VC Brief
 
 **Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M)*
 
 ---
 
@@ -406,7 +406,7 @@ recompile, not a methodology change.
 | Item | Status | Impact |
 |---|---|---|
 | **Capacity demonstration** (sustained high-B saturation) | ✅ DONE (Phase 6L: `--resident-pressure`, mml=8K B=128, both cells 100% KV-block util) | Validated the density claim under real load: **1.83× seq/GB** net of tax (2.02× raw live). Caveat: aggregate throughput **0.22× bf16** at saturation (unoptimized decode path) |
-| **Write-path CUDA-graph capture** | Read-path preflight (B-pre-1..4) complete; write-path capture is the remaining item (~4-7 days) | Full CUDA-graph throughput benefit; graph mode is already correct (Phase 6K.10), performance measurement pending |
+| **Decode-throughput recovery** (the 0.22× closer) | **Attributed (Phase 6M.4): GPU-work-bound at saturation** — decode-attention kernel ~29% + paged gather/copy ~19.5%; host syncs <1%. **CUDA graphs ruled OUT** (6M.3: neutral at saturation, eager ≈ captured). Next gate = **Test 1 roofline (6M.5)** to split compute- vs bandwidth-bound. **⚠ Test 1 BLOCKED on RunPod A100 (`ERR_NVGPUCTRPERM`, perf counters locked) — needs a profiling-enabled experiment server; tooling is committed and ready.** | Bounds the recoverable headroom. Honest ceiling: **~0.22× → ~0.27–0.30×, NOT bf16 parity** (int4 fundamentally reads packed KV + sidecars and dequants/token). Kernel fusion (6F) is gated on the Test 1 verdict + a funding decision |
 | **Tensor parallelism** (TP) for 70B-class models | Not yet validated | Unlocks 70B Llama / Qwen-72B where memory savings move the dollar economics |
 | **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | 2-3 days | De-risks customer adoption — token-agreement + needle are necessary but not sufficient for enterprise deployment |
 
@@ -433,7 +433,7 @@ recompile, not a methodology change.
 ### Realistic v2 timeline
 
 A focused 6-8 week effort can land Tier 1 cleanly:
-- Weeks 1-2: Capacity demonstration (Run 4) + write-path CUDA graph capture
+- Weeks 1-2: Decode-throughput recovery — Test 1 roofline (6M.5) on a profiling-enabled pod, then gated read-path kernel fusion (6F) toward the ~0.27–0.30× ceiling (NOT graph capture — Phase 6M.3 ruled it neutral at saturation)
 - Weeks 2-3: Tensor parallelism (multi-rank pool sharding; smoke verify on 2-rank pod)
 - Weeks 3-4: Quality bench suite (lm-eval-harness integration; run all 4 models)
 - Weeks 5-6: Hard-needle at 16K/32K + sidecar diet option C
@@ -508,7 +508,7 @@ every cell × mml.
 
 | Item | Status |
 |---|---|
-| **Decode throughput negative at saturation: 0.22× bf16 agg (~9× slower/user)** | Real cost (Phase 6L measured, mml=8K B=128); the int4 decode kernel is unoptimized — decode-kernel optimization is the closer (Tier 1 v2 work) |
+| **Decode throughput negative at saturation: 0.22× bf16 agg (~9× slower/user)** | Real cost (Phase 6L measured, mml=8K B=128). **Phase 6M attributed it: GPU-work-bound** (decode-attention ~29% + gather/copy ~19.5%), not removable host overhead — so the recoverable headroom is **bounded (~0.27–0.30×, not parity)**, and the closing lever (read-path kernel fusion, 6F) is gated on the **Test 1 roofline (6M.5)**, which is **blocked on counter-locked pods (`ERR_NVGPUCTRPERM`)** and awaits a profiling-enabled experiment server |
 | **~+4.4 GB total HBM vs bf16 (4.38 GB sidecars)** | Structural (sidecar overhead); diet options can reduce by ~2.5 GB but cannot reach HBM parity without option D or a different KV layout |
 | **Capacity now DEMONSTRATED (Phase 6L) — residual: single-mml** | Was a block-budget estimate; Phase 6L confirmed it under sustained `--resident-pressure` load at mml=8K B=128 (1.83× seq/GB net, 2.02× raw live). Residual: only mml=8K tested; 16K/32K robustness pending |
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
@@ -520,7 +520,8 @@ every cell × mml.
 
 | Item | Confidence |
 |---|---|
-| Write-path CUDA graph capture unlocks 2× aggregate throughput | Medium-high — launch overhead is dominant; graphs eliminate it. Phase 6E writer fusion already improved throughput substantially; graphs are the remaining lever |
+| ~~Write-path CUDA graph capture unlocks 2× aggregate throughput~~ **WITHDRAWN (Phase 6M.3)** | **Overturned.** At saturation, eager ≈ captured (125.5 ≈ 130.4 tok/s) — graphs are **neutral**, not a 2× lever; launch overhead is NOT the saturation bottleneck (6M.4: GPU-work-bound). The real (bounded) lever is read-path kernel fusion, gated on Test 1 |
+| Decode-throughput recovery to ~0.27–0.30× (read-path fusion, 6F) | Medium, and **bounded** — Phase 6M.4 localized the tax to genuine int4 reconstruction (decode-attention + paged gather); fusion can trim the ~19.5% gather pass but int4 cannot reach bf16 parity. Contingent on the Test 1 roofline verdict (currently blocked on a counter-unlocked pod) |
 | ~2× net capacity under sustained high-concurrency load | ✅ **CONFIRMED (Phase 6L)** — the block-budget estimate (~1.8× seq/GB) was confirmed by direct `--resident-pressure` observation: 1.83× net seq/GB, 2.02× raw live at saturation |
 | TP enables 70B-class serving | Medium — code structure looks TP-compatible; risk is in vLLM-side plumbing |
 | Sidecar diet option C (~1.7 GB savings) + option F preserves token-agreement gain | Medium — no quality re-bench yet after diet |
