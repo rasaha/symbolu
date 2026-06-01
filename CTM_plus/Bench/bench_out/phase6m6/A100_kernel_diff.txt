@@ -1,0 +1,54 @@
+==============================================================================
+Phase 6D — Kernel-bucket diff: int4_captured vs bf16_stock
+==============================================================================
+int4_csv: bench_out/phase6m6/A100_int4_captured_kernels.csv
+bf16_csv: bench_out/phase6m6/A100_bf16_stock_kernels.csv
+GPU: NVIDIA A100-SXM4-80GB | 2026-06-01 | long context (~7782-tok prompt)
+NOTE: int4 cell output COLLAPSED this run (regenerated mml=1024 mask) — see
+PHASE_6M6_HARDWARE_FINDINGS.md correctness flag. Kernel-TIME distribution is
+still valid for attribution; the collapse is a quality (mask) issue, not a
+timing artifact.
+
+Total kernel time: int4=305584.0 ms   bf16=266055.4 ms   int4/bf16 = 1.15x
+(absolutes double-count parent aten ops; use deltas + shares, not absolutes)
+
+Bucket                 |    int4 ms |    bf16 ms |   delta ms |  int4 share
+------------------------------------------------------------------------------
+Buckets ranked by absolute int4 - bf16 time delta (biggest = where the gap lives):
+
+mem_other              |  44400.68  |    170.85  | +44229.83  |      14.5%
+main_attn_kernel       |  27581.07  |  14063.18  | +13517.90  |       9.0%
+graph_overhead         |   1335.96  |     30.65  |  +1305.31  |       0.4%
+protect_splice         |    169.42  |      0.00  |   +169.42  |       0.1%
+kv_write               |      0.00  |    198.76  |   -198.76  |       0.0%
+gemm_tc                |  51242.20  |  54485.99  |  -3243.79  |      16.8%
+model_other            |  52044.98  |  57858.64  |  -5813.66  |      17.0%
+other                  | 128809.67  | 139247.35  | -10437.69  |      42.2%
+
+Top unclassified kernels (the int4 eager-KV orchestration tail -> mem_other):
+   48697.57 ms  (14833 calls)  aten::linear            [model, shared]
+   44962.95 ms  (11221 calls)  aten::mm                [model GEMM, shared]
+   11605.44 ms  ( 3612 calls)  vllm::unified_attention_with_output
+    7944.68 ms  ( 3612 calls)  _vllm_fa2_C::varlen_fwd [prefill attn]
+    3734.63 ms  ( 3612 calls)  aten::addmm             [model, shared]
+     976.70 ms  (496972 calls)  aten::item             [host sync — <1% CUDA]
+     976.70 ms  (496972 calls)  aten::_local_scalar_dense
+     946.06 ms  (21560 calls)  fused_add_rms_norm
+     884.31 ms  ( 7224 calls)  _C::fused_add_rms_norm
+     676.83 ms  (32893 calls)  aten::index             [int4 paged gather]
+     562.47 ms  (57792 calls)  cub::DeviceRadixSortOnesweep [int4 slot mgmt]
+     495.32 ms  (90976 calls)  aten::to
+     428.15 ms  ( 3612 calls)  aten::_unique2          [int4 slot mgmt]
+     390.16 ms  ( 3612 calls)  aten::argsort
+     390.16 ms  ( 3612 calls)  aten::sort
+     274.13 ms  (25284 calls)  aten::nonzero           [int4 slot mgmt]
+     270.37 ms  (57456 calls)  bitwise_and (uint8)     [int4 nibble unpack]
+     234.90 ms  (14448 calls)  aten::div
+
+SUMMARY (re-confirms Phase 6M.4):
+- Biggest int4-vs-bf16 delta = mem_other (+44.2s): the paged gather + eager KV
+  orchestration (index / sort / unique / nonzero / bitwise_and / to). THE tax.
+- 2nd = main_attn_kernel (+13.5s): int4 decode attention ~2x bf16's.
+- gemm_tc + model_other net NEGATIVE: correctly shared with bf16, not the tax.
+- host syncs (aten::item x496,972) = ~1s, <1% CUDA -> cheap at long context.
+- The read-path gather+orchestration is the #1 lever -> exactly what 6F targets.
