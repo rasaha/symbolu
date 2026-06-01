@@ -112,23 +112,55 @@ bash CTM_plus/Bench/scripts/verify_phase6e_byte_eq.sh --cuda
 
 ## The gotchas (true for both scenarios)
 
-1. **`--no-build-isolation` is mandatory** for both kernel builds. Without it pip
-   downloads the latest torch from PyPI, which mismatches the pod's CUDA driver
-   and the build breaks. `rebuild_all_kernels.sh` already uses it.
+1. **`--no-build-isolation` is mandatory — but NOT sufficient.** Without it pip
+   downloads the latest torch and the build breaks. **BUT** even with it, the
+   kernel `setup.py`/`pyproject` declare a `torch` dependency, so `pip install
+   -e .` can still silently **downgrade/swap your torch** (observed live:
+   2.5.1 → 2.4.0, which breaks vLLM 0.7.3). The real guard is **also passing
+   `--no-deps`**:
+   ```bash
+   pip install --no-build-isolation --no-deps -e .
+   ```
+   `rebuild_all_kernels.sh` now does this AND restores torch if a build clobbers
+   it. If torch ever ends up wrong, fix with:
+   ```bash
+   pip install --no-deps --force-reinstall torch==2.5.1 \
+       --index-url https://download.pytorch.org/whl/cu121
+   python -c "import torch; print(torch.__version__)"   # must read 2.5.1+cu121
+   ```
 2. **`import torch` BEFORE `import int4_protected_C`** — the `.so` needs
    libc10/libtorch loaded first, else `libc10.so: cannot open shared object file`.
    (The dispatch wrapper handles this in the real code; matters for manual checks.)
-3. **vLLM vendors flash-attn.** The fork's built wheel must be copied OVER
-   `site-packages/vllm/vllm_flash_attn/` — it is NOT a normal pip package.
-   `install_dev_vllm_flash_attn.sh` (called by the rebuild) does this; a backup of
-   the original vendored copy lives at
-   `/workspace/dev/build-logs/vllm_flash_attn_vendored_backup`.
-4. **Kernels are arch-specific.** A100 `sm_80` binaries won't run on H100/H200
+3. **vLLM vendors flash-attn — `pip install -e .` is NOT enough.** vLLM imports
+   flash-attn from `site-packages/vllm/vllm_flash_attn/` (a vendored copy), so the
+   fork must be **built as a WHEEL and copied OVER that slot**. A plain editable
+   install leaves the custom `flash_attn_with_int4_kvcache` symbol out of the
+   vendored slot and the int4 READ path dies at runtime with `cannot import name
+   flash_attn_with_int4_kvcache`. `rebuild_all_kernels.sh` now builds the wheel +
+   runs `install_dev_vllm_flash_attn.sh` + creates the required backup at
+   `/workspace/dev/build-logs/vllm_flash_attn_vendored_backup`, and step 5 asserts
+   the symbol is present. (Symptom seen 2026-06-01 on a fresh pod.)
+4. **`nvcc fatal: Could not open output file` = `$TMPDIR` doesn't exist.** Cleaning
+   `/workspace/tmp` (e.g. to slim a migration) removes the dir nvcc writes to.
+   `mkdir -p /workspace/tmp` before building. The rebuild script now does this.
+5. **The calibrated protect mask is NOT in git.** The int4_protected cells need
+   `/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt`; a fresh pod won't
+   have it. Regenerate (~3 min, no external data):
+   ```bash
+   python CTM_plus/Bench/scripts/calibrate_phase5b_protect_mask.py \
+       --output /workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt \
+       --protect-fraction 0.04 --max-model-len 1024
+   ```
+   Fine for throughput/density runs; NOT a quality re-validation (quality is locked
+   against the original session's mask).
+6. **Set `HF_HUB_ENABLE_HF_TRANSFER=0`** (or `pip install hf_transfer`) — vLLM may
+   abort the model download if this fast-downloader flag is on without the package.
+7. **Kernels are arch-specific.** A100 `sm_80` binaries won't run on H100/H200
    `sm_90`. Cross-arch move ⇒ always `--rebuild`.
-5. **`libcuda.so.1: cannot open shared object file` / "UnspecifiedPlatform"** =
+8. **`libcuda.so.1: cannot open shared object file` / "UnspecifiedPlatform"** =
    no GPU/driver attached (you'll see this on a CPU pod). Not a build problem —
    the code falls back to Python; no benchmark runs until a GPU is present.
-6. **Cache on the volume, not container disk.** Set
+9. **Cache on the volume, not container disk.** Set
    `HF_HOME=/workspace/.cache/huggingface` so a re-download persists across the
    next migration; otherwise it lands on ephemeral disk and vanishes.
 
