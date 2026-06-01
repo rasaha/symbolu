@@ -1,5 +1,19 @@
 # Phase 6N — MMLU quality bench (the cheapest high-value next step)
 
+> ## ✅ RESULT (Qwen-7B, A100, 2026-06-01): int4_protected 63.5% = bf16 63.5%, **0.0 pt delta**
+> 200 MMLU questions (cais/mmlu all/test), greedy 4-choice. Both cells 127/200
+> correct, 0 unparsed. Gate: **PASS** (within ±1.0 pt). Run on the recalibrated
+> mml=8192 mask, with a hard-needle precheck GREEN in the same session (4/4 HIT,
+> COLLAPSE=0). Artifact: `bench_out/phase6n/mmlu_report.json`.
+>
+> **Honest caveat:** 200-Q multiple-choice is a *coarse* signal — 0.0 pt proves
+> int4 doesn't change which A/B/C/D wins (the thing that drives MMLU accuracy),
+> NOT that logits are bitwise-identical (they aren't — it's lossy compression). A
+> larger N (1000+) or generative benches (HumanEval/LongBench) could surface a
+> sub-point difference. Claim it as **"no measurable MMLU accuracy loss at 200 Q,"**
+> not "mathematically identical model."
+
+
 > **Why this first:** the VC brief's #1 open de-risker is "quality bench is needle
 > + token-agreement only — MMLU/HumanEval/LongBench pending." MMLU is the standard
 > academic bar enterprises ask for. This bench closes that gap with **no ncu, no

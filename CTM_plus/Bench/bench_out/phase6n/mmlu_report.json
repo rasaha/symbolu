@@ -1,0 +1,33 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "n_questions": 200,
+  "source": "cais/mmlu all/test [:200]",
+  "dry_run": false,
+  "mask": "qwen2_5_7b_protect_mask_4pct.pt recalibrated at mml=8192 (full context)",
+  "needle_precheck": "phase6k12 hard-needle 4/4 HIT, COLLAPSE=0 (coherent output)",
+  "cells": {
+    "bf16": {
+      "n": 200,
+      "correct": 127,
+      "unparsed": 0,
+      "accuracy_pct": 63.5,
+      "cell": "bf16"
+    },
+    "protected": {
+      "n": 200,
+      "correct": 127,
+      "unparsed": 0,
+      "accuracy_pct": 63.5,
+      "cell": "protected"
+    }
+  },
+  "acceptance": {
+    "bf16_accuracy_pct": 63.5,
+    "protected_accuracy_pct": 63.5,
+    "delta_pct": 0.0,
+    "tolerance_pct": 1.0,
+    "within_tolerance": true,
+    "collapse_suspected": false,
+    "status": "PASS"
+  }
+}
