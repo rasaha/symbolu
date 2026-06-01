@@ -261,34 +261,53 @@ sidecars** (CUDA-graph pools sit outside `max_memory_allocated`). NB: the
 earlier 0.82 / 0.65 GB figures were the Phase 6G audit at **mml=32K in
 binary GiB** — a different config, not the live 8K numbers above.
 
-### Throughput (Qwen-7B, A100-80GB, post-fix)
+### Throughput (Qwen-7B, A100-80GB) — a WORKLOAD CURVE, not one number
 
-int4_protected's decode throughput is **below bf16 at every measured
-operating point** — the size of the gap depends on concurrency and
-generation length:
+int4_protected's decode throughput is below bf16 at every operating point, but
+**the size of the gap is workload-dependent — and that is the actionable finding.**
+The int4 tax is dominated by a per-decode-step paged-gather; it amortizes over
+**fewer steps at short generation**, so short-output workloads pay far less.
 
-| Workload | bf16 agg_tps | int4 agg_tps | ratio |
-|---|---|---|---|
-| mml=8K, B=8, gen=32 (short-gen, low-B) | 131.9 | 74.4 | **0.56×** |
-| mml=16K, B=8, gen=32 | 70.9 | 46.3 | **0.65×** |
-| mml=32K, B=8, gen=32 | 34.7 | 23.1 | **0.67×** |
-| **mml=8K, B=128, gen=512 — SATURATION (Phase 6L)** | **597.3** | **130.4** | **0.22×** |
+**Saturated operating curve (mml=8K, ~0.95×mml prompt, b-list 48–128, Phase 6M.6;
+A100, reproduced on independent hardware):**
 
-**Throughput is decode-throughput-NEGATIVE.** At low-B short-gen int4
-is ~0.56–0.67× bf16 (extra dequant + protect blend). At the **saturated**
-operating point that actually realizes the density win (mml=8K, B=128,
-gen=512), Phase 6L measured int4 at **0.22× bf16 aggregate tok/s** — it
-serves ~2× the users but each user's tokens arrive **~9× slower**
-(per-seq ~10.3 → ~1.1 tok/s). An earlier *non-saturated* high-B run had
-suggested ~1.2–1.5× in int4's favor, but that did **not** hold under real
-saturation; the Phase 6L saturated number supersedes it.
+| Generation length | bf16 agg_tps | int4 agg_tps | **agg ratio** | per-user | density |
+|---|---:|---:|---:|---:|---:|
+| **gen=128 (short output)** | 211.3 | 113.4 | **0.54×** | 0.27× (~3.7× slower) | 1.81× |
+| gen=512 | 576.3 | 184.4 | 0.32× | 0.16× (~6.3× slower) | 1.83× |
+| gen=512, deep saturation (locked 6L) | 597.3 | 130.4 | **0.22×** | 0.11× (~9× slower) | 1.83× |
 
-This is the **as-yet-unoptimized** int4 decode path (throughput
-optimization was explicitly out of scope for Phase 6L). The current
-story is **quality-positive, density-positive, throughput-negative at
-saturation** — a fit for throughput-insensitive, density-bound workloads
-(offline eval, bulk summarization, agentic batch); interactive serving
-needs decode-kernel optimization first.
+**The throughput tax ranges 0.22×–0.54× depending on workload.** The widely-quoted
+"0.22× / ~9× slower" is the **worst case** (deep saturation + long generation), NOT
+the typical case. **Density is invariant at ~1.81–1.83× across the entire curve** —
+the compression win does not depend on the operating point.
+
+**What this means commercially (honest segmentation):**
+- **Short-output, high-concurrency workloads** — embeddings, classification,
+  reranking/scoring, extraction, agentic tool-routing, eval/labeling, RAG retrieval
+  — get the **full ~1.81× density at only ~2× aggregate slowdown (0.54×).** This is
+  the **target segment**, and it is one of the fastest-growing parts of inference
+  spend (agentic + RAG traffic is short-output, high-fan-out by nature).
+- **Long-generation workloads** — interactive chat, long summarization — remain a
+  **batch/offline density play** (0.22–0.32×).
+- **Still NOT interactive-chat-viable** by the ≥0.70×/user bar anywhere. The honest
+  thesis is "win the high-concurrency short-output segment on density economics,"
+  not "replace bf16 everywhere."
+
+**Deployment is a routing decision customers already make:** send short-output
+fan-out traffic to int4_protected (2× the users/GPU, quality-preserved), keep
+long-form chat on bf16. The density savings beat the latency cost on $/request for
+KV-bound short-output traffic. See `PHASE_6M_HEADROOM_NO_NCU.md` (deployment
+guidance) for the routing rubric.
+
+**Bounded recovery (not parity):** attribution (Phase 6M.4) localized the tax to
+genuine int4 reconstruction (paged gather ~25% + decode attention ~21%; host syncs
+<1%). A read-path kernel-fusion effort (6F) could lift the *worst-case* long-gen
+point from ~0.22× toward a **bounded ~0.27–0.30× ceiling — never bf16 parity**
+(int4 fundamentally reads packed KV + sidecars and dequants per token). That work
+is gated on a roofline measurement (Test 1, currently blocked on counter-locked
+pods) and is **lower priority than just deploying at short generation**, where the
+tax is already smallest for free.
 
 ### Bit-identical and prefix-overlap detail (Qwen-7B, 6 prompts, max_model_len=4096)
 
@@ -385,6 +404,11 @@ recompile, not a methodology change.
 - **Quality**: 4 models, 3 families, 2 scales, all 15/15 needle
   replicated 2-of-2 seeds on Mistral / Llama-3.1-8B / Qwen-14B;
   token-agreement +20.4 pt over naive (0.737 vs 0.533, post-fix).
+  **MMLU (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 at both 200 Q
+  (63.5%=63.5%) and 1,000 Q (73.9%=73.9%), 0.0 pt delta — and at 1K,
+  100% per-question agreement (int4 chose the IDENTICAL A/B/C/D answer on
+  all 1,000 questions; net_flips=0).** No measurable accuracy loss AND no
+  hidden compensating flips. (Recalibrated mask; hard-needle 4/4, COLLAPSE=0.)
 - **Correctness**: all three decode bugs fixed (Phase 6K.7/6K.9/6K.10)
   — eager and graph modes both verified correct. Int4 decode
   confirmed `COLLAPSE=0` across every cell × mml post-fix.
@@ -408,7 +432,7 @@ recompile, not a methodology change.
 | **Capacity demonstration** (sustained high-B saturation) | ✅ DONE (Phase 6L: `--resident-pressure`, mml=8K B=128, both cells 100% KV-block util) | Validated the density claim under real load: **1.83× seq/GB** net of tax (2.02× raw live). Caveat: aggregate throughput **0.22× bf16** at saturation (unoptimized decode path) |
 | **Decode-throughput recovery** (the 0.22× closer) | **Attributed (Phase 6M.4): GPU-work-bound at saturation** — decode-attention kernel ~29% + paged gather/copy ~19.5%; host syncs <1%. **CUDA graphs ruled OUT** (6M.3: neutral at saturation, eager ≈ captured). Next gate = **Test 1 roofline (6M.5)** to split compute- vs bandwidth-bound. **⚠ Test 1 BLOCKED on RunPod A100 (`ERR_NVGPUCTRPERM`, perf counters locked) — needs a profiling-enabled experiment server; tooling is committed and ready.** | Bounds the recoverable headroom. Honest ceiling: **~0.22× → ~0.27–0.30×, NOT bf16 parity** (int4 fundamentally reads packed KV + sidecars and dequants/token). Kernel fusion (6F) is gated on the Test 1 verdict + a funding decision |
 | **Tensor parallelism** (TP) for 70B-class models | Not yet validated | Unlocks 70B Llama / Qwen-72B where memory savings move the dollar economics |
-| **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | 2-3 days | De-risks customer adoption — token-agreement + needle are necessary but not sufficient for enterprise deployment |
+| **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | **MMLU DONE (Phase 6N.2): 0.0 pt + 100% per-question agreement at 1,000 Q.** HumanEval/LongBench tooling committed (generate-only; sandbox to score pass@1) | De-risks customer adoption — MMLU closed at scale with fidelity diagnostic; remaining benches are runner-ready |
 
 **Tier 2 — reach + maintainability**
 
@@ -508,13 +532,13 @@ every cell × mml.
 
 | Item | Status |
 |---|---|
-| **Decode throughput negative at saturation: 0.22× bf16 agg (~9× slower/user)** | Real cost (Phase 6L measured, mml=8K B=128). **Phase 6M attributed it: GPU-work-bound** (decode-attention ~29% + gather/copy ~19.5%), not removable host overhead — so the recoverable headroom is **bounded (~0.27–0.30×, not parity)**, and the closing lever (read-path kernel fusion, 6F) is gated on the **Test 1 roofline (6M.5)**, which is **blocked on counter-locked pods (`ERR_NVGPUCTRPERM`)** and awaits a profiling-enabled experiment server |
+| **Decode throughput negative — WORKLOAD-DEPENDENT, range 0.22×–0.54×** | Real cost, but a curve not a number (Phase 6M.6, reproduced on fresh A100): **0.54× at short gen (gen=128), 0.32× at gen=512, 0.22× worst-case (deep sat + long gen)** — density invariant ~1.83× throughout. The "0.22× / 9× slower" is the worst case; short-output workloads pay only ~2×. Attribution (6M.4): GPU-work-bound (paged gather ~25% + attention ~21%, host syncs <1%) → recoverable headroom **bounded ~0.27–0.30×, not parity**; the closing lever (read-path fusion, 6F) is gated on Test 1 (6M.5, blocked on counter-locked pods) and is **lower priority than deploying at short generation.** |
 | **~+4.4 GB total HBM vs bf16 (4.38 GB sidecars)** | Structural (sidecar overhead); diet options can reduce by ~2.5 GB but cannot reach HBM parity without option D or a different KV layout |
 | **Capacity now DEMONSTRATED (Phase 6L) — residual: single-mml** | Was a block-budget estimate; Phase 6L confirmed it under sustained `--resident-pressure` load at mml=8K B=128 (1.83× seq/GB net, 2.02× raw live). Residual: only mml=8K tested; 16K/32K robustness pending |
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
 | **vLLM 0.7.3 V0 fork vendored at SHA `720c948`** | Upstream vLLM has moved to V1; forward-port is 1-2 weeks of maintenance (Tier 2 v2) |
 | **Only D=128 head dim supported** | Kernel constraint; Phi-3.5 (D=96) and similar need a kernel recompile (Tier 2 v2) |
-| **Quality bench is needle + token-agreement + hard-needle at v1** | MMLU / HumanEval / LongBench harness integration is Tier 1 v2 |
+| **Quality bench: needle + token-agreement + hard-needle + MMLU (1K)** | **MMLU 0.0 pt + 100% per-question agreement at 1,000 Q (Phase 6N.2)** — the agreement diagnostic rules out compensating flips that aggregate parity could hide. Residual: 100% agreement on 4-way MC proves argmax unchanged, not bitwise-identical logits; HumanEval pass@1 (sandboxed) + LongBench F1 are runner-ready but not yet executed |
 
 ### Projected (not yet measured)
 

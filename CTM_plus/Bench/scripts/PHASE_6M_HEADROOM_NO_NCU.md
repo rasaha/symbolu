@@ -74,3 +74,70 @@ python CTM_plus/Bench/scripts/estimate_phase6m_headroom.py --selftest   # 7/7
 python CTM_plus/Bench/scripts/estimate_phase6m_headroom.py              # the table above
 bash -n CTM_plus/Bench/scripts/phase6m_operating_point_sweep.sh
 ```
+
+## Tier-1 result (A100, 2026-06-01) — generation length is the big lever
+
+Sweep across generation length (all mml=8192, prompt_frac=0.95):
+
+| gen | b_list | bf16 tps | prot tps | **agg ratio** | per-user | net_density | prot_live |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **128** | 48,72,96,128 | 211.3 | 113.4 | **0.54x** | **0.27x** | 1.81x | 114 |
+| 512 | 96,128 | 575.4 | 182.8 | 0.32x | 0.16x | 1.83x | 117 |
+| 512 | 128 (deep sat, 6L-locked) | 597.3 | 130.4 | 0.22x | 0.11x | 1.83x | 117 |
+
+**KEY FINDING — the throughput tax is operating-point-dependent, range 0.22x-0.54x:**
+- **Short generation (gen=128): 0.54x aggregate / 0.27x per-user (~3.7x slower)** —
+  far better than the 0.22x headline.
+- **Long generation (gen=512): 0.22-0.32x** — the gather tax dominates.
+- **Density invariant ~1.81-1.83x** across all points (a memory measurement).
+
+**Why:** the fixed per-step int4 orchestration (paged-gather setup) amortizes over
+fewer decode steps at short gen, so the tax is a smaller *share* of total work. The
+"0.22x / ~9x slower" headline is the **worst case** (deep saturation + long gen),
+not the typical case.
+
+**Product implication (honest — and it HELPS the story):**
+- **Short-output, high-concurrency workloads** (classification, extraction, scoring,
+  embeddings, agentic tool-routing, MMLU-style eval) get the full ~1.81x density at
+  only **~2x aggregate slowdown** (0.54x).
+- **Long-generation** (chat, long summarization) stays batch/offline (0.22-0.32x).
+- Still NOT interactive-viable (>=0.70x/user bar) anywhere — but the gap is
+  workload-dependent; short-gen serving is the strongest fit.
+
+Best NO-CODE lever found: **deploy at short generation, where the tax is already
+smallest.** It does not remove the gather (Tier 2); it picks the least-taxed point.
+Tier 2's bounded ~0.26-0.30x ceiling is computed at the *worst-case* long-gen point;
+the gain there is smaller precisely because short-gen is already better for free.
+
+## Deployment guidance — routing rubric (for an infra audience)
+
+int4_protected is a **routing decision**, not a global swap. Customers already
+route traffic by workload; this slots in the same way.
+
+| Workload (route HERE → int4_protected) | Why it fits | Measured cost |
+|---|---|---|
+| Embeddings / retrieval / RAG context-read | short output, KV-bound, high fan-out | ~0.54x agg, full 1.81x density |
+| Classification / scoring / reranking | 1-few token outputs | ~0.54x agg |
+| Extraction / structured field pull | short output | ~0.54x agg |
+| Agentic tool-routing / function-call decisions | short output, many concurrent agents | ~0.54x agg |
+| Eval / labeling / judging pipelines | batch, throughput-insensitive | density is pure win |
+| Offline bulk summarization | batch | density is pure win |
+
+| Workload (KEEP on bf16) | Why |
+|---|---|
+| Interactive long-form chat | long generation → 0.22-0.32x, ~6-9x slower/user |
+| Low-concurrency latency-critical paths | density win needs concurrency to matter |
+
+**The $/request argument:** for KV-bound, short-output, high-concurrency traffic,
+fitting ~1.8x the users per GPU at ~2x per-user latency is a **net cost-down** —
+the density saving (fewer GPUs for the same concurrent load) outweighs the latency
+cost when the workload is throughput-tolerant. Model it on YOUR traffic's
+output-length distribution and concurrency.
+
+**⚠ Quality asterisk (do not skip):** the throughput/density numbers above are
+mask-independent and solid. The int4 *quality* re-validation on current hardware is
+PENDING (the regenerated mml=1024 mask collapses output). Locked quality (needle,
++20.4pt token-agreement, COLLAPSE=0) stands from the original session, but for a
+customer POC run the MMLU bench (`bench_phase6n_mmlu_quality.py`) on a properly
+recalibrated mask first. **Do not let a buyer deploy on a collapsed-mask config and
+conclude the method is broken — that is a mask problem, not the method.**
