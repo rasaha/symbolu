@@ -1,0 +1,11 @@
+Phase 6M Tier-1 sweep — gen=128, b-list 48,72,96,128 (A100, 2026-06-01)
+mml=8192, prompt_frac=0.95, gpu_util=0.5
+  bf16:      57 live, 211.3 tok/s, 99.7% KV util, 0 preempts
+  protected: 114 live, 113.4 tok/s, 99.9% KV util, 0 preempts
+  net density ratio: 1.81x (seq/GB 2.436 vs 1.344)
+  raw live ratio: 2.00x
+  sidecar tax: 4.38 GB (99.5% of +4.40 GB delta)
+  agg tps ratio: 0.54x   per-user: 0.27x (~3.7x slower/user)
+KEY: gen=128 throughput (0.54x) is FAR better than gen=512 (0.32x) / deep-sat
+(0.22x) -- the int4 gather tax amortizes better over short generation. Density
+invariant (~1.81x). Quality NOT quoted (regenerated mml=1024 mask collapses output).

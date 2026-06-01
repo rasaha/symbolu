@@ -75,23 +75,36 @@ python CTM_plus/Bench/scripts/estimate_phase6m_headroom.py              # the ta
 bash -n CTM_plus/Bench/scripts/phase6m_operating_point_sweep.sh
 ```
 
-## Tier-1 result so far (A100, 2026-06-01)
+## Tier-1 result (A100, 2026-06-01) — generation length is the big lever
 
-One operating point measured (gen=512, b-list 96,128) — a **third independent
-reproduction** of the same point:
+Sweep across generation length (all mml=8192, prompt_frac=0.95):
 
-| gen | b_list | bf16 tps | prot tps | agg_ratio | net_density | prot_live |
-|---|---|---:|---:|---:|---:|---:|
-| 512 | 96,128 | 575.4 | 182.8 | **0.318×** | **1.827** | 117 |
+| gen | b_list | bf16 tps | prot tps | **agg ratio** | per-user | net_density | prot_live |
+|---|---|---:|---:|---:|---:|---:|---:|
+| **128** | 48,72,96,128 | 211.3 | 113.4 | **0.54x** | **0.27x** | 1.81x | 114 |
+| 512 | 96,128 | 575.4 | 182.8 | 0.32x | 0.16x | 1.83x | 117 |
+| 512 | 128 (deep sat, 6L-locked) | 597.3 | 130.4 | 0.22x | 0.11x | 1.83x | 117 |
 
-Combined with the locked **0.22×** point (B=128, gen=512, deeper saturation), the
-existing-config throughput band is **~0.22–0.32×**. Density is invariant at
-**1.83×** across all points (as it must be — it's a memory measurement).
+**KEY FINDING — the throughput tax is operating-point-dependent, range 0.22x-0.54x:**
+- **Short generation (gen=128): 0.54x aggregate / 0.27x per-user (~3.7x slower)** —
+  far better than the 0.22x headline.
+- **Long generation (gen=512): 0.22-0.32x** — the gather tax dominates.
+- **Density invariant ~1.81-1.83x** across all points (a memory measurement).
 
-**Conclusion (honest):** no *existing* config escapes "throughput-negative"; the
-sweep refines *where in the 0.22–0.32× band* you land, not whether the tax exists.
-A fuller sweep (more gen values / batch sizes) would pinpoint the least-taxed
-deploy config but won't change the conclusion. The real lever remains **Tier 2
-(code: remove the gather)**, bounded by the **Tier-0 ceiling ~0.26–0.29×** — not a
-config choice. (Throughput valid; quality NOT quoted — this pod's regenerated
-mask collapses output.)
+**Why:** the fixed per-step int4 orchestration (paged-gather setup) amortizes over
+fewer decode steps at short gen, so the tax is a smaller *share* of total work. The
+"0.22x / ~9x slower" headline is the **worst case** (deep saturation + long gen),
+not the typical case.
+
+**Product implication (honest — and it HELPS the story):**
+- **Short-output, high-concurrency workloads** (classification, extraction, scoring,
+  embeddings, agentic tool-routing, MMLU-style eval) get the full ~1.81x density at
+  only **~2x aggregate slowdown** (0.54x).
+- **Long-generation** (chat, long summarization) stays batch/offline (0.22-0.32x).
+- Still NOT interactive-viable (>=0.70x/user bar) anywhere — but the gap is
+  workload-dependent; short-gen serving is the strongest fit.
+
+Best NO-CODE lever found: **deploy at short generation, where the tax is already
+smallest.** It does not remove the gather (Tier 2); it picks the least-taxed point.
+Tier 2's bounded ~0.26-0.30x ceiling is computed at the *worst-case* long-gen point;
+the gain there is smaller precisely because short-gen is already better for free.

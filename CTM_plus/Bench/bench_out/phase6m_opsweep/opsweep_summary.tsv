@@ -1,2 +1,4 @@
-gen	b_list	bf16_agg_tps	prot_agg_tps	agg_ratio	net_density	prot_live
-512	96,128	575.4	182.8	0.318	1.827	117
+gen	b_list	bf16_agg_tps	prot_agg_tps	agg_ratio	per_user_ratio	net_density	prot_live
+128	48,72,96,128	211.3	113.4	0.54	0.27	1.81	114
+512	96,128	575.4	182.8	0.318	0.16	1.827	117
+512	128(deepsat,6L-locked)	597.3	130.4	0.22	0.11	1.83	117
