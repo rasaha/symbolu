@@ -103,17 +103,39 @@ else
     echo "[2/5] SKIPPED (no --clean flag)"
 fi
 
+# ----- Record torch version BEFORE builds (the kernel setup.py files declare a
+# torch dep; pip can silently DOWNGRADE/SWAP torch during -e install even with
+# --no-build-isolation. We pin it here and restore if a build clobbers it). -----
+TORCH_BEFORE="$(python -c 'import torch; print(torch.__version__)' 2>/dev/null || echo '')"
+echo "torch before builds: ${TORCH_BEFORE:-<none>}"
+
+_guard_torch() {
+    # If torch changed (or vanished), force-reinstall the original WITHOUT deps.
+    local now
+    now="$(python -c 'import torch; print(torch.__version__)' 2>/dev/null || echo '')"
+    if [[ -n "${TORCH_BEFORE}" && "${now}" != "${TORCH_BEFORE}" ]]; then
+        echo "!!! torch changed ${TORCH_BEFORE} -> ${now:-<gone>} during build; restoring..."
+        local base="${TORCH_BEFORE%%+*}"   # strip +cu121 suffix for the ==spec
+        local idx=""
+        [[ "${TORCH_BEFORE}" == *cu121* ]] && idx="--index-url https://download.pytorch.org/whl/cu121"
+        pip install --no-deps --force-reinstall "torch==${base}" ${idx} 2>&1 | tail -3
+    fi
+}
+
 # ----- Step 3: Rebuild vllm-flash-attn-dev -----
 echo
 echo "[3/5] Rebuilding vllm-flash-attn-dev..."
 echo "      (this takes ~3-8 min on first build, ~30 sec on cached incremental)"
-(cd "${VLLM_FA_DIR}" && pip install --no-build-isolation -e . 2>&1 | tail -10)
+echo "      (--no-deps: do NOT let pip touch torch/other deps; see torch-swap guard)"
+(cd "${VLLM_FA_DIR}" && pip install --no-build-isolation --no-deps -e . 2>&1 | tail -10)
+_guard_torch
 
 # ----- Step 4: Rebuild int4_protected_C -----
 echo
 echo "[4/5] Rebuilding int4_protected_C (Phase 6E fused kernels)..."
 echo "      (this takes ~1-2 min)"
-(cd "${INT4_PROT_C_DIR}" && pip install --no-build-isolation -e . 2>&1 | tail -8)
+(cd "${INT4_PROT_C_DIR}" && pip install --no-build-isolation --no-deps -e . 2>&1 | tail -8)
+_guard_torch
 
 # ----- Step 5: Import sanity -----
 echo

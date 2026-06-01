@@ -1,12 +1,58 @@
 # Phase 6M.5 — Roofline: compute-bound vs bandwidth-bound (Test 1, THE GATE)
 
-> **Status: SCAFFOLD — AWAITING GPU RUN.** This is Test 1 of
-> `PHASE_6M_THROUGHPUT_RECOVERY_TEST_PLAN.md` (§Test 1), the gate that decides
-> whether 6F (kernel work), H100/H200 (Test 2), or an HBM-level change is the
-> right lever. The CPU-side tooling is committed and self-tested; the **GPU
-> measurement runs on an ncu-unlocked pod** (the user drives it). This doc is
-> finalized once the `ncu` SpeedOfLight split is pasted back. **No code/kernel/
-> quant change is authorized by this test.**
+> **Status: BLOCKED on hardware — `ERR_NVGPUCTRPERM` (counters locked).** This is
+> Test 1 of `PHASE_6M_THROUGHPUT_RECOVERY_TEST_PLAN.md` (§Test 1), the gate that
+> decides whether 6F (kernel work), H100/H200 (Test 2), or an HBM-level change is
+> the right lever. The CPU-side tooling is committed and self-tested; the **GPU
+> measurement requires an ncu-unlocked pod**. This doc is finalized once the `ncu`
+> SpeedOfLight split is captured. **No code/kernel/quant change is authorized.**
+
+## ⛔ ATTEMPT LOG — Test 1 BLOCKED on RunPod A100 (2026-06-01)
+
+Ran `roofline_ncu_runner.sh` on a fresh **RunPod A100-SXM4-80GB** (driver
+570.195.03, CUDA 12.8, vLLM 0.7.3, torch 2.5.1+cu121). The §9 ncu unlock probe
+**failed**:
+
+```
+==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA
+GPU Performance Counters on the target device 0.
+```
+
+The runner aborted before booking profiling time (as designed). **ncu cannot
+collect SpeedOfLight on this pod** — GPU performance counters are gated at the
+host/driver level (`NVreg_RestrictProfilingToAdminUsers`), which the container
+cannot change. This is the *same* lock the prior pod hit; it is a RunPod
+instance-type permission, not a fixable in-container issue.
+
+**Environment WAS verified GREEN on this A100** (so the block is purely the ncu
+permission, not the build):
+- Kernel rebuild succeeded (`rebuild_all_kernels.sh`, A100 `sm_80`, after a
+  torch-2.5.1 restore — see note below).
+- **Byte-equivalence: PASS (15/15, 1 skip)** via `verify_phase6e_byte_eq.sh --cuda`.
+- torch 2.5.1+cu121, `cuda=True`; vllm 0.7.3; `vllm.vllm_flash_attn` +
+  `int4_protected_C` import OK.
+
+> Build gotcha recorded: the kernel `setup.py`/`pyproject` declare a `torch`
+> dependency, so `pip install -e .` (even with `--no-build-isolation`) silently
+> **downgraded torch 2.5.1 → 2.4.0** mid-build, breaking vLLM 0.7.3. Fix:
+> restore with `pip install --no-deps --force-reinstall torch==2.5.1
+> --index-url .../cu121`, and build the kernels with **`--no-deps`**.
+> `rebuild_all_kernels.sh` now passes `--no-deps` + a torch-version guard.
+
+### What this unblocks vs blocks
+- **BLOCKED:** the SM%-vs-DRAM% roofline split (needs ncu counters). Therefore
+  **Test 3 (6F) entry gate stays UNVERIFIED** — do not greenlight the multi-week
+  kernel work until the roofline runs on a profiling-enabled pod.
+- **NOT blocked (no ncu needed):** the capacity/throughput baseline
+  (`hardware_test_runner.sh` → `A100_report.json`) and the `torch.profiler` 6D
+  bucket attribution. Run those here to get the reproducible A100 baseline.
+
+### To resolve
+Obtain a pod with GPU performance counters enabled
+(`NVreg_RestrictProfilingToAdminUsers=0`, or a privileged/Secure instance where
+the §9 probe prints the metrics table). RunPod Community-cloud pods typically
+keep counters locked; ask support for a profiling-enabled instance. Then re-run
+`roofline_ncu_runner.sh` and paste the verdict here.
 
 ## Goal (one fact)
 

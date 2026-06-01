@@ -112,9 +112,22 @@ bash CTM_plus/Bench/scripts/verify_phase6e_byte_eq.sh --cuda
 
 ## The gotchas (true for both scenarios)
 
-1. **`--no-build-isolation` is mandatory** for both kernel builds. Without it pip
-   downloads the latest torch from PyPI, which mismatches the pod's CUDA driver
-   and the build breaks. `rebuild_all_kernels.sh` already uses it.
+1. **`--no-build-isolation` is mandatory — but NOT sufficient.** Without it pip
+   downloads the latest torch and the build breaks. **BUT** even with it, the
+   kernel `setup.py`/`pyproject` declare a `torch` dependency, so `pip install
+   -e .` can still silently **downgrade/swap your torch** (observed live:
+   2.5.1 → 2.4.0, which breaks vLLM 0.7.3). The real guard is **also passing
+   `--no-deps`**:
+   ```bash
+   pip install --no-build-isolation --no-deps -e .
+   ```
+   `rebuild_all_kernels.sh` now does this AND restores torch if a build clobbers
+   it. If torch ever ends up wrong, fix with:
+   ```bash
+   pip install --no-deps --force-reinstall torch==2.5.1 \
+       --index-url https://download.pytorch.org/whl/cu121
+   python -c "import torch; print(torch.__version__)"   # must read 2.5.1+cu121
+   ```
 2. **`import torch` BEFORE `import int4_protected_C`** — the `.so` needs
    libc10/libtorch loaded first, else `libc10.so: cannot open shared object file`.
    (The dispatch wrapper handles this in the real code; matters for manual checks.)
