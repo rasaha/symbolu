@@ -1,0 +1,2 @@
+gen	b_list	bf16_agg_tps	prot_agg_tps	agg_ratio	net_density	prot_live
+512	96,128	575.4	182.8	0.318	1.827	117

@@ -74,3 +74,24 @@ python CTM_plus/Bench/scripts/estimate_phase6m_headroom.py --selftest   # 7/7
 python CTM_plus/Bench/scripts/estimate_phase6m_headroom.py              # the table above
 bash -n CTM_plus/Bench/scripts/phase6m_operating_point_sweep.sh
 ```
+
+## Tier-1 result so far (A100, 2026-06-01)
+
+One operating point measured (gen=512, b-list 96,128) — a **third independent
+reproduction** of the same point:
+
+| gen | b_list | bf16 tps | prot tps | agg_ratio | net_density | prot_live |
+|---|---|---:|---:|---:|---:|---:|
+| 512 | 96,128 | 575.4 | 182.8 | **0.318×** | **1.827** | 117 |
+
+Combined with the locked **0.22×** point (B=128, gen=512, deeper saturation), the
+existing-config throughput band is **~0.22–0.32×**. Density is invariant at
+**1.83×** across all points (as it must be — it's a memory measurement).
+
+**Conclusion (honest):** no *existing* config escapes "throughput-negative"; the
+sweep refines *where in the 0.22–0.32× band* you land, not whether the tax exists.
+A fuller sweep (more gen values / batch sizes) would pinpoint the least-taxed
+deploy config but won't change the conclusion. The real lever remains **Tier 2
+(code: remove the gather)**, bounded by the **Tier-0 ceiling ~0.26–0.29×** — not a
+config choice. (Throughput valid; quality NOT quoted — this pod's regenerated
+mask collapses output.)
