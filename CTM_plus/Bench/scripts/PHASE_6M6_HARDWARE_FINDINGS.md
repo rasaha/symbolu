@@ -84,10 +84,40 @@ ratios + Test 1, not the spec sheet. Density ratio should stay ~1.83× across GP
 
 ## Bucket-share check (from the 6D profiler)
 
-Does the **~29% attention + ~19.5% gather** share shrink on newer silicon?
-A100 int4 6D bucket profile (`A100_int4_captured_kernels.csv`): _pending — STEP 2
-of the runner was still executing when the run was captured; CSV to be appended._
-H100/H200 bucket shares: pending those pods.
+A100 int4_captured 6D profile (long context, ~7782-tok prompt, self-CUDA total
+131.3 s) — **re-confirms the Phase 6M.4 attribution:**
+
+| Bucket | Self-CUDA % | Note |
+|---|---:|---|
+| GEMMs (`aten::mm` / ampere_bf16_gemm) | ~37% | the model — **shared with bf16, NOT the int4 tax** |
+| **paged gather** (`index_elementwise`) | **~25%** (22.6 + 2.5) | the int4-specific KV+sidecar gather — matches/exceeds the locked ~19.5% |
+| attention (`flash_fwd` + `varlen_fwd` + `splitkv`) | ~21% | int4 decode/prefill reconstruction |
+| `silu`/`act_and_mul`/elementwise | ~10% | shared model ops |
+| **host syncs** (`aten::item` ×496,972, `Memcpy DtoH` ×522,256) | **<1.6%** | **re-confirms 6M.4: host syncs amortize to <1% at long context** |
+
+**Takeaway:** the int4 tax is **genuine reconstruction (gather ~25% + attention
+~21%)**, not removable host overhead — exactly as 6M.4 found. (CSVs on the pod:
+`A100_int4_captured_kernels.csv`, `A100_bf16_stock_kernels.csv`; re-run
+`analyze_phase6d_profile.py` on them for the full bf16-diff bucket table.)
+
+## 🚩 CORRECTNESS FLAG — int4 output COLLAPSED in this run (regenerated-mask artifact)
+
+The int4_captured profiling cell produced **collapsed/garbage output**
+(`' FactCLUDING10 strugg性价性价性价...'`) vs the bf16 cell's coherent text. **This
+is almost certainly the regenerated protect mask**, which was calibrated at
+**mml=1024** on this fresh pod (the original session's calibrated mask was not
+available). This was a known, pre-flagged risk: a short-context recalibration can
+select weaker protect channels.
+
+- **Does NOT affect the density result** (1.83×/2.02×/4.38 GB) — that is a
+  memory/concurrency measurement, independent of output text quality, and both
+  cells saturated identically.
+- **DOES mean no quality claim rests on this pod's run.** The locked quality
+  (COLLAPSE=0, +20.4 pt token-agreement) was measured against the original
+  session's mask and is unchanged — but it was **NOT** re-validated here.
+- **Before any quality re-run:** restore the original calibrated mask, or
+  recalibrate at full context (`--max-model-len 8192`, more corpus), then re-check
+  with `phase6k12_hard_needle.py` / `bench_phase6j_quality_gpu.py`.
 
 ## Axis attribution — BLOCKED pending Test 1
 
