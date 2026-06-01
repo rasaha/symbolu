@@ -404,9 +404,11 @@ recompile, not a methodology change.
 - **Quality**: 4 models, 3 families, 2 scales, all 15/15 needle
   replicated 2-of-2 seeds on Mistral / Llama-3.1-8B / Qwen-14B;
   token-agreement +20.4 pt over naive (0.737 vs 0.533, post-fix).
-  **MMLU (Qwen-7B, 200 Q, Phase 6N): int4_protected 63.5% = bf16 63.5%,
-  0.0 pt delta — no measurable accuracy loss on a standard academic
-  benchmark** (recalibrated mask; hard-needle 4/4, COLLAPSE=0 in the same run).
+  **MMLU (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 at both 200 Q
+  (63.5%=63.5%) and 1,000 Q (73.9%=73.9%), 0.0 pt delta — and at 1K,
+  100% per-question agreement (int4 chose the IDENTICAL A/B/C/D answer on
+  all 1,000 questions; net_flips=0).** No measurable accuracy loss AND no
+  hidden compensating flips. (Recalibrated mask; hard-needle 4/4, COLLAPSE=0.)
 - **Correctness**: all three decode bugs fixed (Phase 6K.7/6K.9/6K.10)
   — eager and graph modes both verified correct. Int4 decode
   confirmed `COLLAPSE=0` across every cell × mml post-fix.
@@ -430,7 +432,7 @@ recompile, not a methodology change.
 | **Capacity demonstration** (sustained high-B saturation) | ✅ DONE (Phase 6L: `--resident-pressure`, mml=8K B=128, both cells 100% KV-block util) | Validated the density claim under real load: **1.83× seq/GB** net of tax (2.02× raw live). Caveat: aggregate throughput **0.22× bf16** at saturation (unoptimized decode path) |
 | **Decode-throughput recovery** (the 0.22× closer) | **Attributed (Phase 6M.4): GPU-work-bound at saturation** — decode-attention kernel ~29% + paged gather/copy ~19.5%; host syncs <1%. **CUDA graphs ruled OUT** (6M.3: neutral at saturation, eager ≈ captured). Next gate = **Test 1 roofline (6M.5)** to split compute- vs bandwidth-bound. **⚠ Test 1 BLOCKED on RunPod A100 (`ERR_NVGPUCTRPERM`, perf counters locked) — needs a profiling-enabled experiment server; tooling is committed and ready.** | Bounds the recoverable headroom. Honest ceiling: **~0.22× → ~0.27–0.30×, NOT bf16 parity** (int4 fundamentally reads packed KV + sidecars and dequants/token). Kernel fusion (6F) is gated on the Test 1 verdict + a funding decision |
 | **Tensor parallelism** (TP) for 70B-class models | Not yet validated | Unlocks 70B Llama / Qwen-72B where memory savings move the dollar economics |
-| **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | **MMLU DONE (Phase 6N): 0.0 pt delta vs bf16, 200 Q.** HumanEval/LongBench + larger-N MMLU still 2-3 days | De-risks customer adoption — MMLU now closed; remaining benches confirm at scale |
+| **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | **MMLU DONE (Phase 6N.2): 0.0 pt + 100% per-question agreement at 1,000 Q.** HumanEval/LongBench tooling committed (generate-only; sandbox to score pass@1) | De-risks customer adoption — MMLU closed at scale with fidelity diagnostic; remaining benches are runner-ready |
 
 **Tier 2 — reach + maintainability**
 
@@ -536,7 +538,7 @@ every cell × mml.
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
 | **vLLM 0.7.3 V0 fork vendored at SHA `720c948`** | Upstream vLLM has moved to V1; forward-port is 1-2 weeks of maintenance (Tier 2 v2) |
 | **Only D=128 head dim supported** | Kernel constraint; Phi-3.5 (D=96) and similar need a kernel recompile (Tier 2 v2) |
-| **Quality bench: needle + token-agreement + hard-needle + MMLU** | **MMLU added (Phase 6N): 0.0 pt vs bf16 at 200 Q** — caveat: 200 Q is a coarse multiple-choice signal (proves argmax unchanged, not bitwise-identical logits); larger-N + HumanEval/LongBench still pending |
+| **Quality bench: needle + token-agreement + hard-needle + MMLU (1K)** | **MMLU 0.0 pt + 100% per-question agreement at 1,000 Q (Phase 6N.2)** — the agreement diagnostic rules out compensating flips that aggregate parity could hide. Residual: 100% agreement on 4-way MC proves argmax unchanged, not bitwise-identical logits; HumanEval pass@1 (sandboxed) + LongBench F1 are runner-ready but not yet executed |
 
 ### Projected (not yet measured)
 

@@ -1,0 +1,47 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "dry_run": false,
+  "mask": "qwen2_5_7b_protect_mask_4pct.pt recalibrated at mml=8192 (full context)",
+  "eval_date": "2026-06-01",
+  "evals": {
+    "mmlu": {
+      "eval": "mmlu",
+      "n": 1000,
+      "cells": {
+        "bf16": {
+          "n": 1000,
+          "correct": 739,
+          "unparsed": 0,
+          "accuracy_pct": 73.9
+        },
+        "protected": {
+          "n": 1000,
+          "correct": 739,
+          "unparsed": 0,
+          "accuracy_pct": 73.9
+        }
+      },
+      "agreement": {
+        "n": 1000,
+        "agreement_pct": 100.0,
+        "n_agree": 1000,
+        "bf16_right_int4_wrong": 0,
+        "bf16_wrong_int4_right": 0,
+        "net_flips": 0
+      },
+      "acceptance": {
+        "eval": "mmlu",
+        "bf16_score": 73.9,
+        "int4_score": 73.9,
+        "delta": 0.0,
+        "agreement_pct": 100.0,
+        "tolerance_pct": 1.0,
+        "agreement_floor": 95.0,
+        "within_tolerance": true,
+        "agreement_ok": true,
+        "collapse_suspected": false,
+        "status": "PASS"
+      }
+    }
+  }
+}

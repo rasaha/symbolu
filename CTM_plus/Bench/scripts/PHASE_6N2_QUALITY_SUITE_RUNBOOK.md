@@ -1,5 +1,25 @@
 # Phase 6N.2 — Extended quality suite (large-N MMLU + HumanEval + LongBench)
 
+> ## ✅ RESULT — MMLU 1,000 Q (Qwen-7B, A100, 2026-06-01): PERFECT FIDELITY
+> | cell | accuracy | | agreement |
+> |---|---|---|---|
+> | bf16 | 73.9% (739/1000) | | — |
+> | int4_protected | 73.9% (739/1000) | | **100% (1000/1000), net_flips=0** |
+>
+> **0.0 pt delta AND 100% per-question agreement** — int4_protected chose the
+> **identical A/B/C/D answer on all 1,000 questions** (bf16-right/int4-wrong = 0,
+> bf16-wrong/int4-right = 0). The agreement diagnostic — built specifically to
+> catch compensating flips that aggregate parity can hide — found **none.** Gate:
+> PASS (≤1pt AND ≥95% agreement → hit 100%). Recalibrated mml=8192 mask; needle
+> 4/4, COLLAPSE=0. Artifact: `bench_out/phase6n2/mmlu_1k.json`.
+>
+> **Honest residual:** 100% agreement on 4-way multiple choice proves int4 does not
+> change the *argmax* answer — a very strong fidelity signal — but not that logits
+> are bitwise-identical (they are not; it is lossy compression). HumanEval pass@1
+> (generative, sandboxed) + LongBench F1 would test free-form generation; both are
+> runner-ready below, not yet executed.
+
+
 Extends Phase 6N (200-Q MMLU, 0.0pt) along the three benches the brief lists as
 pending, and adds the diagnostic that matters most: **per-question agreement vs
 bf16** (aggregate parity can hide compensating flips).
