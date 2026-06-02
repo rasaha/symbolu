@@ -759,6 +759,38 @@ if _VLLM_FA_AVAILABLE:
                 "key/v_scale is not supported in FlashAttention.")
             assert output is not None, "Output tensor must be provided."
 
+            # ---- Phase 6O: dtype bridge for weight-quant stacking (AWQ/GPTQ) ----
+            # The int4_protected read path dequants K/V to bf16 (see _make_decode_
+            # output / the packed kernels), so the flash-attn kernels require
+            # query (and key/value) to be bf16 too. With BF16 model weights that
+            # is already the case and the casts below are IDENTITY no-ops (byte-eq
+            # preserved). With WEIGHT-QUANT models (AWQ/GPTQ) the activations —
+            # and therefore query/key/value/output — arrive as fp16, which the
+            # kernel rejects with "query and key must have the same dtype"
+            # (Phase 6O). Normalize the attention inputs to bf16 here and restore
+            # the original dtype on the returned output, so int4_protected KV
+            # composes with quantized weights. This is a data-movement bridge
+            # only — no quant/quality change.
+            _KV_COMPUTE_DTYPE = torch.bfloat16
+            _orig_out_dtype = output.dtype
+            _need_dtype_bridge = (query.dtype != _KV_COMPUTE_DTYPE)
+            if _need_dtype_bridge:
+                query = query.to(_KV_COMPUTE_DTYPE)
+                if key is not None:
+                    key = key.to(_KV_COMPUTE_DTYPE)
+                if value is not None:
+                    value = value.to(_KV_COMPUTE_DTYPE)
+                if output.dtype != _KV_COMPUTE_DTYPE:
+                    # Work in bf16 internally; cast back to vLLM's expected dtype
+                    # at return. Allocate a bf16 view so all the `out=` kernel
+                    # writes below land in a matching-dtype buffer.
+                    _external_output = output
+                    output = torch.empty_like(output, dtype=_KV_COMPUTE_DTYPE)
+                else:
+                    _external_output = None
+            else:
+                _external_output = None
+
             attn_type = self.attn_type
             if (attn_type == AttentionType.ENCODER
                     and (not attn_metadata.is_all_encoder_attn_metadata_set)):
@@ -1140,6 +1172,12 @@ if _VLLM_FA_AVAILABLE:
                             out=decode_output.unsqueeze(1),
                             fa_version=self.vllm_flash_attn_version,
                         )
+            # Phase 6O: if we bridged a quantized-weight dtype, copy the bf16
+            # result back into vLLM's externally-owned (fp16) output tensor and
+            # return THAT, so the caller sees the dtype it allocated.
+            if _external_output is not None:
+                _external_output.copy_(output.to(_orig_out_dtype))
+                return _external_output
             return output
 
 else:
