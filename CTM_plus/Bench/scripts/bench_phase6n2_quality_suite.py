@@ -228,7 +228,13 @@ def _load(eval_name: str, n: int) -> List[Dict]:
         per_sub = max(1, n // 3 + 1)
         for sub in ("narrativeqa", "qasper", "hotpotqa", "multifieldqa_en"):
             ds = None
-            for kw in ({"trust_remote_code": True}, {}):
+            # datasets>=3.0 BANS script datasets (THUDM/LongBench ships
+            # LongBench.py). Try, in order: (1) HF's auto-Parquet conversion at
+            # the refs/convert/parquet revision (bypasses the script -- the most
+            # likely-to-work path on new datasets), (2) plain load (works only on
+            # datasets<3.0). NOTE: the auto-Parquet revision may not exist for
+            # every config; if all fail we surface the real error.
+            for kw in ({"revision": "refs/convert/parquet"}, {}):
                 try:
                     ds = load_dataset("THUDM/LongBench", sub, split="test", **kw)
                     break
@@ -252,12 +258,14 @@ def _load(eval_name: str, n: int) -> List[Dict]:
                 break
         if not out:
             raise SystemExit(
-                "LongBench loaded 0 usable items. The THUDM/LongBench config "
-                "names or schema may have changed in this `datasets` version, or "
-                "it needs trust_remote_code/network. Last error: "
-                f"{type(last_err).__name__ if last_err else 'none'}: {str(last_err)[:200]}. "
-                "Try a different --evals (mmlu works), or pin a known LongBench "
-                "loader. (This is a dataset-loading issue, NOT an int4 result.)")
+                "LongBench loaded 0 usable items. THUDM/LongBench is a SCRIPT "
+                "dataset (LongBench.py); datasets>=3.0 bans those, and the "
+                "refs/convert/parquet auto-conversion fallback also failed. Last "
+                f"error: {type(last_err).__name__ if last_err else 'none'}: "
+                f"{str(last_err)[:200]}. Fix options: a Parquet LongBench mirror "
+                "(--evals stays the same, just point the loader at it), or an "
+                "ISOLATED datasets<3.0 venv. MMLU works on this stack and is the "
+                "load-bearing quality result. (Dataset-loading issue, NOT int4.)")
         return out[:n]
     raise ValueError(eval_name)
 
