@@ -63,10 +63,40 @@ us right back on the unsolved integration-shape problem.
 
 **Revised recommendation:** two-tier as *compression-demotion* is **not worth
 building** (the model says it's a dial, not a gain). Two-tier as *attention-based
-skip/eviction* (cold tokens read rarely) is the only version with upside — and it
-is gated entirely on Route-A solving the hot-path integration tax. Don't build
-either until Route-A is proven; the cold-read-skip variant is the one to model
-next (this simulator does NOT yet model skipped reads).
+skip/eviction* (cold tokens read rarely) is the only version with upside.
+
+### MITIGATION MODELED (cold_read_frac, the read-skip mechanism)
+
+`simulate_two_tier_kv.py` now has a `cold_read_frac` knob = fraction of decode
+steps a cold token is actually read. `1.0` = compression (read every step);
+`<1.0` = eviction/read-skip. Side-by-side at the measured anchors, **same
+hot_frac=0.05 (keeps 91% of int4's density):**
+
+| mechanism | cold_read_frac | tps ratio | density kept | verdict |
+|---|---:|---:|---:|---|
+| Compression (read every step) | 1.0 | **0.32×** | 91% | NOT WORTH (the dial) |
+| Read-skip / eviction | 0.15 | **1.93×** | 91% | **WORTH** |
+
+**Same density, ~6× the throughput**, purely from not reading cold tokens every
+step. This is the reconciliation: two-tier wasn't a bad idea — the *compression*
+mechanism was the wrong one. **Read-skip (fewer reads) is the lever; compression
+(smaller bytes) is not.**
+
+**The two IFs that gate it (the real work, NOT captured by the model):**
+1. **Quality:** read-skip = eviction = sometimes NOT reading a token attention
+   needed. The 1.93× assumes that's free; it isn't (lossy). Needs a GPU
+   needle/MMLU run at the chosen `cold_read_frac` to price the quality cost.
+   H2O/StreamingLLM manage it (keep sinks+recent+high-attention) but imperfectly.
+2. **Integration:** the per-step "which to skip" decision is the same hot-path
+   call that cost Phase 4/8 −20%. Gated on Route-A.
+And `cold_read_frac=0.15` itself assumes attention concentrates enough (the H2O
+premise) — unproven for this workload.
+
+**So: model the prize → ~1.9× at 91% density is real IF the two IFs hold. Next
+cheap step before any build: a GPU run measuring quality at `cold_read_frac≈0.15`
+(needle + MMLU) to convert IF #1 from assumption to measurement.** Don't build
+compression-demotion at all; the read-skip variant is worth Route-A only if the
+quality run survives.
 
 ## The central hypothesis (UNMEASURED — this is the whole risk)
 
