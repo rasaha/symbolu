@@ -1,5 +1,17 @@
 # Phase 6N.2 — Extended quality suite (large-N MMLU + HumanEval + LongBench)
 
+> ## ⚠ LongBench BLOCKED (2026-06-02): script-dataset incompatible with datasets>=3.0
+> `THUDM/LongBench` is a **script-based dataset** (`LongBench.py`). The pod's
+> `datasets` 4.8.5 removed script loading: `RuntimeError: Dataset scripts are no
+> longer supported`. NOT fixable by loader flags (`trust_remote_code` is also
+> removed). Options for a future LongBench run: (a) a Parquet-converted LongBench
+> mirror (e.g. a `*-parquet` community copy or `LongBench-v2`), or (b) a pinned
+> `datasets<3.0` in an ISOLATED venv (do NOT downgrade the main venv — breaks the
+> rest of the stack). LongBench is CONFIRMATORY; MMLU (below) is the load-bearing
+> quality result. The bench's loader now fails LOUDLY with this reason instead of
+> crashing. **MMLU + HumanEval(generate-only) paths are unaffected.**
+
+
 > ## ✅ RESULT — MMLU 1,000 Q (Qwen-7B, A100, 2026-06-01): PERFECT FIDELITY
 > | cell | accuracy | | agreement |
 > |---|---|---|---|
