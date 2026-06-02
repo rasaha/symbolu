@@ -404,11 +404,12 @@ recompile, not a methodology change.
 - **Quality**: 4 models, 3 families, 2 scales, all 15/15 needle
   replicated 2-of-2 seeds on Mistral / Llama-3.1-8B / Qwen-14B;
   token-agreement +20.4 pt over naive (0.737 vs 0.533, post-fix).
-  **MMLU (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 at both 200 Q
-  (63.5%=63.5%) and 1,000 Q (73.9%=73.9%), 0.0 pt delta — and at 1K,
-  100% per-question agreement (int4 chose the IDENTICAL A/B/C/D answer on
-  all 1,000 questions; net_flips=0).** No measurable accuracy loss AND no
-  hidden compensating flips. (Recalibrated mask; hard-needle 4/4, COLLAPSE=0.)
+  **Academic benchmarks (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 with
+  0.0 pt delta AND 100% per-question agreement on THREE benchmarks —
+  MMLU (63.5%=63.5% @200Q; 73.9%=73.9% @1,000Q), ARC-Challenge (91.5%=91.5%),
+  TruthfulQA (71.5%=71.5%).** Across all of them int4 chose the IDENTICAL answer
+  on every question (net_flips=0) — no measurable accuracy loss AND no hidden
+  compensating flips. (Recalibrated mask; hard-needle 4/4, COLLAPSE=0.)
 - **Correctness**: all three decode bugs fixed (Phase 6K.7/6K.9/6K.10)
   — eager and graph modes both verified correct. Int4 decode
   confirmed `COLLAPSE=0` across every cell × mml post-fix.
