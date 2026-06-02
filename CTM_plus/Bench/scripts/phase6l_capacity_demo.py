@@ -793,11 +793,18 @@ def _run_worker(cell: str, mml: int, b: int, max_tokens: int,
 
 def run_compare(model: str, mml: int, b_list: list[int], max_tokens: int,
                 prompt_frac: float, gpu_util: float, out_dir: Path,
-                audit_path: Optional[str] = None) -> dict:
+                audit_path: Optional[str] = None,
+                cells: Optional[list[str]] = None,
+                awq_model: Optional[str] = None) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cells = ["bf16", "protected"]
+    cells = cells or ["bf16", "protected"]
     env = dict(os.environ)
     env["PHASE6K10_AUTO_HOOK"] = env.get("PHASE6K10_AUTO_HOOK", "0")
+    # Phase 6O: thread the AWQ checkpoint + base model id to the worker so the
+    # awq_bf16 / awq_protected cells can build with quantization=awq.
+    if awq_model:
+        env["AWQ_MODEL"] = awq_model
+    env["BASE_MODEL"] = model
     # Largest B first for each cell (to force saturation immediately), then
     # descend so we also have a clean reference point.
     sweep = sorted(b_list, reverse=True)
@@ -853,6 +860,13 @@ def main() -> int:
                          "fallback source of exact per-tensor sidecar bytes when "
                          "the per-cell JSONs predate the live worker-side "
                          "discovery (their sidecar_bytes_by_tensor is empty).")
+    ap.add_argument("--cells", default=None,
+                    help="comma-separated cells to run (default 'bf16,protected'). "
+                         "Phase 6O: use 'awq_bf16,awq_protected' to measure the "
+                         "AWQ-weights + int4-KV stack's REAL combined HBM "
+                         "(model_weights_gb + sidecar tax), or mix all four.")
+    ap.add_argument("--awq-model", default="Qwen/Qwen2.5-7B-Instruct-AWQ",
+                    help="AWQ checkpoint id for the awq_* cells.")
     args = ap.parse_args()
 
     if args.selftest:
@@ -872,10 +886,12 @@ def main() -> int:
         return 0 if a.get("claim_demonstrated") else 1
 
     if args.compare:
+        cells = ([c.strip() for c in args.cells.split(",") if c.strip()]
+                 if args.cells else None)
         report = run_compare(
             args.model, args.mml, b_list, args.max_tokens,
             args.prompt_frac, args.gpu_util, Path(args.out_dir),
-            audit_path=args.sidecar_audit,
+            audit_path=args.sidecar_audit, cells=cells, awq_model=args.awq_model,
         )
         a = report["analysis"]
         return 0 if a.get("claim_demonstrated") else 1
