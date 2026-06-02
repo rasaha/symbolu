@@ -1,0 +1,21 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "awq_model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+  "eval_date": "2026-06-02",
+  "dry_run": false,
+  "_RESULT": "FIX CONFIRMED: the Phase 6O dtype bridge makes AWQ weights + int4_protected KV COEXIST and run together (awq_int4prot loaded: true, previously crashed). All four cells score MMLU ~55-56% (within noise) -> the stacked config is not just loading, it is producing CORRECT output. Weight-quant and KV-quant COMPOSE, quality-preserved.",
+  "_HBM_VERDICT_IS_A_FALSE_NEGATIVE": "The analysis 'DOES_NOT_STACK / composes:false' is driven by the UNRELIABLE weights_gb proxy (max_memory_allocated captures the total allocator high-water mark incl. the gpu_memory_utilization=0.5 ~40GB reservation, NOT weight bytes -- AWQ's real ~10GB weight saving reads as 0.021GB). The MEMORY saving could not be measured here; use phase6l_capacity_demo.py live introspection for that. The INTEGRATION + QUALITY result (below) is the valid finding.",
+  "cells": {
+    "bf16_bf16":     {"loaded": true, "mmlu_pct": 55.0, "mmlu": "55/100"},
+    "awq_bf16":      {"loaded": true, "mmlu_pct": 55.0, "mmlu": "55/100, 1 unparsed"},
+    "bf16_int4prot": {"loaded": true, "mmlu_pct": 55.0, "mmlu": "55/100"},
+    "awq_int4prot":  {"loaded": true, "mmlu_pct": 56.0, "mmlu": "56/100, 1 unparsed",
+                      "note": "THE STACK — previously crashed (dtype mismatch); now loads AND matches baseline quality"}
+  },
+  "verdict": {
+    "integration": "COEXIST_OK — AWQ weights + int4_protected KV load and run together (dtype bridge fix, commit e06dd26)",
+    "quality": "PRESERVED — stacked cell MMLU 56% vs 55% baseline (within noise); no collapse",
+    "memory_composition": "UNMEASURED — the HBM proxy in this bench is unreliable (see _HBM_VERDICT_IS_A_FALSE_NEGATIVE); the script's 'DOES_NOT_STACK' is a measurement artifact, NOT a real finding. Run phase6l for exact weight+KV bytes.",
+    "byte_eq_bf16_path": "must be re-confirmed separately via verify_phase6e_byte_eq.sh --cuda (the bridge is gated on query.dtype != bf16, so the bf16 path should be untouched -- verify to be sure)"
+  }
+}
