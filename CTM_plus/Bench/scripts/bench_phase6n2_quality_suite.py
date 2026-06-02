@@ -207,12 +207,67 @@ def acceptance(eval_name: str, bf16_score: float, int4_score: float,
 # ===========================================================================
 # Dataset loaders (GPU path)
 # ===========================================================================
+# Generic multiple-choice (ARC / TruthfulQA have variable choice counts, not
+# always 4 — so we use dynamic letters instead of MMLU's hardcoded A-D).
+_MC_LETTERS = [chr(ord("A") + i) for i in range(8)]   # A..H, ample for any MC set
+
+
+def build_mc_prompt(question: str, choices: List[str]) -> str:
+    lines = [question.strip(), ""]
+    letters = _MC_LETTERS[:len(choices)]
+    for letter, choice in zip(letters, choices):
+        lines.append(f"{letter}. {choice}")
+    lines.append("")
+    lines.append(f"Answer with the single letter ({', '.join(letters)}) of the "
+                 f"correct choice.\nAnswer:")
+    return "\n".join(lines)
+
+
+def parse_mc_answer(text: str, n_choices: int) -> Optional[int]:
+    """First standalone A..(n_choices) letter; conservative (rejects prose),
+    mirrors p6n.parse_answer but for a dynamic letter range."""
+    if not text:
+        return None
+    valid = _MC_LETTERS[:n_choices]
+    up = text.upper()
+    for m in re.finditer(r"(?<![A-Z])([A-H])(?![A-Z])", up):
+        if m.group(1) in valid:
+            return valid.index(m.group(1))
+    return None
+
+
 def _load(eval_name: str, n: int) -> List[Dict]:
     from datasets import load_dataset
     if eval_name == "mmlu":
         ds = load_dataset("cais/mmlu", "all", split="test")
         return [{"q": r["question"], "choices": r["choices"],
                  "answer": int(r["answer"])} for r in ds.select(range(min(n, len(ds))))]
+    if eval_name == "arc":
+        # ARC-Challenge (Parquet-native; loads on datasets>=3.0). Choices vary
+        # in count; answerKey is a letter or number -> map to an index.
+        ds = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="test")
+        out = []
+        for r in ds.select(range(min(n, len(ds)))):
+            texts = r["choices"]["text"]
+            labels = r["choices"]["label"]
+            key = r["answerKey"]
+            if key not in labels:
+                continue   # rare malformed row
+            out.append({"q": r["question"], "choices": texts,
+                        "answer": labels.index(key)})
+        return out
+    if eval_name == "truthfulqa":
+        # TruthfulQA multiple-choice (mc1: exactly one correct). Parquet-native.
+        ds = load_dataset("truthfulqa/truthful_qa", "multiple_choice", split="validation")
+        out = []
+        for r in ds.select(range(min(n, len(ds)))):
+            choices = r["mc1_targets"]["choices"]
+            labels = r["mc1_targets"]["labels"]   # 1 == correct
+            if 1 not in labels:
+                continue
+            out.append({"q": r["question"], "choices": choices,
+                        "answer": labels.index(1)})
+        return out
     if eval_name == "humaneval":
         ds = load_dataset("openai_humaneval", split="test")
         return [{"task_id": r["task_id"], "prompt": r["prompt"],
@@ -316,7 +371,22 @@ def _selftest() -> int:
     assert a["status"] == "COLLAPSE_SUSPECTED", a
     print("  acceptance: regression FAIL, collapse flagged: PASS")
 
-    print("\nself-test: 5/5 PASS")
+    # --- generic MC parser (arc/truthfulqa: variable choice counts) ---
+    assert parse_mc_answer("C", 5) == 2
+    assert parse_mc_answer("The answer is E.", 5) == 4
+    assert parse_mc_answer("E", 4) is None     # E out of range for a 4-choice item
+    assert parse_mc_answer("I don't know", 4) is None   # prose rejected (the 'D' in Don't)
+    assert "A. opt0" in build_mc_prompt("Q?", ["opt0", "opt1", "opt2"])
+    print("  generic MC parse/build (dynamic choice count, prose-safe): PASS")
+
+    # --- arc/truthfulqa dry-run cells (variable 3-5 choices) ---
+    for ev in ("arc", "truthfulqa"):
+        r = _run_eval_dry(ev, 9)
+        assert r["eval"] == ev and r["cells"]["bf16"]["accuracy_pct"] == 100.0, r
+        assert "agreement" in r, r
+    print("  arc/truthfulqa dry-run (variable choices, agreement present): PASS")
+
+    print("\nself-test: 7/7 PASS")
     return 0
 
 
@@ -350,6 +420,9 @@ def _run_eval_gpu(eval_name: str, items: List[Dict], cells: List[str],
         if eval_name == "mmlu":
             prompts = [p6n.build_prompt(it["q"], it["choices"]) for it in items]
             raw_by_cell[cell] = _gen(llm, prompts, 4)
+        elif eval_name in ("arc", "truthfulqa"):
+            prompts = [build_mc_prompt(it["q"], it["choices"]) for it in items]
+            raw_by_cell[cell] = _gen(llm, prompts, 4)
         elif eval_name == "humaneval":
             prompts = [humaneval_prompt(it) for it in items]
             raw_by_cell[cell] = _gen(llm, prompts, 512)
@@ -369,10 +442,16 @@ def _score_eval(eval_name: str, items: List[Dict],
     result: Dict[str, object] = {"eval": eval_name, "n": len(items), "cells": {}}
     preds_by_cell: Dict[str, List] = {}
 
-    if eval_name == "mmlu":
+    if eval_name in ("mmlu", "arc", "truthfulqa"):
         answers = [it["answer"] for it in items]
+        # mmlu is fixed 4-choice (p6n.parse_answer); arc/truthfulqa vary, so use
+        # the per-item generic parser keyed to that item's choice count.
         for cell, raws in raw_by_cell.items():
-            preds = [p6n.parse_answer(r) for r in raws]
+            if eval_name == "mmlu":
+                preds = [p6n.parse_answer(r) for r in raws]
+            else:
+                preds = [parse_mc_answer(r, len(it["choices"]))
+                         for r, it in zip(raws, items)]
             preds_by_cell[cell] = preds
             result["cells"][cell] = p6n.score(preds, answers)
         if "bf16" in preds_by_cell and "protected" in preds_by_cell:
@@ -423,6 +502,17 @@ def _run_eval_dry(eval_name: str, n: int) -> Dict:
         pr = [p6n.LETTERS[it["answer"]] if rng.random() > 0.02
               else p6n.LETTERS[(it["answer"] + 1) % 4] for it in items]
         return _score_eval("mmlu", items, {"bf16": bf, "protected": pr}, False)
+    if eval_name in ("arc", "truthfulqa"):
+        # variable choice counts (3-5) to exercise the generic MC parser.
+        items = []
+        for i in range(n):
+            nc = 3 + (i % 3)   # 3,4,5 choices
+            items.append({"q": f"Q{i}", "choices": [f"opt{j}" for j in range(nc)],
+                          "answer": i % nc})
+        bf = [_MC_LETTERS[it["answer"]] for it in items]
+        pr = [_MC_LETTERS[it["answer"]] if rng.random() > 0.02
+              else _MC_LETTERS[(it["answer"] + 1) % len(it["choices"])] for it in items]
+        return _score_eval(eval_name, items, {"bf16": bf, "protected": pr}, False)
     if eval_name == "humaneval":
         items = [{"task_id": f"t{i}", "prompt": f"def f{i}(x):\n    \"\"\"d\"\"\"\n",
                   "test": "def check(f): assert True", "entry_point": f"f{i}"}
@@ -441,7 +531,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--evals", default="mmlu",
-                    help="comma: mmlu,humaneval,longbench")
+                    help="comma: mmlu,arc,truthfulqa,humaneval,longbench "
+                         "(arc/truthfulqa are Parquet-native MC -> load on "
+                         "datasets>=3.0, unlike the script-based longbench)")
     ap.add_argument("--cells", default="bf16,protected")
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     ap.add_argument("--max-model-len", type=int, default=8192)

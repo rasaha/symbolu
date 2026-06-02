@@ -98,6 +98,29 @@ def test_dry_run_all_evals_schema():
         assert r["eval"] == ev and "cells" in r and "bf16" in r["cells"]
 
 
+def test_generic_mc_parse_dynamic_range():
+    assert m.parse_mc_answer("A", 3) == 0
+    assert m.parse_mc_answer("E", 5) == 4
+    assert m.parse_mc_answer("E", 4) is None       # out of range for 4 choices
+    assert m.parse_mc_answer("I don't know", 4) is None   # prose 'D' rejected
+    assert m.parse_mc_answer("", 4) is None
+
+
+def test_generic_mc_prompt_has_dynamic_letters():
+    p = m.build_mc_prompt("Q?", ["x", "y", "z", "w", "v"])
+    for letter, ch in zip("ABCDE", ["x", "y", "z", "w", "v"]):
+        assert f"{letter}. {ch}" in p
+    assert p.rstrip().endswith("Answer:")
+
+
+def test_arc_truthfulqa_dry_run_schema():
+    for ev in ("arc", "truthfulqa"):
+        r = m._run_eval_dry(ev, 9)
+        assert r["eval"] == ev
+        assert r["cells"]["bf16"]["accuracy_pct"] == 100.0
+        assert "agreement" in r
+
+
 def test_score_eval_empty_items_no_zerodivision():
     # Regression: an empty dataset load must NOT ZeroDivisionError (it did on a
     # live LongBench run where the loader returned 0 items). Should return a
