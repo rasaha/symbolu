@@ -18,7 +18,8 @@ stacking claim, and scope the two-tier/eviction future.
 | **Density 1.83× net seq/GB** (2.02× raw, 117 vs 58 live) | ✅ REPLICATED on a fresh A100 | `bench_out/phase6m6/A100_report.json` |
 | **Sidecar tax 4.38 GB** | ✅ re-measured, matches locked | same |
 | **Quality: MMLU 200 Q = bf16 (63.5%=63.5%, 0.0pt)** | ✅ | `bench_out/phase6n/mmlu_report.json` |
-| **Quality: MMLU 1,000 Q = bf16 (73.9%=73.9%, 0.0pt, 100% per-question agreement, net_flips=0)** | ✅ STRONGEST quality result | `bench_out/phase6n2/mmlu_1k.json` |
+| **Quality: 3 benchmarks all = bf16, 0.0pt + 100% per-question agreement** — MMLU (200Q 63.5%; 1,000Q 73.9%), ARC-Challenge (91.5%), TruthfulQA (71.5%) | ✅ STRONGEST quality result | `bench_out/phase6n2/{mmlu_1k,arc_truthfulqa}.json` |
+| **AWQ combined-memory MEASURED** — weights 14.25→5.57 GB (2.6×), saving identical with bf16/int4 KV (composition proven, orthogonal/additive) | ✅ | `bench_out/phase6o_awq_mem/awq_combined_memory_result.json` |
 | **Quality: hard-needle 4/4, COLLAPSE=0** | ✅ on recalibrated mml=8192 mask | pod `/tmp/needle.json` |
 | **Throughput = a CURVE, 0.22×–0.54×** (workload-dependent) | ✅ | `bench_out/phase6m_opsweep/opsweep_summary.tsv` |
 | **Attribution: gather ~25%, attn ~21%, host <1%** | ✅ re-confirmed (6M.4) | `bench_out/phase6m6/A100_kernel_diff.txt` |
@@ -38,13 +39,21 @@ stacking claim, and scope the two-tier/eviction future.
    residual: 100% MC agreement proves argmax unchanged, not bitwise-identical
    logits; HumanEval/LongBench tooling committed but not yet executed.
 
-3. **AWQ stacking: assertion → crash → fix → validated.** The brief claimed
-   AWQ/GPTQ "stack with int4_protected." Tested: it CRASHED (fp16 activations vs
-   bf16-dequant K → "query and key must have the same dtype"). Wrote a one-commit
-   **dtype bridge** (e06dd26), gated on `query.dtype != bf16`. Re-ran: stack
-   LOADS, MMLU 56% vs 55% (within noise), **byte-eq 15/15 GREEN** (bf16 path
-   untouched). Integration + quality COMPOSE, validated. Open: clean combined-
-   *memory* number (the stack bench's HBM proxy is unreliable → use phase6l).
+3. **AWQ stacking: assertion → crash → fix → validated (incl. memory).** The brief
+   claimed AWQ/GPTQ "stack with int4_protected." Tested: it CRASHED (fp16
+   activations vs bf16-dequant K). Wrote a one-commit **dtype bridge** (e06dd26),
+   gated on `query.dtype != bf16`. Re-ran: stack LOADS, MMLU 56% vs 55%,
+   **byte-eq 15/15 GREEN**. Then MEASURED memory via phase6l live introspection
+   (added AWQ cells to the capacity demo): **AWQ weights 14.25→5.57 GB (2.6×),
+   saving IDENTICAL with bf16 KV and int4 KV (5.571=5.571) → orthogonal +
+   additive → composition PROVEN.** Open (optional): density-RATIO for the stack
+   (AWQ freed ~8.7GB → under-saturated at b-list 96,128; needs higher B).
+
+3b. **Quality breadth: 3 benchmarks, all 0.0pt + 100% agreement.** Added
+   ARC-Challenge (91.5%=91.5%) + TruthfulQA (71.5%=71.5%) via a generic
+   variable-choice MC parser, both ran CLEAN on real data (unparsed=0). With MMLU
+   (200Q+1K) that's three independent academic benchmarks where int4 chose the
+   identical answer on every question.
 
 4. **Two-tier KV: CPU-modeled → DON'T build compression-demotion.**
    `simulate_two_tier_kv.py` at measured anchors → "LIKELY NOT WORTH IT". Density
@@ -64,10 +73,13 @@ stacking claim, and scope the two-tier/eviction future.
   A100 baseline + 6D buckets ARE captured.
 - **Test 3 (6F kernel fusion):** PENDING — gated on Test 1 + funding. Tooling
   prepped (oracle + acceptance + runbook).
-- **AWQ combined-memory number:** the integration+quality compose; the *memory*
-  saving wasn't cleanly measured (HBM proxy unreliable). Small phase6l follow-up.
-- **HumanEval pass@1 / LongBench:** tooling committed; not run (HumanEval needs a
-  sandbox for code execution).
+- **AWQ density-RATIO (optional):** weight saving + composition + quality are
+  MEASURED; only the concurrent-seqs-per-GB ratio for the AWQ stack is open (it
+  under-saturated because AWQ freed ~8.7GB). Needs `--b-list 128,192,256
+  --max-tokens 512`. Low value (it would re-confirm the ~1.83× KV density).
+- **HumanEval pass@1:** generate-only tooling committed; pass@1 needs a SANDBOX
+  (executes model code). **LongBench: BLOCKED** — script-dataset, banned by
+  datasets>=3.0 (ARC/TruthfulQA replaced it as the loadable benches).
 
 ## Decisions on record
 
