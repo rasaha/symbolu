@@ -368,7 +368,7 @@ There are two distinct comparisons:
 | Alternative | Why it doesn't substitute |
 |---|---|
 | Faster fp8 kernels | fp8's quality limit isn't a kernel issue — it's a representation issue. 8 bits per element cannot preserve the per-channel dynamic range of K at the precision that long-context attention requires. |
-| AWQ + AWQ-Marlin | These quantize *weights*, not KV-cache. They stack with int4_protected, they don't replace it. The KV-cache is the memory bottleneck in long-context serving; weights are a separate budget. |
+| AWQ + AWQ-Marlin | These quantize *weights*, not KV-cache — orthogonal budgets, so they are **complementary** to int4_protected, not competitive. **Composition status (Phase 6O, measured):** AWQ-weights and int4_protected-KV each load fine independently, but stacking them currently hits a **dtype mismatch** in the attention kernel (AWQ's fp16 activations vs int4_protected's bf16-dequant K → "query and key must have the same dtype"). The framework loads BOTH paths — it is a **single, located, likely-small fix** (align the attention-input dtype), NOT the zero-effort stack the earlier draft implied. The orthogonality (weights vs KV are separate budgets) holds; the *integration* needs a scoped dtype fix behind the byte-eq oracle. |
 | Speculative decoding | Reduces decode FLOPs, doesn't reduce KV memory. Orthogonal to KV compression. |
 | Paged attention (vLLM) | Already deployed everywhere. Paged attention manages KV memory; it doesn't compress KV. int4_protected uses vLLM's paged cache as its substrate. |
 
