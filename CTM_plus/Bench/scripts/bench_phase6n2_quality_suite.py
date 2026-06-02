@@ -219,21 +219,45 @@ def _load(eval_name: str, n: int) -> List[Dict]:
                  "test": r["test"], "entry_point": r["entry_point"]}
                 for r in ds.select(range(min(n, len(ds))))]
     if eval_name == "longbench":
-        # A few short English subtasks; F1-scored.
-        out = []
-        for sub in ("narrativeqa", "qasper", "hotpotqa"):
-            try:
-                ds = load_dataset("THUDM/LongBench", sub, split="test")
-            except Exception:
+        # A few short English subtasks; F1-scored. The HF config names + the need
+        # for trust_remote_code vary by datasets version, so try a few spellings
+        # and SURFACE the last error if every subtask fails (don't silently
+        # return [] -> downstream ZeroDivision).
+        out: List[Dict] = []
+        last_err = None
+        per_sub = max(1, n // 3 + 1)
+        for sub in ("narrativeqa", "qasper", "hotpotqa", "multifieldqa_en"):
+            ds = None
+            for kw in ({"trust_remote_code": True}, {}):
+                try:
+                    ds = load_dataset("THUDM/LongBench", sub, split="test", **kw)
+                    break
+                except Exception as e:
+                    last_err = e
+            if ds is None:
                 continue
-            for r in ds.select(range(min(n // 3 + 1, len(ds)))):
-                out.append({"prompt": r["input"] if "input" in r.features else r["context"],
-                            "context": r.get("context", ""),
-                            "answers": r["answers"], "subtask": sub})
+            feats = set(getattr(ds, "features", {}) or {})
+            for r in ds.select(range(min(per_sub, len(ds)))):
+                prompt = r.get("input") or r.get("context") or r.get("question") or ""
+                ans = r.get("answers") or r.get("answer") or []
+                if isinstance(ans, str):
+                    ans = [ans]
+                if not prompt or not ans:
+                    continue
+                out.append({"prompt": prompt, "context": r.get("context", ""),
+                            "answers": ans, "subtask": sub})
                 if len(out) >= n:
                     break
             if len(out) >= n:
                 break
+        if not out:
+            raise SystemExit(
+                "LongBench loaded 0 usable items. The THUDM/LongBench config "
+                "names or schema may have changed in this `datasets` version, or "
+                "it needs trust_remote_code/network. Last error: "
+                f"{type(last_err).__name__ if last_err else 'none'}: {str(last_err)[:200]}. "
+                "Try a different --evals (mmlu works), or pin a known LongBench "
+                "loader. (This is a dataset-loading issue, NOT an int4 result.)")
         return out[:n]
     raise ValueError(eval_name)
 
@@ -330,6 +354,10 @@ def _run_eval_gpu(eval_name: str, items: List[Dict], cells: List[str],
 
 def _score_eval(eval_name: str, items: List[Dict],
                 raw_by_cell: Dict[str, List[str]], execute: bool) -> Dict:
+    if not items:
+        # Defensive: a bad dataset load must not divide-by-zero downstream.
+        return {"eval": eval_name, "n": 0, "cells": {},
+                "error": "no items to score (dataset loaded empty)"}
     result: Dict[str, object] = {"eval": eval_name, "n": len(items), "cells": {}}
     preds_by_cell: Dict[str, List] = {}
 

@@ -98,6 +98,14 @@ def test_dry_run_all_evals_schema():
         assert r["eval"] == ev and "cells" in r and "bf16" in r["cells"]
 
 
+def test_score_eval_empty_items_no_zerodivision():
+    # Regression: an empty dataset load must NOT ZeroDivisionError (it did on a
+    # live LongBench run where the loader returned 0 items). Should return a
+    # clean error dict instead.
+    r = m._score_eval("longbench", [], {"bf16": [], "protected": []}, False)
+    assert r["n"] == 0 and "error" in r
+
+
 def test_script_selftest_runs():
     assert m._selftest() == 0
 
