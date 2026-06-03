@@ -234,6 +234,7 @@ class INT4CacheKVRouteA:
         self._profile_events: Dict[str, list] = {
             "reshape_kv": [],
             "cache_append": [],
+            "readskip_decision": [],
             "kernel_inputs": [],
             "kernel_call": [],
             "cast_back": [],
@@ -833,11 +834,19 @@ def _wrap_attention_forward_with_fused_v2(
                 sec_e.record()
                 manager._profile_events["cache_append"].append((sec_s, sec_e))
 
-            # ---- Section: kernel inputs (3 contiguous copies) ----
+            # ---- Section: read-skip decision (scoring + block selection) ----
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
             active_positions = manager._readskip_active_positions(cache, query)
+            if prof:
+                sec_e.record()
+                manager._profile_events["readskip_decision"].append((sec_s, sec_e))
+
+            # ---- Section: kernel inputs (gather/compaction + contiguous copies) ----
+            sec_s, sec_e = _new_event_pair()
+            if prof:
+                sec_s.record()
             inputs = cache.kernel_inputs(active_positions=active_positions)
             if prof:
                 sec_e.record()

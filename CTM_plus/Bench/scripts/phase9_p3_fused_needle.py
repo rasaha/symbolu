@@ -110,6 +110,34 @@ def run(args) -> int:
               flush=True)
         return 0 if ok else 3
 
+    if args.profile:
+        # P4: attribute the per-decode-step overhead. Enable CUDA-event profiling,
+        # run a few retention decodes at long context, split the cost by section.
+        manager.set_profiling(True)
+        rng = random.Random(args.seed)
+        for _ in range(max(2, args.items)):
+            user, _c, _q, _n = build_needle_single(args.context_tokens, 0.5, rng)
+            gen_one(user)
+        stats = manager.get_profile_stats()
+        bypass = (stats.get("total_bypass") or {}).get("mean_ms") or 0.0
+        order = ["readskip_decision", "kernel_inputs", "kernel_call",
+                 "cache_append", "reshape_kv", "cast_back", "total_bypass"]
+        print(f"\n[p3][profile] per-decode-step mean ms by section "
+              f"(mode={mode}, ctx={args.context_tokens}):")
+        for s in order:
+            d = stats.get(s)
+            if not d:
+                continue
+            pct = (100.0 * d["mean_ms"] / bypass) if bypass else 0.0
+            print(f"  {s:<18} mean={d['mean_ms']:.3f}ms  "
+                  f"({pct:4.1f}% of bypass)  n={d['n_calls']}")
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.out).write_text(json.dumps(
+            {"mode": "profile", "context_tokens": args.context_tokens,
+             "readskip_mode": mode, "sections": stats}, indent=2))
+        print(f"[p3][profile] wrote {args.out}")
+        return 0
+
     depths = [float(x) for x in args.depths.split(",") if x.strip()]
     rng = random.Random(args.seed)
     per_depth, dec_tok, dec_t = {}, 0, 0.0
@@ -180,6 +208,10 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="phase9_p3_fused_needle.json")
     ap.add_argument("--check-install", action="store_true")
+    ap.add_argument("--profile", action="store_true",
+                    help="P4: enable CUDA-event profiling, run retention decodes, "
+                         "print per-section ms (readskip_decision / kernel_inputs "
+                         "gather / kernel_call / ...) to attribute the overhead")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
