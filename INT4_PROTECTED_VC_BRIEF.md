@@ -5,6 +5,33 @@
 
 ---
 
+> ## North star: the most token *value* per watt per user
+>
+> Inference economics reduce to one ratio — **useful tokens delivered per joule,
+> per concurrent user.** int4_protected is organized around moving all three
+> terms, crediting only what is measured today:
+>
+> - **per user (shipped):** 1.83× denser KV-cache → more concurrent long-context
+>   users on the same GPU, at = bf16 quality.
+> - **token *value* (shipped):** quality held at bf16 parity (MMLU/ARC 0.0 pt,
+>   needle preserved) — the density is *usable*, not a quality-for-cost trade. A
+>   cheap wrong token has no value; ours are correct.
+> - **per watt (roadmap, in build):** attention-guided read-skip cuts per-token
+>   KV memory traffic at long context (the dominant energy cost of decode). The
+>   quality of the skip is validated; the production kernel is underway.
+>
+> The wedge is the *value* term: competitors buy watts/users by spending quality
+> (fp8, naive int4). We refuse that trade — efficiency only counts when the tokens
+> are still right.
+>
+> <!-- EDITORIAL — VERIFY BEFORE DISTRIBUTION: the "token value per watt per user"
+> framing was provided as attributed to Perplexity CEO Aravind Srinivas (CNBC,
+> 2026-06-03). The source article could not be auto-verified (HTTP 403). Confirm
+> the exact wording + citation, or present the line as Cognade's own framing,
+> before sending this brief to investors. -->
+
+---
+
 ## Page 1 — The Problem
 
 ### LLM inference is becoming memory-bound, and 4-bit KV is the obvious answer that nobody has gotten to work
