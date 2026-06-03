@@ -3,7 +3,54 @@
 > **Status: STRUCTURAL FINDING from a code audit (CPU, $0).** Reframes the
 > experiment. Companion to `PHASE9_STEP1_SMOKE_RESULT.md`.
 
-## ⚠ CORRECTION (supersedes the original framing below)
+## ✅ RECONCILED CONCLUSION (read this; it supersedes both the correction and the original below)
+
+This doc went back and forth. Here is the settled answer, after auditing how the
+evictor actually integrates with vLLM (file:line in the two sections below).
+
+**There are TWO distinct "read-skip" notions. Do not conflate them:**
+
+1. **Intra-sequence read-skip (THE Step-0 prize).** *One long sequence stops
+   reading its own cold middle tokens each decode step → its per-step decode gets
+   cheaper.* This is what `simulate_two_tier_kv.py` sized (~1.9× at long context)
+   and what H2O/StreamingLLM do *within a sequence*. **This is NOT implemented
+   anywhere in the repo, and vLLM 0.7.3 does not provide it for a full-attention
+   model** (a running decode keeps its entire `block_table` and attends over all
+   of it; there is no block_table sparsifier / `skip_blocks` / sparse-decode path).
+   The ONE vLLM-native mechanism that skips intra-sequence reads is **sliding-
+   window attention** — but that is a *fixed* window from model config (e.g.
+   Mistral 4096), not attention-guided, and Qwen2.5-7B does not use it. **So the
+   Step-0 prize requires a BUILD** (block_table sparsifier or a route-A-owned
+   sparse decode). My original "Step 2 is a build" call was correct *for this
+   prize.*
+
+2. **Cross-request eviction (what the CTM+ evictor IS).** *Which cached /
+   unreferenced / cross-request prefix-pool blocks to keep under multi-request
+   memory pressure.* The CTM+ evictor plugs into vLLM's `Evictor` ABC and scores
+   **cached-but-unreferenced** blocks (`vllm_evictor.py:659-685, 1421-1424`); it
+   tracks blocks with a fictitious `sequence_id=0` and **has no notion of which
+   sequence owns a block**. Active sequences are handled by **preemption
+   (swap/recompute), not eviction**. So for a **single long decoding sequence the
+   evictor gives ZERO throughput benefit** — its blocks are never evicted. This
+   lever IS implemented (and the Day-5b bridge now feeds it real attention), but
+   it answers a **different** question (multi-request cache efficiency), **not the
+   Step-0 prize.**
+
+**Net:** my mid-session "correction" (eviction == read-skip) was only half right —
+eviction reduces reads in the *cross-request* sense, but it is **not** the
+intra-sequence lever Step 0 modeled. **To measure the Step-0 prize you must build
+intra-sequence read-skip** (or proxy it with a sliding-window model, which is
+fixed-pattern, not attention-guided). The cross-request eviction A/B is runnable
+today but measures a different prize.
+
+**Decision now belongs to the user** (presented in chat): (a) build intra-sequence
+read-skip [the real prize, a kernel/plumbing build], (b) measure the cross-request
+eviction lever [exists, different prize], or (c) proxy intra-sequence read-skip
+with a sliding-window model [cheap, fixed-pattern].
+
+---
+
+## (Earlier "correction" — kept for the record; the RECONCILED conclusion above qualifies it)
 
 The original version of this doc concluded "read-skip is not implemented → Step 2
 is a build." **That conflated two different things and was too strict.** The
