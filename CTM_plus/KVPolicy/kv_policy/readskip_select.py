@@ -104,6 +104,76 @@ def needle_retained(needle_block_ids: Sequence[int], retained: Set[int]) -> bool
     return all(b in retained for b in needle_block_ids)
 
 
+class ReadSkipController:
+    """Per-sequence (per-layer) read-skip decision state machine — the 'brain'
+    of retention, kept PURE (scores are passed in, computed elsewhere) so it is
+    CPU-unit-testable. Mirrors the observe→retain→refresh loop the Phase-9
+    harness validated GREEN.
+
+    Lifecycle per decode step:
+      1. caller checks `needs_scores()`; if True it computes per-block
+         decode-attention mass for the current step and passes it in.
+      2. `active_positions(seq_len, block_scores)` returns the sorted KV
+         positions to READ this step (or the full range during the observe
+         window / before the first selection).
+
+    Observe window (first `observe_steps`) and every `refresh_every` steps: read
+    EVERYTHING and accumulate EMA scores; otherwise read only the retained set.
+    """
+
+    def __init__(self, block_size: int, sink_tokens: int, recent_tokens: int,
+                 attention_budget_tokens: int, neighbor_blocks: int = 1,
+                 observe_steps: int = 8, refresh_every: int = 16,
+                 score_decay: float = 0.8) -> None:
+        self.block_size = block_size
+        self.sink_tokens = sink_tokens
+        self.recent_tokens = recent_tokens
+        self.budget_blocks = attention_budget_tokens // block_size
+        self.neighbor_blocks = neighbor_blocks
+        self.observe_steps = observe_steps
+        self.refresh_every = refresh_every
+        self.score_decay = score_decay
+        self._step = 0
+        self._ema: Dict[int, float] = {}
+        self._retained: Optional[Set[int]] = None
+
+    def _is_observe_step(self) -> bool:
+        return (self._step < self.observe_steps
+                or (self.refresh_every > 0
+                    and self._step % self.refresh_every == 0))
+
+    def needs_scores(self) -> bool:
+        """Whether the UPCOMING active_positions call should be given
+        block_scores (observe / refresh step)."""
+        return self._is_observe_step()
+
+    def _update_ema(self, block_scores: Sequence[float]) -> None:
+        d = self.score_decay
+        for b, s in enumerate(block_scores):
+            self._ema[b] = d * self._ema.get(b, 0.0) + (1 - d) * float(s)
+
+    def active_positions(self, seq_len: int,
+                         block_scores: Optional[Sequence[float]] = None) -> List[int]:
+        nb = n_blocks(seq_len, self.block_size)
+        observe = self._is_observe_step()
+        if observe and block_scores is not None:
+            self._update_ema(block_scores)
+            score_list = [self._ema.get(b, 0.0) for b in range(nb)]
+            self._retained = select_retained_blocks(
+                nb, score_list, sink_block_set(self.sink_tokens, self.block_size),
+                recent_block_set(seq_len, self.recent_tokens, self.block_size),
+                self.budget_blocks, self.neighbor_blocks)
+        self._step += 1
+        # Read everything during the observe window or before any selection.
+        if observe or self._retained is None:
+            return list(range(seq_len))
+        return blocks_to_positions(self._retained, self.block_size, seq_len)
+
+    @property
+    def retained_blocks(self) -> Optional[Set[int]]:
+        return set(self._retained) if self._retained is not None else None
+
+
 # --------------------------------------------------------------- self-test ----
 
 def _selftest() -> int:
@@ -142,6 +212,28 @@ def _selftest() -> int:
     rp2 = set(retained_positions_for_policy("retention", 8192, bs, 256, 2048, 64, 1,
                                             block_score=sc))
     assert 125 * bs in rp2, "retention must keep the high-score middle block"
+
+    # 8. ReadSkipController: observe window reads ALL; after observing a
+    #    high-attention middle block it RETAINS it (and drops a cold one).
+    S = 40 * bs                       # 40 blocks
+    ctrl = ReadSkipController(block_size=bs, sink_tokens=2 * bs,
+                              recent_tokens=2 * bs, attention_budget_tokens=4 * bs,
+                              neighbor_blocks=1, observe_steps=3, refresh_every=0,
+                              score_decay=0.5)
+    hot = 20                          # a cold-middle block that gets attention
+    scores = [0.0] * n_blocks(S, bs)
+    scores[hot] = 10.0
+    # observe steps: needs_scores True, reads everything.
+    for _ in range(3):
+        assert ctrl.needs_scores()
+        ap = ctrl.active_positions(S, block_scores=scores)
+        assert ap == list(range(S)), "observe window must read all"
+    # post-observe: no longer needs scores; retains the hot block, drops a far cold one.
+    assert not ctrl.needs_scores()
+    ap = ctrl.active_positions(S)
+    assert len(ap) < S, "retention must skip something"
+    assert hot * bs in ap, "the observed high-attention block must be retained"
+    assert 10 * bs not in ap, "a cold un-attended middle block must be skipped"
     print("readskip_select self-test: PASS")
     return 0
 

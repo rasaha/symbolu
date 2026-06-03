@@ -278,6 +278,27 @@ def main(argv: Sequence[str]) -> int:
         ),
     )
     parser.add_argument(
+        "--int4-kv-backend", default="dequant_fallback",
+        choices=["dequant_fallback", "fused_v2"],
+        help=(
+            "Route-A INT4 decode backend. 'dequant_fallback' (default) "
+            "round-trips K/V and runs vLLM attention. 'fused_v2' uses the "
+            "ProtectedKINT4 fused decode kernel AND is the path that supports "
+            "read-skip (INT4_READSKIP_MODE). Requires the fused kernel built."
+        ),
+    )
+    parser.add_argument(
+        "--int4-kv-max-seq-len", type=int, default=None,
+        help=(
+            "fused_v2 only: per-sequence KV cache capacity (tokens). Default "
+            "None -> --max-model-len (or 32768). Sizes the ProtectedKINT4Cache."
+        ),
+    )
+    parser.add_argument(
+        "--int4-kv-protect-fraction", type=float, default=0.04,
+        help="fused_v2 only: protect-mask fraction for the cache (default 0.04).",
+    )
+    parser.add_argument(
         "--int4-kv-num-kv-heads", type=int, default=None,
         help=(
             "Route-A INT4: KV-head count, needed to reshape vLLM's "
@@ -527,6 +548,11 @@ def main(argv: Sequence[str]) -> int:
         int4_kv_bits=args.int4_kv_bits,
         int4_kv_sink_size=args.int4_kv_sink_size,
         int4_kv_num_kv_heads=args.int4_kv_num_kv_heads,
+        int4_kv_backend=args.int4_kv_backend,
+        int4_kv_max_seq_len=(args.int4_kv_max_seq_len
+                             if args.int4_kv_max_seq_len is not None
+                             else (args.max_model_len or 32768)),
+        int4_kv_protect_fraction=args.int4_kv_protect_fraction,
         cache_aware_scheduling=args.cache_aware_scheduling,
         cache_aware_max_starvation_seconds=(
             args.cache_aware_max_starvation_seconds

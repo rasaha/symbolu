@@ -840,6 +840,18 @@ def test_readskip_active_positions_modes():
     assert m._readskip_active_positions(_FakeCache()) is None
     m._readskip_mode = "retain_all"
     assert m._readskip_active_positions(_FakeCache()) == [0, 1, 2, 3, 4, 5]
-    m._readskip_mode = "retention"          # P2 not wired yet -> None
-    assert m._readskip_active_positions(_FakeCache()) is None
-    assert m._readskip_calls == 2           # off doesn't count
+    # retention: config normally set in __init__ (bypassed by __new__ here). An
+    # observe step with no query reads ALL (range(s)); selection is exercised by
+    # the ReadSkipController unit test + the GPU needle/MMLU gate.
+    m._readskip_block_size = 2
+    m._readskip_sink_tokens = 2
+    m._readskip_recent_tokens = 2
+    m._readskip_budget_tokens = 2
+    m._readskip_neighbor = 0
+    m._readskip_observe = 4
+    m._readskip_refresh = 0
+    m._readskip_decay = 0.5
+    m._readskip_controllers = {}
+    m._readskip_mode = "retention"
+    assert m._readskip_active_positions(_FakeCache(), query=None) == [0, 1, 2, 3, 4, 5]
+    assert m._readskip_calls == 2           # off doesn't count; retain_all + retention

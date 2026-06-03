@@ -5,6 +5,34 @@
 
 ---
 
+> ## North star: "the most token value per watt per user"
+>
+> > *"Whoever is able to maximize this particular objective really will — by
+> > balancing accuracy, latency, cost, privacy and intelligence all together —
+> > they're going to win; that's what's going to win long term."*
+> > — **Aravind Srinivas, CEO, Perplexity**, on the company that delivers the
+> > "most token value per watt per user" (CNBC, interview with Elaine Yu, June 2026)
+>
+> Inference economics reduce to that ratio: **useful tokens delivered per joule,
+> per concurrent user.** int4_protected is built to move it on the very axes
+> Srinivas names — and, decisively, without spending the **accuracy** term that
+> competitors trade away:
+>
+> - **per user / cost (shipped):** 1.83× denser KV-cache → more concurrent
+>   long-context users on the same GPU.
+> - **token *value* / accuracy (shipped):** quality held at bf16 parity (MMLU/ARC
+>   0.0 pt; needle preserved). A cheap *wrong* token has no value — this is the
+>   wedge: fp8 and naive int4 buy density by spending accuracy; we don't.
+> - **per watt (roadmap, in build):** attention-guided read-skip cuts per-token
+>   KV memory traffic at long context — the energy-per-token lever. Skip quality
+>   validated; production kernel underway.
+>
+> The bet: when accuracy is non-negotiable, the efficiency frontier is won by the
+> approach that compounds density + energy savings *on top of* preserved quality —
+> not by trading quality for either.
+
+---
+
 ## Page 1 — The Problem
 
 ### LLM inference is becoming memory-bound, and 4-bit KV is the obvious answer that nobody has gotten to work

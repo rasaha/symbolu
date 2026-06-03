@@ -248,19 +248,63 @@ class INT4CacheKVRouteA:
         self._readskip_mode = os.environ.get("INT4_READSKIP_MODE", "off")
         self._readskip_calls = 0
 
-    def _readskip_active_positions(self, cache) -> "Optional[List[int]]":
+        def _ri(name: str, dflt: int) -> int:
+            try:
+                return int(os.environ.get(name, dflt))
+            except ValueError:
+                return dflt
+        # Retention knobs (env-overridable) — defaults match the GREEN harness.
+        self._readskip_block_size = _ri("INT4_READSKIP_BLOCK", 32)
+        self._readskip_sink_tokens = _ri("INT4_READSKIP_SINK", 256)
+        self._readskip_recent_tokens = _ri("INT4_READSKIP_RECENT", 2048)
+        self._readskip_budget_tokens = _ri("INT4_READSKIP_BUDGET", 2048)
+        self._readskip_neighbor = _ri("INT4_READSKIP_NEIGHBOR", 1)
+        self._readskip_observe = _ri("INT4_READSKIP_OBSERVE", 8)
+        self._readskip_refresh = _ri("INT4_READSKIP_REFRESH", 16)
+        try:
+            self._readskip_decay = float(os.environ.get("INT4_READSKIP_DECAY", 0.8))
+        except ValueError:
+            self._readskip_decay = 0.8
+        self._readskip_controllers: Dict[int, Any] = {}
+
+    def _readskip_active_positions(self, cache, query=None) -> "Optional[List[int]]":
         """READ-SKIP: retained KV positions for this decode step, or None (read
         all). "off" -> None (identity). "retain_all" -> range(s) (byte-eq gate).
-        "retention" (P2) will select sink+recent+attention blocks from the bridge
-        scores via kv_policy.readskip_select."""
+        "retention" -> per-cache ReadSkipController fed decode-attention block
+        scores (sink+recent+top-attention+neighbors); observe/refresh steps read
+        all. Fail-open: any scoring error -> read all this step."""
         mode = self._readskip_mode
         if mode == "off":
             return None
-        self._readskip_calls += 1
         s = cache.seq_len
         if mode == "retain_all":
+            self._readskip_calls += 1
             return list(range(s))          # must be byte-identical to "off"
-        # P2: mode == "retention" -> readskip_select.retained_positions_for_policy
+        if mode == "retention":
+            self._readskip_calls += 1
+            from kv_policy.readskip_select import ReadSkipController
+            ctrl = self._readskip_controllers.get(id(cache))
+            if ctrl is None:
+                ctrl = ReadSkipController(
+                    block_size=self._readskip_block_size,
+                    sink_tokens=self._readskip_sink_tokens,
+                    recent_tokens=self._readskip_recent_tokens,
+                    attention_budget_tokens=self._readskip_budget_tokens,
+                    neighbor_blocks=self._readskip_neighbor,
+                    observe_steps=self._readskip_observe,
+                    refresh_every=self._readskip_refresh,
+                    score_decay=self._readskip_decay)
+                self._readskip_controllers[id(cache)] = ctrl
+            scores = None
+            if ctrl.needs_scores() and query is not None:
+                try:
+                    scores = cache.block_attention_scores(
+                        query, self._readskip_block_size)
+                except Exception:  # noqa: BLE001 — fail-open: read all this step
+                    logger.exception(
+                        "read-skip block scoring failed; reading all this step")
+                    scores = None
+            return ctrl.active_positions(s, block_scores=scores)
         return None
 
     @property
@@ -322,6 +366,9 @@ class INT4CacheKVRouteA:
             "fused_v2_fallbacks": dict(self._fused_v2_fallbacks),
             "fused_v2_layers": len(self._caches),
             "fused_v2_cache_stats": cache_stats,
+            "readskip_mode": getattr(self, "_readskip_mode", "off"),
+            "readskip_calls": getattr(self, "_readskip_calls", 0),
+            "readskip_controllers": len(getattr(self, "_readskip_controllers", {})),
         }
 
     # ------------------------------------------------------------------ #
@@ -790,7 +837,7 @@ def _wrap_attention_forward_with_fused_v2(
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
-            active_positions = manager._readskip_active_positions(cache)
+            active_positions = manager._readskip_active_positions(cache, query)
             inputs = cache.kernel_inputs(active_positions=active_positions)
             if prof:
                 sec_e.record()
