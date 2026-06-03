@@ -75,3 +75,42 @@ the per-step cost: gather-copy vs K-reconstruction-scoring vs the actual fused
 attention. That says exactly which overhead to kill (and whether it's
 software-killable or the hardware case). The harness already has
 `manager.set_profiling(True)` + per-section CUDA events for this.
+
+## P4 RESULT — it's the CONFIG (near-full retention), NOT dispatch-boundness
+
+Profiled retention decode @ ctx8000 (mean ms per layer-decode-call, % of total):
+
+| section | mean ms | % | meaning |
+|---|---:|---:|---|
+| kernel_call | 5.594 | **67.1%** | the fused attention — DOMINATES |
+| readskip_decision | 1.031 | 12.4% | scoring + block selection |
+| kernel_inputs (gather) | 1.033 | 12.4% | host compaction copy |
+| cache_append | 0.590 | 7.1% | |
+| total_bypass | 8.331 | 100% | |
+
+**The read-skip overhead (decision + gather) is ~25% — real but NOT the cause of
+the 2× slowdown.** The attention kernel is 67% and **isn't shrinking**: at ctx8000
+the default knobs (`sink 256 + recent 2048 + budget 2048` + neighbors) **retain
+~75-80% of the 8k cache** — read-skip barely skips. So kernel_call stays large
+while ~25% overhead is piled on top -> net 2x slower.
+
+This is NOT the "dispatch-bound -> PCAM" verdict. It is the Step-0 length/
+aggressiveness regime: the ~1.9x prize was modeled at **~15% retained at long
+context**; here we retain ~80% at 8k, so there is almost nothing to skip. We never
+entered the winning regime — the default keep-set is larger than the context can
+benefit from.
+
+### The decisive re-test (config, not code)
+Re-run retention with an AGGRESSIVE keep-set so retained << seq, e.g.
+`INT4_READSKIP_RECENT=512 INT4_READSKIP_BUDGET=512 INT4_READSKIP_SINK=64`
+(~1100 retained of 8000 = ~86% skipped), and/or ctx 16k/32k where a fixed keep-set
+is a smaller fraction. THEN kernel_call should drop ~proportionally and we learn
+whether the (now-meaningful) attention savings beat the ~25% overhead:
+ - savings beat overhead -> SOFTWARE WIN (then trim the 25% via kernel-emitted
+   scores + in-kernel skip; per-watt bullet becomes measured).
+ - savings still lose to the per-step decision cost even at high skip -> THAT is
+   the measured PCAM case.
+
+Quality must be re-checked at the aggressive setting (more skip = more H2O risk);
+P3 retention quality was perfect at ~20% skip, and the sliding-window proxy was
+GREEN, so it's promising but not yet proven at ~85% skip.
