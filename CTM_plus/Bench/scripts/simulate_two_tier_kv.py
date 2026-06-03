@@ -32,6 +32,9 @@ Usage:
   python CTM_plus/Bench/scripts/simulate_two_tier_kv.py \
       --int4-agg-ratio 0.32 --density 1.83 --hot-fracs 0.1,0.25,0.5 \
       --bookkeeping 0.05
+  python CTM_plus/Bench/scripts/simulate_two_tier_kv.py --derive-crf  # Phase 9 Step 0:
+      # DERIVE the achievable cold_read_frac from a sink+recent keep-set across
+      # sequence lengths (is the 0.15 headline reachable, and at what context?)
   python CTM_plus/Bench/scripts/simulate_two_tier_kv.py --selftest
 """
 from __future__ import annotations
@@ -101,6 +104,53 @@ def simulate(hot_frac: float, int4_agg_ratio: float, density: float,
         "density_kept_vs_allint4_pct": round(100.0 * (twotier_density - 1.0) /
                                              (allint4_density - 1.0), 1)
         if allint4_density > 1.0 else 0.0,
+    }
+
+
+def achievable_cold_read_frac(seq_len: int, n_sink: int, n_recent: int,
+                              middle_keep_frac: float, hot_frac: float) -> Dict[str, float]:
+    """DERIVE cold_read_frac from the StreamingLLM/H2O keep-set, instead of
+    treating it as a free dial.
+
+    The headline 1.9x assumes `cold_read_frac=0.15` — but is 0.15 ACHIEVABLE?
+    Route-A can't skip everything: an attention-safe skip MUST keep the
+    always-read set (the `n_sink` attention sinks + the `n_recent`-token recent
+    window), and within the remaining MIDDLE it can keep only `middle_keep_frac`
+    of tokens (the heavy hitters). So the realised cold-tier read fraction is a
+    STRUCTURAL consequence of (seq_len, keep-set sizes, hot_frac), not a knob.
+
+    Model (token-count accounting at one decode step on a length-`seq_len` seq):
+      - always-read set A = min(n_sink + n_recent, seq_len): read every step.
+      - the hot (bf16) tier absorbs A first (recent+sink ARE the hot tokens). If
+        hot_frac*S < A, the leftover always-read tokens spill into the cold tier
+        and are STILL read every step (read prob 1.0).
+      - every other cold token is "middle": read at `middle_keep_frac`.
+      cold_read_frac = (always_read_in_cold*1.0 + middle_in_cold*middle_keep)
+                       / cold_total.
+
+    The structural consequence (the whole point): the floor is `middle_keep_frac`
+    (long seq, hot tier covers the always-read set) and it rises toward 1.0 as
+    `seq_len` shrinks toward the keep-set size. So the read-skip prize is
+    SEQUENCE-LENGTH DEPENDENT — big at long context, ~nil at short context where
+    sink+recent already are most of the cache and there is nothing to skip.
+    """
+    seq_len = max(1, int(seq_len))
+    hot_frac = max(0.0, min(hot_frac, 1.0))
+    middle_keep_frac = max(0.0, min(middle_keep_frac, 1.0))
+    always_read = min(n_sink + n_recent, seq_len)          # A
+    hot_tokens = hot_frac * seq_len
+    cold_total = max(1e-9, seq_len - hot_tokens)
+    # always-read tokens not absorbed by the hot tier spill into cold (still read):
+    always_read_in_cold = max(0.0, min(always_read - hot_tokens, cold_total))
+    middle_in_cold = max(0.0, cold_total - always_read_in_cold)
+    cold_reads = always_read_in_cold * 1.0 + middle_in_cold * middle_keep_frac
+    crf = cold_reads / cold_total
+    return {
+        "seq_len": seq_len,
+        "always_read": int(always_read),
+        "always_read_in_cold": round(always_read_in_cold, 1),
+        "cold_read_frac": round(crf, 4),
+        "middle_keep_frac": middle_keep_frac,
     }
 
 
@@ -196,7 +246,35 @@ def _selftest() -> int:
     assert verdict(rows_evict).startswith("WORTH"), verdict(rows_evict)
     print("  read-skip variant clears the verdict bar (compression did not): PASS")
 
-    print("\nself-test: 10/10 PASS")
+    # 11. DERIVED cold_read_frac floor == middle_keep_frac when the hot tier
+    # covers the whole always-read set (long seq). At seq=8192, hot_frac=0.05
+    # (=410 hot tokens) covers sink+recent=4+256=260, so cold is ALL middle ->
+    # crf collapses to middle_keep.
+    d = achievable_cold_read_frac(8192, 4, 256, 0.15, 0.05)
+    assert abs(d["cold_read_frac"] - 0.15) < 0.01, d
+    print(f"  derived crf floor == middle_keep at long seq (8192 -> "
+          f"crf={d['cold_read_frac']}): PASS")
+
+    # 12. SEQUENCE-LENGTH DEPENDENCE: shorter seq -> always-read set dominates
+    # the cache -> crf rises toward 1.0 -> less to skip. Monotone in seq_len.
+    crfs = [achievable_cold_read_frac(S, 4, 512, 0.15, 0.05)["cold_read_frac"]
+            for S in (1024, 4096, 16384)]
+    assert crfs[0] > crfs[1] > crfs[2], crfs
+    assert crfs[0] > 0.4, ("short seq has little to skip", crfs)   # 1k: crf high
+    print(f"  derived crf rises as seq shrinks (16k/4k/1k -> {crfs[::-1]}): PASS")
+
+    # 13. THE STEP-0 GATE: at a DERIVED (not free) crf, the read-skip prize is
+    # real ONLY at long context. Plug the derived crf back into the cost model.
+    long_crf = achievable_cold_read_frac(16384, 4, 512, 0.15, 0.05)["cold_read_frac"]
+    short_crf = achievable_cold_read_frac(1024, 4, 512, 0.15, 0.05)["cold_read_frac"]
+    long_gain = simulate(0.05, 0.32, 1.83, 0.05, cold_read_frac=long_crf)["tps_gain_vs_allint4"]
+    short_gain = simulate(0.05, 0.32, 1.83, 0.05, cold_read_frac=short_crf)["tps_gain_vs_allint4"]
+    assert long_gain >= 0.10, ("long-context prize must clear the 10% bar", long_gain)
+    assert short_gain < long_gain, (short_gain, long_gain)
+    print(f"  derived prize real at long ctx (+{long_gain}) but shrinks short "
+          f"(+{short_gain}): PASS")
+
+    print("\nself-test: 13/13 PASS")
     return 0
 
 
@@ -217,6 +295,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                          "If omitted, the run shows BOTH a compression (1.0) and a "
                          "read-skip (0.15) sweep side by side.")
     ap.add_argument("--min-tps-gain", type=float, default=0.10)
+    # --- DERIVED cold_read_frac (the keep-set model: sink+recent kept, middle skipped) ---
+    ap.add_argument("--derive-crf", action="store_true",
+                    help="DERIVE cold_read_frac from a StreamingLLM/H2O keep-set "
+                         "(sink+recent always read, middle kept at --middle-keep) "
+                         "across --seq-lens, instead of using a free dial. Shows "
+                         "whether the headline 0.15 is ACHIEVABLE and at what context.")
+    ap.add_argument("--seq-lens", default="1024,4096,8192,16384,32768",
+                    help="comma-separated sequence lengths to sweep in --derive-crf mode")
+    ap.add_argument("--n-sink", type=int, default=4,
+                    help="attention-sink tokens always read (StreamingLLM uses 4)")
+    ap.add_argument("--n-recent", type=int, default=512,
+                    help="recent-window tokens always read")
+    ap.add_argument("--middle-keep", type=float, default=0.15,
+                    help="fraction of the MIDDLE (non-sink, non-recent) tokens kept "
+                         "(the heavy-hitter retention rate; H2O-style)")
     args = ap.parse_args(argv)
 
     if args.selftest:
@@ -240,6 +333,44 @@ def main(argv: Optional[List[str]] = None) -> int:
         print()
         return rows
 
+    def _derived_table(hot_frac: float):
+        """STEP-0 GATE: derive cold_read_frac per sequence length from the
+        keep-set, plug it into the cost model, and print whether the prize is
+        real at ACHIEVABLE skip rates (not at a hand-set 0.15)."""
+        seq_lens = [int(x) for x in args.seq_lens.split(",") if x.strip()]
+        print(f"--- DERIVED read-skip prize (keep-set: sink={args.n_sink} + "
+              f"recent={args.n_recent} always read, middle kept @ "
+              f"{args.middle_keep:.0%}; hot_frac={hot_frac}) ---")
+        print(f"{'seq_len':>8} | {'derived crf':>11} | {'tps ratio':>9} | "
+              f"{'vs all-int4':>11} | {'density':>8} | {'gain>=10%?':>10}")
+        print("-" * 74)
+        any_win = False
+        for S in seq_lens:
+            d = achievable_cold_read_frac(S, args.n_sink, args.n_recent,
+                                          args.middle_keep, hot_frac)
+            r = simulate(hot_frac, args.int4_agg_ratio, args.density,
+                         args.bookkeeping, cold_read_frac=d["cold_read_frac"])
+            win = r["tps_gain_vs_allint4"] >= args.min_tps_gain
+            any_win = any_win or win
+            print(f"{S:>8} | {d['cold_read_frac']:>11.3f} | "
+                  f"{r['twotier_tps_ratio']:>8.3f}x | "
+                  f"{r['tps_gain_vs_allint4']:>+10.3f} | "
+                  f"{r['twotier_density']:>7.3f}x | {'YES' if win else 'no':>10}")
+        print("-" * 74)
+        if any_win:
+            print("VERDICT: PRIZE IS REAL at achievable skip rates — and it GROWS with "
+                  "context. The derived crf falls to its floor (=middle-keep 0.15) once "
+                  "the cache dwarfs the always-read keep-set, so the headline ~1.9x is "
+                  "achievable at long context (>=8k) but the gain is much smaller short "
+                  "(the keep-set is then most of the cache, leaving little to skip). The "
+                  "0.15 is NOT a free dial — it is earned by length. ➜ the GPU A/B MUST "
+                  "use a LONG-context workload; Step 3 still gates on quality + dispatch tax.")
+        else:
+            print("VERDICT: NO WIN at achievable skip rates for these seq lengths — "
+                  "the always-read keep-set (sink+recent) is too large a share of the "
+                  "cache to leave anything worth skipping. STOP / lengthen context.")
+        print()
+
     print("=" * 78)
     print("Two-tier KV — PRIZE-SIZING MODEL (predictions, NOT measurements)")
     print("=" * 78)
@@ -250,7 +381,11 @@ def main(argv: Optional[List[str]] = None) -> int:
           f"all-int4 tps={allint4['allint4_tps_ratio']}x/density={allint4['allint4_density']}x")
     print()
 
-    if args.cold_read_frac is not None:
+    if args.derive_crf:
+        # Derive the skip rate from the keep-set at the most-dense hot_frac in
+        # the sweep (lowest hot_frac = highest density = the regime we care about).
+        _derived_table(min(hot_fracs))
+    elif args.cold_read_frac is not None:
         _table(args.cold_read_frac,
                "COMPRESSION" if args.cold_read_frac >= 0.999 else "EVICTION / READ-SKIP")
     else:

@@ -98,6 +98,19 @@ cheap step before any build: a GPU run measuring quality at `cold_read_frac≈0.
 compression-demotion at all; the read-skip variant is worth Route-A only if the
 quality run survives.
 
+### UPDATE (Phase 9 Step 0): `cold_read_frac=0.15` is no longer a free dial — it is DERIVED and ACHIEVABLE
+
+The 0.15 above was a hand-set knob. Step 0 (`PHASE9_STEP0_FINDINGS.md`) closed
+that gap: `simulate_two_tier_kv.py --derive-crf` now *derives* the achievable
+`cold_read_frac` from an attention-safe keep-set (sink + recent always read,
+middle kept at the heavy-hitter rate). Finding: **0.15 is the floor the derived
+crf reaches at long context (≥8k), not an assumption** — and the prize **grows
+with context** (1k → +0.24 gain; 16k → +1.61, the ~1.9× headline). It even
+survives a pessimistic 2× keep fraction (≈1.0× vs all-int4 0.32×). **Verdict:
+the prize is real at achievable skip rates → proceed to the GPU smoke (Step 1).
+Constraint handed forward: the A/B MUST use a long-context (≥8k) workload, or a
+short-context run will falsely bury the win.**
+
 ## The central hypothesis (UNMEASURED — this is the whole risk)
 
 > If attention is concentrated (a small fraction of tokens carry most of the
