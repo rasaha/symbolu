@@ -836,6 +836,9 @@ class AsyncEngineDriver:
         int4_kv_bits: int = 4,
         int4_kv_sink_size: int = 0,
         int4_kv_num_kv_heads: Optional[int] = None,
+        int4_kv_backend: str = "dequant_fallback",
+        int4_kv_max_seq_len: Optional[int] = None,
+        int4_kv_protect_fraction: float = 0.04,
         cache_aware_scheduling: bool = False,
         cache_aware_measurement_only: bool = False,
         cache_aware_max_starvation_seconds: float = 30.0,
@@ -966,6 +969,11 @@ class AsyncEngineDriver:
             int(int4_kv_num_kv_heads)
             if int4_kv_num_kv_heads is not None else None
         )
+        self.int4_kv_backend = str(int4_kv_backend)
+        self.int4_kv_max_seq_len = (
+            int(int4_kv_max_seq_len) if int4_kv_max_seq_len is not None else None
+        )
+        self.int4_kv_protect_fraction = float(int4_kv_protect_fraction)
         self.max_decode_tokens = max_decode_tokens
         self.sample_interval_seconds = (
             sample_interval_seconds
@@ -1605,6 +1613,13 @@ class AsyncEngineDriver:
                         bits=self.int4_kv_bits,
                         sink_size=self.int4_kv_sink_size,
                         num_kv_heads=self.int4_kv_num_kv_heads,
+                        kernel_backend=self.int4_kv_backend,
+                        # fused_v2 needs a sized cache + per-token K
+                        # (cache_k_group_size=1); ignored by dequant_fallback.
+                        max_seq_len=self.int4_kv_max_seq_len,
+                        protect_fraction=self.int4_kv_protect_fraction,
+                        cache_k_group_size=1,
+                        cache_v_group_size=self.int4_kv_v_group_size,
                     )
                 )
                 logger.info(

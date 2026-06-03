@@ -366,6 +366,9 @@ class INT4CacheKVRouteA:
             "fused_v2_fallbacks": dict(self._fused_v2_fallbacks),
             "fused_v2_layers": len(self._caches),
             "fused_v2_cache_stats": cache_stats,
+            "readskip_mode": getattr(self, "_readskip_mode", "off"),
+            "readskip_calls": getattr(self, "_readskip_calls", 0),
+            "readskip_controllers": len(getattr(self, "_readskip_controllers", {})),
         }
 
     # ------------------------------------------------------------------ #
