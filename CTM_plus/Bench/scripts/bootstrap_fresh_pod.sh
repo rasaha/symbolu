@@ -88,8 +88,12 @@ print('STACK:', 'torch', torch.__version__, '| tf', transformers.__version__, \
 '| tok', tokenizers.__version__, '| np', numpy.__version__, '| vllm', vllm.__version__, \
 '| cuda', torch.cuda.is_available())" || die "runtime import failed"
 
-say "3. CTM+ python package (editable, --no-deps so it cannot swap torch)"
+say "3. CTM+ python packages (editable, --no-deps so they cannot swap torch)"
 (cd "$REPO" && pip install --no-deps -e CTM_plus/KVPolicy/) || die "KVPolicy install failed"
+# ctm_bench is the benchmark harness ('python -m ctm_bench.scripts.run_streaming').
+# Stdlib-only (install_requires=[]), so --no-deps is safe. Without this the
+# runner fails with ModuleNotFoundError: No module named 'ctm_bench'.
+(cd "$REPO" && pip install --no-deps -e CTM_plus/Bench/) || die "ctm_bench install failed"
 
 say "4. Unpack the flash-attn fork (if not already present)"
 if [[ ! -d "$FA_DIR" ]]; then
