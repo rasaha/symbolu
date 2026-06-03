@@ -41,7 +41,12 @@ Every needle case logs `needle_token_span`, `needle_block_ids`,
 cd /workspace/symbolu/CTM_plus && source /workspace/venv-vllm/bin/activate
 # CPU logic check (no model):
 python Bench/scripts/phase9_decode_retention_harness.py --selftest
-# the deliverable smoke (ctx 4096; depths 0.1/0.5/0.9; 2 seeds; all 4 policies):
+# STEP 1 — stabilise the baseline FIRST (full_attention only, many seeds, verbose
+# failing cases). Must reach >= 0.95 needle before retention is evaluable:
+python Bench/scripts/phase9_decode_retention_harness.py --calibrate \
+  --context-lens 4096 --depths 0.10,0.30,0.50,0.70,0.90 --calibrate-seeds 16 \
+  --output-json Bench/bench_out/PHASE9_DECODE_RETENTION/calib.json
+# STEP 2 — the deliverable smoke (ctx 4096; depths 0.1/0.5/0.9; 2 seeds; all policies):
 python Bench/scripts/phase9_decode_retention_harness.py --smoke \
   --output-json Bench/bench_out/PHASE9_DECODE_RETENTION/smoke.json
 # fuller run later:
