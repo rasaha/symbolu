@@ -400,14 +400,14 @@ class INT4CacheKVRouteA:
         return self._caches[module_id]
 
     def reset(self) -> None:
-        """Clear per-sequence state on every cache. Keeps buffers.
-
-        Called between requests by the throughput harness. For
-        ``dequant_fallback`` this is a no-op (the path is stateless
-        across calls).
+        """Clear per-sequence state on every cache + the read-skip controllers.
+        Keeps buffers. MUST be called between requests for fused_v2 (the cache is
+        single-sequence; without a reset, each prefill appends on top of the last
+        and overflows max_seq_len). No-op for dequant_fallback (stateless).
         """
         for cache in self._caches.values():
             cache.reset()
+        getattr(self, "_readskip_controllers", {}).clear()
 
     def _record_fused_v2_fallback(self, reason: str) -> None:
         self._fused_v2_fallbacks[reason] = (

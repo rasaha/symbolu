@@ -83,6 +83,9 @@ def run(args) -> int:
     sp = SamplingParams(temperature=0.0, max_tokens=args.max_gen)
 
     def gen_one(prompt):
+        # Each needle is an INDEPENDENT sequence. fused_v2 v1 is single-sequence:
+        # reset per-prompt or prefills accumulate and overflow max_seq_len.
+        manager.reset()
         chat = tok.apply_chat_template(
             [{"role": "user", "content": prompt}],
             tokenize=False, add_generation_prompt=True)
