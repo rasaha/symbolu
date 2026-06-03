@@ -49,17 +49,32 @@ clean 1.0 took isolating several confounds (each was a real bug, all fixed):
    ≈ 0.9. Retention *needs* eager (for decode-attn `output_attentions`), so the fix
    is **eager + fp32** → baseline 1.0 at ctx 512/2048/4096, observation intact.
 
-## Caveats — why this is GREEN-preliminary, not final
+## Confirmation: multi_needle is GREEN too
 
-1. **Small sample:** 6 needle items/policy (2 seeds × 3 depths × 1 task). Clean
-   (6/6) but should be confirmed at 4 seeds × more depths.
-2. **`multi_needle` not yet run** — the harder test (keep the CORRECT section's
-   code among three). This is the real check that retention keeps the *right*
-   payload, not merely any code. **Run it before declaring final.**
-3. **Quality proxy, not the kernel:** masking (full cache kept), bf16/fp32 not
-   int4. The build must still verify the *composition* (int4 cold store +
-   read-skip) and that physical KV pruning matches the masked behaviour.
-4. This is the **quality** half; throughput was measured separately (proxy).
+The `multi_needle` task (three sections, distinct codes, ask for ONE — the test
+that retention keeps the *correct* payload, not merely *a* code) ran at ctx8192
+(eager+fp32, depths 0.1/0.5/0.9, 2 seeds):
+
+| policy | needle hit | needle_retained | d0.1 | d0.5 | d0.9 |
+|---|---:|---:|:--:|:--:|:--:|
+| full_attention | 1.00 | 1.00 | 2/2 | 2/2 | 2/2 |
+| recent_only | 0.33 | 0.33 | 0/2 | 0/2 | 2/2 |
+| sink_recent | 0.33 | 0.33 | 0/2 | 0/2 | 2/2 |
+| **decode_attention_retention** | **1.00** | **1.00** | 2/2 | 2/2 | 2/2 |
+
+Same clean separation: retention keeps the right code at every depth; the fixed
+windows drop it at 0.1/0.5. DECISION: GREEN. **Both tasks now confirm GREEN.**
+
+## Caveats — what remains (honest)
+
+1. **Modest N:** 6 items/policy/task (12 needle items/policy across both tasks).
+   The *separation is perfect* (retention=full=1.00 vs fixed-window=0.33 on both
+   tasks, all depths) so more seeds are unlikely to flip it — but the full
+   160-case run (4 seeds × 5 depths × both tasks) is worth banking for the record.
+2. **Quality proxy, not the kernel:** masking (full cache kept), fp32/bf16 not
+   int4. The build must verify the *composition* (int4 cold store + read-skip) and
+   that physical KV pruning reproduces the masked behaviour.
+3. This is the **quality** half; throughput was measured separately (proxy ~10×).
 
 ## Confirmation run (do this before final sign-off)
 
