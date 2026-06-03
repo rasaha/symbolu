@@ -134,6 +134,37 @@ def run_cell(args) -> int:
     rng = random.Random(args.seed)
     sp = SamplingParams(temperature=0.0, max_tokens=args.max_gen)
 
+    # The model is an INSTRUCT model — feed it via its chat template, or it
+    # behaves like a base completion model and emits ~nothing (the bug that made
+    # the first run score 0/4 even at full attention / depth 0.95). Fall back to
+    # a Mistral [INST] wrapper if the tokenizer exposes no template.
+    tok = llm.get_tokenizer()
+
+    def _wrap(prompt: str) -> str:
+        try:
+            return tok.apply_chat_template(
+                [{"role": "user", "content": prompt}],
+                tokenize=False, add_generation_prompt=True)
+        except Exception:
+            return f"[INST] {prompt} [/INST]"
+
+    if args.sanity:
+        # Cheap (~30s) harness validity check: a SHORT-context needle right
+        # before the question MUST be retrieved, or the elicitation is broken
+        # (independent of read-skip). Prints the raw answer so you can eyeball it.
+        prompt, expected, distractors, mode = build_depth_item(800, 0.95, rng)
+        out = llm.generate([_wrap(prompt)], sp)
+        text = out[0].outputs[0].text
+        verdict = classify(text, expected, distractors, mode)
+        print(f"[proxy][sanity] expected={expected!r} got={text[:80]!r} -> {verdict}",
+              flush=True)
+        print("[proxy][sanity] " + ("PASS — elicitation works; run the full proxy."
+              if verdict == "HIT" else
+              "FAIL — model isn't answering the needle; the quality cliff would be "
+              "uninterpretable. Try a stronger instruct model or check formatting."),
+              flush=True)
+        return 0 if verdict == "HIT" else 3
+
     depths = [float(x) for x in args.depths.split(",") if x.strip()]
     per_depth = {}
     decode_tokens_total = 0
@@ -145,7 +176,7 @@ def run_cell(args) -> int:
             prompt, expected, distractors, mode = build_depth_item(
                 args.context_tokens, d, rng)
             t0 = time.perf_counter()
-            out = llm.generate([prompt], sp)
+            out = llm.generate([_wrap(prompt)], sp)
             dt = time.perf_counter() - t0
             text = out[0].outputs[0].text
             n_gen = len(out[0].outputs[0].token_ids)
@@ -219,6 +250,9 @@ def main(argv=None) -> int:
     ap.add_argument("--out", default="readskip_proxy.json")
     ap.add_argument("--check-window", action="store_true",
                     help="load the model + print the effective window, then exit (cheap toggle preflight)")
+    ap.add_argument("--sanity", action="store_true",
+                    help="one short-context depth-0.95 needle; must HIT or the "
+                         "elicitation is broken (cheap harness-validity check)")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
