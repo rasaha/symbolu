@@ -1,7 +1,48 @@
-# Phase 9 — DECISIVE FINDING: read-skip is not implemented (Step 2 is a build, not a measurement)
+# Phase 9 — read-skip mechanism: what exists vs what doesn't
 
 > **Status: STRUCTURAL FINDING from a code audit (CPU, $0).** Reframes the
 > experiment. Companion to `PHASE9_STEP1_SMOKE_RESULT.md`.
+
+## ⚠ CORRECTION (supersedes the original framing below)
+
+The original version of this doc concluded "read-skip is not implemented → Step 2
+is a build." **That conflated two different things and was too strict.** The
+precise line:
+
+- **Read-skip FOR THROUGHPUT = eviction.** When a cold block is evicted, vLLM's
+  paged attention reads only the *live* blocks in the block table — so a freed
+  block is, by definition, a block that is no longer read. **H2O and StreamingLLM
+  ARE eviction policies** (drop the cold tokens); the session's own simulator and
+  `TWO_TIER_ARCHITECTURE_NOTE.md` use "eviction / read-skip" interchangeably for
+  the throughput mechanism. This **exists** and is wired to attention:
+  - `--ctm-plus` — attention-guided evictor (`CTMEvictorModern`)
+  - `--phase3-attention` — the bridge that feeds real per-block attention to it
+    (Day 5b proved it carries non-zero signal end-to-end on GPU)
+  - `--phase4-cython-evictor` — `CTMEvictorModernC`, the Cython port that the
+    Phase 8 audit said recovers the −20% dispatch tax (**the exact "without the
+    dispatch tax" lever the session question asks about**)
+  - `--phase4-fast-hooks` — further per-fire dispatch reduction
+  - `--int4-kv-sink-size` + `--extended-pinning`/`--pin-first-n-blocks` — the
+    StreamingLLM keep-set (sinks + pinned recent/prefix)
+  - `--preemption-mode recompute` — actually FREES blocks under pressure (the
+    smoke's default `swap` only swap-thrashes to CPU; it never exercised eviction)
+- **What is genuinely NOT built** is the *keep-stored-in-int4 two-tier* variant:
+  an evicted-but-later-needed token cannot be restored (it's gone, not demoted to
+  a cold int4 tier). That is a **quality refinement** (it bounds the H2O
+  information-loss risk) — it is **not required to MEASURE** read-skip's
+  throughput, its quality cost, or the dispatch attribution.
+
+**Consequence:** Step 2 IS a measurement after all, using the existing eviction
+path with the right config (and `--phase4-cython-evictor` directly answers the
+"without the −20% tax" half). The two-tier kernel build is only warranted **if**
+eviction's measured quality cost fails the needle/MMLU bar. **Measure first.**
+
+The scoped-build section below remains valid **only** as the fallback plan for
+that keep-stored two-tier variant — not as the prerequisite for Step 2.
+
+---
+
+## (Original framing — kept for the record; see correction above)
 
 ## The finding
 
