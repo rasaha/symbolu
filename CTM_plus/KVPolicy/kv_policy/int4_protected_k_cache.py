@@ -464,8 +464,22 @@ class ProtectedKINT4Cache:
     # Kernel inputs                                                      #
     # ------------------------------------------------------------------ #
 
-    def kernel_inputs(self) -> dict:
+    def kernel_inputs(self, active_positions=None) -> dict:
         """Return the tensors the fused kernel expects.
+
+        ``active_positions`` (READ-SKIP): an optional sorted 1-D index of the KV
+        positions to actually read this step (sink + recent + decode-attention
+        selected blocks — see kv_policy/readskip_select.py). When given, the
+        per-position buffers are COMPACTED to those positions so the fused kernel
+        iterates only ``len(active_positions)`` tiles (physical read-skip); the
+        unread (cold) positions remain STORED in int4 (density preserved).
+        ``None`` reads the full ``[:s]`` sequence (identity — byte-eq baseline).
+
+        Why the gather is byte-safe: every buffer is ``(MS, H, *)`` per-position;
+        K scale is per-position (``k_group_size=1``) and V scale groups over
+        head_dim (not sequence), so a position-gather stays aligned with the
+        kernel's per-position scale indexing. Rotary is baked into the stored K,
+        so gathering preserves positional encoding.
 
         Auto-freezes the protect mask on first call. Returns a dict
         ready to be ``**``-unpacked into
@@ -498,22 +512,38 @@ class ProtectedKINT4Cache:
         self._kernel_inputs_calls += 1
         s = self._s_curr
 
-        # Permute (S, H, *) -> (H, S, *), contiguous-copy, unsqueeze(B=1).
+        # Read every stored position ([:s], identity) unless a read-skip index is
+        # given, in which case gather only the retained positions (compacted).
+        if active_positions is None:
+            rows = slice(0, s)
+        else:
+            rows = torch.as_tensor(active_positions, dtype=torch.long,
+                                   device=self.k_packed_buf.device)
+            if rows.ndim != 1 or rows.numel() < 1:
+                raise ValueError("active_positions must be a non-empty 1-D index")
+            if int(rows.min()) < 0 or int(rows.max()) >= s:
+                raise ValueError(
+                    f"active_positions out of range [0,{s}): "
+                    f"[{int(rows.min())},{int(rows.max())}]")
+            self._kernel_inputs_skip_calls = (
+                getattr(self, "_kernel_inputs_skip_calls", 0) + 1)
+
+        # Permute (n, H, *) -> (H, n, *), contiguous-copy, unsqueeze(B=1).
         k_packed = (
-            self.k_packed_buf[:s].permute(1, 0, 2).contiguous().unsqueeze(0)
+            self.k_packed_buf[rows].permute(1, 0, 2).contiguous().unsqueeze(0)
         )
         k_fp16 = (
-            self.k_fp16_buf[:s].permute(1, 0, 2).contiguous().unsqueeze(0)
+            self.k_fp16_buf[rows].permute(1, 0, 2).contiguous().unsqueeze(0)
         )
         v_packed = (
-            self.v_packed_buf[:s].permute(1, 0, 2).contiguous().unsqueeze(0)
+            self.v_packed_buf[rows].permute(1, 0, 2).contiguous().unsqueeze(0)
         )
-        # Scales/offsets already in (S, H, *); just unsqueeze.
-        k_scale = self.k_scale_buf[:s].unsqueeze(0)
-        v_scale = self.v_scale_buf[:s].unsqueeze(0)
+        # Scales/offsets already in (n, H, *); just unsqueeze.
+        k_scale = self.k_scale_buf[rows].unsqueeze(0)
+        v_scale = self.v_scale_buf[rows].unsqueeze(0)
         if self._asymmetric:
-            k_offset = self.k_offset_buf[:s].unsqueeze(0)
-            v_offset = self.v_offset_buf[:s].unsqueeze(0)
+            k_offset = self.k_offset_buf[rows].unsqueeze(0)
+            v_offset = self.v_offset_buf[rows].unsqueeze(0)
         else:
             k_offset = None
             v_offset = None

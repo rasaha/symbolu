@@ -756,3 +756,69 @@ def test_fused_v2_refuses_non_v1_k_group_size():
             max_seq_len=32,
             cache_k_group_size=32,
         )
+
+
+# --------------------------------------------------------------------- #
+# READ-SKIP: kernel_inputs(active_positions=...) gather (P1 byte-eq)     #
+# --------------------------------------------------------------------- #
+
+
+def test_kernel_inputs_active_positions_identity_and_compaction():
+    """P1 byte-eq foundation: kernel_inputs(active_positions=all) is identical to
+    the full [:s] path, and a subset compacts to exactly those positions (the
+    physical read-skip; cold positions stay stored but unread)."""
+    import torch
+    from kv_policy.int4_protected_k_cache import ProtectedKINT4Cache
+    from kv_policy.readskip_select import blocks_to_positions
+
+    S = 40
+    c = ProtectedKINT4Cache(
+        max_seq_len=64, k_group_size=1, v_group_size=32, asymmetric=True,
+    )
+    g = torch.Generator().manual_seed(7)
+    k = torch.randn(S, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.float16,
+                    generator=g)
+    v = torch.randn(S, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.float16,
+                    generator=g)
+    c.append(k, v)
+
+    full = c.kernel_inputs()
+    allp = c.kernel_inputs(active_positions=list(range(S)))
+    for key in ("k_packed", "k_scale", "k_fp16", "v_packed", "v_scale",
+                "k_offset", "v_offset"):
+        a, b = full[key], allp[key]
+        if a is None:
+            assert b is None, key
+            continue
+        assert a.shape == b.shape, (key, a.shape, b.shape)
+        assert torch.equal(a, b), f"{key} differs: [:s] vs active_positions=all"
+
+    # subset of blocks -> compacted to exactly those positions.
+    bs = 8
+    sub_pos = blocks_to_positions({0, 3, 4}, bs, S)   # sink-ish + a middle block
+    sub = c.kernel_inputs(active_positions=sub_pos)
+    assert sub["k_packed"].shape[2] == len(sub_pos)
+    assert sub["k_scale"].shape[1] == len(sub_pos)
+    assert sub["v_scale"].shape[1] == len(sub_pos)
+    idx = torch.tensor(sub_pos, dtype=torch.long)
+    assert torch.equal(sub["k_packed"], full["k_packed"][:, :, idx, :])
+    assert torch.equal(sub["k_scale"], full["k_scale"][:, idx, :, :])
+    assert torch.equal(sub["v_packed"], full["v_packed"][:, :, idx, :])
+    assert getattr(c, "_kernel_inputs_skip_calls", 0) >= 1
+
+
+def test_kernel_inputs_active_positions_validation():
+    """Out-of-range / empty indices are rejected (fail loud, never silently
+    read the wrong KV)."""
+    import torch
+    from kv_policy.int4_protected_k_cache import ProtectedKINT4Cache
+
+    c = ProtectedKINT4Cache(
+        max_seq_len=32, k_group_size=1, v_group_size=32, asymmetric=True,
+    )
+    k = torch.randn(10, QWEN_NUM_KV_HEADS, QWEN_HEAD_DIM, dtype=torch.float16)
+    c.append(k, k.clone())
+    with pytest.raises(ValueError):
+        c.kernel_inputs(active_positions=[0, 5, 99])   # out of range (s=10)
+    with pytest.raises(ValueError):
+        c.kernel_inputs(active_positions=[])           # empty
