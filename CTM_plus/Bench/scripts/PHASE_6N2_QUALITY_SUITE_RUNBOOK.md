@@ -1,5 +1,17 @@
 # Phase 6N.2 — Extended quality suite (large-N MMLU + HumanEval + LongBench)
 
+> ## ⚠ LongBench BLOCKED (2026-06-02): script-dataset incompatible with datasets>=3.0
+> `THUDM/LongBench` is a **script-based dataset** (`LongBench.py`). The pod's
+> `datasets` 4.8.5 removed script loading: `RuntimeError: Dataset scripts are no
+> longer supported`. NOT fixable by loader flags (`trust_remote_code` is also
+> removed). Options for a future LongBench run: (a) a Parquet-converted LongBench
+> mirror (e.g. a `*-parquet` community copy or `LongBench-v2`), or (b) a pinned
+> `datasets<3.0` in an ISOLATED venv (do NOT downgrade the main venv — breaks the
+> rest of the stack). LongBench is CONFIRMATORY; MMLU (below) is the load-bearing
+> quality result. The bench's loader now fails LOUDLY with this reason instead of
+> crashing. **MMLU + HumanEval(generate-only) paths are unaffected.**
+
+
 > ## ✅ RESULT — MMLU 1,000 Q (Qwen-7B, A100, 2026-06-01): PERFECT FIDELITY
 > | cell | accuracy | | agreement |
 > |---|---|---|---|
@@ -23,6 +35,24 @@
 Extends Phase 6N (200-Q MMLU, 0.0pt) along the three benches the brief lists as
 pending, and adds the diagnostic that matters most: **per-question agreement vs
 bf16** (aggregate parity can hide compensating flips).
+
+## ARC-Challenge + TruthfulQA (Parquet-native — load on datasets>=3.0, unlike LongBench)
+
+Added as MMLU-style multiple-choice evals (with the same per-question agreement
+diagnostic), but using a GENERIC parser for their variable choice counts (ARC has
+3–5; TruthfulQA mc1 varies). Both are Parquet datasets, so they avoid the
+script-loader ban that blocks LongBench.
+
+```bash
+source /workspace/venv-vllm/bin/activate
+export HF_HUB_ENABLE_HF_TRANSFER=0 HF_HOME=/workspace/.cache/huggingface
+python CTM_plus/Bench/scripts/bench_phase6n2_quality_suite.py \
+    --evals arc,truthfulqa --num-questions 200 --cells bf16,protected \
+    --out CTM_plus/Bench/bench_out/phase6n2/arc_truthfulqa.json
+```
+Same gate as MMLU: |delta| ≤ 1.0pt AND agreement ≥ 95%. Confirmatory — corroborates
+the MMLU 1K @ 100%-agreement result on two more academic benchmarks. Needs the
+mml=8192 mask (int4 cell).
 
 ## Run (on a GPU pod with a FULL-CONTEXT calibrated mask)
 

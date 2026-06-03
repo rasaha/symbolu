@@ -342,14 +342,24 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
     eager = os.environ.get("ENFORCE_EAGER", "0").strip() in ("1", "true", "yes")
     os.environ.pop("PHASE6B3_FORCE_EAGER", None)
 
+    # Phase 6O: AWQ weight-quant cells. `awq_bf16` = AWQ weights + bf16 KV;
+    # `awq_protected` = AWQ weights + int4_protected KV (the STACK). The weights
+    # path (quantization=awq + an AWQ checkpoint) is orthogonal to the KV path;
+    # `is_awq` selects the model id + passes quantization through. The KV side is
+    # decided by whether the cell name ends in "protected" (int4) or not (bf16).
+    is_awq = cell.startswith("awq")
+    awq_model = os.environ.get("AWQ_MODEL", "Qwen/Qwen2.5-7B-Instruct-AWQ")
+    base_model = os.environ.get("BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    kv_is_int4 = cell in ("protected", "naive", "awq_protected")
+
     if cell == "naive":
         os.environ["PHASE6J_NAIVE_FORCE_ZERO"] = "1"
         os.environ["PROTECT_MASK_PATH"] = os.environ.get("NAIVE_MASK_PATH", NAIVE_MASK_DEFAULT)
-    elif cell == "protected":
+    elif cell in ("protected", "awq_protected"):
         os.environ["PHASE6J_NAIVE_FORCE_ZERO"] = "0"
         os.environ.pop("PROTECT_MASK_PATH", None)
 
-    if cell != "bf16":
+    if kv_is_int4:
         # Phase 6K.14: pin the slot pool to B so the pool can hold every
         # concurrent decode slot (belt-and-suspenders with runtime auto-bump).
         # MUST be set BEFORE the writer is constructed (first forward).
@@ -378,24 +388,33 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
            "sidecar_bytes_by_tensor": {}, "model_weights_gb": None,
            "kv_cache_budget_gb": None,
            "evict_on_decode": os.environ.get("PHASE6K14_EVICT_ON_DECODE", "1")
-           if cell != "bf16" else None,
+           if kv_is_int4 else None,
            "error": None}
 
     from vllm import SamplingParams
+    # AWQ cells use the AWQ checkpoint + quantization=awq; others use bf16 weights.
+    _model_id = awq_model if is_awq else base_model
+    _weight_kwargs = {"quantization": "awq"} if is_awq else {"dtype": "bfloat16"}
     try:
-        if cell == "bf16":
+        if not kv_is_int4:
+            # bf16 KV (cells: "bf16", "awq_bf16"). Weights bf16 or AWQ.
             from vllm import LLM
-            llm = LLM(model="Qwen/Qwen2.5-7B-Instruct", max_model_len=mml,
-                      gpu_memory_utilization=util, dtype="bfloat16",
-                      max_num_seqs=batch, enforce_eager=eager)
+            llm = LLM(model=_model_id, max_model_len=mml,
+                      gpu_memory_utilization=util,
+                      max_num_seqs=batch, enforce_eager=eager, **_weight_kwargs)
         else:
+            # int4_protected KV (cells: "protected", "naive", "awq_protected").
+            # Int4ProtectedLLM forwards **kwargs to vllm.LLM, so quantization=awq
+            # passes through (Phase 6O dtype bridge makes the stack run). AWQ
+            # weights => no dtype= (the checkpoint dictates it).
             from kv_policy.int4_protected import Int4ProtectedLLM
             from kv_policy.phase6b2_precapture_hook import (
                 install_int4_protected_precapture_hook, _collect_writers,
                 _collect_impls, _resolve_inner_model, _resolve_model_runner)
-            llm = Int4ProtectedLLM(model="Qwen/Qwen2.5-7B-Instruct", max_model_len=mml,
+            _int4_kwargs = {"quantization": "awq"} if is_awq else {}
+            llm = Int4ProtectedLLM(model=_model_id, max_model_len=mml,
                                    gpu_memory_utilization=util, max_num_seqs=batch,
-                                   enforce_eager=eager)
+                                   enforce_eager=eager, **_int4_kwargs)
             try:
                 m = _resolve_inner_model(llm)
                 install_int4_protected_precapture_hook(
@@ -411,7 +430,7 @@ def run_worker(mml, batch, max_tokens=8, prompt_frac=0.95, gpu_util=None,
         return 0
 
     rec["max_concurrency"] = _max_concurrency(llm, mml)
-    if cell != "bf16":
+    if kv_is_int4:
         rec["max_active_slots"] = _writer_max_active_slots(llm)
     # max_tokens drives saturation: short gen (8) is throughput-only and lets
     # vLLM queue-drain B in waves WITHOUT memory pressure (so nothing ever

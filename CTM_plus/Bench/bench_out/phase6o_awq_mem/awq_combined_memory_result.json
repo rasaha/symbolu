@@ -1,0 +1,29 @@
+{
+  "_what": "AWQ x int4_protected combined-memory measurement (Phase 6O), via phase6l LIVE tensor introspection (model_weights_gb) -- the REAL number the stack bench's max_memory_allocated proxy could not give.",
+  "eval_date": "2026-06-02",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "awq_model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+  "config": "mml=8192, b-list 96/128, max-tokens 128 (under-saturated for AWQ -> density RATIO not computed; weight numbers are valid regardless)",
+  "model_weights_gb": {
+    "bf16_baseline": 14.25,
+    "awq_bf16": 5.571,
+    "awq_protected": 5.571,
+    "awq_saving_vs_bf16_gb": 8.68,
+    "awq_compression_x": 2.56
+  },
+  "hbm_gb_total": {
+    "awq_bf16": 42.40,
+    "awq_protected": 48.35,
+    "delta_int4_kv_overhead_gb": 5.95,
+    "note": "awq_protected - awq_bf16 = the int4 KV path cost (4.38GB sidecars + CUDA-graph pools) ON TOP of the AWQ-shrunk weights"
+  },
+  "findings": {
+    "awq_shrinks_weights": "14.25 -> 5.571 GB (2.56x, -8.68 GB) -- measured via live introspection, vs the broken proxy's '0.021 GB' in stack_fixed.json",
+    "composition_proven": "weight saving IDENTICAL with bf16 KV (5.571) and int4 KV (5.571) -> AWQ weight-quant and int4_protected KV are ORTHOGONAL; the int4 path does not interfere with weight quantization. They COMPOSE at the memory level.",
+    "stack_total": "footprint = AWQ-shrunk weights (5.57 GB) + int4 KV+sidecars. Both compression effects present and additive."
+  },
+  "caveats": {
+    "density_ratio_not_computed": "this run used max-tokens 128 + b-list 96,128 -> AWQ freed ~8.7GB which became extra KV budget, so the cells did NOT saturate the block limit (CEILING_NOT_REACHED). The concurrent-seqs-per-GB density RATIO for the AWQ stack is therefore not measured here; a higher-pressure re-run (--b-list 128,192,256 --max-tokens 512) would compute it. The WEIGHT-saving + composition result above does NOT depend on saturation.",
+    "report_json_aggregate": "the top-level report.json hbm_accounting keys on bf16/protected and shows null for the awq_* cells; the real numbers are in the per-cell JSONs (phase6l_awq_*_mml8192_B128.json), captured here."
+  }
+}

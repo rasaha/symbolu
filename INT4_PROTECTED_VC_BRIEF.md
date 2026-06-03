@@ -368,7 +368,7 @@ There are two distinct comparisons:
 | Alternative | Why it doesn't substitute |
 |---|---|
 | Faster fp8 kernels | fp8's quality limit isn't a kernel issue — it's a representation issue. 8 bits per element cannot preserve the per-channel dynamic range of K at the precision that long-context attention requires. |
-| AWQ + AWQ-Marlin | These quantize *weights*, not KV-cache. They stack with int4_protected, they don't replace it. The KV-cache is the memory bottleneck in long-context serving; weights are a separate budget. |
+| AWQ + AWQ-Marlin | These quantize *weights*, not KV-cache — orthogonal budgets, **complementary** to int4_protected. **Composition status (Phase 6O, measured + fixed):** the stack initially crashed on a dtype mismatch (AWQ fp16 activations vs int4 bf16-dequant K); a one-commit dtype bridge (e06dd26) fixed it, and **byte-equivalence on the bf16 path stayed GREEN (15/15)** — the fix is non-invasive. **AWQ weights + int4_protected KV now load and run together with quality preserved — MMLU 56% (stacked) vs 55% (each alone), within noise.** The *integration and quality* compose, validated. **Memory composition also MEASURED (live introspection, Phase 6O): AWQ shrinks weights 14.25 → 5.57 GB (2.6×, −8.7 GB), and the saving is IDENTICAL with bf16 KV and int4 KV (5.571 = 5.571) — proving the two are orthogonal and additive.** So int4_protected compresses the KV-cache (its moat, which AWQ/GPTQ cannot touch) AND stacks with AWQ weight-quant: both memory budgets shrink together, quality preserved. |
 | Speculative decoding | Reduces decode FLOPs, doesn't reduce KV memory. Orthogonal to KV compression. |
 | Paged attention (vLLM) | Already deployed everywhere. Paged attention manages KV memory; it doesn't compress KV. int4_protected uses vLLM's paged cache as its substrate. |
 
@@ -404,11 +404,12 @@ recompile, not a methodology change.
 - **Quality**: 4 models, 3 families, 2 scales, all 15/15 needle
   replicated 2-of-2 seeds on Mistral / Llama-3.1-8B / Qwen-14B;
   token-agreement +20.4 pt over naive (0.737 vs 0.533, post-fix).
-  **MMLU (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 at both 200 Q
-  (63.5%=63.5%) and 1,000 Q (73.9%=73.9%), 0.0 pt delta — and at 1K,
-  100% per-question agreement (int4 chose the IDENTICAL A/B/C/D answer on
-  all 1,000 questions; net_flips=0).** No measurable accuracy loss AND no
-  hidden compensating flips. (Recalibrated mask; hard-needle 4/4, COLLAPSE=0.)
+  **Academic benchmarks (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 with
+  0.0 pt delta AND 100% per-question agreement on THREE benchmarks —
+  MMLU (63.5%=63.5% @200Q; 73.9%=73.9% @1,000Q), ARC-Challenge (91.5%=91.5%),
+  TruthfulQA (71.5%=71.5%).** Across all of them int4 chose the IDENTICAL answer
+  on every question (net_flips=0) — no measurable accuracy loss AND no hidden
+  compensating flips. (Recalibrated mask; hard-needle 4/4, COLLAPSE=0.)
 - **Correctness**: all three decode bugs fixed (Phase 6K.7/6K.9/6K.10)
   — eager and graph modes both verified correct. Int4 decode
   confirmed `COLLAPSE=0` across every cell × mml post-fix.

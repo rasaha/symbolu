@@ -1,0 +1,19 @@
+{
+  "_what": "Phase 6N.2 ARC-Challenge + TruthfulQA quality benches (Qwen-7B, A100, 2026-06-02). Validates the new Parquet-native MC evals run CLEAN on real data (not just CPU selftest) AND corroborates the MMLU 1K result on two more academic benchmarks.",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "config": "200 questions each, bf16 vs int4_protected, mml=8192 mask",
+  "evals": {
+    "arc": {
+      "bf16_accuracy_pct": 91.5, "protected_accuracy_pct": 91.5,
+      "delta_pct": 0.0, "agreement_pct": 100.0, "net_flips": 0,
+      "unparsed": 0, "status": "PASS"
+    },
+    "truthfulqa": {
+      "bf16_accuracy_pct": 71.5, "protected_accuracy_pct": 71.5,
+      "delta_pct": 0.0, "agreement_pct": 100.0, "net_flips": 0,
+      "unparsed": 0, "status": "PASS"
+    }
+  },
+  "finding": "int4_protected = bf16 EXACTLY on ARC-Challenge (91.5%) and TruthfulQA (71.5%): 0.0pt delta AND 100% per-question agreement (identical answer on all 200 of each). unparsed=0 confirms the generic variable-choice MC parser works on real data. Combined with MMLU (200Q + 1000Q, both 0.0pt + 100% agreement), int4_protected now matches bf16 on THREE academic benchmarks with perfect per-question fidelity.",
+  "caveat": "100% MC agreement proves the argmax answer is unchanged across these benchmarks; not bitwise-identical logits (lossy compression). Generative quality (free-form) remains tested only via token-agreement; HumanEval pass@1 needs a sandbox."
+}

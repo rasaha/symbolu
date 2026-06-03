@@ -1,0 +1,20 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "awq_model": "Qwen/Qwen2.5-7B-Instruct-AWQ",
+  "eval_date": "2026-06-02",
+  "dry_run": false,
+  "_NOTE_hbm": "HBM/weights_gb figures are UNRELIABLE (max_memory_allocated proxy captures total high-water mark, not weight footprint -- reads ~41GB for everything). Use ONLY the load/integration signal, not the GB numbers.",
+  "_NOTE_mmlu": "MMLU sanity did not run -- `datasets` not installed in this fresh-pod venv (ModuleNotFoundError). Integration finding stands; quality sanity pending a re-run with `pip install datasets`.",
+  "cells": {
+    "bf16_bf16":     {"loaded": true,  "config": {"weights": "bf16", "kv": "bf16"}},
+    "awq_bf16":      {"loaded": true,  "config": {"weights": "awq",  "kv": "bf16"}},
+    "bf16_int4prot": {"loaded": true,  "config": {"weights": "bf16", "kv": "int4_protected"}},
+    "awq_int4prot":  {"loaded": false, "config": {"weights": "awq",  "kv": "int4_protected"},
+                      "error": "RuntimeError: query and key must have the same dtype"}
+  },
+  "verdict": {
+    "integration": "INTEGRATION_FAILED — AWQ (fp16 activations) + int4_protected (bf16-dequant K) hit a dtype mismatch in the attention kernel: 'query and key must have the same dtype'. The framework loads BOTH (AWQ weights + int4 attention) — they collide on ONE dtype assumption at the attention boundary, not a deep incompatibility.",
+    "composition": "NOT_COMPUTED — stacked cell did not load",
+    "fixability": "LIKELY a small fix: align the attention-input dtype (cast query bf16<->fp16 at the int4 attention entry, or set the int4 dequant target to match the AWQ activation dtype). NOT zero-effort as the brief's 'they stack' implied; a scoped kernel/wrapper change behind the byte-eq oracle."
+  }
+}
