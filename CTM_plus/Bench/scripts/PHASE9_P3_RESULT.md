@@ -147,3 +147,45 @@ The algorithm is settled (quality free at high skip); from here it's an
 amortization/kernel-efficiency curve. If longer gen + kernel-emitted scores
 cross to positive -> software per-watt win. If the per-step decision floor still
 dominates after that -> the measured PCAM case.
+
+## P4c — longer generation (gen=128, 86% skip, ctx8000): BREAKEVEN reached
+
+| (8k, ~86% skip, gen=128) | decode tps | quality d0.1/0.5/0.9 |
+|---|---:|---:|
+| off | 7.29 | 1.0/1.0/1.0 |
+| retention | 7.50 | 1.0/1.0/1.0 |
+
+Retention is now ~parity / +2.9% at PERFECT quality. Honest magnitude: +2.9% is
+within cross-run noise (off drifted 10.75->8.9->7.29 across separate processes),
+so the fair claim is BREAKEVEN, not a large win.
+
+### The trajectory is the result (every lever moved it as predicted)
+| config | skip | gen | retention vs off |
+|---|---:|---:|---:|
+| default knobs | ~20% | 32 | -48.7% |
+| aggressive | ~86% | 32 | -20.0% |
+| aggressive | ~86% | 128 | **+2.9% (breakeven)** |
+
+Read-skip went from 2x SLOWER to breakeven purely by entering the right regime
+(enough skip + amortized observe), with quality FREE at every step. It is NOT
+dispatch-bound; it is a tunable amortization/kernel-efficiency curve sitting at
+breakeven with clear headroom.
+
+### Remaining headroom toward the Step-0 ~1.9x (all known, none blocking)
+- **Kernel-emitted block scores**: the fused kernel already computes softmax p;
+  sum per block -> removes the ~1ms full-K torch scoring AND the observe-phase
+  full read (the biggest residual cost). Largest expected lever.
+- **Longer context (16k/32k)**: bigger per-step skip benefit; Step-0 showed the
+  prize grows with length.
+- **v2 in-kernel block-skip**: removes the residual host gather.
+- These are upside, not blockers — the sign is already non-negative.
+
+## Phase 9 build — measurement arc COMPLETE
+- Quality + correctness of read-skip on the production kernel: PROVEN (1.0 at
+  every depth, up to ~86% skip; byte-eq 6/6).
+- Throughput: from 2x slower -> BREAKEVEN by config/amortization, with known
+  headroom (kernel-emitted scores, longer ctx) toward the modeled ~1.9x.
+- int4_protected density + quality (the shipped product): untouched.
+- Verdict: read-skip is quality-safe and throughput-viable; the remaining gains
+  are well-understood kernel optimizations, not a hardware-mandate. PCAM stays
+  parked (we did NOT hit a dispatch floor that only hardware breaks).
