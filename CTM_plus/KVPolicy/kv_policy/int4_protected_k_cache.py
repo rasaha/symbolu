@@ -559,6 +559,43 @@ class ProtectedKINT4Cache:
             "v_offset": v_offset,
         }
 
+    def block_attention_scores(self, query, block_size: int) -> list:
+        """READ-SKIP scoring: per-block decode-attention mass from `query` to the
+        stored K, reconstructed EXACTLY as the fused kernel does
+        (kiv*scale(+offset), then protect-overlay where the mask is set). Returns
+        a python list of length n_blocks. Called only on observe/refresh steps.
+
+        GQA: query heads are mean-pooled within each KV-head group. GPU path.
+        """
+        import math
+        from kv_policy.int4_per_channel_kv import unpack_int4
+        s = self._s_curr
+        D = self._head_dim
+        H_kv = self._num_kv_heads
+        nb = (s + block_size - 1) // block_size
+        if s < 1 or D is None or H_kv is None:
+            return [0.0] * max(nb, 0)
+        # Reconstruct K_eff (s, H_kv, D) — mirror the kernel exactly.
+        kiv = unpack_int4(self.k_packed_buf[:s], D).float()          # [-8,7]
+        k_dq = kiv * self.k_scale_buf[:s].float()
+        if self._asymmetric and self.k_offset_buf is not None:
+            k_dq = k_dq + self.k_offset_buf[:s].float()
+        pm = self._protect_mask.bool().unsqueeze(0)                  # (1,H,D)
+        k_eff = torch.where(pm, self.k_fp16_buf[:s].float(), k_dq)   # (s,H,D)
+        # Query -> per-KV-head via GQA mean-pool.
+        q = query.reshape(-1, D).float()                            # (H_q, D)
+        H_q = q.shape[0]
+        if H_q < 1 or H_q % H_kv != 0:
+            return [0.0] * nb
+        q_kv = q.view(H_kv, H_q // H_kv, D).mean(dim=1)             # (H_kv, D)
+        logits = torch.einsum("hd,shd->hs", q_kv, k_eff) / math.sqrt(D)
+        probs = torch.softmax(logits, dim=-1)                       # (H_kv, s)
+        pos_mass = probs.sum(dim=0)                                 # (s,)
+        blk = torch.zeros(nb, device=pos_mass.device, dtype=pos_mass.dtype)
+        idx = (torch.arange(s, device=pos_mass.device) // block_size)
+        blk.scatter_add_(0, idx, pos_mass)
+        return blk.tolist()
+
     # ------------------------------------------------------------------ #
     # Repr                                                               #
     # ------------------------------------------------------------------ #
