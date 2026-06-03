@@ -78,9 +78,42 @@ def random_code(rng: random.Random) -> str:
     return str(rng.randint(1000000, 9999999))
 
 
+# NUMBER-FREE filler. The earlier 'Log entry {i}: ...' filler injected ~450
+# numbers into the haystack, so the model — asked for 'the magic number' — grabbed
+# corrupted/blended digits from nearby log indices (calibration 0.61, single-digit
+# errors). Canonical NIAH works because the haystack is number-free so the secret
+# number is the ONLY one. None of these sentences contains a digit.
+_FILLER_SENTENCES = [
+    "The maintenance crew completed their rounds without incident.",
+    "All monitored systems reported nominal status throughout the shift.",
+    "The corridor lighting flickered briefly and then steadied.",
+    "Routine diagnostics returned no anomalies of any kind.",
+    "The ventilation hummed quietly in the background as usual.",
+    "Personnel rotated through their stations on the standing schedule.",
+    "No alerts were raised by the perimeter sensors overnight.",
+    "The supply manifest was reconciled and filed without issue.",
+    "Ambient temperature stayed within the comfortable working band.",
+    "The night watch reported a calm and uneventful period.",
+    "Calibration of the auxiliary equipment proceeded smoothly.",
+    "The archival backups synchronized as expected during the lull.",
+    "A faint smell of coffee drifted from the break room.",
+    "The status board showed only steady green indicators.",
+    "Communications with the outer stations stayed clear and stable.",
+    "The duty log was updated and countersigned by the supervisor.",
+    "Spare components were inventoried and returned to storage.",
+    "The hum of the cooling pumps was the only notable sound.",
+    "Foot traffic in the main hall tapered off after the changeover.",
+    "The weekly inspection found everything in good working order.",
+    "Operators noted nothing unusual on their secondary displays.",
+    "The reserve generators idled quietly on standby.",
+    "Documentation for the shift was archived per standard procedure.",
+    "The quiet routine of the facility continued undisturbed.",
+]
+
+
 def _filler(n: int) -> str:
-    return " ".join(f"Log entry {i}: nominal status, no action required."
-                    for i in range(n))
+    return " ".join(_FILLER_SENTENCES[i % len(_FILLER_SENTENCES)]
+                    for i in range(max(0, n)))
 
 
 def build_needle_single(context_tokens: int, depth: float, rng: random.Random):
