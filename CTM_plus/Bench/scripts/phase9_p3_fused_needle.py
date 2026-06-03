@@ -109,6 +109,29 @@ def _paired_deltas(base_by_cell, other_by_cell):
     return out
 
 
+def _profile_section_rows(per_mode, order, baseline):
+    """Side-by-side per-section profiler rows for the paired profiler: a list of
+    ``(section, {mode: mean_ms}, {non_baseline_mode: delta_ms_vs_baseline})`` in
+    ``order``, skipping sections absent from every mode. This is what attributes a
+    gap — e.g. ``kernel_inputs`` (the host gather) or the observe-phase scoring not
+    shrinking. PURE; CPU-unit-tested."""
+    modes = list(per_mode.keys())
+    base = per_mode.get(baseline, {}).get("sections", {})
+    rows = []
+    for sec in order:
+        cells, deltas, present = {}, {}, False
+        for m in modes:
+            ms = per_mode[m].get("sections", {}).get(sec)
+            cells[m] = ms
+            if ms is not None:
+                present = True
+                if m != baseline and base.get(sec) is not None:
+                    deltas[m] = round(ms - base[sec], 4)
+        if present:
+            rows.append((sec, cells, deltas))
+    return rows
+
+
 def run(args) -> int:
     import random
     from vllm import LLM, SamplingParams
@@ -230,29 +253,15 @@ def run(args) -> int:
     return 0
 
 
-def run_ab(args) -> int:
-    """Within-process paired A/B: build ONE warm engine, then measure every mode
-    (default off vs retention) back-to-back on the SAME needle across seeds x
-    depths, with warmup discarded and repeated timed measurements. Decode timing
-    EXCLUDES prefill (vLLM token-time metrics when populated, else a prefill+1
-    calibration subtracted from the full generate). Reports per-mode decode-tps
-    with spread and the paired delta vs the baseline (off) per (seed, depth) cell,
-    so a throughput claim can be judged against its own noise."""
-    import random
-    from vllm import LLM, SamplingParams
+def _build_fused_engine(args):
+    """Build the vLLM engine + install the route-A manager. Returns
+    (llm, manager, teardown, tok, backend). Shared by --ab and --profile-ab."""
+    from vllm import LLM
     from kv_policy.int4_cache_kv_route_a import (
         install_int4_cache_kv_route_a, BACKEND_FUSED_V2, BACKEND_DEQUANT_FALLBACK,
     )
-
     backend = (BACKEND_FUSED_V2 if args.backend == "fused_v2"
                else BACKEND_DEQUANT_FALLBACK)
-    modes = [m.strip() for m in args.ab_modes.split(",") if m.strip()]
-    seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
-    depths = [float(d) for d in args.depths.split(",") if d.strip()]
-    gen = int(args.ab_gen)
-    repeats = max(1, int(args.repeats))
-    warmup = max(1, int(args.warmup))   # >=1: also JIT-warms + detects metrics
-
     llm = LLM(model=args.model, enforce_eager=True,
               max_model_len=args.max_model_len,
               gpu_memory_utilization=args.gpu_util)
@@ -261,7 +270,29 @@ def run_ab(args) -> int:
         model=model, k_group_size=32, v_group_size=32, asymmetric=True, bits=4,
         sink_size=4, kernel_backend=backend, max_seq_len=args.max_model_len,
         protect_fraction=0.04, cache_k_group_size=1, cache_v_group_size=32)
-    tok = llm.get_tokenizer()
+    return llm, manager, teardown, llm.get_tokenizer(), backend
+
+
+def run_ab(args) -> int:
+    """Within-process paired A/B: build ONE warm engine, then measure every mode
+    (default off vs retention) back-to-back on the SAME needle across seeds x
+    depths, with warmup discarded and repeated timed measurements. Decode timing
+    EXCLUDES prefill (vLLM token-time metrics when populated, else a prefill+1
+    calibration subtracted from the full generate). Reports per-mode decode-tps
+    with spread, the paired delta vs the baseline (off) per (seed, depth) cell, and
+    the read-skip diagnostics (how much was ACTUALLY skipped + observe/steady step
+    split), so a throughput claim can be judged against its own noise and cause."""
+    import random
+    from vllm import SamplingParams
+
+    modes = [m.strip() for m in args.ab_modes.split(",") if m.strip()]
+    seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
+    depths = [float(d) for d in args.depths.split(",") if d.strip()]
+    gen = int(args.ab_gen)
+    repeats = max(1, int(args.repeats))
+    warmup = max(1, int(args.warmup))   # >=1: also JIT-warms + detects metrics
+
+    llm, manager, teardown, tok, backend = _build_fused_engine(args)
     print(f"[ab] backend={backend} modes={modes} seeds={seeds} depths={depths} "
           f"gen={gen} repeats={repeats} warmup={warmup} ctx={args.context_tokens} "
           f"max_model_len={args.max_model_len}", flush=True)
@@ -298,6 +329,7 @@ def run_ab(args) -> int:
               else "two_pass:full-minus-prefill")
     print(f"[ab] decode-time method = {method}  (warmup {warmup}/mode discarded)",
           flush=True)
+    manager.clear_readskip_stats()   # skip-fraction reflects the MEASURED phase only
 
     # ---- measurement loop (interleave modes per repeat so paired samples are
     #      adjacent in time -> clock drift cancels in the within-cell delta) ----
@@ -364,6 +396,14 @@ def run_ab(args) -> int:
         paired[m] = {"delta_pct_mean": round(dmean, 2), "delta_pct_std": round(dstd, 2),
                      "n_cells": len(deltas), "deltas_pct": [round(x, 2) for x in deltas]}
 
+    st = manager.stats
+    skip_diag = {
+        "steady_skip_frac": st.get("readskip_steady_skip_frac"),
+        "steady_retained_mean": st.get("readskip_steady_retained_mean"),
+        "steady_seq_mean": st.get("readskip_steady_seq_mean"),
+        "observe_steps": st.get("readskip_observe_steps"),
+        "steady_steps": st.get("readskip_steady_steps"),
+    }
     report = {
         "kind": "within_process_ab", "model": args.model, "backend": backend,
         "context_tokens": args.context_tokens, "gen": gen, "repeats": repeats,
@@ -371,7 +411,8 @@ def run_ab(args) -> int:
         "baseline": baseline, "max_model_len": args.max_model_len,
         "decode_time_method": method, "per_mode": per_mode,
         "paired_vs_baseline": paired,
-        "readskip_calls": manager.stats.get("readskip_calls"), "items": items,
+        "readskip_calls": st.get("readskip_calls"), "skip_diag": skip_diag,
+        "items": items,
     }
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(report, indent=2))
@@ -385,6 +426,13 @@ def run_ab(args) -> int:
         pm = per_mode[m]
         print(f"[ab]   {m:<10} {pm['tps_mean']:.2f} +/- {pm['tps_std']:.2f} tps   "
               f"quality={pm['hit_rate_by_depth']}")
+    if skip_diag["steady_steps"]:
+        print(f"[ab] retention skip: steady skip_frac="
+              f"{skip_diag['steady_skip_frac']:.1%} "
+              f"(retained ~{skip_diag['steady_retained_mean']:.0f} of "
+              f"~{skip_diag['steady_seq_mean']:.0f}); steps observe="
+              f"{skip_diag['observe_steps']} steady={skip_diag['steady_steps']} "
+              f"(observe steps re-read all + re-score -> use --profile-ab to time them)")
     for m, p in paired.items():
         lo, hi = p["delta_pct_mean"] - p["delta_pct_std"], p["delta_pct_mean"] + p["delta_pct_std"]
         verdict = ("WIN (beyond spread)" if lo > 0 else
@@ -392,6 +440,114 @@ def run_ab(args) -> int:
         print(f"[ab]   {m} vs {baseline}: {p['delta_pct_mean']:+.1f}% "
               f"+/- {p['delta_pct_std']:.1f}%  over {p['n_cells']} cells -> {verdict}")
     print(f"[ab] wrote {args.out}", flush=True)
+    try:
+        teardown()
+    except Exception:
+        pass
+    return 0
+
+
+def run_profile_ab(args) -> int:
+    """Paired per-section profiler. In ONE process, profile each mode (off vs
+    retention) over a few long-context needle decodes and print the per-decode-step
+    cost broken down by section (kernel_call / readskip_decision / kernel_inputs
+    gather / cache_append / ...) side by side with the off->mode delta, PLUS
+    retention's observe-vs-steady total_bypass split + skip fraction. This
+    attributes WHERE a gap is (e.g. the observe phase eating the skip savings, or
+    the host gather not shrinking). Profiling adds CUDA syncs that perturb timing,
+    so this is SEPARATE from --ab (which gives the clean tps verdict)."""
+    import random
+    from vllm import SamplingParams
+
+    modes = [m.strip() for m in args.ab_modes.split(",") if m.strip()]
+    gen = int(args.ab_gen)
+    items = max(1, int(args.items))
+    depth = [float(d) for d in args.depths.split(",") if d.strip()][0]
+
+    llm, manager, teardown, tok, backend = _build_fused_engine(args)
+    print(f"[prof-ab] backend={backend} modes={modes} ctx={args.context_tokens} "
+          f"gen={gen} items={items} depth={depth}", flush=True)
+
+    def _gen(prompt):
+        manager.reset()
+        chat = tok.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=False, add_generation_prompt=True)
+        llm.generate([chat], SamplingParams(temperature=0.0, max_tokens=gen),
+                     use_tqdm=False)
+
+    # Warmup (discarded) per mode to JIT-compile the kernel shapes before timing.
+    warm_user, _wc, _wq, _wn = build_needle_single(
+        args.context_tokens, depth, random.Random(args.seed))
+    for mode in modes:
+        manager.set_readskip_mode(mode)
+        _gen(warm_user)
+
+    per_mode = {}
+    for mode in modes:
+        manager.set_readskip_mode(mode)
+        manager.clear_profile()
+        manager.clear_readskip_stats()
+        manager.set_profiling(True)
+        rng = random.Random(args.seed + 1)
+        for _ in range(items):
+            u, _c, _q, _n = build_needle_single(args.context_tokens, depth, rng)
+            _gen(u)
+        manager.set_profiling(False)
+        sections = manager.get_profile_stats()
+        st = manager.stats
+        per_mode[mode] = {
+            "sections": {k: round(v["mean_ms"], 4) for k, v in sections.items()
+                         if isinstance(v, dict) and "mean_ms" in v},
+            "total_bypass_split": sections.get("total_bypass_split"),
+            "skip_frac": st.get("readskip_steady_skip_frac"),
+            "observe_steps": st.get("readskip_observe_steps"),
+            "steady_steps": st.get("readskip_steady_steps"),
+        }
+
+    order = ["kernel_call", "readskip_decision", "kernel_inputs", "cache_append",
+             "reshape_kv", "cast_back", "total_bypass"]
+    baseline = "off" if "off" in per_mode else modes[0]
+    rows = _profile_section_rows(per_mode, order, baseline)
+
+    report = {"kind": "profile_ab", "model": args.model, "backend": backend,
+              "context_tokens": args.context_tokens, "gen": gen, "items": items,
+              "depth": depth, "modes": modes, "baseline": baseline,
+              "per_mode": per_mode,
+              "section_order": order, "max_model_len": args.max_model_len}
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps(report, indent=2))
+
+    # ---- side-by-side attribution table ----
+    others = [m for m in modes if m != baseline]
+    hdr = f"{'section':<18} " + "".join(f"{m:>12}" for m in modes)
+    hdr += "".join(f"{('Δ '+m):>12}" for m in others)
+    print(f"\n[prof-ab] === per-decode-step ms by section "
+          f"(ctx={args.context_tokens}, gen={gen}) ===")
+    print("[prof-ab] " + hdr)
+    for sec, cells, deltas in rows:
+        line = f"{sec:<18} " + "".join(
+            (f"{cells[m]:>12.4f}" if cells.get(m) is not None else f"{'-':>12}")
+            for m in modes)
+        line += "".join(
+            (f"{deltas[m]:>+12.4f}" if m in deltas else f"{'-':>12}") for m in others)
+        print("[prof-ab] " + line)
+    for m in modes:
+        sp = per_mode[m].get("total_bypass_split")
+        if sp:
+            obs = sp.get("observe", {}); std = sp.get("steady", {})
+            print(f"[prof-ab] {m} total_bypass split: "
+                  f"observe={obs.get('mean_ms', float('nan')):.3f}ms"
+                  f"(n={obs.get('n', 0)}) vs steady="
+                  f"{std.get('mean_ms', float('nan')):.3f}ms(n={std.get('n', 0)}) "
+                  f"-> observe steps cost "
+                  f"{(obs.get('mean_ms', 0) / std['mean_ms']):.1f}x a steady step"
+                  if std.get("mean_ms") else "")
+        if per_mode[m]["steady_steps"]:
+            print(f"[prof-ab] {m} steady skip_frac={per_mode[m]['skip_frac']:.1%} "
+                  f"(observe={per_mode[m]['observe_steps']} "
+                  f"steady={per_mode[m]['steady_steps']} steps)")
+    print(f"[prof-ab] wrote {args.out}", flush=True)
     try:
         teardown()
     except Exception:
@@ -429,13 +585,27 @@ def _selftest() -> int:
     assert len(dd) == 2 and all(abs(x - 10.0) < 1e-9 for x in dd), dd
     assert _paired_deltas({(1, 0.5): 0.0, (3, 0.1): 7.0}, {(3, 0.1): 7.0}) == [0.0]
 
+    # --- paired profiler: section table (off baseline, retention deltas) ---
+    pm = {"off": {"sections": {"kernel_call": 5.0, "kernel_inputs": 0.1,
+                               "total_bypass": 6.0}},
+          "retention": {"sections": {"kernel_call": 2.0, "kernel_inputs": 1.2,
+                                     "total_bypass": 5.0}}}
+    rows = _profile_section_rows(
+        pm, ["kernel_call", "kernel_inputs", "missing", "total_bypass"], "off")
+    assert {r[0] for r in rows} == {"kernel_call", "kernel_inputs", "total_bypass"}
+    kc = next(r for r in rows if r[0] == "kernel_call")
+    assert kc[1]["retention"] == 2.0 and abs(kc[2]["retention"] + 3.0) < 1e-9, kc
+    ki = next(r for r in rows if r[0] == "kernel_inputs")
+    assert abs(ki[2]["retention"] - 1.1) < 1e-9, ki   # gather got pricier under retention
+
     # runtime mode switch: exercise the REAL manager method on a stub (no torch
     # needed — it only flips _readskip_mode and clears _readskip_controllers).
     here = os.path.dirname(os.path.abspath(__file__))
     kvp = os.path.normpath(os.path.join(here, "..", "..", "KVPolicy"))
     if kvp not in sys.path:
         sys.path.insert(0, kvp)
-    from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
+    from kv_policy.int4_cache_kv_route_a import (
+        INT4CacheKVRouteA, _observe_steady_split)
     import types
     stub = types.SimpleNamespace(_readskip_mode="off",
                                  _readskip_controllers={1: object()})
@@ -446,6 +616,41 @@ def _selftest() -> int:
         raise AssertionError("set_readskip_mode should reject an unknown mode")
     except ValueError:
         pass
+    # clear_readskip_stats zeroes the cumulative diagnostics (real method, stub).
+    stub2 = types.SimpleNamespace(
+        _readskip_calls=5, _readskip_observe_steps=8, _readskip_steady_steps=120,
+        _readskip_retained_tokens=132000, _readskip_seq_tokens=960000)
+    INT4CacheKVRouteA.clear_readskip_stats(stub2)
+    assert stub2._readskip_steady_steps == 0 and stub2._readskip_seq_tokens == 0
+
+    # observe/steady split (real module helper): observe steps cost more.
+    spl = _observe_steady_split(
+        [10.0, 2.0, 11.0],
+        [("retention", True, 8, 8), ("retention", False, 8, 1),
+         ("retention", True, 8, 8)])
+    assert spl["observe"]["n"] == 2 and spl["steady"]["n"] == 1, spl
+    assert _observe_steady_split([1.0], [("off", None, 8, 8)]) == {}  # off not classified
+
+    # The REAL accumulation glue (_readskip_active_positions) on stubs: observe
+    # steps read all (retained==seq), steady steps skip, counters + meta track it.
+    class _Cache:
+        seq_len = 4096
+        def block_attention_scores(self, query, block_size):
+            sc = [0.0] * ((self.seq_len + block_size - 1) // block_size)
+            sc[40] = 9.0
+            return sc
+    mgr = types.SimpleNamespace(
+        _readskip_mode="retention", _readskip_calls=0, _readskip_block_size=32,
+        _readskip_sink_tokens=64, _readskip_recent_tokens=512,
+        _readskip_budget_tokens=512, _readskip_neighbor=1, _readskip_observe=3,
+        _readskip_refresh=0, _readskip_decay=0.8, _readskip_controllers={},
+        _readskip_observe_steps=0, _readskip_steady_steps=0,
+        _readskip_retained_tokens=0, _readskip_seq_tokens=0, _last_readskip_meta=None)
+    for _ in range(8):
+        INT4CacheKVRouteA._readskip_active_positions(mgr, _Cache(), query=object())
+    assert mgr._readskip_observe_steps == 3 and mgr._readskip_steady_steps == 5
+    sf = 1 - mgr._readskip_retained_tokens / mgr._readskip_seq_tokens
+    assert 0.5 < sf < 0.99 and mgr._last_readskip_meta[0] == "retention", sf
 
     print("p3 fused needle self-test: PASS")
     return 0
@@ -490,9 +695,16 @@ def main(argv=None) -> int:
     ap.add_argument("--ab-gen", type=int, default=128,
                     help="decode tokens for the timed pass (amortizes the observe "
                          "phase; Phase-9 breakeven was at gen=128)")
+    ap.add_argument("--profile-ab", action="store_true",
+                    help="paired per-section profiler: off vs retention per-step "
+                         "cost by section (+ observe/steady split + skip fraction) "
+                         "in one process, to attribute WHERE a gap is. SEPARATE "
+                         "from --ab because profiling perturbs the tps timing.")
     args = ap.parse_args(argv)
     if args.selftest:
         return _selftest()
+    if args.profile_ab:
+        return run_profile_ab(args)
     if args.ab:
         return run_ab(args)
     return run(args)

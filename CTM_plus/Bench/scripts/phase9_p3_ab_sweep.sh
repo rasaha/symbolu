@@ -99,6 +99,13 @@ for ctx, r in rows:
         L += ["", f"**{m} vs {r['baseline']}: {pv['delta_pct_mean']:+.1f}% "
                   f"+/- {pv['delta_pct_std']:.1f}%** over {pv['n_cells']} (seed,depth) "
                   f"cells -> **{verdict}**  (per-cell: {pv['deltas_pct']})"]
+    sd = r.get("skip_diag") or {}
+    if sd.get("steady_steps"):
+        L += ["", f"- retention skipped **{sd['steady_skip_frac']:.0%}** in steady state "
+                  f"(retained ~{sd['steady_retained_mean']:.0f} of "
+                  f"~{sd['steady_seq_mean']:.0f}); steps observe={sd['observe_steps']} "
+                  f"steady={sd['steady_steps']} (observe steps re-read all + re-score "
+                  f"— time them with `--profile-ab`)"]
     L.append("")
 L += ["## How to read it",
       "- Quality is the GATE: retention hit-rate must match off (needle survives the",
