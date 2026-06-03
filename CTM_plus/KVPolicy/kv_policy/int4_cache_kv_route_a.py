@@ -62,6 +62,7 @@ CPU-tested; GPU verification rides the throughput run.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
@@ -238,6 +239,29 @@ class INT4CacheKVRouteA:
             "cast_back": [],
             "total_bypass": [],
         }
+
+        # READ-SKIP (Phase-9 build): which historical KV positions the fused
+        # decode reads. "off" = read all ([:s], identity — default, no behavior
+        # change). "retain_all" = explicitly pass range(s) — the byte-eq gate that
+        # the active_positions plumbing is transparent. "retention" (P2) =
+        # sink+recent+attention-selected blocks via kv_policy.readskip_select.
+        self._readskip_mode = os.environ.get("INT4_READSKIP_MODE", "off")
+        self._readskip_calls = 0
+
+    def _readskip_active_positions(self, cache) -> "Optional[List[int]]":
+        """READ-SKIP: retained KV positions for this decode step, or None (read
+        all). "off" -> None (identity). "retain_all" -> range(s) (byte-eq gate).
+        "retention" (P2) will select sink+recent+attention blocks from the bridge
+        scores via kv_policy.readskip_select."""
+        mode = self._readskip_mode
+        if mode == "off":
+            return None
+        self._readskip_calls += 1
+        s = cache.seq_len
+        if mode == "retain_all":
+            return list(range(s))          # must be byte-identical to "off"
+        # P2: mode == "retention" -> readskip_select.retained_positions_for_policy
+        return None
 
     @property
     def kernel_backend(self) -> str:
@@ -766,7 +790,8 @@ def _wrap_attention_forward_with_fused_v2(
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
-            inputs = cache.kernel_inputs()
+            active_positions = manager._readskip_active_positions(cache)
+            inputs = cache.kernel_inputs(active_positions=active_positions)
             if prof:
                 sec_e.record()
                 manager._profile_events["kernel_inputs"].append((sec_s, sec_e))

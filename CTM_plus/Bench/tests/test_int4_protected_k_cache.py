@@ -822,3 +822,24 @@ def test_kernel_inputs_active_positions_validation():
         c.kernel_inputs(active_positions=[0, 5, 99])   # out of range (s=10)
     with pytest.raises(ValueError):
         c.kernel_inputs(active_positions=[])           # empty
+
+
+def test_readskip_active_positions_modes():
+    """The route-A read-skip mode switch: off -> None (identity), retain_all ->
+    range(s) (byte-eq gate), retention -> None (P2 stub). Pure logic; uses
+    __new__ to bypass the torch-y manager __init__."""
+    from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
+
+    m = INT4CacheKVRouteA.__new__(INT4CacheKVRouteA)
+    m._readskip_calls = 0
+
+    class _FakeCache:
+        seq_len = 6
+
+    m._readskip_mode = "off"
+    assert m._readskip_active_positions(_FakeCache()) is None
+    m._readskip_mode = "retain_all"
+    assert m._readskip_active_positions(_FakeCache()) == [0, 1, 2, 3, 4, 5]
+    m._readskip_mode = "retention"          # P2 not wired yet -> None
+    assert m._readskip_active_positions(_FakeCache()) is None
+    assert m._readskip_calls == 2           # off doesn't count
