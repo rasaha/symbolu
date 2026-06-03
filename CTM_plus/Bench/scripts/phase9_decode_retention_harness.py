@@ -64,25 +64,18 @@ BASELINE_MIN = 0.95           # full_attention needle floor below which = INVALI
 # ------------------------------------------------------- synthetic tasks ------
 
 _SECTIONS = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF"]
-# The payload must be ARBITRARY (so it isn't question-relevant -> prefill cosine
-# can't find it) yet HIGHLY COPYABLE. A random 9-char code is NOT copyable: a 7B
-# model mis-transcribes ~1 char in 6 even under full attention (calibration found
-# 0.84), capping the baseline below the 0.95 floor and testing copy-fidelity, not
-# retention. Real words are in-vocabulary and copied near-perfectly, so a 3-word
-# passphrase keeps the payload arbitrary while making full attention near-perfect.
-_WORDS = ["CRIMSON", "FALCON", "MEADOW", "GRANITE", "VELVET", "HARBOR", "COBALT",
-          "EMBER", "WILLOW", "CIPHER", "LUNAR", "NOMAD", "QUARTZ", "RAVEN",
-          "SAFFRON", "TUNDRA", "ZEPHYR", "ONYX", "MARBLE", "CEDAR", "THORN",
-          "GLACIER", "COMET", "BASIL", "INDIGO", "WALNUT", "SIERRA", "MONSOON",
-          "PEWTER", "BRAMBLE", "FJORD", "LICHEN", "KESTREL", "OBSIDIAN",
-          "CINDER", "JUNIPER"]
+# The payload must be ARBITRARY (not question-relevant, so prefill cosine can't
+# find it) yet VERBATIM-COPYABLE. Two earlier payloads failed the copy bar even
+# under full attention: a random 9-char code (~0.84 baseline; char substitutions)
+# and an UPPERCASE 3-word passphrase (~0.78; the model respells BRAMBLE->BRAMMABLE,
+# drops leading letters). The canonical NIAH secret — a plain multi-digit MAGIC
+# NUMBER — is copied near-perfectly (contiguous digits, in-vocabulary) and is not
+# in the question. So the baseline measures RETENTION, not copy fidelity.
 
 
 def random_code(rng: random.Random) -> str:
-    """Arbitrary, highly-copyable 3-word passphrase, e.g. 'CRIMSON-FALCON-MEADOW'.
-    Arbitrary (not question-relevant) yet copied near-perfectly by the model, so
-    the baseline measures RETENTION, not character-copy fidelity."""
-    return "-".join(rng.sample(_WORDS, 3))
+    """Arbitrary, highly-copyable 7-digit magic number (canonical NIAH secret)."""
+    return str(rng.randint(1000000, 9999999))
 
 
 def _filler(n: int) -> str:
@@ -98,10 +91,10 @@ def build_needle_single(context_tokens: int, depth: float, rng: random.Random):
     after = max(0, total - before)
     section = rng.choice(_SECTIONS)
     code = random_code(rng)
-    needle = f"SECTION {section} ACCESS CODE: {code}"
-    question = (f"\n\nReturn only the exact access code for SECTION {section}. "
-                f"Do not include any other text.")
-    user = (f"The context below contains one hidden access-code record.\n\n"
+    needle = f"The SECTION {section} magic number is {code}"
+    question = (f"\n\nWhat is the SECTION {section} magic number? "
+                f"Reply with only the number and nothing else.")
+    user = (f"The context below contains one hidden magic-number record.\n\n"
             f"{_filler(before)} {needle}. {_filler(after)}{question}")
     return user, code, question, needle
 
@@ -121,12 +114,12 @@ def build_needle_multi(context_tokens: int, depth: float, rng: random.Random):
     for k in order:
         gap = max(1, int((depths[k] - last) * total))
         parts.append(_filler(gap))
-        parts.append(f"SECTION {sections[k]} ACCESS CODE: {codes[k]}.")
+        parts.append(f"The SECTION {sections[k]} magic number is {codes[k]}.")
         last = depths[k]
     parts.append(_filler(max(1, int((1.0 - last) * total))))
-    question = (f"\n\nReturn only the exact access code for SECTION "
-                f"{sections[want]}. Do not include any other text.")
-    needle = f"SECTION {sections[want]} ACCESS CODE: {codes[want]}"
+    question = (f"\n\nWhat is the SECTION {sections[want]} magic number? "
+                f"Reply with only the number and nothing else.")
+    needle = f"The SECTION {sections[want]} magic number is {codes[want]}"
     return " ".join(parts) + question, codes[want], question, needle
 
 
@@ -234,13 +227,6 @@ class Engine:
         recents = recent_block_set(cfg, prompt_len)
         budget_blocks = cfg.attention_budget_tokens // bs
 
-        def blocks_to_token_mask(retained: set):
-            m = torch.zeros(prompt_len, dtype=torch.long)
-            for p in range(prompt_len):
-                if (p // bs) in retained:
-                    m[p] = 1
-            return m
-
         if policy == "full_attention":
             retained = set(range(n_hist_blocks))
         elif policy == "recent_only":
@@ -253,19 +239,63 @@ class Engine:
 
         device = next(self.model.parameters()).device
         input_ids = torch.tensor([ids], device=device)
+        if policy == "full_attention":
+            # Baseline via STANDARD generation — the yardstick must not depend on
+            # the masked decode loop. No masking, no observation.
+            with torch.no_grad():
+                gen = self.model.generate(
+                    input_ids, max_new_tokens=cfg.max_new_tokens,
+                    do_sample=False, pad_token_id=self.tok.eos_token_id)
+            text = self.tok.decode(gen[0, prompt_len:], skip_special_tokens=True)
+            ret = set(range(n_hist_blocks))
+        else:
+            text, ret = self._masked_decode(
+                input_ids, prompt_len, bs, n_hist_blocks, sinks, recents,
+                budget_blocks, retained, observe)
+        hit, reason, norm = match_code(text, expected)
+        other = sorted({m for m in _CODE_RE.findall(text.upper())
+                        if _alnum(m) != _alnum(expected)})
+        return {
+            "task": task, "policy": policy, "context_len": context_len,
+            "depth": depth, "seed": seed, "hit": hit, "match_reason": reason,
+            "needle_retained": needle_retained(needle_block_ids, ret),
+            "prompt_len_tokens": prompt_len,
+            "needle_text": needle_text,
+            "expected_answer": expected,
+            "generated_text": text[:200],
+            "normalized_generated": norm[:120],
+            "expected_in_generated": _alnum(expected) in _alnum(text),
+            "other_code_like": other[:5],
+            "needle_token_span": [span_idx[0], span_idx[-1]] if span_idx else [-1, -1],
+            "needle_block_ids": needle_block_ids,
+            "retained_block_ids": sorted(ret)[:64] + (["..."] if len(ret) > 64 else []),
+            "n_retained_blocks": len(ret), "n_hist_blocks": n_hist_blocks,
+        }
+
+    def _masked_decode(self, input_ids, prompt_len, bs, n_hist_blocks, sinks,
+                       recents, budget_blocks, retained, observe):
+        """Manual greedy decode with per-step historical attention masking.
+        Returns (generated_text, retained_block_set). Observation (when
+        `observe`) captures decode-time attention to score historical blocks."""
+        torch = self.torch
+        cfg = self.cfg
+        device = input_ids.device
+
+        def hist_mask(rset):
+            m = torch.zeros(prompt_len, dtype=torch.long, device=device)
+            for p in range(prompt_len):
+                if (p // bs) in rset:
+                    m[p] = 1
+            return m
+
         block_score = [0.0] * n_hist_blocks
         retained_final = set(retained)
-
         with torch.no_grad():
             out = self.model(input_ids, use_cache=True)
             cache = out.past_key_values
         cached_len = prompt_len
         next_tok = int(out.logits[0, -1].argmax())
         gen_ids = [next_tok]
-
-        def hist_mask_for(rset):
-            return blocks_to_token_mask(rset).to(device)
-
         eos = self.tok.eos_token_id
         for step in range(cfg.max_new_tokens - 1):
             if next_tok == eos:
@@ -273,10 +303,9 @@ class Engine:
             need_attn = observe and (step < cfg.observe_steps
                                      or (cfg.refresh_every > 0
                                          and step % cfg.refresh_every == 0))
-            use_retained = (retained if (observe and step < cfg.observe_steps)
-                            else retained_final)
-            hmask = hist_mask_for(set(range(n_hist_blocks))
-                                  if need_attn else use_retained)
+            use_ret = (retained if (observe and step < cfg.observe_steps)
+                       else retained_final)
+            hmask = hist_mask(set(range(n_hist_blocks)) if need_attn else use_ret)
             gen_part = torch.ones(cached_len - prompt_len + 1,
                                   dtype=torch.long, device=device)
             attn_mask = torch.cat([hmask, gen_part]).unsqueeze(0)
@@ -305,28 +334,9 @@ class Engine:
             gen_ids.append(next_tok)
             if next_tok in self._newline_ids and len(gen_ids) > 1:
                 break
-
         text = self.tok.decode(gen_ids, skip_special_tokens=True)
-        ret = retained_final if observe else retained
-        hit, reason, norm = match_code(text, expected)
-        other = sorted({m for m in _CODE_RE.findall(text.upper())
-                        if _alnum(m) != _alnum(expected)})
-        return {
-            "task": task, "policy": policy, "context_len": context_len,
-            "depth": depth, "seed": seed, "hit": hit, "match_reason": reason,
-            "needle_retained": needle_retained(needle_block_ids, ret),
-            "prompt_len_tokens": prompt_len,
-            "needle_text": needle_text,
-            "expected_answer": expected,
-            "generated_text": text[:200],
-            "normalized_generated": norm[:120],
-            "expected_in_generated": _alnum(expected) in _alnum(text),
-            "other_code_like": other[:5],
-            "needle_token_span": [span_idx[0], span_idx[-1]] if span_idx else [-1, -1],
-            "needle_block_ids": needle_block_ids,
-            "retained_block_ids": sorted(ret)[:64] + (["..."] if len(ret) > 64 else []),
-            "n_retained_blocks": len(ret), "n_hist_blocks": n_hist_blocks,
-        }
+        ret = retained_final if observe else set(retained)
+        return text, ret
 
     MCQ = [
         ("The capital of France is", {"A": "Paris", "B": "Rome",
@@ -517,12 +527,12 @@ def _selftest() -> int:
     assert match_code("The code is Q7M-42X-L9P.", "Q7M-42X-L9P")[:2] == (True, "substring")
     assert match_code("answer: q7m 42x l9p", "Q7M-42X-L9P")[0]   # spaces/case
     assert match_code("ABC-123-XYZ", "Q7M-42X-L9P")[:2] == (False, "none")
-    # builders: 4-tuple, explicit needle, copyable 3-word passphrase present.
+    # builders: 4-tuple, explicit needle, copyable magic number present.
     u, c, q, nd = build_needle_single(2000, 0.3, random.Random(1))
-    assert "ACCESS CODE:" in nd and c in nd and c.count("-") == 2
-    assert "Return only the exact access code" in q
+    assert "magic number" in nd and c in nd and c.isdigit() and len(c) == 7
+    assert "magic number" in q
     um, cm, _q, ndm = build_needle_multi(2000, 0.9, random.Random(2))
-    assert um.count(cm) == 1 and "ACCESS CODE:" in ndm and cm.count("-") == 2
+    assert um.count(cm) == 1 and "magic number" in ndm and cm.isdigit()
     # guard at 0.95.
     assert classify_decision({"full_attention": {"needle_overall": 0.9},
                               "decode_attention_retention": {}}).startswith("INVALID")
