@@ -576,12 +576,19 @@ class ProtectedKINT4Cache:
         if s < 1 or D is None or H_kv is None:
             return [0.0] * max(nb, 0)
         # Reconstruct K_eff (s, H_kv, D) — mirror the kernel exactly.
+        # The protect mask is frozen lazily by kernel_inputs(); scoring runs
+        # BEFORE that on the first decode step, so freeze here if needed.
+        if not self._protect_frozen:
+            self.freeze_protect_mask()
         kiv = unpack_int4(self.k_packed_buf[:s], D).float()          # [-8,7]
         k_dq = kiv * self.k_scale_buf[:s].float()
         if self._asymmetric and self.k_offset_buf is not None:
             k_dq = k_dq + self.k_offset_buf[:s].float()
-        pm = self._protect_mask.bool().unsqueeze(0)                  # (1,H,D)
-        k_eff = torch.where(pm, self.k_fp16_buf[:s].float(), k_dq)   # (s,H,D)
+        if self._protect_mask is not None:
+            pm = self._protect_mask.bool().unsqueeze(0)              # (1,H,D)
+            k_eff = torch.where(pm, self.k_fp16_buf[:s].float(), k_dq)
+        else:
+            k_eff = k_dq                                            # no protection
         # Query -> per-KV-head via GQA mean-pool.
         q = query.reshape(-1, D).float()                            # (H_q, D)
         H_q = q.shape[0]
