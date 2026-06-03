@@ -114,3 +114,36 @@ whether the (now-meaningful) attention savings beat the ~25% overhead:
 Quality must be re-checked at the aggressive setting (more skip = more H2O risk);
 P3 retention quality was perfect at ~20% skip, and the sliding-window proxy was
 GREEN, so it's promising but not yet proven at ~85% skip.
+
+## P4b — AGGRESSIVE skip re-test (RECENT=512 BUDGET=512 SINK=64, ctx8000, ~86% skip)
+
+| | off | retention (~86% skip) |
+|---|---:|---:|
+| quality d0.1/0.5/0.9 | 1.0/1.0/1.0 | **1.0/1.0/1.0** |
+| decode tps | 8.9 | 7.12  (**-20%**, up from -48.7% at ~20% skip) |
+
+**Quality holds at ~86% skip** — the needle survives at every depth even when
+retention drops most of the cache. The H2O risk is retired even at aggressive
+skip (was perfect at ~20% skip; still perfect at ~86%).
+
+**Throughput improved with skip (-48.7% -> -20%) but is still negative.** The
+residual gap is the OBSERVE phase, not the skip: on observe/refresh steps
+(first observe_steps=8 + every refresh_every=16) retention reads the FULL cache
+AND runs full-K torch scoring (~1ms). At max_gen=32 that's ~9 of 32 steps running
+the expensive full+score path -> they dominate the average and eat the savings
+the other ~23 (compacted, fast) steps produce.
+
+### Levers to cross into positive (cheapest first)
+1. **Longer generation** (max_gen 128-256): amortize the fixed observe cost over
+   more fast compacted steps. Cheapest test; likely the biggest single lever at
+   these settings.
+2. **Cheaper / rarer scoring**: larger refresh_every; or KERNEL-EMITTED block
+   scores (the fused kernel already computes softmax p -> sum per block for ~free)
+   to remove the full-K torch reconstruction and the observe-phase full read.
+3. **Longer context** (16k/32k): bigger per-step skip benefit.
+4. v2 in-kernel block-skip to remove the residual host gather.
+
+The algorithm is settled (quality free at high skip); from here it's an
+amortization/kernel-efficiency curve. If longer gen + kernel-emitted scores
+cross to positive -> software per-watt win. If the per-step decision floor still
+dominates after that -> the measured PCAM case.
