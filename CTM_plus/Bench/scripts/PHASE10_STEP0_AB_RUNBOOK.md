@@ -36,8 +36,14 @@
     timing split. This attributes *where* a gap lives (e.g. the observe phase
     eating the savings, or the gather not shrinking). Profiling perturbs timing,
     so it is deliberately **separate** from the `--ab` tps verdict.
+  - `--bf16-ref` (new): vanilla vLLM (no int4/read-skip), same needle + timing →
+    the **absolute scale**. int4 is a density play (slower than bf16 on its own,
+    capstone 0.22–0.54×); read-skip's job is to claw decode tput back toward bf16.
+    Separate engine, so a reference LINE (not a paired delta). The sweep reports
+    `off ×bf16`, `retention ×bf16`, and the gap to the cost-model **~1.9× target**.
 - `phase9_p3_ab_sweep.sh`: runs `--ab` across a context sweep → one markdown
-  report (`PHASE10_STEP0_AB_REPORT.md`), now including the skip fraction.
+  report (`PHASE10_STEP0_AB_REPORT.md`), now including the skip fraction, the
+  bf16 reference row + ×bf16 ratios, and the ~1.9× target gap (`BF16=0` to skip).
 
 CPU-validated here: `python Bench/scripts/phase9_p3_fused_needle.py --selftest`
 covers the pure timing/aggregation math, the section-table + observe/steady split
@@ -107,6 +113,24 @@ scoring) is eating it. If the **observe** total_bypass mean ≫ **steady** → t
 observe phase dominates (Step 1 kernel-emitted scores is the fix). That mapping is
 exactly the Step-1-vs-PCAM decision, now measured per-section.
 
+### bf16 reference (`--bf16-ref`) — the absolute scale (gap #4)
+
+The sweep runs this automatically per context (set `BF16=0` to skip). Manually:
+
+```bash
+cd CTM_plus
+python Bench/scripts/phase9_p3_fused_needle.py --bf16-ref \
+  --context-tokens 16384 --max-model-len 18432 --ab-gen 128 \
+  --seeds 1,2,3 --depths 0.1,0.5,0.9 --repeats 3 --warmup 2 \
+  --out Bench/bench_out/PHASE10_AB/bf16_ctx16384.json
+```
+
+It builds a **vanilla** engine (no int4 manager), so run it as a separate process
+(the sweep does). Caveat: bf16 KV is larger than int4 — at long context you may
+need a lower `--gpu-util` or it can OOM where int4 fit. The report shows
+`off ×bf16` (the density tax, ~0.2–0.5×), `retention ×bf16` (how far read-skip
+claws back), and the gap to the modeled ~1.9× (≈ +90% vs off) target.
+
 ## How to read the result (the decision rule)
 
 1. **Quality is the GATE, checked first.** `retention` hit-rate must equal `off`
@@ -127,14 +151,16 @@ exactly the Step-1-vs-PCAM decision, now measured per-section.
 
 `decode_time_method` (from any JSON): `__________________` (metrics / two_pass)
 
-| context | off tps (m ± s) | retention tps (m ± s) | paired Δ% (m ± s) | verdict | skip frac | obs/steady steps | retention quality |
-|---|---:|---:|---:|---|---:|---:|---|
-| 8000  (control) | ____ ± ____ | ____ ± ____ | ____ ± ____ | WIN/BE/LOSS | ___% | __/__ | ____ |
-| 16384           | ____ ± ____ | ____ ± ____ | ____ ± ____ | WIN/BE/LOSS | ___% | __/__ | ____ |
-| 30720 (~32k)    | ____ ± ____ | ____ ± ____ | ____ ± ____ | WIN/BE/LOSS | ___% | __/__ | ____ |
+| context | off tps (m ± s) | retention tps (m ± s) | bf16 tps (ref) | paired Δ% (m ± s) | verdict | retention ×bf16 | skip frac | obs/steady | retention quality |
+|---|---:|---:|---:|---:|---|---:|---:|---:|---|
+| 8000  (control) | ____ ± ____ | ____ ± ____ | ____ | ____ ± ____ | WIN/BE/LOSS | ___× | ___% | __/__ | ____ |
+| 16384           | ____ ± ____ | ____ ± ____ | ____ | ____ ± ____ | WIN/BE/LOSS | ___× | ___% | __/__ | ____ |
+| 30720 (~32k)    | ____ ± ____ | ____ ± ____ | ____ | ____ ± ____ | WIN/BE/LOSS | ___× | ___% | __/__ | ____ |
 
 - Trend (Δ% vs context): `8k → 16k → 32k = ____ → ____ → ____`  (rising? = prize grows with length)
 - Skip frac trend: `8k → 16k → 32k = ___% → ___% → ___%`  (rising = fixed keep-set is a smaller fraction at length, as predicted)
+- vs bf16: off = ___× bf16 (the density tax); retention = ___× → ___× → ___× bf16 (does read-skip reach/pass the bf16 bar at length?)
+- vs ~1.9× target (≈ +90% Δ vs off): this sweep's best Δ = ____% (gap to target = ____ pts)
 - Quality gate: retention == off at all depths?  **YES / NO**  (NO ⇒ stop, tune budget/observe before any tput claim)
 
 ### Attribution (`--profile-ab`, per-decode-step ms) — paste when diagnosing a gap

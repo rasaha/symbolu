@@ -52,6 +52,10 @@ log "model=$MODEL  skip(SINK=$INT4_READSKIP_SINK RECENT=$INT4_READSKIP_RECENT BU
 log "seeds=$SEEDS depths=$DEPTHS repeats=$REPEATS warmup=$WARMUP gen=$GEN modes=$MODES"
 log "sweep(context:max_model_len)=$SWEEP"
 
+# gap #4: bf16 reference line (separate vanilla engine). On by default; BF16=0 to
+# skip (it doubles model loads, and bf16 KV is larger -> may need a lower GU/ctx).
+BF16="${BF16:-1}"
+
 for pair in $SWEEP; do
   CTX="${pair%%:*}"; MML="${pair##*:}"
   log "ctx=$CTX max_model_len=$MML"
@@ -60,26 +64,37 @@ for pair in $SWEEP; do
     --ab-modes "$MODES" --seeds "$SEEDS" --depths "$DEPTHS" \
     --repeats "$REPEATS" --warmup "$WARMUP" --ab-gen "$GEN" \
     --out "$OUT/ab_ctx${CTX}.json"
+  if [ "$BF16" = "1" ]; then
+    log "ctx=$CTX bf16 reference (vanilla, no int4/read-skip)"
+    python "$PY" --bf16-ref --model "$MODEL" \
+      --context-tokens "$CTX" --max-model-len "$MML" --gpu-util "$GU" \
+      --seeds "$SEEDS" --depths "$DEPTHS" \
+      --repeats "$REPEATS" --warmup "$WARMUP" --ab-gen "$GEN" \
+      --out "$OUT/bf16_ctx${CTX}.json"
+  fi
 done
 
 log "combine -> PHASE10_STEP0_AB_REPORT.md"
 python - "$OUT" "$SWEEP" <<'PY'
 import json, pathlib, sys
 out = pathlib.Path(sys.argv[1]); sweep = sys.argv[2].split()
+TARGET_X = 1.9   # Step-0 cost-model modeled net read-skip speedup vs off (long ctx)
 rows = []
 for pair in sweep:
     ctx = pair.split(":")[0]
     p = out / f"ab_ctx{ctx}.json"
+    bf = out / f"bf16_ctx{ctx}.json"
+    bf16 = json.load(open(bf)) if bf.exists() else None
     if not p.exists():
-        rows.append((ctx, None)); continue
-    rows.append((ctx, json.load(open(p))))
+        rows.append((ctx, None, bf16)); continue
+    rows.append((ctx, json.load(open(p)), bf16))
 L = ["# Phase 10 Step 0 — read-skip length sweep (within-process paired A/B)", "",
      "Hardened yardstick: off vs retention on ONE warm engine, decode-only timing",
      "(prefill excluded), warmup discarded, repeated measurements. The paired delta",
      "per context is within-process, so it is NOT contaminated by the cross-run drift",
      "(10.75->8.9->7.29) that made the original breakeven untrustworthy.", ""]
 any_ok = False
-for ctx, r in rows:
+for ctx, r, bf16 in rows:
     if r is None:
         L.append(f"- ctx={ctx}: MISSING ({out}/ab_ctx{ctx}.json not found)"); continue
     any_ok = True
@@ -92,6 +107,9 @@ for ctx, r in rows:
         pm = r["per_mode"][m]
         L.append(f"| {m} | {pm['tps_mean']:.2f} +/- {pm['tps_std']:.2f} | "
                  f"{pm['hit_rate_by_depth']} |")
+    if bf16:
+        L.append(f"| bf16 (ref) | {bf16['tps_mean']:.2f} +/- {bf16['tps_std']:.2f} | "
+                 f"{bf16['hit_rate_by_depth']} |")
     for m, pv in r.get("paired_vs_baseline", {}).items():
         lo, hi = pv["delta_pct_mean"]-pv["delta_pct_std"], pv["delta_pct_mean"]+pv["delta_pct_std"]
         verdict = ("WIN (beyond spread)" if lo > 0 else
@@ -99,6 +117,19 @@ for ctx, r in rows:
         L += ["", f"**{m} vs {r['baseline']}: {pv['delta_pct_mean']:+.1f}% "
                   f"+/- {pv['delta_pct_std']:.1f}%** over {pv['n_cells']} (seed,depth) "
                   f"cells -> **{verdict}**  (per-cell: {pv['deltas_pct']})"]
+    # gap #4: where do off/retention sit vs the bf16 bar, and vs the modeled target?
+    tgt = (TARGET_X - 1.0) * 100.0
+    base_tps = r["per_mode"][r["baseline"]]["tps_mean"]
+    ret = r["per_mode"].get("retention", {}).get("tps_mean")
+    if bf16 and bf16.get("tps_mean"):
+        b = bf16["tps_mean"]
+        line = f"- vs bf16 ({b:.2f} tps): off={base_tps / b:.2f}x bf16 (the int4 density tax)"
+        if ret:
+            line += f", retention={ret / b:.2f}x bf16 ({ret / b:.0%} of bf16)"
+        L += ["", line]
+    L += ["", f"- cost-model target: read-skip ~{TARGET_X:.1f}x off (paired Δ ≈ "
+              f"+{tgt:.0f}%) at long context; this row's Δ vs that target = "
+              f"{(r['paired_vs_baseline'].get('retention', {}).get('delta_pct_mean', 0)) - tgt:+.0f} pts"]
     sd = r.get("skip_diag") or {}
     if sd.get("steady_steps"):
         L += ["", f"- retention skipped **{sd['steady_skip_frac']:.0%}** in steady state "

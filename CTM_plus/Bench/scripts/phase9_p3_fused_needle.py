@@ -555,6 +555,95 @@ def run_profile_ab(args) -> int:
     return 0
 
 
+# Step-0 cost model's modeled net read-skip speedup vs full-int4 (off) at long
+# context (PHASE9_STEP0_FINDINGS). The paired Δ% target line: (1.9 - 1) * 100.
+COST_MODEL_TARGET_X = 1.9
+
+
+def run_bf16_ref(args) -> int:
+    """bf16 REFERENCE (gap #4): vanilla vLLM — NO int4, NO read-skip — on the same
+    needle, with the same decode-only timing + warmup + repeats. This is the
+    ABSOLUTE scale the off<->retention paired delta sits against: int4_protected is
+    a density play and is SLOWER than bf16 on its own (capstone 0.22-0.54x); the
+    whole point of read-skip is to claw decode throughput back toward (or past)
+    bf16 at long context. Separate process (no manager installed), so it is a
+    reference LINE, not a within-process paired delta — compare with that caveat."""
+    import random
+    from vllm import LLM, SamplingParams
+
+    seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
+    depths = [float(d) for d in args.depths.split(",") if d.strip()]
+    gen = int(args.ab_gen)
+    repeats = max(1, int(args.repeats))
+    warmup = max(1, int(args.warmup))
+
+    # Vanilla engine — deliberately NOT installing the int4 route-A manager.
+    llm = LLM(model=args.model, enforce_eager=True,
+              max_model_len=args.max_model_len,
+              gpu_memory_utilization=args.gpu_util)
+    tok = llm.get_tokenizer()
+    print(f"[bf16] vanilla bf16 reference (no int4/read-skip) seeds={seeds} "
+          f"depths={depths} gen={gen} repeats={repeats} ctx={args.context_tokens} "
+          f"max_model_len={args.max_model_len}", flush=True)
+
+    def _cell_seed(seed, depth):
+        return seed * 10000 + int(round(depth * 1000))
+
+    def _gen(prompt, max_tokens):
+        chat = tok.apply_chat_template(
+            [{"role": "user", "content": prompt}],
+            tokenize=False, add_generation_prompt=True)
+        sp = SamplingParams(temperature=0.0, max_tokens=max_tokens)
+        t0 = time.perf_counter()
+        out = llm.generate([chat], sp, use_tqdm=False)
+        dt = time.perf_counter() - t0
+        o = out[0].outputs[0]
+        return o.text, len(o.token_ids), dt, getattr(out[0], "metrics", None)
+
+    # warmup (discarded) + decode-time-method detection (mirror run_ab).
+    wu, _c, _q, _n = build_needle_single(
+        args.context_tokens, depths[0], random.Random(_cell_seed(seeds[0], depths[0])))
+    last_metrics = None
+    for _ in range(warmup):
+        _t, _nn, _dt, last_metrics = _gen(wu, gen)
+    use_metrics = _decode_time_from_metrics(last_metrics) is not None
+    method = ("metrics:last-first_token_time" if use_metrics
+              else "two_pass:full-minus-prefill")
+    print(f"[bf16] decode-time method = {method} (warmup {warmup} discarded)",
+          flush=True)
+
+    tps_samples, hits = [], {}
+    for seed in seeds:
+        for depth in depths:
+            user, code, _q, _n = build_needle_single(
+                args.context_tokens, depth, random.Random(_cell_seed(seed, depth)))
+            prefill_t = None
+            if not use_metrics:
+                prefill_t = sorted(_gen(user, 1)[2] for _ in range(2))[1]
+            text = None
+            for _r in range(repeats):
+                text, n, dt_full, mtr = _gen(user, gen)
+                ddt = (_decode_time_from_metrics(mtr) if use_metrics
+                       else max(1e-6, dt_full - prefill_t))
+                if ddt and ddt > 0:
+                    tps_samples.append(max(1, n - 1) / ddt)
+            hits.setdefault(f"{depth:.2f}", []).append(int(match_code(text, code)[0]))
+
+    mean, std = _mean_std(tps_samples)
+    report = {"kind": "bf16_ref", "model": args.model, "context_tokens": args.context_tokens,
+              "gen": gen, "repeats": repeats, "warmup_discarded": warmup,
+              "seeds": seeds, "depths": depths, "max_model_len": args.max_model_len,
+              "decode_time_method": method, "tps_mean": round(mean, 3),
+              "tps_std": round(std, 3), "n_samples": len(tps_samples),
+              "hit_rate_by_depth": {d: round(sum(v) / len(v), 3)
+                                    for d, v in sorted(hits.items())}}
+    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out).write_text(json.dumps(report, indent=2))
+    print(f"[bf16] decode tps = {mean:.2f} +/- {std:.2f} (n={len(tps_samples)})  "
+          f"quality={report['hit_rate_by_depth']}  wrote {args.out}", flush=True)
+    return 0
+
+
 def _selftest() -> int:
     import random
     u, c, q, n = build_needle_single(2000, 0.5, random.Random(1))
@@ -700,11 +789,17 @@ def main(argv=None) -> int:
                          "cost by section (+ observe/steady split + skip fraction) "
                          "in one process, to attribute WHERE a gap is. SEPARATE "
                          "from --ab because profiling perturbs the tps timing.")
+    ap.add_argument("--bf16-ref", action="store_true",
+                    help="bf16 reference (gap #4): vanilla vLLM, no int4/read-skip, "
+                         "same needle + decode-only timing. The absolute scale the "
+                         "off<->retention paired delta sits against (separate engine).")
     args = ap.parse_args(argv)
     if args.selftest:
         return _selftest()
     if args.profile_ab:
         return run_profile_ab(args)
+    if args.bf16_ref:
+        return run_bf16_ref(args)
     if args.ab:
         return run_ab(args)
     return run(args)
