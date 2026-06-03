@@ -196,6 +196,11 @@ def run_cell(args) -> int:
               flush=True)
 
     tps = (decode_tokens_total / decode_time_total) if decode_time_total else 0.0
+    n_items = sum(v["items"] for v in per_depth.values()) or 1
+    mean_gen = decode_tokens_total / n_items
+    # A working baseline answers with a few tokens; ~1 token/gen means the model
+    # emitted ~nothing (degenerate) -> hit rates are meaningless for this cell.
+    degenerate = mean_gen < 3.0
     result = {
         "model": args.model,
         "requested_sliding_window": sw,
@@ -205,8 +210,17 @@ def run_cell(args) -> int:
         "max_model_len": args.max_model_len,
         "decode_tps": round(tps, 2),
         "decode_tokens": decode_tokens_total,
+        "mean_gen_tokens": round(mean_gen, 2),
+        "degenerate_baseline": degenerate,
         "per_depth_hit_rate": per_depth,
     }
+    if degenerate:
+        print(f"[proxy] WARNING: mean_gen_tokens={mean_gen:.2f} (<3) — this cell is "
+              "DEGENERATE (model emitted ~nothing). Hit rates are meaningless; the "
+              "context is likely out-of-distribution for this model's attention "
+              "(e.g. full attention beyond a sliding-window model's training "
+              "length). Lower --context-tokens into the model's viable band.",
+              flush=True)
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2))

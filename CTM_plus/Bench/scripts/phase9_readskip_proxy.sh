@@ -11,9 +11,14 @@ REPO_ROOT="${REPO_ROOT:-$PWD}"; cd "$REPO_ROOT"
 OUT_ROOT="${OUT_ROOT:-./Bench/bench_out/PHASE9_READSKIP_PROXY}"
 mkdir -p "$OUT_ROOT"
 
+# Defaults sit in Mistral-v0.1's VIABLE BAND: it was trained with a 4096 window,
+# so full attention (the OFF baseline) only works in-distribution up to ~its
+# training length. context=4000 keeps OFF valid; window=1024 < context leaves a
+# skippable middle (depths 0.10/0.50 outside the window, 0.80/0.95 inside).
+# A 16k context made OFF degenerate (emitted ~1 token) -> cliff unmeasurable.
 MODEL="${MODEL:-mistralai/Mistral-7B-Instruct-v0.1}"   # native sliding_window=4096
-WINDOW="${WINDOW:-4096}"
-CONTEXT_TOKENS="${CONTEXT_TOKENS:-16000}"
+WINDOW="${WINDOW:-1024}"
+CONTEXT_TOKENS="${CONTEXT_TOKENS:-4000}"
 DEPTHS="${DEPTHS:-0.1,0.5,0.8,0.95}"
 ITEMS="${ITEMS:-4}"
 MAX_GEN="${MAX_GEN:-32}"
@@ -59,8 +64,14 @@ L = ["# Phase 9 — read-skip proxy (sliding-window) report", "",
 if off['decode_tps']:
     g = (on['decode_tps']-off['decode_tps'])/off['decode_tps']*100
     L.append(f"- **delta = {g:+.1f}%**  (>0 => read-skip is faster at this context)")
-L += ["", "## (2) QUALITY — the H2O cliff (hit rate by needle depth)",
-      "| depth | ON inside-window? | ON hit | OFF hit |", "|---|---|---:|---:|"]
+L += ["", "## (2) QUALITY — the H2O cliff (hit rate by needle depth)"]
+if off.get("degenerate_baseline") or on.get("degenerate_baseline"):
+    L += [f"⚠ DEGENERATE CELL(s): mean_gen_tokens ON={on.get('mean_gen_tokens')} "
+          f"OFF={off.get('mean_gen_tokens')} (<3 = model emitted ~nothing). The "
+          "quality table below is INVALID — lower CONTEXT_TOKENS into the model's "
+          "viable band (full attention must work for the OFF baseline). The "
+          "THROUGHPUT number above is still valid.", ""]
+L += ["| depth | ON inside-window? | ON hit | OFF hit |", "|---|---|---:|---:|"]
 for d in on['per_depth_hit_rate']:
     o = on['per_depth_hit_rate'][d]; f = off['per_depth_hit_rate'].get(d, {})
     L.append(f"| {d} | {o.get('needle_inside_window')} | {o['hit_rate']} | {f.get('hit_rate')} |")
