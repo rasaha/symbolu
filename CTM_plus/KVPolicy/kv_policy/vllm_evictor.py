@@ -1631,11 +1631,27 @@ class AttentionAggregator:
         :meth:`forward_block_attention` and clear the buffer.
 
         Returns the number of blocks flushed.
+
+        Concurrency: the flusher runs as a separate asyncio task while
+        the capture hook calls :meth:`record_block_attention` from
+        vLLM's model-execution path (a different thread). Iterating
+        ``self._buffer`` directly therefore raced — "dictionary changed
+        size during iteration" (seen on the Day-5b bridge run). We
+        detach the current buffer with a single atomic rebind so
+        concurrent ``record_*`` calls populate a FRESH dict while we
+        iterate the snapshot; nothing is lost (late samples flush next
+        interval) and the iteration can no longer see a size change.
         """
-        if not self._buffer:
+        # ``pending = self._buffer; self._buffer = {}`` — the rebind is a
+        # single STORE_ATTR in CPython, so a concurrent record_* either
+        # sees the old dict (its sample lands in ``pending``, still
+        # flushed below) or the new one (flushed next interval).
+        pending = self._buffer
+        if not pending:
             return 0
+        self._buffer = {}
         flushed = 0
-        for block_id, entry in self._buffer.items():
+        for block_id, entry in pending.items():
             try:
                 evictor.forward_block_attention(
                     block_id=block_id,
@@ -1646,7 +1662,6 @@ class AttentionAggregator:
                 # Best-effort: a stale block_id (e.g. evicted between
                 # capture and flush) shouldn't kill the run.
                 continue
-        self._buffer.clear()
         self._stats["blocks_flushed"] += flushed
         self._stats["flushes"] += 1
         return flushed
