@@ -410,6 +410,25 @@ class INT4CacheKVRouteA:
             cache.reset()
         getattr(self, "_readskip_controllers", {}).clear()
 
+    def set_readskip_mode(self, mode: str) -> None:
+        """Switch the read-skip mode at RUNTIME and clear per-sequence controllers.
+
+        Enables a WITHIN-PROCESS paired A/B (e.g. off vs retention on a single
+        warm engine), which removes the cross-run GPU-clock/warmup drift that made
+        separate-process comparisons noisy in Phase 9 (off drifted 10.75 -> 8.9 ->
+        7.29 across processes). The retention KNOBS (sink/recent/budget/observe/
+        refresh/decay) are fixed at ``__init__`` from the env — this only flips
+        WHICH policy runs, never the policy's parameters. Clearing the controllers
+        makes the next sequence re-observe from scratch (no stale EMA bleeding from
+        the previously-measured mode).
+        """
+        valid = ("off", "retain_all", "retention")
+        if mode not in valid:
+            raise ValueError(
+                f"unknown read-skip mode {mode!r}; expected one of {valid}")
+        self._readskip_mode = mode
+        getattr(self, "_readskip_controllers", {}).clear()
+
     def _record_fused_v2_fallback(self, reason: str) -> None:
         self._fused_v2_fallbacks[reason] = (
             self._fused_v2_fallbacks.get(reason, 0) + 1
