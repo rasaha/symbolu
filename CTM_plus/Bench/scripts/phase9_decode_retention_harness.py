@@ -46,6 +46,7 @@ class Config:
     model: str = "Qwen/Qwen2.5-7B-Instruct"
     dtype: str = "bfloat16"
     device: str = "cuda"
+    attn_impl: str = "eager"          # eager required for decode-attn observation
     block_size: int = 32
     sink_tokens: int = 256
     recent_tokens: int = 2048
@@ -63,19 +64,23 @@ BASELINE_MIN = 0.95           # full_attention needle floor below which = INVALI
 
 # ------------------------------------------------------- synthetic tasks ------
 
-_SECTIONS = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF"]
-# The payload must be ARBITRARY (not question-relevant, so prefill cosine can't
-# find it) yet VERBATIM-COPYABLE. Two earlier payloads failed the copy bar even
-# under full attention: a random 9-char code (~0.84 baseline; char substitutions)
-# and an UPPERCASE 3-word passphrase (~0.78; the model respells BRAMBLE->BRAMMABLE,
-# drops leading letters). The canonical NIAH secret — a plain multi-digit MAGIC
-# NUMBER — is copied near-perfectly (contiguous digits, in-vocabulary) and is not
-# in the question. So the baseline measures RETENTION, not copy fidelity.
+_SECTIONS = ["NORTH", "SOUTH", "EAST", "WEST", "CENTRAL", "HARBOR", "SUMMIT"]
+# Payload: a structured RECORD with an ACCESS_CODE of distinct NATO phonetic
+# words. Arbitrary (not in the question) and highly copyable (NATO words are
+# short, in-vocabulary, unambiguous — unlike random digits which the model
+# digit-fuzzes, or uppercase compounds which it respells). The RECORD delimiters
+# help the model locate the field. Sections use a DISJOINT word set (compass/
+# place) so the code words can't be confused with the section name.
+_NATO = ["ALFA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF",
+         "HOTEL", "INDIA", "JULIET", "KILO", "LIMA", "MIKE", "NOVEMBER",
+         "OSCAR", "PAPA", "QUEBEC", "ROMEO", "SIERRA", "TANGO", "UNIFORM",
+         "VICTOR", "WHISKEY", "XRAY", "YANKEE", "ZULU"]
 
 
 def random_code(rng: random.Random) -> str:
-    """Arbitrary, highly-copyable 7-digit magic number (canonical NIAH secret)."""
-    return str(rng.randint(1000000, 9999999))
+    """Arbitrary, highly-copyable ACCESS_CODE = 3 distinct NATO words,
+    e.g. 'KILO-ROMEO-VICTOR'."""
+    return "-".join(rng.sample(_NATO, 3))
 
 
 # NUMBER-FREE filler. The earlier 'Log entry {i}: ...' filler injected ~450
@@ -124,11 +129,12 @@ def build_needle_single(context_tokens: int, depth: float, rng: random.Random):
     after = max(0, total - before)
     section = rng.choice(_SECTIONS)
     code = random_code(rng)
-    needle = f"The SECTION {section} magic number is {code}"
-    question = (f"\n\nWhat is the SECTION {section} magic number? "
-                f"Reply with only the number and nothing else.")
-    user = (f"The context below contains one hidden magic-number record.\n\n"
-            f"{_filler(before)} {needle}. {_filler(after)}{question}")
+    needle = (f"<<< RECORD_START >>> SECTION: {section} "
+              f"ACCESS_CODE: {code} <<< RECORD_END >>>")
+    question = (f"\n\nReturn only the exact ACCESS_CODE for SECTION {section}. "
+                f"No explanation.")
+    user = (f"The context below contains one hidden access-code record.\n\n"
+            f"{_filler(before)} {needle} {_filler(after)}{question}")
     return user, code, question, needle
 
 
@@ -147,12 +153,14 @@ def build_needle_multi(context_tokens: int, depth: float, rng: random.Random):
     for k in order:
         gap = max(1, int((depths[k] - last) * total))
         parts.append(_filler(gap))
-        parts.append(f"The SECTION {sections[k]} magic number is {codes[k]}.")
+        parts.append(f"<<< RECORD_START >>> SECTION: {sections[k]} "
+                     f"ACCESS_CODE: {codes[k]} <<< RECORD_END >>>")
         last = depths[k]
     parts.append(_filler(max(1, int((1.0 - last) * total))))
-    question = (f"\n\nWhat is the SECTION {sections[want]} magic number? "
-                f"Reply with only the number and nothing else.")
-    needle = f"The SECTION {sections[want]} magic number is {codes[want]}"
+    question = (f"\n\nReturn only the exact ACCESS_CODE for SECTION "
+                f"{sections[want]}. No explanation.")
+    needle = (f"<<< RECORD_START >>> SECTION: {sections[want]} "
+              f"ACCESS_CODE: {codes[want]} <<< RECORD_END >>>")
     return " ".join(parts) + question, codes[want], question, needle
 
 
@@ -228,11 +236,22 @@ class Engine:
         dt = {"bfloat16": torch.bfloat16, "float16": torch.float16,
               "float32": torch.float32}[cfg.dtype]
         self.model = AutoModelForCausalLM.from_pretrained(
-            cfg.model, torch_dtype=dt, attn_implementation="eager",
+            cfg.model, torch_dtype=dt, attn_implementation=cfg.attn_impl,
             device_map=cfg.device)
         self.model.eval()
         self._newline_ids = {i for i in
                              (self.tok.encode("\n", add_special_tokens=False) or [])}
+        from transformers import GenerationConfig
+        # Clean greedy config — overrides Qwen's sampling defaults (the
+        # temperature/top_p/top_k warnings) and sets the stop token explicitly so
+        # generation can't run on into a new chat turn.
+        self._gc = GenerationConfig(
+            do_sample=False, num_beams=1, temperature=None, top_p=None, top_k=None,
+            max_new_tokens=cfg.max_new_tokens,
+            eos_token_id=self.tok.eos_token_id,
+            pad_token_id=(self.tok.pad_token_id
+                          if self.tok.pad_token_id is not None
+                          else self.tok.eos_token_id))
 
     def _encode(self, user_content: str, expected: str):
         chat = self.tok.apply_chat_template(
@@ -274,17 +293,18 @@ class Engine:
         input_ids = torch.tensor([ids], device=device)
         if policy == "full_attention":
             # Baseline via STANDARD generation — the yardstick must not depend on
-            # the masked decode loop. No masking, no observation.
+            # the masked decode loop. Explicit attention_mask + clean greedy cfg.
+            attn = torch.ones_like(input_ids)
             with torch.no_grad():
-                gen = self.model.generate(
-                    input_ids, max_new_tokens=cfg.max_new_tokens,
-                    do_sample=False, pad_token_id=self.tok.eos_token_id)
+                gen = self.model.generate(input_ids, attention_mask=attn,
+                                          generation_config=self._gc)
             text = self.tok.decode(gen[0, prompt_len:], skip_special_tokens=True)
             ret = set(range(n_hist_blocks))
         else:
             text, ret = self._masked_decode(
                 input_ids, prompt_len, bs, n_hist_blocks, sinks, recents,
                 budget_blocks, retained, observe)
+        text = text.split("\n")[0].strip()       # stop at first newline (no run-on)
         hit, reason, norm = match_code(text, expected)
         other = sorted({m for m in _CODE_RE.findall(text.upper())
                         if _alnum(m) != _alnum(expected)})
@@ -348,7 +368,7 @@ class Engine:
                                  use_cache=True, output_attentions=need_attn)
             cache = out.past_key_values
             cached_len += 1
-            if need_attn:
+            if need_attn and getattr(out, "attentions", None):
                 new = [0.0] * n_hist_blocks
                 for layer_attn in out.attentions:
                     a = layer_attn[0, :, -1, :prompt_len].float().sum(0)
@@ -499,44 +519,53 @@ def run_harness(cfg, context_lens, depths, seeds, tasks, policies=POLICIES):
             "decision": decision}
 
 
-def run_calibration(cfg, depths, seeds, context_len) -> dict:
-    """full_attention ONLY, many seeds — stabilise + dump every failing case."""
+def run_calibration(cfg, depths, seeds, context_lens) -> dict:
+    """full_attention ONLY — preflight SANITY suite across context lengths to
+    localise the failure (short ctx ~perfect but long ctx low => attention/length;
+    short ctx also low => generation/tokenization). Dumps every failing case."""
     eng = Engine(cfg)
-    results, fails = [], []
-    for depth in depths:
-        for seed in range(seeds):
-            rng = random.Random(hash(("cal", context_len, depth, seed)) & 0xffffffff)
-            user, code, _q, needle = build_needle_single(context_len, depth, rng)
-            r = eng.run_case("full_attention", user, code, needle,
-                             "needle_random_code", context_len, depth, seed)
-            results.append(r)
-            if not r["hit"]:
-                fails.append(r)
-    hit = sum(r["hit"] for r in results)
-    rate = round(hit / len(results), 3)
+    per_ctx, all_results = {}, []
+    for context_len in context_lens:
+        results, fails = [], []
+        for depth in depths:
+            for seed in range(seeds):
+                rng = random.Random(hash(("cal", context_len, depth, seed)) & 0xffffffff)
+                user, code, _q, needle = build_needle_single(context_len, depth, rng)
+                r = eng.run_case("full_attention", user, code, needle,
+                                 "needle_random_code", context_len, depth, seed)
+                results.append(r); all_results.append(r)
+                if not r["hit"]:
+                    fails.append(r)
+        hit = sum(r["hit"] for r in results)
+        rate = round(hit / len(results), 3)
+        per_ctx[context_len] = rate
+        print("\n" + "=" * 70)
+        print(f"BASELINE — full_attention @ ctx{context_len} (attn={cfg.attn_impl})")
+        print(f"  hit rate: {hit}/{len(results)} = {rate}  (floor {BASELINE_MIN})")
+        print("=" * 70)
+        for r in fails[:12]:
+            print(f"  d={r['depth']} s={r['seed']} plen={r['prompt_len_tokens']} "
+                  f"exp={r['expected_answer']!r} got={r['generated_text']!r} "
+                  f"reason={r['match_reason']}")
+        if len(fails) > 12:
+            print(f"  ... +{len(fails) - 12} more fails")
     print("\n" + "=" * 70)
-    print(f"BASELINE CALIBRATION — full_attention @ ctx{context_len}")
-    print(f"  needle hit rate: {hit}/{len(results)} = {rate}  "
-          f"(floor for valid eval: {BASELINE_MIN})")
-    print("=" * 70)
-    if fails:
-        print(f"\n{len(fails)} FAILING CASES (verbose):")
-        for r in fails:
-            print(f"\n  depth={r['depth']} seed={r['seed']} "
-                  f"prompt_len={r['prompt_len_tokens']} reason={r['match_reason']}")
-            print(f"    needle   : {r['needle_text']}")
-            print(f"    expected : {r['expected_answer']}")
-            print(f"    generated: {r['generated_text']!r}")
-            print(f"    normalized: {r['normalized_generated']!r}  "
-                  f"expected_in_generated={r['expected_in_generated']}  "
-                  f"other_codes={r['other_code_like']}")
-    verdict = ("BASELINE OK — proceed to evaluate retention." if rate >= BASELINE_MIN
-               else f"BASELINE TOO LOW ({rate} < {BASELINE_MIN}) — fix prompt/"
-               "matching/gen before judging retention.")
-    print("\n" + verdict)
-    return {"mode": "calibration", "context_len": context_len, "rate": rate,
-            "config": dataclasses.asdict(cfg), "results": results,
-            "verdict": verdict}
+    print("PREFLIGHT SUMMARY (full_attention hit rate by context length):")
+    for c in context_lens:
+        print(f"  ctx{c}: {per_ctx[c]}")
+    big = max(context_lens)
+    ok = per_ctx[big] >= BASELINE_MIN
+    verdict = (f"BASELINE OK @ ctx{big} ({per_ctx[big]}) — proceed to retention."
+               if ok else
+               f"BASELINE TOO LOW @ ctx{big} ({per_ctx[big]} < {BASELINE_MIN}). "
+               "If short ctx is high and it decays with length -> attention/length "
+               "(try --attn-impl sdpa); if short ctx is also low -> generation/"
+               "tokenization. If unfixable, switch to a validated long-context "
+               "benchmark.")
+    print(verdict)
+    return {"mode": "calibration", "attn_impl": cfg.attn_impl,
+            "rate_by_ctx": per_ctx, "config": dataclasses.asdict(cfg),
+            "results": all_results, "verdict": verdict}
 
 # ---------------------------------------------------------------- selftest ----
 
@@ -560,12 +589,12 @@ def _selftest() -> int:
     assert match_code("The code is Q7M-42X-L9P.", "Q7M-42X-L9P")[:2] == (True, "substring")
     assert match_code("answer: q7m 42x l9p", "Q7M-42X-L9P")[0]   # spaces/case
     assert match_code("ABC-123-XYZ", "Q7M-42X-L9P")[:2] == (False, "none")
-    # builders: 4-tuple, explicit needle, copyable magic number present.
+    # builders: 4-tuple, structured RECORD needle, copyable NATO ACCESS_CODE.
     u, c, q, nd = build_needle_single(2000, 0.3, random.Random(1))
-    assert "magic number" in nd and c in nd and c.isdigit() and len(c) == 7
-    assert "magic number" in q
+    assert "ACCESS_CODE:" in nd and c in nd and c.count("-") == 2
+    assert "Return only the exact ACCESS_CODE" in q
     um, cm, _q, ndm = build_needle_multi(2000, 0.9, random.Random(2))
-    assert um.count(cm) == 1 and "magic number" in ndm and cm.isdigit()
+    assert um.count(cm) == 1 and "ACCESS_CODE:" in ndm and cm.count("-") == 2
     # guard at 0.95.
     assert classify_decision({"full_attention": {"needle_overall": 0.9},
                               "decode_attention_retention": {}}).startswith("INVALID")
@@ -582,6 +611,7 @@ def _selftest() -> int:
 
 def _cfg(a) -> Config:
     return Config(model=a.model, dtype=a.dtype, device=a.device,
+                  attn_impl=a.attn_impl,
                   block_size=a.block_size, sink_tokens=a.sink_tokens,
                   recent_tokens=a.recent_tokens, observe_steps=a.observe_steps,
                   attention_budget_tokens=a.attention_budget_tokens,
@@ -595,6 +625,10 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     ap.add_argument("--dtype", default="bfloat16")
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--attn-impl", default="eager",
+                    choices=["eager", "sdpa", "flash_attention_2"],
+                    help="eager needed for retention's decode-attn observation; "
+                         "use sdpa to test if eager degrades the baseline")
     ap.add_argument("--block-size", type=int, default=32)
     ap.add_argument("--sink-tokens", type=int, default=256)
     ap.add_argument("--recent-tokens", type=int, default=2048)
@@ -621,8 +655,8 @@ def main(argv=None) -> int:
     cfg = _cfg(a)
     depths = [float(x) for x in a.depths.split(",") if x.strip()]
     if a.calibrate:
-        out = run_calibration(cfg, depths, a.calibrate_seeds,
-                              int(a.context_lens.split(",")[0]))
+        ctx = [int(x) for x in a.context_lens.split(",") if x.strip()]
+        out = run_calibration(cfg, depths, a.calibrate_seeds, ctx)
     else:
         if a.smoke:
             ctx, depths, seeds, tasks = [4096], [0.10, 0.50, 0.90], 2, \
