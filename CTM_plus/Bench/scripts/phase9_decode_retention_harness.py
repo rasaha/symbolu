@@ -64,19 +64,25 @@ BASELINE_MIN = 0.95           # full_attention needle floor below which = INVALI
 # ------------------------------------------------------- synthetic tasks ------
 
 _SECTIONS = ["ALPHA", "BRAVO", "CHARLIE", "DELTA", "ECHO", "FOXTROT", "GOLF"]
-# Unambiguous code charset: no 0/O/1/I/L (the leading-0 drop was the baseline's
-# one failure at smoke). The needle is an arbitrary code either way; using a
-# copy-reliable alphabet measures RETENTION, not the model's robustness to
-# confusable characters.
-_CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+# The payload must be ARBITRARY (so it isn't question-relevant -> prefill cosine
+# can't find it) yet HIGHLY COPYABLE. A random 9-char code is NOT copyable: a 7B
+# model mis-transcribes ~1 char in 6 even under full attention (calibration found
+# 0.84), capping the baseline below the 0.95 floor and testing copy-fidelity, not
+# retention. Real words are in-vocabulary and copied near-perfectly, so a 3-word
+# passphrase keeps the payload arbitrary while making full attention near-perfect.
+_WORDS = ["CRIMSON", "FALCON", "MEADOW", "GRANITE", "VELVET", "HARBOR", "COBALT",
+          "EMBER", "WILLOW", "CIPHER", "LUNAR", "NOMAD", "QUARTZ", "RAVEN",
+          "SAFFRON", "TUNDRA", "ZEPHYR", "ONYX", "MARBLE", "CEDAR", "THORN",
+          "GLACIER", "COMET", "BASIL", "INDIGO", "WALNUT", "SIERRA", "MONSOON",
+          "PEWTER", "BRAMBLE", "FJORD", "LICHEN", "KESTREL", "OBSIDIAN",
+          "CINDER", "JUNIPER"]
 
 
 def random_code(rng: random.Random) -> str:
-    """Hyphenated random code, e.g. 'Q7M-42X-L9P' — NOT semantically related to
-    the question (the whole point: prefill relevance cannot find it)."""
-    def seg(n):
-        return "".join(rng.choice(_CODE_CHARS) for _ in range(n))
-    return f"{seg(3)}-{seg(3)}-{seg(3)}"
+    """Arbitrary, highly-copyable 3-word passphrase, e.g. 'CRIMSON-FALCON-MEADOW'.
+    Arbitrary (not question-relevant) yet copied near-perfectly by the model, so
+    the baseline measures RETENTION, not character-copy fidelity."""
+    return "-".join(rng.sample(_WORDS, 3))
 
 
 def _filler(n: int) -> str:
@@ -511,12 +517,12 @@ def _selftest() -> int:
     assert match_code("The code is Q7M-42X-L9P.", "Q7M-42X-L9P")[:2] == (True, "substring")
     assert match_code("answer: q7m 42x l9p", "Q7M-42X-L9P")[0]   # spaces/case
     assert match_code("ABC-123-XYZ", "Q7M-42X-L9P")[:2] == (False, "none")
-    # builders: 4-tuple, explicit needle, code present + unique.
+    # builders: 4-tuple, explicit needle, copyable 3-word passphrase present.
     u, c, q, nd = build_needle_single(2000, 0.3, random.Random(1))
-    assert "ACCESS CODE:" in nd and f"{c}" in nd and _CODE_RE.search(c)
+    assert "ACCESS CODE:" in nd and c in nd and c.count("-") == 2
     assert "Return only the exact access code" in q
     um, cm, _q, ndm = build_needle_multi(2000, 0.9, random.Random(2))
-    assert um.count(cm) == 1 and "ACCESS CODE:" in ndm
+    assert um.count(cm) == 1 and "ACCESS CODE:" in ndm and cm.count("-") == 2
     # guard at 0.95.
     assert classify_decision({"full_attention": {"needle_overall": 0.9},
                               "decode_attention_retention": {}}).startswith("INVALID")
