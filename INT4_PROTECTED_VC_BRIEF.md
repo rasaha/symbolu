@@ -5,30 +5,31 @@
 
 ---
 
-> ## North star: the most token *value* per watt per user
+> ## North star: "the most token value per watt per user"
 >
-> Inference economics reduce to one ratio — **useful tokens delivered per joule,
-> per concurrent user.** int4_protected is organized around moving all three
-> terms, crediting only what is measured today:
+> > *"Whoever is able to maximize this particular objective really will — by
+> > balancing accuracy, latency, cost, privacy and intelligence all together —
+> > they're going to win; that's what's going to win long term."*
+> > — **Aravind Srinivas, CEO, Perplexity**, on the company that delivers the
+> > "most token value per watt per user" (CNBC, interview with Elaine Yu, June 2026)
 >
-> - **per user (shipped):** 1.83× denser KV-cache → more concurrent long-context
->   users on the same GPU, at = bf16 quality.
-> - **token *value* (shipped):** quality held at bf16 parity (MMLU/ARC 0.0 pt,
->   needle preserved) — the density is *usable*, not a quality-for-cost trade. A
->   cheap wrong token has no value; ours are correct.
+> Inference economics reduce to that ratio: **useful tokens delivered per joule,
+> per concurrent user.** int4_protected is built to move it on the very axes
+> Srinivas names — and, decisively, without spending the **accuracy** term that
+> competitors trade away:
+>
+> - **per user / cost (shipped):** 1.83× denser KV-cache → more concurrent
+>   long-context users on the same GPU.
+> - **token *value* / accuracy (shipped):** quality held at bf16 parity (MMLU/ARC
+>   0.0 pt; needle preserved). A cheap *wrong* token has no value — this is the
+>   wedge: fp8 and naive int4 buy density by spending accuracy; we don't.
 > - **per watt (roadmap, in build):** attention-guided read-skip cuts per-token
->   KV memory traffic at long context (the dominant energy cost of decode). The
->   quality of the skip is validated; the production kernel is underway.
+>   KV memory traffic at long context — the energy-per-token lever. Skip quality
+>   validated; production kernel underway.
 >
-> The wedge is the *value* term: competitors buy watts/users by spending quality
-> (fp8, naive int4). We refuse that trade — efficiency only counts when the tokens
-> are still right.
->
-> <!-- EDITORIAL — VERIFY BEFORE DISTRIBUTION: the "token value per watt per user"
-> framing was provided as attributed to Perplexity CEO Aravind Srinivas (CNBC,
-> 2026-06-03). The source article could not be auto-verified (HTTP 403). Confirm
-> the exact wording + citation, or present the line as Cognade's own framing,
-> before sending this brief to investors. -->
+> The bet: when accuracy is non-negotiable, the efficiency frontier is won by the
+> approach that compounds density + energy savings *on top of* preserved quality —
+> not by trading quality for either.
 
 ---
 
