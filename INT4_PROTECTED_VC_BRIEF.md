@@ -23,9 +23,14 @@
 > - **token *value* / accuracy (shipped):** quality held at bf16 parity (MMLU/ARC
 >   0.0 pt; needle preserved). A cheap *wrong* token has no value — this is the
 >   wedge: fp8 and naive int4 buy density by spending accuracy; we don't.
-> - **per watt (roadmap, in build):** attention-guided read-skip cuts per-token
->   KV memory traffic at long context — the energy-per-token lever. Skip quality
->   validated; production kernel underway.
+> - **per watt (early-validated, in build):** attention-guided read-skip cuts
+>   per-token KV-read traffic at long context — the energy-per-token lever. On the
+>   **production fused kernel**, measured: **quality preserved to ~86% skip**
+>   (needle 1.0 at every depth; byte-eq verified) and **decode throughput at
+>   breakeven** vs full int4 (up from 2× slower as the implementation entered the
+>   right regime), with a clear kernel-optimization path (kernel-emitted scores,
+>   longer context) toward the ~1.9× the cost model predicts. The gains are
+>   software-capturable — not a hardware mandate.
 >
 > The bet: when accuracy is non-negotiable, the efficiency frontier is won by the
 > approach that compounds density + energy savings *on top of* preserved quality —
