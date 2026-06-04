@@ -297,6 +297,12 @@ class INT4CacheKVRouteA:
             self._readskip_decay = float(os.environ.get("INT4_READSKIP_DECAY", 0.8))
         except ValueError:
             self._readskip_decay = 0.8
+        # Step 1: emit observe-step block scores from the fused Triton kernel
+        # instead of reconstructing the whole K in eager torch (the Phase-10
+        # bottleneck). Opt-in via INT4_READSKIP_KERNEL_SCORES=1.
+        self._readskip_kernel_scores = (
+            os.environ.get("INT4_READSKIP_KERNEL_SCORES", "0")
+            not in ("0", "", "false", "False", "no"))
         self._readskip_controllers: Dict[int, Any] = {}
         # Read-skip diagnostics (cumulative across the process; reset with
         # clear_readskip_stats() — e.g. after warmup). Answer the "evaluate gaps"
@@ -346,7 +352,8 @@ class INT4CacheKVRouteA:
             if was_observe and query is not None:
                 try:
                     scores = cache.block_attention_scores(
-                        query, self._readskip_block_size)
+                        query, self._readskip_block_size,
+                        use_kernel=self._readskip_kernel_scores)
                 except Exception:  # noqa: BLE001 — fail-open: read all this step
                     logger.exception(
                         "read-skip block scoring failed; reading all this step")
@@ -429,6 +436,7 @@ class INT4CacheKVRouteA:
             "readskip_mode": getattr(self, "_readskip_mode", "off"),
             "readskip_calls": getattr(self, "_readskip_calls", 0),
             "readskip_controllers": len(getattr(self, "_readskip_controllers", {})),
+            "readskip_kernel_scores": getattr(self, "_readskip_kernel_scores", False),
             # Diagnostics: how much retention ACTUALLY skipped + the observe/steady
             # step split (the gap-attribution the tps headline can't show).
             "readskip_observe_steps": getattr(self, "_readskip_observe_steps", 0),

@@ -48,12 +48,15 @@ fused kernel — i.e. the kernel's GPU-validated input shapes.
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 try:
     import torch  # type: ignore
 except ImportError:  # pragma: no cover - guarded at caller
     torch = None  # type: ignore
+
+logger = logging.getLogger("int4_protected_k_cache")
 
 
 class ProtectedKINT4Cache:
@@ -559,13 +562,20 @@ class ProtectedKINT4Cache:
             "v_offset": v_offset,
         }
 
-    def block_attention_scores(self, query, block_size: int) -> list:
+    def block_attention_scores(self, query, block_size: int,
+                               use_kernel: bool = False) -> list:
         """READ-SKIP scoring: per-block decode-attention mass from `query` to the
         stored K, reconstructed EXACTLY as the fused kernel does
         (kiv*scale(+offset), then protect-overlay where the mask is set). Returns
         a python list of length n_blocks. Called only on observe/refresh steps.
 
         GQA: query heads are mean-pooled within each KV-head group. GPU path.
+
+        ``use_kernel`` (Step 1): emit the per-block scores from a fused Triton pass
+        (``fused_protected_k_block_scores``) instead of reconstructing the WHOLE K
+        in eager torch — the Phase-10 measured bottleneck. Same result (proven by
+        the numpy decomposition==softmax proof); fail-open to the torch path if the
+        kernel is unavailable or raises.
         """
         import math
         from kv_policy.int4_per_channel_kv import unpack_int4
@@ -575,11 +585,29 @@ class ProtectedKINT4Cache:
         nb = (s + block_size - 1) // block_size
         if s < 1 or D is None or H_kv is None:
             return [0.0] * max(nb, 0)
-        # Reconstruct K_eff (s, H_kv, D) — mirror the kernel exactly.
         # The protect mask is frozen lazily by kernel_inputs(); scoring runs
         # BEFORE that on the first decode step, so freeze here if needed.
         if not self._protect_frozen:
             self.freeze_protect_mask()
+
+        # ---- Step 1: kernel-emitted block scores (no torch K reconstruction) ----
+        if use_kernel and torch is not None and getattr(query, "is_cuda", False) \
+                and self._k_group_size == 1:
+            try:
+                from kv_policy.int4_fused_attention_kernel import (
+                    fused_protected_k_block_scores, combine_block_scores)
+                blk_sum, blk_max = fused_protected_k_block_scores(
+                    query, self.k_packed_buf, self.k_scale_buf,
+                    (self.k_offset_buf if self._asymmetric else None),
+                    self.k_fp16_buf, self._protect_mask,
+                    num_kv_heads=H_kv, head_dim=D, asymmetric=self._asymmetric,
+                    block_size=block_size, seq_len=s)
+                return combine_block_scores(blk_sum, blk_max)
+            except Exception:  # noqa: BLE001 — fail-open to the torch path
+                logger.exception(
+                    "kernel block-scores failed; falling back to torch scoring")
+
+        # ---- Torch path (reference): reconstruct K_eff (s, H_kv, D) exactly. ----
         kiv = unpack_int4(self.k_packed_buf[:s], D).float()          # [-8,7]
         k_dq = kiv * self.k_scale_buf[:s].float()
         if self._asymmetric and self.k_offset_buf is not None:

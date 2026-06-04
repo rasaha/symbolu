@@ -295,7 +295,8 @@ def run_ab(args) -> int:
     llm, manager, teardown, tok, backend = _build_fused_engine(args)
     print(f"[ab] backend={backend} modes={modes} seeds={seeds} depths={depths} "
           f"gen={gen} repeats={repeats} warmup={warmup} ctx={args.context_tokens} "
-          f"max_model_len={args.max_model_len}", flush=True)
+          f"max_model_len={args.max_model_len} "
+          f"kernel_scores={manager.stats.get('readskip_kernel_scores')}", flush=True)
 
     def _chat(prompt):
         return tok.apply_chat_template(
@@ -416,6 +417,7 @@ def run_ab(args) -> int:
         "decode_time_method": method, "per_mode": per_mode,
         "paired_vs_baseline": paired,
         "readskip_calls": st.get("readskip_calls"), "skip_diag": skip_diag,
+        "readskip_kernel_scores": st.get("readskip_kernel_scores"),
         "items": items,
     }
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
@@ -729,7 +731,7 @@ def _selftest() -> int:
     # steps read all (retained==seq), steady steps skip, counters + meta track it.
     class _Cache:
         seq_len = 4096
-        def block_attention_scores(self, query, block_size):
+        def block_attention_scores(self, query, block_size, use_kernel=False):
             sc = [0.0] * ((self.seq_len + block_size - 1) // block_size)
             sc[40] = 9.0
             return sc
@@ -737,8 +739,8 @@ def _selftest() -> int:
         _readskip_mode="retention", _readskip_calls=0, _readskip_block_size=32,
         _readskip_sink_tokens=64, _readskip_recent_tokens=512,
         _readskip_budget_tokens=512, _readskip_neighbor=1, _readskip_observe=3,
-        _readskip_refresh=0, _readskip_decay=0.8, _readskip_controllers={},
-        _readskip_observe_steps=0, _readskip_steady_steps=0,
+        _readskip_refresh=0, _readskip_decay=0.8, _readskip_kernel_scores=False,
+        _readskip_controllers={}, _readskip_observe_steps=0, _readskip_steady_steps=0,
         _readskip_retained_tokens=0, _readskip_seq_tokens=0, _last_readskip_meta=None)
     for _ in range(8):
         INT4CacheKVRouteA._readskip_active_positions(mgr, _Cache(), query=object())

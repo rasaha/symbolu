@@ -294,3 +294,223 @@ def fused_protected_k_decode_attention(
         D=D,
     )
     return out
+
+
+# =========================================================================== #
+# Read-skip STEP 1 — kernel-emitted block scores.
+#
+# Replaces ProtectedKINT4Cache.block_attention_scores' torch reconstruction
+# (unpack_int4 + dequant + protect-overlay + matmul over the WHOLE K, in eager
+# torch — the Phase-10 measured bottleneck whose cost grows with context) with a
+# single fused Triton pass that reuses the SAME int4-unpack the decode kernel
+# uses. The per-block softmax mass is computed block-locally (each block's own
+# max + sum-exp) so there is NO online-softmax / split-K state to thread; a tiny
+# host combine rescales by the per-head global max and normalises. This block
+# decomposition is exactly equal to a direct softmax-then-block-sum (proven in
+# numpy by ``_block_scores_selftest`` below), so the kernel is correct by
+# construction; the GPU gate is byte-equality of its scores vs the torch path.
+# =========================================================================== #
+
+if _HAVE_TRITON:
+
+    @triton.jit
+    def _protected_k_block_scores_kernel(
+        q_ptr, k_packed_ptr, k_scale_ptr, k_offset_ptr, k_fp16_ptr,
+        protect_mask_ptr, blk_sum_ptr, blk_max_ptr,
+        H_q, H_kv, S_kv, n_blocks,
+        softmax_scale,
+        G: tl.constexpr, D: tl.constexpr, DH: tl.constexpr,
+        BLOCK: tl.constexpr, ASYMMETRIC: tl.constexpr,
+    ):
+        # One program per (KV head, read-skip block). B=1 (the cache is single-
+        # sequence). Buffers are in the cache's NATIVE (S, H, *) layout — no
+        # permute/copy. Emits this block's local (sum_exp, max); the host rescales.
+        hkv = tl.program_id(0)
+        blk = tl.program_id(1)
+
+        d = tl.arange(0, D)
+        byte_col = d // 2
+        is_high = d % 2
+
+        # GQA: mean-pool the G query heads sharing this KV head (matches the torch
+        # block_attention_scores q_kv = q.view(H_kv, G, D).mean(1)).
+        q_kv = tl.zeros((D,), tl.float32)
+        for g in range(0, G):
+            hq = hkv * G + g
+            q_kv += tl.load(q_ptr + hq * D + d).to(tl.float32)
+        q_kv = q_kv / G
+
+        pm = tl.load(protect_mask_ptr + hkv * D + d) != 0
+
+        s = blk * BLOCK + tl.arange(0, BLOCK)          # (BLOCK,) positions
+        valid = s < S_kv
+
+        # ---- K tile (BLOCK, D): unpack INT4, dequant, protect-overlay. Mirrors
+        #      the decode kernel; native (S, H, *) layout; group_size_k == 1. ----
+        kp_off = (s[:, None] * H_kv + hkv) * DH + byte_col[None, :]
+        kbyte = tl.load(k_packed_ptr + kp_off, mask=valid[:, None], other=0).to(tl.int32)
+        kiv = (((kbyte >> (4 * is_high[None, :])) & 0xF) - 8).to(tl.float32)
+        sc_off = (s[:, None] * H_kv + hkv) * D + d[None, :]
+        k_sc = tl.load(k_scale_ptr + sc_off, mask=valid[:, None], other=1.0).to(tl.float32)
+        k_dq = kiv * k_sc
+        if ASYMMETRIC:
+            k_of = tl.load(k_offset_ptr + sc_off, mask=valid[:, None], other=0.0).to(tl.float32)
+            k_dq = k_dq + k_of
+        k_f16 = tl.load(k_fp16_ptr + sc_off, mask=valid[:, None], other=0.0).to(tl.float32)
+        k_eff = tl.where(pm[None, :], k_f16, k_dq)     # (BLOCK, D)
+
+        # logits = (k_eff · q_kv) / sqrt(D); masked positions -> -inf.
+        logits = tl.sum(k_eff * q_kv[None, :], axis=1) * softmax_scale   # (BLOCK,)
+        logits = tl.where(valid, logits, -float("inf"))
+
+        m_blk = tl.max(logits, axis=0)                 # block-local max
+        # exp(-inf - m) = 0 for masked / empty-block positions.
+        s_blk = tl.sum(tl.exp(logits - m_blk), axis=0)
+
+        out_off = hkv * n_blocks + blk
+        tl.store(blk_sum_ptr + out_off, s_blk)
+        tl.store(blk_max_ptr + out_off, m_blk)
+
+
+def fused_protected_k_block_scores(
+    q: "torch.Tensor",
+    k_packed: "torch.Tensor",
+    k_scale: "torch.Tensor",
+    k_offset: "Optional[torch.Tensor]",
+    k_fp16: "torch.Tensor",
+    protect_mask: "torch.Tensor",
+    *,
+    num_kv_heads: int,
+    head_dim: int,
+    asymmetric: bool,
+    block_size: int,
+    seq_len: int,
+    softmax_scale: Optional[float] = None,
+):
+    """Kernel-emitted read-skip block scores (Step 1). Inputs are the cache's
+    NATIVE single-sequence buffers (no permute):
+
+      q          (H_q, D)            fp16  — the decode query
+      k_packed   (S, H_kv, D//2)     uint8
+      k_scale    (S, H_kv, D)        fp16  — per-position (group_size_k == 1)
+      k_offset   (S, H_kv, D)/None   fp16
+      k_fp16     (S, H_kv, D)        fp16  — protected-K overlay
+      protect_mask (H_kv, D)         int8/bool
+
+    Returns ``(blk_sum, blk_max)`` each ``(H_kv, n_blocks)`` fp32 — this block's
+    local sum-exp and max. Combine on the host with ``combine_block_scores`` to
+    get the per-block softmax mass summed over KV heads (the
+    ``block_attention_scores`` contract). Single Triton pass; reuses the decode
+    kernel's int4 unpack; cost is O(s) read-only, no torch reconstruction.
+    """
+    if torch is None:
+        raise ImportError("fused_protected_k_block_scores requires PyTorch.")
+    if not _HAVE_TRITON:
+        raise ImportError("fused_protected_k_block_scores requires Triton (GPU build).")
+    if not q.is_cuda:
+        raise ValueError("inputs must be on CUDA.")
+    D = head_dim
+    H_kv = num_kv_heads
+    H_q = q.shape[-1] // D if q.ndim == 1 else q.numel() // D
+    G = H_q // H_kv
+    DH = (D + 1) // 2
+    n_blocks = (seq_len + block_size - 1) // block_size
+    if softmax_scale is None:
+        softmax_scale = 1.0 / math.sqrt(D)
+    if k_offset is None:
+        k_offset = torch.zeros_like(k_scale)
+
+    q2 = q.reshape(-1).contiguous()        # (H_q*D,)
+    blk_sum = torch.empty((H_kv, n_blocks), dtype=torch.float32, device=q.device)
+    blk_max = torch.empty((H_kv, n_blocks), dtype=torch.float32, device=q.device)
+    grid = (H_kv, n_blocks)
+    _protected_k_block_scores_kernel[grid](
+        q2, k_packed, k_scale, k_offset, k_fp16, protect_mask,
+        blk_sum, blk_max,
+        H_q, H_kv, seq_len, n_blocks,
+        float(softmax_scale),
+        G=G, D=D, DH=DH, BLOCK=block_size, ASYMMETRIC=bool(asymmetric),
+    )
+    return blk_sum, blk_max
+
+
+def combine_block_scores(blk_sum, blk_max):
+    """Host combine for the kernel-emitted block scores: rescale each block's
+    local sum-exp by ``exp(block_max - per_head_global_max)``, normalise per KV
+    head (so each head's masses sum to 1 — a softmax), then sum over KV heads.
+    Equals ``block_attention_scores``' ``softmax(logits).sum(heads)`` per block
+    (proven in numpy by ``_block_scores_selftest``). Works on a torch tensor
+    (GPU, production) or numpy array (CPU, test) — duck-typed on ``.exp``.
+
+    ``blk_sum``/``blk_max``: ``(H_kv, n_blocks)``. Returns a length-n_blocks list.
+    """
+    if hasattr(blk_max, "exp"):  # torch
+        M = blk_max.max(dim=-1, keepdim=True).values
+        w = blk_sum * (blk_max - M).exp()
+        Z = w.sum(dim=-1, keepdim=True).clamp_min(1e-20)
+        return (w / Z).sum(dim=0).tolist()
+    import numpy as _np      # numpy (CPU reference/test)
+    M = blk_max.max(axis=-1, keepdims=True)
+    w = blk_sum * _np.exp(blk_max - M)
+    Z = _np.maximum(w.sum(axis=-1, keepdims=True), 1e-20)
+    return (w / Z).sum(axis=0).tolist()
+
+
+# --------------------------------------------------------------- CPU proof ----
+
+def _block_scores_selftest() -> int:
+    """Prove (in numpy, no torch/triton) that the kernel's block-local
+    decomposition + host combine equals a DIRECT softmax-then-block-sum — i.e.
+    the ``block_attention_scores`` semantic. This is the correctness contract the
+    Triton kernel mirrors; the GPU gate is then just byte-eq vs the torch path."""
+    import numpy as np
+    rng = np.random.default_rng(0)
+    for (s, H_kv, G, D, bs) in [(200, 4, 7, 128, 32), (256, 2, 1, 64, 32),
+                                (97, 3, 2, 32, 16), (64, 1, 4, 16, 64)]:
+        nb = (s + bs - 1) // bs
+        H_q = H_kv * G
+        q = rng.standard_normal((H_q, D)).astype(np.float32)
+        k_eff = rng.standard_normal((s, H_kv, D)).astype(np.float32)
+        scale = 1.0 / math.sqrt(D)
+        q_kv = q.reshape(H_kv, G, D).mean(1)                       # (H_kv, D)
+        logits = np.einsum("hd,shd->hs", q_kv, k_eff) * scale      # (H_kv, s)
+
+        # DIRECT (the block_attention_scores math): softmax over positions per
+        # head, sum over heads, sum per block.
+        probs = np.exp(logits - logits.max(1, keepdims=True))
+        probs = probs / probs.sum(1, keepdims=True)
+        pos_mass = probs.sum(0)                                    # (s,)
+        direct = np.zeros(nb, np.float64)
+        for p in range(s):
+            direct[p // bs] += pos_mass[p]
+
+        # KERNEL path: per (head, block) local max + sum-exp, then host combine.
+        blk_sum = np.zeros((H_kv, nb), np.float32)
+        blk_max = np.full((H_kv, nb), -np.inf, np.float32)
+        for h in range(H_kv):
+            for blk in range(nb):
+                lo, hi = blk * bs, min((blk + 1) * bs, s)
+                lg = logits[h, lo:hi]
+                m = lg.max()
+                blk_max[h, blk] = m
+                blk_sum[h, blk] = np.exp(lg - m).sum()
+        got = combine_block_scores(blk_sum, blk_max)
+
+        assert np.allclose(got, direct, atol=1e-5), (s, H_kv, G, D, bs,
+                                                     np.abs(np.array(got) - direct).max())
+        # sanity: a sharp needle concentrates mass in its block.
+    # sharp-needle sanity (single head): one position dominates -> its block ~1.0
+    s, bs = 320, 32
+    lg = np.full((1, s), -10.0, np.float32); lg[0, 137] = 20.0
+    bsum = np.zeros((1, s // bs), np.float32); bmax = np.full((1, s // bs), -np.inf, np.float32)
+    for blk in range(s // bs):
+        seg = lg[0, blk * bs:(blk + 1) * bs]
+        bmax[0, blk] = seg.max(); bsum[0, blk] = np.exp(seg - seg.max()).sum()
+    sc = combine_block_scores(bsum, bmax)
+    assert sc[137 // bs] > 0.99 and sum(sc) - 1.0 < 1e-4, sc
+    print("block-scores numpy proof (decomposition == direct softmax): PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_block_scores_selftest())
