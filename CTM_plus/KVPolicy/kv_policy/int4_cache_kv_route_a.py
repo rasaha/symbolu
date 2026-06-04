@@ -320,7 +320,12 @@ class INT4CacheKVRouteA:
         all). "off" -> None (identity). "retain_all" -> range(s) (byte-eq gate).
         "retention" -> per-cache ReadSkipController fed decode-attention block
         scores (sink+recent+top-attention+neighbors); observe/refresh steps read
-        all. Fail-open: any scoring error -> read all this step."""
+        all. "score_noskip" (Stage-A diagnostic) -> score on the normal cadence
+        but ALWAYS read all (return None, no gather): isolates pure scoring
+        overhead with quality identical to "off" (nothing is skipped). The bench
+        then decomposes the cost: (score_noskip - off) = scoring overhead;
+        (retain_all - off) = gather-all tax; (retention - off) = the net.
+        Fail-open: any scoring error -> read all this step."""
         mode = self._readskip_mode
         if mode == "off":
             self._last_readskip_meta = ("off", None, cache.seq_len, cache.seq_len)
@@ -330,7 +335,7 @@ class INT4CacheKVRouteA:
             self._readskip_calls += 1
             self._last_readskip_meta = ("retain_all", None, s, s)
             return list(range(s))          # must be byte-identical to "off"
-        if mode == "retention":
+        if mode in ("retention", "score_noskip"):
             self._readskip_calls += 1
             from kv_policy.readskip_select import ReadSkipController
             ctrl = self._readskip_controllers.get(id(cache))
@@ -360,6 +365,9 @@ class INT4CacheKVRouteA:
                     scores = None
             active = ctrl.active_positions(s, block_scores=scores)
             # --- diagnostics: skip fraction + observe/steady split ---
+            # In score_noskip the controller still computes its selection (so the
+            # would-be skip fraction is recorded — a safe offline replay, since we
+            # read all), but we discard it below.
             retained = len(active)
             if was_observe:
                 self._readskip_observe_steps += 1   # re-read all + re-score
@@ -367,7 +375,9 @@ class INT4CacheKVRouteA:
                 self._readskip_steady_steps += 1    # compacted (actually skipping)
                 self._readskip_retained_tokens += retained
                 self._readskip_seq_tokens += s
-            self._last_readskip_meta = ("retention", was_observe, s, retained)
+            self._last_readskip_meta = (mode, was_observe, s, retained)
+            if mode == "score_noskip":
+                return None      # scored (cost paid) but read-all, no gather
             return active
         return None
 
@@ -498,7 +508,7 @@ class INT4CacheKVRouteA:
         makes the next sequence re-observe from scratch (no stale EMA bleeding from
         the previously-measured mode).
         """
-        valid = ("off", "retain_all", "retention")
+        valid = ("off", "retain_all", "retention", "score_noskip")
         if mode not in valid:
             raise ValueError(
                 f"unknown read-skip mode {mode!r}; expected one of {valid}")

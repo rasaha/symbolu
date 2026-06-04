@@ -6,9 +6,12 @@ short sequences (nothing actually skipped). P3 is the payoff measurement: a REAL
 needle-in-haystack at long context, decoded through vLLM offline + route-A
 fused_v2 + read-skip, with answer-checking + decode timing. One read-skip mode per
 invocation (INT4_READSKIP_MODE env); phase9_p3_fused_needle.sh runs the 3 cells:
-  off        — full int4 (baseline)
-  retain_all — read-skip plumbing on but keeps everything (BYTE-EQ vs off)
-  retention  — sink+recent+attention-selected (the real skip; quality must hold)
+  off          — full int4 (baseline)
+  retain_all   — read-skip plumbing on but keeps everything (BYTE-EQ vs off)
+  retention    — sink+recent+attention-selected (the real skip; quality must hold)
+  score_noskip — score on the normal cadence but read all (isolates scoring cost;
+                 quality identical to off). Decompose: (score_noskip-off)=scoring,
+                 (retain_all-off)=gather-all, (retention-off)=net.
 
 fused_v2 v1 is BATCH=1, so we generate ONE prompt at a time (each prompt's decode
 steps are batch=1 -> the fused bypass + read-skip fire). At long context the
@@ -748,6 +751,29 @@ def _selftest() -> int:
     sf = 1 - mgr._readskip_retained_tokens / mgr._readskip_seq_tokens
     assert 0.5 < sf < 0.99 and mgr._last_readskip_meta[0] == "retention", sf
 
+    # score_noskip (Stage-A diagnostic): scores on the SAME cadence as retention
+    # (pays the cost, advances the controller, records the would-be skip fraction)
+    # but ALWAYS returns None -> read all, no gather. Quality == off by construction.
+    scored = {"n": 0}
+    class _CacheCount(_Cache):
+        def block_attention_scores(self, query, block_size, use_kernel=False):
+            scored["n"] += 1
+            return super().block_attention_scores(query, block_size, use_kernel)
+    mgr2 = types.SimpleNamespace(**{**mgr.__dict__})
+    mgr2._readskip_mode = "score_noskip"
+    mgr2._readskip_calls = 0; mgr2._readskip_controllers = {}
+    mgr2._readskip_observe_steps = 0; mgr2._readskip_steady_steps = 0
+    mgr2._readskip_retained_tokens = 0; mgr2._readskip_seq_tokens = 0
+    cc = _CacheCount()                                  # one instance -> one controller
+    rets = [INT4CacheKVRouteA._readskip_active_positions(mgr2, cc, query=object())
+            for _ in range(8)]
+    assert all(r is None for r in rets), "score_noskip must read all (None)"
+    # scoring happens exactly on observe steps (cost paid on the normal cadence)
+    assert scored["n"] == mgr2._readskip_observe_steps > 0, (scored, mgr2._readskip_observe_steps)
+    assert mgr2._readskip_calls == 8 and mgr2._last_readskip_meta[0] == "score_noskip"
+    # would-be skip fraction still recorded (safe offline replay) despite reading all
+    assert mgr2._readskip_seq_tokens > 0 and mgr2._readskip_retained_tokens > 0
+
     print("p3 fused needle self-test: PASS")
     return 0
 
@@ -778,8 +804,11 @@ def main(argv=None) -> int:
                          "spread + paired delta vs off on a single warm engine "
                          "(removes cross-run noise AND prefill dilution)")
     ap.add_argument("--ab-modes", default="off,retention",
-                    help="comma list of modes to compare (off/retain_all/retention); "
-                         "baseline is 'off' when present")
+                    help="comma list of modes to compare "
+                         "(off/retain_all/retention/score_noskip); baseline is 'off' "
+                         "when present. For the cost decomposition use "
+                         "off,score_noskip,retain_all,retention: Δ% vs off gives "
+                         "scoring overhead / gather-all tax / net respectively")
     ap.add_argument("--seeds", default="1,2,3",
                     help="comma list of integer seeds; each is one paired (seed,depth) "
                          "cell per depth -> the spread of the paired delta")

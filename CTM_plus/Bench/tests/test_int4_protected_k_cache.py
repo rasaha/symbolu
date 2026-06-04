@@ -855,3 +855,9 @@ def test_readskip_active_positions_modes():
     m._readskip_mode = "retention"
     assert m._readskip_active_positions(_FakeCache(), query=None) == [0, 1, 2, 3, 4, 5]
     assert m._readskip_calls == 2           # off doesn't count; retain_all + retention
+    # score_noskip (Stage-A diagnostic): scores but ALWAYS reads all -> None.
+    m._readskip_kernel_scores = False
+    m._readskip_controllers = {}
+    m._readskip_mode = "score_noskip"
+    assert m._readskip_active_positions(_FakeCache(), query=None) is None
+    assert m._readskip_calls == 3 and m._last_readskip_meta[0] == "score_noskip"
