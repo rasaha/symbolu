@@ -19,6 +19,10 @@
   - **decode-only timing** — `last_token_time − first_token_time` from vLLM
     metrics when populated, else a `prefill+1` calibration subtracted from the
     full generate (auto-detected; recorded in the JSON as `decode_time_method`);
+  - **forced full decode** (`ignore_eos=True`) — the needle answer is ~7 tokens,
+    so natural EOS ends decode inside the observe window and read-skip never
+    amortizes; forcing the full `--ab-gen` window is what measures the gen=N
+    regime (quality is still detected from the early tokens);
   - **warmup discarded** (`--warmup`, ≥1: JIT-warms the kernel + settles clocks);
   - **repeated measurements** (`--repeats`) → per-mode tps **mean ± std** and the
     paired delta's **mean ± std across (seed,depth) cells**;
@@ -135,7 +139,11 @@ claws back), and the gap to the modeled ~1.9× (≈ +90% vs off) target.
 
 1. **Quality is the GATE, checked first.** `retention` hit-rate must equal `off`
    at every depth (the needle must survive the skip). A throughput number on
-   degraded quality is a **FAIL**, not a win — non-negotiable.
+   degraded quality is a **FAIL**, not a win — non-negotiable. **But the gate is
+   only meaningful where the `off` baseline is 1.0** — if full-int4 itself misses
+   a deep needle (seen at depth 0.9, where bf16 is 1.0 but off is 0.0), that's a
+   separate int4-path issue to diagnose; judge retention only at depths where
+   off=1.0 until it's resolved.
 2. **Throughput verdict per context** = paired delta vs its **± spread**:
    - delta − std > 0 → **WIN**; delta + std < 0 → **LOSS**; else **BREAKEVEN**.
    - Never report a within-spread delta as a win (the Phase-9 meta-lesson).

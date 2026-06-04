@@ -305,7 +305,11 @@ def run_ab(args) -> int:
     def _gen(chat, max_tokens):
         # fused_v2 is single-sequence: reset per request (mirrors gen_one).
         manager.reset()
-        sp = SamplingParams(temperature=0.0, max_tokens=max_tokens)
+        # ignore_eos: the needle ANSWER is short (~7 tokens), so natural EOS ends
+        # decode inside the observe window and read-skip never amortizes. Forcing
+        # the full `max_tokens` decode is what measures the gen=N regime (quality
+        # is detected from the early tokens regardless; match_code scans the text).
+        sp = SamplingParams(temperature=0.0, max_tokens=max_tokens, ignore_eos=True)
         t0 = time.perf_counter()
         out = llm.generate([chat], sp, use_tqdm=False)
         dt = time.perf_counter() - t0
@@ -473,7 +477,8 @@ def run_profile_ab(args) -> int:
         chat = tok.apply_chat_template(
             [{"role": "user", "content": prompt}],
             tokenize=False, add_generation_prompt=True)
-        llm.generate([chat], SamplingParams(temperature=0.0, max_tokens=gen),
+        llm.generate([chat],
+                     SamplingParams(temperature=0.0, max_tokens=gen, ignore_eos=True),
                      use_tqdm=False)
 
     # Warmup (discarded) per mode to JIT-compile the kernel shapes before timing.
@@ -593,7 +598,7 @@ def run_bf16_ref(args) -> int:
         chat = tok.apply_chat_template(
             [{"role": "user", "content": prompt}],
             tokenize=False, add_generation_prompt=True)
-        sp = SamplingParams(temperature=0.0, max_tokens=max_tokens)
+        sp = SamplingParams(temperature=0.0, max_tokens=max_tokens, ignore_eos=True)
         t0 = time.perf_counter()
         out = llm.generate([chat], sp, use_tqdm=False)
         dt = time.perf_counter() - t0
