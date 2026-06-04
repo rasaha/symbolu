@@ -562,6 +562,47 @@ class ProtectedKINT4Cache:
             "v_offset": v_offset,
         }
 
+    def kernel_inputs_gather(self, active_positions) -> dict:
+        """READ-SKIP Step 2: return the FULL, NATIVE, per-position buffers (no
+        permute, no index_select) plus ``gather_idx`` — the retained positions as
+        an int32 index. For ``fused_protected_k_decode_attention_gather``, which
+        reads K/V in place at ``gather_idx[logical]`` instead of compacting first.
+        Removes the 3 permute-contiguous copies AND the gather of
+        ``kernel_inputs(active_positions=…)``. ``k_group_size == 1`` only.
+
+        Returns ``[:s]`` views of the cache buffers (zero-copy) and the index."""
+        if torch is None:
+            raise ImportError("kernel_inputs_gather requires PyTorch.")
+        if not self._allocated or self._s_curr < 1:
+            raise ValueError("kernel_inputs_gather called on empty cache.")
+        if self._k_group_size != 1:
+            raise ValueError("kernel_inputs_gather assumes k_group_size == 1.")
+        if not self._protect_frozen:
+            self.freeze_protect_mask()
+        s = self._s_curr
+        gather_idx = torch.as_tensor(
+            active_positions, dtype=torch.int32, device=self.k_packed_buf.device)
+        if gather_idx.ndim != 1 or gather_idx.numel() < 1:
+            raise ValueError("active_positions must be a non-empty 1-D index")
+        if int(gather_idx.min()) < 0 or int(gather_idx.max()) >= s:
+            raise ValueError(
+                f"active_positions out of range [0,{s}): "
+                f"[{int(gather_idx.min())},{int(gather_idx.max())}]")
+        self._kernel_inputs_calls += 1
+        self._kernel_inputs_skip_calls = (
+            getattr(self, "_kernel_inputs_skip_calls", 0) + 1)
+        return {
+            "k_packed": self.k_packed_buf[:s],          # (s, H_kv, D//2) native view
+            "k_scale": self.k_scale_buf[:s],            # (s, H_kv, D)
+            "k_offset": self.k_offset_buf[:s] if self._asymmetric else None,
+            "k_fp16": self.k_fp16_buf[:s],              # (s, H_kv, D)
+            "protect_mask": self._protect_mask,
+            "v_packed": self.v_packed_buf[:s],          # (s, H_kv, D//2)
+            "v_scale": self.v_scale_buf[:s],            # (s, H_kv, n_grp_v)
+            "v_offset": self.v_offset_buf[:s] if self._asymmetric else None,
+            "gather_idx": gather_idx,
+        }
+
     def block_attention_scores(self, query, block_size: int,
                                use_kernel: bool = False) -> list:
         """READ-SKIP scoring: per-block decode-attention mass from `query` to the

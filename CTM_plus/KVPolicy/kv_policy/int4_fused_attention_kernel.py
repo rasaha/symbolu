@@ -57,25 +57,35 @@ if _HAVE_TRITON:
     def _fused_protected_k_decode_attn_splitk_kernel(
         q_ptr, k_packed_ptr, k_scale_ptr, k_offset_ptr, k_fp16_ptr,
         protect_mask_ptr, v_packed_ptr, v_scale_ptr, v_offset_ptr,
-        m_scratch_ptr, l_scratch_ptr, acc_scratch_ptr,
-        B, H_q, H_kv, S_kv, n_grp_k, n_grp_v,
+        m_scratch_ptr, l_scratch_ptr, acc_scratch_ptr, gather_ptr,
+        B, H_q, H_kv, S_kv, N_active, n_grp_k, n_grp_v,
         SPLIT_K, chunk_size,
         softmax_scale,
         G: tl.constexpr, G_PAD: tl.constexpr,
         D: tl.constexpr, DH: tl.constexpr,
         GS_k: tl.constexpr, GS_v: tl.constexpr,
         BLOCK_N: tl.constexpr, ASYMMETRIC: tl.constexpr,
+        USE_GATHER: tl.constexpr,
     ):
         # One program per (batch, KV head, split). The G query heads
         # sharing this KV head are handled as the M dim of the matmuls.
+        #
+        # READ-SKIP Step 2 (USE_GATHER): the split iterates LOGICAL positions
+        # [0, N_active); each logical position's PHYSICAL buffer row is looked up
+        # from gather_ptr (the retained KV positions), so K/V are read in place
+        # from the FULL cache buffers — no host index_select, no permute-copy. The
+        # packed/fp16 buffers are then in NATIVE (S, H, *) layout (not permuted);
+        # scales are native in BOTH paths. When USE_GATHER is False this compiles
+        # to the original permuted-buffer path, byte-for-byte.
         pid_bh = tl.program_id(0)
         pid_sk = tl.program_id(1)
         b = pid_bh // H_kv
         hkv = pid_bh % H_kv
 
-        # KV range owned by this split.
+        # KV range owned by this split — over LOGICAL positions (== physical when
+        # not gathering, since N_active == S_kv then).
         s_start = pid_sk * chunk_size
-        s_end = tl.minimum(s_start + chunk_size, S_kv)
+        s_end = tl.minimum(s_start + chunk_size, N_active)
 
         d = tl.arange(0, D)                       # (D,) head-dim
         byte_col = d // 2
@@ -99,14 +109,23 @@ if _HAVE_TRITON:
 
         n_tiles = tl.cdiv(s_end - s_start, BLOCK_N)
         for t in range(0, n_tiles):
-            s = s_start + t * BLOCK_N + tl.arange(0, BLOCK_N)
+            s = s_start + t * BLOCK_N + tl.arange(0, BLOCK_N)   # LOGICAL positions
             valid = s < s_end
+            # Physical buffer row: gathered from the retained-position index when
+            # skipping, else identity. Drives buffer offsets; `valid` stays logical.
+            if USE_GATHER:
+                ps = tl.load(gather_ptr + s, mask=valid, other=0)
+            else:
+                ps = s
 
             # ---- K tile: load packed bytes, unpack INT4, dequant ----
-            kp_off = (((b * H_kv + hkv) * S_kv) + s[:, None]) * DH + byte_col[None, :]
+            if USE_GATHER:   # FULL buffers, NATIVE (S, H, DH): per-position stride H*DH
+                kp_off = ((ps[:, None] * H_kv) + hkv) * DH + byte_col[None, :]
+            else:            # compacted buffers, PERMUTED (H, S, DH): per-head stride S*DH
+                kp_off = (((b * H_kv + hkv) * S_kv) + ps[:, None]) * DH + byte_col[None, :]
             kbyte = tl.load(k_packed_ptr + kp_off, mask=valid[:, None], other=0).to(tl.int32)
             kiv = (((kbyte >> (4 * is_high[None, :])) & 0xF) - 8).to(tl.float32)
-            gk = s // GS_k
+            gk = ps // GS_k                                  # scales are native in both paths
             ks_off = (((b * n_grp_k + gk[:, None]) * H_kv) + hkv) * D + d[None, :]
             k_sc = tl.load(k_scale_ptr + ks_off, mask=valid[:, None], other=1.0).to(tl.float32)
             k_dq = kiv * k_sc
@@ -114,7 +133,10 @@ if _HAVE_TRITON:
                 k_of = tl.load(k_offset_ptr + ks_off, mask=valid[:, None], other=0.0).to(tl.float32)
                 k_dq = k_dq + k_of
             # protected-K overlay
-            kf_off = (((b * H_kv + hkv) * S_kv) + s[:, None]) * D + d[None, :]
+            if USE_GATHER:
+                kf_off = ((ps[:, None] * H_kv) + hkv) * D + d[None, :]
+            else:
+                kf_off = (((b * H_kv + hkv) * S_kv) + ps[:, None]) * D + d[None, :]
             k_f16 = tl.load(k_fp16_ptr + kf_off, mask=valid[:, None], other=0.0).to(tl.float32)
             k_eff = tl.where(pm[None, :], k_f16, k_dq).to(tl.float16)   # (BLOCK_N, D)
 
@@ -130,11 +152,15 @@ if _HAVE_TRITON:
             l_i = l_i * alpha + tl.sum(p, axis=1)
 
             # ---- V tile: load packed, unpack, dequant -> (BLOCK_N, D) fp16 ----
-            vp_off = (((b * H_kv + hkv) * S_kv) + s[:, None]) * DH + byte_col[None, :]
+            if USE_GATHER:   # FULL native (S, H, DH)
+                vp_off = ((ps[:, None] * H_kv) + hkv) * DH + byte_col[None, :]
+            else:            # compacted permuted (H, S, DH)
+                vp_off = (((b * H_kv + hkv) * S_kv) + ps[:, None]) * DH + byte_col[None, :]
             vbyte = tl.load(v_packed_ptr + vp_off, mask=valid[:, None], other=0).to(tl.int32)
             viv = (((vbyte >> (4 * is_high[None, :])) & 0xF) - 8).to(tl.float32)
             gv = d // GS_v
-            vs_off = (((b * S_kv + s[:, None]) * H_kv) + hkv) * n_grp_v + gv[None, :]
+            # v_scale is native (S, H, n_grp_v) in both paths; S_kv == its S dim.
+            vs_off = (((b * S_kv + ps[:, None]) * H_kv) + hkv) * n_grp_v + gv[None, :]
             v_sc = tl.load(v_scale_ptr + vs_off, mask=valid[:, None], other=1.0).to(tl.float32)
             v_dq = viv * v_sc
             if ASYMMETRIC:
@@ -273,17 +299,21 @@ def fused_protected_k_decode_attention(
     out = torch.empty((B, H_q, D), dtype=torch.float16, device=q.device)
 
     # Pass 1: split-K fused decode. One program per (b, hkv, split).
+    # No gather: dummy index ptr, N_active == S_kv, USE_GATHER=False (compiles to
+    # the original permuted-buffer path).
+    dummy_gather = torch.empty(1, dtype=torch.int32, device=q.device)
     grid1 = (B * H_kv, split_k)
     _fused_protected_k_decode_attn_splitk_kernel[grid1](
         q, k_packed, k_scale, k_offset, k_fp16,
         protect_mask, v_packed, v_scale, v_offset,
-        m_scratch, l_scratch, acc_scratch,
-        B, H_q, H_kv, S_kv, n_grp_k, n_grp_v,
+        m_scratch, l_scratch, acc_scratch, dummy_gather,
+        B, H_q, H_kv, S_kv, S_kv, n_grp_k, n_grp_v,
         split_k, chunk_size,
         softmax_scale,
         G=G, G_PAD=G_PAD, D=D, DH=DH,
         GS_k=group_size_k, GS_v=group_size_v,
         BLOCK_N=block_n, ASYMMETRIC=bool(asymmetric),
+        USE_GATHER=False,
     )
 
     # Pass 2: combine the splits per (b, hq).
@@ -292,6 +322,109 @@ def fused_protected_k_decode_attention(
         m_scratch, l_scratch, acc_scratch, out,
         B, H_q, split_k,
         D=D,
+    )
+    return out
+
+
+def fused_protected_k_decode_attention_gather(
+    q: "torch.Tensor",
+    k_packed: "torch.Tensor",
+    k_scale: "torch.Tensor",
+    k_offset: "Optional[torch.Tensor]",
+    k_fp16: "torch.Tensor",
+    protect_mask: "torch.Tensor",
+    v_packed: "torch.Tensor",
+    v_scale: "torch.Tensor",
+    v_offset: "Optional[torch.Tensor]",
+    gather_idx: "torch.Tensor",
+    *,
+    group_size_k: int,
+    group_size_v: int,
+    asymmetric: bool,
+    softmax_scale: Optional[float] = None,
+    block_n: int = 64,
+    split_k: Optional[int] = None,
+) -> "torch.Tensor":
+    """READ-SKIP Step 2 — in-kernel gather decode (removes the host gather).
+
+    Same attention as ``fused_protected_k_decode_attention`` over the retained
+    positions ``gather_idx``, but the buffers are the cache's FULL, NATIVE,
+    per-position buffers — NOT permute-copied and NOT index_select-compacted. The
+    kernel reads K/V in place at ``gather_idx[logical]``:
+
+      q        (B, H_q, D) fp16
+      k_packed (S, H_kv, D//2) uint8      k_scale  (S, H_kv, D) fp16  (group=1)
+      k_offset (S, H_kv, D)/None          k_fp16   (S, H_kv, D) fp16
+      v_packed (S, H_kv, D//2) uint8      v_scale  (S, H_kv, n_grp_v) fp16
+      v_offset (S, H_kv, n_grp_v)/None    protect_mask (H_kv, D)
+      gather_idx (N_active,) int32        — retained KV positions (sorted, < S)
+
+    Output ``(B, H_q, D)`` fp16 — identical to compacting to ``gather_idx`` then
+    running the permuted kernel (the addressing equivalence is proven in numpy by
+    ``_gather_addressing_selftest``; the attention math is the validated kernel,
+    unchanged). ``group_size_k == 1`` (production K config).
+    """
+    if torch is None:
+        raise ImportError("requires PyTorch.")
+    if not _HAVE_TRITON:
+        raise ImportError("requires Triton (GPU build).")
+    if not q.is_cuda:
+        raise ValueError("inputs must be on CUDA.")
+    if group_size_k != 1:
+        raise ValueError("gather decode assumes group_size_k == 1 (per-position K scale).")
+
+    B, H_q, D = q.shape
+    S_full, H_kv, DH = k_packed.shape
+    assert DH == (D + 1) // 2
+    assert H_q % H_kv == 0
+    assert protect_mask.shape == (H_kv, D)
+    n_grp_k = k_scale.shape[0]            # native (S, H, D): S-dim
+    n_grp_v = v_scale.shape[2]            # native (S, H, n_grp_v)
+
+    gather_idx = gather_idx.to(torch.int32).contiguous()
+    N_active = int(gather_idx.numel())
+    if N_active < 1:
+        raise ValueError("gather_idx must be non-empty")
+
+    G = H_q // H_kv
+    G_PAD = max(16, _next_pow2(G))
+    if split_k is None:
+        split_k = max(1, min(64, (N_active + 511) // 512))
+    chunk_size = (N_active + split_k - 1) // split_k
+    if softmax_scale is None:
+        softmax_scale = 1.0 / math.sqrt(D)
+    if k_offset is None:
+        k_offset = torch.zeros_like(k_scale)
+    if v_offset is None:
+        v_offset = torch.zeros_like(v_scale)
+
+    for name, t in dict(q=q, k_packed=k_packed, k_scale=k_scale, k_offset=k_offset,
+                        k_fp16=k_fp16, protect_mask=protect_mask, v_packed=v_packed,
+                        v_scale=v_scale, v_offset=v_offset, gather_idx=gather_idx).items():
+        if not t.is_contiguous():
+            raise ValueError(f"{name} must be contiguous.")
+
+    m_scratch = torch.empty((B, H_q, split_k), dtype=torch.float32, device=q.device)
+    l_scratch = torch.empty((B, H_q, split_k), dtype=torch.float32, device=q.device)
+    acc_scratch = torch.empty((B, H_q, split_k, D), dtype=torch.float32, device=q.device)
+    out = torch.empty((B, H_q, D), dtype=torch.float16, device=q.device)
+
+    grid1 = (B * H_kv, split_k)
+    _fused_protected_k_decode_attn_splitk_kernel[grid1](
+        q, k_packed, k_scale, k_offset, k_fp16,
+        protect_mask, v_packed, v_scale, v_offset,
+        m_scratch, l_scratch, acc_scratch, gather_idx,
+        B, H_q, H_kv, S_full, N_active, n_grp_k, n_grp_v,
+        split_k, chunk_size,
+        softmax_scale,
+        G=G, G_PAD=G_PAD, D=D, DH=DH,
+        GS_k=group_size_k, GS_v=group_size_v,
+        BLOCK_N=block_n, ASYMMETRIC=bool(asymmetric),
+        USE_GATHER=True,
+    )
+    grid2 = (B * H_q,)
+    _combine_splits_kernel[grid2](
+        m_scratch, l_scratch, acc_scratch, out, B, H_q, split_k, D=D,
     )
     return out
 
@@ -512,5 +645,35 @@ def _block_scores_selftest() -> int:
     return 0
 
 
+def _gather_addressing_selftest() -> int:
+    """Prove (numpy, no GPU) the Step-2 addressing equivalence: reading the FULL
+    NATIVE buffer at physical row ``gather_idx[logical]`` picks the SAME element as
+    the old path (index_select to ``gather_idx`` -> permute to (H, N, *)) reads at
+    ``logical``. This is the only new risk surface — the native vs permuted offset
+    arithmetic the kernel branches on; the attention math is the validated kernel,
+    unchanged."""
+    import numpy as np
+    rng = np.random.default_rng(0)
+    # packed/fp16/v_packed buffers: NATIVE (S, H, W). Scales are native in BOTH
+    # paths, so only this layout branch needs proving.
+    for (S, H, W) in [(50, 4, 64), (33, 2, 8), (128, 3, 16), (200, 4, 128)]:
+        buf = rng.integers(0, 255, (S, H, W)).astype(np.int64)        # (S, H, W)
+        gather = np.sort(rng.choice(S, size=max(1, S // 3), replace=False)).astype(np.int64)
+        N = gather.size
+        compact = buf[gather].transpose(1, 0, 2).copy()              # (H, N, W) permuted
+        flat_native = buf.reshape(-1)
+        flat_perm = compact.reshape(-1)
+        for hkv in range(H):
+            for logical in range(N):
+                ps = int(gather[logical])
+                w = int(rng.integers(0, W))
+                native = flat_native[(ps * H + hkv) * W + w]          # kernel USE_GATHER offset
+                permuted = flat_perm[(hkv * N + logical) * W + w]     # kernel non-gather offset
+                assert native == permuted, (S, H, W, hkv, logical, w)
+    print("gather addressing (native == permuted-compacted): PASS")
+    return 0
+
+
 if __name__ == "__main__":
-    raise SystemExit(_block_scores_selftest())
+    rc = _block_scores_selftest() or _gather_addressing_selftest()
+    raise SystemExit(rc)

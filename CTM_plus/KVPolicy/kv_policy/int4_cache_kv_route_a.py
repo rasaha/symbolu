@@ -303,6 +303,12 @@ class INT4CacheKVRouteA:
         self._readskip_kernel_scores = (
             os.environ.get("INT4_READSKIP_KERNEL_SCORES", "0")
             not in ("0", "", "false", "False", "no"))
+        # Step 2: in-kernel gather decode on steady steps — read K/V in place via a
+        # retained-position index instead of host-compacting (no permute-copy, no
+        # index_select). Opt-in via INT4_READSKIP_INKERNEL=1.
+        self._readskip_inkernel = (
+            os.environ.get("INT4_READSKIP_INKERNEL", "0")
+            not in ("0", "", "false", "False", "no"))
         self._readskip_controllers: Dict[int, Any] = {}
         # Read-skip diagnostics (cumulative across the process; reset with
         # clear_readskip_stats() — e.g. after warmup). Answer the "evaluate gaps"
@@ -447,6 +453,7 @@ class INT4CacheKVRouteA:
             "readskip_calls": getattr(self, "_readskip_calls", 0),
             "readskip_controllers": len(getattr(self, "_readskip_controllers", {})),
             "readskip_kernel_scores": getattr(self, "_readskip_kernel_scores", False),
+            "readskip_inkernel": getattr(self, "_readskip_inkernel", False),
             # Diagnostics: how much retention ACTUALLY skipped + the observe/steady
             # step split (the gap-attribution the tps headline can't show).
             "readskip_observe_steps": getattr(self, "_readskip_observe_steps", 0),
@@ -969,10 +976,18 @@ def _wrap_attention_forward_with_fused_v2(
                 manager._profile_events["readskip_decision"].append((sec_s, sec_e))
 
             # ---- Section: kernel inputs (gather/compaction + contiguous copies) ----
+            # Step 2: in-kernel gather (no host compaction) when enabled AND this
+            # is a real retained subset (steady step). Observe/None -> normal path.
+            use_gather = (getattr(manager, "_readskip_inkernel", False)
+                          and active_positions is not None
+                          and cache.k_group_size == 1)
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
-            inputs = cache.kernel_inputs(active_positions=active_positions)
+            if use_gather:
+                inputs = cache.kernel_inputs_gather(active_positions)
+            else:
+                inputs = cache.kernel_inputs(active_positions=active_positions)
             if prof:
                 sec_e.record()
                 manager._profile_events["kernel_inputs"].append((sec_s, sec_e))
@@ -1020,23 +1035,43 @@ def _wrap_attention_forward_with_fused_v2(
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
-            from kv_policy.int4_fused_attention_kernel import (
-                fused_protected_k_decode_attention,
-            )
-            out = fused_protected_k_decode_attention(
-                q=q_kernel,
-                k_packed=inputs["k_packed"],
-                k_scale=inputs["k_scale"],
-                k_offset=inputs["k_offset"],
-                k_fp16=inputs["k_fp16"],
-                protect_mask=inputs["protect_mask"],
-                v_packed=inputs["v_packed"],
-                v_scale=inputs["v_scale"],
-                v_offset=inputs["v_offset"],
-                group_size_k=cache.k_group_size,
-                group_size_v=cache.v_group_size,
-                asymmetric=cache.asymmetric,
-            )  # (1, H_q, D) fp16
+            if use_gather:
+                from kv_policy.int4_fused_attention_kernel import (
+                    fused_protected_k_decode_attention_gather,
+                )
+                out = fused_protected_k_decode_attention_gather(
+                    q=q_kernel,
+                    k_packed=inputs["k_packed"],
+                    k_scale=inputs["k_scale"],
+                    k_offset=inputs["k_offset"],
+                    k_fp16=inputs["k_fp16"],
+                    protect_mask=inputs["protect_mask"],
+                    v_packed=inputs["v_packed"],
+                    v_scale=inputs["v_scale"],
+                    v_offset=inputs["v_offset"],
+                    gather_idx=inputs["gather_idx"],
+                    group_size_k=cache.k_group_size,
+                    group_size_v=cache.v_group_size,
+                    asymmetric=cache.asymmetric,
+                )  # (1, H_q, D) fp16
+            else:
+                from kv_policy.int4_fused_attention_kernel import (
+                    fused_protected_k_decode_attention,
+                )
+                out = fused_protected_k_decode_attention(
+                    q=q_kernel,
+                    k_packed=inputs["k_packed"],
+                    k_scale=inputs["k_scale"],
+                    k_offset=inputs["k_offset"],
+                    k_fp16=inputs["k_fp16"],
+                    protect_mask=inputs["protect_mask"],
+                    v_packed=inputs["v_packed"],
+                    v_scale=inputs["v_scale"],
+                    v_offset=inputs["v_offset"],
+                    group_size_k=cache.k_group_size,
+                    group_size_v=cache.v_group_size,
+                    asymmetric=cache.asymmetric,
+                )  # (1, H_q, D) fp16
             if prof:
                 sec_e.record()
                 manager._profile_events["kernel_call"].append((sec_s, sec_e))

@@ -299,7 +299,8 @@ def run_ab(args) -> int:
     print(f"[ab] backend={backend} modes={modes} seeds={seeds} depths={depths} "
           f"gen={gen} repeats={repeats} warmup={warmup} ctx={args.context_tokens} "
           f"max_model_len={args.max_model_len} "
-          f"kernel_scores={manager.stats.get('readskip_kernel_scores')}", flush=True)
+          f"kernel_scores={manager.stats.get('readskip_kernel_scores')} "
+          f"inkernel={manager.stats.get('readskip_inkernel')}", flush=True)
 
     def _chat(prompt):
         return tok.apply_chat_template(
@@ -421,6 +422,7 @@ def run_ab(args) -> int:
         "paired_vs_baseline": paired,
         "readskip_calls": st.get("readskip_calls"), "skip_diag": skip_diag,
         "readskip_kernel_scores": st.get("readskip_kernel_scores"),
+        "readskip_inkernel": st.get("readskip_inkernel"),
         "items": items,
     }
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
