@@ -10,6 +10,107 @@
 > keeps decode work **~flat as context grows** (bounded retained set), so that
 > stored long context stays usable instead of slowing decode linearly.
 
+## UPDATE — YaRN crossover MEASURED (~42k), but quality gate FAILED
+
+Ran the YaRN-extended sweep (`--hf-overrides` rope_scaling yarn factor 2.0,
+max_model_len 65536) to convert the projected crossover into a measured one:
+
+| ctx | off tps | retention tps | retention vs off | needle quality |
+|---:|---:|---:|---:|:--:|
+| 32 000 | 24.89 | 21.93 | **−11.9 %** (loss) | **0.0 / 0.0** |
+| 44 000 | 20.80 | 21.32 | **+2.5 %** (WIN) | **0.0 / 0.0** |
+| 52 000 / 60 000 | (running — `off` keeps slowing, retention stays flat) | | |
+
+**Two-sided result:**
+- ✅ **Crossover physics confirmed and measured.** `off` slopes down with context
+  (24.89 → 20.80 tps, linear KV read), `retention` stays flat (21.93 → 21.32,
+  bounded retained set ~1.7k, skip 94–96 %), so they **cross at ~42k** — *earlier*
+  than the ~50k extrapolation. The bounded-vs-linear thesis is now measured, not
+  projected.
+- ❌ **NOT a usable win — YaRN factor-2 broke the model.** Needle quality is **0.0 for
+  BOTH off and retention** at *both* contexts — including at 32k, which is *inside*
+  Qwen2.5-7B's native window, so static YaRN factor-2 degraded retrieval even
+  in-range (the runbook's predicted quality ceiling). A throughput crossover on a
+  model that can no longer retrieve the needle is mechanism-confirmation, not a
+  product result. (0.0 for both modes ⇒ it's the rope scaling, not read-skip.)
+
+**What it actually establishes:** the crossover is real memory-bandwidth physics and
+will hold — but a *usable* (throughput-positive AND quality-intact) crossover needs a
+model **natively trained for long context** (a 128k Qwen/Llama variant), NOT YaRN
+bolted onto a 32k-native model. The mechanism transfers; the quality collapse is a
+YaRN artifact specific to this extension.
+
+## RESOLVED — measured + usable crossover on Llama-3.1-8B (native 128k, NO YaRN)
+
+The clean version. `NousResearch/Meta-Llama-3.1-8B-Instruct`, native 128k (modest
+rope_scaling), int4 read-skip, no rope hacking:
+
+| ctx | off tps | retention tps | retention vs off | needle quality |
+|---:|---:|---:|---:|:--:|
+| 32 000 | 14.83 | 18.54 | **+25.0 %** | **1.0 / 1.0** |
+| 44 000 | 11.92 | 17.45 | **+46.4 %** | **1.0 / 1.0** |
+| 52 000 | 10.80 | 17.15 | **+58.8 %** | **1.0 / 1.0** |
+| 60 000 | 9.58 | 16.49 | **+72.2 %** | **1.0 / 1.0** |
+
+**Both claim-gate conditions pass at EVERY context, and the win grows monotonically.**
+`off` slopes down (14.83 → 9.58 as KV piles up); `retention` stays flat (~16–18, bounded
+~1.8k retained, 94–97 % skip); gap widens **+25 → +46 → +59 → +72 %**, needle **1.0/1.0
+throughout.**
+
+- **Earlier and steeper than Qwen** because Llama-3.1-8B has **8 KV heads vs Qwen's 4**
+  → ~2.3× the KV per token → `off`'s full-KV read is much heavier → bounded retention
+  wins sooner and by more. (Engine reports max-concurrency 3.91× vs Qwen-1M's 9.02×.)
+- **int4 KV preserves quality here** (standard rope_scaling) where Qwen-1M broke it
+  (extreme rope_theta) → int4 KV's long-context quality is **model-dependent**; a real
+  caveat for int4_protected on extreme-rope models, and the reason this demo is on Llama.
+
+**Verdict upgrade: read-skip's long-context throughput win is MEASURED, not projected.**
+On a widely-deployed 128k-native open model, read-skip decodes **+25 % at 32k growing to
++72 % at 60k**, reading ~95–97 % less KV, **quality fully preserved (needle 1.0/1.0).** The density framing
+below still holds for the ≤32k / short-context regime; *above* ~32k on KV-heavy
+long-context models, it's also a genuine **throughput** win.
+
+## GENERALIZATION — a second standard-rope model (Mistral), and the extreme-rope contrast (Qwen-1M)
+
+To check the crossover isn't a Llama artifact, the same int4 read-skip A/B ran on two
+more models. Net: **the throughput crossover generalizes; int4's long-context quality is
+rope-dependent; and read-skip's retention quality is model-dependent.**
+
+| model | rope | KV heads | ctx | `off` quality | retention vs off | retention quality |
+|---|---|---:|---:|:--:|---:|:--:|
+| Llama-3.1-8B | standard | 8 | 32 000 | 1.0 / 1.0 | **+25.0 %** | **1.0 / 1.0** |
+| Mistral-7B-v0.3 | standard | 8 | 30 000 | 1.0 / 1.0 | **+25.6 %** | 1.0 / **0.667** |
+| Qwen2.5-7B-1M | extreme θ | 4 | 8 000 | 1.0 | −18.8 % | 1.0 |
+| Qwen2.5-7B-1M | extreme θ | 4 | 32 000 | **0.667 / 0.0** | −11.7 % | 0.333 / 0.0 |
+
+(Raw: `native_sanity.json`, `native_ctx32000.json`, `mistral_ctx30k.json` in
+`bench_out/PHASE10_AB/`. The Mistral JSON is transcribed from the harness console log —
+provenance note inside the file — because its raw dump wasn't pulled off the pod.)
+
+**Three independent reads:**
+1. **The crossover generalizes and is GQA-width-driven.** Mistral (8 KV heads, standard
+   rope) crosses **+25.6 % at 30k** — within noise of Llama's +25.0 % at 32k. Both are
+   8-KV-head models, so `off`'s full-KV read is heavy and the bounded retained set wins
+   early. Qwen's 4 KV heads make `off` lighter → later (~42k) crossover, exactly as the
+   YaRN run showed. So the crossover point is a function of **KV-head count**, not of any
+   one model.
+2. **The long-context int4-quality wall is EXTREME-ROPE-SPECIFIC, not general.** Both
+   standard-rope models hold int4 `off` quality 1.0/1.0 out to 30–60k. The *only* model
+   that broke is **Qwen2.5-7B-1M**, whose rope_theta is cranked for a 1M window: it passes
+   at 8k (1.0) but **collapses by 32k (`off` 0.667/0.0)**. Because `off` itself fails, the
+   culprit is int4 K-quantization under extreme rope — **not** read-skip (which only ever
+   reads a subset of that same broken KV). This is the "quality wall at longer context"
+   seen live, now pinned to its cause: a genuine int4_protected caveat for extreme-rope
+   models, and the reason the headline demo runs on Llama, not Qwen-1M.
+3. **Read-skip's retention quality is model-dependent — the honest caveat.** Llama keeps
+   the retention needle **1.0/1.0**; Mistral keeps depth-0.1 at 1.0 but drops **depth-0.5
+   to 0.667** (2 of 3 seeds — one mid-context needle lost) at the *same* tuned keep-set
+   (sink 64 / recent 512 / budget 512). The EMA block-retention policy is not uniformly
+   lossless: on some models a mid-context fact falls outside the retained set. For a
+   quality-sensitive deployment the keep-set must be validated (or widened) per model —
+   retention is **not** a free, model-agnostic 1.0/1.0. (The throughput win, by contrast,
+   reproduces cleanly.)
+
 ## The deciding evidence — context sweep (refresh=0, tuned keep-set)
 
 `INT4_READSKIP_KERNEL_SCORES=1 SINK=64 RECENT=512 BUDGET=512 REFRESH=0`, gen=128,
@@ -113,11 +214,13 @@ python Bench/scripts/phase9_p3_fused_needle.py --ab --ab-modes off,retention \
 done
 ```
 
-## If resumed later (not pursued now)
+## If resumed later
 
-- **Prove the crossover:** YaRN rope-scaling (factor ~2) to run 48–64k and show
-  `retention` cross **positive**; validate YaRN doesn't erode needle quality at
-  extended context first.
+- **Prove the crossover — DONE (see the UPDATE section up top):** YaRN factor-2 ran
+  32–60k; crossover MEASURED at ~42k (`retention` +2.5 % at 44k), but YaRN broke
+  needle quality (0.0/0.0) — so the *next* step is a **natively-long-context model**
+  (128k Qwen/Llama) where no rope hacking is needed, to get a crossover that's
+  throughput-positive AND quality-intact.
 - **Pull the crossover earlier:** move the controller fully on-GPU to kill the
   per-step decision sync (`readskip_decision`); structural, risky, bounded by
   gather efficiency at ≤32k — diminishing returns vs the YaRN proof.

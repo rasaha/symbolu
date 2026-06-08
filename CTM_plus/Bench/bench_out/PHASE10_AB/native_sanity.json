@@ -1,0 +1,82 @@
+{
+  "kind": "within_process_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct-1M",
+  "backend": "fused_v2",
+  "context_tokens": 8000,
+  "gen": 64,
+  "repeats": 2,
+  "warmup_discarded": 1,
+  "seeds": [
+    1
+  ],
+  "depths": [
+    0.5
+  ],
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 65536,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 28.595,
+      "tps_std": 0.124,
+      "n_samples": 2,
+      "hit_rate_by_depth": {
+        "0.50": 1.0
+      }
+    },
+    "retention": {
+      "tps_mean": 23.22,
+      "tps_std": 0.049,
+      "n_samples": 2,
+      "hit_rate_by_depth": {
+        "0.50": 1.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {
+      "delta_pct_mean": -18.8,
+      "delta_pct_std": 0.0,
+      "n_cells": 1,
+      "deltas_pct": [
+        -18.8
+      ]
+    }
+  },
+  "readskip_calls": 3528,
+  "skip_diag": {
+    "steady_skip_frac": 0.7761095820966585,
+    "steady_retained_mean": 1697.761038961039,
+    "steady_seq_mean": 7583.0,
+    "observe_steps": 448,
+    "steady_steps": 3080
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 28.595,
+      "tps_std": 0.124,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "assistant\nThe hidden access code in the provided text is \"SIERRA-ALFA-FOXTROT\".\u2697"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 23.22,
+      "tps_std": 0.049,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "assistant\nThe hidden access code in the provided text is \"SIERRA-ALFA-FOXTROT\".a"
+    }
+  ]
+}

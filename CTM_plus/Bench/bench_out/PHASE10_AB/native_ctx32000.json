@@ -1,0 +1,192 @@
+{
+  "kind": "within_process_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct-1M",
+  "backend": "fused_v2",
+  "context_tokens": 32000,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "depths": [
+    0.1,
+    0.5
+  ],
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 65536,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 24.928,
+      "tps_std": 0.024,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 0.667,
+        "0.50": 0.0
+      }
+    },
+    "retention": {
+      "tps_mean": 22.008,
+      "tps_std": 0.223,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 0.333,
+        "0.50": 0.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {
+      "delta_pct_mean": -11.72,
+      "delta_pct_std": 0.59,
+      "n_cells": 6,
+      "deltas_pct": [
+        -10.89,
+        -11.96,
+        -11.43,
+        -12.66,
+        -11.6,
+        -11.75
+      ]
+    }
+  },
+  "readskip_calls": 64008,
+  "skip_diag": {
+    "steady_skip_frac": 0.9390164380377577,
+    "steady_retained_mean": 1833.6232492997199,
+    "steady_seq_mean": 30067.5,
+    "observe_steps": 4032,
+    "steady_steps": 59976
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.935,
+      "tps_std": 0.023,
+      "hit": 0,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "The hidden access code in the provided context is: **INDINDER-ECHO-MIKE**\n"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 22.219,
+      "tps_std": 0.171,
+      "hit": 0,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "The hidden access code in the provided context is: **INDINDER-ECHOCHO-M-M-M-M**M"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 24.911,
+      "tps_std": 0.01,
+      "hit": 0,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": " assistant\n\n assistant\n\n assistant\n\n assistant\n\n assistant\n\n assistant\n\n\n assist"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.933,
+      "tps_std": 0.07,
+      "hit": 0,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": " assistant\n\n assistant\n\n assistant\n_start_start assistant\n assistant assistant_s"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.959,
+      "tps_std": 0.015,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "The access code for the section north is **UNIFORM-LIMA-YANKEE**.\n"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 22.105,
+      "tps_std": 0.207,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "The access code for the section north is **UNIFORM-LIMA-YANKEE**** CODE provided"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 24.932,
+      "tps_std": 0.011,
+      "hit": 0,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": ""
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.776,
+      "tps_std": 0.317,
+      "hit": 0,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": " access accessassistant access accessited code archivedassistant"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.934,
+      "tps_std": 0.01,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "The hidden access code in the provided context is **VICTOR-UNIFORM-LIMA**.\n"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 22.041,
+      "tps_std": 0.18,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "The hidden access code in the provided context is **VICTOR-UNIFORM-L Lima code-L"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 24.897,
+      "tps_std": 0.021,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "Based on the document provided, the hidden access code embedded within the detai"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.972,
+      "tps_std": 0.2,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "Based on the document provided, the hidden access code recorded within the text "
+    }
+  ]
+}

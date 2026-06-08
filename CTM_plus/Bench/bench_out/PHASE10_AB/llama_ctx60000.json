@@ -1,0 +1,192 @@
+{
+  "kind": "within_process_ab",
+  "model": "NousResearch/Meta-Llama-3.1-8B-Instruct",
+  "backend": "fused_v2",
+  "context_tokens": 60000,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "depths": [
+    0.1,
+    0.5
+  ],
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 65536,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 9.58,
+      "tps_std": 0.006,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    },
+    "retention": {
+      "tps_mean": 16.492,
+      "tps_std": 0.107,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {
+      "delta_pct_mean": 72.16,
+      "delta_pct_std": 0.61,
+      "n_cells": 6,
+      "deltas_pct": [
+        72.53,
+        72.41,
+        72.81,
+        71.04,
+        72.02,
+        72.12
+      ]
+    }
+  },
+  "readskip_calls": 73152,
+  "skip_diag": {
+    "steady_skip_frac": 0.9681456269909077,
+    "steady_retained_mean": 1791.8403361344538,
+    "steady_seq_mean": 56251.0,
+    "observe_steps": 4608,
+    "steady_steps": 68544
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 9.578,
+      "tps_std": 0.004,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE<|start_header_id|>assistant<|end_header_id|>\n\nThe access code fo"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 16.525,
+      "tps_std": 0.012,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE<|start_header_id|>assistant<|end_header_id|>\n\nThe ACCESS_CODE fo"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 9.576,
+      "tps_std": 0.006,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT<|start_header_id|>assistant<|end_header_id|>\n\nThe access cod"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 16.51,
+      "tps_std": 0.084,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT<|start_header_id|><|start_header_id|><|start_header_id|><|st"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 9.58,
+      "tps_std": 0.011,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE<|start_header_id|>assistant<|end_header_id|>\n\nThe access cod"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 16.554,
+      "tps_std": 0.073,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE<|start_header_id|>assistant<|end_header_id|><|start_header_i"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 9.583,
+      "tps_std": 0.003,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO<|start_header_id|>assistant<|end_header_id|>\n\nGOLF-UNIFORM-KIL"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 16.391,
+      "tps_std": 0.065,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO<|start_header_id|>assistant<|end_header_id|>\n\nGOLF-<|start_hea"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 9.578,
+      "tps_std": 0.008,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA<|start_header_id|>assistant<|end_header_id|>\n\nThe access cod"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 16.476,
+      "tps_std": 0.224,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA<|start_header_id|>assistant<|end_header_id|><|start_header_i"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 9.584,
+      "tps_std": 0.004,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA<|start_header_id|>assistant<|end_header_id|>\n\nThe ACCESS_CO"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 16.496,
+      "tps_std": 0.077,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA<|start_header_id|><|start_header_id|><|start_header_id|><|s"
+    }
+  ]
+}
