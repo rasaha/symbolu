@@ -48,12 +48,15 @@ fused kernel — i.e. the kernel's GPU-validated input shapes.
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 try:
     import torch  # type: ignore
 except ImportError:  # pragma: no cover - guarded at caller
     torch = None  # type: ignore
+
+logger = logging.getLogger("int4_protected_k_cache")
 
 
 class ProtectedKINT4Cache:
@@ -517,11 +520,17 @@ class ProtectedKINT4Cache:
         if active_positions is None:
             rows = slice(0, s)
         else:
+            # Step 3: the controller passes an in-range GPU tensor (active_index);
+            # index_select needs int64. Cast (cheap on-device) but SKIP the
+            # int(min)/int(max) bounds-check sync for tensor inputs (it's a
+            # per-layer-per-step GPU->CPU stall and the controller guarantees the
+            # range). Python-list inputs (tests/other callers) keep the check.
+            already_tensor = torch.is_tensor(active_positions)
             rows = torch.as_tensor(active_positions, dtype=torch.long,
                                    device=self.k_packed_buf.device)
             if rows.ndim != 1 or rows.numel() < 1:
                 raise ValueError("active_positions must be a non-empty 1-D index")
-            if int(rows.min()) < 0 or int(rows.max()) >= s:
+            if not already_tensor and (int(rows.min()) < 0 or int(rows.max()) >= s):
                 raise ValueError(
                     f"active_positions out of range [0,{s}): "
                     f"[{int(rows.min())},{int(rows.max())}]")
@@ -559,13 +568,64 @@ class ProtectedKINT4Cache:
             "v_offset": v_offset,
         }
 
-    def block_attention_scores(self, query, block_size: int) -> list:
+    def kernel_inputs_gather(self, active_positions) -> dict:
+        """READ-SKIP Step 2: return the FULL, NATIVE, per-position buffers (no
+        permute, no index_select) plus ``gather_idx`` — the retained positions as
+        an int32 index. For ``fused_protected_k_decode_attention_gather``, which
+        reads K/V in place at ``gather_idx[logical]`` instead of compacting first.
+        Removes the 3 permute-contiguous copies AND the gather of
+        ``kernel_inputs(active_positions=…)``. ``k_group_size == 1`` only.
+
+        Returns ``[:s]`` views of the cache buffers (zero-copy) and the index."""
+        if torch is None:
+            raise ImportError("kernel_inputs_gather requires PyTorch.")
+        if not self._allocated or self._s_curr < 1:
+            raise ValueError("kernel_inputs_gather called on empty cache.")
+        if self._k_group_size != 1:
+            raise ValueError("kernel_inputs_gather assumes k_group_size == 1.")
+        if not self._protect_frozen:
+            self.freeze_protect_mask()
+        s = self._s_curr
+        # Step 3: the controller passes an in-range GPU int32 tensor; skip the
+        # per-step bounds-check sync for tensor inputs (controller guarantees it).
+        already_tensor = torch.is_tensor(active_positions)
+        gather_idx = torch.as_tensor(
+            active_positions, dtype=torch.int32, device=self.k_packed_buf.device)
+        if gather_idx.ndim != 1 or gather_idx.numel() < 1:
+            raise ValueError("active_positions must be a non-empty 1-D index")
+        if not already_tensor and (int(gather_idx.min()) < 0 or int(gather_idx.max()) >= s):
+            raise ValueError(
+                f"active_positions out of range [0,{s}): "
+                f"[{int(gather_idx.min())},{int(gather_idx.max())}]")
+        self._kernel_inputs_calls += 1
+        self._kernel_inputs_skip_calls = (
+            getattr(self, "_kernel_inputs_skip_calls", 0) + 1)
+        return {
+            "k_packed": self.k_packed_buf[:s],          # (s, H_kv, D//2) native view
+            "k_scale": self.k_scale_buf[:s],            # (s, H_kv, D)
+            "k_offset": self.k_offset_buf[:s] if self._asymmetric else None,
+            "k_fp16": self.k_fp16_buf[:s],              # (s, H_kv, D)
+            "protect_mask": self._protect_mask,
+            "v_packed": self.v_packed_buf[:s],          # (s, H_kv, D//2)
+            "v_scale": self.v_scale_buf[:s],            # (s, H_kv, n_grp_v)
+            "v_offset": self.v_offset_buf[:s] if self._asymmetric else None,
+            "gather_idx": gather_idx,
+        }
+
+    def block_attention_scores(self, query, block_size: int,
+                               use_kernel: bool = False) -> list:
         """READ-SKIP scoring: per-block decode-attention mass from `query` to the
         stored K, reconstructed EXACTLY as the fused kernel does
         (kiv*scale(+offset), then protect-overlay where the mask is set). Returns
         a python list of length n_blocks. Called only on observe/refresh steps.
 
         GQA: query heads are mean-pooled within each KV-head group. GPU path.
+
+        ``use_kernel`` (Step 1): emit the per-block scores from a fused Triton pass
+        (``fused_protected_k_block_scores``) instead of reconstructing the WHOLE K
+        in eager torch — the Phase-10 measured bottleneck. Same result (proven by
+        the numpy decomposition==softmax proof); fail-open to the torch path if the
+        kernel is unavailable or raises.
         """
         import math
         from kv_policy.int4_per_channel_kv import unpack_int4
@@ -575,11 +635,29 @@ class ProtectedKINT4Cache:
         nb = (s + block_size - 1) // block_size
         if s < 1 or D is None or H_kv is None:
             return [0.0] * max(nb, 0)
-        # Reconstruct K_eff (s, H_kv, D) — mirror the kernel exactly.
         # The protect mask is frozen lazily by kernel_inputs(); scoring runs
         # BEFORE that on the first decode step, so freeze here if needed.
         if not self._protect_frozen:
             self.freeze_protect_mask()
+
+        # ---- Step 1: kernel-emitted block scores (no torch K reconstruction) ----
+        if use_kernel and torch is not None and getattr(query, "is_cuda", False) \
+                and self._k_group_size == 1:
+            try:
+                from kv_policy.int4_fused_attention_kernel import (
+                    fused_protected_k_block_scores, combine_block_scores)
+                blk_sum, blk_max = fused_protected_k_block_scores(
+                    query, self.k_packed_buf, self.k_scale_buf,
+                    (self.k_offset_buf if self._asymmetric else None),
+                    self.k_fp16_buf, self._protect_mask,
+                    num_kv_heads=H_kv, head_dim=D, asymmetric=self._asymmetric,
+                    block_size=block_size, seq_len=s)
+                return combine_block_scores(blk_sum, blk_max)
+            except Exception:  # noqa: BLE001 — fail-open to the torch path
+                logger.exception(
+                    "kernel block-scores failed; falling back to torch scoring")
+
+        # ---- Torch path (reference): reconstruct K_eff (s, H_kv, D) exactly. ----
         kiv = unpack_int4(self.k_packed_buf[:s], D).float()          # [-8,7]
         k_dq = kiv * self.k_scale_buf[:s].float()
         if self._asymmetric and self.k_offset_buf is not None:

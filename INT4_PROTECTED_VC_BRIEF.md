@@ -1,7 +1,7 @@
 # int4_protected — VC Brief
 
 **Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M)*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10)*
 
 ---
 
@@ -23,14 +23,22 @@
 > - **token *value* / accuracy (shipped):** quality held at bf16 parity (MMLU/ARC
 >   0.0 pt; needle preserved). A cheap *wrong* token has no value — this is the
 >   wedge: fp8 and naive int4 buy density by spending accuracy; we don't.
-> - **per watt (early-validated, in build):** attention-guided read-skip cuts
->   per-token KV-read traffic at long context — the energy-per-token lever. On the
->   **production fused kernel**, measured: **quality preserved to ~86% skip**
->   (needle 1.0 at every depth; byte-eq verified) and **decode throughput at
->   breakeven** vs full int4 (up from 2× slower as the implementation entered the
->   right regime), with a clear kernel-optimization path (kernel-emitted scores,
->   longer context) toward the ~1.9× the cost model predicts. The gains are
->   software-capturable — not a hardware mandate.
+> - **per watt / long-context (in build, Phase 10):** layered on the int4 cache,
+>   attention-guided **read-skip** cuts per-token KV-read traffic — the
+>   energy-per-token lever — by **94% at 32K with needle quality fully preserved**
+>   (1.0/1.0 at both depths; the retained-index path is GPU-verified
+>   output-identical to full-read, `gather == full-read`). Honest on timing:
+>   below ~32K decode is weight-bound and full-int4 KV reads are already cheap, so
+>   read-skip measures **−10.6% vs full-int4 at 32K** (recovered from ~−30% as the
+>   controller moved on-GPU — tensor index + cached block-ids + tuned observe
+>   cadence). But the retained set is **bounded** while full attention grows
+>   **linearly**: the measured A/B gap **halves from 16K→32K** and the curves
+>   **extrapolate to cross near ~50K**, where read-skip turns throughput-positive
+>   (a YaRN-extended run to convert that extrapolation into a measured number is
+>   the next gate). Realized value today is **density + flat decode-scaling that
+>   compounds on int4** — store 4× the context per GB and hold per-token decode
+>   ~flat as context grows, not a sub-32K speed win. Software-capturable, not a
+>   hardware mandate.
 >
 > The bet: when accuracy is non-negotiable, the efficiency frontier is won by the
 > approach that compounds density + energy savings *on top of* preserved quality —
@@ -478,6 +486,7 @@ recompile, not a methodology change.
 | Sidecar diet (fp8 sidecars, option C) | ~3 days kernel work | Reduces sidecar overhead by ~1.7 GB (partial toward HBM parity) |
 | Pre-calibrated mask zoo | 1 day | Ship 10-20 popular models pre-calibrated; remove user-side calibration step |
 | Cold-tier (per-session safetensors snapshot/restore) | 4-6 weeks | Optional 3-tier KV storage (hot GPU / warm CPU swap / cold disk). Warm-tier foundation verified bit-clean (TIER5A measured GREEN — see Page 6). |
+| **Read-skip long-context crossover (YaRN-extended 48–64K)** | 2–3 days | Convert the **~50K crossover extrapolation into a measured throughput-positive number** — the read-skip headline. Rope-scaling decouples the speed win from Qwen-7B's 32K native cap; validate needle quality holds at extended context first. Tooling (`phase9_p3_fused_needle.py --ab`) is committed; gated only on the YaRN config + GPU time. |
 
 **Tier 3 — research extensions**
 
@@ -550,6 +559,7 @@ every cell × mml.
 | Warm-tier swap-restore is byte-clean for int4_protected on vLLM 0.7.3 (Qwen-7B + A100 + `preemption_mode='swap'`): under matched concurrent pressure, swap-mode and recompute-mode baselines produced bit-identical 64-token output. All six TIER5A acceptance gates GREEN. | TIER5A bench: `Bench/scripts/PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md` |
 | Read-path preflight for CUDA Graphs (B-pre-1..4) COMPLETE; graph mode verified correct end-to-end (6K.10) | `Bench/scripts/OPTION_B_PREFLIGHT.md`; `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` |
 | CPU regression: slot lifecycle (5/5 PASS, including wave-leak repro + fix) | `Bench/tests/test_phase6k14_slot_gc.py` |
+| **Read-skip (Phase 10, Qwen-7B, A100):** at 32K context **94% of per-token KV positions skipped** with **needle 1.0/1.0** (depths 0.1/0.5); the retained-index path is GPU-gated **output-identical to full-read** (`gather == compacted == full`). Decode **−10.6% vs full-int4 at 32K** (weight-bound regime; recovered from ~−30% via on-GPU tensor index + block-id cache + tuned observe cadence). A/B gap **halves 16K→32K** (5.05→2.67 tok/s), extrapolating to a ~50K crossover | `phase9_p3_fused_needle.py --ab` (sweep 8K/16K/32K); `test_gather_decode_gpu.py`; `Bench/scripts/PHASE10_FINAL_VERDICT.md` |
 
 ### Tested-and-found (the negative results — partner-shareable)
 
@@ -561,6 +571,7 @@ every cell × mml.
 | **Pure int4 KIVI on K + V** | Token-agreement vs bf16 = 0.533 (53%); hard-needle misses = 5 (4 V-bound + 1 K-bound) vs bf16's 0. The K channel is the dominant failure; protected-K eliminates K-bound misses. |
 | **Higher protect_fractions (6%, 8%, 16%)** | 4% holds for Mistral-7B / Llama-3.1-8B / Qwen-14B (2-of-2 seeds). Qwen-7B shows seed-level variance at L1200 under 4%; 6%/8% is the documented safety knob. |
 | **`enforce_eager=False` graph capture (pre-fix)** | Crashed pre-Phase 6K.10. Post-fix: graph mode correct (A_rate=0.0 all cells). Write-path capture (for full CUDA-graph throughput benefit) is the remaining engineering item. |
+| **Read-skip decode below ~32K** | Throughput-NEGATIVE: −17.6% (8K), −17.7% (16K), −10.6% (32K) vs full-int4. Below ~32K decode is weight-bound and full-int4 KV reads are already cheap/coalesced, so skipping 94% of a *scattered* gather doesn't beat the *contiguous* full read. Attribution: the residual is the **gather/compaction copy**, NOT the controller (the per-step GPU→CPU sync was already removed on-GPU in Phase 10). The win is gated to long context (≳50K, extrapolated) — not a sub-32K speed play. |
 
 ### Honest cost / risk
 
@@ -585,6 +596,8 @@ every cell × mml.
 | Sidecar diet option C (~1.7 GB savings) + option F preserves token-agreement gain | Medium — no quality re-bench yet after diet |
 | Methodology extends to Phi (D=96) | Medium — calibration math is architecture-agnostic; kernel constraint is the only barrier |
 | Methodology extends to mixture-of-experts (Mixtral, DeepSeek) | Untested — MoE adds routing complexity orthogonal to attention |
+| **Read-skip turns decode throughput-positive past ~50K context** (bounded retained set vs linear full-attention; the measured 16K→32K gap-halving extrapolated) | Medium — **two independent estimates agree**: the A/B gap-halving extrapolates to ~50K, and **section-level profiling independently predicts ~53K** (the `kernel_call` skip-saving scales with context while the fixed overhead stack — `cache_append` + decision + index — stays mostly bounded). Still **PROJECTED, no measured speedup claimed**: the crossover sits past Qwen-7B's 32K native window, so a YaRN-extended run is needed to confirm it directly |
+| **Read-skip general fidelity under skip** — token-agreement beyond needle, + the observe-refresh quality/speed knob | Untested — needle 1.0/1.0 validated at 94% skip, but broader generation fidelity and the refresh-cadence trade-off on *shifting*-attention workloads (the static needle is favorable) are not yet benched |
 
 ---
 

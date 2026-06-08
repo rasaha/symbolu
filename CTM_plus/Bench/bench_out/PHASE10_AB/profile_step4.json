@@ -1,0 +1,67 @@
+{
+  "kind": "profile_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "backend": "fused_v2",
+  "context_tokens": 30720,
+  "gen": 128,
+  "items": 2,
+  "depth": 0.5,
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "per_mode": {
+    "off": {
+      "sections": {
+        "reshape_kv": 0.0113,
+        "cache_append": 0.1979,
+        "readskip_decision": 0.0052,
+        "kernel_inputs": 0.1452,
+        "kernel_call": 0.7645,
+        "cast_back": 0.0096,
+        "total_bypass": 1.1673
+      },
+      "total_bypass_split": null,
+      "skip_frac": 0.0,
+      "observe_steps": 0,
+      "steady_steps": 0
+    },
+    "retention": {
+      "sections": {
+        "reshape_kv": 0.0359,
+        "cache_append": 0.5675,
+        "readskip_decision": 0.2205,
+        "kernel_inputs": 0.2288,
+        "kernel_call": 0.372,
+        "cast_back": 0.0095,
+        "total_bypass": 1.5051
+      },
+      "total_bypass_split": {
+        "observe": {
+          "n": 448,
+          "mean_ms": 2.3469453592385565,
+          "total_ms": 1051.4315209388733
+        },
+        "steady": {
+          "n": 6664,
+          "mean_ms": 1.4484640100852353,
+          "total_ms": 9652.564163208008
+        }
+      },
+      "skip_frac": 0.9406770362354757,
+      "observe_steps": 448,
+      "steady_steps": 6664
+    }
+  },
+  "section_order": [
+    "kernel_call",
+    "readskip_decision",
+    "kernel_inputs",
+    "cache_append",
+    "reshape_kv",
+    "cast_back",
+    "total_bypass"
+  ],
+  "max_model_len": 32768
+}

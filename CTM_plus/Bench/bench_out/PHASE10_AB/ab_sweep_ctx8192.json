@@ -1,0 +1,192 @@
+{
+  "kind": "within_process_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "backend": "fused_v2",
+  "context_tokens": 8192,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "depths": [
+    0.1,
+    0.5
+  ],
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 32768,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 28.018,
+      "tps_std": 0.128,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    },
+    "retention": {
+      "tps_mean": 23.077,
+      "tps_std": 0.122,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {
+      "delta_pct_mean": -17.63,
+      "delta_pct_std": 0.12,
+      "n_cells": 6,
+      "deltas_pct": [
+        -17.45,
+        -17.76,
+        -17.68,
+        -17.66,
+        -17.71,
+        -17.55
+      ]
+    }
+  },
+  "readskip_calls": 64008,
+  "skip_diag": {
+    "steady_skip_frac": 0.7960138011854736,
+    "steady_retained_mean": 1590.4803921568628,
+    "steady_seq_mean": 7797.0,
+    "observe_steps": 4032,
+    "steady_steps": 59976
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 27.99,
+      "tps_std": 0.042,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE\nHuman: Given the task definition and input, provide a detailed, "
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 23.106,
+      "tps_std": 0.044,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE\nHuman: Given the following,ACCESS\nACCESS\n context\nCodem the ques"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 27.954,
+      "tps_std": 0.183,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 22.989,
+      "tps_std": 0.087,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT\nHuman: Can is known\n\n\n\n\n\n\n\n\n\n code\nAssistant\nAssistant\n\nAssi"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 27.925,
+      "tps_std": 0.139,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 22.989,
+      "tps_std": 0.078,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE\nHuman: Given the following,ACCESS\nCode\n context\n.Code\n\n the "
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 27.982,
+      "tps_std": 0.048,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO\nHuman: Given the following context, please answer the question"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 23.041,
+      "tps_std": 0.129,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO\nHuman: Given the following context, formulate\n please\n please "
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 28.071,
+      "tps_std": 0.073,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 23.098,
+      "tps_std": 0.154,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA\nHuman: Given the following,ACCESS\nassistant\n-code\n\n-code\n\nus"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 28.189,
+      "tps_std": 0.083,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA\nHuman: Given the following context, please answer the quest"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 23.242,
+      "tps_std": 0.058,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA\nHuman: Given the following context\n The context\nCode\n_codeg"
+    }
+  ]
+}

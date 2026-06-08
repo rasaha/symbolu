@@ -81,6 +81,32 @@ BACKEND_FUSED_V2 = "fused_v2"
 _VALID_BACKENDS = (BACKEND_DEQUANT_FALLBACK, BACKEND_FUSED_V2)
 
 
+def _observe_steady_split(times_ms, metas) -> dict:
+    """Split per-step ``total_bypass`` times (ms) into the read-skip OBSERVE vs
+    STEADY phases, using the per-step meta tuples ``(kind, is_observe, seq,
+    retained)`` recorded in lockstep. OBSERVE steps re-read the whole cache +
+    re-score (the P4b residual cost); STEADY steps are the compacted, actually-
+    skipping ones. Only ``retention`` steps are classified. Returns
+    ``{'observe': {...}, 'steady': {...}}`` for whichever bucket has samples.
+
+    PURE (no torch / no CUDA) so it is CPU-unit-testable; the caller turns CUDA
+    events into ``times_ms`` first.
+    """
+    if len(times_ms) != len(metas):
+        return {}
+    obs, std = [], []
+    for t, meta in zip(times_ms, metas):
+        if not meta or meta[0] != "retention":
+            continue
+        (obs if meta[1] else std).append(float(t))
+    out = {}
+    for name, xs in (("observe", obs), ("steady", std)):
+        if xs:
+            out[name] = {"n": len(xs), "mean_ms": sum(xs) / len(xs),
+                         "total_ms": sum(xs)}
+    return out
+
+
 class INT4CacheKVRouteA:
     """Per-call KIVI INT4 compress→decompress for the vLLM Attention
     layer.
@@ -240,6 +266,11 @@ class INT4CacheKVRouteA:
             "cast_back": [],
             "total_bypass": [],
         }
+        # Per-bypass-step meta, appended in lockstep with ``total_bypass`` so
+        # ``get_profile_stats`` can split the step cost into the read-skip
+        # OBSERVE phase (re-read all + re-score — the P4b residual) vs the STEADY
+        # (compacted, actually-skipping) phase. Tuple: (kind, is_observe, seq, retained).
+        self._profile_step_meta: list = []
 
         # READ-SKIP (Phase-9 build): which historical KV positions the fused
         # decode reads. "off" = read all ([:s], identity — default, no behavior
@@ -266,22 +297,57 @@ class INT4CacheKVRouteA:
             self._readskip_decay = float(os.environ.get("INT4_READSKIP_DECAY", 0.8))
         except ValueError:
             self._readskip_decay = 0.8
+        # Step 1: emit observe-step block scores from the fused Triton kernel
+        # instead of reconstructing the whole K in eager torch (the Phase-10
+        # bottleneck). Opt-in via INT4_READSKIP_KERNEL_SCORES=1.
+        self._readskip_kernel_scores = (
+            os.environ.get("INT4_READSKIP_KERNEL_SCORES", "0")
+            not in ("0", "", "false", "False", "no"))
+        # Step 2: in-kernel gather decode on steady steps — read K/V in place via a
+        # retained-position index instead of host-compacting (no permute-copy, no
+        # index_select). Opt-in via INT4_READSKIP_INKERNEL=1.
+        self._readskip_inkernel = (
+            os.environ.get("INT4_READSKIP_INKERNEL", "0")
+            not in ("0", "", "false", "False", "no"))
         self._readskip_controllers: Dict[int, Any] = {}
+        # Read-skip diagnostics (cumulative across the process; reset with
+        # clear_readskip_stats() — e.g. after warmup). Answer the "evaluate gaps"
+        # questions the tps headline can't: (1) how much was ACTUALLY skipped
+        # (skip fraction = 1 - retained/seq on STEADY steps), and (2) the
+        # observe/steady STEP split (observe steps re-read all + re-score).
+        self._readskip_observe_steps = 0
+        self._readskip_steady_steps = 0
+        self._readskip_retained_tokens = 0   # summed over STEADY steps only
+        self._readskip_seq_tokens = 0        # summed over STEADY steps only
+        self._last_readskip_meta = None      # (kind, is_observe, seq, retained)
 
     def _readskip_active_positions(self, cache, query=None) -> "Optional[List[int]]":
         """READ-SKIP: retained KV positions for this decode step, or None (read
         all). "off" -> None (identity). "retain_all" -> range(s) (byte-eq gate).
         "retention" -> per-cache ReadSkipController fed decode-attention block
         scores (sink+recent+top-attention+neighbors); observe/refresh steps read
-        all. Fail-open: any scoring error -> read all this step."""
+        all. "score_noskip" (Stage-A diagnostic) -> score on the normal cadence
+        but ALWAYS read all (return None, no gather): isolates pure scoring
+        overhead with quality identical to "off" (nothing is skipped). The bench
+        then decomposes the cost: (score_noskip - off) = scoring overhead;
+        (retain_all - off) = gather-all tax; (retention - off) = the net.
+        Fail-open: any scoring error -> read all this step."""
         mode = self._readskip_mode
         if mode == "off":
+            self._last_readskip_meta = ("off", None, cache.seq_len, cache.seq_len)
             return None
         s = cache.seq_len
         if mode == "retain_all":
             self._readskip_calls += 1
-            return list(range(s))          # must be byte-identical to "off"
-        if mode == "retention":
+            self._last_readskip_meta = ("retain_all", None, s, s)
+            # Step 3: GPU arange, NOT torch.as_tensor(list(range(s))) — the latter
+            # is the per-step cost the profile exposed (retain_all kernel_inputs
+            # 3.28ms). Must still be byte-identical to "off".
+            buf = getattr(cache, "k_packed_buf", None)
+            if torch is not None and buf is not None:
+                return torch.arange(s, device=buf.device, dtype=torch.int32)
+            return list(range(s))          # CPU fallback (selftest)
+        if mode in ("retention", "score_noskip"):
             self._readskip_calls += 1
             from kv_policy.readskip_select import ReadSkipController
             ctrl = self._readskip_controllers.get(id(cache))
@@ -296,16 +362,44 @@ class INT4CacheKVRouteA:
                     refresh_every=self._readskip_refresh,
                     score_decay=self._readskip_decay)
                 self._readskip_controllers[id(cache)] = ctrl
+            # Capture the observe/steady classification BEFORE active_positions
+            # advances the controller's step counter (needs_scores is pure).
+            was_observe = ctrl.needs_scores()
             scores = None
-            if ctrl.needs_scores() and query is not None:
+            if was_observe and query is not None:
                 try:
                     scores = cache.block_attention_scores(
-                        query, self._readskip_block_size)
+                        query, self._readskip_block_size,
+                        use_kernel=self._readskip_kernel_scores)
                 except Exception:  # noqa: BLE001 — fail-open: read all this step
                     logger.exception(
                         "read-skip block scoring failed; reading all this step")
                     scores = None
-            return ctrl.active_positions(s, block_scores=scores)
+            # Step 3: build the retained index as a GPU tensor straight from the
+            # small block set (no per-layer torch.as_tensor of a multi-thousand
+            # Python list — the kernel_inputs bottleneck the profile exposed). CPU
+            # fallback (no torch / stub cache) keeps the Python-list path.
+            buf = getattr(cache, "k_packed_buf", None)
+            if torch is not None and buf is not None:
+                active = ctrl.active_index(s, buf.device, block_scores=scores)
+                retained = int(active.numel())
+            else:
+                active = ctrl.active_positions(s, block_scores=scores)
+                retained = len(active)
+            # --- diagnostics: skip fraction + observe/steady split ---
+            # In score_noskip the controller still computes its selection (so the
+            # would-be skip fraction is recorded — a safe offline replay, since we
+            # read all), but we discard it below.
+            if was_observe:
+                self._readskip_observe_steps += 1   # re-read all + re-score
+            else:
+                self._readskip_steady_steps += 1    # compacted (actually skipping)
+                self._readskip_retained_tokens += retained
+                self._readskip_seq_tokens += s
+            self._last_readskip_meta = (mode, was_observe, s, retained)
+            if mode == "score_noskip":
+                return None      # scored (cost paid) but read-all, no gather
+            return active
         return None
 
     @property
@@ -356,6 +450,9 @@ class INT4CacheKVRouteA:
         cache_stats = {
             mid: c.stats for mid, c in self._caches.items()
         } if self._kernel_backend == BACKEND_FUSED_V2 else {}
+        steady = getattr(self, "_readskip_steady_steps", 0)
+        retsum = getattr(self, "_readskip_retained_tokens", 0)
+        seqsum = getattr(self, "_readskip_seq_tokens", 0)
         return {
             "forward_calls": self._forward_calls,
             "tokens_compressed": self._tokens_compressed,
@@ -370,6 +467,17 @@ class INT4CacheKVRouteA:
             "readskip_mode": getattr(self, "_readskip_mode", "off"),
             "readskip_calls": getattr(self, "_readskip_calls", 0),
             "readskip_controllers": len(getattr(self, "_readskip_controllers", {})),
+            "readskip_kernel_scores": getattr(self, "_readskip_kernel_scores", False),
+            "readskip_inkernel": getattr(self, "_readskip_inkernel", False),
+            # Diagnostics: how much retention ACTUALLY skipped + the observe/steady
+            # step split (the gap-attribution the tps headline can't show).
+            "readskip_observe_steps": getattr(self, "_readskip_observe_steps", 0),
+            "readskip_steady_steps": getattr(self, "_readskip_steady_steps", 0),
+            "readskip_steady_retained_mean": (
+                retsum / steady if steady else 0.0),
+            "readskip_steady_seq_mean": (seqsum / steady if steady else 0.0),
+            "readskip_steady_skip_frac": (
+                1.0 - retsum / seqsum if seqsum else 0.0),
         }
 
     # ------------------------------------------------------------------ #
@@ -410,6 +518,35 @@ class INT4CacheKVRouteA:
             cache.reset()
         getattr(self, "_readskip_controllers", {}).clear()
 
+    def set_readskip_mode(self, mode: str) -> None:
+        """Switch the read-skip mode at RUNTIME and clear per-sequence controllers.
+
+        Enables a WITHIN-PROCESS paired A/B (e.g. off vs retention on a single
+        warm engine), which removes the cross-run GPU-clock/warmup drift that made
+        separate-process comparisons noisy in Phase 9 (off drifted 10.75 -> 8.9 ->
+        7.29 across processes). The retention KNOBS (sink/recent/budget/observe/
+        refresh/decay) are fixed at ``__init__`` from the env — this only flips
+        WHICH policy runs, never the policy's parameters. Clearing the controllers
+        makes the next sequence re-observe from scratch (no stale EMA bleeding from
+        the previously-measured mode).
+        """
+        valid = ("off", "retain_all", "retention", "score_noskip")
+        if mode not in valid:
+            raise ValueError(
+                f"unknown read-skip mode {mode!r}; expected one of {valid}")
+        self._readskip_mode = mode
+        getattr(self, "_readskip_controllers", {}).clear()
+
+    def clear_readskip_stats(self) -> None:
+        """Reset the cumulative read-skip diagnostics (calls, skip fraction,
+        observe/steady step counts). Call after warmup so the reported skip
+        fraction reflects only the measured phase, not the discarded warmup."""
+        self._readskip_calls = 0
+        self._readskip_observe_steps = 0
+        self._readskip_steady_steps = 0
+        self._readskip_retained_tokens = 0
+        self._readskip_seq_tokens = 0
+
     def _record_fused_v2_fallback(self, reason: str) -> None:
         self._fused_v2_fallbacks[reason] = (
             self._fused_v2_fallbacks.get(reason, 0) + 1
@@ -431,6 +568,7 @@ class INT4CacheKVRouteA:
         ``set_profiling(True)`` for a fresh measurement."""
         for events in self._profile_events.values():
             events.clear()
+        self._profile_step_meta.clear()
 
     def get_profile_stats(self) -> dict:
         """Read the recorded per-section CUDA-event timings. Forces
@@ -455,6 +593,15 @@ class INT4CacheKVRouteA:
                 "p99_ms": times_ms[min(n - 1, int(0.99 * n))],
                 "total_ms": sum(times_ms),
             }
+        # Observe vs steady split of the whole-step cost (in recorded order, so it
+        # stays aligned with the per-step meta). This is what attributes a gap:
+        # if steady << observe, the win is being eaten by the observe phase.
+        tb = self._profile_events.get("total_bypass", [])
+        split = _observe_steady_split(
+            [start.elapsed_time(end) for start, end in tb],
+            list(self._profile_step_meta))
+        if split:
+            stats["total_bypass_split"] = split
         return stats
 
     def round_trip_kv(
@@ -844,10 +991,18 @@ def _wrap_attention_forward_with_fused_v2(
                 manager._profile_events["readskip_decision"].append((sec_s, sec_e))
 
             # ---- Section: kernel inputs (gather/compaction + contiguous copies) ----
+            # Step 2: in-kernel gather (no host compaction) when enabled AND this
+            # is a real retained subset (steady step). Observe/None -> normal path.
+            use_gather = (getattr(manager, "_readskip_inkernel", False)
+                          and active_positions is not None
+                          and cache.k_group_size == 1)
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
-            inputs = cache.kernel_inputs(active_positions=active_positions)
+            if use_gather:
+                inputs = cache.kernel_inputs_gather(active_positions)
+            else:
+                inputs = cache.kernel_inputs(active_positions=active_positions)
             if prof:
                 sec_e.record()
                 manager._profile_events["kernel_inputs"].append((sec_s, sec_e))
@@ -895,23 +1050,43 @@ def _wrap_attention_forward_with_fused_v2(
             sec_s, sec_e = _new_event_pair()
             if prof:
                 sec_s.record()
-            from kv_policy.int4_fused_attention_kernel import (
-                fused_protected_k_decode_attention,
-            )
-            out = fused_protected_k_decode_attention(
-                q=q_kernel,
-                k_packed=inputs["k_packed"],
-                k_scale=inputs["k_scale"],
-                k_offset=inputs["k_offset"],
-                k_fp16=inputs["k_fp16"],
-                protect_mask=inputs["protect_mask"],
-                v_packed=inputs["v_packed"],
-                v_scale=inputs["v_scale"],
-                v_offset=inputs["v_offset"],
-                group_size_k=cache.k_group_size,
-                group_size_v=cache.v_group_size,
-                asymmetric=cache.asymmetric,
-            )  # (1, H_q, D) fp16
+            if use_gather:
+                from kv_policy.int4_fused_attention_kernel import (
+                    fused_protected_k_decode_attention_gather,
+                )
+                out = fused_protected_k_decode_attention_gather(
+                    q=q_kernel,
+                    k_packed=inputs["k_packed"],
+                    k_scale=inputs["k_scale"],
+                    k_offset=inputs["k_offset"],
+                    k_fp16=inputs["k_fp16"],
+                    protect_mask=inputs["protect_mask"],
+                    v_packed=inputs["v_packed"],
+                    v_scale=inputs["v_scale"],
+                    v_offset=inputs["v_offset"],
+                    gather_idx=inputs["gather_idx"],
+                    group_size_k=cache.k_group_size,
+                    group_size_v=cache.v_group_size,
+                    asymmetric=cache.asymmetric,
+                )  # (1, H_q, D) fp16
+            else:
+                from kv_policy.int4_fused_attention_kernel import (
+                    fused_protected_k_decode_attention,
+                )
+                out = fused_protected_k_decode_attention(
+                    q=q_kernel,
+                    k_packed=inputs["k_packed"],
+                    k_scale=inputs["k_scale"],
+                    k_offset=inputs["k_offset"],
+                    k_fp16=inputs["k_fp16"],
+                    protect_mask=inputs["protect_mask"],
+                    v_packed=inputs["v_packed"],
+                    v_scale=inputs["v_scale"],
+                    v_offset=inputs["v_offset"],
+                    group_size_k=cache.k_group_size,
+                    group_size_v=cache.v_group_size,
+                    asymmetric=cache.asymmetric,
+                )  # (1, H_q, D) fp16
             if prof:
                 sec_e.record()
                 manager._profile_events["kernel_call"].append((sec_s, sec_e))
@@ -930,6 +1105,9 @@ def _wrap_attention_forward_with_fused_v2(
                 manager._profile_events["cast_back"].append((sec_s, sec_e))
                 tot_e.record()
                 manager._profile_events["total_bypass"].append((tot_s, tot_e))
+                # Lockstep with total_bypass so get_profile_stats can split the
+                # step cost into the read-skip observe vs steady phases.
+                manager._profile_step_meta.append(manager._last_readskip_meta)
             return out
         except Exception:  # noqa: BLE001 — fail-open per fail-safe posture
             logger.exception(
