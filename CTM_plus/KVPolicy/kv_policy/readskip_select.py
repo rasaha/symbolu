@@ -136,6 +136,7 @@ class ReadSkipController:
         self._step = 0
         self._ema: Dict[int, float] = {}
         self._retained: Optional[Set[int]] = None
+        self._cached_blocks = None    # Step 4: GPU block-id tensor, rebuilt on observe
 
     def _is_observe_step(self) -> bool:
         return (self._step < self.observe_steps
@@ -176,30 +177,32 @@ class ReadSkipController:
                 recent_block_set(seq_len, self.recent_tokens, self.block_size),
                 self.budget_blocks, self.neighbor_blocks)
         self._step += 1
+        if observe:
+            self._cached_blocks = None    # retained set may have changed -> rebuild
         return observe or self._retained is None
 
     def active_index(self, seq_len: int, device,
                      block_scores: Optional[Sequence[float]] = None):
-        """READ-SKIP Step 3: the retained positions as a GPU int32 tensor, built
-        on-device from the SMALL retained-block set — NOT a Python list. Avoids
-        the per-layer-per-step ``torch.as_tensor(list_of_thousands)`` that the
-        profile showed dominates ``kernel_inputs`` (1.3ms vs off's 0.14ms). Same
-        positions as ``active_positions`` (proven by ``_index_expand_selftest``);
-        same cadence/EMA side-effects."""
+        """READ-SKIP Step 3+4: the retained positions as a GPU int32 tensor, built
+        on-device from the SMALL retained-block set — NOT a Python list. Avoids the
+        per-layer-per-step ``torch.as_tensor(list_of_thousands)`` that the profile
+        showed dominates ``kernel_inputs``.
+
+        Step 4: cache the BLOCK-ID tensor (``torch.tensor(sorted(retained))`` — the
+        expensive Python->GPU transfer), rebuilt only on observe steps since
+        ``self._retained`` is constant across steady steps. The cheap expansion +
+        ``< seq_len`` filter still runs every step, so the highest block correctly
+        picks up new tokens as ``seq_len`` grows — i.e. EXACTLY ``active_positions``
+        / ``blocks_to_positions``, no staleness. Same cadence/EMA effects."""
         import torch
         read_all = self._step_and_select(seq_len, block_scores)
         if read_all:
             return torch.arange(seq_len, device=device, dtype=torch.int32)
-        return self._retained_to_index(seq_len, device)
-
-    def _retained_to_index(self, seq_len: int, device):
-        """Expand self._retained (a small block set, ~50-200) -> sorted GPU int32
-        positions, on-device (torch.arange per block via broadcast; the last
-        partial block is clamped to seq_len). Block-major + ascending == sorted."""
-        import torch
+        if self._cached_blocks is None:
+            self._cached_blocks = torch.tensor(
+                sorted(self._retained), device=device, dtype=torch.int64)
         bs = self.block_size
-        blocks = torch.tensor(sorted(self._retained), device=device, dtype=torch.int64)
-        pos = (blocks[:, None] * bs
+        pos = (self._cached_blocks[:, None] * bs
                + torch.arange(bs, device=device, dtype=torch.int64)[None, :]).reshape(-1)
         return pos[pos < seq_len].to(torch.int32)
 

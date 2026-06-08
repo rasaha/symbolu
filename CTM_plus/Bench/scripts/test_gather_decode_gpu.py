@@ -66,14 +66,17 @@ def main() -> int:
                                   attention_budget_tokens=512, neighbor_blocks=1,
                                   observe_steps=3, refresh_every=0, score_decay=0.5)
     ca, cb = _twin(), _twin()
-    S3 = 8000
-    sc = [0.0] * ((S3 + 31) // 32); sc[100] = 9.0; sc[200] = 4.0
-    for _ in range(4):  # 3 observe + 1 steady
-        lst = ca.active_positions(S3, block_scores=sc)
-        idx = cb.active_index(S3, "cuda", block_scores=sc)
+    sc = [0.0] * ((8100 + 31) // 32); sc[100] = 9.0; sc[200] = 4.0
+    # 3 observe + 7 steady, seq_len GROWS each step (decode appends): exercises the
+    # Step-4 block-id cache AND that the highest block still fills correctly as
+    # seq_len advances (cache must NOT freeze the tail).
+    for i in range(10):
+        s_i = 8000 + i * 7
+        lst = ca.active_positions(s_i, block_scores=sc)
+        idx = cb.active_index(s_i, "cuda", block_scores=sc)
         assert idx.dtype == _t.int32 and idx.is_cuda, (idx.dtype, idx.device)
-        assert idx.tolist() == lst, "active_index (GPU) != active_positions (CPU)"
-    print("active_index == active_positions (GPU expansion): PASS")
+        assert idx.tolist() == lst, f"step {i} s={s_i}: active_index != active_positions"
+    print("active_index == active_positions across growing steady steps (cached): PASS")
 
     dev = "cuda"
     H_kv, D, G = 4, 128, 7
