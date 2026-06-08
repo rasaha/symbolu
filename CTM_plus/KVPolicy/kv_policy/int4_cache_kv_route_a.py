@@ -340,7 +340,13 @@ class INT4CacheKVRouteA:
         if mode == "retain_all":
             self._readskip_calls += 1
             self._last_readskip_meta = ("retain_all", None, s, s)
-            return list(range(s))          # must be byte-identical to "off"
+            # Step 3: GPU arange, NOT torch.as_tensor(list(range(s))) — the latter
+            # is the per-step cost the profile exposed (retain_all kernel_inputs
+            # 3.28ms). Must still be byte-identical to "off".
+            buf = getattr(cache, "k_packed_buf", None)
+            if torch is not None and buf is not None:
+                return torch.arange(s, device=buf.device, dtype=torch.int32)
+            return list(range(s))          # CPU fallback (selftest)
         if mode in ("retention", "score_noskip"):
             self._readskip_calls += 1
             from kv_policy.readskip_select import ReadSkipController
@@ -369,12 +375,21 @@ class INT4CacheKVRouteA:
                     logger.exception(
                         "read-skip block scoring failed; reading all this step")
                     scores = None
-            active = ctrl.active_positions(s, block_scores=scores)
+            # Step 3: build the retained index as a GPU tensor straight from the
+            # small block set (no per-layer torch.as_tensor of a multi-thousand
+            # Python list — the kernel_inputs bottleneck the profile exposed). CPU
+            # fallback (no torch / stub cache) keeps the Python-list path.
+            buf = getattr(cache, "k_packed_buf", None)
+            if torch is not None and buf is not None:
+                active = ctrl.active_index(s, buf.device, block_scores=scores)
+                retained = int(active.numel())
+            else:
+                active = ctrl.active_positions(s, block_scores=scores)
+                retained = len(active)
             # --- diagnostics: skip fraction + observe/steady split ---
             # In score_noskip the controller still computes its selection (so the
             # would-be skip fraction is recorded — a safe offline replay, since we
             # read all), but we discard it below.
-            retained = len(active)
             if was_observe:
                 self._readskip_observe_steps += 1   # re-read all + re-score
             else:

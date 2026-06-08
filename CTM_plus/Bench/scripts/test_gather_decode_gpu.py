@@ -56,6 +56,25 @@ def main() -> int:
         return 0
     from kv_policy.int4_protected_k_cache import ProtectedKINT4Cache
 
+    # Step 3 unit: the on-GPU index expansion (active_index) must equal the
+    # CPU-proven Python list (active_positions). Two twin controllers fed the same
+    # scores (each call advances the step counter, so we can't call both on one).
+    from kv_policy.readskip_select import ReadSkipController
+    import torch as _t
+    def _twin():
+        return ReadSkipController(block_size=32, sink_tokens=64, recent_tokens=512,
+                                  attention_budget_tokens=512, neighbor_blocks=1,
+                                  observe_steps=3, refresh_every=0, score_decay=0.5)
+    ca, cb = _twin(), _twin()
+    S3 = 8000
+    sc = [0.0] * ((S3 + 31) // 32); sc[100] = 9.0; sc[200] = 4.0
+    for _ in range(4):  # 3 observe + 1 steady
+        lst = ca.active_positions(S3, block_scores=sc)
+        idx = cb.active_index(S3, "cuda", block_scores=sc)
+        assert idx.dtype == _t.int32 and idx.is_cuda, (idx.dtype, idx.device)
+        assert idx.tolist() == lst, "active_index (GPU) != active_positions (CPU)"
+    print("active_index == active_positions (GPU expansion): PASS")
+
     dev = "cuda"
     H_kv, D, G = 4, 128, 7
     H_q = H_kv * G

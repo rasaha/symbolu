@@ -154,6 +154,18 @@ class ReadSkipController:
 
     def active_positions(self, seq_len: int,
                          block_scores: Optional[Sequence[float]] = None) -> List[int]:
+        read_all = self._step_and_select(seq_len, block_scores)
+        # Read everything during the observe window or before any selection.
+        if read_all:
+            return list(range(seq_len))
+        return blocks_to_positions(self._retained, self.block_size, seq_len)
+
+    def _step_and_select(self, seq_len: int,
+                         block_scores: Optional[Sequence[float]] = None) -> bool:
+        """Advance the observe/steady cadence and (on observe) re-select the
+        retained block set from the EMA scores. Returns True if this step must
+        read ALL positions (observe window, or before any selection exists).
+        Shared by active_positions (Python list) and active_index (GPU tensor)."""
         nb = n_blocks(seq_len, self.block_size)
         observe = self._is_observe_step()
         if observe and block_scores is not None:
@@ -164,10 +176,32 @@ class ReadSkipController:
                 recent_block_set(seq_len, self.recent_tokens, self.block_size),
                 self.budget_blocks, self.neighbor_blocks)
         self._step += 1
-        # Read everything during the observe window or before any selection.
-        if observe or self._retained is None:
-            return list(range(seq_len))
-        return blocks_to_positions(self._retained, self.block_size, seq_len)
+        return observe or self._retained is None
+
+    def active_index(self, seq_len: int, device,
+                     block_scores: Optional[Sequence[float]] = None):
+        """READ-SKIP Step 3: the retained positions as a GPU int32 tensor, built
+        on-device from the SMALL retained-block set — NOT a Python list. Avoids
+        the per-layer-per-step ``torch.as_tensor(list_of_thousands)`` that the
+        profile showed dominates ``kernel_inputs`` (1.3ms vs off's 0.14ms). Same
+        positions as ``active_positions`` (proven by ``_index_expand_selftest``);
+        same cadence/EMA side-effects."""
+        import torch
+        read_all = self._step_and_select(seq_len, block_scores)
+        if read_all:
+            return torch.arange(seq_len, device=device, dtype=torch.int32)
+        return self._retained_to_index(seq_len, device)
+
+    def _retained_to_index(self, seq_len: int, device):
+        """Expand self._retained (a small block set, ~50-200) -> sorted GPU int32
+        positions, on-device (torch.arange per block via broadcast; the last
+        partial block is clamped to seq_len). Block-major + ascending == sorted."""
+        import torch
+        bs = self.block_size
+        blocks = torch.tensor(sorted(self._retained), device=device, dtype=torch.int64)
+        pos = (blocks[:, None] * bs
+               + torch.arange(bs, device=device, dtype=torch.int64)[None, :]).reshape(-1)
+        return pos[pos < seq_len].to(torch.int32)
 
     @property
     def retained_blocks(self) -> Optional[Set[int]]:
@@ -234,6 +268,21 @@ def _selftest() -> int:
     assert len(ap) < S, "retention must skip something"
     assert hot * bs in ap, "the observed high-attention block must be retained"
     assert 10 * bs not in ap, "a cold un-attended middle block must be skipped"
+
+    # 9. Step 3 index expansion: the on-GPU expansion (full block via broadcast,
+    #    then filter < seq_len) must yield EXACTLY blocks_to_positions. Mimic it in
+    #    pure Python (no torch) so the equivalence is CPU-proven; the kernel/cache
+    #    GPU gate then only has to confirm the torch port.
+    def _gpu_expand_mimic(blocks, block_size, seq_len):
+        flat = []
+        for b in sorted(blocks):
+            flat.extend(range(b * block_size, b * block_size + block_size))  # full block
+        return [p for p in flat if p < seq_len]                              # then filter
+    for (blocks, S2) in [({0, 1, 30, 31, 62, 63}, 64 * bs), ({0, 5, 9}, 300),
+                         (set(range(40)), 40 * bs), ({0, 9}, 257), ({3}, 100)]:
+        assert _gpu_expand_mimic(blocks, bs, S2) == blocks_to_positions(blocks, bs, S2), \
+            (sorted(blocks), S2)
+
     print("readskip_select self-test: PASS")
     return 0
 

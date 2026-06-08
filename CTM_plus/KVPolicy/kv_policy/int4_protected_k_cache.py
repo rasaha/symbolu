@@ -520,11 +520,17 @@ class ProtectedKINT4Cache:
         if active_positions is None:
             rows = slice(0, s)
         else:
+            # Step 3: the controller passes an in-range GPU tensor (active_index);
+            # index_select needs int64. Cast (cheap on-device) but SKIP the
+            # int(min)/int(max) bounds-check sync for tensor inputs (it's a
+            # per-layer-per-step GPU->CPU stall and the controller guarantees the
+            # range). Python-list inputs (tests/other callers) keep the check.
+            already_tensor = torch.is_tensor(active_positions)
             rows = torch.as_tensor(active_positions, dtype=torch.long,
                                    device=self.k_packed_buf.device)
             if rows.ndim != 1 or rows.numel() < 1:
                 raise ValueError("active_positions must be a non-empty 1-D index")
-            if int(rows.min()) < 0 or int(rows.max()) >= s:
+            if not already_tensor and (int(rows.min()) < 0 or int(rows.max()) >= s):
                 raise ValueError(
                     f"active_positions out of range [0,{s}): "
                     f"[{int(rows.min())},{int(rows.max())}]")
@@ -580,11 +586,14 @@ class ProtectedKINT4Cache:
         if not self._protect_frozen:
             self.freeze_protect_mask()
         s = self._s_curr
+        # Step 3: the controller passes an in-range GPU int32 tensor; skip the
+        # per-step bounds-check sync for tensor inputs (controller guarantees it).
+        already_tensor = torch.is_tensor(active_positions)
         gather_idx = torch.as_tensor(
             active_positions, dtype=torch.int32, device=self.k_packed_buf.device)
         if gather_idx.ndim != 1 or gather_idx.numel() < 1:
             raise ValueError("active_positions must be a non-empty 1-D index")
-        if int(gather_idx.min()) < 0 or int(gather_idx.max()) >= s:
+        if not already_tensor and (int(gather_idx.min()) < 0 or int(gather_idx.max()) >= s):
             raise ValueError(
                 f"active_positions out of range [0,{s}): "
                 f"[{int(gather_idx.min())},{int(gather_idx.max())}]")
