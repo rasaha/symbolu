@@ -184,7 +184,8 @@ def main() -> int:
     ap.add_argument("--arm", choices=["b0", "b1"], required=True)
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     ap.add_argument("--group-size", type=int, default=32, help="32=B1, 128=B3(coarse)")
-    ap.add_argument("--dataset", default="wikitext")
+    ap.add_argument("--dataset", default="Salesforce/wikitext",
+                    help="HF dataset id (namespace/name; newer hub rejects bare ids)")
     ap.add_argument("--dataset-config", default="wikitext-103-raw-v1")
     ap.add_argument("--text-column", default="text")
     ap.add_argument("--max-seq-len", type=int, default=4096)
