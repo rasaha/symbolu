@@ -596,7 +596,7 @@ every cell × mml.
 | Sidecar diet option C (~1.7 GB savings) + option F preserves token-agreement gain | Medium — no quality re-bench yet after diet |
 | Methodology extends to Phi (D=96) | Medium — calibration math is architecture-agnostic; kernel constraint is the only barrier |
 | Methodology extends to mixture-of-experts (Mixtral, DeepSeek) | Untested — MoE adds routing complexity orthogonal to attention |
-| **Read-skip turns decode throughput-positive past ~50K context** (bounded retained set vs linear full-attention; the measured 16K→32K gap-halving extrapolated) | Medium — physically grounded (bounded vs linear KV growth) and the A/B trend is monotone, but the crossover sits past Qwen-7B's 32K native window; a YaRN-extended run is needed to measure it directly rather than extrapolate |
+| **Read-skip turns decode throughput-positive past ~50K context** (bounded retained set vs linear full-attention; the measured 16K→32K gap-halving extrapolated) | Medium — **two independent estimates agree**: the A/B gap-halving extrapolates to ~50K, and **section-level profiling independently predicts ~53K** (the `kernel_call` skip-saving scales with context while the fixed overhead stack — `cache_append` + decision + index — stays mostly bounded). Still **PROJECTED, no measured speedup claimed**: the crossover sits past Qwen-7B's 32K native window, so a YaRN-extended run is needed to confirm it directly |
 | **Read-skip general fidelity under skip** — token-agreement beyond needle, + the observe-refresh quality/speed knob | Untested — needle 1.0/1.0 validated at 94% skip, but broader generation fidelity and the refresh-cadence trade-off on *shifting*-attention workloads (the static needle is favorable) are not yet benched |
 
 ---
