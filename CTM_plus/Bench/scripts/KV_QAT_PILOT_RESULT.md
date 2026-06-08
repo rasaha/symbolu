@@ -64,6 +64,36 @@ adds nothing on top.
   full FT / longer QAT, (c) a **generation/downstream** eval for sensitivity, (d) a
   harsher quant (2-bit) to open real headroom.
 
+## Follow-up: rotation lever (QuaRot/SpinQuant-style) — ALSO negative, and instructive
+
+Training-free test (`kv_qat_rotation_test.py`, base Qwen2.5-7B, group-128, Hadamard on
+head_dim=128): rotate Q,K post-RoPE by an orthogonal `R` (attention scores preserved),
+then quantize the **rotated** K (V bf16 to isolate K).
+
+| metric | raw K-int4 | rotated K-int4 |
+|---|---:|---:|
+| K quant rel-error | 0.0238 | **0.0251 (worse, +5%)** |
+| token-agreement vs bf16 | 0.9464 | 0.9432 (−0.003) |
+
+Rotation did **not** help — it slightly hurt. **Why:** `round_trip_kv` already quantizes
+K **per-channel** (each channel its own scale) — which *is* the outlier handling rotation
+provides. QuaRot's win is for **per-tensor** quant (one outlier channel forces a huge
+tensor-wide scale); against per-channel quant, rotation only smears the channel structure
+the quantizer already exploits → neutral-to-harmful. (Exactly why KIVI/KVQuant use
+per-channel K.)
+
+**Meta-finding (both levers):** in this regime K int4 error is already tiny (~2.4%) and
+agreement ~0.95 — barely a problem for any lever to fix. The protect sidecar earns its
+keep on the **hard tail** (the brief's 0.533→0.737 token-agreement on the *serving* path /
+hard-retrieval), which this cheap teacher-forced + `round_trip_kv` harness does not reach.
+So neither training nor rotation helped *where we can cheaply measure*; definitively
+settling "can you drop protect" needs the **hard regime** (fused_v2 serving quant /
+generation-based / long-context).
+
+**Combined verdict: both cheap "remove-the-tax" levers (KV-QAT training, Hadamard
+rotation) are negative in the measurable regime. The density-not-footprint memory story
+stands.**
+
 ## Reproduce
 
 ```bash
