@@ -40,6 +40,35 @@ model **natively trained for long context** (a 128k Qwen/Llama variant), NOT YaR
 bolted onto a 32k-native model. The mechanism transfers; the quality collapse is a
 YaRN artifact specific to this extension.
 
+## RESOLVED — measured + usable crossover on Llama-3.1-8B (native 128k, NO YaRN)
+
+The clean version. `NousResearch/Meta-Llama-3.1-8B-Instruct`, native 128k (modest
+rope_scaling), int4 read-skip, no rope hacking:
+
+| ctx | off tps | retention tps | retention vs off | needle quality |
+|---:|---:|---:|---:|:--:|
+| 32 000 | 14.83 | 18.54 | **+25.0 %** | **1.0 / 1.0** |
+| 44 000 | 11.92 | 17.45 | **+46.4 %** | **1.0 / 1.0** |
+| 52 000 | 10.80 | 17.15 | **+58.8 %** | **1.0 / 1.0** |
+| 60 000 | (pending) | | | |
+
+**Both claim-gate conditions pass at EVERY context, and the win grows.** `off` slopes
+down (14.83 → 10.80 as KV piles up); `retention` stays flat (~17–18, bounded ~1.88k
+retained, 94–96 % skip); gap widens **+25 → +46 → +59 %**, needle **1.0/1.0 throughout.**
+
+- **Earlier and steeper than Qwen** because Llama-3.1-8B has **8 KV heads vs Qwen's 4**
+  → ~2.3× the KV per token → `off`'s full-KV read is much heavier → bounded retention
+  wins sooner and by more. (Engine reports max-concurrency 3.91× vs Qwen-1M's 9.02×.)
+- **int4 KV preserves quality here** (standard rope_scaling) where Qwen-1M broke it
+  (extreme rope_theta) → int4 KV's long-context quality is **model-dependent**; a real
+  caveat for int4_protected on extreme-rope models, and the reason this demo is on Llama.
+
+**Verdict upgrade: read-skip's long-context throughput win is MEASURED, not projected.**
+On a widely-deployed 128k-native open model, read-skip decodes **+25 % at 32k growing to
++59 % at 52k**, reading ~95 % less KV, **quality fully preserved.** The density framing
+below still holds for the ≤32k / short-context regime; *above* ~32k on KV-heavy
+long-context models, it's also a genuine **throughput** win.
+
 ## The deciding evidence — context sweep (refresh=0, tuned keep-set)
 
 `INT4_READSKIP_KERNEL_SCORES=1 SINK=64 RECENT=512 BUDGET=512 REFRESH=0`, gen=128,
