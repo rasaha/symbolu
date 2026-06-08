@@ -1,0 +1,89 @@
+# KV-aware fine-tune PILOT — RESULT (negative, well-qualified)
+
+> **Verdict: a light LoRA KV-QAT fine-tune does NOT make Qwen2.5-7B measurably more
+> int4-tolerant than a plain LoRA control (`B1 − B0 ≈ 0` at two distortion
+> strengths).** So this lever does **not** reduce protected-sidecar dependence; the
+> +4.7 GB footprint tax is **not** removed by it. The memory verdict
+> (`MEMORY_STORY.md` §6: density-positive, **footprint-negative**) stands.
+
+## Setup
+
+- Qwen2.5-7B-Instruct; LoRA r=16 on q/k/v/o (10.1 M params, **0.13%**); 200 steps;
+  `Salesforce/wikitext` (wikitext-103-raw-v1); seq 4096.
+- **Post-RoPE** K + V fake-quant via `INT4CacheKVRouteA.round_trip_kv` (dequant_fallback
+  = naive int4 = the design's **0%-protect** arm), straight-through estimator.
+- Arms: **A0** base (no train), **B0** LoRA + **no** fake-quant (control, captures
+  fine-tune drift), **B1** LoRA + KV-QAT.
+- Eval (`kv_qat_eval.py`): teacher-forced argmax **token-agreement, int4-KV vs
+  bf16-KV**, 32 × 512 wikitext-test positions, using the **same** `round_trip_kv`
+  distortion as training (train==eval parity — no fused_v2 gap). Measured at
+  group-32 and group-128.
+
+## Numbers — int4-vs-bf16 token-agreement
+
+| arm | group-32 | group-128 |
+|---|---:|---:|
+| A0 base | 0.9498 | 0.9325 |
+| B0 control | 0.9624 | 0.9484 |
+| **B1 KV-QAT** | **0.9609** | **0.9493** |
+| **B1 − B0** | **−0.0015** | **+0.0009** |
+
+`B1 − B0` is within noise (|Δ| ≈ 15–25 of 16,352 positions) at **both** strengths.
+B0 alone captures the entire (small, +0.013–0.016 over base) benefit; KV-awareness
+adds nothing on top.
+
+## Why (consistent across signals)
+
+- **Training loss B1 ≈ B0 throughout** (B1 only ~0.005–0.02 higher). Cross-entropy is
+  insensitive to the KV distortion → **weak adaptation pressure** → no inference-time
+  robustness gain. The eval confirms what the train curve foreshadowed.
+- **KILL GATE 4** triggered at group-32 and re-confirmed at group-128.
+- **Stage-5 sidecar sweep (protect 5/3/0) is MOOT** and was not run: with no
+  robustness gain over the control, there is nothing that would let B1 drop protect
+  channels where B0/base could not.
+
+## Honest scope — what this does and does NOT claim
+
+- Tests **one cheap lever**: LoRA (0.13% of params), 200 steps. It does **not** test
+  full fine-tuning, longer/larger QAT, or **learned rotations (SpinQuant/QuaRot)** —
+  the heavier interventions the literature used to actually remove outlier dependence.
+  Claim is therefore **"light LoRA KV-QAT doesn't help,"** NOT "training can't help."
+- The eval metric (teacher-forced argmax) is **near-ceiling** (base 0.93–0.95 even
+  under int4) — less sensitive than a generation-based / downstream-task metric, and
+  far gentler than the brief's naive-int4 0.533 (a harsher/generation measure). The
+  null is **robust across two strengths**, but a more sensitive eval could surface
+  effects this one can't. Direction (no gain) is clear; absolute headroom is limited.
+
+## Implication
+
+- The post-hoc int4_protected sidecar tax is **not** removed by this training lever;
+  the density-not-footprint memory framing is unchanged.
+- The training-side counterfactual, **as cheaply tested, does not flip the memory
+  story.** If revisited, higher-EV levers (in rough order): (a) **learned rotation
+  before quant** (SpinQuant-style — removes K outliers *without* fine-tuning), (b)
+  full FT / longer QAT, (c) a **generation/downstream** eval for sensitivity, (d) a
+  harsher quant (2-bit) to open real headroom.
+
+## Reproduce
+
+```bash
+# train (per arm)
+PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_pilot.py --arm b0 --steps 200 --max-seq-len 4096 --merge --output kv_qat_b0
+PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_pilot.py --arm b1 --steps 200 --max-seq-len 4096 --merge --output kv_qat_b1
+# eval (per arm, per group size)
+for M in Qwen/Qwen2.5-7B-Instruct ./kv_qat_b0 ./kv_qat_b1; do
+  PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_eval.py --model $M --group-size 32
+  PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_eval.py --model $M --group-size 128
+done
+```
+
+## Pointers
+
+| thing | where |
+|---|---|
+| Design + hypotheses | `KV_AWARE_TRAINING_EXPERIMENT_DESIGN.md` |
+| Runbook + gates | `KV_QAT_PILOT_RUNBOOK.md` |
+| Train harness | `Bench/scripts/kv_qat_pilot.py` |
+| Eval | `Bench/scripts/kv_qat_eval.py` |
+| Fake-quant core (STE + parity) | `KVPolicy/kv_policy/kv_aware_qat.py` |
+| Memory verdict (unchanged) | `MEMORY_STORY.md` §6 |
