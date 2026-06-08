@@ -112,6 +112,47 @@ where int4 genuinely wrecks generation, KV-QAT does NOT help — marginally hurt
 "too easy" caveat is resolved: **the training negative is now definitive across easy
 AND hard regimes (B1 ≤ B0 in both).**
 
+## Lever 3 result + FINAL SYNTHESIS — three cheap levers, all negative
+
+**Scale-metadata probe** (`kv_qat_scale_probe.py`, base Qwen2.5-7B, group-32): can a
+per-vector norm + random rotation + FIXED int4 quantizer (no per-block scales) match
+per-channel int4?
+
+| scheme | K quant rel-error | scale metadata (scalars/token·head) |
+|---|---:|---:|
+| per-channel int4 (current) | 0.0176 | 8 |
+| polar-core (fixed quantizer) | **0.1249 (7.1× worse)** | 1 |
+
+No. Dropping per-block scales inflates K error 7.1×. Qwen2.5's K is strongly
+anisotropic — after a random rotation the coordinates do NOT become the uniform
+≈N(0,1/D) the fixed quantizer assumes, so it misallocates bins on exactly the
+informative directions. Reclaiming the 3.4 GB this way needs the full TurboQuant
+pipeline (data-dependent Lloyd-Max + a 1-bit QJL corrector + custom kernels) — a real
+engineering project, not a cheap probe.
+
+### Three independent cheap levers to remove the KV tax — ALL negative
+
+| lever | targets | result | why |
+|---|---|---|---|
+| **1. KV-QAT training** (LoRA) | protect channels | **negative** (B1−B0 ≈ 0 easy; −0.043 hard) | light FT doesn't undo outlier geometry; slightly worse in free-gen |
+| **2. Outlier rotation** (Hadamard/QuaRot) | protect ch. (~1 GB) | **negative** (K err +5%, 0.0238→0.0251) | `round_trip_kv` already **per-channel** → rotation redundant/harmful |
+| **3. Scale-metadata** (rot + fixed quant) | scale/xmin (~3.4 GB) | **negative as cheap lever** (K err 7.1× worse) | anisotropic K breaks the uniform-sphere assumption; needs QJL kernels |
+
+> **Record correction:** Hadamard outlier-rotation (lever 2) is **NOT** a confirmed
+> win here — it was **measured negative** (+5% error). QuaRot helps **per-tensor**
+> quant; against an already **per-channel** KV quantizer it is redundant. Any
+> recommendation to "execute Hadamard rotation for a cheap win" contradicts the data.
+
+**Bottom line:** none of the three cheap levers removes the protect/scale tax on
+Qwen2.5-7B. Common thread — the K representation is already well-served by per-channel
+int4, and its anisotropic outlier structure defeats data-oblivious transforms (for
+outliers *and* for metadata). The protect sidecar exists because the hard tail
+genuinely needs it; no cheap transform removes that need. **The density-positive,
+footprint-negative memory verdict (`MEMORY_STORY.md` §6) is the final, tested
+conclusion.** The only remaining path — a full TurboQuant Lloyd-Max + QJL + custom
+kernel pipeline — is a real engineering project with uncertain payoff: documented,
+not recommended.
+
 ## Reproduce
 
 ```bash
