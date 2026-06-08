@@ -174,6 +174,29 @@ working lever. Mistral leans MORE on the protect sidecar → it also has more he
 for the one lever NOT re-tested here, **KV-QAT training** — the only regime where a
 Mistral re-run could still surprise.
 
+### Mistral training (B0/B1) — small, noisy, opposite-sign to Qwen; still no win
+
+Hard-regime free-gen agreement (group-32), 16 prompts × 48 tokens:
+
+| arm | Qwen2.5-7B | Mistral-7B-v0.3 |
+|---|---:|---:|
+| base (A0) | 0.236 | 0.740 |
+| b0 control | 0.237 | 0.580 |
+| b1 KV-QAT | 0.194 | 0.619 |
+| **B1 − B0** | **−0.043** | **+0.038** |
+
+- **B1 − B0 flips sign across models** (−0.04 Qwen, +0.04 Mistral) and both are within
+  the high-variance noise band (per-prompt 0.58–1.0). b0 was eval'd on the merged save,
+  b1 in-process (LoRA-active) — same forward in theory, but the sign isn't airtight.
+- **Neither b1 beats its base** (Qwen 0.194<0.236; Mistral 0.619<0.740). KV-QAT does
+  NOT make the model more int4-robust than the untrained model on either family.
+- **New Mistral nuance:** plain LoRA FT (b0) *hurt* int4 robustness (0.74→0.58) — didn't
+  happen on Qwen — and KV-QAT only partially clawed that back (→0.62), not to base.
+
+**Cross-model verdict on the training lever: no consistent benefit (B1−B0 ≈ 0 ± noise,
+sign-unstable), and in no case does training beat baseline int4 robustness. KV-QAT
+stays negative; FT can even hurt. Density-not-footprint stands.**
+
 ## Reproduce
 
 ```bash
