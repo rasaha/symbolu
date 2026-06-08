@@ -135,6 +135,26 @@ def _profile_section_rows(per_mode, order, baseline):
     return rows
 
 
+def _engine_kwargs(args):
+    """Shared vLLM ``LLM(...)`` kwargs for all three engine builders (profile /
+    --ab / bf16_ref), so they can't drift. ``--hf-overrides`` (a JSON object) is
+    passed straight to ``LLM(hf_overrides=...)`` — its purpose is to inject
+    ``rope_scaling`` (YaRN) so a 32K-native model (Qwen2.5-7B) can run the 48-64K
+    read-skip CROSSOVER experiment past its native window. Empty -> stock defaults
+    (byte-for-byte the prior behavior)."""
+    kw = dict(enforce_eager=True, max_model_len=args.max_model_len,
+              gpu_memory_utilization=args.gpu_util)
+    raw = (getattr(args, "hf_overrides", "") or "").strip()
+    if raw:
+        import json
+        ov = json.loads(raw)
+        if not isinstance(ov, dict):
+            raise SystemExit("--hf-overrides must be a JSON object, got: " + raw)
+        kw["hf_overrides"] = ov
+        print(f"[engine] hf_overrides={ov}", flush=True)
+    return kw
+
+
 def run(args) -> int:
     import random
     from vllm import LLM, SamplingParams
@@ -145,9 +165,7 @@ def run(args) -> int:
     backend = (BACKEND_FUSED_V2 if args.backend == "fused_v2"
                else BACKEND_DEQUANT_FALLBACK)
     mode = os.environ.get("INT4_READSKIP_MODE", "off")
-    llm = LLM(model=args.model, enforce_eager=True,
-              max_model_len=args.max_model_len,
-              gpu_memory_utilization=args.gpu_util)
+    llm = LLM(model=args.model, **_engine_kwargs(args))
     model = _extract_model(llm.llm_engine)
     manager, teardown = install_int4_cache_kv_route_a(
         model=model, k_group_size=32, v_group_size=32, asymmetric=True, bits=4,
@@ -265,9 +283,7 @@ def _build_fused_engine(args):
     )
     backend = (BACKEND_FUSED_V2 if args.backend == "fused_v2"
                else BACKEND_DEQUANT_FALLBACK)
-    llm = LLM(model=args.model, enforce_eager=True,
-              max_model_len=args.max_model_len,
-              gpu_memory_utilization=args.gpu_util)
+    llm = LLM(model=args.model, **_engine_kwargs(args))
     model = _extract_model(llm.llm_engine)
     manager, teardown = install_int4_cache_kv_route_a(
         model=model, k_group_size=32, v_group_size=32, asymmetric=True, bits=4,
@@ -590,9 +606,7 @@ def run_bf16_ref(args) -> int:
     warmup = max(1, int(args.warmup))
 
     # Vanilla engine — deliberately NOT installing the int4 route-A manager.
-    llm = LLM(model=args.model, enforce_eager=True,
-              max_model_len=args.max_model_len,
-              gpu_memory_utilization=args.gpu_util)
+    llm = LLM(model=args.model, **_engine_kwargs(args))
     tok = llm.get_tokenizer()
     print(f"[bf16] vanilla bf16 reference (no int4/read-skip) seeds={seeds} "
           f"depths={depths} gen={gen} repeats={repeats} ctx={args.context_tokens} "
@@ -793,6 +807,12 @@ def main(argv=None) -> int:
     ap.add_argument("--items", type=int, default=2)
     ap.add_argument("--max-gen", type=int, default=16)
     ap.add_argument("--max-model-len", type=int, default=16384)
+    ap.add_argument("--hf-overrides", default="",
+                    help="JSON object passed to vLLM LLM(hf_overrides=...). Use to "
+                         "inject rope_scaling (YaRN) for >native-window context, "
+                         "e.g. the 48-64K read-skip crossover on Qwen2.5-7B: "
+                         "'{\"rope_scaling\":{\"rope_type\":\"yarn\",\"factor\":2.0,"
+                         "\"original_max_position_embeddings\":32768}}'")
     ap.add_argument("--gpu-util", type=float, default=0.6)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--out", default="phase9_p3_fused_needle.json")
