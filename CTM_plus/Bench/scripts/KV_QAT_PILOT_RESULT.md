@@ -228,6 +228,48 @@ design (Gemini's Option 1 instinct was right); if it evaporates, protect's value
 catastrophic-outlier preservation recon error misses. Everything else (training,
 rotation, scale-drop) stays negative.
 
+### Downstream resolver — int4_protected WINS; head-mixed's recon edge inverts
+
+Each K scheme applied at inference (fixed, calibrated; V bf16); perplexity + free-gen
+token-agreement vs bf16:
+
+| model | scheme | ppl-gap | gen-agree |
+|---|---|---:|---:|
+| Qwen2.5-7B | uniform-4b | +0.181 | 0.448 |
+| Qwen2.5-7B | **protect [i4p]** | +0.133 | **0.523** |
+| Qwen2.5-7B | head-mixed | +0.134 | 0.500 |
+| Mistral-7B | uniform-4b | +0.050 | 0.807 |
+| Mistral-7B | **protect [i4p]** | +0.009 | **0.930** |
+| Mistral-7B | head-mixed | +0.016 | 0.737 |
+
+**Channel-protect wins on BOTH metrics, BOTH models** — decisively on Mistral's hard
+tail (0.93 vs 0.74). Head-mixed's ~20% *reconstruction*-error advantage **inverts**
+downstream.
+
+**Why:** protect's value is the catastrophic-outlier preservation that *average* metrics
+(recon error, perplexity) under-weight. Head-mixed minimizes average K error but
+under-protects the specific outlier channels whose error *cascades* in free generation.
+Mistral (K 2.5× harder → leans more on protect) shows the large gap (+0.19). (gen-agree
+is noisy, but protect ≥ head-mixed is consistent across 2 models × 2 metrics.)
+
+**This validates int4_protected's channel-protect design on exactly the axis it was built
+for.** The one lever that beat it on a proxy affirms it once measured downstream.
+
+## FINAL VERDICT — every lever resolved
+
+| lever | goal | result |
+|---|---|---|
+| KV-QAT training | remove protect tax | NEGATIVE (Qwen + Mistral; no gain, FT can hurt) |
+| Hadamard rotation | remove protect (~1 GB) | NEGATIVE (redundant vs per-channel; Qwen + Mistral) |
+| scale-metadata / polar | remove scale (~3.4 GB) | NEGATIVE cheap (needs heavy QJL kernels) |
+| head-wise allocation | beat the protect *design* | wins recon error, **LOSES downstream** → protect validated |
+
+**Cheap removal of the int4 KV tax is exhausted across two model families, and the
+protect-channel design is downstream-optimal. The density-positive, footprint-negative
+memory verdict stands as the tested conclusion.** The remaining frontier is a different
+axis — sparse-attention training / co-design (stacks on int4_protected) — not a
+refinement of the quantization scheme.
+
 ## Reproduce
 
 ```bash
