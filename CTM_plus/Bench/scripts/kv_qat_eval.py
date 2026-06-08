@@ -24,7 +24,8 @@ import sys
 def install_int4_inference_hooks(torch, model, mgr):
     """Apply round_trip_kv to K (POST-RoPE) + V at inference. No STE (no backward).
     Returns restore()."""
-    import transformers.models.qwen2.modeling_qwen2 as qm
+    from kv_policy.kv_aware_qat import rotary_module
+    qm = rotary_module(model)
     orig = qm.apply_rotary_pos_emb
 
     def fq_k(k):

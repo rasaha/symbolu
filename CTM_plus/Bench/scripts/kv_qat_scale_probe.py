@@ -95,7 +95,8 @@ def main() -> int:
 
     err_pc, err_pol = [0.0, 0.0], [0.0, 0.0]
 
-    import transformers.models.qwen2.modeling_qwen2 as qm
+    from kv_policy.kv_aware_qat import rotary_module
+    qm = rotary_module(model)
     orig = qm.apply_rotary_pos_emb
 
     def wrap(q, k, cos, sin, *a, **kw):

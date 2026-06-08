@@ -36,10 +36,12 @@ def rand_orth(torch, n, device, dtype):
     return q.to(device=device, dtype=dtype)
 
 
-def install_k_quant_hook(torch, mgr, R, err):
-    """Wrap qwen2 apply_rotary_pos_emb: optionally rotate (q,k) by R, then quantize K.
-    Accumulates relative K quant error into err=[num,den]. R=None -> raw (no rotation)."""
-    import transformers.models.qwen2.modeling_qwen2 as qm
+def install_k_quant_hook(torch, model, mgr, R, err):
+    """Wrap the model's apply_rotary_pos_emb: optionally rotate (q,k) by R, then
+    quantize K. Accumulates relative K quant error into err=[num,den]. R=None -> raw.
+    Model-agnostic (qwen2 / mistral / llama / ...)."""
+    from kv_policy.kv_aware_qat import rotary_module
+    qm = rotary_module(model)
     orig = qm.apply_rotary_pos_emb
 
     def wrap(q, k, cos, sin, *a, **kw):
@@ -126,12 +128,12 @@ def main() -> int:
     for i, ids in enumerate(seqs):
         ids = ids.to(dev)
         p_bf16 = preds(ids)
-        r = install_k_quant_hook(torch, mgr, None, err_raw)
+        r = install_k_quant_hook(torch, model, mgr, None, err_raw)
         try:
             p_raw = preds(ids)
         finally:
             r()
-        r = install_k_quant_hook(torch, mgr, R, err_rot)
+        r = install_k_quant_hook(torch, model, mgr, R, err_rot)
         try:
             p_rot = preds(ids)
         finally:

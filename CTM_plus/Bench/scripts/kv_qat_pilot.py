@@ -54,12 +54,11 @@ def mean_pert(stats, which) -> float:
 
 # --------------------------------------------------------------------------- hooks
 def install_post_rope_hooks(torch, model, mgr, ste_fake_quant, stats):
-    """POST-RoPE K (wrap qwen2 apply_rotary_pos_emb — rotated K is what the int4
-    cache stores at inference) + V via v_proj forward-hook. Returns restore()."""
-    import transformers.models.qwen2.modeling_qwen2 as qm
-    if not hasattr(qm, "apply_rotary_pos_emb"):
-        raise RuntimeError("transformers qwen2 has no apply_rotary_pos_emb; "
-                           "use --pre-rope or adapt the hook to this version")
+    """POST-RoPE K (wrap the model's apply_rotary_pos_emb — rotated K is what the int4
+    cache stores at inference) + V via v_proj forward-hook. Returns restore().
+    Model-agnostic (qwen2 / mistral / llama / ...) via rotary_module(model)."""
+    from kv_policy.kv_aware_qat import rotary_module
+    qm = rotary_module(model)
     stats["hook_loc"] = "post-RoPE"
     orig_rope = qm.apply_rotary_pos_emb
 

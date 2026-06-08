@@ -56,6 +56,22 @@ def kv_qat_round_trip(manager: Any, key, value) -> "Tuple[Any, Any]":
     return ste_fake_quant(key, k_lossy), ste_fake_quant(value, v_lossy)
 
 
+def rotary_module(model):
+    """The transformers modeling module whose ``apply_rotary_pos_emb`` the model's
+    attention calls — resolved from ``model.config.model_type`` so the post-RoPE
+    hook works across qwen2 / mistral / llama / ... not just qwen2. (The attention
+    forward looks the function up in this module's namespace at call time, so
+    patching the module binding takes effect.)"""
+    import importlib
+    mt = getattr(getattr(model, "config", None), "model_type", None) or ""
+    mod = importlib.import_module(f"transformers.models.{mt}.modeling_{mt}")
+    if not hasattr(mod, "apply_rotary_pos_emb"):
+        raise RuntimeError(
+            f"{mod.__name__} has no apply_rotary_pos_emb — the post-RoPE hook needs "
+            f"adapting for model_type={mt!r}")
+    return mod
+
+
 def _selftest() -> None:
     """CPU self-test: STE forward-parity + identity-backward, and that the KV
     wrapper byte-matches the manager's round_trip_kv on BOTH K and V while
