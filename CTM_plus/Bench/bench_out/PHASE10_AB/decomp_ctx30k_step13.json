@@ -1,0 +1,358 @@
+{
+  "kind": "within_process_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "backend": "fused_v2",
+  "context_tokens": 30720,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "depths": [
+    0.1,
+    0.5
+  ],
+  "modes": [
+    "off",
+    "score_noskip",
+    "retain_all",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 32768,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 25.056,
+      "tps_std": 0.129,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    },
+    "score_noskip": {
+      "tps_mean": 20.825,
+      "tps_std": 0.101,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    },
+    "retain_all": {
+      "tps_mean": 18.545,
+      "tps_std": 0.03,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    },
+    "retention": {
+      "tps_mean": 20.476,
+      "tps_std": 0.295,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 1.0,
+        "0.50": 1.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "score_noskip": {
+      "delta_pct_mean": -16.88,
+      "delta_pct_std": 0.1,
+      "n_cells": 6,
+      "deltas_pct": [
+        -16.75,
+        -16.95,
+        -16.89,
+        -16.79,
+        -16.91,
+        -17.02
+      ]
+    },
+    "retain_all": {
+      "delta_pct_mean": -25.99,
+      "delta_pct_std": 0.18,
+      "n_cells": 6,
+      "deltas_pct": [
+        -26.08,
+        -26.05,
+        -25.62,
+        -26.09,
+        -26.03,
+        -26.04
+      ]
+    },
+    "retention": {
+      "delta_pct_mean": -18.28,
+      "delta_pct_std": 0.43,
+      "n_cells": 6,
+      "deltas_pct": [
+        -17.49,
+        -18.42,
+        -18.57,
+        -18.08,
+        -18.47,
+        -18.65
+      ]
+    }
+  },
+  "readskip_calls": 192024,
+  "skip_diag": {
+    "steady_skip_frac": 0.7760775306787008,
+    "steady_retained_mean": 6465.35544217687,
+    "steady_seq_mean": 28873.1875,
+    "observe_steps": 15120,
+    "steady_steps": 112896
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 25.112,
+      "tps_std": 0.002,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE\nHuman: Please provide a detailed explanation of the process of p"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "score_noskip",
+      "tps_mean": 20.907,
+      "tps_std": 0.05,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE\nHuman: Please provide a detailed explanation of the process of p"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retain_all",
+      "tps_mean": 18.563,
+      "tps_std": 0.008,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE\nHuman: Please provide a detailed explanation of the process of p"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 20.721,
+      "tps_std": 0.249,
+      "hit": 1,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "INDIA-ECHO-MIKE\nHuman: Given the following context, please answer the question: "
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 25.071,
+      "tps_std": 0.049,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT\nHuman: Please provide a detailed explanation of the concept "
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "score_noskip",
+      "tps_mean": 20.822,
+      "tps_std": 0.04,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT\nHuman: Please provide a detailed explanation of the concept "
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retain_all",
+      "tps_mean": 18.539,
+      "tps_std": 0.019,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT\nHuman: Please provide a detailed explanation of the concept "
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 20.454,
+      "tps_std": 0.281,
+      "hit": 1,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "SIERRA-ALFA-FOXTROT\nHuman: Given the following context, what is the purpose of t"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.876,
+      "tps_std": 0.277,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "score_noskip",
+      "tps_mean": 20.674,
+      "tps_std": 0.161,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retain_all",
+      "tps_mean": 18.502,
+      "tps_std": 0.056,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 20.258,
+      "tps_std": 0.619,
+      "hit": 1,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "UNIFORM-LIMA-YANKEE\nHuman: Given the following context, what is the name of the "
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 25.11,
+      "tps_std": 0.022,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO\nHuman: Given the task definition and input, provide a detailed"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "score_noskip",
+      "tps_mean": 20.895,
+      "tps_std": 0.014,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO\nHuman: Given the task definition and input, provide a detailed"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retain_all",
+      "tps_mean": 18.559,
+      "tps_std": 0.006,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO\nHuman: Given the task definition and input, provide a detailed"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 20.571,
+      "tps_std": 0.033,
+      "hit": 1,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "GOLF-UNIFORM-KILO\nHuman: Given the following context, please answer the question"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 25.09,
+      "tps_std": 0.024,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "score_noskip",
+      "tps_mean": 20.848,
+      "tps_std": 0.04,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retain_all",
+      "tps_mean": 18.56,
+      "tps_std": 0.011,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA\nHuman: Given the following context, please answer the questi"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 20.456,
+      "tps_std": 0.159,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "VICTOR-UNIFORM-LIMA\nHuman: Given the following context, how would you formulate "
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 25.074,
+      "tps_std": 0.024,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA\nHuman: Given the following context, please answer the quest"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "score_noskip",
+      "tps_mean": 20.807,
+      "tps_std": 0.035,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA\nHuman: Given the following context, please answer the quest"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retain_all",
+      "tps_mean": 18.545,
+      "tps_std": 0.006,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA\nHuman: Given the following context, please answer the quest"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 20.399,
+      "tps_std": 0.04,
+      "hit": 1,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "VICTOR-UNIFORM-DELTA\nHuman: Given the following context, what is the name of the"
+    }
+  ]
+}
