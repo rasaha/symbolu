@@ -10,6 +10,36 @@
 > keeps decode work **~flat as context grows** (bounded retained set), so that
 > stored long context stays usable instead of slowing decode linearly.
 
+## UPDATE — YaRN crossover MEASURED (~42k), but quality gate FAILED
+
+Ran the YaRN-extended sweep (`--hf-overrides` rope_scaling yarn factor 2.0,
+max_model_len 65536) to convert the projected crossover into a measured one:
+
+| ctx | off tps | retention tps | retention vs off | needle quality |
+|---:|---:|---:|---:|:--:|
+| 32 000 | 24.89 | 21.93 | **−11.9 %** (loss) | **0.0 / 0.0** |
+| 44 000 | 20.80 | 21.32 | **+2.5 %** (WIN) | **0.0 / 0.0** |
+| 52 000 / 60 000 | (running — `off` keeps slowing, retention stays flat) | | |
+
+**Two-sided result:**
+- ✅ **Crossover physics confirmed and measured.** `off` slopes down with context
+  (24.89 → 20.80 tps, linear KV read), `retention` stays flat (21.93 → 21.32,
+  bounded retained set ~1.7k, skip 94–96 %), so they **cross at ~42k** — *earlier*
+  than the ~50k extrapolation. The bounded-vs-linear thesis is now measured, not
+  projected.
+- ❌ **NOT a usable win — YaRN factor-2 broke the model.** Needle quality is **0.0 for
+  BOTH off and retention** at *both* contexts — including at 32k, which is *inside*
+  Qwen2.5-7B's native window, so static YaRN factor-2 degraded retrieval even
+  in-range (the runbook's predicted quality ceiling). A throughput crossover on a
+  model that can no longer retrieve the needle is mechanism-confirmation, not a
+  product result. (0.0 for both modes ⇒ it's the rope scaling, not read-skip.)
+
+**What it actually establishes:** the crossover is real memory-bandwidth physics and
+will hold — but a *usable* (throughput-positive AND quality-intact) crossover needs a
+model **natively trained for long context** (a 128k Qwen/Llama variant), NOT YaRN
+bolted onto a 32k-native model. The mechanism transfers; the quality collapse is a
+YaRN artifact specific to this extension.
+
 ## The deciding evidence — context sweep (refresh=0, tuned keep-set)
 
 `INT4_READSKIP_KERNEL_SCORES=1 SINK=64 RECENT=512 BUDGET=512 REFRESH=0`, gen=128,
@@ -113,11 +143,13 @@ python Bench/scripts/phase9_p3_fused_needle.py --ab --ab-modes off,retention \
 done
 ```
 
-## If resumed later (not pursued now)
+## If resumed later
 
-- **Prove the crossover:** YaRN rope-scaling (factor ~2) to run 48–64k and show
-  `retention` cross **positive**; validate YaRN doesn't erode needle quality at
-  extended context first.
+- **Prove the crossover — DONE (see the UPDATE section up top):** YaRN factor-2 ran
+  32–60k; crossover MEASURED at ~42k (`retention` +2.5 % at 44k), but YaRN broke
+  needle quality (0.0/0.0) — so the *next* step is a **natively-long-context model**
+  (128k Qwen/Llama) where no rope hacking is needed, to get a crossover that's
+  throughput-positive AND quality-intact.
 - **Pull the crossover earlier:** move the controller fully on-GPU to kill the
   per-step decision sync (`readskip_decision`); structural, risky, bounded by
   gather efficiency at ≤32k — diminishing returns vs the YaRN proof.
