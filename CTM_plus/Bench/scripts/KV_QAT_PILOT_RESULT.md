@@ -94,6 +94,24 @@ generation-based / long-context).
 rotation) are negative in the measurable regime. The density-not-footprint memory story
 stands.**
 
+## Hard-regime confirmation (free generation) — the "too easy" caveat is RESOLVED
+
+The teacher-forced metric was near-ceiling. Re-ran in the harsh regime: greedy free
+generation, use_cache=False (full-block requant), 16 wikitext prompts × 48 gen tokens,
+int4-vs-bf16 (`kv_qat_gen_eval.py`, group-32).
+
+| arm | gen agreement | mean common-prefix /48 |
+|---|---:|---:|
+| A0 base | 0.236 | 8.2 |
+| B0 control | 0.237 | 9.4 |
+| B1 KV-QAT | **0.194** | **7.4** |
+
+int4 NOW bites hard — generation agreement crashes 0.95 → ~0.24 (cascading), so there
+is real headroom. And **B1 − B0 = −0.043** (B1 slightly WORSE, shorter prefix). Even
+where int4 genuinely wrecks generation, KV-QAT does NOT help — marginally hurts. The
+"too easy" caveat is resolved: **the training negative is now definitive across easy
+AND hard regimes (B1 ≤ B0 in both).**
+
 ## Reproduce
 
 ```bash
