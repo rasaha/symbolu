@@ -126,12 +126,13 @@ def main() -> int:
         log(f"[stage4] step {step}: forward ...")
         opt.zero_grad(set_to_none=True)
         out = model(input_ids=input_ids, labels=input_ids)
-        log(f"[stage4] step {step}: backward (loss={float(out.loss):.4f}) ...")
+        lossval = float(out.loss.detach())            # detach: float() on a grad tensor warns
+        log(f"[stage4] step {step}: backward (loss={lossval:.4f}) ...")
         out.loss.backward()
         kp = model.model.layers[0].self_attn.k_proj.weight
         kgradnorms.append(0.0 if kp.grad is None else float(kp.grad.norm()))
         opt.step()
-        losses.append(float(out.loss))
+        losses.append(lossval)
         log(f"[stage4] step {step}: done  k_proj.grad_norm={kgradnorms[-1]:.4e}")
 
     # --- verdict --------------------------------------------------------------------
