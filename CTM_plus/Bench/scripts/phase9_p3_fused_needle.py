@@ -747,8 +747,11 @@ def _selftest() -> int:
         _readskip_refresh=0, _readskip_decay=0.8, _readskip_kernel_scores=False,
         _readskip_controllers={}, _readskip_observe_steps=0, _readskip_steady_steps=0,
         _readskip_retained_tokens=0, _readskip_seq_tokens=0, _last_readskip_meta=None)
-    for _ in range(8):
-        INT4CacheKVRouteA._readskip_active_positions(mgr, _Cache(), query=object())
+    c0 = _Cache()       # ONE instance -> ONE controller (keyed by id(cache)).
+    for _ in range(8):  # Do NOT pass a throwaway _Cache() per iter and rely on
+        # CPython recycling its id() — that's allocator-dependent (passes on some
+        # boxes, gives 8 fresh controllers -> all "observe" on others).
+        INT4CacheKVRouteA._readskip_active_positions(mgr, c0, query=object())
     assert mgr._readskip_observe_steps == 3 and mgr._readskip_steady_steps == 5
     sf = 1 - mgr._readskip_retained_tokens / mgr._readskip_seq_tokens
     assert 0.5 < sf < 0.99 and mgr._last_readskip_meta[0] == "retention", sf
