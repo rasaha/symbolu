@@ -197,6 +197,37 @@ Hard-regime free-gen agreement (group-32), 16 prompts × 48 tokens:
 sign-unstable), and in no case does training beat baseline int4 robustness. KV-QAT
 stays negative; FT can even hurt. Density-not-footprint stands.**
 
+## Head-wise mixed precision (Option 1) — beats channel-protect on K RECON error (the one positive)
+
+`kv_qat_headwise_probe.py`, at matched avg bits:
+
+| model | uniform 4-bit | channel-protect 4% (4.47b) | head-mixed (4.50b) | per-head sens. spread |
+|---|---:|---:|---:|---:|
+| Qwen2.5-7B | 0.0268 | 0.0251 | **0.0201 (−20%)** | 2.48× (concentrated) |
+| Mistral-7B-v0.3 | 0.0702 | 0.0651 | **0.0526 (−19%)** | 1.04× (flat) |
+
+Head-granular bit allocation has **~20% lower K reconstruction error than
+int4_protected's channel-bf16-protect**, on BOTH models — against the prior that finer
+channel-granularity wins.
+
+**Why (rate-distortion):** 4% of channels at bf16 (16-bit, over-precise) + 96% at 4-bit
+is a lopsided allocation; spending the same budget as a uniform 4→~4.5-bit lift reduces
+more total error (convex distortion → balanced beats extreme). Mistral's sensitivity is
+FLAT yet head-mixed still wins → it's allocation efficiency, not head-concentration.
+
+**CRUCIAL caveat — proxy vs downstream:** this is K *reconstruction* error, NOT model
+quality. int4_protected's protect was validated DOWNSTREAM (token-agreement 0.737 vs
+0.533, hard-needle) — it targets the outlier channels that *catastrophically* break the
+attention inner product, which recon error under-weights. So head-mixed's lower recon
+error does **not** establish it beats int4_protected on quality.
+
+**Status: the ONE lever with a positive signal — but on a proxy.** Resolving test =
+downstream token-agreement with head-mixed-allocated KV vs protect KV. If it holds
+downstream, mixed-precision bit allocation is a real improvement to the int4_protected
+design (Gemini's Option 1 instinct was right); if it evaporates, protect's value is the
+catastrophic-outlier preservation recon error misses. Everything else (training,
+rotation, scale-drop) stays negative.
+
 ## Reproduce
 
 ```bash
