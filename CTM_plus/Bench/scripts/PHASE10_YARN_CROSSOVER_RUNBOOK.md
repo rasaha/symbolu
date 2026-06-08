@@ -97,3 +97,54 @@ Tabulate `retention vs off` Δ% per context:
 - A natively-long model (e.g. a 128K-trained Qwen/Llama) would remove the YaRN
   caveat entirely and is the cleaner demo if available — the `--hf-overrides` flag
   is then simply left empty.
+
+---
+
+## NEXT VALID TEST — native long-context model (no YaRN), with a hard claim gate
+
+YaRN factor-2 on 32K-native Qwen2.5-7B **broke quality** (needle 0.0/0.0 even at 32K)
+while still showing the throughput crossover (~42K, +2.5% at 44K). So the crossover
+*physics* are confirmed but **not usable**. The only valid way to claim a real
+crossover is on a model **natively trained for long context** — no rope hacking — so
+the quality gate can actually pass.
+
+**Model (primary): `Qwen/Qwen2.5-7B-Instruct-1M`** — *same architecture* as the tested
+read-skip backend (28L, 4 KV heads, D=128), so the int4 route-A kernels work
+unchanged, but natively long (no YaRN; leave `--hf-overrides` empty).
+**Fallback: `meta-llama/Llama-3.1-8B-Instruct`** — standard attention, native 128K,
+already int4_protected-validated; use if the Qwen-1M config trips vLLM 0.7.3 (DCA).
+
+**Step 1 — sanity at short ctx (loads in int4 read-skip + quality intact?):**
+```bash
+M=Qwen/Qwen2.5-7B-Instruct-1M
+INT4_READSKIP_KERNEL_SCORES=1 INT4_READSKIP_SINK=64 INT4_READSKIP_RECENT=512 \
+INT4_READSKIP_BUDGET=512 INT4_READSKIP_REFRESH=0 \
+python Bench/scripts/phase9_p3_fused_needle.py --ab --ab-modes off,retention \
+  --model $M --context-tokens 8000 --max-model-len 65536 --ab-gen 64 \
+  --seeds 1 --depths 0.5 --repeats 2 --warmup 1 \
+  --out Bench/bench_out/PHASE10_AB/native_sanity.json
+```
+**Gate 1:** quality must be `1.0/1.0`. If 0.0 → the model isn't running correctly in
+the int4 backend (or DCA conflict) → switch to the Llama fallback before sweeping.
+
+**Step 2 — crossover sweep (only if Gate 1 passed), NO `--hf-overrides`:**
+```bash
+for CTX in 32000 44000 52000 60000; do
+INT4_READSKIP_KERNEL_SCORES=1 INT4_READSKIP_SINK=64 INT4_READSKIP_RECENT=512 \
+INT4_READSKIP_BUDGET=512 INT4_READSKIP_REFRESH=0 \
+python Bench/scripts/phase9_p3_fused_needle.py --ab --ab-modes off,retention \
+  --model $M --context-tokens $CTX --max-model-len 65536 --ab-gen 128 \
+  --seeds 1,2,3 --depths 0.1,0.5 --repeats 3 --warmup 2 \
+  --out Bench/bench_out/PHASE10_AB/native_ctx${CTX}.json
+done
+```
+
+## THE CLAIM GATE (both must hold, at the same context)
+
+> Claim "read-skip is throughput-positive at long context" **only if**, at some ctx:
+> 1. **`retention vs off` > 0** (throughput crossover), AND
+> 2. **needle quality = 1.0 / 1.0** (model still does the task).
+>
+> Throughput-positive with broken quality (the YaRN result) is **not a claim** — it's
+> mechanism confirmation. Quality-intact but throughput-negative is **not a claim**
+> either. Both, together, or it stays "projected."
