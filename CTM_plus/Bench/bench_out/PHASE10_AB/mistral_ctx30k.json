@@ -1,0 +1,50 @@
+{
+  "kind": "within_process_ab",
+  "_source": "console_ab_log_paste",
+  "_provenance_note": "Raw harness JSON for this run was not captured off the pod (disk/quota churn during the Mistral session); every value below is transcribed verbatim from the harness's own [ab] console summary. Per-item generated text and per-item tps_std were not in that summary and are intentionally omitted rather than invented. The per-depth retention quality 0.50=0.667 means 2 of 3 seeds hit the mid-context needle; the harness did not print which seed missed, so per-cell 'hit' is left null for retention depth 0.5.",
+  "model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "backend": "fused_v2",
+  "context_tokens": 30000,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [1, 2, 3],
+  "depths": [0.1, 0.5],
+  "modes": ["off", "retention"],
+  "baseline": "off",
+  "max_model_len": 32768,
+  "kernel_scores": true,
+  "inkernel": false,
+  "per_mode": {
+    "off": {
+      "tps_mean": 14.79,
+      "tps_std": 0.01,
+      "n_samples": 18,
+      "hit_rate_by_depth": {"0.10": 1.0, "0.50": 1.0}
+    },
+    "retention": {
+      "tps_mean": 18.59,
+      "tps_std": 0.05,
+      "n_samples": 18,
+      "hit_rate_by_depth": {"0.10": 1.0, "0.50": 0.667}
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {"delta_pct_mean": 25.6, "delta_pct_std": 0.3, "n_cells": 6, "verdict": "WIN (beyond spread)"}
+  },
+  "skip_diag": {
+    "steady_skip_frac": 0.95,
+    "steady_retained_approx": 1601,
+    "steady_seq_approx": 31733,
+    "observe_steps": 4608,
+    "steady_steps": 68544
+  },
+  "items": [
+    {"seed": 1, "depth": 0.1, "off_tps": 14.79, "retention_tps": 18.57},
+    {"seed": 1, "depth": 0.5, "off_tps": 14.80, "retention_tps": 18.59},
+    {"seed": 2, "depth": 0.1, "off_tps": 14.79, "retention_tps": 18.61},
+    {"seed": 2, "depth": 0.5, "off_tps": 14.80, "retention_tps": 18.59},
+    {"seed": 3, "depth": 0.1, "off_tps": 14.79, "retention_tps": 18.65},
+    {"seed": 3, "depth": 0.5, "off_tps": 14.78, "retention_tps": 18.51}
+  ]
+}

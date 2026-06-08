@@ -70,6 +70,47 @@ On a widely-deployed 128k-native open model, read-skip decodes **+25 % at 32k gr
 below still holds for the ≤32k / short-context regime; *above* ~32k on KV-heavy
 long-context models, it's also a genuine **throughput** win.
 
+## GENERALIZATION — a second standard-rope model (Mistral), and the extreme-rope contrast (Qwen-1M)
+
+To check the crossover isn't a Llama artifact, the same int4 read-skip A/B ran on two
+more models. Net: **the throughput crossover generalizes; int4's long-context quality is
+rope-dependent; and read-skip's retention quality is model-dependent.**
+
+| model | rope | KV heads | ctx | `off` quality | retention vs off | retention quality |
+|---|---|---:|---:|:--:|---:|:--:|
+| Llama-3.1-8B | standard | 8 | 32 000 | 1.0 / 1.0 | **+25.0 %** | **1.0 / 1.0** |
+| Mistral-7B-v0.3 | standard | 8 | 30 000 | 1.0 / 1.0 | **+25.6 %** | 1.0 / **0.667** |
+| Qwen2.5-7B-1M | extreme θ | 4 | 8 000 | 1.0 | −18.8 % | 1.0 |
+| Qwen2.5-7B-1M | extreme θ | 4 | 32 000 | **0.667 / 0.0** | −11.7 % | 0.333 / 0.0 |
+
+(Raw: `native_sanity.json`, `native_ctx32000.json`, `mistral_ctx30k.json` in
+`bench_out/PHASE10_AB/`. The Mistral JSON is transcribed from the harness console log —
+provenance note inside the file — because its raw dump wasn't pulled off the pod.)
+
+**Three independent reads:**
+1. **The crossover generalizes and is GQA-width-driven.** Mistral (8 KV heads, standard
+   rope) crosses **+25.6 % at 30k** — within noise of Llama's +25.0 % at 32k. Both are
+   8-KV-head models, so `off`'s full-KV read is heavy and the bounded retained set wins
+   early. Qwen's 4 KV heads make `off` lighter → later (~42k) crossover, exactly as the
+   YaRN run showed. So the crossover point is a function of **KV-head count**, not of any
+   one model.
+2. **The long-context int4-quality wall is EXTREME-ROPE-SPECIFIC, not general.** Both
+   standard-rope models hold int4 `off` quality 1.0/1.0 out to 30–60k. The *only* model
+   that broke is **Qwen2.5-7B-1M**, whose rope_theta is cranked for a 1M window: it passes
+   at 8k (1.0) but **collapses by 32k (`off` 0.667/0.0)**. Because `off` itself fails, the
+   culprit is int4 K-quantization under extreme rope — **not** read-skip (which only ever
+   reads a subset of that same broken KV). This is the "quality wall at longer context"
+   seen live, now pinned to its cause: a genuine int4_protected caveat for extreme-rope
+   models, and the reason the headline demo runs on Llama, not Qwen-1M.
+3. **Read-skip's retention quality is model-dependent — the honest caveat.** Llama keeps
+   the retention needle **1.0/1.0**; Mistral keeps depth-0.1 at 1.0 but drops **depth-0.5
+   to 0.667** (2 of 3 seeds — one mid-context needle lost) at the *same* tuned keep-set
+   (sink 64 / recent 512 / budget 512). The EMA block-retention policy is not uniformly
+   lossless: on some models a mid-context fact falls outside the retained set. For a
+   quality-sensitive deployment the keep-set must be validated (or widened) per model —
+   retention is **not** a free, model-agnostic 1.0/1.0. (The throughput win, by contrast,
+   reproduces cleanly.)
+
 ## The deciding evidence — context sweep (refresh=0, tuned keep-set)
 
 `INT4_READSKIP_KERNEL_SCORES=1 SINK=64 RECENT=512 BUDGET=512 REFRESH=0`, gen=128,

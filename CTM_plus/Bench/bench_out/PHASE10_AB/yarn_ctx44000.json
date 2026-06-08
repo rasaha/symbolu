@@ -1,0 +1,192 @@
+{
+  "kind": "within_process_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "backend": "fused_v2",
+  "context_tokens": 44000,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "depths": [
+    0.1,
+    0.5
+  ],
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 65536,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 20.804,
+      "tps_std": 0.014,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 0.0,
+        "0.50": 0.0
+      }
+    },
+    "retention": {
+      "tps_mean": 21.324,
+      "tps_std": 0.167,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 0.0,
+        "0.50": 0.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {
+      "delta_pct_mean": 2.5,
+      "delta_pct_std": 0.55,
+      "n_cells": 6,
+      "deltas_pct": [
+        2.87,
+        2.07,
+        2.46,
+        3.41,
+        2.21,
+        1.99
+      ]
+    }
+  },
+  "readskip_calls": 64008,
+  "skip_diag": {
+    "steady_skip_frac": 0.9584540023039331,
+    "steady_retained_mean": 1716.1820728291316,
+    "steady_seq_mean": 41308.0,
+    "observe_steps": 4032,
+    "steady_steps": 59976
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 20.801,
+      "tps_std": 0.018,
+      "hit": 0,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "The duty by the``\\n``\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\t\\\\"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 21.397,
+      "tps_std": 0.217,
+      "hit": 0,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "The duty by the``\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``\\\\n``n``n"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 20.816,
+      "tps_std": 0.017,
+      "hit": 0,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "The inital`` The inital``.0`` Calibration diagnostics`` The inital``.0`` Calibra"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.248,
+      "tps_std": 0.244,
+      "hit": 0,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "The inital`` The inital``. No alerts`` personnel`` No alerts`` personnel`` The i"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 20.795,
+      "tps_std": 0.01,
+      "hit": 0,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "The duty on the``\n\n`` Operators``\n\n````\n\n````\n\n````\n\n````\n\n````\n\n````\n\n````\n\n```"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 21.307,
+      "tps_std": 0.066,
+      "hit": 0,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "The duty on the``\n\n`` Operators``\n\n``00````````000``````````````````0``00``````0"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 20.8,
+      "tps_std": 0.024,
+      "hit": 0,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "00000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.509,
+      "tps_std": 0.189,
+      "hit": 0,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": "00000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 20.804,
+      "tps_std": 0.005,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "`` Operators`` Communications with the``\n\n`` Operators``\\01000``\n\n`` Operators``"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 21.264,
+      "tps_std": 0.025,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "`` Operators`` Communications with the``\n\n`` Operators``````0````},\r\n\r\n`````````"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 20.806,
+      "tps_std": 0.005,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "The hum of the hum of the hum of the hum of the hum of the hum of the hum of the"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.221,
+      "tps_std": 0.015,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "The hum of the hum of the hum of the hum of the hum of the hum of the hum of the"
+    }
+  ]
+}

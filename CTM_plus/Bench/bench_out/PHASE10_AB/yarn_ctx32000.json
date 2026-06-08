@@ -1,0 +1,192 @@
+{
+  "kind": "within_process_ab",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "backend": "fused_v2",
+  "context_tokens": 32000,
+  "gen": 128,
+  "repeats": 3,
+  "warmup_discarded": 2,
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "depths": [
+    0.1,
+    0.5
+  ],
+  "modes": [
+    "off",
+    "retention"
+  ],
+  "baseline": "off",
+  "max_model_len": 65536,
+  "decode_time_method": "metrics:last-first_token_time",
+  "per_mode": {
+    "off": {
+      "tps_mean": 24.895,
+      "tps_std": 0.018,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 0.0,
+        "0.50": 0.0
+      }
+    },
+    "retention": {
+      "tps_mean": 21.931,
+      "tps_std": 0.104,
+      "n_samples": 18,
+      "hit_rate_by_depth": {
+        "0.10": 0.0,
+        "0.50": 0.0
+      }
+    }
+  },
+  "paired_vs_baseline": {
+    "retention": {
+      "delta_pct_mean": -11.9,
+      "delta_pct_std": 0.3,
+      "n_cells": 6,
+      "deltas_pct": [
+        -11.51,
+        -11.61,
+        -12.0,
+        -12.27,
+        -12.16,
+        -11.89
+      ]
+    }
+  },
+  "readskip_calls": 64008,
+  "skip_diag": {
+    "steady_skip_frac": 0.9431424469047863,
+    "steady_retained_mean": 1710.1330532212885,
+    "steady_seq_mean": 30077.5,
+    "observe_steps": 4032,
+    "steady_steps": 59976
+  },
+  "readskip_kernel_scores": true,
+  "readskip_inkernel": false,
+  "items": [
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.877,
+      "tps_std": 0.016,
+      "hit": 0,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "The hum of the cool pumps| The ventilation hum of the cool pumps| The ventilatio"
+    },
+    {
+      "seed": 1,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 22.014,
+      "tps_std": 0.173,
+      "hit": 0,
+      "expected": "INDIA-ECHO-MIKE",
+      "generated": "The hum of the cool pumps| The ventilation hum of the\nThe daily inspection of th"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 24.906,
+      "tps_std": 0.014,
+      "hit": 0,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "00000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "seed": 1,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 22.016,
+      "tps_std": 0.065,
+      "hit": 0,
+      "expected": "SIERRA-ALFA-FOXTROT",
+      "generated": "00000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.897,
+      "tps_std": 0.007,
+      "hit": 0,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "The The The and the exact one. No alerts| The The and the exact one. No alerts| "
+    },
+    {
+      "seed": 2,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 21.91,
+      "tps_std": 0.029,
+      "hit": 0,
+      "expected": "UNIFORM-LIMA-YANKEE",
+      "generated": "The The The and the exact one. No alerts. The exact one. No alerts. The exact on"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 24.902,
+      "tps_std": 0.018,
+      "hit": 0,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": " Operators in the on the standing schedule. No alerts were raised by the supervi"
+    },
+    {
+      "seed": 2,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.848,
+      "tps_std": 0.045,
+      "hit": 0,
+      "expected": "GOLF-UNIFORM-KILO",
+      "generated": " Operators in the on the standing schedule. No alerts were were were000000000000"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "off",
+      "tps_mean": 24.893,
+      "tps_std": 0.012,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "The status has reconciled the The The duty| nominal status| The The duty| nomina"
+    },
+    {
+      "seed": 3,
+      "depth": 0.1,
+      "mode": "retention",
+      "tps_mean": 21.866,
+      "tps_std": 0.008,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-LIMA",
+      "generated": "The status has reconciled the The The duty has been on the exact. No alerts. The"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "off",
+      "tps_mean": 24.892,
+      "tps_std": 0.034,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "01000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "seed": 3,
+      "depth": 0.5,
+      "mode": "retention",
+      "tps_mean": 21.933,
+      "tps_std": 0.13,
+      "hit": 0,
+      "expected": "VICTOR-UNIFORM-DELTA",
+      "generated": "01000000000000000000000000000000000000000001010000000000000010100000010101001000"
+    }
+  ]
+}
