@@ -263,6 +263,7 @@ for.** The one lever that beat it on a proxy affirms it once measured downstream
 | Hadamard rotation | remove protect (~1 GB) | NEGATIVE (redundant vs per-channel; Qwen + Mistral) |
 | scale-metadata / polar | remove scale (~3.4 GB) | NEGATIVE cheap (needs heavy QJL kernels) |
 | head-wise allocation | beat the protect *design* | wins recon error, **LOSES downstream** → protect validated |
+| high-dim VQ (E8 lattice / HQMQ quaternion) | denser codec, recover hard tail | **PARKED** — its rotation + "no per-channel scale" + recon-MSE premises are exactly the three above (all negative here); multi-week kernel; → `VECTOR_QUANT_E8_HQMQ_EVAL.md` |
 
 **Cheap removal of the int4 KV tax is exhausted across two model families, and the
 protect-channel design is downstream-optimal. The density-positive, footprint-negative
