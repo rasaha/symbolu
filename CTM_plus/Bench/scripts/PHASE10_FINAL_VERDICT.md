@@ -50,11 +50,12 @@ rope_scaling), int4 read-skip, no rope hacking:
 | 32 000 | 14.83 | 18.54 | **+25.0 %** | **1.0 / 1.0** |
 | 44 000 | 11.92 | 17.45 | **+46.4 %** | **1.0 / 1.0** |
 | 52 000 | 10.80 | 17.15 | **+58.8 %** | **1.0 / 1.0** |
-| 60 000 | (pending) | | | |
+| 60 000 | 9.58 | 16.49 | **+72.2 %** | **1.0 / 1.0** |
 
-**Both claim-gate conditions pass at EVERY context, and the win grows.** `off` slopes
-down (14.83 → 10.80 as KV piles up); `retention` stays flat (~17–18, bounded ~1.88k
-retained, 94–96 % skip); gap widens **+25 → +46 → +59 %**, needle **1.0/1.0 throughout.**
+**Both claim-gate conditions pass at EVERY context, and the win grows monotonically.**
+`off` slopes down (14.83 → 9.58 as KV piles up); `retention` stays flat (~16–18, bounded
+~1.8k retained, 94–97 % skip); gap widens **+25 → +46 → +59 → +72 %**, needle **1.0/1.0
+throughout.**
 
 - **Earlier and steeper than Qwen** because Llama-3.1-8B has **8 KV heads vs Qwen's 4**
   → ~2.3× the KV per token → `off`'s full-KV read is much heavier → bounded retention
@@ -65,7 +66,7 @@ retained, 94–96 % skip); gap widens **+25 → +46 → +59 %**, needle **1.0/1.
 
 **Verdict upgrade: read-skip's long-context throughput win is MEASURED, not projected.**
 On a widely-deployed 128k-native open model, read-skip decodes **+25 % at 32k growing to
-+59 % at 52k**, reading ~95 % less KV, **quality fully preserved.** The density framing
++72 % at 60k**, reading ~95–97 % less KV, **quality fully preserved (needle 1.0/1.0).** The density framing
 below still holds for the ≤32k / short-context regime; *above* ~32k on KV-heavy
 long-context models, it's also a genuine **throughput** win.
 
