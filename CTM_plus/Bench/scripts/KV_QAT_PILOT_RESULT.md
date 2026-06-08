@@ -153,6 +153,27 @@ conclusion.** The only remaining path — a full TurboQuant Lloyd-Max + QJL + cu
 kernel pipeline — is a real engineering project with uncertain payoff: documented,
 not recommended.
 
+## Cross-model check — Mistral-7B-Instruct-v0.3 (cheap levers generalize)
+
+Re-ran the two training-free probes on Mistral (model-agnostic hooks):
+
+| probe | Qwen2.5-7B | Mistral-7B-v0.3 |
+|---|---|---|
+| rotation: per-channel K err (g128) | 0.0238 | 0.0607 |
+| rotation: + Hadamard | 0.0251 (+5%) | 0.0640 (+5%) → still WORSE |
+| scale-probe: per-channel K err (g32) | 0.0176 | 0.0449 |
+| scale-probe: polar-core fixed | 0.1249 (7.1×) | 0.1244 (2.8×) → still WORSE |
+
+Both cheap levers replicate as **negative** on Mistral — same direction, same
+mechanism. The Qwen conclusions **generalize across model families.**
+
+Nuance: Mistral's K is ~2.5× **harder** to per-channel int4-quantize (0.045 vs 0.018
+at g32). The polar-core absolute error is ~identical across both (~0.124 — the
+fixed-quantizer floor), so Mistral's smaller ratio is just a worse baseline, not a
+working lever. Mistral leans MORE on the protect sidecar → it also has more headroom
+for the one lever NOT re-tested here, **KV-QAT training** — the only regime where a
+Mistral re-run could still surprise.
+
 ## Reproduce
 
 ```bash
