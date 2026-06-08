@@ -178,6 +178,42 @@ def _print_hook_report(stats):
 
 
 # --------------------------------------------------------------------------- train
+def _eval_after(args, torch, tok, model, dev):
+    """In-process int4-vs-bf16 free-generation agreement on the just-trained model —
+    no save, no reload (dodges disk-quota + tokenizer-convert issues). Same metric as
+    kv_qat_gen_eval.py, so the number is comparable to base/B0 from that script."""
+    import kv_qat_gen_eval as ge
+    from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
+    mgr = INT4CacheKVRouteA(
+        k_group_size=args.group_size, v_group_size=args.group_size, asymmetric=True,
+        bits=4, sink_size=0, num_kv_heads=model.config.num_key_value_heads,
+        kernel_backend="dequant_fallback")
+    model.eval()
+    pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
+    prompts = ge.build_prompts(torch, tok, 16, 128, args.dataset, args.dataset_config)
+
+    @torch.no_grad()
+    def gen(ids, hooked):
+        r = ge.install_int4_inference_hooks(torch, model, mgr) if hooked else None
+        try:
+            out = model.generate(ids, max_new_tokens=48, do_sample=False, num_beams=1,
+                                 use_cache=False, pad_token_id=pad)
+        finally:
+            if r is not None:
+                r()
+        return out[0, ids.shape[1]:]
+
+    matched = total = 0
+    for ids in prompts:
+        ids = ids.to(dev)
+        gb, gi = gen(ids, False), gen(ids, True)
+        n = min(gb.numel(), gi.numel())
+        matched += int((gb[:n] == gi[:n]).sum())
+        total += n
+    print(f"[eval-after] arm={args.arm}  int4-vs-bf16 free-gen agreement = "
+          f"{matched/max(1,total):.4f}  ({total} positions)", flush=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", choices=["b0", "b1"], required=True)
@@ -196,6 +232,9 @@ def main() -> int:
     ap.add_argument("--smoke", action="store_true", help="2-step wiring report on the real model")
     ap.add_argument("--overfit", action="store_true", help="40-step learning sanity on 16 fixed examples")
     ap.add_argument("--merge", action="store_true", help="merge LoRA into base + save (for eval)")
+    ap.add_argument("--eval-after", action="store_true",
+                    help="after training, run in-process int4-vs-bf16 free-gen agreement and EXIT "
+                         "(no save -- dodges disk-quota + tokenizer-convert issues)")
     ap.add_argument("--output", default="kv_qat_out")
     args = ap.parse_args()
     if args.smoke:
@@ -318,6 +357,9 @@ def main() -> int:
             "layer/step; result is INVALID. Run --smoke to debug the hook.")
     print(f"[pilot] done  arm={args.arm}  loss {losses[0]:.3f}->{losses[-1]:.3f}  "
           f"fired K={stats['k_fired']} V={stats['v_fired']}", flush=True)
+    if args.eval_after:
+        _eval_after(args, torch, tok, model, dev)
+        return 0
     out = args.output
     if args.merge:
         print("[pilot] merging LoRA -> base and saving (for int4 eval) ...", flush=True)
