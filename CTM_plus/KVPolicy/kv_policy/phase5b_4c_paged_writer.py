@@ -218,10 +218,22 @@ def _vllm_max_num_seqs() -> Optional[int]:
         from vllm.config import get_current_vllm_config  # type: ignore
     except Exception:
         return None
+    # get_current_vllm_config() logs a WARNING ("Current VLLM config is not
+    # set.", config.py:3486) and returns a default when the config contextvar is
+    # unset — which is the case during CUDA-graph capture, where this best-effort
+    # probe runs once per layer per captured shape (a log flood). Our guards
+    # below catch the return value, not the warning vLLM emits first; silence
+    # that one logger for the duration of this guarded read. Behavior unchanged.
+    import logging
+    _cfg_log = logging.getLogger("vllm.config")
+    _prev_level = _cfg_log.level
+    _cfg_log.setLevel(logging.ERROR)
     try:
         cfg = get_current_vllm_config()
     except Exception:
         return None
+    finally:
+        _cfg_log.setLevel(_prev_level)
     if cfg is None:
         return None
     try:
