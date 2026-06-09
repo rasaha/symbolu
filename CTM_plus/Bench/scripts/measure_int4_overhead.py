@@ -143,7 +143,7 @@ def flags_line(params: dict) -> str:
 # GPU workers (pod only). Lazy torch/vLLM import; reuse audit_phase6g helpers.
 # --------------------------------------------------------------------------- #
 def worker_bf16(model: str, max_model_len: int, gpu_util: float,
-                max_num_seqs: int, out: Path) -> int:
+                max_num_seqs: int, out: Path, eager: bool = False) -> int:
     import torch
     from vllm import LLM, SamplingParams
     import audit_phase6g_sidecar_overhead as a6g
@@ -151,7 +151,7 @@ def worker_bf16(model: str, max_model_len: int, gpu_util: float,
     torch.cuda.reset_peak_memory_stats()
     llm = LLM(model=model, max_model_len=max_model_len,
               gpu_memory_utilization=gpu_util, max_num_seqs=max_num_seqs,
-              enforce_eager=False)
+              enforce_eager=eager)
     llm.generate(["Hello"], SamplingParams(temperature=0.0, max_tokens=2))
     torch.cuda.synchronize()
     kv = a6g._kv_cache_summary(llm)
@@ -175,7 +175,7 @@ def worker_bf16(model: str, max_model_len: int, gpu_util: float,
 
 
 def worker_int4(model: str, max_model_len: int, gpu_util: float,
-                max_num_seqs: int, out: Path) -> int:
+                max_num_seqs: int, out: Path, eager: bool = False) -> int:
     import os
     os.environ.setdefault("PHASE6E_FUSED_WRITER", "1")
     import torch
@@ -186,7 +186,7 @@ def worker_int4(model: str, max_model_len: int, gpu_util: float,
     torch.cuda.reset_peak_memory_stats()
     llm = Int4ProtectedLLM(model=model, max_model_len=max_model_len,
                            gpu_memory_utilization=gpu_util,
-                           max_num_seqs=max_num_seqs)
+                           max_num_seqs=max_num_seqs, enforce_eager=eager)
     llm.generate(["Hello"], SamplingParams(temperature=0.0, max_tokens=2))
     torch.cuda.synchronize()
 
@@ -247,6 +247,8 @@ def run_driver(args) -> int:
                "--model", args.model, "--max-model-len", str(args.max_model_len),
                "--gpu-util", str(args.gpu_util), "--max-num-seqs", str(S),
                "--output", str(out)]
+        if args.eager:
+            cmd.append("--eager")
         print(f"=== spawn {kind} (max_num_seqs={S}) ===")
         if subprocess.run(cmd, check=False).returncode != 0:
             raise SystemExit(f"worker {kind} S={S} failed")
@@ -361,6 +363,9 @@ def main(argv=None) -> int:
     ap.add_argument("--gpu-util", type=float, default=0.5)
     ap.add_argument("--max-num-seqs", type=int, default=8, help="worker mode: slots for this run")
     ap.add_argument("--slots", default="8,64", help="driver: two max_num_seqs to separate per-slot/fixed")
+    ap.add_argument("--eager", action="store_true",
+                    help="enforce_eager (no CUDA graphs). MATCH YOUR DEPLOYMENT: read-skip "
+                         "runs eager (smaller fixed tax); the +4.68GB capacity figure used graphs.")
     ap.add_argument("--output", type=str, help="worker mode: JSON output path")
     ap.add_argument("--output-dir", default="bench_out/int4_overhead", help="driver: output dir")
     args = ap.parse_args(argv)
@@ -369,10 +374,10 @@ def main(argv=None) -> int:
         return selftest()
     if args.worker_bf16:
         return worker_bf16(args.model, args.max_model_len, args.gpu_util,
-                           args.max_num_seqs, Path(args.output))
+                           args.max_num_seqs, Path(args.output), args.eager)
     if args.worker_int4:
         return worker_int4(args.model, args.max_model_len, args.gpu_util,
-                           args.max_num_seqs, Path(args.output))
+                           args.max_num_seqs, Path(args.output), args.eager)
     if args.run:
         return run_driver(args)
     ap.print_help()

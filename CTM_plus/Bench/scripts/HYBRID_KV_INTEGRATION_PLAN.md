@@ -132,9 +132,47 @@ multi-week two-pool fork (Tier 2) is justified only by a measured per-sequence c
 **and** a bimodal single-engine workload. The measurement is the cheap step that tells you
 which, so run it before committing engineering.
 
+## Runbook — the decision in 3 commands (pod, venv-vllm)
+
+```bash
+# 0. fresh code on the pod (RunPod MooseFS volume)
+cd /workspace/symbolu && git pull origin claude/bold-johnson-rXAd4 && cd CTM_plus
+
+# 1. MEASURE — pin per_token_frac / stage_per_slot / fixed_tax for YOUR deployment.
+#    --slots 8,64 gives the two-point slope that separates per-slot from fixed.
+#    Add --eager IFF you deploy eager (read-skip does); omit it if you serve with
+#    CUDA graphs (the +4.68 GB capacity regime). The fixed tax differs between them.
+python Bench/scripts/measure_int4_overhead.py --run \
+    --model Qwen/Qwen2.5-7B-Instruct --max-model-len 16384 --slots 8,64        # [--eager]
+
+# 2. FEED the printed flags into the cost model + check YOUR traffic shape.
+python Bench/scripts/hybrid_kv_scheduler.py --crossover \
+    --per-token-frac <P> --stage-per-slot-mb <Y> --fixed-tax-gb <Z>
+python Bench/scripts/hybrid_kv_scheduler.py --workload <your-traffic> \
+    --per-token-frac <P> --stage-per-slot-mb <Y> --fixed-tax-gb <Z>
+```
+
+### Reading the verdict → the tier
+
+Step 1 prints `Crossover regime:` and the cost-params JSON. Map it:
+
+| measurement output | meaning | do this |
+|---|---|---|
+| `LOAD-driven` (stage_per_slot < ~4 MB) | per-seq routing buys nothing; only total resident load matters | **Tier 0.** Compare your service's steady resident tokens to `N*` (step 2). Above `N*` → launch **int4_protected**; below → launch **bf16**. Done, no code. |
+| `PER-SEQUENCE-driven` (stage_per_slot tens of MB) **and** workload is **unimodal** (all short *or* all long) | routing exists but your traffic doesn't straddle `L*` | **Tier 0.** One launch-time dtype still wins; pick by where your lengths sit vs `L*`. |
+| `PER-SEQUENCE-driven` **and** workload is **bimodal** on one engine/GPU (many short + many long concurrently) | per-seq routing genuinely pays, and you can't split into two services | **Tier 2.** Build the two-pool fork (4 insertion points above), gated on the risk table. |
+
+Sanity checks on the step-1 output before trusting it:
+- `_detail.net_density_x` should land near **~1.8×** (the audited density). Far off → wrong
+  config or the int4 path didn't install (check the worker logged writers found).
+- `_detail.per_slot_intercept_mb` should be small; a large intercept means a fixed lump was
+  mislabeled per-slot — it's correctly folded into `fixed_tax_gb`, but eyeball it.
+- Re-run step 1 with and without `--eager` if you're unsure which you'll deploy; the
+  `fixed_tax_gb` (hence `N*`) will move, and that moves the Tier-0 launch threshold.
+
 ## Pointers
 - Cost model + policies: `hybrid_kv_scheduler.py` (`--crossover` shows `L*` and `N*`).
-- Overhead measurement: `measure_int4_overhead.py` (`--run` on the pod).
+- Overhead measurement: `measure_int4_overhead.py` (`--run` on the pod; `--eager` to match deploy).
 - Backend hooks referenced: `KVPolicy/kv_policy/phase5b_backend_install.py`,
   `phase5b_4c_paged_writer.py` (slot pool), `int4_cache_kv_route_a.py` (int4 path),
   swap-restore `PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md`, slot GC `test_phase6k14_slot_gc.py`.
