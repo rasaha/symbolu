@@ -111,12 +111,26 @@ def int4_seq_marginal_bytes(mc: ModelConfig, cal: Int4Calib, length: int) -> flo
 
 
 def crossover_length(mc: ModelConfig, cal: Int4Calib) -> float:
-    """L* where int4's marginal per-seq cost == bf16's.
+    """PER-SEQUENCE crossover L* where int4's marginal per-seq cost == bf16's.
         stage + frac*c*L == c*L  ->  L* = stage / ((1-frac)*c)
     Below L*, bf16 is smaller for that sequence; above, int4 is. Independent of
-    batch and of the fixed tax (that is a separate pool-open cost)."""
+    batch and of the fixed tax. Drives policy #4 (per-sequence routing) -- but is
+    only material if stage_per_slot is non-trivial. The 6G audit suggests the
+    staging pool is small, in which case this L* is tiny and the LOAD crossover
+    below is the operative one (-> policy #6)."""
     c = mc.bf16_kv_bytes_per_token()
     return (cal.stage_per_slot_mb * MB) / ((1.0 - cal.per_token_frac) * c)
+
+
+def load_crossover_tokens(mc: ModelConfig, cal: Int4Calib) -> float:
+    """LOAD crossover: total resident cached tokens at which opening the int4
+    pool pays for its fixed tax.
+        fixed_tax == (1-frac)*c*N  ->  N* = fixed_tax / ((1-frac)*c)
+    Below N*, bf16-only is smaller (fixed tax not amortized); above, int4 wins.
+    This is the operative crossover when per-slot staging is negligible, and is
+    exactly what policy #6 (load-switch) keys on."""
+    c = mc.bf16_kv_bytes_per_token()
+    return (cal.fixed_tax_gb * GB) / ((1.0 - cal.per_token_frac) * c)
 
 
 # --------------------------------------------------------------------------- #
@@ -240,8 +254,15 @@ def report_crossover(mc: ModelConfig, cal: Int4Calib):
     print(f"  per-slot staging pool  : {cal.stage_per_slot_mb:.1f} MB/slot   "
           f"<-- ESTIMATE; measure on pod")
     print(f"  fixed int4 tax (pool)  : {cal.fixed_tax_gb:.2f} GB one-time")
-    print(f"  => per-seq crossover L*: {crossover_length(mc, cal):,.0f} tokens")
-    print(f"     (seqs longer than L* are cheaper in int4; shorter in bf16)")
+    Lstar = crossover_length(mc, cal)
+    Nstar = load_crossover_tokens(mc, cal)
+    print(f"  => per-seq crossover L* : {Lstar:,.0f} tokens   (policy #4 routing)")
+    print(f"  => LOAD crossover  N*   : {Nstar:,.0f} total resident tokens   (policy #6 switch)")
+    regime = ("LOAD-driven -> #6 load-switch is operative; #4 per-seq routing adds little"
+              if Lstar < 256 else
+              "PER-SEQUENCE-driven -> #4 routing matters; route seqs > L* to int4")
+    print(f"     regime: {regime}")
+    print(f"     (N* example: ~{Nstar/2048:,.0f} seqs of 2K, or 1 seq of {Nstar:,.0f})")
     print("\n  L* sensitivity to the un-measured staging pool:")
     print(f"  {'stage MB/slot':>14}{'L* (tokens)':>14}")
     for s in (8, 16, 24, 32, 48, 64, 96):

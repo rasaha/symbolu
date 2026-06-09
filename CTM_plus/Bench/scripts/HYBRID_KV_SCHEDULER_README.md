@@ -85,14 +85,35 @@ regime read-skip already targets, and the guard makes it costless everywhere els
    8 → 96 MB/slot (see `--crossover`). Everything else (bf16 per-token exact; int4
    per-token from the §1/§4 audit) is grounded.
 
-## Next step to make it exact (one pod measurement)
+## Two crossover regimes — and which one you're in matters
 
-`measure_stage_pool()` documents the procedure: on the GPU pod (venv-vllm), load the
-int4_protected backend, snapshot `torch.cuda.memory_allocated()`, admit one max-len
-sequence, snapshot again; the delta minus `frac·c·L` is the per-slot staging (run at
-two batch sizes to separate `fixed_tax` from per-slot). Feed the result via
-`--stage-per-slot-mb` / `--fixed-tax-gb` for an exact crossover. That single number
-turns this from a calibrated estimate into a measured decision.
+The harness reports **both**:
+- **per-sequence `L*`** (policy #4 routing) — driven by the per-slot staging pool.
+- **load `N*`** in total resident tokens (policy #6 load-switch) — driven by the fixed tax.
+
+Which dominates decides the integration: if per-slot staging is small (the 6G-audit
+expectation), `L*` is tiny and the crossover is **load-driven** → policy #6, and a
+launch-time pool choice suffices (no fork). If staging is material, `L*` matters →
+policy #4 per-sequence routing. `--crossover` prints the regime verdict.
+
+## Next step to make it exact — `measure_int4_overhead.py` (one pod run)
+
+That script pins the three parameters on the GPU pod by reusing the proven
+`audit_phase6g_sidecar_overhead` introspection (builds the real `Int4ProtectedLLM`, walks
+every writer's sidecar tensors, snapshots the CUDA-graph tax) plus a bf16 baseline and a
+second `max_num_seqs` point:
+
+```bash
+python Bench/scripts/measure_int4_overhead.py --run \
+    --model Qwen/Qwen2.5-7B-Instruct --max-model-len 16384 --slots 8,64
+# -> --per-token-frac X --stage-per-slot-mb Y --fixed-tax-gb Z  (+ the regime verdict)
+```
+
+Its decomposition math is pure and verified here (`--selftest`); only the raw
+measurements run on the pod. Feed the printed flags back into `--crossover`.
+
+See **`HYBRID_KV_INTEGRATION_PLAN.md`** for the engineering ladder (Tier 0 launch-time
+choice → Tier 2 two-pool fork) gated on that measurement.
 
 ## Run
 
