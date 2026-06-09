@@ -264,7 +264,7 @@ for.** The one lever that beat it on a proxy affirms it once measured downstream
 | scale-metadata / polar | remove scale (~3.4 GB) | NEGATIVE cheap (needs heavy QJL kernels) |
 | head-wise allocation | beat the protect *design* | wins recon error, **LOSES downstream** → protect validated |
 | high-dim VQ (E8 lattice / HQMQ quaternion) | denser codec, recover hard tail | **PARKED** — its rotation + "no per-channel scale" + recon-MSE premises are exactly the three above (all negative here); multi-week kernel; → `VECTOR_QUANT_E8_HQMQ_EVAL.md` |
-| **learned rotation + per-tensor** (SpinQuant/KurTail-style) | delete scale/protect (~3.4 GB) | **RESOLVED NEGATIVE — measured FAIL on Qwen2.5-7B.** Hard-tail gate: learned per-tensor **0.0404** vs per-channel+protect **0.2656** vs naive **0.2357** free-gen agreement → learned is **6× worse than even naive int4**. Recon foreshadowed it (never matches per-channel; layer-0 not-rotatable). The one un-disproven lever is now disproven. → §below |
+| **learned rotation + per-tensor** (SpinQuant/KurTail-style) | delete scale/protect (~3.4 GB) | **RESOLVED NEGATIVE — measured FAIL on 2 models.** Hard-tail gate: learned per-tensor **below even naive int4** on BOTH — Qwen 0.0404 / Llama 0.3854 vs protect 0.2656 / 0.5104. Llama is more rotatable (no layer-0 wall) but still loses; rotating to drop scales makes K *worse* than keeping them. TurboQuant package sym4 on Qwen = 0.0365 (8-bit sanity 0.70 → genuine low-bit wall). The one un-disproven lever is disproven. → §below |
 
 **The CHEAP, data-oblivious removals are exhausted across two model families** (random/
 Hadamard rotation, scale-drop, light KV-QAT all negative), and the protect-channel design
@@ -298,11 +298,28 @@ conclusion **unless that learned-rotation probe clears a hard-tail gate** (§bel
 > int4** (0.24): the ~1.6–4× per-token recon gap cascades over 48 free-gen tokens into a
 > near-total collapse. The rotated single-scale K destroys generation.
 >
-> **Verdict: rotation cannot delete the ~3.4 GB scale/protect tax on Qwen2.5-7B K.** Now
-> **5 independent lines** all negative: random-rotation scale-drop (7.1×), TurboQuant/QJL
+> **CONFIRMED on a 2nd model — Llama-3.1-8B (more rotatable, still FAILs):**
+>
+> | arm | Qwen2.5-7B | Llama-3.1-8B |
+> |---|---:|---:|
+> | naive per-channel int4 | 0.2357 | 0.4714 |
+> | per-channel + **PROTECT** (bar) | **0.2656** | **0.5104** |
+> | learned-R + per-tensor | 0.0404 | 0.3854 |
+> | learned − protect | −0.225 | **−0.125** |
+>
+> Llama's K is genuinely more rotatable (recon: no layer-0 wall, 1.5–1.8× residual vs
+> Qwen's 1.6–4.3×; KurTail's "LLaMA-3 rotation-friendly" hint borne out) → learned per-tensor
+> 0.39 vs Qwen's 0.04. **But it still FAILs**, and decisively: on BOTH models learned
+> per-tensor is **below even naive per-channel int4** (Llama 0.385 < 0.471; Qwen 0.040 < 0.236).
+> **Rotating to delete the scales makes K *worse* than keeping them** — there is no
+> "trade per-channel for rotation" that wins.
+>
+> **Verdict: rotation cannot delete the ~3.4 GB scale/protect tax — measured on 2 models.**
+> Now **6 independent lines** all negative: random-rotation scale-drop (7.1×), TurboQuant/QJL
 > retirement (3052× ppl), KVLinC keeps per-channel K + adapters, Phase-A recon (no match),
-> Phase-B gate (0.04 vs 0.27). **Ship the hybrid scheduler.** Kernel work correctly NOT
-> started (gated on this PASS).
+> Phase-B gate **on Qwen (0.04) AND Llama (0.39)**, TurboQuant package sym4 on Qwen (0.0365,
+> 8-bit sanity 0.70 → genuine low-bit wall). **Ship the hybrid scheduler.** Kernel work
+> correctly NOT started (gated on a PASS that never came).
 >
 > *(Caveat on the bar: on this free-gen wikitext harness protect (0.27) only modestly beats
 > naive (0.24) — int4 bites hard here; protect's larger advantage is on the serving-path /
