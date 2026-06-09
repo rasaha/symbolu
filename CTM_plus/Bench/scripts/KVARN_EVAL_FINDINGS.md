@@ -58,6 +58,59 @@ pessimistic *for Llama*.
   hard-tail metric KVarN hasn't been stressed on here).
 - **Next validation before crowning KVarN:** re-run on Llama at `--max-model-len 32768` with a
   **needle** task — 0.98 on 4K free-gen is not the regime where the other methods broke.
+  (`kvarn_hard_needle.py` does exactly this, reusing `phase6k12`'s builder/classifier/seed so
+  the row lands in the same table as int4_protected's hard-tail numbers.)
+
+## Why the throughput gap exists (code-grounded — it's integration, not the quantizer math)
+
+int4_protected is throughput-**negative** (0.24× bf16 early; ~0.5× bf16 ceiling at Phase 10);
+KVarN is throughput-**neutral-to-positive** (285.6 vs its own bf16 281.6 = ≥1.0×). Comparing
+*within each engine* isolates the quantizer's cost: int4 costs ~0.5–0.76× of its own stock;
+KVarN's quantizer costs ~**0**. Why:
+
+**Primary cause (~80%): native cache dtype vs Python wrapper.** The team's own per-decode
+breakdown (`KERNEL_6C3C_PHASE2_4_MEASUREMENT_FINDINGS.md:26-39`, Qwen2.5-7B):
+
+| block | ms | share |
+|---|---:|---:|
+| decode_append | 0.108 | 8% |
+| decode_kernel (the actual attention) | 0.434 | 32% |
+| **decode_repack (Python glue)** | **0.804** | **60%** |
+
+60% of every decode step is a host-side repack — **not** the kernel. The fused kernel itself is
+*46% faster* than its predecessor (`...FINDINGS.md:13-19`); in their words: *"the kernel itself
+isn't a bottleneck... the slowdown is entirely the Python repack."* The repack exists because
+int4_protected is a **wrapper/hook over vLLM 0.7.3 (V0)**, not a registered `kv_cache_dtype`.
+Finding 4 (`...FINDINGS.md:70-95`) scopes the real fix — *"registering a custom `kv_cache_dtype`
+in vLLM's CacheEngine"* — as **multi-week Phase 5B/5C work**, the unfinished ship blocker.
+
+KVarN runs as `kv_cache_dtype="kvarn_k4v2_g128"` — one flag. That *is* the native CacheEngine
+integration int4 hasn't finished. Its dequant happens *inside* the fused kernel (the same
+load → unpack → ×scale → `tl.dot` int4's own kernel does at
+`int4_fused_attention_kernel.py:154-173`); **no Python in the decode hot path.** The dequant
+math is identical and cheap in both — that is NOT the cause.
+
+**Secondary cause (~20%): the scheme is structurally heavier.** Even fully native, int4 carries
+two costs KVarN doesn't: (1) the **protect mask is a dual path** — the kernel reads the top-4%
+K channels from a separate bf16 buffer (`k_fp16_ptr` + `protect_mask_ptr`) and merges them every
+step; KVarN has no protect → one uniform packed path with cleaner coalescing. (2) **per-channel
+K groups along the SEQ axis** → decode tokens stage into a partial group needing finalization
+(much of what `decode_repack` does); KVarN applies Hadamard + variance-normalization at *write*
+time (g128, paged-native) → nothing to stage at decode. Plus V0 (82 tok/s stock) vs V1 (281
+tok/s bf16) is ~3.4× of KVarN's *absolute* throughput, independent of the quantizer.
+
+**One root cause, two symptoms.** The same not-yet-native status that forces the per-step Python
+repack (→ throughput-negative) also prevents shrinking vLLM's preallocated KV reserve, so int4
+carries a *sidecar* tax instead of a clean reserve-shrink (→ 1.83× with a 3.4 GB tax). KVarN,
+being native, gets both: no host tax **and** a real reserve shrink (2.67×, its 9.5 GiB tail pool
+is the native sizing).
+
+**Implication.** Most of the gap is engineering debt (closeable — native integration would lift
+int4 toward ~0.7–0.9× bf16), but it is *unfinished* multi-week work, and even fully native the
+protect + per-channel-over-SEQ costs likely cap int4 at throughput-**neutral**, not positive —
+KVarN is ≥bf16 because at decode it has nothing extra to do. **Throughput is a losing axis to
+fight KVarN on;** int4_protected's edge is the Qwen2.5-7B/GQA-7 segment where KVarN crashes (and
+the harder quality validation), not speed.
 
 ## Reproduce
 ```bash
