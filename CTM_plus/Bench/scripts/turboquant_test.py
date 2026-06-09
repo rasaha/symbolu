@@ -59,15 +59,21 @@ def token_agreement(ref, test):
     return matched / n, pre
 
 
-def read_verdict(turbo_agree: float, protect_bar: float = 0.2656,
-                 naive: float = 0.2357) -> str:
-    """Same bar as the gate: TurboQuant must MATCH per-channel+protect to be a real
-    quality option. (Anchors are from the use_cache=False gate -> indicative.)"""
-    if turbo_agree >= protect_bar - 0.01:
-        return ("MATCHES protect-class quality (>= the gate bar) -- worth a memory check")
-    if turbo_agree >= naive - 0.01:
-        return ("naive-int4 class (below protect) -- density-at-quality-cost, not a tax win")
-    return ("BELOW naive int4 -- catastrophic, like the learned-rotation gate (0.04)")
+def read_verdict(spec: str, agree: float) -> str:
+    """Bits-aware, regime-honest. The tax-deletion question is the LOW-bit (<=4) config;
+    >=8-bit 'working' is NOT a tax win (8-bit K >= our 4-bit). Do NOT compare these
+    use_cache=True numbers to the gate's use_cache=False anchors as a 'beats protect'
+    claim -- different regime."""
+    kw = _cache_kwargs(spec)
+    bits = kw.get("bits", min([v for k, v in kw.items() if k.endswith("bits")] or [0]))
+    if bits <= 4:                                  # the tax-deletion-relevant config
+        if agree < 0.15:
+            return "CATASTROPHIC -- the 4-bit (tax-deletion) config fails: the low-bit K wall"
+        return ("4-bit survives here -- worth a WITHIN-REGIME protect/naive comparison + a "
+                "real memory check before believing it")
+    return ("8-bit works, but 8-bit K is NOT tax-deletion (>= our 4-bit) -- quality here "
+            "doesn't address the tax. (use_cache=True is gentler than the gate; this number "
+            "is NOT comparable to protect 0.27.)")
 
 
 # --------------------------------------------------------------------------- #
@@ -149,10 +155,10 @@ def run_gpu(args) -> int:
         results[spec] = agree
         print(f"\n[turbo] config={spec}  ({_cache_kwargs(spec)})")
         print(f"  free-gen agreement vs bf16 = {agree:.4f}  mean_prefix={prefix/len(prompts):.1f}/{args.gen}")
-        print(f"  -> {read_verdict(agree)}")
+        print(f"  -> {read_verdict(spec, agree)}")
 
-    print("\n[turbo] vs the gate anchors (use_cache=False -> indicative):")
-    print("        naive per-channel 0.2357 | protect 0.2656 | learned-rotation 0.0404")
+    print("\n[turbo] gate anchors are use_cache=FALSE (harsher) -- cross-regime, do NOT read")
+    print("        a higher number here as 'beats protect':  naive 0.2357 | protect 0.2656 | learned 0.0404")
     for spec, a in results.items():
         tag = ("sym4 = the real tax-deletion test (DeepSeek: 'fails catastrophically')"
                if spec == "sym4" else
@@ -183,9 +189,12 @@ def selftest() -> int:
     check("empty ref -> 0.0", a == 0.0 and p == 0)
     check("config sym4 -> bits=4", _cache_kwargs("sym4") == {"bits": 4})
     check("config k8v4 -> key/value bits", _cache_kwargs("k8v4") == {"key_bits": 8, "value_bits": 4})
-    check("verdict: 0.04 -> below naive (catastrophic)", "BELOW naive" in read_verdict(0.04))
-    check("verdict: 0.27 -> matches protect", "MATCHES" in read_verdict(0.27))
-    check("verdict: 0.24 -> naive class", "naive-int4 class" in read_verdict(0.24))
+    check("verdict: sym4 @ 0.036 -> 4-bit wall (catastrophic)",
+          "CATASTROPHIC" in read_verdict("sym4", 0.036))
+    check("verdict: sym8 @ 0.70 -> 8-bit works but NOT tax-deletion",
+          "NOT tax-deletion" in read_verdict("sym8", 0.70))
+    check("verdict: sym4 @ 0.30 -> 4-bit survives -> needs within-regime check",
+          "WITHIN-REGIME" in read_verdict("sym4", 0.30))
     print(f"\n{'ALL PASS' if not fails else f'{len(fails)} FAIL: ' + ', '.join(fails)}")
     return 0 if not fails else 1
 
