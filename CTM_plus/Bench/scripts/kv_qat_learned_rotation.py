@@ -226,8 +226,9 @@ def rotated_per_tensor_round_trip(K: np.ndarray, R: np.ndarray, bits: int = 4) -
 # GPU/pod mode: extract POST-RoPE K from the real model, run the recon screen.
 # --------------------------------------------------------------------------- #
 def run_gpu(args) -> int:
+    # HF/system-python path (NO vLLM): transformers + the pure-torch round-trip,
+    # like kv_qat_gen_eval. Run in the same env as the other KV-QAT scripts.
     import torch
-    from vllm import LLM  # noqa: F401  (kept for env parity; we use HF for hooks)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1].parent / "KVPolicy"))
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from kv_policy.kv_aware_qat import rotary_module
