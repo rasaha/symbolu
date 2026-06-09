@@ -206,17 +206,19 @@ def run_gpu(args) -> int:
         if spec not in ("naive", "protect"):
             print(f"  -> {read_verdict(spec, agree)}")
 
-    # WITHIN-REGIME verdict: the honest comparison (all use_cache=True).
+    # use_cache=True comparison -- CONFOUNDED, do not read as a clean verdict.
     if "protect" in results and "sym4" in results:
         d = results["sym4"] - results["protect"]
-        print(f"\n[turbo] WITHIN-REGIME (use_cache=True, apples-to-apples):")
+        print(f"\n[turbo] use_cache=True numbers (CONFOUNDED -- see caveat):")
         print(f"        naive {results.get('naive', float('nan')):.4f} | protect {results['protect']:.4f} "
-              f"| TurboQuant sym4 {results['sym4']:.4f}")
-        verdict = ("MATCHES/BEATS protect -> a real Llama win; now do the MEMORY check "
-                   "(does TurboQuant's radii metadata < our per-channel+protect tax?)"
-                   if d >= -0.01 else
-                   f"LOSES to protect by {d:.3f} -> 4-bit TurboQuant does not match the protected design")
-        print(f"        sym4 - protect = {d:+.4f}  -> {verdict}")
+              f"| TurboQuant sym4 {results['sym4']:.4f}   (sym4-protect = {d:+.4f})")
+        print("        CAVEAT: the int4 hooks scale K per-channel over the TOKEN axis; at T=1")
+        print("        incremental decode (group_size>=s) that is DEGENERATE -> generated-token K")
+        print("        is LOSSLESS, so naive/protect quantize ONLY the prompt while TurboQuant")
+        print("        quantizes everything. NOT apples-to-apples (the protect~naive gap collapsing")
+        print("        to ~0 is the tell). The FAITHFUL protect is the GATE's number (use_cache=False);")
+        print("        TurboQuant can't run there. This does NOT establish 'beats protect' -- a clean")
+        print("        comparison needs the real fused_v2 protected serving path vs TurboQuant.")
     return 0
 
 
