@@ -235,9 +235,9 @@ def run_gpu(args) -> int:
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     tok = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.float16,
-                                                 device_map=dev)
-    model.eval()
+    # .to(dev) (not device_map=) so we don't require `accelerate` -- matches the gate.
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model, torch_dtype=torch.float16).to(dev).eval()
     layers = [int(x) for x in args.layers.split(",") if x.strip()]
     captured: dict = {}
 
