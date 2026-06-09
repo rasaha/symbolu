@@ -167,10 +167,15 @@ def run_gpu(args) -> int:
     qm.apply_rotary_pos_emb = orig
 
     R = np.zeros((n_layers, n_kv, D, D), dtype=np.float32)
+    import time as _t
+    t0 = _t.time()
     for li in range(n_layers):
         kl = np.concatenate(Kbuf[li], axis=1)          # [n_kv, T*ncalib, D] -> more tokens for R
         for h in range(n_kv):
             R[li, h], _, _ = learn_rotation(kl[h], iters=args.iters, seed=1)
+        done = (li + 1) * n_kv
+        print(f"  [calib] layer {li+1}/{n_layers} ({done}/{n_layers*n_kv} rotations, "
+              f"{_t.time()-t0:.0f}s)", flush=True)   # CPU numpy -> slow; --iters/--calib-prompts to speed
     Rt = torch.tensor(R, device=dev, dtype=torch.float32)
     print(f"[gate] learned {n_layers*n_kv} rotations (D={D}).", flush=True)
 
