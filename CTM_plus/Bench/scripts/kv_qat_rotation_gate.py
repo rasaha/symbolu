@@ -5,11 +5,14 @@
 #   The recon screen (kv_qat_learned_rotation.py) asks "is K rotatable?" cheaply.
 #   This asks the question that actually decides shipping: does learned-rotation +
 #   PER-TENSOR K hold the HARD TAIL as well as the per-channel + protect design it
-#   would replace? It runs free-generation token-agreement vs bf16 for THREE arms
-#   and gates on arm 3 >= arm 2:
-#     arm 1  bf16                         -> 1.0 reference (NOT the bar)
-#     arm 2  per-channel + protect        -> the BASELINE TO MATCH (round_trip_kv)
-#     arm 3  learned-R post-RoPE + per-tensor K  -> the lever
+#   would replace? It runs free-generation token-agreement vs bf16 for these arms
+#   and gates on learned >= protect:
+#     bf16                              -> 1.0 reference (NOT the bar)
+#     naive per-channel int4            -> round_trip_kv (context; NOT the bar)
+#     per-channel + PROTECT top-4%      -> the BAR to match (reimplemented here --
+#                                          round_trip_kv does NOT protect; protect
+#                                          lives only in the fused_v2 serving kernel)
+#     learned-R post-RoPE + per-tensor K -> the lever
 #
 # WHY THIS GATE, NOT THE EXTERNAL ONES
 #   * Hard-tail FREE-GENERATION agreement (use_cache=False, full requant) -- NOT
@@ -61,26 +64,55 @@ def arm3_k_path(k: np.ndarray, R: np.ndarray, bits: int = 4) -> np.ndarray:
     return out
 
 
+def _per_channel_rt_1h(kh: np.ndarray, bits: int = 4) -> np.ndarray:
+    """Per-channel (per-column) int4 round-trip for one head [T,D] -- the NAIVE arm."""
+    qm = 2 ** (bits - 1) - 1
+    s = np.abs(kh).max(0, keepdims=True) / qm
+    s = np.where(s == 0, 1.0, s)
+    return np.clip(np.round(kh / s), -qm, qm) * s
+
+
+def protect_round_trip(k: np.ndarray, fraction: float = 0.04, bits: int = 4) -> np.ndarray:
+    """The BAR arm: per-channel int4 + PROTECT the top-`fraction` magnitude K channels
+    at bf16 (the actual int4_protected design). round_trip_kv does NOT do this (it's
+    naive per-channel); protect lives only in the fused_v2 serving kernel -- so the gate
+    reimplements it here to bar against the real design. k:[H,T,D]."""
+    H, T, D = k.shape
+    n_p = max(1, int(round(fraction * D)))
+    out = np.empty_like(k)
+    for h in range(H):
+        kh = k[h]
+        kq = _per_channel_rt_1h(kh, bits)
+        idx = np.argpartition(np.abs(kh).max(0), D - n_p)[D - n_p:]   # top-n_p channels
+        kq[:, idx] = kh[:, idx]                                       # keep protected at bf16
+        out[h] = kq
+    return out
+
+
 def attn_scores(q: np.ndarray, k: np.ndarray) -> np.ndarray:
     """[H,Tq,D],[H,Tk,D] -> [H,Tq,Tk] per-head QK^T."""
     return np.einsum("hqd,hkd->hqk", q, k)
 
 
-def gate_verdict(agree_bf16: float, agree_perchan: float, agree_learned: float,
-                 margin: float = 0.01) -> dict:
-    """arm3 must MATCH arm2 (per-channel+protect), not bf16. bf16 is the 1.0 ref."""
-    delta = agree_learned - agree_perchan
+def gate_verdict(agree_bf16: float, agree_protect: float, agree_learned: float,
+                 agree_naive: "float | None" = None, margin: float = 0.01) -> dict:
+    """arm3 (learned per-tensor) must MATCH the BAR = per-channel+PROTECT, not bf16
+    (1.0 ref) and not naive per-channel. delta is measured vs protect."""
+    delta = agree_learned - agree_protect
     label = ("PASS" if delta >= -margin else "FAIL")
-    return {
+    out = {
         "bf16_ref": round(agree_bf16, 4),
-        "per_channel_protect": round(agree_perchan, 4),     # the bar
+        "naive_per_channel": (round(agree_naive, 4) if agree_naive is not None else None),
+        "per_channel_protect_BAR": round(agree_protect, 4),
         "learned_per_tensor": round(agree_learned, 4),
-        "learned_minus_baseline": round(delta, 4),
+        "learned_minus_protect": round(delta, 4),
         "verdict": label,
-        "note": ("learned per-tensor matches/exceeds per-channel+protect on the hard tail"
+        "note": ("learned per-tensor matches/exceeds per-channel+PROTECT on the hard tail "
+                 "-> the ~3.4GB tax is deletable, justify the kernel"
                  if label == "PASS" else
-                 "learned per-tensor LOSES the hard tail vs per-channel+protect -> ship hybrid"),
+                 "learned per-tensor LOSES the hard tail vs per-channel+PROTECT -> ship hybrid"),
     }
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -118,24 +150,25 @@ def run_gpu(args) -> int:
     print("[gate] calibrating learned R per (layer, kv-head)...", flush=True)
     qm = rotary_module(model)
     orig = qm.apply_rotary_pos_emb
+    ncalib = min(args.calib_prompts, len(prompts))
     Kbuf = {li: [] for li in range(n_layers)}
     state = {"i": 0}
 
     def cap(q, k, cos, sin, *a, **kw):
         qe, ke = orig(q, k, cos, sin, *a, **kw)
         li = state["i"] % n_layers
-        if len(Kbuf[li]) < 1:                          # one chunk/layer is enough to learn R
-            Kbuf[li].append(ke.detach().float().cpu().numpy()[0])   # [n_kv, T, D]
+        Kbuf[li].append(ke.detach().float().cpu().numpy()[0])      # [n_kv, T, D]
         state["i"] += 1
         return qe, ke
     qm.apply_rotary_pos_emb = cap
     with torch.no_grad():
-        model(prompts[0].to(dev))
+        for p in prompts[:ncalib]:
+            model(p.to(dev))
     qm.apply_rotary_pos_emb = orig
 
     R = np.zeros((n_layers, n_kv, D, D), dtype=np.float32)
     for li in range(n_layers):
-        kl = Kbuf[li][0]                               # [n_kv, T, D]
+        kl = np.concatenate(Kbuf[li], axis=1)          # [n_kv, T*ncalib, D] -> more tokens for R
         for h in range(n_kv):
             R[li, h], _, _ = learn_rotation(kl[h], iters=args.iters, seed=1)
     Rt = torch.tensor(R, device=dev, dtype=torch.float32)
@@ -173,6 +206,40 @@ def run_gpu(args) -> int:
                 hh.remove()
         return restore
 
+    def _v_handles():
+        def vhook(m, inp, out):
+            shape = out.shape
+            flat = out.reshape(-1, shape[-1])
+            _, vl = mgr.round_trip_kv(flat, flat)
+            return vl.reshape(shape)
+        return [m.register_forward_hook(vhook)
+                for n, m in model.named_modules() if n.rsplit(".", 1)[-1] == "v_proj"]
+
+    # --- arm-2 hook: per-channel int4 + PROTECT top-4% K channels at bf16 (the BAR).
+    #     round_trip_kv does NOT protect (it's naive per-channel) -> reimplement here.
+    def install_protect_hook():
+        qmv = 7
+        n_p = max(1, round(args.protect_fraction * D))
+        def protect_k(ke):                                 # [B, n_kv, T, D]
+            x = ke.float()
+            s = x.abs().amax(dim=2, keepdim=True) / qmv     # per-channel scale (over T)
+            s = torch.where(s == 0, torch.ones_like(s), s)
+            kq = torch.clamp(torch.round(x / s), -qmv, qmv) * s
+            idx = x.abs().amax(dim=2).topk(n_p, dim=-1).indices            # [B,n_kv,n_p]
+            mask = torch.zeros_like(x, dtype=torch.bool)
+            mask.scatter_(3, idx.unsqueeze(2).expand(-1, -1, x.shape[2], -1), True)
+            return torch.where(mask, x, kq).to(ke.dtype)    # protected channels stay bf16
+        def rope(q, k, cos, sin, *a, **kw):
+            qe, ke = orig(q, k, cos, sin, *a, **kw)
+            return qe, protect_k(ke)
+        qm.apply_rotary_pos_emb = rope
+        handles = _v_handles()
+        def restore():
+            qm.apply_rotary_pos_emb = orig
+            for hh in handles:
+                hh.remove()
+        return restore
+
     @torch.no_grad()
     def gen(ids):
         out = model.generate(ids, max_new_tokens=args.gen, do_sample=False, num_beams=1,
@@ -193,12 +260,13 @@ def run_gpu(args) -> int:
             matched += int((g_ref[:n] == g[:n]).sum()); total += n
         return matched / max(1, total)
 
-    a_perchan = agreement(lambda: ge.install_int4_inference_hooks(torch, model, mgr))
-    a_learned = agreement(install_learned_hook)
-    v = gate_verdict(1.0, a_perchan, a_learned, margin=args.margin)
-    print("\n[gate] 3-arm hard-tail free-generation agreement vs bf16:")
+    a_naive   = agreement(lambda: ge.install_int4_inference_hooks(torch, model, mgr))  # naive per-channel
+    a_protect = agreement(install_protect_hook)                                        # per-channel + PROTECT (bar)
+    a_learned = agreement(install_learned_hook)                                        # learned R + per-tensor
+    v = gate_verdict(1.0, a_protect, a_learned, agree_naive=a_naive, margin=args.margin)
+    print("\n[gate] hard-tail free-generation agreement vs bf16 (bar = per-channel+PROTECT):")
     for k_, val in v.items():
-        print(f"  {k_:24s} {val}")
+        print(f"  {k_:26s} {val}")
     print(f"\n[gate] {v['verdict']}: {v['note']}")
     return 0
 
@@ -232,7 +300,18 @@ def selftest() -> int:
     check("quant error in rotated path shrinks with bits (12-bit << 4-bit)", s12 < s4 * 0.2)
     check("12-bit rotated-per-tensor path ~ exact", s12 / (np.abs(base).max()) < 0.02)
 
-    # gate logic: PASS iff learned >= per-channel (within margin); bf16 is only the ref.
+    # protect arm (the BAR): per-channel + protect top-frac beats NAIVE per-channel on
+    # recon when a channel has dominant energy -> validates the reimplemented protect.
+    ka = rng.standard_normal((H, T, D)); ka[:, :, 0] *= 12.0     # one dominant channel
+    naive = np.stack([_per_channel_rt_1h(ka[h], 4) for h in range(H)])
+    prot = protect_round_trip(ka, fraction=0.06, bits=4)
+    e_naive = np.linalg.norm(ka - naive) / np.linalg.norm(ka)
+    e_prot = np.linalg.norm(ka - prot) / np.linalg.norm(ka)
+    check("protect (top-frac bf16) beats NAIVE per-channel on recon", e_prot < e_naive)
+    check("protect keeps the dominant channel exact",
+          np.abs(prot[:, :, 0] - ka[:, :, 0]).max() < 1e-12)
+
+    # gate logic: PASS iff learned >= per-channel+PROTECT (within margin); bf16 is only the ref.
     p = gate_verdict(1.0, 0.74, 0.75)
     check("gate PASS when learned >= per-channel+protect", p["verdict"] == "PASS")
     f = gate_verdict(1.0, 0.74, 0.60)
@@ -255,7 +334,11 @@ def main(argv=None) -> int:
     ap.add_argument("--prompt-len", type=int, default=128)
     ap.add_argument("--gen", type=int, default=48)
     ap.add_argument("--iters", type=int, default=300, help="Cayley iterations per (layer,head)")
-    ap.add_argument("--margin", type=float, default=0.01, help="how far below per-channel still PASS")
+    ap.add_argument("--calib-prompts", type=int, default=4,
+                    help="prompts used to collect K for learning R (more = better R)")
+    ap.add_argument("--protect-fraction", type=float, default=0.04,
+                    help="arm-2 bar: top-fraction of K channels kept bf16 (the int4_protected design)")
+    ap.add_argument("--margin", type=float, default=0.01, help="how far below PROTECT still PASS")
     ap.add_argument("--dataset", default="Salesforce/wikitext")
     ap.add_argument("--dataset-config", default="wikitext-103-raw-v1")
     args = ap.parse_args(argv)
