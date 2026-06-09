@@ -90,12 +90,16 @@ def _make_cache(spec: str):
     try:
         return TurboQuantCache(**kw)
     except TypeError as e:
+        if "key_bits" in kw or "value_bits" in kw:
+            raise SystemExit(
+                f"This turboquant package is SYMMETRIC-ONLY: TurboQuantCache(bits=N).\n"
+                f"It has NO key_bits/value_bits -> DeepSeek's 'asymmetric for Qwen' API was\n"
+                f"fabricated. Use sym4 / sym8 (and note: even if asymmetric existed, K@8-bit\n"
+                f"is not tax-deletion). Rejected: {e}")
         import inspect
-        sig = inspect.signature(TurboQuantCache.__init__)
         raise SystemExit(
             f"TurboQuantCache(**{kw}) rejected: {e}\n"
-            f"Actual signature: {sig}\n"
-            f"-> the package API differs from DeepSeek's snippet; adjust _cache_kwargs().")
+            f"Actual signature: {inspect.signature(TurboQuantCache.__init__)}")
 
 
 # --------------------------------------------------------------------------- #
@@ -190,8 +194,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Measure TurboQuant free-gen agreement vs bf16")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
-    ap.add_argument("--configs", default="sym4,k8v4",
-                    help="comma list: sym4 (tax-deletion test) / k8v4 (DeepSeek Qwen rec) / sym3 ...")
+    ap.add_argument("--configs", default="sym4,sym8",
+                    help="comma list of symmetric bits: sym4 (tax-deletion test) / sym8 "
+                         "(sanity: isolates low-bit vs integration) / sym3 / sym2. "
+                         "NOTE: this package is symmetric-only -- no k8v4 (DeepSeek's "
+                         "asymmetric API does not exist).")
     ap.add_argument("--n-prompts", type=int, default=16)
     ap.add_argument("--prompt-len", type=int, default=128)
     ap.add_argument("--gen", type=int, default=48)
