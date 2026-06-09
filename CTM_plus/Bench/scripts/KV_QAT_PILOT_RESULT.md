@@ -264,12 +264,53 @@ for.** The one lever that beat it on a proxy affirms it once measured downstream
 | scale-metadata / polar | remove scale (~3.4 GB) | NEGATIVE cheap (needs heavy QJL kernels) |
 | head-wise allocation | beat the protect *design* | wins recon error, **LOSES downstream** → protect validated |
 | high-dim VQ (E8 lattice / HQMQ quaternion) | denser codec, recover hard tail | **PARKED** — its rotation + "no per-channel scale" + recon-MSE premises are exactly the three above (all negative here); multi-week kernel; → `VECTOR_QUANT_E8_HQMQ_EVAL.md` |
+| **learned rotation + per-tensor** (SpinQuant-style) | delete scale/protect (~3.4 GB) | **OPEN — the one un-disproven lever.** Random/Hadamard rotations (data-oblivious) are the negatives above; a *learned* (data-dependent) R is untested. Probe built: `kv_qat_learned_rotation.py` → §below |
 
-**Cheap removal of the int4 KV tax is exhausted across two model families, and the
-protect-channel design is downstream-optimal. The density-positive, footprint-negative
-memory verdict stands as the tested conclusion.** The remaining frontier is a different
-axis — sparse-attention training / co-design (stacks on int4_protected) — not a
-refinement of the quantization scheme.
+**The CHEAP, data-oblivious removals are exhausted across two model families** (random/
+Hadamard rotation, scale-drop, light KV-QAT all negative), and the protect-channel design
+is downstream-optimal among them. The **one lever not yet disproven** is a **learned**
+(data-dependent) rotation + per-tensor scale — the only point that can adapt to *where* K's
+outliers live. The density-positive, footprint-negative memory verdict stands as the tested
+conclusion **unless that learned-rotation probe clears a hard-tail gate** (§below).
+
+## Lever 5 — learned rotation (the one open bet): rotatability PROBE BUILT
+
+`kv_qat_learned_rotation.py` tests the single question the cheap negatives can't settle:
+**is K's anisotropy *rotatable*?** It learns an orthogonal R by 4th-moment (kurtosis)
+minimization on the Stiefel manifold (Cayley retraction), then asks whether per-tensor int4
+in the rotated basis approaches per-channel. Output: a **gap-closed %** and a verdict
+(`rotatable` / `partial` / `not_rotatable`).
+
+**Three design fixes vs the external write-ups (all baked into the probe + tests):**
+1. **First model = base Qwen2.5-7B (standard rope), NOT Qwen-1M.** Qwen-1M conflates
+   "rotatable?" with "survives extreme rope?"; standard rope is apples-to-apples with the
+   random-7.1× / Hadamard-+5% points.
+2. **Rotate POST-RoPE K** (how the cache stores it) — and the probe **verifies the RoPE
+   math**: post-RoPE rotation by *any* orthogonal R preserves attention (tested, diff
+   1.8e-14); **pre-RoPE rotation by a *general* R BREAKS it** (tested, diff 14.2); only a
+   RoPE-*commuting* R works pre-RoPE. So a general learned R must go post-RoPE = an
+   **online per-token matmul, NOT foldable into weights** (corrects the claim that pre-RoPE
+   "also works" / fuses for free).
+3. **Recon is a PRE-FILTER, not the gate.** recon ≠ downstream (head-wise won recon, lost
+   downstream). The GO/NO-GO is the **hard-tail** eval.
+
+**Honest failure-detector:** the probe distinguishes **channel-axis** anisotropy (rotatable
+— a rotation spreads it) from **row/spectral** anisotropy (failure-mode #1 — rotation only
+*relocates* it). CPU selftest proves both (channel → `rotatable`, row → `not_rotatable`).
+
+**Sequencing (do NOT build kernels first):**
+```bash
+# 1. RECON SCREEN (pod, venv-vllm) — is K rotatable at all? cheap, no kernels.
+PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_learned_rotation.py \
+    --model Qwen/Qwen2.5-7B-Instruct --layers 0,13,27 --tokens 4000
+#   verdict 'not_rotatable' on K-heavy layers -> ABANDON (ship the hybrid scheduler).
+#   verdict 'rotatable' (gap >70%)            -> proceed to the gate:
+# 2. HARD-TAIL GATE — wire rotated_per_tensor_round_trip() into kv_qat_gen_eval +
+#    kv_qat_downstream_resolver (free-gen / hard-needle, NOT teacher-forced ppl),
+#    rotating Q by the SAME R. Ship only if it MATCHES per-channel+protect on the tail.
+# 3. Only if the gate passes: the RoPE-fused online-rotation kernel (weeks) — the
+#    throughput question, which recon/quality do not answer.
+```
 
 ## Reproduce
 
@@ -293,4 +334,5 @@ done
 | Train harness | `Bench/scripts/kv_qat_pilot.py` |
 | Eval | `Bench/scripts/kv_qat_eval.py` |
 | Fake-quant core (STE + parity) | `KVPolicy/kv_policy/kv_aware_qat.py` |
+| Learned-rotation probe (lever 5) | `Bench/scripts/kv_qat_learned_rotation.py` + `Bench/tests/test_kv_qat_learned_rotation.py` |
 | Memory verdict (unchanged) | `MEMORY_STORY.md` §6 |

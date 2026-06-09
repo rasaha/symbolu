@@ -659,6 +659,57 @@ Naive int4 achieves the same density with degraded fidelity.
 int4_protected closes the quality gap while maintaining the density
 advantage.
 
+### Forward thesis — the bottleneck is shifting from memory capacity to data movement
+
+The infrastructure conversation is moving from "can it fit in HBM?" (capacity) to
+"what does it cost to **move** the bytes?" — HBM↔compute bandwidth, GPU↔GPU
+interconnect, and the cross-node KV transport that disaggregated prefill/decode,
+prefix caching, and KV offload now depend on. This shift is a **tailwind, not a
+pivot**, because the portfolio's single strongest *measured* result is itself a
+data-movement result — but the framing stays honest about which legs are proven.
+
+**read-skip is a data-movement win, already MEASURED.** Decode is memory-**bandwidth**-
+bound: the per-token cost is *moving* weights + KV out of HBM, not merely storing them.
+read-skip cuts the KV bytes moved per step by **~95%** (bounded retained set vs linear
+growth), which is why it decodes **+25% at 32K growing to +72% at 60K** on
+Llama-3.1-8B at needle **1.0/1.0** (replicated **+25.6%** on Mistral-7B). That is a
+direct reduction in the dominant data-movement term of decode, **captured in software
+on today's GPUs** — no new hardware mandate. As the narrative moves capacity→movement,
+this is the asset that moves to center stage.
+
+**int4_protected (the quant) is a quality-preserving KV shrink — most valuable exactly
+where KV becomes *transported* data.** The emerging movement-bound architectures —
+disaggregated prefill/decode, cross-request prefix caches, HBM→CPU/NVMe KV offload —
+all ship and store the KV cache as their primary payload. A 4-bit KV that *holds
+quality* is the right thing to move and cache: **~1.8× less KV transported than bf16
+without the fidelity loss fp8 takes** (fp8: needle 1/15). Byte-clean CPU swap-restore
+is already validated (TIER5A). **PROJECTED, not built:** the high-value transport legs
+— tensor/context-parallel KV exchange and disaggregated/cross-node KV — are
+unimplemented, and TP is explicitly unvalidated. We claim the *mechanism* on these,
+not a measurement.
+
+**The composed view — the stack attacks all three data-movement terms of decode**, two
+of three already measured:
+
+| decode HBM-traffic term | lever | status |
+|---|---|---|
+| weight movement (short-ctx bottleneck) | AWQ weight-quant — **composes**, orthogonal budget (weights 14.25→5.57 GB, identical under bf16 and int4 KV) | MEASURED stack |
+| KV bytes per position | int4_protected — ~1.8× net (sidecar-inclusive) | density MEASURED; bandwidth unrealized as wall-clock |
+| KV positions read per step | read-skip — ~95% fewer | MEASURED (+72% @60K, quality 1.0/1.0) |
+
+**The honest drag carries to this axis too.** The ~3.4 GB sidecar tax isn't only a
+capacity cost — in a movement-bound world the sidecars are *extra bytes to move, and
+scattered* (poorer coalescing than the contiguous int4 read), so the net transport
+reduction is the **~1.8×** density figure, not 4×. The same tax, on a new axis. And on
+the single-GPU decode path the int4 quant remains throughput-negative today
+(**0.22–0.67× bf16**) — the per-position byte saving is real but unrealized as
+wall-clock until read-path kernel fusion.
+
+**Net positioning:** the move to data movement *promotes* read-skip (measured, on the
+dominant bottleneck) and gives the quality-preserving KV shrink a second use
+(transported/cached KV) — provided the multi-GPU and disaggregated legs stay labeled
+**projected** until built.
+
 ### Target customer profile
 
 The shippable product fits any of:
