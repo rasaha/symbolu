@@ -325,6 +325,31 @@ conclusion **unless that learned-rotation probe clears a hard-tail gate** (§bel
 > naive (0.24) — int4 bites hard here; protect's larger advantage is on the serving-path /
 > hard-needle metric, 0.737 vs 0.533. Immaterial to the verdict: learned loses to BOTH.)*
 
+### Footnote — TurboQuant on Llama: an open (confounded) thread, parked
+
+The TurboQuant *package* (PolarQuant + Lloyd-Max + QJL — a stronger, data-oblivious VQ than
+our uniform per-tensor rotation) was run on our stack (`turboquant_test.py`). On **Qwen2.5-7B**
+it confirms the wall: symmetric 4-bit free-gen agreement vs bf16 = **0.0365** (8-bit sanity
+0.70 → genuine low-bit failure, not integration). **But on Llama-3.1-8B, sym4 = 0.5990** —
+not catastrophic. Llama's K genuinely tolerates TurboQuant 4-bit where Qwen's doesn't
+(consistent with the recon: Llama more rotatable, no layer-0 wall).
+
+**Does it beat *real* protect on Llama? UNRESOLVED — and not claimed.** The attempt to compare
+within `use_cache=True` was **confounded**: `quantize_per_channel_int4` scales K over the
+*token* axis, so at T=1 incremental decode the int4 hooks leave generated-token K **lossless**
+(they quantize the prompt only) while TurboQuant quantizes everything — not apples-to-apples
+(the `protect 0.4935 ≈ naive 0.4870` collapse, +0.006, was the tell). The faithful protect is
+the gate's **0.510** (`use_cache=False`); TurboQuant structurally can't run there.
+
+**Status: parked, not chased.** (a) The clean question isn't "delete int4_protected's tax" but
+"is the TurboQuant *package* a better KV scheme than int4_protected **on Llama**" — a
+third-party-stack swap with its own metadata + the documented dequant-throughput cost. (b)
+Confirming it needs the real `fused_v2` protected serving path vs TurboQuant at the vLLM level
+(incremental-decode-faithful) — a real project. **The learned-rotation tax-deletion lever stays
+settled NEGATIVE on both models;** this footnote records only that data-oblivious VQ is
+non-catastrophic on Llama and worth a faithful look *if* TurboQuant-on-Llama ever becomes a
+direction to ship.
+
 `kv_qat_learned_rotation.py` tests the single question the cheap negatives can't settle:
 **is K's anisotropy *rotatable*?** It learns an orthogonal R by 4th-moment (kurtosis)
 minimization on the Stiefel manifold (Cayley retraction), then asks whether per-tensor int4
