@@ -87,6 +87,30 @@ K, no protect" — the opposite of "near-lossless." The 0.9818 free-gen number w
 short-context, easy-metric artifact; the longer the context, the further KVarN falls while bf16
 stays perfect.
 
+## Head-to-head on the SAME needles — int4_protected vs KVarN (Llama, verified int4)
+
+`phase6k12_hard_needle.py` (venv-vllm, vLLM 0.7.3) on Llama-3.1-8B with `--cells bf16,protected`,
+**same `build_item`/`classify`/seed 1234 as the KVarN run above** — so the needles are
+byte-identical and the rows line up directly. **int4 confirmed active, not a bf16 fallback:** the
+protected cell reports `kv_cache_dtype=int4_protected` and **2.0× token capacity** (`Maximum
+concurrency 47.38x` vs bf16 `23.69x` at 8K) — the KV is genuinely packed.
+
+| ctx | bf16 | **int4_protected** (verified int4, 2.0× density) | KVarN k4v2 |
+|---|---:|---:|---:|
+| 8K | 0.955 | **0.955** (= bf16, near-lossless) | 0.250 |
+| 32K | 1.000 | _(pending)_ | 0.062 |
+
+At 8K int4_protected is **byte-for-byte identical to bf16** (21 HIT / 0 NEAR_V / 0 MISS_K / 1
+COLLAPSE / 2 FORMAT — even the model's own quirks reproduced exactly) while holding 2× the
+tokens, on the *identical* needles where KVarN dropped to 0.250. The protect mask delivers what
+KVarN's no-protect 4-bit K cannot: near-lossless selective retrieval **and** real density.
+
+**The trade, now measured on both sides, one model, one needle set:** KVarN packs *more* (2.67×)
+but loses the hard tail (0.25 → 0.06); int4_protected packs *less* (2.0×) but keeps
+full-precision quality (0.955 = bf16). For long-context selective retrieval — the regime the
+project targets — that is the difference between usable and not. (32K protected row pending; bf16
+is 1.000 there and KVarN 0.062, so the gap can only widen in int4_protected's favor.)
+
 ## Strategic read
 
 - **The split is now measured, not asserted.** KVarN trades hard-tail quality for throughput by
