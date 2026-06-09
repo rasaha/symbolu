@@ -370,6 +370,7 @@ tax is already smallest for free.
 | **AWQ / GPTQ** (weight-only quantization) | weights only, not KV | high | does NOT compress KV-cache; orthogonal solution |
 | **naive int4 (KIVI-style)** | 0.5× KV | degraded — token-agreement vs bf16: 0.533 (53%); easy needle deceptively OK but general fidelity substantially reduced | research-grade; our measurements confirm fidelity degradation |
 | **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 *(competitor's reported figure)* | W4A4 not KV; complementary, not competitive |
+| **KVarN k4v2** (Huawei, vLLM-0.22) | 2.67× KV (−9.5 GB tail pool); Llama-family only | easy free-gen 0.982 vs bf16; **hard-needle COLLAPSE: 0.25 (8K) → 0.06 (32K), K-bound**; crashes on Qwen2.5-7B (GQA-7) | only competitor run **head-to-head on our hardware** — wins easy metric + throughput, loses the hard tail |
 | **int4_protected** *(this work)* | **0.5× KV + ~4.4 GB sidecar overhead (4.38 GB live)** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
 
 ### The relevant comparison
@@ -394,6 +395,31 @@ There are two distinct comparisons:
   users) and are throughput-insensitive, int4 serves ~1.83× more users
   per GPU at near-bf16 quality. For workloads with slack KV headroom or
   latency sensitivity, bf16 is simpler and faster per-seq.
+
+**int4_protected vs KVarN** (the head-to-head we actually ran — same model, same needles):
+- KVarN (Huawei, vLLM-0.22 fork; Hadamard + iterative variance-normalization; 4-bit K / 2-bit V;
+  **no protect**) is the strongest external KV method we tested: near-lossless easy free-gen
+  (0.982 token-agreement vs bf16), 2.67× density, throughput ≥ bf16 on a modern (V1) engine.
+- Run head-to-head on **identical** Llama-3.1-8B hard needles (same builder / classifier / seed
+  as our own validation), int4_protected matches **full precision** exactly where KVarN
+  **collapses K-bound**:
+
+  | hard-needle retrieval | bf16 | int4_protected | KVarN |
+  |---|---:|---:|---:|
+  | 8K | 0.955 | **0.955** | 0.250 |
+  | 32K | 1.000 | **1.000** | 0.062 |
+
+- The failure is precisely what protect defends: KVarN drops the protected channels, so its 4-bit
+  K loses long-range retrieval (`MISS_K`-heavy, **worsening with context length**). int4_protected
+  was confirmed genuinely active (2.0× token capacity, `kv_cache_dtype=int4_protected` — not a
+  bf16 fallback). **A credible competitor — near-lossless on the easy metrics — was beaten on the
+  regime the product targets (selective long-context retrieval), while int4_protected held
+  full-precision quality at 2× density.**
+- **Fair to KVarN (the honest moat boundary):** KVarN wins density (2.67× vs 2.0×), throughput
+  (≥bf16 vs 0.3–0.5×), and easy/short-context quality, on a newer engine. For short-context or
+  throughput-bound serving it is the better choice. int4_protected's defensible moat is the
+  **hard tail** (long-context selective retrieval) **and Qwen2.5-7B / GQA-7 models where KVarN
+  crashes** — not throughput. (Full data: `CTM_plus/Bench/scripts/KVARN_EVAL_FINDINGS.md`.)
 
 **int4_protected vs fp8** (the quality-at-density story):
 - Both deliver ~2× KV concurrency density vs bf16.
