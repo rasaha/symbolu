@@ -264,7 +264,7 @@ for.** The one lever that beat it on a proxy affirms it once measured downstream
 | scale-metadata / polar | remove scale (~3.4 GB) | NEGATIVE cheap (needs heavy QJL kernels) |
 | head-wise allocation | beat the protect *design* | wins recon error, **LOSES downstream** → protect validated |
 | high-dim VQ (E8 lattice / HQMQ quaternion) | denser codec, recover hard tail | **PARKED** — its rotation + "no per-channel scale" + recon-MSE premises are exactly the three above (all negative here); multi-week kernel; → `VECTOR_QUANT_E8_HQMQ_EVAL.md` |
-| **learned rotation + per-tensor** (SpinQuant-style) | delete scale/protect (~3.4 GB) | **OPEN — the one un-disproven lever.** Random/Hadamard rotations (data-oblivious) are the negatives above; a *learned* (data-dependent) R is untested. Probe built: `kv_qat_learned_rotation.py` → §below |
+| **learned rotation + per-tensor** (SpinQuant/KurTail-style) | delete scale/protect (~3.4 GB) | **RESOLVED NEGATIVE — measured FAIL on Qwen2.5-7B.** Hard-tail gate: learned per-tensor **0.0404** vs per-channel+protect **0.2656** vs naive **0.2357** free-gen agreement → learned is **6× worse than even naive int4**. Recon foreshadowed it (never matches per-channel; layer-0 not-rotatable). The one un-disproven lever is now disproven. → §below |
 
 **The CHEAP, data-oblivious removals are exhausted across two model families** (random/
 Hadamard rotation, scale-drop, light KV-QAT all negative), and the protect-channel design
@@ -273,7 +273,40 @@ is downstream-optimal among them. The **one lever not yet disproven** is a **lea
 outliers live. The density-positive, footprint-negative memory verdict stands as the tested
 conclusion **unless that learned-rotation probe clears a hard-tail gate** (§below).
 
-## Lever 5 — learned rotation (the one open bet): rotatability PROBE BUILT
+## Lever 5 — learned rotation (the one open bet): RESOLVED NEGATIVE (measured)
+
+> **RESULT (Qwen2.5-7B, pod, this run).** The one un-disproven lever is now disproven.
+>
+> **Phase A — recon screen** (`kv_qat_learned_rotation.py`, layers 0/13/27, ~2k tok):
+> learned per-tensor K **never matches per-channel** — layer 0 **not_rotatable** (gap
+> closed 4%, learned 0.103 vs per-channel 0.024 = 4.3× worse); layers 13/27 "rotatable"
+> (80–83% gap closed) but still **1.6–1.9× worse** than per-channel (`matches_per_channel:
+> False` everywhere). Learned **did** beat data-oblivious (hadamard/random) at deep layers
+> — so learned > Hadamard/TurboQuant is confirmed — but rotation can't remove the residual
+> (persistent/spectral) anisotropy.
+>
+> **Phase B — hard-tail gate** (`kv_qat_rotation_gate.py`, 16 prompts, free-gen, vs **protect**):
+>
+> | arm | free-gen agreement vs bf16 |
+> |---|---:|
+> | bf16 | 1.0 (ref) |
+> | naive per-channel int4 | 0.2357 |
+> | per-channel + **PROTECT** (the bar) | **0.2656** |
+> | learned-R post-RoPE + per-tensor | **0.0404** |
+>
+> **FAIL by −0.225 vs protect.** Learned per-tensor (0.04) is **6× worse than even naive
+> int4** (0.24): the ~1.6–4× per-token recon gap cascades over 48 free-gen tokens into a
+> near-total collapse. The rotated single-scale K destroys generation.
+>
+> **Verdict: rotation cannot delete the ~3.4 GB scale/protect tax on Qwen2.5-7B K.** Now
+> **5 independent lines** all negative: random-rotation scale-drop (7.1×), TurboQuant/QJL
+> retirement (3052× ppl), KVLinC keeps per-channel K + adapters, Phase-A recon (no match),
+> Phase-B gate (0.04 vs 0.27). **Ship the hybrid scheduler.** Kernel work correctly NOT
+> started (gated on this PASS).
+>
+> *(Caveat on the bar: on this free-gen wikitext harness protect (0.27) only modestly beats
+> naive (0.24) — int4 bites hard here; protect's larger advantage is on the serving-path /
+> hard-needle metric, 0.737 vs 0.533. Immaterial to the verdict: learned loses to BOTH.)*
 
 `kv_qat_learned_rotation.py` tests the single question the cheap negatives can't settle:
 **is K's anisotropy *rotatable*?** It learns an orthogonal R by 4th-moment (kurtosis)
