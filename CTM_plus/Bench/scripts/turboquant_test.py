@@ -140,31 +140,83 @@ def run_gpu(args) -> int:
                              use_cache=True, past_key_values=cache, pad_token_id=pad)
         return out[0, ids.shape[1]:].tolist()
 
+    # bf16 reference (use_cache=True), computed ONCE -> all arms compared to the same ref.
+    refs = [gen(ids.to(dev), None) for ids in prompts]
+
+    # int4 baselines (naive per-channel / protect) IN THE SAME use_cache=True regime, so
+    # TurboQuant is finally apples-to-apples (not the cross-regime gate anchors). vLLM-free.
+    from kv_policy.int4_cache_kv_route_a import INT4CacheKVRouteA
+    from kv_policy.kv_aware_qat import rotary_module
+    n_kv = model.config.num_key_value_heads
+    D = model.config.hidden_size // model.config.num_attention_heads
+    mgr = INT4CacheKVRouteA(k_group_size=32, v_group_size=32, asymmetric=True, bits=4,
+                            sink_size=0, num_kv_heads=n_kv, kernel_backend="dequant_fallback")
+    qm = rotary_module(model); orig = qm.apply_rotary_pos_emb
+
+    def _v_handles():
+        def vhook(m, inp, out):
+            flat = out.reshape(-1, out.shape[-1])
+            return mgr.round_trip_kv(flat, flat)[1].reshape(out.shape)
+        return [mm.register_forward_hook(vhook)
+                for n, mm in model.named_modules() if n.rsplit(".", 1)[-1] == "v_proj"]
+
+    def install_protect():                              # per-channel int4 + top-4% protect (K), int4 V
+        qmv = 7; n_p = max(1, round(0.04 * D))
+        def protect_k(ke):
+            x = ke.float()
+            s = x.abs().amax(dim=2, keepdim=True) / qmv
+            s = torch.where(s == 0, torch.ones_like(s), s)
+            kq = torch.clamp(torch.round(x / s), -qmv, qmv) * s
+            idx = x.abs().amax(dim=2).topk(n_p, dim=-1).indices
+            mask = torch.zeros_like(x, dtype=torch.bool)
+            mask.scatter_(3, idx.unsqueeze(2).expand(-1, -1, x.shape[2], -1), True)
+            return torch.where(mask, x, kq).to(ke.dtype)
+        def rope(q, k, cos, sin, *a, **kw):
+            qe, ke = orig(q, k, cos, sin, *a, **kw); return qe, protect_k(ke)
+        qm.apply_rotary_pos_emb = rope
+        hs = _v_handles()
+        def restore():
+            qm.apply_rotary_pos_emb = orig
+            for h in hs: h.remove()
+        return restore
+
+    def arm_tokens(spec, ids):
+        if spec == "naive":
+            r = ge.install_int4_inference_hooks(torch, model, mgr)
+            try: return gen(ids, None)
+            finally: r()
+        if spec == "protect":
+            r = install_protect()
+            try: return gen(ids, None)
+            finally: r()
+        return gen(ids, _make_cache(spec))              # sym* -> TurboQuantCache
+
     results = {}
     for spec in [c for c in args.configs.split(",") if c.strip()]:
         matched = total = prefix = 0
-        for ids in prompts:
-            ids = ids.to(dev)
-            ref = gen(ids, None)                       # bf16 default cache (use_cache=True)
-            cache = _make_cache(spec)                  # FRESH cache per prompt
-            test = gen(ids, cache)
+        for ids, ref in zip(prompts, refs):
+            test = arm_tokens(spec, ids.to(dev))
             a, p = token_agreement(ref, test)
             n = min(len(ref), len(test))
             matched += int(a * n); total += n; prefix += p
-        agree = matched / max(1, total)
-        results[spec] = agree
-        print(f"\n[turbo] config={spec}  ({_cache_kwargs(spec)})")
+        agree = matched / max(1, total); results[spec] = agree
+        label = spec if spec in ("naive", "protect") else f"{spec} {_cache_kwargs(spec)}"
+        print(f"\n[turbo] config={label}")
         print(f"  free-gen agreement vs bf16 = {agree:.4f}  mean_prefix={prefix/len(prompts):.1f}/{args.gen}")
-        print(f"  -> {read_verdict(spec, agree)}")
+        if spec not in ("naive", "protect"):
+            print(f"  -> {read_verdict(spec, agree)}")
 
-    print("\n[turbo] gate anchors are use_cache=FALSE (harsher) -- cross-regime, do NOT read")
-    print("        a higher number here as 'beats protect':  naive 0.2357 | protect 0.2656 | learned 0.0404")
-    for spec, a in results.items():
-        tag = ("sym4 = the real tax-deletion test (DeepSeek: 'fails catastrophically')"
-               if spec == "sym4" else
-               "k8v4 = K kept at 8-bit -> NOT tax-deletion (8-bit K > our 4-bit)"
-               if spec == "k8v4" else "")
-        print(f"        {spec:6s} {a:.4f}   {tag}")
+    # WITHIN-REGIME verdict: the honest comparison (all use_cache=True).
+    if "protect" in results and "sym4" in results:
+        d = results["sym4"] - results["protect"]
+        print(f"\n[turbo] WITHIN-REGIME (use_cache=True, apples-to-apples):")
+        print(f"        naive {results.get('naive', float('nan')):.4f} | protect {results['protect']:.4f} "
+              f"| TurboQuant sym4 {results['sym4']:.4f}")
+        verdict = ("MATCHES/BEATS protect -> a real Llama win; now do the MEMORY check "
+                   "(does TurboQuant's radii metadata < our per-channel+protect tax?)"
+                   if d >= -0.01 else
+                   f"LOSES to protect by {d:.3f} -> 4-bit TurboQuant does not match the protected design")
+        print(f"        sym4 - protect = {d:+.4f}  -> {verdict}")
     return 0
 
 
