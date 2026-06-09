@@ -26,8 +26,12 @@
 #   # one cell:
 #   CELL=protected ENFORCE_EAGER=1 PHASE6E_FUSED_WRITER=1 \
 #     python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --worker --mml 8192
-#   # full driver (bf16/naive/protected):
+#   # full driver (bf16/naive/protected), default Qwen2.5-7B:
 #   python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --mml 8192 2>&1 | tee /tmp/phase6k12.log
+#   # Llama-3.1-8B (same needles as the KVarN hard-needle run; needs the calibrated mask):
+#   python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --mml 8192 \
+#     --model NousResearch/Meta-Llama-3.1-8B-Instruct --cells bf16,protected \
+#     --protect-mask /workspace/dev/build-logs/meta_llama_3_1_8b_instruct_protect_mask_4pct.pt
 
 import argparse
 import json
@@ -164,6 +168,10 @@ def classify(text, expected, distractors, mode):
 # ----------------------------------------------------------------------- worker
 def run_worker(mml, items_per_mode):
     cell = os.environ.get("CELL", "protected")
+    # Model + protect-mask are env-threaded (the driver copies os.environ into each
+    # worker's env). Absent => legacy Qwen behavior. For non-Qwen models (e.g. Llama)
+    # the driver sets NEEDLE_MODEL + NEEDLE_PROTECT_MASK.
+    model = os.environ.get("NEEDLE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
     eager = os.environ.get("ENFORCE_EAGER", "1").strip() in ("1", "true", "yes")
     os.environ.pop("PHASE6B3_FORCE_EAGER", None)
     if cell == "naive":
@@ -171,17 +179,21 @@ def run_worker(mml, items_per_mode):
         os.environ["PROTECT_MASK_PATH"] = os.environ.get("NAIVE_MASK_PATH", NAIVE_MASK_DEFAULT)
     elif cell == "protected":
         os.environ["PHASE6J_NAIVE_FORCE_ZERO"] = "0"
-        os.environ.pop("PROTECT_MASK_PATH", None)
+        _pm = os.environ.get("NEEDLE_PROTECT_MASK")
+        if _pm:
+            os.environ["PROTECT_MASK_PATH"] = _pm        # model-specific calibrated mask
+        else:
+            os.environ.pop("PROTECT_MASK_PATH", None)    # legacy Qwen backend default
 
     from vllm import SamplingParams
     if cell == "bf16":
         from vllm import LLM
-        llm = LLM(model="Qwen/Qwen2.5-7B-Instruct", max_model_len=mml,
+        llm = LLM(model=model, max_model_len=mml,
                   gpu_memory_utilization=0.5, dtype="bfloat16",
                   max_num_seqs=8, enforce_eager=eager)
     else:
         from kv_policy.int4_protected import Int4ProtectedLLM
-        llm = Int4ProtectedLLM(model="Qwen/Qwen2.5-7B-Instruct", max_model_len=mml,
+        llm = Int4ProtectedLLM(model=model, max_model_len=mml,
                                gpu_memory_utilization=0.5, max_num_seqs=8, enforce_eager=eager)
 
     sp = SamplingParams(temperature=0.0, max_tokens=16)
@@ -268,8 +280,11 @@ def run_worker(mml, items_per_mode):
 # ----------------------------------------------------------------------- driver
 def run_driver(mml, items_per_mode):
     naive_mask = Path(os.environ.get("NAIVE_MASK_PATH", NAIVE_MASK_DEFAULT))
+    model = os.environ.get("NEEDLE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    cells = [c.strip() for c in
+             os.environ.get("NEEDLE_CELLS", ",".join(CELLS)).split(",") if c.strip()]
     rows = []
-    for cell in CELLS:
+    for cell in cells:
         out = f"/tmp/phase6k12_{cell}_mml{mml}.json"
         env = dict(os.environ)
         env.update({"CELL": cell, "OUTPUT": out, "NAIVE_MASK_PATH": str(naive_mask)})
@@ -287,6 +302,7 @@ def run_driver(mml, items_per_mode):
 
     print("\n" + "=" * 96)
     print(f"PHASE 6K.12 — HARD needle (mml={mml}, {items_per_mode}/mode, {len(MODES)} modes)")
+    print(f"  model={model}  cells={cells}")
     print("=" * 96)
     print("  strict   = HIT / total                 (FORMAT counts AGAINST)")
     print("  retrieval= HIT / (total - FORMAT)       (FORMAT EXCLUDED as ambiguous)")
@@ -356,7 +372,27 @@ def main():
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--mml", type=int, default=8192)
     ap.add_argument("--items", type=int, default=6, help="items per mode")
+    ap.add_argument("--model", default=None,
+                    help="HF model id. Default Qwen2.5-7B. For Llama/Mistral pass the id "
+                         "AND --protect-mask (the calibrated per-model mask).")
+    ap.add_argument("--protect-mask", default=None,
+                    help="Calibrated protect-mask .pt for the protected cell (REQUIRED for "
+                         "non-Qwen). Build via calibrate_phase5b_protect_mask.py.")
+    ap.add_argument("--naive-mask", default=None,
+                    help="Naive (zero-protect) mask .pt for the naive cell (optional).")
+    ap.add_argument("--cells", default=None,
+                    help="Comma subset of bf16,naive,protected (default all three).")
     args = ap.parse_args()
+    # Env-thread model/mask/cells so both the driver and its worker subprocesses
+    # (which copy os.environ) see them. Absent => legacy Qwen behavior, unchanged.
+    if args.model:
+        os.environ["NEEDLE_MODEL"] = args.model
+    if args.protect_mask:
+        os.environ["NEEDLE_PROTECT_MASK"] = args.protect_mask
+    if args.naive_mask:
+        os.environ["NAIVE_MASK_PATH"] = args.naive_mask
+    if args.cells:
+        os.environ["NEEDLE_CELLS"] = args.cells
     if args.selftest:
         return _selftest()
     if args.worker:

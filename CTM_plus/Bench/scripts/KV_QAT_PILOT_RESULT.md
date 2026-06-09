@@ -264,7 +264,7 @@ for.** The one lever that beat it on a proxy affirms it once measured downstream
 | scale-metadata / polar | remove scale (~3.4 GB) | NEGATIVE cheap (needs heavy QJL kernels) |
 | head-wise allocation | beat the protect *design* | wins recon error, **LOSES downstream** → protect validated |
 | high-dim VQ (E8 lattice / HQMQ quaternion) | denser codec, recover hard tail | **PARKED** — its rotation + "no per-channel scale" + recon-MSE premises are exactly the three above (all negative here); multi-week kernel; → `VECTOR_QUANT_E8_HQMQ_EVAL.md` |
-| **learned rotation + per-tensor** (SpinQuant-style) | delete scale/protect (~3.4 GB) | **OPEN — the one un-disproven lever.** Random/Hadamard rotations (data-oblivious) are the negatives above; a *learned* (data-dependent) R is untested. Probe built: `kv_qat_learned_rotation.py` → §below |
+| **learned rotation + per-tensor** (SpinQuant/KurTail-style) | delete scale/protect (~3.4 GB) | **RESOLVED NEGATIVE — measured FAIL on 2 models.** Hard-tail gate: learned per-tensor **below even naive int4** on BOTH — Qwen 0.0404 / Llama 0.3854 vs protect 0.2656 / 0.5104. Llama is more rotatable (no layer-0 wall) but still loses; rotating to drop scales makes K *worse* than keeping them. TurboQuant package sym4 on Qwen = 0.0365 (8-bit sanity 0.70 → genuine low-bit wall). The one un-disproven lever is disproven. → §below |
 
 **The CHEAP, data-oblivious removals are exhausted across two model families** (random/
 Hadamard rotation, scale-drop, light KV-QAT all negative), and the protect-channel design
@@ -273,7 +273,82 @@ is downstream-optimal among them. The **one lever not yet disproven** is a **lea
 outliers live. The density-positive, footprint-negative memory verdict stands as the tested
 conclusion **unless that learned-rotation probe clears a hard-tail gate** (§below).
 
-## Lever 5 — learned rotation (the one open bet): rotatability PROBE BUILT
+## Lever 5 — learned rotation (the one open bet): RESOLVED NEGATIVE (measured)
+
+> **RESULT (Qwen2.5-7B, pod, this run).** The one un-disproven lever is now disproven.
+>
+> **Phase A — recon screen** (`kv_qat_learned_rotation.py`, layers 0/13/27, ~2k tok):
+> learned per-tensor K **never matches per-channel** — layer 0 **not_rotatable** (gap
+> closed 4%, learned 0.103 vs per-channel 0.024 = 4.3× worse); layers 13/27 "rotatable"
+> (80–83% gap closed) but still **1.6–1.9× worse** than per-channel (`matches_per_channel:
+> False` everywhere). Learned **did** beat data-oblivious (hadamard/random) at deep layers
+> — so learned > Hadamard/TurboQuant is confirmed — but rotation can't remove the residual
+> (persistent/spectral) anisotropy.
+>
+> **Phase B — hard-tail gate** (`kv_qat_rotation_gate.py`, 16 prompts, free-gen, vs **protect**):
+>
+> | arm | free-gen agreement vs bf16 |
+> |---|---:|
+> | bf16 | 1.0 (ref) |
+> | naive per-channel int4 | 0.2357 |
+> | per-channel + **PROTECT** (the bar) | **0.2656** |
+> | learned-R post-RoPE + per-tensor | **0.0404** |
+>
+> **FAIL by −0.225 vs protect.** Learned per-tensor (0.04) is **6× worse than even naive
+> int4** (0.24): the ~1.6–4× per-token recon gap cascades over 48 free-gen tokens into a
+> near-total collapse. The rotated single-scale K destroys generation.
+>
+> **CONFIRMED on a 2nd model — Llama-3.1-8B (more rotatable, still FAILs):**
+>
+> | arm | Qwen2.5-7B | Llama-3.1-8B |
+> |---|---:|---:|
+> | naive per-channel int4 | 0.2357 | 0.4714 |
+> | per-channel + **PROTECT** (bar) | **0.2656** | **0.5104** |
+> | learned-R + per-tensor | 0.0404 | 0.3854 |
+> | learned − protect | −0.225 | **−0.125** |
+>
+> Llama's K is genuinely more rotatable (recon: no layer-0 wall, 1.5–1.8× residual vs
+> Qwen's 1.6–4.3×; KurTail's "LLaMA-3 rotation-friendly" hint borne out) → learned per-tensor
+> 0.39 vs Qwen's 0.04. **But it still FAILs**, and decisively: on BOTH models learned
+> per-tensor is **below even naive per-channel int4** (Llama 0.385 < 0.471; Qwen 0.040 < 0.236).
+> **Rotating to delete the scales makes K *worse* than keeping them** — there is no
+> "trade per-channel for rotation" that wins.
+>
+> **Verdict: rotation cannot delete the ~3.4 GB scale/protect tax — measured on 2 models.**
+> Now **6 independent lines** all negative: random-rotation scale-drop (7.1×), TurboQuant/QJL
+> retirement (3052× ppl), KVLinC keeps per-channel K + adapters, Phase-A recon (no match),
+> Phase-B gate **on Qwen (0.04) AND Llama (0.39)**, TurboQuant package sym4 on Qwen (0.0365,
+> 8-bit sanity 0.70 → genuine low-bit wall). **Ship the hybrid scheduler.** Kernel work
+> correctly NOT started (gated on a PASS that never came).
+>
+> *(Caveat on the bar: on this free-gen wikitext harness protect (0.27) only modestly beats
+> naive (0.24) — int4 bites hard here; protect's larger advantage is on the serving-path /
+> hard-needle metric, 0.737 vs 0.533. Immaterial to the verdict: learned loses to BOTH.)*
+
+### Footnote — TurboQuant on Llama: an open (confounded) thread, parked
+
+The TurboQuant *package* (PolarQuant + Lloyd-Max + QJL — a stronger, data-oblivious VQ than
+our uniform per-tensor rotation) was run on our stack (`turboquant_test.py`). On **Qwen2.5-7B**
+it confirms the wall: symmetric 4-bit free-gen agreement vs bf16 = **0.0365** (8-bit sanity
+0.70 → genuine low-bit failure, not integration). **But on Llama-3.1-8B, sym4 = 0.5990** —
+not catastrophic. Llama's K genuinely tolerates TurboQuant 4-bit where Qwen's doesn't
+(consistent with the recon: Llama more rotatable, no layer-0 wall).
+
+**Does it beat *real* protect on Llama? UNRESOLVED — and not claimed.** The attempt to compare
+within `use_cache=True` was **confounded**: `quantize_per_channel_int4` scales K over the
+*token* axis, so at T=1 incremental decode the int4 hooks leave generated-token K **lossless**
+(they quantize the prompt only) while TurboQuant quantizes everything — not apples-to-apples
+(the `protect 0.4935 ≈ naive 0.4870` collapse, +0.006, was the tell). The faithful protect is
+the gate's **0.510** (`use_cache=False`); TurboQuant structurally can't run there.
+
+**Status: parked, not chased.** (a) The clean question isn't "delete int4_protected's tax" but
+"is the TurboQuant *package* a better KV scheme than int4_protected **on Llama**" — a
+third-party-stack swap with its own metadata + the documented dequant-throughput cost. (b)
+Confirming it needs the real `fused_v2` protected serving path vs TurboQuant at the vLLM level
+(incremental-decode-faithful) — a real project. **The learned-rotation tax-deletion lever stays
+settled NEGATIVE on both models;** this footnote records only that data-oblivious VQ is
+non-catastrophic on Llama and worth a faithful look *if* TurboQuant-on-Llama ever becomes a
+direction to ship.
 
 `kv_qat_learned_rotation.py` tests the single question the cheap negatives can't settle:
 **is K's anisotropy *rotatable*?** It learns an orthogonal R by 4th-moment (kurtosis)
