@@ -1,13 +1,14 @@
-# KVarN evaluation — measured on our stack (the first positive external result)
+# KVarN evaluation — measured on our stack (easy-metric win, hard-tail collapse)
 
 > **TL;DR.** [KVarN](https://github.com/huawei-csl/KVarN) (Huawei, vLLM-0.22 fork, Hadamard
 > rotation + iterative variance normalization, `kvarn_k4v2_g128` = 4-bit K / 2-bit V) beats
 > int4_protected on the **easy metrics** on Llama-family models — free-gen quality (0.9818),
-> density (2.67×), throughput (≥bf16). **But on the HARD tail it COLLAPSES**: selective
-> long-context needle retrieval drops to **0.25 vs bf16's 0.955 (−0.705 gap), failing K-bound**
-> (`MISS_K=15`) — the exact failure mode int4_protected's protect mask defends against. So the
-> "near-lossless" claim is **short-context / easy-metric only**; the 0.98 free-gen number does
-> NOT survive the regime the whole project targets. Net read: KVarN is a real competitor for
+> density (2.67×), throughput (≥bf16). **But on the HARD tail it COLLAPSES, worse the longer the
+> context**: selective needle retrieval is **0.25 vs bf16 0.955 at 8K (−0.705)** → **0.06 vs bf16
+> 1.000 at 32K (−0.938)**, failing **K-bound** (`MISS_K=15` at both lengths) — the exact failure
+> int4_protected's protect mask defends against. bf16 is *perfect* at 32K, so this is the
+> quantizer, not a model ceiling. The "near-lossless" claim is a **short-context / easy-metric
+> artifact**; the 0.98 free-gen number does NOT survive the regime the whole project targets. Net read: KVarN is a real competitor for
 > **short-context / throughput-bound Llama serving**, but **int4_protected owns the hard tail**
 > (selective long-context retrieval) **and** the Qwen2.5-7B / GQA-7 segment (where KVarN crashes).
 > KVarN trades hard-tail quality for throughput by dropping protect; int4_protected trades
@@ -59,31 +60,32 @@ pessimistic *for Llama*.
 `kvarn_hard_needle.py` (venv-kvarn, vLLM 0.22) reuses `phase6k12_hard_needle`'s builder +
 classifier + seed 1234 — the **same needles** int4_protected was validated on — and runs two
 cells in the same engine: full-precision KV (`bf16`, the anchor) vs KVarN. Llama-3.1-8B,
-`--mml 8192`, 6 items/mode, 4 adversarial modes:
+4 adversarial modes, **measured at two context lengths** (the gap widens with length):
 
-| cell | strict | retrieval | HIT | NEAR_V | **MISS_K** | COLLAPSE | FORMAT |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| bf16 (anchor) | 0.875 | **0.955** | 21 | 0 | 0 | 1 | 2 |
-| **KVarN k4v2** | 0.250 | **0.250** | 6 | 1 | **15** | 2 | 0 |
-| | | **gap −0.705** | | | ↑ K-bound | | |
+| ctx | cell | strict | retrieval | HIT | NEAR_V | **MISS_K** | COLLAPSE | FORMAT |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 8K | bf16 (anchor) | 0.875 | **0.955** | 21 | 0 | 0 | 1 | 2 |
+| 8K | **KVarN k4v2** | 0.250 | **0.250** | 6 | 1 | **15** | 2 | 0 |
+| 32K | bf16 (anchor) | 0.875 | **1.000** | 14 | 0 | 0 | 0 | 2 |
+| 32K | **KVarN k4v2** | 0.062 | **0.062** | 1 | 0 | **15** | 0 | 0 |
 
-Per mode (bf16 → KVarN): `multi` 6/6 → **1/6**, `distractor` 3 HIT → **0/6**, `conflict` 6/6 →
-**0/6**, `qa` 6/6 → **5/6 (holds)**.
+**gap: 8K −0.705 → 32K −0.938 (widens with context length).** Per mode at 32K (bf16 → KVarN):
+`multi` 4/4 → **1/4**, `distractor` 4/4 → **0/4**, `conflict` 4/4 → **0/4**, `qa` 4/4 → **0/4**.
 
-**The diagnosis is unambiguous.** KVarN fails **K-bound** — `MISS_K=15` (no answer-shaped output
-at all, the model can't *locate* the key) vs `NEAR_V=1` (located-but-imprecise). It is **not**
-V-bound. That is the exact failure int4_protected's **protect mask** prevents: naive 4-bit K
-with no protected channels loses the long-range retrieval signal. KVarN behaves precisely like
-"naive 4-bit K, no protect."
+**bf16 is *perfect* at 32K (1.000) — the decisive control.** Llama-3.1-8B handles the 32K hard
+needle flawlessly in full precision, so KVarN's collapse is **not** a model-capability ceiling or
+a harness artifact: it is purely the KV quantization destroying retrieval. (At 8K the `qa` mode
+held 5/6 for KVarN — proving the engine/harness work — then goes 0/4 at 32K as the damage
+compounds.)
 
-**Internal control rules out a harness/engine artifact:** the `qa` mode (single buried fact,
-asked directly) still holds at **5/6**. Same engine, same prompts, same greedy sampling — if the
-harness or KVarN's kernel were broken, `qa` would fail too. Instead, single-fact retrieval works
-while the modes needing *selective* K-matching collapse. That gradient is what KV-precision loss
-looks like; it is a genuine quality failure.
-
-**Caveat:** 1 model, 24 items, 8K. Effect size (−0.705) and structure (qa holds, selective modes
-collapse) make it decisive, not noise — but the **32K run is the seal** (pending).
+**The diagnosis is unambiguous and gets worse with distance.** KVarN fails **K-bound** —
+`MISS_K=15` at *both* lengths (no answer-shaped output; the model can't *locate* the key), with
+zero `NEAR_V`. It is **not** V-bound. That is the exact failure int4_protected's **protect mask**
+prevents: naive 4-bit K with no protected channels loses the long-range retrieval signal, and the
+loss **compounds with context length** (0.25 → 0.06). KVarN behaves precisely like "naive 4-bit
+K, no protect" — the opposite of "near-lossless." The 0.9818 free-gen number was a
+short-context, easy-metric artifact; the longer the context, the further KVarN falls while bf16
+stays perfect.
 
 ## Strategic read
 
