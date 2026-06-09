@@ -305,11 +305,17 @@ PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_learned_rotation.py \
     --model Qwen/Qwen2.5-7B-Instruct --layers 0,13,27 --tokens 4000
 #   verdict 'not_rotatable' on K-heavy layers -> ABANDON (ship the hybrid scheduler).
 #   verdict 'rotatable' (gap >70%)            -> proceed to the gate:
-# 2. HARD-TAIL GATE — wire rotated_per_tensor_round_trip() into kv_qat_gen_eval +
-#    kv_qat_downstream_resolver (free-gen / hard-needle, NOT teacher-forced ppl),
-#    rotating Q by the SAME R. Ship only if it MATCHES per-channel+protect on the tail.
-# 3. Only if the gate passes: the RoPE-fused online-rotation kernel (weeks) — the
-#    throughput question, which recon/quality do not answer.
+# 2. HARD-TAIL GATE (built: kv_qat_rotation_gate.py) — 3-arm FREE-GENERATION agreement:
+#    bf16 (1.0 ref) / per-channel+protect (the BAR, ~0.74) / learned-R post-RoPE +
+#    per-tensor K. Learns R per (layer,head), rotates Q by the same R (GQA-mapped).
+PYTHONPATH=KVPolicy python Bench/scripts/kv_qat_rotation_gate.py \
+    --model Qwen/Qwen2.5-7B-Instruct --n-prompts 16 --gen 48
+#    PASS iff learned >= per-channel+protect (NOT >= bf16; even protect doesn't reach
+#    bf16 on this hard metric). FAIL -> ship the hybrid scheduler.
+# 3. Only if the gate PASSES: the RoPE-fused online-rotation kernel (weeks) — the
+#    throughput question, which recon/quality do not answer. NB: rotation is
+#    post-RoPE (online matmul), NOT foldable into Wq/Wk; the recurring decode cost
+#    is one Q@R per step (K is rotated once at write) -> plausibly small, measure first.
 ```
 
 ## Reproduce
