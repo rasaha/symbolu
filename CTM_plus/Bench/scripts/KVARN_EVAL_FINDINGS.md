@@ -12,7 +12,9 @@
 > **short-context / throughput-bound Llama serving**, but **int4_protected owns the hard tail**
 > (selective long-context retrieval) **and** the Qwen2.5-7B / GQA-7 segment (where KVarN crashes).
 > KVarN trades hard-tail quality for throughput by dropping protect; int4_protected trades
-> throughput for hard-tail quality by keeping it. **Both now measured on the same harness.**
+> throughput for hard-tail quality by keeping it. **Head-to-head on identical Llama needles:
+> int4_protected = bf16 at both 8K (0.955) and 32K (1.000), at verified 2.0× density; KVarN
+> 0.250 → 0.062.** Both measured on the same harness.
 
 ## Measured — Llama-3.1-8B (clean comparison, KVarN's real kernel vs bf16, same engine)
 
@@ -98,18 +100,18 @@ concurrency 47.38x` vs bf16 `23.69x` at 8K) — the KV is genuinely packed.
 | ctx | bf16 | **int4_protected** (verified int4, 2.0× density) | KVarN k4v2 |
 |---|---:|---:|---:|
 | 8K | 0.955 | **0.955** (= bf16, near-lossless) | 0.250 |
-| 32K | 1.000 | _(pending)_ | 0.062 |
+| 32K | 1.000 | **1.000** (= bf16, near-lossless) | 0.062 |
 
-At 8K int4_protected is **byte-for-byte identical to bf16** (21 HIT / 0 NEAR_V / 0 MISS_K / 1
-COLLAPSE / 2 FORMAT — even the model's own quirks reproduced exactly) while holding 2× the
-tokens, on the *identical* needles where KVarN dropped to 0.250. The protect mask delivers what
-KVarN's no-protect 4-bit K cannot: near-lossless selective retrieval **and** real density.
+int4_protected is **byte-for-byte identical to bf16 at both lengths** (8K: 21 HIT / 1 COLLAPSE /
+2 FORMAT; 32K: 14 HIT / 0 MISS_K / 0 COLLAPSE / 2 FORMAT — even the model's own quirks reproduced
+exactly) while holding 2× the tokens, on the *identical* needles where KVarN dropped to 0.250 →
+0.062. The protect mask delivers what KVarN's no-protect 4-bit K cannot: near-lossless selective
+retrieval **and** real density, at *every* length tested.
 
 **The trade, now measured on both sides, one model, one needle set:** KVarN packs *more* (2.67×)
-but loses the hard tail (0.25 → 0.06); int4_protected packs *less* (2.0×) but keeps
-full-precision quality (0.955 = bf16). For long-context selective retrieval — the regime the
-project targets — that is the difference between usable and not. (32K protected row pending; bf16
-is 1.000 there and KVarN 0.062, so the gap can only widen in int4_protected's favor.)
+but loses the hard tail (0.25 → 0.06, worsening with length); int4_protected packs *less* (2.0×)
+but keeps full-precision quality (0.955 / 1.000 = bf16 at 8K / 32K). For long-context selective
+retrieval — the regime the project targets — that is the difference between usable and not.
 
 ## Strategic read
 
