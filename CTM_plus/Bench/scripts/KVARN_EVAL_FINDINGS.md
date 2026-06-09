@@ -1,12 +1,17 @@
 # KVarN evaluation — measured on our stack (the first positive external result)
 
 > **TL;DR.** [KVarN](https://github.com/huawei-csl/KVarN) (Huawei, vLLM-0.22 fork, Hadamard
-> rotation + iterative variance normalization, `kvarn_k4v2_g128` = 4-bit K / 2-bit V) is the
-> **first method in the entire KV-compression investigation that beats int4_protected on its
-> own turf — on Llama-family models.** Near-lossless quality **and** more density **and**
-> throughput ≥ bf16. But it **crashes on Qwen2.5-7B** (a kernel bug), and the win is measured
-> only at short context with an easy metric. A serious competitor for the **power-of-2-GQA /
-> Llama-family** segment; **not** applicable to Qwen2.5-7B, and not a hard-tail-validated win yet.
+> rotation + iterative variance normalization, `kvarn_k4v2_g128` = 4-bit K / 2-bit V) beats
+> int4_protected on the **easy metrics** on Llama-family models — free-gen quality (0.9818),
+> density (2.67×), throughput (≥bf16). **But on the HARD tail it COLLAPSES**: selective
+> long-context needle retrieval drops to **0.25 vs bf16's 0.955 (−0.705 gap), failing K-bound**
+> (`MISS_K=15`) — the exact failure mode int4_protected's protect mask defends against. So the
+> "near-lossless" claim is **short-context / easy-metric only**; the 0.98 free-gen number does
+> NOT survive the regime the whole project targets. Net read: KVarN is a real competitor for
+> **short-context / throughput-bound Llama serving**, but **int4_protected owns the hard tail**
+> (selective long-context retrieval) **and** the Qwen2.5-7B / GQA-7 segment (where KVarN crashes).
+> KVarN trades hard-tail quality for throughput by dropping protect; int4_protected trades
+> throughput for hard-tail quality by keeping it. **Both now measured on the same harness.**
 
 ## Measured — Llama-3.1-8B (clean comparison, KVarN's real kernel vs bf16, same engine)
 
@@ -39,27 +44,65 @@ pessimistic *for Llama*.
    analog of the sidecar overhead, which is why net capacity is **2.67×** not the ~4.7× the
    per-token density (≈27 KB/tok vs bf16 128 KB/tok) would give. Better ratio than
    int4_protected's 1.83×, but not tax-free.
-3. **Short-context, easy metric.** 4K `max-model-len`, 48-token greedy gen, instruction
-   prompts. 0.98 free-gen is strong but it is **NOT the hard tail** — long-context (32k+) +
-   hard-needle, the regime where Qwen-1M broke and where protect earns its keep, is
-   **unvalidated**. KVarN's own headline is MATH500/AIME24/HumanEval (reasoning), so it
-   plausibly holds, but we haven't measured the regime that matters most.
+3. **The 0.98 was short-context / easy-metric — and the hard tail is now MEASURED NEGATIVE
+   (see next section).** 4K `max-model-len`, 48-token greedy gen, instruction prompts barely
+   exercise long-range K. On the hard selective-needle harness KVarN drops to **0.25 retrieval
+   vs bf16's 0.955**, failing **K-bound**. KVarN's own headline (MATH500/AIME24/HumanEval) is
+   reasoning — local KV dependency — which is why it can look near-lossless there yet collapse
+   on selective long-context retrieval.
 4. **Different stack.** KVarN is vLLM **0.22** (V1); int4_protected is the **0.7.3** (V0)
    fork. Adopting KVarN means *leaving* int4_protected, not improving it — and the throughput
    edge is partly the newer engine, not just the quantizer.
 
+## Hard tail — MEASURED (KVarN collapses, fails K-bound)
+
+`kvarn_hard_needle.py` (venv-kvarn, vLLM 0.22) reuses `phase6k12_hard_needle`'s builder +
+classifier + seed 1234 — the **same needles** int4_protected was validated on — and runs two
+cells in the same engine: full-precision KV (`bf16`, the anchor) vs KVarN. Llama-3.1-8B,
+`--mml 8192`, 6 items/mode, 4 adversarial modes:
+
+| cell | strict | retrieval | HIT | NEAR_V | **MISS_K** | COLLAPSE | FORMAT |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| bf16 (anchor) | 0.875 | **0.955** | 21 | 0 | 0 | 1 | 2 |
+| **KVarN k4v2** | 0.250 | **0.250** | 6 | 1 | **15** | 2 | 0 |
+| | | **gap −0.705** | | | ↑ K-bound | | |
+
+Per mode (bf16 → KVarN): `multi` 6/6 → **1/6**, `distractor` 3 HIT → **0/6**, `conflict` 6/6 →
+**0/6**, `qa` 6/6 → **5/6 (holds)**.
+
+**The diagnosis is unambiguous.** KVarN fails **K-bound** — `MISS_K=15` (no answer-shaped output
+at all, the model can't *locate* the key) vs `NEAR_V=1` (located-but-imprecise). It is **not**
+V-bound. That is the exact failure int4_protected's **protect mask** prevents: naive 4-bit K
+with no protected channels loses the long-range retrieval signal. KVarN behaves precisely like
+"naive 4-bit K, no protect."
+
+**Internal control rules out a harness/engine artifact:** the `qa` mode (single buried fact,
+asked directly) still holds at **5/6**. Same engine, same prompts, same greedy sampling — if the
+harness or KVarN's kernel were broken, `qa` would fail too. Instead, single-fact retrieval works
+while the modes needing *selective* K-matching collapse. That gradient is what KV-precision loss
+looks like; it is a genuine quality failure.
+
+**Caveat:** 1 model, 24 items, 8K. Effect size (−0.705) and structure (qa holds, selective modes
+collapse) make it decisive, not noise — but the **32K run is the seal** (pending).
+
 ## Strategic read
 
-- For the **Llama-family long-context serving segment**, KVarN is now a serious competitor —
-  arguably *better* than int4_protected on density + throughput at comparable (near-lossless)
-  quality. If that segment is the target, KVarN-on-a-modern-vLLM is a real alternative.
-- **int4_protected's remaining edges:** it **runs on Qwen2.5-7B** (KVarN crashes), it handles
-  the extreme-rope models, and its quality is validated *harder* (15/15 hard-needle, the
-  hard-tail metric KVarN hasn't been stressed on here).
-- **Next validation before crowning KVarN:** re-run on Llama at `--max-model-len 32768` with a
-  **needle** task — 0.98 on 4K free-gen is not the regime where the other methods broke.
-  (`kvarn_hard_needle.py` does exactly this, reusing `phase6k12`'s builder/classifier/seed so
-  the row lands in the same table as int4_protected's hard-tail numbers.)
+- **The split is now measured, not asserted.** KVarN trades hard-tail quality for throughput by
+  dropping protect; int4_protected trades throughput for hard-tail quality by keeping it. Same
+  harness, same needles, both sides.
+- **KVarN wins** the *short-context / throughput-bound* Llama segment: ≥bf16 throughput (native
+  V1 cache dtype), 2.67× density, 0.98 easy free-gen. For reasoning workloads (local KV
+  dependency) it plausibly holds.
+- **int4_protected wins the hard tail** — selective long-context retrieval, the regime the whole
+  project targets — where KVarN collapses **K-bound** (0.25 vs 0.955). The protect mask is
+  buying exactly the robustness KVarN lacks. int4_protected **also** owns the **Qwen2.5-7B /
+  GQA-7** segment (KVarN crashes) and the extreme-rope models.
+- **This walks back the earlier "first method to beat int4_protected on its own turf" read.**
+  KVarN beats it on the *easy* metric; on the hard tail — int4_protected's actual turf — KVarN
+  loses badly. The competition is regime-split, not a KVarN win.
+- **Seal it:** re-run `kvarn_hard_needle.py --mml 32768` (and ideally the int4_protected protect
+  cell on the same Llama needles) to confirm the collapse deepens at 32K. The 8K result is
+  already decisive on effect size.
 
 ## Why the throughput gap exists (code-grounded — it's integration, not the quantizer math)
 
