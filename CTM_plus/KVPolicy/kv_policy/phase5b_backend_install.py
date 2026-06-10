@@ -330,6 +330,11 @@ if _VLLM_FA_AVAILABLE:
                 )
                 self._phase5b_idx_max_B  = new_max
                 self._phase5b_idx_dev    = device
+                # 6K.16d replay-trace: a (re)allocation AFTER graph capture
+                # would orphan the recorded ops' buffer — log every event.
+                from kv_policy.phase5b_4c_paged_writer import rt_alloc_event
+                rt_alloc_event("slot_idx_buf", self._phase5b_slot_idx_buf,
+                               f"grew_to={new_max} prev={cur}")
             return (
                 self._phase5b_slot_idx_buf[:B],
                 self._phase5b_batch_idx_arange[:B],

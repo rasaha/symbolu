@@ -469,6 +469,57 @@ def is_pad_seq_id(sid: Any) -> bool:
     return isinstance(sid, int) and sid <= _PAD_SEQ_ID_BASE
 
 
+# ---- 6K.16d replay-trace (the graphs-edge instrument) --------------------
+#
+# INT4_PROTECTED_REPLAY_TRACE=/path.jsonl arms host-side dumps at the two
+# windows that bracket every step (the 6B.2 hook, pre- and post-forward).
+# Inside a replayed graph nothing can print, so the strategy is: dump every
+# INPUT the recorded tail ops depend on (pool counters, stage content,
+# slot/seq_lens buffers, SeqState ints, buffer identities, allocation
+# events) at the host windows of BOTH an eager run and a graphs run of the
+# same workload, then diff. The first diverging (step, field) names the
+# frozen/stale quantity. See PHASE6K16_APC_CONTRACT.md (graphs OPEN edge).
+
+_RT_EVENTS: list = []        # allocation events drained into step records
+
+
+def rt_path() -> str:
+    return os.environ.get("INT4_PROTECTED_REPLAY_TRACE", "").strip()
+
+
+def rt_alloc_event(kind: str, obj: "Any", note: str = "") -> None:
+    """Record a buffer (re)allocation. A realloc event appearing AFTER
+    engine init in the graphs trace = object-identity break (the graph
+    holds the old tensor while hosts write the new one)."""
+    if not rt_path():
+        return
+    try:
+        _RT_EVENTS.append({
+            "kind": kind, "id": id(obj),
+            "shape": list(getattr(obj, "shape", [])), "note": note,
+        })
+    except Exception:
+        pass
+
+
+def rt_drain_events() -> list:
+    out, _RT_EVENTS[:] = list(_RT_EVENTS), []
+    return out
+
+
+def rt_tensor_sig(t: "Any", max_vals: int = 8) -> dict:
+    """Cheap content signature: norm + sha1 + head values (host-side only)."""
+    import hashlib
+    tt = t.detach().float().cpu().contiguous().flatten()
+    h = hashlib.sha1()
+    h.update(tt.numpy().tobytes())
+    return {
+        "sha1": h.hexdigest()[:12],
+        "norm": round(float(tt.norm()), 3),
+        "head": [round(float(x), 4) for x in tt[:max_vals].tolist()],
+    }
+
+
 # ---- S1 byte-gate dump (contract C-GATE / P1) ---------------------------
 #
 # INT4_PROTECTED_DUMP_BLOCKS=/path.pt makes the FIRST writer to finalize a
@@ -1533,6 +1584,12 @@ class PagedKVWriter:
         # pad scratch slot (contract B2) — excluded from the free list.
         self._free_slots = list(range(n_slots - 1))
         self._allocated = True
+        rt_alloc_event("k_stage_pool", self._k_stage_pool,
+                       f"layer={self.layer_idx}")
+        rt_alloc_event("count_pool", self._k_stage_count_pool,
+                       f"layer={self.layer_idx}")
+        rt_alloc_event("block_id_pool", self._k_stage_block_id_pool,
+                       f"layer={self.layer_idx}")
 
         logger.info(
             "PagedKVWriter layer=%d allocated: NB=%d BS=%d H=%d D=%d "

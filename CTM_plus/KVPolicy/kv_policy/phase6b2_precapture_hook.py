@@ -517,8 +517,85 @@ def install_int4_protected_precapture_hook(
         install_time_impls=list(impls) if impls else [],
     )
 
+    def _trace_counters(w, sids):
+        """Host-side snapshot of the layer-0 writer's per-seq tail state."""
+        out = {}
+        for sid in sids:
+            slot = w._slot_map.get(sid)
+            if slot is None:
+                out[str(sid)] = None
+                continue
+            st = w._seq_states.get(sid)
+            out[str(sid)] = {
+                "slot": slot,
+                "state_ints": [st.k_stage_count, st.k_stage_block_id]
+                if st is not None else None,
+                "pool": [int(w._k_stage_count_pool[slot]),
+                         int(w._k_stage_block_id_pool[slot]),
+                         int(w._seq_pos_pool[slot])],
+            }
+        return out
+
+    def _trace_dump(record):
+        import json as _json
+        from kv_policy.phase5b_4c_paged_writer import rt_path
+        p = rt_path()
+        if not p:
+            return
+        try:
+            with open(p, "a") as f:
+                f.write(_json.dumps(record) + "\n")
+        except Exception as _e:
+            logger.warning("replay-trace write failed: %s", _e)
+
     def _wrapped(model_input, kv_caches, *args, **kwargs):
         attn_metadata = getattr(model_input, "attn_metadata", None)
+        # ---- 6K.16d replay-trace (env-gated; never breaks the forward) ----
+        from kv_policy.phase5b_4c_paged_writer import (
+            rt_path as _rt_path, rt_drain_events as _rt_drain,
+            rt_tensor_sig as _rt_sig, is_pad_seq_id as _rt_is_pad,
+        )
+        _tracing = bool(_rt_path())
+        _t_pre = None
+        if _tracing:
+            try:
+                handle.trace_step = getattr(handle, "trace_step", -1) + 1
+                w0 = next((w for w in handle.install_time_writers
+                           if w._allocated), None)
+                dec = getattr(attn_metadata, "decode_metadata", None) \
+                    if attn_metadata is not None else None
+                _t_pre = {
+                    "step": handle.trace_step, "phase": "pre",
+                    "is_decode": _is_pure_decode_step(attn_metadata),
+                    "stash_calls": handle.stash_call_count,
+                    "attn_meta_id": id(attn_metadata),
+                    "alloc_events": _rt_drain(),
+                }
+                if w0 is not None:
+                    _t_pre["pool_ids"] = {
+                        "k_stage_pool": id(w0._k_stage_pool),
+                        "count_pool": id(w0._k_stage_count_pool),
+                        "block_pool": id(w0._k_stage_block_id_pool),
+                    }
+                    _t_pre["live_sids"] = list(w0._slot_map.keys())
+                    _t_pre["counters_presync"] = _trace_counters(
+                        w0, list(w0._slot_map.keys()))
+                if dec is not None and getattr(dec, "block_tables", None) \
+                        is not None and dec.block_tables.numel() > 0:
+                    _t_pre["seq_lens"] = dec.seq_lens_tensor.cpu().tolist()
+                    _t_pre["seq_lens_id"] = id(dec.seq_lens_tensor)
+                    _t_pre["bt_id"] = id(dec.block_tables)
+                    _bt = dec.block_tables.cpu()
+                    _t_pre["bt_tail"] = [
+                        r[max(0, (int(s) - 1) // 32 - 1):(int(s) - 1) // 32 + 1]
+                        .tolist()
+                        for r, s in zip(_bt, _t_pre["seq_lens"])]
+                _sm = getattr(attn_metadata, "slot_mapping", None)
+                if _sm is not None and _sm.numel() <= 64:
+                    _t_pre["slot_mapping"] = _sm.cpu().tolist()
+            except Exception as _e:
+                logger.warning("replay-trace pre failed: %s", _e)
+                _t_pre = None
         # Phase 6K.16c: stash real seq ids in attention-row order on EVERY
         # step (prefill OR decode), so the write/read paths can use stable
         # identity under prefix caching. Decode -> _int4_real_seq_ids;
@@ -566,7 +643,71 @@ def install_int4_protected_precapture_hook(
                 handle.skipped_step_count += 1
         else:
             handle.skipped_step_count += 1
-        return original_fn(model_input, kv_caches, *args, **kwargs)
+        if _t_pre is not None:
+            # post-sync counter view + the stash's resolved ids/slots.
+            try:
+                w0 = next((w for w in handle.install_time_writers
+                           if w._allocated), None)
+                if w0 is not None:
+                    _t_pre["counters_postsync"] = _trace_counters(
+                        w0, list(w0._slot_map.keys()))
+                stash = read_stash(attn_metadata) or {}
+                _t_pre["stash_seq_ids"] = stash.get("seq_ids")
+                _sit = stash.get("slot_idx_t")
+                _t_pre["stash_slot_idx_id"] = id(_sit) if _sit is not None else None
+                _impl0 = (handle.install_time_impls or [None])[0]
+                if _impl0 is not None:
+                    _b = getattr(_impl0, "_phase5b_slot_idx_buf", None)
+                    _t_pre["impl0_slot_buf_id"] = id(_b) if _b is not None else None
+                    if _b is not None and _b.numel() <= 64:
+                        _t_pre["impl0_slot_buf"] = _b.cpu().tolist()
+            except Exception as _e:
+                logger.warning("replay-trace stash-view failed: %s", _e)
+            _trace_dump(_t_pre)
+        _out = original_fn(model_input, kv_caches, *args, **kwargs)
+        if _t_pre is not None:
+            try:
+                import torch as _torch
+                _torch.cuda.synchronize()
+                w0 = next((w for w in handle.install_time_writers
+                           if w._allocated), None)
+                rec = {"step": _t_pre["step"], "phase": "post"}
+                if w0 is not None:
+                    sids = [s for s in w0._slot_map.keys()
+                            if not _rt_is_pad(s)]
+                    rec["counters_post"] = _trace_counters(w0, sids)
+                    rec["stage_sig"] = {}
+                    for sid in sids:
+                        slot = w0._slot_map.get(sid)
+                        if slot is not None:
+                            rec["stage_sig"][str(sid)] = _rt_sig(
+                                w0._k_stage_pool[slot])
+                    # crossing detection: a seq whose count dropped to 0
+                    # this step finalized block X (its PRE block id) — dump
+                    # the finalized block's bytes (S1-style, layer 0).
+                    pre_c = _t_pre.get("counters_postsync") or {}
+                    kvc = kv_caches[0] if kv_caches is not None and len(
+                        kv_caches) > 0 else None
+                    if kvc is not None and kvc.numel() > 0:
+                        rec["finalized"] = {}
+                        for sid in sids:
+                            a = pre_c.get(str(sid))
+                            b = rec["counters_post"].get(str(sid))
+                            if (a and b and a["pool"][0] > 0
+                                    and b["pool"][0] == 0):
+                                X = a["pool"][1]
+                                if X >= 0:
+                                    rec["finalized"][str(sid)] = {
+                                        "block": X,
+                                        "packed_k": _rt_sig(
+                                            kvc[0, X, :, :, :w0.D // 2]),
+                                        "k_scale": _rt_sig(w0.k_scale_ext[X]),
+                                    }
+            except Exception as _e:
+                logger.warning("replay-trace post failed: %s", _e)
+                rec = {"step": _t_pre["step"], "phase": "post", "error": str(_e)}
+            _trace_dump(rec)
+        return _out
 
     try:
         _wrapped.__name__ = getattr(original_fn, "__name__", "execute_model")
