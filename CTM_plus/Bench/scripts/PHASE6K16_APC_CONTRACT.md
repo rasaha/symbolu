@@ -91,6 +91,26 @@
 > graphs apc cell + a **step-index** compare (not the divergence-sensitive
 > `(sids,seq_lens)` key, which hides token-divergence by survivorship).
 
+> **NARROWED (2026-06-10, v6 per-row OUT mirror — five hypotheses eliminated by
+> measurement; root is the B>1 K/V reconstruction).** The replay-trace gained a
+> persistent per-row `out` mirror (a CAPTURED copy into a stable buffer, the
+> only way to observe a B>1 read under graphs — the `_rt_read_refs` view goes
+> stale because the equivalence batch replays without re-running Python). A=B6
+> reproducer (`--num-seqs 6`, eager HIT vs graphs **MISS**, degenerate `зрения`)
+> measured per-row layer-0 attention `out`: graphs is **~1.8× eager norm,
+> CONSTANT across rows (~0.89 vs eager's varied 0.44–0.57), heads matching** —
+> a systematic common inflation, not random corruption. Eliminated, each by a
+> direct measurement (not reasoning): **GC** (EVICT_ON_DECODE=0 byte-identical),
+> **identity** (decode resolves `real_stash [1..6]`, distinct slots, no collision),
+> **partial-tail** (full-block rows 1/3 diverge too), **FP reduction-noise**
+> (50–130% norm Δ, gross not subtle), **masking** (`kernel_seqlen == seqlen`
+> every row). What remains: the **int4 dequant + protect-overlay reconstruction
+> of VALID positions at B>1 under graphs** — the B=1 v5 byte-exact proof covered
+> one row; it breaks at width 8. Naming the op needs the SAME persistent-buffer
+> treatment applied to the per-row K reconstruction (k_int4/k_scale/k_protect),
+> then the fix. Eager ship unaffected; this is the recorded next step for a
+> gated-off, throughput-negative path.
+
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
 > the writer's state model has no *stated* contract — every fix guessed at an
