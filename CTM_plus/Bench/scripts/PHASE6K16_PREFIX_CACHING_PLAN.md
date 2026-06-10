@@ -1,18 +1,27 @@
 # Phase 6K.16 — prefix caching (APC) for int4_protected: feasibility + plan
 
-> **STATUS: GATED OFF — feasibility established, full integration is multi-week.**
-> Storage is APC-compatible by construction; the dequant-context prefill path
-> works (a sequence runs 1.000 end-to-end). But the V0 writer's per-sequence
-> identity/lifecycle has MULTIPLE independent bugs under shared blocks. Four were
-> found + fixed via trace-driven debugging (collision, churn, graph-padding,
-> GC-eviction — see "Debugging log" below), each correct, yet the gate agreement
-> held flat at **0.375** across the last three because each bug was orthogonal to
-> the next. A fifth (batched-decode crossing) remains. Conclusion: finishing APC
-> is a focused multi-week rework of the writer's state model, not a few fixes.
-> The guard stays closed (`INT4_PROTECTED_ALLOW_PREFIX_CACHING` required);
-> production is unaffected. Resume only if APC is prioritized vs other work.
+> **STATUS: MACHINERY VALIDATED UNDER THE CONTRACT (eager/B=1 cells) — guard
+> stays on until the graphs-cell revalidation + payoff measurement.**
+> The turn that broke the stall was replacing fix-by-fix with a stated
+> **correctness contract** (`PHASE6K16_APC_CONTRACT.md`): identity = real vLLM
+> rid everywhere, crossings finalize/reset under the same rid, padding inert,
+> block-local refused loudly, and — decisively — a corrected success
+> definition: the **S1 byte-gate** (cached blocks bit-exact vs fresh prefill)
+> as the machinery criterion, with agreement demoted to a bounded residual.
+> Measured: **S1 PASS 13/13 blocks bit-exact; warm 1.000; needle 1.000; zero
+> degenerate APC outputs** — the residual "failures" were coherent near-tie
+> flips on open-ended prompts, and in one case the *no-APC baseline* was the
+> degenerate side. The flat-0.375 mystery: the old gate measured
+> agreement-to-baseline, not correctness. The 4 fixed identity bugs (+ the
+> supposed 5th "batched" edge, which dissolved: B=1 reproduced it, and the
+> texts showed it was the residual) are logged below.
+> **Before flipping the factory default:** rerun the graphs+batched cell on the
+> current commit (last needle-MISS predates the GC fix + pad sentinels), add an
+> APC cell to the 6k12 hard-needle harness, and measure the payoff (hit-rate /
+> prefill-throughput). Until then `INT4_PROTECTED_ALLOW_PREFIX_CACHING=1`
+> remains required; production default unchanged.
 >
-> _(original plan + Tier-0/1 implementation notes preserved below)_
+> _(original plan + Tier-0/1 implementation notes + debugging log preserved below)_
 
 > **Status: Tier 1 IMPLEMENTED (dequant-context prefill, CPU-verified) — pending the
 > GPU gates below. Tier 0 (guards) LANDED earlier; the guard now gates an

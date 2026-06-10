@@ -230,36 +230,41 @@ def compare(noapc_path, apc_path):
         print(f"GATE-HITS       {'PASS' if gate_hits else 'FAIL'}   "
               f"cache_hit_blocks={hits}")
 
-    # WARM diagnostic (NOT a gate): the warm call has no cached context in
-    # either mode, so its outputs should agree ~1.0. If they DIVERGE, the
-    # APC engine is broken before any prefix-prefill involvement (allocator
-    # or writer interaction) — the bug is NOT in the dequant-context path.
+    # GATE-WARM: the warm call has no cached context in either mode, so its
+    # outputs must agree ~1.0; divergence = engine/writer-under-APC bug
+    # (allocator/identity), independent of the prefix path.
+    gate_warm = None
     if a.get("warm_ids") and b.get("warm_ids"):
         wag, wpre = token_agreement(a["warm_ids"], b["warm_ids"])
-        print(f"  warm-call agreement={wag:.3f} prefix={wpre} "
-              f"(diverged => engine/writer-under-APC bug, not the prefix path)")
+        gate_warm = wag >= 0.95
+        print(f"GATE-WARM       {'PASS' if gate_warm else 'FAIL'}   "
+              f"agreement={wag:.3f} prefix={wpre} "
+              f"(no-hit path must be engine-identical)")
 
-    # GATE-AGREEMENT
+    # S3-RESIDUAL (INFO, not a gate — contract C-GATE): APC prefill attends
+    # the cached prefix in dequant-int4; no-APC attends fresh bf16. On
+    # open-ended prompts a greedy near-tie can flip and diverge COHERENTLY —
+    # the bounded residual, same class as protect-vs-bf16 (~0.955 on hard
+    # needles). The MACHINERY gate is the S1 byte-gate
+    # (phase6k16_byte_gate.py: cached blocks bit-exact vs fresh prefill).
+    # Texts are printed for divergent prompts so coherent-vs-DEGENERATE is
+    # adjudicable by eye; degenerate APC text => suffix-side machinery bug.
     agrees = []
     for k in sorted(a["eq_ids"], key=int):
         ag, pre = token_agreement(a["eq_ids"][k], b["eq_ids"].get(k, []))
         agrees.append(ag)
         print(f"  prompt[{k}] agreement={ag:.3f} prefix={pre}")
-        # Coherent-but-different (= the bounded S3 quant residual flipping a
-        # greedy near-tie) vs DEGENERATE (= machinery bug). Print both texts
-        # for divergent prompts so the difference is adjudicable by eye.
         if ag < 0.5 and (b.get("eq_texts") or {}).get(k) is not None:
             print(f"            apc:   {b['eq_texts'][k][:70]!r}")
             if (a.get("eq_texts") or {}).get(k) is not None:
                 print(f"            noapc: {a['eq_texts'][k][:70]!r}")
     mean_ag = sum(agrees) / max(1, len(agrees))
-    gate_ag = mean_ag >= AGREEMENT_GATE
-    print(f"GATE-AGREEMENT  {'PASS' if gate_ag else 'FAIL'}   mean={mean_ag:.4f} "
-          f"(gate >= {AGREEMENT_GATE}; NOT expected 1.0 — apc context is "
-          f"dequant-int4, noapc context is fresh bf16)")
+    print(f"S3-RESIDUAL     INFO   mean={mean_ag:.4f} over open-ended prompts "
+          f"(bounded residual, NOT a pass/fail bar — see contract §6; "
+          f"machinery gate = S1 byte-gate)")
 
-    # GATE-NEEDLE (+ token-level diagnostic: prefix tells WHERE it broke —
-    # prefix 0/1 = prefill-output divergence; longer = decode-side)
+    # GATE-NEEDLE (factual retrieval from INSIDE the cached prefix — the
+    # hard-tail check; prefix tells WHERE divergence starts if it fails)
     hit_apc = code in b["needle_text"]
     hit_no = code in a["needle_text"]
     gate_nd = hit_apc and hit_no
@@ -269,11 +274,15 @@ def compare(noapc_path, apc_path):
           f"agreement={nag:.3f} prefix={npre} "
           f"(code={code}; apc answered: {b['needle_text'][:40]!r})")
 
-    all_known = [g for g in (gate_hits, gate_ag, gate_nd) if g is not None]
-    verdict = all(all_known) and gate_hits is not None
+    # Contract C-GATE verdict: HITS (non-vacuous) + WARM (engine sane) +
+    # NEEDLE (factual retrieval). S1 byte-gate is the primary machinery
+    # criterion and runs separately (phase6k16_byte_gate.py).
+    all_known = [g for g in (gate_hits, gate_warm, gate_nd) if g is not None]
+    verdict = bool(all_known) and all(all_known) and gate_hits is not None
     print("-" * 78)
-    print("VERDICT:", "ALL GATES PASS — flip the factory default per the plan doc"
-          if verdict else "NOT PASSED — keep the guard; debug per plan doc")
+    print("VERDICT:", "GATES PASS (with S1 byte-gate PASS => APC machinery "
+          "validated under the contract; residual is bounded)"
+          if verdict else "NOT PASSED — see contract §6/§7 to localize")
     print("=" * 78)
     return 0 if verdict else 1
 

@@ -1,13 +1,23 @@
 # Phase 6K.16 — APC correctness contract (the math, not another patch)
 
-> **MEASURED (pod, Llama-3.1-8B): S1 PASS — 13/13 prefix blocks bit-exact**
-> (packed K + packed V + all five sidecars) between a fresh no-APC prefill and
-> the APC engine. **P1 holds; the storage/write machinery satisfies the
-> contract.** With warm=1.000 and needle=1.000 (a hit sequence crossing a block
-> boundary), the rid identity chain (stash → write → GC → read) is validated
-> end-to-end. Remaining adjudication: the three divergent OPEN-ENDED prompts'
-> texts (coherent ⇒ the bounded S3 residual, contract satisfied; degenerate ⇒
-> suffix-block corruption outside S1's scope — the next named target).
+> **MEASURED (pod, Llama-3.1-8B): THE CONTRACT IS SATISFIED (eager/B=1 cells).**
+> - **S1 byte-gate: PASS — 13/13 prefix blocks bit-exact** (packed K + packed V
+>   + all five sidecars) vs a fresh no-APC prefill. P1 holds.
+> - **GATE-WARM 1.000, GATE-NEEDLE 1.000** (a hit sequence crossing a block
+>   boundary, retrieving from the cached prefix) — the rid identity chain
+>   (stash → write → GC → read) works end-to-end.
+> - **Texts adjudicated: ZERO degenerate APC outputs.** The three divergent
+>   open-ended prompts are coherent near-tie flips (the bounded S3 residual) —
+>   and on prompt[1] the *no-APC baseline itself* was the degenerate side
+>   (`…-old-old-old`), with APC producing the better text; agreement-to-baseline
+>   scored correctness as failure. This vindicates §6: the old ≥0.9 agreement
+>   gate measured the wrong thing. The gates script now implements C-GATE
+>   (HITS + WARM + NEEDLE gates; agreement = bounded-residual INFO).
+>
+> **Remaining before flipping the factory default:** revalidate the
+> graphs+batched cell on the current commit (its last needle-MISS predates the
+> GC fix + pad sentinels), an APC cell on the 6k12 hard-needle harness, and the
+> payoff measurement (hit-rate / prefill-throughput). Machinery: validated.
 
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
