@@ -122,17 +122,43 @@ def run_mode(args):
         print("[rt] graphs mode (APC_ALLOW_GRAPHS=1 — exercising the open edge)")
     else:
         kw["enforce_eager"] = True
+    # The concurrent hit batch must fit in one wave, else it splits and the
+    # decode never reaches B=num_seqs. Capture sizes follow max_num_seqs.
+    kw["max_num_seqs"] = max(args.max_num_seqs, args.num_seqs)
     llm = Int4ProtectedLLM(**kw)
     sp = SamplingParams(temperature=0.0, max_tokens=args.gen)
-    # warm (populates the prefix cache), then ONE hit sequence; gen long
-    # enough to guarantee >=1 block crossing during decode.
+    # warm (populates the prefix cache) so the following sequences are APC
+    # hits; gen long enough to guarantee >=1 block crossing during decode.
     llm.generate([prefix + "Summarize the above in one sentence."], sp)
-    out = llm.generate(
-        [prefix + "What is the vault access code? Answer with only the code."],
-        sp)
-    txt = out[0].outputs[0].text
+
+    # The HIT batch. --num-seqs N > 1 submits N concurrent shared-prefix
+    # sequences in ONE generate call -> a real B=N decode. This is the only
+    # way to reach the edges a B=1 needle CANNOT: vLLM routes B=1 to the exact
+    # size-1 captured graph (no padding), so padding (#3, e.g. 6->8), shared-
+    # prefix collision (#1) and GC-eviction (#4) only fire with B>1. The needle
+    # is row 0; the rest are decoys sharing the SAME prefix (forcing the cache
+    # collision) with varied questions (forcing staggered block crossings).
+    needle_q = "What is the vault access code? Answer with only the code."
+    _decoys = [
+        "List three facts from the passage.",
+        "What is the main topic? One word.",
+        "Translate the first sentence to French.",
+        "How many sentences are there? A number.",
+        "Give a short title for the passage.",
+        "What is the overall tone? One word.",
+        "Name one entity mentioned above.",
+    ]
+    if args.num_seqs <= 1:
+        prompts = [prefix + needle_q]
+    else:
+        fillers = (_decoys * ((args.num_seqs // len(_decoys)) + 1))[
+            : args.num_seqs - 1]
+        prompts = [prefix + needle_q] + [prefix + d for d in fillers]
+    out = llm.generate(prompts, sp)
+    txt = out[0].outputs[0].text   # needle is row 0
     n = sum(1 for _ in open(args.trace)) if Path(args.trace).exists() else 0
-    print(f"[rt] mode={args.mode} trace={args.trace} records={n}")
+    print(f"[rt] mode={args.mode} trace={args.trace} records={n} "
+          f"num_seqs={len(prompts)} (max_num_seqs={kw['max_num_seqs']})")
     print(f"[rt] needle answered: {txt[:60]!r}  (code={code}, "
           f"{'HIT' if code in txt else 'MISS'})")
     return 0
@@ -290,8 +316,13 @@ def main(argv=None):
     ap.add_argument("--max-model-len", type=int, default=4096)
     ap.add_argument("--gpu-util", type=float, default=0.4)
     ap.add_argument("--max-num-seqs", type=int, default=8,
-                    help="B=1 workload; smaller captures fewer/narrower "
-                         "graph shapes -> much lower capture memory.")
+                    help="smaller captures fewer/narrower graph shapes -> "
+                         "much lower capture memory. Auto-raised to --num-seqs.")
+    ap.add_argument("--num-seqs", type=int, default=1,
+                    help="concurrent shared-prefix sequences in the HIT batch. "
+                         ">1 submits them in ONE generate call -> real B=N "
+                         "decode, reaching the padding(#3)/collision(#1)/GC(#4) "
+                         "edges a B=1 needle (routed to the size-1 graph) can't.")
     ap.add_argument("--gen", type=int, default=40)
     args = ap.parse_args(argv)
     if args.selftest:
