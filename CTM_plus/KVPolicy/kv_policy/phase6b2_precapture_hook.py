@@ -557,11 +557,26 @@ def install_int4_protected_precapture_hook(
         )
         _tracing = bool(_rt_path())
         _t_pre = None
+
+        def _trace_w0():
+            # TRACE-ONLY lazy writer resolution: in eager mode the factory
+            # collects writers before any forward has created them, so
+            # install_time_writers is empty — fall back to the impls'
+            # lazily-created writers. Does NOT affect production resolve.
+            w = next((w for w in handle.install_time_writers
+                      if w._allocated), None)
+            if w is not None:
+                return w
+            for impl in (handle.install_time_impls or []):
+                cand = getattr(impl, "_phase5b_paged_writer", None)
+                if cand is not None and getattr(cand, "_allocated", False):
+                    return cand
+            return None
+
         if _tracing:
             try:
                 handle.trace_step = getattr(handle, "trace_step", -1) + 1
-                w0 = next((w for w in handle.install_time_writers
-                           if w._allocated), None)
+                w0 = _trace_w0()
                 dec = getattr(attn_metadata, "decode_metadata", None) \
                     if attn_metadata is not None else None
                 _t_pre = {
@@ -646,8 +661,7 @@ def install_int4_protected_precapture_hook(
         if _t_pre is not None:
             # post-sync counter view + the stash's resolved ids/slots.
             try:
-                w0 = next((w for w in handle.install_time_writers
-                           if w._allocated), None)
+                w0 = _trace_w0()
                 if w0 is not None:
                     _t_pre["counters_postsync"] = _trace_counters(
                         w0, list(w0._slot_map.keys()))
@@ -669,8 +683,7 @@ def install_int4_protected_precapture_hook(
             try:
                 import torch as _torch
                 _torch.cuda.synchronize()
-                w0 = next((w for w in handle.install_time_writers
-                           if w._allocated), None)
+                w0 = _trace_w0()
                 rec = {"step": _t_pre["step"], "phase": "post"}
                 if w0 is not None:
                     sids = [s for s in w0._slot_map.keys()

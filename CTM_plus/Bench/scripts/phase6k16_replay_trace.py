@@ -34,15 +34,25 @@ for _root in ROOT_CANDIDATES:
         sys.path.insert(0, str(kvp))
         break
 
-# Fields whose VALUES must match step-for-step between eager and graphs
-# (until the first true divergence). Identity fields (ids) are compared
-# WITHIN a trace for stability, not across traces (addresses differ).
-VALUE_FIELDS = ("is_decode", "seq_lens", "slot_mapping", "bt_tail",
-                "live_sids", "stash_seq_ids",
+# Fields whose VALUES must match for the same (live_sids, seq_lens) step
+# between eager and graphs (until the first true divergence). NB
+# stash_seq_ids is graphs-only (eager self-resolves) and seq_lens_id /
+# bt_id / stash_slot_idx_id legitimately drift per step (vLLM rebuilds
+# host metadata objects; the stash tensor is fresh by design) — only the
+# pools + impl slot buffer must be identity-stable (the recorded ops
+# close over THOSE objects).
+VALUE_FIELDS = ("is_decode", "slot_mapping", "bt_tail",
                 "counters_presync", "counters_postsync")
 POST_FIELDS = ("counters_post", "stage_sig", "finalized")
-ID_FIELDS = ("pool_ids", "impl0_slot_buf_id", "stash_slot_idx_id",
-             "seq_lens_id", "bt_id")
+ID_FIELDS = ("pool_ids", "impl0_slot_buf_id")
+
+
+def _align_key(r):
+    sids = r.get("live_sids")
+    sl = r.get("seq_lens")
+    if sids is None or sl is None:
+        return None
+    return (tuple(sorted(str(s) for s in sids)), tuple(sl))
 
 
 def run_mode(args):
@@ -123,28 +133,43 @@ def compare(eager_path, graphs_path):
         print(f"  [{name}] alloc events after step 0: "
               f"{'none' if not late else late[:3]}")
 
-    # 2. Cross-trace value diff, step-aligned on DECODE steps.
-    e_dec = [s for s in sorted(e_pre) if e_pre[s].get("is_decode")]
-    g_dec = [s for s in sorted(g_pre) if g_pre[s].get("is_decode")]
-    n = min(len(e_dec), len(g_dec))
+    # 2. Cross-trace value diff, aligned by (live_sids, seq_lens) — robust
+    # to step-count skew (graphs init adds steps) and overlapping seq-len
+    # ranges between the warm and hit sequences.
+    e_keyed = {}
+    for s in sorted(e_pre):
+        k = _align_key(e_pre[s])
+        if k is not None and e_pre[s].get("is_decode") and k not in e_keyed:
+            e_keyed[k] = s
+    g_keyed = {}
+    for s in sorted(g_pre):
+        k = _align_key(g_pre[s])
+        if k is not None and g_pre[s].get("is_decode") and k not in g_keyed:
+            g_keyed[k] = s
+    common = [k for k in g_keyed if k in e_keyed]
+    common.sort(key=lambda k: g_keyed[k])
+    print(f"  aligned decode steps: {len(common)} "
+          f"(eager-only={len(e_keyed) - len(common)}, "
+          f"graphs-only={len(g_keyed) - len(common)})")
     first = None
-    for k in range(n):
+    for k in common:
+        es, gs = e_keyed[k], g_keyed[k]
         diffs = []
-        _diff(e_pre[e_dec[k]], g_pre[g_dec[k]], "pre", VALUE_FIELDS, diffs)
-        ep, gp = e_post.get(e_dec[k]), g_post.get(g_dec[k])
+        _diff(e_pre[es], g_pre[gs], "pre", VALUE_FIELDS, diffs)
+        ep, gp = e_post.get(es), g_post.get(gs)
         if ep and gp:
             _diff(ep, gp, "post", POST_FIELDS, diffs)
         if diffs:
-            first = (k, diffs)
+            first = (k, es, gs, diffs)
             break
     if first is None:
-        print(f"\n  NO DIVERGENCE across {n} aligned decode steps — the "
-              f"traced state surface is identical; the bug is OUTSIDE it "
+        print(f"\n  NO DIVERGENCE across {len(common)} aligned decode steps — "
+              f"the traced state surface is identical; the bug is OUTSIDE it "
               f"(extend the surface).")
     else:
-        k, diffs = first
-        print(f"\n  FIRST DIVERGENCE at aligned decode step {k} "
-              f"(eager step {e_dec[k]}, graphs step {g_dec[k]}):")
+        k, es, gs, diffs = first
+        print(f"\n  FIRST DIVERGENCE at key sids={k[0]} seq_lens={k[1]} "
+              f"(eager step {es}, graphs step {gs}):")
         for label, f, va, vb in diffs[:6]:
             print(f"    [{label}] {f}:")
             print(f"        eager : {json.dumps(va)[:160]}")
@@ -166,6 +191,7 @@ def selftest():
     print("phase6k16_replay_trace selftest")
     a, b = "/tmp/_rt_a.jsonl", "/tmp/_rt_b.jsonl"
     rec = {"step": 0, "phase": "pre", "is_decode": True, "seq_lens": [500],
+           "live_sids": [1],
            "counters_presync": {"1": {"slot": 0, "pool": [5, 14, 0],
                                       "state_ints": [5, 14]}},
            "pool_ids": {"k_stage_pool": 111}}
