@@ -68,6 +68,29 @@
 > `out`-divergence to name the corrupting step. Ship posture unchanged
 > (eager-only); this only narrows the open edge.
 
+> **CONFIRMED (2026-06-10, gates re-run on current code — the bug is current,
+> B>1-only, and partial-tail-specific).** The source-of-truth gates cell
+> (`phase6k16_prefix_gates.py --mode apc`, graphs via `ALLOW_GRAPHS=1`,
+> equivalence prompts run **batched**) on current code: **GATE-HITS PASS**
+> (`prefix_prefill_calls=64`, non-vacuous), **GATE-WARM PASS** (1.000 — the
+> no-hit path is engine-identical under graphs, so graphs itself is sound),
+> **GATE-NEEDLE FAIL** (`apc=MISS noapc=HIT`, degenerate output
+> `зрения`/`ComponentPlacement`/`-old-old-old`). So the defect is **not stale**
+> (not fixed by the rid work) and is isolated to the **B>1 hit path under
+> graphs**. Sharpened by the per-prompt agreement: **the only survivor is
+> prompt[1] (`prefix=32`, a full-block prefix with NO partial tail to splice,
+> agreement 1.000); every partial-tail hit (prompts 0/2/3/4/5) goes
+> degenerate.** Signature = attention reading uninitialized / wrong-sequence
+> staged K. Diagnosis: at B>1, concurrent hit sequences sharing a prefix block
+> get their per-sequence **partial-block staging/slot bookkeeping crossed**
+> (collision §7 #1 / GC-eviction #4) — a hit seq reads another seq's (or a
+> freed) partial tail. NOT the read math (v5 proved B=1 bit-exact), NOT the
+> no-hit path (GATE-WARM PASS). **Eager-only ship vindicated**: graphs+APC is
+> broken exactly in the batched-serving regime it would exist to serve. Next
+> localization (collision vs GC) = arm `INT4_PROTECTED_REPLAY_TRACE` on the
+> graphs apc cell + a **step-index** compare (not the divergence-sensitive
+> `(sids,seq_lens)` key, which hides token-divergence by survivorship).
+
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
 > the writer's state model has no *stated* contract — every fix guessed at an
