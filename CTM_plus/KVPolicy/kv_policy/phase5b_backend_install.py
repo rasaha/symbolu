@@ -341,6 +341,22 @@ if _VLLM_FA_AVAILABLE:
                 self._phase5b_cache_seqlens_i32[:B],
             )
 
+        def _ensure_rt_out_buf(self, B, HD, device, dtype):
+            """v6 replay-trace: persistent per-row OUT mirror. A CAPTURED
+            copy into this stable-address buffer refreshes it on EVERY graph
+            replay — the only way the host window can read a B>1 read under
+            graphs (the `_rt_read_refs` view goes stale because the
+            equivalence batch replays without re-running this Python, leaking
+            a B=1 warm step's `_one` refs = the e=6/g=1 blindness). Sized to a
+            generous cap once so it never reallocs (a realloc after capture
+            would orphan the recorded copy)."""
+            cur = getattr(self, "_rt_out_buf", None)
+            if (cur is None or cur.shape[0] < B or cur.shape[1] != HD
+                    or cur.device != device or cur.dtype != dtype):
+                self._rt_out_buf = torch.zeros(
+                    (max(B, 256), HD), dtype=dtype, device=device)
+            return self._rt_out_buf
+
         def _ensure_protect_mask_bhd(self, B: int, writer):
             """(Re-)allocate the (B, H, D) int8 protect_mask buffer if
             needed. Content is per-model-frozen (writer.protect_mask is
@@ -670,6 +686,12 @@ if _VLLM_FA_AVAILABLE:
                     "slot_idx": slot_idx_t,
                     "BS": BS,
                 }
+                # v6: persistent per-row OUT mirror via a CAPTURED copy, so
+                # the hook reads the REPLAYED per-row out for ALL B rows
+                # (refs above go stale under graphs — see _ensure_rt_out_buf).
+                _hd = out.reshape(B, -1).shape[1]
+                _ob = self._ensure_rt_out_buf(B, _hd, out.device, out.dtype)
+                _ob[:B].copy_(out.reshape(B, -1), non_blocking=True)
             return out
 
         def _read_decode_packed_one(

@@ -784,6 +784,31 @@ def install_int4_protected_precapture_hook(
                                     rec["view_tail"][str(row)] = ent
                         except Exception as _e2:
                             rec["view_tail_error"] = str(_e2)[:80]
+                    # v6: per-row OUT from the PERSISTENT mirror — the surface
+                    # the e=6/g=1 blindness hid. A captured copy refreshes
+                    # `_rt_out_buf` every replay, and `_phase5b_cache_seqlens_i32`
+                    # is likewise persistent, so this reads the REAL replayed
+                    # per-row attention output for ALL B rows under graphs.
+                    try:
+                        ob = getattr(_impl0, "_rt_out_buf", None) \
+                            if _impl0 is not None else None
+                        csl_buf = getattr(
+                            _impl0, "_phase5b_cache_seqlens_i32", None) \
+                            if _impl0 is not None else None
+                        _sids = _t_pre.get("stash_seq_ids") or []
+                        _nlive = sum(1 for s in _sids if not _rt_is_pad(s))
+                        if ob is not None and _nlive > 0:
+                            rec["row_out"] = {}
+                            for i in range(min(_nlive, ob.shape[0])):
+                                _sl = (int(csl_buf[i].item())
+                                       if csl_buf is not None
+                                       and i < csl_buf.shape[0] else None)
+                                rec["row_out"][str(i)] = {
+                                    "seqlen": _sl,
+                                    "out": _rt_sig(ob[i].float()),
+                                }
+                    except Exception as _e4:
+                        rec["row_out_error"] = str(_e4)[:80]
                     pre_c = _t_pre.get("counters_postsync") or {}
                     kvc = kv_caches[0] if kv_caches is not None and len(
                         kv_caches) > 0 else None
