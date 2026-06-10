@@ -53,6 +53,21 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 
+# Phase 6K.16 — prefix-caching guard. The inherited prefix-enabled prefill
+# branch passes key_cache/value_cache to flash_attn_varlen_func, but under
+# int4_protected those paged tensors hold PACKED uint8 nibbles — the varlen
+# kernel would read them as bf16 -> garbage attention (or a dtype assert) on
+# the cached-prefix region. Until the dequant-context prefill path lands
+# (PHASE6K16_PREFIX_CACHING_PLAN.md), that branch refuses loudly. It only
+# fires with enable_prefix_caching=True (or chunked prefill, likewise off).
+_ALLOW_PREFIX_CACHING_ENV = "INT4_PROTECTED_ALLOW_PREFIX_CACHING"
+
+
+def _allow_prefix_caching_override() -> bool:
+    raw = os.environ.get(_ALLOW_PREFIX_CACHING_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
 # ----------------------------------------------------------------------
 # Decode-path profiler (Phase 6 v2 Option D step 3 prep).
 #
@@ -402,11 +417,20 @@ if _VLLM_FA_AVAILABLE:
                 # During capture the batched path handles B=1 too (it's a
                 # degenerate case); `_read_decode_packed_one` has .item()
                 # calls that are forbidden inside torch.cuda.graph context.
+                _seqlen0 = int(cache_seqlens_orig[0].item())
+                # 6K.16b: same identity rule as the write path.
+                from kv_policy.phase5b_4c_paged_writer import (
+                    block_local_seq_ids_enabled as _bl_ids,
+                )
+                if _bl_ids(writer):
+                    _sid0 = int(block_table[0][max(0, (_seqlen0 - 1) // writer.BS)].item())
+                else:
+                    _sid0 = _seq_id_from_block_table_row(block_table[0])
                 return self._read_decode_packed_one(
                     query_q, kv_cache, layer, writer,
                     bt=block_table[0],
-                    seqlen=int(cache_seqlens_orig[0].item()),
-                    seq_id=_seq_id_from_block_table_row(block_table[0]),
+                    seqlen=_seqlen0,
+                    seq_id=_sid0,
                 )
 
             # Multi-batch path (Phase 6 v2 Option A): ONE batched kernel
@@ -471,7 +495,16 @@ if _VLLM_FA_AVAILABLE:
                 n_blocks_max = block_table.shape[1]
                 if not _in_capture_read:
                     # CAPTURE-EXEMPT: pre-capture host sync for seq_ids.
-                    seq_ids = block_table[:, 0].cpu().tolist()
+                    # 6K.16b: block-local identity (APC-sound) when the
+                    # writer runs backing-skip; legacy [:,0] otherwise.
+                    from kv_policy.phase5b_4c_paged_writer import (
+                        block_local_seq_ids_enabled as _bl_ids,
+                        decode_seq_ids_from_meta as _dec_ids,
+                    )
+                    seq_ids = _dec_ids(
+                        block_table, cache_seqlens_orig, BS,
+                        block_local=_bl_ids(writer),
+                    )
                 else:
                     seq_ids = None   # not used in captured ops
                 S_padded = n_blocks_max * BS
@@ -952,9 +985,18 @@ if _VLLM_FA_AVAILABLE:
                                     # hook deployments). Self-resolve as
                                     # in 6B.1. The seq_id derivation
                                     # mirrors _derive_write_partitions's
-                                    # decode branch (block_tables[i, 0]).
-                                    seq_ids = dec_meta.block_tables[:, 0] \
-                                        .cpu().tolist()
+                                    # decode branch (6K.16b: block-local
+                                    # when backing-skip; legacy [:,0]
+                                    # otherwise).
+                                    from kv_policy.phase5b_4c_paged_writer import (
+                                        block_local_seq_ids_enabled as _bl_ids,
+                                        decode_seq_ids_from_meta as _dec_ids,
+                                    )
+                                    seq_ids = _dec_ids(
+                                        dec_meta.block_tables,
+                                        getattr(dec_meta, "seq_lens_tensor", None),
+                                        BS, block_local=_bl_ids(writer),
+                                    )
                                     # Phase 6K.14: GC slots held by
                                     # completed / recompute-preempted seqs
                                     # (absent from this pure-decode batch)
@@ -1006,6 +1048,7 @@ if _VLLM_FA_AVAILABLE:
                             # Legacy partition + per-seq write (eager).
                             partitions = _derive_write_partitions(
                                 attn_metadata, slot_mapping_flat, BS,
+                                writer=writer,
                             )
                             # Phase 6K.9 fix: clear stale per-sequence writer
                             # state at the PREFILL boundary. seq_id is derived
@@ -1101,20 +1144,45 @@ if _VLLM_FA_AVAILABLE:
                     # Prefix-enabled attention (Q current, K/V from cache).
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support prefix caching")
-                    assert prefill_meta.seq_lens is not None
-                    max_seq_len = max(prefill_meta.seq_lens)
-                    flash_attn_varlen_func(
-                        q=query, k=key_cache, v=value_cache,
-                        cu_seqlens_q=prefill_meta.query_start_loc,
-                        max_seqlen_q=prefill_meta.max_query_len,
-                        seqused_k=prefill_meta.seq_lens_tensor,
-                        max_seqlen_k=max_seq_len,
+                    # Phase 6K.16 Tier 1: the paged cache is int4-PACKED here,
+                    # so the STOCK call (varlen over key_cache/value_cache with
+                    # block_table=) would read nibbles as bf16 — it is REPLACED
+                    # by the dequant-context path: cached blocks are
+                    # dequantized (protect channels exact) to the query dtype
+                    # and passed explicitly. Still gated until the GPU gates
+                    # pass (Bench/scripts/phase6k16_prefix_gates.py).
+                    if not _allow_prefix_caching_override():
+                        raise RuntimeError(
+                            "int4_protected: prefix-aware prefill is gated — "
+                            "the Tier-1 dequant-context path is implemented "
+                            "but not GPU-validated yet. Run with "
+                            "enable_prefix_caching=False (the default), or "
+                            "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to "
+                            "enable it (then run Bench/scripts/"
+                            "phase6k16_prefix_gates.py). Plan: "
+                            "PHASE6K16_PREFIX_CACHING_PLAN.md"
+                        )
+                    writer = getattr(self, "_phase5b_paged_writer", None)
+                    if writer is None:
+                        raise RuntimeError(
+                            "int4_protected prefix prefill: no paged writer "
+                            "installed on this impl (install order bug)."
+                        )
+                    cs = Int4ProtectedAttentionImpl._call_stats
+                    cs["prefix_prefill_calls"] = cs.get("prefix_prefill_calls", 0) + 1
+                    from kv_policy.phase6k16_prefix_prefill import run_prefix_prefill
+                    run_prefix_prefill(
+                        query=query,
+                        new_key=key[:num_prefill_kv_tokens],
+                        new_value=value[:num_prefill_kv_tokens],
+                        kv_cache=kv_cache,
+                        writer=writer,
+                        prefill_meta=prefill_meta,
+                        flash_attn_varlen_func=flash_attn_varlen_func,
                         softmax_scale=softmax_scale,
-                        causal=True,
                         window_size=window_size,
                         alibi_slopes=alibi_slopes,
-                        block_table=prefill_meta.block_tables,
-                        softcap=logits_soft_cap,
+                        logits_soft_cap=logits_soft_cap,
                         out=prefill_output,
                         fa_version=self.vllm_flash_attn_version,
                     )
@@ -1320,32 +1388,50 @@ def _is_pure_decode_write(attn_metadata: Any, T_total: int) -> bool:
     return True
 
 
-def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tensor", BS: int):
+def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tensor", BS: int,
+                             writer: Any = None):
     """Phase 5B.6 step 3 fix: partition a multi-token write call across
     sequences so each seq's SeqState (bf16 backing, K staging) receives
     its own data.
 
-    Returns: list of (seq_id, slice) tuples. The seq_id derivation
-    matches how _read_decode_packed_one identifies sequences:
-      - PREFILL:  seq_id = slot_mapping[seq_start] // BS
-                  (= the seq's FIRST BLOCK, which equals what decode
-                  later sees as block_tables[i, 0])
-      - DECODE:   seq_id = decode_meta.block_tables[i, 0]
+    Returns: list of (seq_id, slice) tuples.
 
-    Both forms collapse to `block_table[0]` for any given sequence —
-    stable across that sequence's lifetime in vLLM 0.7.3 V0.
+    Phase 6K.16b — sequence identity. TWO derivations, selected by
+    ``block_local_seq_ids_enabled(writer)`` (backing-skip mode, the
+    default; see phase5b_4c_paged_writer for the full rationale):
+
+      BLOCK-LOCAL (backing-skip; APC-sound):
+        identity = block of the token being WRITTEN.
+        - PREFILL: LAST non-padding slot of the segment // BS (the block
+          left staged — what decode step 1 looks up).
+        - DECODE:  block_tables[i, (seq_len-1) // BS] == slot // BS.
+
+      LEGACY (bf16-backing mode; pre-6K.16b behavior, byte-identical):
+        - PREFILL: FIRST non-padding slot // BS.
+        - DECODE:  block_tables[i, 0].
+        The legacy invariant ("both collapse to block_table[0], stable
+        for the sequence's lifetime") is FALSE under prefix caching —
+        which is why APC requires backing-skip + block-local ids.
     """
+    from kv_policy.phase5b_4c_paged_writer import (
+        block_local_seq_ids_enabled,
+        decode_seq_ids_from_meta,
+        prefill_seq_id_for_segment,
+    )
+    block_local = writer is not None and block_local_seq_ids_enabled(writer)
+
     dec_meta = getattr(attn_metadata, "decode_metadata", None)
     pre_meta = getattr(attn_metadata, "prefill_metadata", None)
 
     if (dec_meta is not None
             and getattr(dec_meta, "block_tables", None) is not None
             and dec_meta.block_tables.numel() > 0):
-        B = dec_meta.block_tables.shape[0]
-        return [
-            (_seq_id_from_block_table_row(dec_meta.block_tables[i]), slice(i, i + 1))
-            for i in range(B)
-        ]
+        ids = decode_seq_ids_from_meta(
+            dec_meta.block_tables,
+            getattr(dec_meta, "seq_lens_tensor", None),
+            BS, block_local=block_local,
+        )
+        return [(sid, slice(i, i + 1)) for i, sid in enumerate(ids)]
 
     if pre_meta is not None:
         # Multi-seq prefill (rare in V0 default; happens with batched
@@ -1358,23 +1444,20 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
                 start, end = qsl_cpu[i], qsl_cpu[i + 1]
                 if end <= start:
                     continue
-                first_slot = int(slot_mapping_flat[start].item())
-                if first_slot < 0:
+                sid = prefill_seq_id_for_segment(
+                    slot_mapping_flat, start, end, BS, block_local=block_local)
+                if sid < 0:
                     # All padding for this seg; skip.
                     continue
-                partitions.append((first_slot // BS, slice(start, end)))
+                partitions.append((sid, slice(start, end)))
             if partitions:
                 return partitions
-        # Single-seq prefill. Derive from the first non-padding slot.
-        first_slot = -1
+        # Single-seq prefill.
         n = int(slot_mapping_flat.shape[0])
-        for j in range(n):
-            v = int(slot_mapping_flat[j].item())
-            if v >= 0:
-                first_slot = v
-                break
-        if first_slot >= 0:
-            return [(first_slot // BS, slice(0, n))]
+        sid = prefill_seq_id_for_segment(
+            slot_mapping_flat, 0, n, BS, block_local=block_local)
+        if sid >= 0:
+            return [(sid, slice(0, n))]
 
     # Fallback: no metadata, no valid slots. Use the default seq.
     return [(0, slice(0, int(slot_mapping_flat.shape[0])))]

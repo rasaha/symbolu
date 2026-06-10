@@ -208,7 +208,23 @@ def _resolve_and_stash(
     block_tables = dec_meta.block_tables
     # One coalesced host sync per step. Pre-capture-hoistable; the
     # captured region never sees it.
-    seq_ids = block_tables[:, 0].cpu().tolist()
+    # 6K.16b: identity = block of the token being written (APC-sound)
+    # when the writers run backing-skip mode; legacy [:,0] otherwise.
+    # MUST match the write/read-path derivations exactly — the pool
+    # counters synced below are keyed by these ids.
+    from kv_policy.phase5b_4c_paged_writer import (
+        block_local_seq_ids_enabled as _bl_ids,
+        decode_seq_ids_from_meta as _dec_ids,
+    )
+    _primary_w = writers[0] if writers else None
+    if _primary_w is not None and _bl_ids(_primary_w):
+        seq_ids = _dec_ids(
+            block_tables,
+            getattr(dec_meta, "seq_lens_tensor", None),
+            int(_primary_w.BS), block_local=True,
+        )
+    else:
+        seq_ids = block_tables[:, 0].cpu().tolist()
 
     # The hook fires from `worker.execute_model` -> our wrap, which
     # runs OUTSIDE vLLM's `@torch.inference_mode()` decorator (that
