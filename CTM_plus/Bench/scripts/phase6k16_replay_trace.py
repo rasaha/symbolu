@@ -34,15 +34,72 @@ for _root in ROOT_CANDIDATES:
         sys.path.insert(0, str(kvp))
         break
 
-# Fields whose VALUES must match step-for-step between eager and graphs
-# (until the first true divergence). Identity fields (ids) are compared
-# WITHIN a trace for stability, not across traces (addresses differ).
-VALUE_FIELDS = ("is_decode", "seq_lens", "slot_mapping", "bt_tail",
-                "live_sids", "stash_seq_ids",
-                "counters_presync", "counters_postsync")
+# Cross-mode comparison is SEMANTIC, not raw: eager and graphs differ
+# legitimately in (a) slot numbers (capture dummies consume slots first),
+# (b) SeqState ints (graphs: pool canonical, ints stale by design),
+# (c) sync timing (eager syncs inside the forward, after the pre dump).
+# What MUST match per (live_sids, seq_lens) step: the step INPUTS
+# (slot_mapping, block-table tails) and the post-step SEMANTIC state —
+# pool [count, block, seq_pos] per sid, stage content hash per sid, and
+# finalized-block bytes at crossings. presync/postsync stay in the dump
+# for human reading but are excluded from the cross-diff.
+VALUE_FIELDS = ("is_decode", "slot_mapping", "bt_tail")
 POST_FIELDS = ("counters_post", "stage_sig", "finalized")
-ID_FIELDS = ("pool_ids", "impl0_slot_buf_id", "stash_slot_idx_id",
-             "seq_lens_id", "bt_id")
+ID_FIELDS = ("pool_ids", "impl0_slot_buf_id")
+
+
+def _norm_post(r):
+    """Mode-invariant view of a post record."""
+    out = {}
+    c = r.get("counters_post") or {}
+    out["pool"] = {sid: (v or {}).get("pool") for sid, v in c.items()}
+    sg = r.get("stage_sig") or {}
+    out["stage_sha"] = {sid: (v or {}).get("sha1") for sid, v in sg.items()}
+    out["stage_norm"] = {sid: (v or {}).get("norm") for sid, v in sg.items()}
+    fin = r.get("finalized") or {}
+    out["finalized"] = {
+        sid: {"block": (v or {}).get("block"),
+              "packed_sha": ((v or {}).get("packed_k") or {}).get("sha1"),
+              "scale_sha": ((v or {}).get("k_scale") or {}).get("sha1")}
+        for sid, v in fin.items()}
+    # v4: the replayed READ's transient output — per-row last-block view
+    # content (the spliced tail the kernel actually consumed) + the read's
+    # cache_seqlens/slot buffer VALUES. Rows with seq<=0 are padding.
+    vt = r.get("view_tail") or {}
+
+    def _sha(v, key):
+        return ((v or {}).get(key) or {}).get("sha1")
+
+    def _nrm(v, key):
+        return ((v or {}).get(key) or {}).get("norm")
+
+    out["view_tail"] = {
+        row: {"last_block": (v or {}).get("last_block"),
+              "k_int4_sha": _sha(v, "k_int4"),
+              "k_int4_norm": _nrm(v, "k_int4"),
+              "k_scale_sha": _sha(v, "k_scale"),
+              # v5: the kernel surface v4 couldn't see. A divergence here
+              # NAMES the buffer: protect_bf16/protect_slot = protected
+              # overlay; bf16_k = positional K backing; v_kernel = V input;
+              # out = the per-row attention result (integral screen).
+              "protect_bf16_sha": _sha(v, "k_protect_bf16"),
+              "protect_slot_sha": _sha(v, "protect_slot"),
+              "bf16_k_sha": _sha(v, "bf16_k"),
+              "v_kernel_sha": _sha(v, "v_kernel"),
+              "out_sha": _sha(v, "out"),
+              "out_norm": _nrm(v, "out")}
+        for row, v in vt.items()}
+    csl = r.get("read_cache_seqlens")
+    out["read_cache_seqlens"] = [s for s in (csl or []) if s > 0]
+    return out
+
+
+def _align_key(r):
+    sids = r.get("live_sids")
+    sl = r.get("seq_lens")
+    if sids is None or sl is None:
+        return None
+    return (tuple(sorted(str(s) for s in sids)), tuple(sl))
 
 
 def run_mode(args):
@@ -57,6 +114,7 @@ def run_mode(args):
 
     kw = dict(model=args.model, max_model_len=args.max_model_len,
               gpu_memory_utilization=args.gpu_util,
+              max_num_seqs=args.max_num_seqs,
               enable_prefix_caching=True)
     if args.mode == "graphs":
         os.environ["INT4_PROTECTED_APC_ALLOW_GRAPHS"] = "1"
@@ -64,17 +122,43 @@ def run_mode(args):
         print("[rt] graphs mode (APC_ALLOW_GRAPHS=1 — exercising the open edge)")
     else:
         kw["enforce_eager"] = True
+    # The concurrent hit batch must fit in one wave, else it splits and the
+    # decode never reaches B=num_seqs. Capture sizes follow max_num_seqs.
+    kw["max_num_seqs"] = max(args.max_num_seqs, args.num_seqs)
     llm = Int4ProtectedLLM(**kw)
     sp = SamplingParams(temperature=0.0, max_tokens=args.gen)
-    # warm (populates the prefix cache), then ONE hit sequence; gen long
-    # enough to guarantee >=1 block crossing during decode.
+    # warm (populates the prefix cache) so the following sequences are APC
+    # hits; gen long enough to guarantee >=1 block crossing during decode.
     llm.generate([prefix + "Summarize the above in one sentence."], sp)
-    out = llm.generate(
-        [prefix + "What is the vault access code? Answer with only the code."],
-        sp)
-    txt = out[0].outputs[0].text
+
+    # The HIT batch. --num-seqs N > 1 submits N concurrent shared-prefix
+    # sequences in ONE generate call -> a real B=N decode. This is the only
+    # way to reach the edges a B=1 needle CANNOT: vLLM routes B=1 to the exact
+    # size-1 captured graph (no padding), so padding (#3, e.g. 6->8), shared-
+    # prefix collision (#1) and GC-eviction (#4) only fire with B>1. The needle
+    # is row 0; the rest are decoys sharing the SAME prefix (forcing the cache
+    # collision) with varied questions (forcing staggered block crossings).
+    needle_q = "What is the vault access code? Answer with only the code."
+    _decoys = [
+        "List three facts from the passage.",
+        "What is the main topic? One word.",
+        "Translate the first sentence to French.",
+        "How many sentences are there? A number.",
+        "Give a short title for the passage.",
+        "What is the overall tone? One word.",
+        "Name one entity mentioned above.",
+    ]
+    if args.num_seqs <= 1:
+        prompts = [prefix + needle_q]
+    else:
+        fillers = (_decoys * ((args.num_seqs // len(_decoys)) + 1))[
+            : args.num_seqs - 1]
+        prompts = [prefix + needle_q] + [prefix + d for d in fillers]
+    out = llm.generate(prompts, sp)
+    txt = out[0].outputs[0].text   # needle is row 0
     n = sum(1 for _ in open(args.trace)) if Path(args.trace).exists() else 0
-    print(f"[rt] mode={args.mode} trace={args.trace} records={n}")
+    print(f"[rt] mode={args.mode} trace={args.trace} records={n} "
+          f"num_seqs={len(prompts)} (max_num_seqs={kw['max_num_seqs']})")
     print(f"[rt] needle answered: {txt[:60]!r}  (code={code}, "
           f"{'HIT' if code in txt else 'MISS'})")
     return 0
@@ -123,28 +207,45 @@ def compare(eager_path, graphs_path):
         print(f"  [{name}] alloc events after step 0: "
               f"{'none' if not late else late[:3]}")
 
-    # 2. Cross-trace value diff, step-aligned on DECODE steps.
-    e_dec = [s for s in sorted(e_pre) if e_pre[s].get("is_decode")]
-    g_dec = [s for s in sorted(g_pre) if g_pre[s].get("is_decode")]
-    n = min(len(e_dec), len(g_dec))
+    # 2. Cross-trace value diff, aligned by (live_sids, seq_lens) — robust
+    # to step-count skew (graphs init adds steps) and overlapping seq-len
+    # ranges between the warm and hit sequences.
+    e_keyed = {}
+    for s in sorted(e_pre):
+        k = _align_key(e_pre[s])
+        if k is not None and e_pre[s].get("is_decode") and k not in e_keyed:
+            e_keyed[k] = s
+    g_keyed = {}
+    for s in sorted(g_pre):
+        k = _align_key(g_pre[s])
+        if k is not None and g_pre[s].get("is_decode") and k not in g_keyed:
+            g_keyed[k] = s
+    common = [k for k in g_keyed if k in e_keyed]
+    common.sort(key=lambda k: g_keyed[k])
+    print(f"  aligned decode steps: {len(common)} "
+          f"(eager-only={len(e_keyed) - len(common)}, "
+          f"graphs-only={len(g_keyed) - len(common)})")
     first = None
-    for k in range(n):
+    for k in common:
+        es, gs = e_keyed[k], g_keyed[k]
         diffs = []
-        _diff(e_pre[e_dec[k]], g_pre[g_dec[k]], "pre", VALUE_FIELDS, diffs)
-        ep, gp = e_post.get(e_dec[k]), g_post.get(g_dec[k])
+        _diff(e_pre[es], g_pre[gs], "pre", VALUE_FIELDS, diffs)
+        ep, gp = e_post.get(es), g_post.get(gs)
         if ep and gp:
-            _diff(ep, gp, "post", POST_FIELDS, diffs)
+            _diff(_norm_post(ep), _norm_post(gp), "post",
+                  ("pool", "stage_sha", "stage_norm", "finalized",
+                   "read_cache_seqlens", "view_tail"), diffs)
         if diffs:
-            first = (k, diffs)
+            first = (k, es, gs, diffs)
             break
     if first is None:
-        print(f"\n  NO DIVERGENCE across {n} aligned decode steps — the "
-              f"traced state surface is identical; the bug is OUTSIDE it "
+        print(f"\n  NO DIVERGENCE across {len(common)} aligned decode steps — "
+              f"the traced state surface is identical; the bug is OUTSIDE it "
               f"(extend the surface).")
     else:
-        k, diffs = first
-        print(f"\n  FIRST DIVERGENCE at aligned decode step {k} "
-              f"(eager step {e_dec[k]}, graphs step {g_dec[k]}):")
+        k, es, gs, diffs = first
+        print(f"\n  FIRST DIVERGENCE at key sids={k[0]} seq_lens={k[1]} "
+              f"(eager step {es}, graphs step {gs}):")
         for label, f, va, vb in diffs[:6]:
             print(f"    [{label}] {f}:")
             print(f"        eager : {json.dumps(va)[:160]}")
@@ -166,6 +267,7 @@ def selftest():
     print("phase6k16_replay_trace selftest")
     a, b = "/tmp/_rt_a.jsonl", "/tmp/_rt_b.jsonl"
     rec = {"step": 0, "phase": "pre", "is_decode": True, "seq_lens": [500],
+           "live_sids": [1],
            "counters_presync": {"1": {"slot": 0, "pool": [5, 14, 0],
                                       "state_ints": [5, 14]}},
            "pool_ids": {"k_stage_pool": 111}}
@@ -212,7 +314,15 @@ def main(argv=None):
     ap.add_argument("--trace", default="/tmp/rt.jsonl")
     ap.add_argument("--model", default="NousResearch/Meta-Llama-3.1-8B-Instruct")
     ap.add_argument("--max-model-len", type=int, default=4096)
-    ap.add_argument("--gpu-util", type=float, default=0.5)
+    ap.add_argument("--gpu-util", type=float, default=0.4)
+    ap.add_argument("--max-num-seqs", type=int, default=8,
+                    help="smaller captures fewer/narrower graph shapes -> "
+                         "much lower capture memory. Auto-raised to --num-seqs.")
+    ap.add_argument("--num-seqs", type=int, default=1,
+                    help="concurrent shared-prefix sequences in the HIT batch. "
+                         ">1 submits them in ONE generate call -> real B=N "
+                         "decode, reaching the padding(#3)/collision(#1)/GC(#4) "
+                         "edges a B=1 needle (routed to the size-1 graph) can't.")
     ap.add_argument("--gen", type=int, default=40)
     args = ap.parse_args(argv)
     if args.selftest:

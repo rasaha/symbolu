@@ -557,11 +557,26 @@ def install_int4_protected_precapture_hook(
         )
         _tracing = bool(_rt_path())
         _t_pre = None
+
+        def _trace_w0():
+            # TRACE-ONLY lazy writer resolution: in eager mode the factory
+            # collects writers before any forward has created them, so
+            # install_time_writers is empty — fall back to the impls'
+            # lazily-created writers. Does NOT affect production resolve.
+            w = next((w for w in handle.install_time_writers
+                      if w._allocated), None)
+            if w is not None:
+                return w
+            for impl in (handle.install_time_impls or []):
+                cand = getattr(impl, "_phase5b_paged_writer", None)
+                if cand is not None and getattr(cand, "_allocated", False):
+                    return cand
+            return None
+
         if _tracing:
             try:
                 handle.trace_step = getattr(handle, "trace_step", -1) + 1
-                w0 = next((w for w in handle.install_time_writers
-                           if w._allocated), None)
+                w0 = _trace_w0()
                 dec = getattr(attn_metadata, "decode_metadata", None) \
                     if attn_metadata is not None else None
                 _t_pre = {
@@ -646,8 +661,7 @@ def install_int4_protected_precapture_hook(
         if _t_pre is not None:
             # post-sync counter view + the stash's resolved ids/slots.
             try:
-                w0 = next((w for w in handle.install_time_writers
-                           if w._allocated), None)
+                w0 = _trace_w0()
                 if w0 is not None:
                     _t_pre["counters_postsync"] = _trace_counters(
                         w0, list(w0._slot_map.keys()))
@@ -669,8 +683,7 @@ def install_int4_protected_precapture_hook(
             try:
                 import torch as _torch
                 _torch.cuda.synchronize()
-                w0 = next((w for w in handle.install_time_writers
-                           if w._allocated), None)
+                w0 = _trace_w0()
                 rec = {"step": _t_pre["step"], "phase": "post"}
                 if w0 is not None:
                     sids = [s for s in w0._slot_map.keys()
@@ -685,6 +698,134 @@ def install_int4_protected_precapture_hook(
                     # crossing detection: a seq whose count dropped to 0
                     # this step finalized block X (its PRE block id) — dump
                     # the finalized block's bytes (S1-style, layer 0).
+                    # v4: the replayed READ's transient output — the spliced
+                    # view (graph-pool memory, stable address, refreshed by
+                    # every replay). Slice each live row's LAST block (the
+                    # tail) — comparable across eager-one and graphs-batched.
+                    _impl0 = (handle.install_time_impls or [None])[0]
+                    refs = getattr(_impl0, "_rt_read_refs", None) \
+                        if _impl0 is not None else None
+                    if refs is not None:
+                        try:
+                            BSr = refs["BS"]
+                            csl = refs["cache_seqlens"]
+                            rec["read_cache_seqlens"] = \
+                                csl.cpu().tolist()[:8]
+                            sit = refs.get("slot_idx")
+                            rec["read_slot_idx"] = (
+                                sit.cpu().tolist()[:8] if sit is not None
+                                else None)
+                            ki, ks = refs["k_int4"], refs["k_scale"]
+
+                            def _psig(t, sl=None):
+                                # Per-field guard: a shape surprise on a v5
+                                # field must not wipe the v4 view_tail data.
+                                try:
+                                    if t is None:
+                                        return None
+                                    x = t if sl is None else t[sl]
+                                    return _rt_sig(
+                                        x.float() if x.is_floating_point()
+                                        else x)
+                                except Exception:
+                                    return None
+
+                            kp = refs.get("k_protect_bf16")
+                            ps = refs.get("protect_slot")
+                            bk = refs.get("bf16_k")
+                            vk = refs.get("v_kernel")
+                            ou = refs.get("out")
+                            rec["view_tail"] = {}
+                            for row, s in enumerate(
+                                    rec["read_cache_seqlens"]):
+                                if row >= ki.shape[0] or s <= 0:
+                                    continue
+                                lb = (int(s) - 1) // BSr
+                                a, b2 = lb * BSr, (lb + 1) * BSr
+                                if b2 <= ki.shape[1]:
+                                    ent = {
+                                        "last_block": lb,
+                                        "k_int4": _rt_sig(
+                                            ki[row, a:b2].float()),
+                                        "k_scale": _rt_sig(ks[row, lb]
+                                                           if ks.dim() == 4
+                                                           else ks[row]),
+                                        # v5: the unobserved kernel surface.
+                                        # protect_bf16/protect_slot = the
+                                        # protected-channel overlay; bf16_k =
+                                        # the positional bf16 K backing/stub;
+                                        # v_kernel = the V the kernel read;
+                                        # out = the per-row attention result
+                                        # (the integral screen).
+                                        "k_protect_bf16": _psig(
+                                            kp, row if kp is not None
+                                            else None),
+                                        "protect_slot": _psig(
+                                            ps, row if ps is not None
+                                            else None),
+                                        "bf16_k": _psig(
+                                            bk, (row, slice(a, b2))
+                                            if (bk is not None
+                                                and bk.dim() >= 2
+                                                and b2 <= bk.shape[1])
+                                            else (row if bk is not None
+                                                  else None)),
+                                        "v_kernel": _psig(
+                                            vk, (row, slice(a, b2))
+                                            if (vk is not None
+                                                and vk.dim() >= 2
+                                                and b2 <= vk.shape[1])
+                                            else (row if vk is not None
+                                                  else None)),
+                                        "out": _psig(
+                                            ou, row if ou is not None
+                                            else None),
+                                    }
+                                    rec["view_tail"][str(row)] = ent
+                        except Exception as _e2:
+                            rec["view_tail_error"] = str(_e2)[:80]
+                    # v6: per-row OUT from the PERSISTENT mirror — the surface
+                    # the e=6/g=1 blindness hid. A captured copy refreshes
+                    # `_rt_out_buf` every replay, and `_phase5b_cache_seqlens_i32`
+                    # is likewise persistent, so this reads the REAL replayed
+                    # per-row attention output for ALL B rows under graphs.
+                    try:
+                        ob = getattr(_impl0, "_rt_out_buf", None) \
+                            if _impl0 is not None else None
+                        # `_phase5b_cache_seqlens_i32` is the EXACT mask length
+                        # the kernel used this step (persistent, captured-copy
+                        # refreshed) — compare it to the true seqlen to test the
+                        # masking-failure hypothesis at B>1 under graphs.
+                        csl_buf = getattr(
+                            _impl0, "_phase5b_cache_seqlens_i32", None) \
+                            if _impl0 is not None else None
+                        # v7: per-row VALID-position input norms [k_int4, v].
+                        comp = getattr(_impl0, "_rt_comp_buf", None) \
+                            if _impl0 is not None else None
+                        # Live rows/seqlens from the pre-dump's decode metadata
+                        # — present in BOTH eager and graphs. (v6 used the
+                        # stash count, which is graphs-only and zeroed eager.)
+                        _seqlens = _t_pre.get("seq_lens") or []
+                        _nlive = len(_seqlens)
+                        if ob is not None and _nlive > 0:
+                            rec["row_out"] = {}
+                            for i in range(min(_nlive, ob.shape[0])):
+                                _ks = (int(csl_buf[i].item())
+                                       if csl_buf is not None
+                                       and i < csl_buf.shape[0] else None)
+                                _ent = {
+                                    "seqlen": _seqlens[i],
+                                    "kernel_seqlen": _ks,
+                                    "out": _rt_sig(ob[i].float()),
+                                }
+                                if comp is not None and i < comp.shape[0]:
+                                    _ent["ki_norm"] = round(
+                                        float(comp[i, 0].item()), 4)
+                                    _ent["v_norm"] = round(
+                                        float(comp[i, 1].item()), 4)
+                                rec["row_out"][str(i)] = _ent
+                    except Exception as _e4:
+                        rec["row_out_error"] = str(_e4)[:80]
                     pre_c = _t_pre.get("counters_postsync") or {}
                     kvc = kv_caches[0] if kv_caches is not None and len(
                         kv_caches) > 0 else None

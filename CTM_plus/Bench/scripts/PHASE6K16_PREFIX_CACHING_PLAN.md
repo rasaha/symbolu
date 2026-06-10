@@ -1,7 +1,10 @@
 # Phase 6K.16 — prefix caching (APC) for int4_protected: feasibility + plan
 
-> **STATUS: MACHINERY VALIDATED UNDER THE CONTRACT (eager/B=1 cells) — guard
-> stays on until the graphs-cell revalidation + payoff measurement.**
+> **STATUS: BANKED — APC ships EAGER-ONLY. Root cause of graphs+APC corruption
+> is the int4 attention KERNEL (not graph-safe at B>1), NOT our state machine;
+> see PHASE6K16_APC_CONTRACT.md "ROOT FOUND". Our Python machinery is validated
+> (eager all B, graphs B=1); the kernel fix is low-ROI (int4 is kernel-bound)
+> and out of repo scope. Diagnostic instruments retained, env-gated.**
 > The turn that broke the stall was replacing fix-by-fix with a stated
 > **correctness contract** (`PHASE6K16_APC_CONTRACT.md`): identity = real vLLM
 > rid everywhere, crossings finalize/reset under the same rid, padding inert,
@@ -383,6 +386,21 @@ in several independent ways. Each was found by adding targeted tracing
    `_read_decode_packed_batched`, which still fails at block crossings
    (`prefix=1,2`, prompts [1]/[4]/[5]) and at prefill output (prompt [0]). This
    is the next edge; expect more after it.
+
+**v5 update (2026-06-10): the single-seq read is PROVEN correct — edge #5 is
+B>1-only.** The replay-trace instrument now observes the full captured-read
+kernel surface under replay (int4 K view, the `k_protect_bf16`/`protect_slot`
+overlay, the V input, and the attention `out`). A/B eager-vs-graphs at B=1
+(`max_num_seqs=8`, Llama-3.1-8B) shows **0 `out`-divergences across all 78
+decode steps** — the cache-hit partial K-tail included; the only cross-mode
+diff is `k_protect_bf16` in `cache_seqlens`-masked padding, which never reaches
+`out`. So `_read_decode_packed_batched`'s B=1 path, the unconditional splice,
+the inline pool write, and the hook sync are all replay-safe. Edge #5 is thus
+**not the read math** — it is the B>1 batched bookkeeping (collision +
+GC-eviction + CUDA-graph padding, edges #1/#3/#4 under concurrency). Pinning it
+needs the **full multi-seq regression** with `INT4_PROTECTED_REPLAY_TRACE`
+armed; scan for the first `out`-divergence to name the corrupting step. The
+single-needle micro-trace cannot reach it.
 
 **Why "multi-week, not a few fixes":** three correct fixes (padding, real-id,
 GC) moved the gate metric by **0.000** because each addressed a real but

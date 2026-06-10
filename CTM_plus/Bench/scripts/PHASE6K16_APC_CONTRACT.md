@@ -1,5 +1,16 @@
 # Phase 6K.16 — APC correctness contract (the math, not another patch)
 
+> **FINAL VERDICT (2026-06-10): APC ships EAGER-ONLY. The graphs+APC corruption
+> is the int4 attention KERNEL, not our state machine — `flash_attn_with_int4_kvcache`
+> is not CUDA-graph-safe at B>1 (identical inputs → ~1.8× inflated output under
+> replay; full input-vs-kernel proof in the "ROOT FOUND" note below). Every
+> Python-layer hypothesis — collision, identity, GC, padding, partial-tail,
+> masking, protect, FP-reduction — was eliminated by measurement. Status:
+> BANKED. The eager-only ship is correct and validated; a kernel fix is
+> low-ROI (int4 is kernel-bound, so CUDA graphs buy little) and needs the
+> vLLM-flash-attn fork source. The env-gated replay-trace/byte-gate/prefix-debug
+> instruments are retained for whoever revisits the kernel.**
+
 > **MEASURED (pod, Llama-3.1-8B): THE CONTRACT IS SATISFIED (eager/B=1 cells).**
 > - **S1 byte-gate: PASS — 13/13 prefix blocks bit-exact** (packed K + packed V
 >   + all five sidecars) vs a fresh no-APC prefill. P1 holds.
@@ -32,6 +43,102 @@
 > (`INT4_PROTECTED_APC_ALLOW_GRAPHS=1` = dev override used by the gates
 > harness). Remaining for eager-only default-flip: the 6k12 `--apc` hard-tail
 > cell + the payoff measurement. Graphs+APC = named OPEN edge, gated off.
+
+> **UPDATE (2026-06-10, replay-trace v5 — the single-seq read is PROVEN
+> bit-exact under graphs; the defect is concurrency bookkeeping, not read math).**
+> The §5b "what capture may freeze" suspicion was tested directly. The
+> replay-trace instrument (`phase6k16_replay_trace.py`, v5) now observes the
+> ENTIRE captured-read kernel surface step-by-step under replay: the int4 K
+> view (`k_int4`/`k_scale`/`k_xmin`), the protected-channel overlay
+> (`k_protect_bf16`/`protect_slot`), the positional bf16 K stub, the V input,
+> **and the attention `out` itself** — each riding the graph-pool buffers the
+> replay rewrites, so the host window reads what the replayed gather+kernel
+> actually produced. A/B (eager vs graphs, B=1 needle, `max_num_seqs=8`,
+> Llama-3.1-8B) result: **0 `out`-divergences across all 78 aligned decode
+> steps.** Every kernel input AND the output are bit-identical eager-vs-graphs,
+> *including* the cache-hit partial K-tail (block 13 at `seq_len=418`) the audit
+> had fingered. The lone cross-mode difference is `k_protect_bf16` in
+> **`cache_seqlens`-masked padding positions** of the partial block (stale
+> uninitialized bytes, eager vs graphs allocate them differently) — and it
+> **does not reach the output**: `out` is bit-identical, which is only possible
+> if the divergence is confined to masked positions (the kernel attends all
+> valid positions, so any valid-position protect diff would move `out`).
+>
+> **Therefore the single-sequence captured read is cleared** — seq_len mask
+> refresh, slot-index hand-off, protect gather, int4 reconstruction, and the
+> partial-tail splice are all replay-safe at B=1. The measured graphs+APC
+> corruption (gates graphs cell: degenerate text 5/6 + needle MISS, all
+> **batched/B>1**) is **exclusively in the B>1 concurrency bookkeeping** — the
+> §7 collision (shared `block_tables[0]`), GC-eviction, and CUDA-graph padding
+> (`stash count != rows`) edges that only fire with multiple live sequences.
+> This is consistent with the plan's earlier observation (graphs+batched MISS,
+> graphs+B=1 HIT) but **upgrades it from coincidence to instrument-backed
+> proof**. Reproducing/fixing it needs the **full multi-seq regression**, not a
+> single-needle micro-trace; the v5 `out`-screen is the durable tool — arm
+> `INT4_PROTECTED_REPLAY_TRACE` on any B>1 graphs run and scan for the first
+> `out`-divergence to name the corrupting step. Ship posture unchanged
+> (eager-only); this only narrows the open edge.
+
+> **CONFIRMED (2026-06-10, gates re-run on current code — the bug is current,
+> B>1-only, and partial-tail-specific).** The source-of-truth gates cell
+> (`phase6k16_prefix_gates.py --mode apc`, graphs via `ALLOW_GRAPHS=1`,
+> equivalence prompts run **batched**) on current code: **GATE-HITS PASS**
+> (`prefix_prefill_calls=64`, non-vacuous), **GATE-WARM PASS** (1.000 — the
+> no-hit path is engine-identical under graphs, so graphs itself is sound),
+> **GATE-NEEDLE FAIL** (`apc=MISS noapc=HIT`, degenerate output
+> `зрения`/`ComponentPlacement`/`-old-old-old`). So the defect is **not stale**
+> (not fixed by the rid work) and is isolated to the **B>1 hit path under
+> graphs**. Sharpened by the per-prompt agreement: **the only survivor is
+> prompt[1] (`prefix=32`, a full-block prefix with NO partial tail to splice,
+> agreement 1.000); every partial-tail hit (prompts 0/2/3/4/5) goes
+> degenerate.** Signature = attention reading uninitialized / wrong-sequence
+> staged K. Diagnosis: at B>1, concurrent hit sequences sharing a prefix block
+> get their per-sequence **partial-block staging/slot bookkeeping crossed**
+> (collision §7 #1 / GC-eviction #4) — a hit seq reads another seq's (or a
+> freed) partial tail. NOT the read math (v5 proved B=1 bit-exact), NOT the
+> no-hit path (GATE-WARM PASS). **Eager-only ship vindicated**: graphs+APC is
+> broken exactly in the batched-serving regime it would exist to serve. Next
+> localization (collision vs GC) = arm `INT4_PROTECTED_REPLAY_TRACE` on the
+> graphs apc cell + a **step-index** compare (not the divergence-sensitive
+> `(sids,seq_lens)` key, which hides token-divergence by survivorship).
+
+> **NARROWED (2026-06-10, v6 per-row OUT mirror — five hypotheses eliminated by
+> measurement; root is the B>1 K/V reconstruction).** The replay-trace gained a
+> persistent per-row `out` mirror (a CAPTURED copy into a stable buffer, the
+> only way to observe a B>1 read under graphs — the `_rt_read_refs` view goes
+> stale because the equivalence batch replays without re-running Python). A=B6
+> reproducer (`--num-seqs 6`, eager HIT vs graphs **MISS**, degenerate `зрения`)
+> measured per-row layer-0 attention `out`: graphs is **~1.8× eager norm,
+> CONSTANT across rows (~0.89 vs eager's varied 0.44–0.57), heads matching** —
+> a systematic common inflation, not random corruption. Eliminated, each by a
+> direct measurement (not reasoning): **GC** (EVICT_ON_DECODE=0 byte-identical),
+> **identity** (decode resolves `real_stash [1..6]`, distinct slots, no collision),
+> **partial-tail** (full-block rows 1/3 diverge too), **FP reduction-noise**
+> (50–130% norm Δ, gross not subtle), **masking** (`kernel_seqlen == seqlen`
+> every row). What remains: the **int4 dequant + protect-overlay reconstruction
+> of VALID positions at B>1 under graphs** — the B=1 v5 byte-exact proof covered
+> one row; it breaks at width 8. Naming the op needs the SAME persistent-buffer
+> treatment applied to the per-row K reconstruction (k_int4/k_scale/k_protect),
+> then the fix. Eager ship unaffected; this is the recorded next step for a
+> gated-off, throughput-negative path.
+
+> **ROOT FOUND (2026-06-10, v7 input-vs-kernel split — it's the KERNEL, not our
+> code).** v7 mirrored per-row VALID-position input norms (captured copies,
+> reliable under graphs). Measured at B=6 (eager HIT / graphs MISS): **`k_int4`
+> is BIT-IDENTICAL eager-vs-graphs (e.g. 68001.8438 == 68001.8438), `v` matches
+> to ~0.03% (masked padding), yet `out` diverges 54–129%.** Same inputs in,
+> different output out ⇒ **`flash_attn_with_int4_kvcache` is not CUDA-graph-safe
+> at B>1** — it computes a ~1.8× inflated, constant-across-rows output under
+> replay. This CLEARS the entire Python layer (gather, identity, masking,
+> protect [ablated: PHASE6J_NAIVE_FORCE_ZERO kept the divergence], splice,
+> dequant inputs — all verified equal). The defect is inside the custom int4
+> attention kernel (vLLM-flash-attn fork; source not in this repo). **Strategic
+> note:** graphs cut *launch* overhead, but int4_protected is *kernel-bound*
+> (~0.3× bf16) — so a graphs+APC fix buys little throughput regardless. Fix
+> paths: (a) the kernel `.cu` (fork source + CUDA recompile — real fix, small
+> payoff); (b) capture only size-1 decode graphs under APC (B>1 runs eager —
+> correct, B=1 latency win, trivial Python change); (c) keep eager-only. Eager
+> ship stands and loses little.
 
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because

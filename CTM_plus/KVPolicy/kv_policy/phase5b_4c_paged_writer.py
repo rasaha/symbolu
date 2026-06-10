@@ -414,7 +414,20 @@ def _prefix_dbg(msg: str) -> None:
     if os.environ.get("INT4_PROTECTED_PREFIX_DEBUG", "").strip() not in (
             "1", "true", "yes"):
         return
-    if _PREFIX_DBG_BUDGET[0] >= _PREFIX_DBG_MAX:
+    # CUDA-graph CAPTURE + memory profiling fire hundreds of dummy max-width
+    # resolves at init; without skipping them the bounded budget is exhausted
+    # before the FIRST real decode step (the only ones that matter). Skip the
+    # capturing stream; the env override raises the budget for profiling noise.
+    try:
+        if _in_cuda_graph_capture():
+            return
+    except Exception:
+        pass
+    cap = _PREFIX_DBG_MAX
+    _env_cap = os.environ.get("INT4_PROTECTED_PREFIX_DEBUG_MAX", "").strip()
+    if _env_cap.isdigit():
+        cap = int(_env_cap)
+    if _PREFIX_DBG_BUDGET[0] >= cap:
         return
     _PREFIX_DBG_BUDGET[0] += 1
     logger.warning("[6K.16c-trace] %s", msg)

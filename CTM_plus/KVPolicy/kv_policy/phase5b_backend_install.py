@@ -341,6 +341,32 @@ if _VLLM_FA_AVAILABLE:
                 self._phase5b_cache_seqlens_i32[:B],
             )
 
+        def _ensure_rt_out_buf(self, B, HD, device, dtype):
+            """v6 replay-trace: persistent per-row OUT mirror. A CAPTURED
+            copy into this stable-address buffer refreshes it on EVERY graph
+            replay — the only way the host window can read a B>1 read under
+            graphs (the `_rt_read_refs` view goes stale because the
+            equivalence batch replays without re-running this Python, leaking
+            a B=1 warm step's `_one` refs = the e=6/g=1 blindness). Sized to a
+            generous cap once so it never reallocs (a realloc after capture
+            would orphan the recorded copy)."""
+            cur = getattr(self, "_rt_out_buf", None)
+            if (cur is None or cur.shape[0] < B or cur.shape[1] != HD
+                    or cur.device != device or cur.dtype != dtype):
+                self._rt_out_buf = torch.zeros(
+                    (max(B, 256), HD), dtype=dtype, device=device)
+            return self._rt_out_buf
+
+        def _ensure_rt_comp_buf(self, B, device):
+            """v7: persistent per-row component-norm buffer [ki_valid, v_valid]
+            — captured copies refresh it every replay (same trick as the OUT
+            mirror). Protect is ruled out; this names input-vs-kernel."""
+            cur = getattr(self, "_rt_comp_buf", None)
+            if cur is None or cur.shape[0] < B or cur.device != device:
+                self._rt_comp_buf = torch.zeros(
+                    (max(B, 256), 2), dtype=torch.float32, device=device)
+            return self._rt_comp_buf
+
         def _ensure_protect_mask_bhd(self, B: int, writer):
             """(Re-)allocate the (B, H, D) int8 protect_mask buffer if
             needed. Content is per-model-frozen (writer.protect_mask is
@@ -639,6 +665,66 @@ if _VLLM_FA_AVAILABLE:
                     packed_n_protect=writer.n_protect,
                     **packed_v_kwargs,
                 )
+            # 6K.16d v4 replay-trace: retain refs to the READ's transient
+            # tensors. At CAPTURE these are graph-pool allocations with
+            # stable addresses — each replay re-executes the recorded ops
+            # into the SAME memory, so the post-step host window can read
+            # what the replayed gather+splice actually produced (the one
+            # surface no prior window could see). Env-gated; refs only.
+            import os as _os
+            if _os.environ.get("INT4_PROTECTED_REPLAY_TRACE", "").strip():
+                self._rt_read_refs = {
+                    "mode": "batched",
+                    "k_int4": view["k_int4"],
+                    "k_scale": view["k_scale"],
+                    # v5: the previously-unobserved kernel inputs. The
+                    # protect channels are the int4_PROTECTED differentiator
+                    # (top-n_protect K dims carried at bf16); k_int4/k_scale
+                    # alone (v4) reconstruct the lossy bulk but NOT the
+                    # protected overlay. These ride in the gathered `view`
+                    # (graph-pool memory, stable address) so the post-step
+                    # window reads what the replayed gather produced. `out`
+                    # is the kernel integral — the screen for "did the read
+                    # actually diverge" independent of which input caused it.
+                    "k_protect_bf16": view.get("k_protect_bf16"),
+                    "protect_slot": view.get("protect_slot"),
+                    "k_xmin": view.get("k_xmin"),
+                    "bf16_k": bf16_k_batch,
+                    "v_kernel": v_for_kernel,
+                    "out": out,
+                    "cache_seqlens": cache_seqlens_i32,
+                    "slot_idx": slot_idx_t,
+                    "BS": BS,
+                }
+                # v6: persistent per-row OUT mirror via a CAPTURED copy, so
+                # the hook reads the REPLAYED per-row out for ALL B rows
+                # (refs above go stale under graphs — see _ensure_rt_out_buf).
+                _hd = out.reshape(B, -1).shape[1]
+                _ob = self._ensure_rt_out_buf(B, _hd, out.device, out.dtype)
+                _ob[:B].copy_(out.reshape(B, -1), non_blocking=True)
+                # v7: per-row VALID-position norms of the kernel's K/V inputs.
+                # If these match eager-vs-graphs but `out` doesn't, the bug is
+                # in the KERNEL; if k_int4 or v diverges, it's our gather.
+                try:
+                    _B7, _S7, _H7, _hd7 = view["k_int4"].shape
+                    _vm = (torch.arange(_S7, device=out.device).unsqueeze(0)
+                           < cache_seqlens_long_t.unsqueeze(1)
+                           ).float().view(_B7, _S7, 1, 1)
+                    _ki7 = (view["k_int4"].float() * _vm
+                            ).reshape(_B7, -1).norm(dim=1)
+                    _vsrc = view.get("v_bf16")
+                    if _vsrc is None:
+                        _vsrc = view.get("v_int4")
+                    if (_vsrc is not None and _vsrc.dim() == 4
+                            and _vsrc.shape[1] == _S7):
+                        _v7 = (_vsrc.float() * _vm).reshape(_B7, -1).norm(dim=1)
+                    else:
+                        _v7 = torch.zeros(_B7, device=out.device)
+                    _cb7 = self._ensure_rt_comp_buf(B, out.device)
+                    _cb7[:B, 0].copy_(_ki7)
+                    _cb7[:B, 1].copy_(_v7)
+                except Exception:
+                    pass
             return out
 
         def _read_decode_packed_one(
@@ -739,6 +825,25 @@ if _VLLM_FA_AVAILABLE:
                     packed_n_protect=writer.n_protect,
                     **packed_v_kwargs,
                 )
+            # 6K.16d v4 replay-trace: mirror of the batched-path ref stash
+            # (eager B=1 fast path) so the A/B compares like vs like.
+            import os as _os
+            if _os.environ.get("INT4_PROTECTED_REPLAY_TRACE", "").strip():
+                self._rt_read_refs = {
+                    "mode": "one",
+                    "k_int4": view["k_int4"],
+                    "k_scale": view["k_scale"],
+                    # v5: mirror of the batched stash (see batched path).
+                    "k_protect_bf16": view.get("k_protect_bf16"),
+                    "protect_slot": view.get("protect_slot"),
+                    "k_xmin": view.get("k_xmin"),
+                    "bf16_k": dummy,
+                    "v_kernel": v_for_kernel,
+                    "out": out,
+                    "cache_seqlens": cache_seqlens_i32,
+                    "slot_idx": None,
+                    "BS": BS,
+                }
             return out
 
         def _ensure_dummy_kv(self, S, H, D, device):
