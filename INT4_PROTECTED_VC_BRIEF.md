@@ -759,6 +759,30 @@ dominant bottleneck) and gives the quality-preserving KV shrink a second use
 (transported/cached KV) — provided the multi-GPU and disaggregated legs stay labeled
 **projected** until built.
 
+### Where int4_protected sits in the memory stack
+
+The serving bottleneck *is* the memory hierarchy — **"AI is only as fast as the
+memory feeding it."** int4_protected has a clear primary home in that stack, a
+strong secondary lever, and honest zones of no influence. Mapped to the five
+layers (it doesn't make any layer intrinsically *faster* — it **reduces the
+demand** on the ones that bind):
+
+| Layer | Influence | How |
+|---|---|---|
+| **① SRAM** — on-chip cache | **None — and a small cost** | The 4-bit→bf16 dequant runs in registers/compute; this is the *source* of the throughput tax, not a saving. |
+| **② HBM / DRAM** — the fuel line | **PRIMARY — maximum influence** | The KV-cache lives here and **exceeds weight memory past ~32K**. **Capacity:** 2× KV density (1.83× net) → ~2× more concurrent users / longer context in the same HBM. **Bandwidth:** decode is HBM-bound — 4-bit KV moves **~1.8× fewer bytes/token** to compute (the literal "lighter feed"). |
+| **③④ NAND/SSD + HDD** — active + archive | **Indirect — cheaper at every tier below HBM** | A 4-bit, quality-preserving KV is ~1.8× smaller to spill or archive; warm-tier CPU swap-restore is **byte-clean** (TIER5A). When the hot tier overflows, the offload payload shrinks and restore is faster — the right payload to *move and cache* as KV becomes transported data. |
+| **⑤ Controllers** — traffic system | **Strong secondary — via read-skip** | read-skip *is* a memory-traffic controller: it moves only the KV positions worth reading (**95% fewer at 32K, needle 1.0/1.0**) — "optimizes flow, prevents bottlenecks," layered *on* the Layer-2 compression. Deployment routing (short-output→int4, long-form→bf16) is controller logic too. |
+| **Model weights** | **Not its lever** | Weight footprint is AWQ's domain; int4_protected composes with it but owns only the *KV* term. |
+
+**One line:** int4_protected's say is at **Layer 2** — it makes the KV-cache (the
+dominant thing the fuel line carries at long context) **~2× denser and ~1.8×
+lighter to move**, with read-skip (Layer 5) cutting *positions* moved by ~95%.
+It's a **capacity-and-bandwidth play, not a raw-speed one** (it spends some
+Layer-1 compute on dequant — the disclosed tax). In the stack's own terms: *it
+doesn't make the fuel line faster — it makes the engine sip instead of guzzle,
+and packs 2× the fuel in the tank, without losing octane (quality).*
+
 ### Target customer profile
 
 The shippable product fits any of:
