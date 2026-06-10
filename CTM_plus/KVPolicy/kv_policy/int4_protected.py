@@ -342,15 +342,14 @@ def Int4ProtectedLLM(
 
     # Phase 6K.16 — prefix-caching guard, same gating shape as 6K.15.
     _requested_apc = kwargs.pop("enable_prefix_caching", None)
+    _apc_resolved = False
     if kv_cache_dtype == "int4_protected":
         _apc_resolved = _resolve_prefix_caching(_requested_apc)
         kwargs["enable_prefix_caching"] = _apc_resolved
-        # Contract C-ID (PHASE6K16_APC_CONTRACT.md): under APC, block-local
-        # identity is forbidden on the live path — the writer's resolvers
-        # RAISE instead of silently falling back when the rid stash is
-        # missing. The flag arms that refusal.
-        from kv_policy.phase5b_4c_paged_writer import set_apc_active
-        set_apc_active(_apc_resolved)
+        # Contract C-ID refusal is armed AFTER engine construction + hook
+        # install (below) — engine init runs CUDA-graph capture WARM-UPS
+        # (dummy decode batches, hook not yet installed, some outside the
+        # capturing stream) where block-local placeholders are by-design.
     elif _requested_apc is not None:
         kwargs["enable_prefix_caching"] = _requested_apc
 
@@ -430,6 +429,17 @@ def Int4ProtectedLLM(
                 "enforce_eager=True or install the hook manually.",
                 type(e).__name__, e,
             )
+
+    # Phase 6K.16c — ARM the contract C-ID refusal now that the engine is
+    # built and the rid-stashing hook is installed: from here on, a LIVE
+    # step without the rid stash under APC raises instead of silently
+    # using block-local identity. (Armed even if hook install failed —
+    # the resulting loud first-decode error is the correct outcome.)
+    if _apc_resolved:
+        from kv_policy.phase5b_4c_paged_writer import set_apc_active
+        set_apc_active(True)
+        logger.info("Int4ProtectedLLM: APC contract refusal armed "
+                    "(post-init; capture warm-ups exempt by construction).")
 
     return llm
 

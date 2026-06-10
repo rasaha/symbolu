@@ -91,7 +91,10 @@ class TestWiring(unittest.TestCase):
         # int4-gated resolution + the 6K.16c contract flag are both wired:
         gate = src.index('if kv_cache_dtype == "int4_protected":')
         self.assertGreater(src.index("_resolve_prefix_caching", gate), gate)
-        self.assertIn("set_apc_active(_apc_resolved)", src)
+        # Contract arming happens POST-init (capture warm-ups exempt):
+        self.assertIn("set_apc_active(True)", src)
+        self.assertLess(src.index("llm = LLM("), src.index("set_apc_active(True)"),
+                        "C-ID refusal must arm AFTER engine construction")
 
     def test_backend_branch_guarded_and_rewired(self):
         # Tier 1: inside the prefix-enabled prefill branch (between the
