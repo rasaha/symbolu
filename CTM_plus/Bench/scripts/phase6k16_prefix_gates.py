@@ -117,9 +117,14 @@ def run_mode(args):
         max_model_len=args.max_model_len,
         gpu_memory_utilization=args.gpu_util,
         enable_prefix_caching=(args.mode == "apc"),
+        enforce_eager=(True if args.eager else None),
     )
     from vllm import SamplingParams
     sp = SamplingParams(temperature=0.0, max_tokens=args.gen)
+    if args.eager:
+        print("[p6k16] enforce_eager=True (CUDA graphs OFF — bisection cell)")
+    if args.b1:
+        print("[p6k16] --b1: equivalence prompts as 6 SEPARATE generate() calls")
 
     probe = None
     if args.mode == "apc":
@@ -143,8 +148,16 @@ def run_mode(args):
     hits_after_warm = probe.cache_hit_blocks if probe else None
 
     # 2) EQUIVALENCE prompts: shared prefix + distinct questions.
-    outs = llm.generate([prefix + q for q in questions], sp)
-    eq_ids = {str(i): list(o.outputs[0].token_ids) for i, o in enumerate(outs)}
+    #    --b1 sends them as separate calls (B=1 decode) to split
+    #    batched-decode interactions from per-seq behavior.
+    if args.b1:
+        eq_ids = {}
+        for i, q in enumerate(questions):
+            o = llm.generate([prefix + q], sp)
+            eq_ids[str(i)] = list(o[0].outputs[0].token_ids)
+    else:
+        outs = llm.generate([prefix + q for q in questions], sp)
+        eq_ids = {str(i): list(o.outputs[0].token_ids) for i, o in enumerate(outs)}
 
     # 3) NEEDLE inside the cached prefix.
     nd = llm.generate(
@@ -235,12 +248,15 @@ def compare(noapc_path, apc_path):
           f"(gate >= {AGREEMENT_GATE}; NOT expected 1.0 — apc context is "
           f"dequant-int4, noapc context is fresh bf16)")
 
-    # GATE-NEEDLE
+    # GATE-NEEDLE (+ token-level diagnostic: prefix tells WHERE it broke —
+    # prefix 0/1 = prefill-output divergence; longer = decode-side)
     hit_apc = code in b["needle_text"]
     hit_no = code in a["needle_text"]
     gate_nd = hit_apc and hit_no
+    nag, npre = token_agreement(a.get("needle_ids", []), b.get("needle_ids", []))
     print(f"GATE-NEEDLE     {'PASS' if gate_nd else 'FAIL'}   "
           f"apc={'HIT' if hit_apc else 'MISS'} noapc={'HIT' if hit_no else 'MISS'} "
+          f"agreement={nag:.3f} prefix={npre} "
           f"(code={code}; apc answered: {b['needle_text'][:40]!r})")
 
     all_known = [g for g in (gate_hits, gate_ag, gate_nd) if g is not None]
@@ -284,6 +300,11 @@ def main(argv=None):
     ap.add_argument("--max-model-len", type=int, default=4096)
     ap.add_argument("--gpu-util", type=float, default=0.5)
     ap.add_argument("--gen", type=int, default=32)
+    ap.add_argument("--eager", action="store_true",
+                    help="bisection cell: enforce_eager=True (no CUDA graphs)")
+    ap.add_argument("--b1", action="store_true",
+                    help="bisection cell: equivalence prompts as separate "
+                         "B=1 generate() calls")
     ap.add_argument("--out", default="/tmp/p6k16_out.json")
     args = ap.parse_args(argv)
     if args.selftest:
