@@ -105,6 +105,9 @@ def _resolve_block_manager(llm):
 
 
 def run_mode(args):
+    # Stale-file insurance: if this run crashes, --compare must not silently
+    # read a previous run's output.
+    Path(args.out).unlink(missing_ok=True)
     if args.mode == "apc":
         # Self-contained: the factory + backend guards honor this env.
         os.environ["INT4_PROTECTED_ALLOW_PREFIX_CACHING"] = "1"

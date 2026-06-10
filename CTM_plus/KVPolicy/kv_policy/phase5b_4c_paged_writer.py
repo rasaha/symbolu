@@ -539,14 +539,18 @@ def resolve_decode_seq_ids(
         logger.warning(
             "int4_protected real-seq-id stash count %d > %d decode rows "
             "(unexpected batch shape).", len(real), n_rows)
-    if apc_active():
-        # Contract C-ID: no silent block-local under APC.
+    if apc_active() and not _in_cuda_graph_capture():
+        # Contract C-ID: no silent block-local under APC — on LIVE steps.
+        # CUDA-graph CAPTURE is exempt: it runs DUMMY decode batches during
+        # engine init (before the 6B.2 hook exists); capture-time identities
+        # are throwaway placeholders that the hook re-resolves at every
+        # replay, so block-local there is by-design and corrupts nothing.
         raise RuntimeError(
-            "int4_protected APC: real-seq-id stash unavailable for a decode "
-            "step (rows=%d, stash=%s) — identity is unprovable, refusing "
-            "rather than risking SeqState corruption. The 6B.2 hook must be "
-            "installed and stashing rids every step under prefix caching."
-            % (n_rows, "absent" if real is None else len(real)))
+            "int4_protected APC: real-seq-id stash unavailable for a LIVE "
+            "decode step (rows=%d, stash=%s) — identity is unprovable, "
+            "refusing rather than risking SeqState corruption. The 6B.2 hook "
+            "must be installed and stashing rids every step under prefix "
+            "caching." % (n_rows, "absent" if real is None else len(real)))
     bl = decode_seq_ids_from_meta(
         block_tables, seq_lens_tensor, BS, block_local=block_local)
     _prefix_dbg(f"decode-resolve rows={n_rows} -> {bl[:6]} "
