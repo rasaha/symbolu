@@ -792,19 +792,16 @@ def install_int4_protected_precapture_hook(
                     try:
                         ob = getattr(_impl0, "_rt_out_buf", None) \
                             if _impl0 is not None else None
-                        csl_buf = getattr(
-                            _impl0, "_phase5b_cache_seqlens_i32", None) \
-                            if _impl0 is not None else None
-                        _sids = _t_pre.get("stash_seq_ids") or []
-                        _nlive = sum(1 for s in _sids if not _rt_is_pad(s))
+                        # Live rows/seqlens from the pre-dump's decode metadata
+                        # — present in BOTH eager and graphs. (v6 used the
+                        # stash count, which is graphs-only and zeroed eager.)
+                        _seqlens = _t_pre.get("seq_lens") or []
+                        _nlive = len(_seqlens)
                         if ob is not None and _nlive > 0:
                             rec["row_out"] = {}
                             for i in range(min(_nlive, ob.shape[0])):
-                                _sl = (int(csl_buf[i].item())
-                                       if csl_buf is not None
-                                       and i < csl_buf.shape[0] else None)
                                 rec["row_out"][str(i)] = {
-                                    "seqlen": _sl,
+                                    "seqlen": _seqlens[i],
                                     "out": _rt_sig(ob[i].float()),
                                 }
                     except Exception as _e4:
