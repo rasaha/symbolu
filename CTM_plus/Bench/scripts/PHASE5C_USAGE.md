@@ -122,14 +122,19 @@ Architecture support matrix:
     groups, so leaving it unset was not safe). Do NOT point swap-driving
     harnesses (e.g. `runner_vllm_streaming`'s swap-telemetry mode) at an
     int4_protected engine.
-  - Prefix caching (APC): **Tier-1 IMPLEMENTED, gated** (Phase 6K.16).
-    The dequant-context prefill path (`phase6k16_prefix_prefill.py`)
-    rebuilds cached blocks in bf16 (protect channels exact) and runs
-    plain varlen — CPU-verified, pending the GPU gates
-    (`phase6k16_prefix_gates.py`). Until gates pass, the factory and
-    the branch refuse unless `INT4_PROTECTED_ALLOW_PREFIX_CACHING=1`.
-    Requires the default backing-skip mode; refuses
-    `PHASE6C_BF16_BACKING_SKIP=0`. Chunked prefill remains out of scope.
+  - Prefix caching (APC): **SHIPPED — eager-only opt-in** (Phase 6K.16).
+    `Int4ProtectedLLM(..., enable_prefix_caching=True)` enables the
+    dequant-context prefill path (cached blocks rebuilt protect-exact).
+    Validated on Llama-3.1-8B: S1 byte-gate 13/13 bit-exact vs fresh
+    prefill; warm/needle 1.000; 6k12 hard-needle APC cell retrieval
+    **0.955 == protected == bf16**. Default remains False. Constraints:
+    **eager-only** (the factory forces `enforce_eager=True`; combining
+    with CUDA graphs is refused — the captured decode replay corrupts
+    hit-seq partial K-tails; named OPEN edge in
+    `PHASE6K16_APC_CONTRACT.md`); must construct via the factory (raw
+    `LLM(enable_prefix_caching=True)` is refused — the 6B.2 rid-stash
+    hook is required); requires default backing-skip mode; chunked
+    prefill out of scope.
 
 ## What you get
 

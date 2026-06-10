@@ -56,24 +56,16 @@ class TestResolvePrefixCaching(unittest.TestCase):
     def test_explicit_false_is_false(self):
         self.assertIs(ip._resolve_prefix_caching(False), False)
 
-    def test_true_refused_by_default(self):
-        with self.assertRaises(RuntimeError) as cm:
-            ip._resolve_prefix_caching(True)
-        msg = str(cm.exception)
-        self.assertIn("prefix", msg.lower())
-        self.assertIn("gated", msg)
-        self.assertIn("phase6k16_prefix_gates", msg)
-        self.assertIn(ip._ALLOW_PREFIX_CACHING_ENV, msg)
-        self.assertIn("PHASE6K16_PREFIX_CACHING_PLAN.md", msg)
-
-    def test_env_override_allows_true(self):
-        os.environ[ip._ALLOW_PREFIX_CACHING_ENV] = "1"
+    def test_true_accepted_shipped(self):
+        # 6K.16 SHIPPED (eager-only opt-in): True is accepted without any
+        # env — contract-validated (S1 13/13, hard-needle 0.955 == bf16).
         self.assertIs(ip._resolve_prefix_caching(True), True)
 
-    def test_env_override_zero_still_refuses(self):
+    def test_env_override_still_harmless(self):
+        os.environ[ip._ALLOW_PREFIX_CACHING_ENV] = "1"
+        self.assertIs(ip._resolve_prefix_caching(True), True)
         os.environ[ip._ALLOW_PREFIX_CACHING_ENV] = "0"
-        with self.assertRaises(RuntimeError):
-            ip._resolve_prefix_caching(True)
+        self.assertIs(ip._resolve_prefix_caching(True), True)
 
     def test_env_override_does_not_change_default(self):
         os.environ[ip._ALLOW_PREFIX_CACHING_ENV] = "1"
@@ -108,10 +100,11 @@ class TestWiring(unittest.TestCase):
         anchor = src.index("Only decoder-only models support prefix caching")
         decode_section = src.index("Decode attention", anchor)
         branch = src[anchor:decode_section]
-        guard = branch.index("prefix-aware prefill is gated")
+        guard = branch.index("WITHOUT factory arming")
         dequant = branch.index("run_prefix_prefill")
         self.assertLess(guard, dequant,
-                        "guard must precede the dequant-context call")
+                        "raw-LLM refusal must precede the dequant-context call")
+        self.assertIn("apc_active", branch)   # factory-armed path honored
         self.assertNotIn("block_table=prefill_meta.block_tables", branch,
                          "stock varlen-over-packed call must be removed "
                          "from the prefix branch")

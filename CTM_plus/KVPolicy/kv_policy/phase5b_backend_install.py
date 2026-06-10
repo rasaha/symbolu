@@ -1174,23 +1174,28 @@ if _VLLM_FA_AVAILABLE:
                     # Prefix-enabled attention (Q current, K/V from cache).
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support prefix caching")
-                    # Phase 6K.16 Tier 1: the paged cache is int4-PACKED here,
-                    # so the STOCK call (varlen over key_cache/value_cache with
-                    # block_table=) would read nibbles as bf16 — it is REPLACED
-                    # by the dequant-context path: cached blocks are
-                    # dequantized (protect channels exact) to the query dtype
-                    # and passed explicitly. Still gated until the GPU gates
-                    # pass (Bench/scripts/phase6k16_prefix_gates.py).
-                    if not _allow_prefix_caching_override():
+                    # Phase 6K.16 (SHIPPED, eager-only): the paged cache is
+                    # int4-PACKED here, so the STOCK call (varlen over
+                    # key_cache/value_cache with block_table=) would read
+                    # nibbles as bf16 — it is REPLACED by the dequant-context
+                    # path: cached blocks are dequantized (protect channels
+                    # exact) and passed explicitly. Allowed when the FACTORY
+                    # armed APC (apc_active(); installs the rid-stash hook +
+                    # eager coupling) or the legacy env override is set.
+                    # A raw LLM(enable_prefix_caching=True) bypassing the
+                    # factory is REFUSED: without the 6B.2 hook the rid stash
+                    # never exists and identity is unprovable (contract C-ID).
+                    from kv_policy.phase5b_4c_paged_writer import (
+                        apc_active as _apc_armed,
+                    )
+                    if not (_apc_armed() or _allow_prefix_caching_override()):
                         raise RuntimeError(
-                            "int4_protected: prefix-aware prefill is gated — "
-                            "the Tier-1 dequant-context path is implemented "
-                            "but not GPU-validated yet. Run with "
-                            "enable_prefix_caching=False (the default), or "
-                            "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to "
-                            "enable it (then run Bench/scripts/"
-                            "phase6k16_prefix_gates.py). Plan: "
-                            "PHASE6K16_PREFIX_CACHING_PLAN.md"
+                            "int4_protected: prefix-aware prefill reached "
+                            "WITHOUT factory arming — construct via "
+                            "Int4ProtectedLLM(enable_prefix_caching=True) "
+                            "(installs the required rid-stash hook + "
+                            "eager-only coupling). Raw LLM(...) with APC is "
+                            "unsupported. Contract: PHASE6K16_APC_CONTRACT.md"
                         )
                     writer = getattr(self, "_phase5b_paged_writer", None)
                     if writer is None:

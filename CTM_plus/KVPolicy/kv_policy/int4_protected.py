@@ -238,24 +238,18 @@ def _resolve_prefix_caching(requested: Optional[bool]) -> bool:
     """
     if not requested:
         return False
-    if _allow_prefix_caching_override():
-        logger.warning(
-            "int4_protected: enable_prefix_caching=True allowed by %s=1 — "
-            "routing prefix prefill through the Tier-1 dequant-context path "
-            "(phase6k16_prefix_prefill). Implemented + CPU-verified, NOT yet "
-            "GPU-gate-validated: run Bench/scripts/phase6k16_prefix_gates.py.",
-            _ALLOW_PREFIX_CACHING_ENV,
-        )
-        return True
-    raise RuntimeError(
-        "int4_protected: enable_prefix_caching=True is gated. The Tier-1 "
-        "dequant-context prefill path is IMPLEMENTED (cached blocks are "
-        "dequantized, protect channels exact) but not GPU-validated yet — "
-        "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to enable it, then run "
-        "Bench/scripts/phase6k16_prefix_gates.py (GATE-HITS / GATE-AGREEMENT "
-        "/ GATE-NEEDLE). Plan + flip-the-default criteria: "
-        "PHASE6K16_PREFIX_CACHING_PLAN.md."
+    # 6K.16 SHIPPED (eager-only opt-in). Validated on Llama-3.1-8B:
+    # S1 byte-gate 13/13 bit-exact; warm/needle 1.000; texts coherent;
+    # 6k12 hard-needle APC cell retrieval 0.955 == protected == bf16.
+    # Graphs+APC remains a named OPEN edge (replay tail corruption) and is
+    # refused / forced-eager by the coupling below. The legacy
+    # INT4_PROTECTED_ALLOW_PREFIX_CACHING env is no longer required
+    # (harmless if set).
+    logger.info(
+        "int4_protected: prefix caching ENABLED (eager-only opt-in; "
+        "contract-validated — see PHASE6K16_APC_CONTRACT.md)."
     )
+    return True
 
 
 def Int4ProtectedLLM(
