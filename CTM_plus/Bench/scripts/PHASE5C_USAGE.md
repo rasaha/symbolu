@@ -122,13 +122,14 @@ Architecture support matrix:
     groups, so leaving it unset was not safe). Do NOT point swap-driving
     harnesses (e.g. `runner_vllm_streaming`'s swap-telemetry mode) at an
     int4_protected engine.
-  - Prefix caching (APC) + chunked prefill: **NOT YET** (Phase 6K.16).
-    The prefill-with-context branch would read the int4-packed paged
-    cache as bf16, so the factory refuses `enable_prefix_caching=True`
-    and the backend raises at the branch itself. The storage layer is
-    APC-compatible by construction (block-local quant groups, block_id-
-    keyed sidecars); the Tier-1 dequant-context prefill path is scoped
-    in `PHASE6K16_PREFIX_CACHING_PLAN.md`.
+  - Prefix caching (APC): **Tier-1 IMPLEMENTED, gated** (Phase 6K.16).
+    The dequant-context prefill path (`phase6k16_prefix_prefill.py`)
+    rebuilds cached blocks in bf16 (protect channels exact) and runs
+    plain varlen — CPU-verified, pending the GPU gates
+    (`phase6k16_prefix_gates.py`). Until gates pass, the factory and
+    the branch refuse unless `INT4_PROTECTED_ALLOW_PREFIX_CACHING=1`.
+    Requires the default backing-skip mode; refuses
+    `PHASE6C_BF16_BACKING_SKIP=0`. Chunked prefill remains out of scope.
 
 ## What you get
 
@@ -250,7 +251,7 @@ explicit layer-idx pre-assignment.
 | `PHASE5B_4C_BF16_BACKING_MAX_SEQLEN` | `4096` | Size of per-layer BF16 K/V backing buffer. Increase for longer contexts. |
 | `PHASE5B_4C_BF16_V` | unset | Debug switch — stash V as bf16 instead of packing. Used during 5B.4c.3 V-isolation. Production runs leave unset. |
 | `INT4_PROTECTED_ALLOW_SWAP` | unset | Phase 6K.15 escape hatch — `1` lets `preemption_mode="swap"` through the factory's refusal (with a corruption warning). For breakage repro / sidecar-migration development ONLY; never production. |
-| `INT4_PROTECTED_ALLOW_PREFIX_CACHING` | unset | Phase 6K.16 escape hatch — `1` lets `enable_prefix_caching=True` through both guards (factory init + prefill branch). Cached-prefix attention reads packed KV as bf16 → garbage; for Tier-1 development of the dequant-context path ONLY. |
+| `INT4_PROTECTED_ALLOW_PREFIX_CACHING` | unset | Phase 6K.16 — `1` enables the implemented Tier-1 dequant-context prefix prefill (factory + branch guards lift together). Pending GPU gates (`phase6k16_prefix_gates.py`); until they pass, treat as development-only. |
 
 ## What's deferred (post-v1 follow-ups)
 

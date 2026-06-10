@@ -241,19 +241,20 @@ def _resolve_prefix_caching(requested: Optional[bool]) -> bool:
     if _allow_prefix_caching_override():
         logger.warning(
             "int4_protected: enable_prefix_caching=True allowed by %s=1 — "
-            "the prefix-prefill path reads the int4-packed cache as bf16; "
-            "cached-prefix attention WILL be garbage. Development only.",
+            "routing prefix prefill through the Tier-1 dequant-context path "
+            "(phase6k16_prefix_prefill). Implemented + CPU-verified, NOT yet "
+            "GPU-gate-validated: run Bench/scripts/phase6k16_prefix_gates.py.",
             _ALLOW_PREFIX_CACHING_ENV,
         )
         return True
     raise RuntimeError(
-        "int4_protected does not support enable_prefix_caching=True yet: "
-        "prefill-with-context would read the int4-packed paged KV as bf16. "
-        "The storage layer is prefix-compatible (block-local quant groups, "
-        "block_id-keyed sidecars); the dequant-context prefill path is the "
-        "missing piece — see PHASE6K16_PREFIX_CACHING_PLAN.md. Use the "
-        "default (False), or set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to "
-        "bypass for development."
+        "int4_protected: enable_prefix_caching=True is gated. The Tier-1 "
+        "dequant-context prefill path is IMPLEMENTED (cached blocks are "
+        "dequantized, protect channels exact) but not GPU-validated yet — "
+        "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to enable it, then run "
+        "Bench/scripts/phase6k16_prefix_gates.py (GATE-HITS / GATE-AGREEMENT "
+        "/ GATE-NEEDLE). Plan + flip-the-default criteria: "
+        "PHASE6K16_PREFIX_CACHING_PLAN.md."
     )
 
 

@@ -1,6 +1,12 @@
 # Phase 6K.16 — prefix caching (APC) for int4_protected: feasibility + plan
 
-> **Status: Tier 0 LANDED (guards + this plan). Tier 1 is pod work (GPU-validated).**
+> **Status: Tier 1 IMPLEMENTED (dequant-context prefill, CPU-verified) — pending the
+> GPU gates below. Tier 0 (guards) LANDED earlier; the guard now gates an
+> implemented path rather than a missing one.** Enable with
+> `INT4_PROTECTED_ALLOW_PREFIX_CACHING=1` + `Int4ProtectedLLM(...,
+> enable_prefix_caching=True)`; validate with
+> `Bench/scripts/phase6k16_prefix_gates.py`; flip the factory default once all
+> gates pass.
 > Verdict up front: **the storage layer is already prefix-cache-compatible by
 > construction** — the blocker is ONE attention path (prefill-with-context reads the
 > int4-packed cache as bf16) plus a writer bookkeeping init. This is **days of
@@ -53,15 +59,19 @@ Transient cost: `prefix_len · H_kv · D · 2B · 2(KV)` per seq ≈ **33 MB @ 8
 Tier 2 (perf polish, only if the spike/latency matters): teach the vendored FA
 varlen kernel to read packed int4 directly, like the decode reader.
 
-### Gap 2 — writer SeqState init for cache-hit sequences
-Today `ensure_seq_state` assumes a sequence streams from position 0. Under APC a
-hit sequence's prefill feeds only the *suffix*; the writer must initialize
-`s_curr = 32 · n_computed_blocks`. Because hits are **block-aligned = group-
-aligned**, the staging buffer starts EMPTY (no partial group to reconstruct) —
-this is the same alignment luck as Gap 1's reuse of full-block dequant. Plumbing:
-the model runner exposes `computed_block_nums` in the seq-group metadata; thread
-it (or just the cached-token count = context_len at first write) to the writer's
-prefill-boundary init.
+### Gap 2 — writer SeqState init: **COLLAPSED ON INSPECTION (no code needed)**
+The plan originally scoped an `s_curr = 32·n_computed` offset init. Reading the
+write path showed it is unnecessary: **every scatter is `slot_mapping`-derived**
+(`block_ids = slots // BS`, `positions = slots % BS` — absolute, straight from
+vLLM), so packed K/V, sidecars, protect, and staging land at correct absolute
+positions for suffix-only prefills with no writer changes. The per-seq counters:
+`k_stage_*` are block-keyed (correct, since cache-hit suffixes start
+block-aligned); `seq_pos` is only consumed by the **legacy bf16 backing pool**
+(suffix-relative indexing → WRONG under APC) — which is skipped by default since
+Phase 6C. Accordingly the Tier-1 code **refuses APC when
+`PHASE6C_BF16_BACKING_SKIP=0`** (`check_writer_apc_compatible`) instead of
+patching SeqState. Less code, fewer regressions; the constraint is enforced, not
+assumed.
 
 ### Gap 3 — validation gates (pod, in order)
 1. **Byte gate:** two sequences sharing a 4-block prefix → assert packed bytes +
@@ -96,7 +106,7 @@ prefill-boundary init.
 - **Spec-decode varlen** — same packed-cache issue, separate feature, unsupported.
 - **V1-engine APC** — belongs to the eventual 0.7.3→V1 port, not this phase.
 
-## Tier 0 (LANDED with this doc)
+## Tier 0 (LANDED)
 
 - Backend guard at the exact unsound branch (`RuntimeError`, env-bypassable):
   `phase5b_backend_install.py` prefix-enabled prefill.
@@ -105,3 +115,44 @@ prefill-boundary init.
   default now passes an explicit `enable_prefix_caching=False` so engine logs are
   self-documenting.
 - CPU tests: `tests/test_phase6k16_prefix_guard.py`.
+
+## Tier 1 (IMPLEMENTED — pending GPU gates)
+
+- **`kv_policy/phase6k16_prefix_prefill.py`** — the dequant-context path:
+  `gather_context_kv` (per-seq cached blocks → bf16 K/V; K per-channel-in-block
+  dequant + **exact protect scatter-merge**; V per-token per-group dequant),
+  `build_prefix_varlen_inputs` (interleave [ctx ∥ new] + `cu_seqlens_k`),
+  `run_prefix_prefill` (orchestrator → plain `flash_attn_varlen_func`, explicit
+  K/V, no `block_table=`), `check_writer_apc_compatible` (refuses legacy
+  bf16-backing mode). CPU selftest: 13 checks incl. nibble round-trip exact,
+  K within the principled bound (scale/2 + 15·|Δscale_bf16| + |Δxmin_bf16| +
+  cast eps), **protect channels bit-exact**, V in-bound, interleave layout,
+  alignment + backing rails. `python kv_policy/phase6k16_prefix_prefill.py`.
+- **Branch wiring** — the stock varlen-over-packed call in
+  `phase5b_backend_install.py`'s prefix branch is REPLACED by
+  `run_prefix_prefill` (guard still fires without the env);
+  `_call_stats["prefix_prefill_calls"]` counts invocations.
+- **GPU gates** — `Bench/scripts/phase6k16_prefix_gates.py`:
+
+```bash
+# pod, venv-vllm; Llama mask already calibrated
+M=NousResearch/Meta-Llama-3.1-8B-Instruct
+export PROTECT_MASK_PATH=/workspace/dev/build-logs/meta_llama_3_1_8b_instruct_protect_mask_4pct.pt
+python Bench/scripts/phase6k16_prefix_gates.py --selftest                        # CPU
+python Bench/scripts/phase6k16_prefix_gates.py --mode noapc --out /tmp/p6k16_noapc.json --model $M
+python Bench/scripts/phase6k16_prefix_gates.py --mode apc   --out /tmp/p6k16_apc.json   --model $M
+python Bench/scripts/phase6k16_prefix_gates.py --compare /tmp/p6k16_noapc.json /tmp/p6k16_apc.json
+```
+
+  - **GATE-HITS**: `cache_hit_blocks > 0` in the apc run (Phase 3A probe on the
+    block manager) — proves the test actually exercised cache hits.
+  - **GATE-AGREEMENT**: mean greedy token agreement apc-vs-noapc ≥ 0.90 over 6
+    shared-prefix prompts. NOT expected to be 1.0: noapc prefill attends fresh
+    bf16 context; apc attends dequant-int4 context — the gap is int4's prefill-
+    attention quant error, the same magnitude class as protect-vs-bf16 (0.955).
+  - **GATE-NEEDLE**: a code buried inside the CACHED prefix is retrieved under
+    apc (and the noapc control) — the hard-tail check.
+- **Flip criteria**: all three gates PASS → make `enable_prefix_caching=True`
+  legal without the env (keep `False` as the default until a hit-rate +
+  throughput win is measured); add an APC cell to the 6k12 hard-needle harness
+  for the full-strength version of GATE-NEEDLE.

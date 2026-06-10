@@ -61,7 +61,8 @@ class TestResolvePrefixCaching(unittest.TestCase):
             ip._resolve_prefix_caching(True)
         msg = str(cm.exception)
         self.assertIn("prefix", msg.lower())
-        self.assertIn("int4-packed", msg)
+        self.assertIn("gated", msg)
+        self.assertIn("phase6k16_prefix_gates", msg)
         self.assertIn(ip._ALLOW_PREFIX_CACHING_ENV, msg)
         self.assertIn("PHASE6K16_PREFIX_CACHING_PLAN.md", msg)
 
@@ -91,18 +92,25 @@ class TestWiring(unittest.TestCase):
                              '        kwargs["enable_prefix_caching"]')
         self.assertGreater(idx_gate, 0)
 
-    def test_backend_branch_guarded(self):
-        # The guard must live INSIDE the prefix-enabled prefill branch,
-        # after the decoder-only assert and BEFORE the varlen call that
-        # would misread the packed cache.
+    def test_backend_branch_guarded_and_rewired(self):
+        # Tier 1: inside the prefix-enabled prefill branch (between the
+        # decoder-only assert and the decode section) the guard must come
+        # first, the dequant-context path must be called, and the STOCK
+        # varlen-over-packed call (its distinctive block_table= line) must
+        # be GONE from this branch.
         bi_path = Path(ip.__file__).parent / "phase5b_backend_install.py"
         src = bi_path.read_text()
         self.assertIn("_ALLOW_PREFIX_CACHING_ENV", src)
         anchor = src.index("Only decoder-only models support prefix caching")
-        guard = src.index("prefix-aware prefill is not", anchor)
-        nxt_varlen = src.index("flash_attn_varlen_func", anchor)
-        self.assertLess(guard, nxt_varlen,
-                        "guard must precede the varlen call in the branch")
+        decode_section = src.index("Decode attention", anchor)
+        branch = src[anchor:decode_section]
+        guard = branch.index("prefix-aware prefill is gated")
+        dequant = branch.index("run_prefix_prefill")
+        self.assertLess(guard, dequant,
+                        "guard must precede the dequant-context call")
+        self.assertNotIn("block_table=prefill_meta.block_tables", branch,
+                         "stock varlen-over-packed call must be removed "
+                         "from the prefix branch")
 
     def test_shared_env_name(self):
         from kv_policy import phase5b_backend_install as bi

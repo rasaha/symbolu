@@ -1116,34 +1116,45 @@ if _VLLM_FA_AVAILABLE:
                     # Prefix-enabled attention (Q current, K/V from cache).
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support prefix caching")
-                    # Phase 6K.16 guard: key_cache/value_cache are int4-PACKED
-                    # uint8 here; this varlen call would read them as bf16.
-                    # Refuse until the dequant-context prefill path lands.
+                    # Phase 6K.16 Tier 1: the paged cache is int4-PACKED here,
+                    # so the STOCK call (varlen over key_cache/value_cache with
+                    # block_table=) would read nibbles as bf16 — it is REPLACED
+                    # by the dequant-context path: cached blocks are
+                    # dequantized (protect channels exact) to the query dtype
+                    # and passed explicitly. Still gated until the GPU gates
+                    # pass (Bench/scripts/phase6k16_prefix_gates.py).
                     if not _allow_prefix_caching_override():
                         raise RuntimeError(
-                            "int4_protected: prefix-aware prefill is not "
-                            "supported yet — the paged KV cache is int4-packed "
-                            "and flash_attn_varlen_func would read it as bf16 "
-                            "(garbage attention over the cached prefix). Run "
-                            "with enable_prefix_caching=False (the default) "
-                            "and chunked prefill off, or set "
-                            + _ALLOW_PREFIX_CACHING_ENV + "=1 to bypass for "
-                            "development. Plan: PHASE6K16_PREFIX_CACHING_PLAN.md"
+                            "int4_protected: prefix-aware prefill is gated — "
+                            "the Tier-1 dequant-context path is implemented "
+                            "but not GPU-validated yet. Run with "
+                            "enable_prefix_caching=False (the default), or "
+                            "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to "
+                            "enable it (then run Bench/scripts/"
+                            "phase6k16_prefix_gates.py). Plan: "
+                            "PHASE6K16_PREFIX_CACHING_PLAN.md"
                         )
-                    assert prefill_meta.seq_lens is not None
-                    max_seq_len = max(prefill_meta.seq_lens)
-                    flash_attn_varlen_func(
-                        q=query, k=key_cache, v=value_cache,
-                        cu_seqlens_q=prefill_meta.query_start_loc,
-                        max_seqlen_q=prefill_meta.max_query_len,
-                        seqused_k=prefill_meta.seq_lens_tensor,
-                        max_seqlen_k=max_seq_len,
+                    writer = getattr(self, "_phase5b_paged_writer", None)
+                    if writer is None:
+                        raise RuntimeError(
+                            "int4_protected prefix prefill: no paged writer "
+                            "installed on this impl (install order bug)."
+                        )
+                    cs = Int4ProtectedAttentionImpl._call_stats
+                    cs["prefix_prefill_calls"] = cs.get("prefix_prefill_calls", 0) + 1
+                    from kv_policy.phase6k16_prefix_prefill import run_prefix_prefill
+                    run_prefix_prefill(
+                        query=query,
+                        new_key=key[:num_prefill_kv_tokens],
+                        new_value=value[:num_prefill_kv_tokens],
+                        kv_cache=kv_cache,
+                        writer=writer,
+                        prefill_meta=prefill_meta,
+                        flash_attn_varlen_func=flash_attn_varlen_func,
                         softmax_scale=softmax_scale,
-                        causal=True,
                         window_size=window_size,
                         alibi_slopes=alibi_slopes,
-                        block_table=prefill_meta.block_tables,
-                        softcap=logits_soft_cap,
+                        logits_soft_cap=logits_soft_cap,
                         out=prefill_output,
                         fa_version=self.vllm_flash_attn_version,
                     )
