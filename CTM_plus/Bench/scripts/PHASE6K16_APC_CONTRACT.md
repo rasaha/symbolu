@@ -111,6 +111,24 @@
 > then the fix. Eager ship unaffected; this is the recorded next step for a
 > gated-off, throughput-negative path.
 
+> **ROOT FOUND (2026-06-10, v7 input-vs-kernel split — it's the KERNEL, not our
+> code).** v7 mirrored per-row VALID-position input norms (captured copies,
+> reliable under graphs). Measured at B=6 (eager HIT / graphs MISS): **`k_int4`
+> is BIT-IDENTICAL eager-vs-graphs (e.g. 68001.8438 == 68001.8438), `v` matches
+> to ~0.03% (masked padding), yet `out` diverges 54–129%.** Same inputs in,
+> different output out ⇒ **`flash_attn_with_int4_kvcache` is not CUDA-graph-safe
+> at B>1** — it computes a ~1.8× inflated, constant-across-rows output under
+> replay. This CLEARS the entire Python layer (gather, identity, masking,
+> protect [ablated: PHASE6J_NAIVE_FORCE_ZERO kept the divergence], splice,
+> dequant inputs — all verified equal). The defect is inside the custom int4
+> attention kernel (vLLM-flash-attn fork; source not in this repo). **Strategic
+> note:** graphs cut *launch* overhead, but int4_protected is *kernel-bound*
+> (~0.3× bf16) — so a graphs+APC fix buys little throughput regardless. Fix
+> paths: (a) the kernel `.cu` (fork source + CUDA recompile — real fix, small
+> payoff); (b) capture only size-1 decode graphs under APC (B>1 runs eager —
+> correct, B=1 latency win, trivial Python change); (c) keep eager-only. Eager
+> ship stands and loses little.
+
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
 > the writer's state model has no *stated* contract — every fix guessed at an
