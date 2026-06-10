@@ -33,6 +33,41 @@
 > harness). Remaining for eager-only default-flip: the 6k12 `--apc` hard-tail
 > cell + the payoff measurement. Graphs+APC = named OPEN edge, gated off.
 
+> **UPDATE (2026-06-10, replay-trace v5 — the single-seq read is PROVEN
+> bit-exact under graphs; the defect is concurrency bookkeeping, not read math).**
+> The §5b "what capture may freeze" suspicion was tested directly. The
+> replay-trace instrument (`phase6k16_replay_trace.py`, v5) now observes the
+> ENTIRE captured-read kernel surface step-by-step under replay: the int4 K
+> view (`k_int4`/`k_scale`/`k_xmin`), the protected-channel overlay
+> (`k_protect_bf16`/`protect_slot`), the positional bf16 K stub, the V input,
+> **and the attention `out` itself** — each riding the graph-pool buffers the
+> replay rewrites, so the host window reads what the replayed gather+kernel
+> actually produced. A/B (eager vs graphs, B=1 needle, `max_num_seqs=8`,
+> Llama-3.1-8B) result: **0 `out`-divergences across all 78 aligned decode
+> steps.** Every kernel input AND the output are bit-identical eager-vs-graphs,
+> *including* the cache-hit partial K-tail (block 13 at `seq_len=418`) the audit
+> had fingered. The lone cross-mode difference is `k_protect_bf16` in
+> **`cache_seqlens`-masked padding positions** of the partial block (stale
+> uninitialized bytes, eager vs graphs allocate them differently) — and it
+> **does not reach the output**: `out` is bit-identical, which is only possible
+> if the divergence is confined to masked positions (the kernel attends all
+> valid positions, so any valid-position protect diff would move `out`).
+>
+> **Therefore the single-sequence captured read is cleared** — seq_len mask
+> refresh, slot-index hand-off, protect gather, int4 reconstruction, and the
+> partial-tail splice are all replay-safe at B=1. The measured graphs+APC
+> corruption (gates graphs cell: degenerate text 5/6 + needle MISS, all
+> **batched/B>1**) is **exclusively in the B>1 concurrency bookkeeping** — the
+> §7 collision (shared `block_tables[0]`), GC-eviction, and CUDA-graph padding
+> (`stash count != rows`) edges that only fire with multiple live sequences.
+> This is consistent with the plan's earlier observation (graphs+batched MISS,
+> graphs+B=1 HIT) but **upgrades it from coincidence to instrument-backed
+> proof**. Reproducing/fixing it needs the **full multi-seq regression**, not a
+> single-needle micro-trace; the v5 `out`-screen is the durable tool — arm
+> `INT4_PROTECTED_REPLAY_TRACE` on any B>1 graphs run and scan for the first
+> `out`-divergence to name the corrupting step. Ship posture unchanged
+> (eager-only); this only narrows the open edge.
+
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
 > the writer's state model has no *stated* contract — every fix guessed at an
