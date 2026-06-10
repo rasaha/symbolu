@@ -792,6 +792,13 @@ def install_int4_protected_precapture_hook(
                     try:
                         ob = getattr(_impl0, "_rt_out_buf", None) \
                             if _impl0 is not None else None
+                        # `_phase5b_cache_seqlens_i32` is the EXACT mask length
+                        # the kernel used this step (persistent, captured-copy
+                        # refreshed) — compare it to the true seqlen to test the
+                        # masking-failure hypothesis at B>1 under graphs.
+                        csl_buf = getattr(
+                            _impl0, "_phase5b_cache_seqlens_i32", None) \
+                            if _impl0 is not None else None
                         # Live rows/seqlens from the pre-dump's decode metadata
                         # — present in BOTH eager and graphs. (v6 used the
                         # stash count, which is graphs-only and zeroed eager.)
@@ -800,8 +807,12 @@ def install_int4_protected_precapture_hook(
                         if ob is not None and _nlive > 0:
                             rec["row_out"] = {}
                             for i in range(min(_nlive, ob.shape[0])):
+                                _ks = (int(csl_buf[i].item())
+                                       if csl_buf is not None
+                                       and i < csl_buf.shape[0] else None)
                                 rec["row_out"][str(i)] = {
                                     "seqlen": _seqlens[i],
+                                    "kernel_seqlen": _ks,
                                     "out": _rt_sig(ob[i].float()),
                                 }
                     except Exception as _e4:
