@@ -1,5 +1,14 @@
 # Phase 6K.16 — APC correctness contract (the math, not another patch)
 
+> **MEASURED (pod, Llama-3.1-8B): S1 PASS — 13/13 prefix blocks bit-exact**
+> (packed K + packed V + all five sidecars) between a fresh no-APC prefill and
+> the APC engine. **P1 holds; the storage/write machinery satisfies the
+> contract.** With warm=1.000 and needle=1.000 (a hit sequence crossing a block
+> boundary), the rid identity chain (stash → write → GC → read) is validated
+> end-to-end. Remaining adjudication: the three divergent OPEN-ENDED prompts'
+> texts (coherent ⇒ the bounded S3 residual, contract satisfied; degenerate ⇒
+> suffix-block corruption outside S1's scope — the next named target).
+
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
 > the writer's state model has no *stated* contract — every fix guessed at an
