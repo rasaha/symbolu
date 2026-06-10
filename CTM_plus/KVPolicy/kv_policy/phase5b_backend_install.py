@@ -330,6 +330,11 @@ if _VLLM_FA_AVAILABLE:
                 )
                 self._phase5b_idx_max_B  = new_max
                 self._phase5b_idx_dev    = device
+                # 6K.16d replay-trace: a (re)allocation AFTER graph capture
+                # would orphan the recorded ops' buffer — log every event.
+                from kv_policy.phase5b_4c_paged_writer import rt_alloc_event
+                rt_alloc_event("slot_idx_buf", self._phase5b_slot_idx_buf,
+                               f"grew_to={new_max} prev={cur}")
             return (
                 self._phase5b_slot_idx_buf[:B],
                 self._phase5b_batch_idx_arange[:B],
@@ -394,7 +399,8 @@ if _VLLM_FA_AVAILABLE:
             self._phase5b_paged_writer = writer
             return writer
 
-        def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer):
+        def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer,
+                                attn_metadata=None):
             """Phase 5B.4c.2 / 5B.6 step 3: packed decode read path.
             Now handles batch>=1 by looping over sequences.
 
@@ -418,14 +424,16 @@ if _VLLM_FA_AVAILABLE:
                 # degenerate case); `_read_decode_packed_one` has .item()
                 # calls that are forbidden inside torch.cuda.graph context.
                 _seqlen0 = int(cache_seqlens_orig[0].item())
-                # 6K.16b: same identity rule as the write path.
+                # 6K.16c: stable real-id stash if present, else 6K.16b
+                # block-local / legacy — must match the write path.
                 from kv_policy.phase5b_4c_paged_writer import (
                     block_local_seq_ids_enabled as _bl_ids,
+                    resolve_decode_seq_ids as _resolve_ids,
                 )
-                if _bl_ids(writer):
-                    _sid0 = int(block_table[0][max(0, (_seqlen0 - 1) // writer.BS)].item())
-                else:
-                    _sid0 = _seq_id_from_block_table_row(block_table[0])
+                _sid0 = _resolve_ids(
+                    attn_metadata, block_table, cache_seqlens_orig,
+                    writer.BS, block_local=_bl_ids(writer),
+                )[0]
                 return self._read_decode_packed_one(
                     query_q, kv_cache, layer, writer,
                     bt=block_table[0],
@@ -442,11 +450,12 @@ if _VLLM_FA_AVAILABLE:
                 query_q, kv_cache, layer, writer,
                 block_table=block_table,
                 cache_seqlens_orig=cache_seqlens_orig,
+                attn_metadata=attn_metadata,
             )
 
         def _read_decode_packed_batched(
             self, query_q, kv_cache, layer, writer, *,
-            block_table, cache_seqlens_orig,
+            block_table, cache_seqlens_orig, attn_metadata=None,
         ):
             """Multi-seq packed decode in a SINGLE kernel call.
 
@@ -495,14 +504,14 @@ if _VLLM_FA_AVAILABLE:
                 n_blocks_max = block_table.shape[1]
                 if not _in_capture_read:
                     # CAPTURE-EXEMPT: pre-capture host sync for seq_ids.
-                    # 6K.16b: block-local identity (APC-sound) when the
-                    # writer runs backing-skip; legacy [:,0] otherwise.
+                    # 6K.16c: stable real-id stash if present, else 6K.16b
+                    # block-local / legacy. Must match the write path.
                     from kv_policy.phase5b_4c_paged_writer import (
                         block_local_seq_ids_enabled as _bl_ids,
-                        decode_seq_ids_from_meta as _dec_ids,
+                        resolve_decode_seq_ids as _resolve_ids,
                     )
-                    seq_ids = _dec_ids(
-                        block_table, cache_seqlens_orig, BS,
+                    seq_ids = _resolve_ids(
+                        attn_metadata, block_table, cache_seqlens_orig, BS,
                         block_local=_bl_ids(writer),
                     )
                 else:
@@ -657,7 +666,26 @@ if _VLLM_FA_AVAILABLE:
             with _maybe_region("one.splice"):
                 tail_len = seqlen % BS
                 if tail_len != 0:
-                    seq_state = writer.get_seq_state(seq_id)
+                    # 6K.16c diagnostic: under APC the prefill/decode identity
+                    # handoff can miss (prefill registered the partial tail
+                    # under a different id). Don't CRASH — ensure a state so the
+                    # run completes and we can read the agreement number. NOTE:
+                    # a freshly-ensured state has empty staging, so this read's
+                    # partial tail may be wrong for the affected sequence; the
+                    # warning quantifies how often it fires.
+                    from kv_policy.phase5b_4c_paged_writer import _prefix_dbg
+                    try:
+                        seq_state = writer.get_seq_state(seq_id)
+                    except KeyError:
+                        _prefix_dbg(f"B1-read seqlen={seqlen} tail={tail_len} "
+                                    f"seq_id={seq_id} -> SeqState MISS "
+                                    f"(have={list(writer._slot_map.keys())[:8]})")
+                        import logging as _lg
+                        _lg.getLogger(__name__).warning(
+                            "[6K.16c] B=1 read: no SeqState for seq_id=%s "
+                            "(prefill/decode identity miss) — ensuring empty; "
+                            "this read's K-tail may be wrong.", seq_id)
+                        seq_state = writer.ensure_seq_state(seq_id, query_q.device)
                     _splice_k_partial_tail(
                         view, writer, last_block_idx=n_blocks_used - 1,
                         state=seq_state,
@@ -981,18 +1009,20 @@ if _VLLM_FA_AVAILABLE:
                                         "write_decode_batched_via_hook_calls"
                                     ] += 1
                                 else:
-                                    # Hook NOT installed (CPU tests, pre-
-                                    # hook deployments). Self-resolve as
-                                    # in 6B.1. The seq_id derivation
-                                    # mirrors _derive_write_partitions's
-                                    # decode branch (6K.16b: block-local
-                                    # when backing-skip; legacy [:,0]
-                                    # otherwise).
+                                    # Hook stash absent for this step. Self-
+                                    # resolve as in 6B.1. 6K.16c: MUST use the
+                                    # same resolver as the read path / hook —
+                                    # prefer the stable real-id stash, else
+                                    # block-local. (Using block-local here while
+                                    # the read used real-stash made THIS GC evict
+                                    # the real-id SeqState the read then missed —
+                                    # the 6K.16c decode-eviction bug.)
                                     from kv_policy.phase5b_4c_paged_writer import (
                                         block_local_seq_ids_enabled as _bl_ids,
-                                        decode_seq_ids_from_meta as _dec_ids,
+                                        resolve_decode_seq_ids as _resolve_ids,
                                     )
-                                    seq_ids = _dec_ids(
+                                    seq_ids = _resolve_ids(
+                                        attn_metadata,
                                         dec_meta.block_tables,
                                         getattr(dec_meta, "seq_lens_tensor", None),
                                         BS, block_local=_bl_ids(writer),
@@ -1009,7 +1039,12 @@ if _VLLM_FA_AVAILABLE:
                                     # Ensure SeqState exists for each decode
                                     # seq (allocates a pool slot lazily on
                                     # first write).
+                                    from kv_policy.phase5b_4c_paged_writer import (
+                                        is_pad_seq_id as _is_pad,
+                                    )
                                     for sid in seq_ids:
+                                        if _is_pad(sid):
+                                            continue  # B2: pads inert
                                         writer.ensure_seq_state(sid, kv_cache.device)
                                     slot_idx_list = writer.slot_indices_for(seq_ids)
                                     # Phase 6B.3 (Option X): use the
@@ -1144,23 +1179,28 @@ if _VLLM_FA_AVAILABLE:
                     # Prefix-enabled attention (Q current, K/V from cache).
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support prefix caching")
-                    # Phase 6K.16 Tier 1: the paged cache is int4-PACKED here,
-                    # so the STOCK call (varlen over key_cache/value_cache with
-                    # block_table=) would read nibbles as bf16 — it is REPLACED
-                    # by the dequant-context path: cached blocks are
-                    # dequantized (protect channels exact) to the query dtype
-                    # and passed explicitly. Still gated until the GPU gates
-                    # pass (Bench/scripts/phase6k16_prefix_gates.py).
-                    if not _allow_prefix_caching_override():
+                    # Phase 6K.16 (SHIPPED, eager-only): the paged cache is
+                    # int4-PACKED here, so the STOCK call (varlen over
+                    # key_cache/value_cache with block_table=) would read
+                    # nibbles as bf16 — it is REPLACED by the dequant-context
+                    # path: cached blocks are dequantized (protect channels
+                    # exact) and passed explicitly. Allowed when the FACTORY
+                    # armed APC (apc_active(); installs the rid-stash hook +
+                    # eager coupling) or the legacy env override is set.
+                    # A raw LLM(enable_prefix_caching=True) bypassing the
+                    # factory is REFUSED: without the 6B.2 hook the rid stash
+                    # never exists and identity is unprovable (contract C-ID).
+                    from kv_policy.phase5b_4c_paged_writer import (
+                        apc_active as _apc_armed,
+                    )
+                    if not (_apc_armed() or _allow_prefix_caching_override()):
                         raise RuntimeError(
-                            "int4_protected: prefix-aware prefill is gated — "
-                            "the Tier-1 dequant-context path is implemented "
-                            "but not GPU-validated yet. Run with "
-                            "enable_prefix_caching=False (the default), or "
-                            "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to "
-                            "enable it (then run Bench/scripts/"
-                            "phase6k16_prefix_gates.py). Plan: "
-                            "PHASE6K16_PREFIX_CACHING_PLAN.md"
+                            "int4_protected: prefix-aware prefill reached "
+                            "WITHOUT factory arming — construct via "
+                            "Int4ProtectedLLM(enable_prefix_caching=True) "
+                            "(installs the required rid-stash hook + "
+                            "eager-only coupling). Raw LLM(...) with APC is "
+                            "unsupported. Contract: PHASE6K16_APC_CONTRACT.md"
                         )
                     writer = getattr(self, "_phase5b_paged_writer", None)
                     if writer is None:
@@ -1220,6 +1260,7 @@ if _VLLM_FA_AVAILABLE:
                             kv_cache=kv_cache,
                             decode_meta=decode_meta,
                             layer=layer,
+                            attn_metadata=attn_metadata,
                         )
                         decode_output.copy_(out_packed.squeeze(1))
                     else:
@@ -1415,8 +1456,9 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
     """
     from kv_policy.phase5b_4c_paged_writer import (
         block_local_seq_ids_enabled,
-        decode_seq_ids_from_meta,
+        resolve_decode_seq_ids,
         prefill_seq_id_for_segment,
+        stashed_real_seq_ids,
     )
     block_local = writer is not None and block_local_seq_ids_enabled(writer)
 
@@ -1426,8 +1468,10 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
     if (dec_meta is not None
             and getattr(dec_meta, "block_tables", None) is not None
             and dec_meta.block_tables.numel() > 0):
-        ids = decode_seq_ids_from_meta(
-            dec_meta.block_tables,
+        # 6K.16c stable real-id stash (if present + count-matched), else
+        # 6K.16b block-local / legacy.
+        ids = resolve_decode_seq_ids(
+            attn_metadata, dec_meta.block_tables,
             getattr(dec_meta, "seq_lens_tensor", None),
             BS, block_local=block_local,
         )
@@ -1439,23 +1483,56 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
         qsl = getattr(pre_meta, "query_start_loc", None)
         if qsl is not None and qsl.shape[0] > 2:
             qsl_cpu = qsl.cpu().tolist()
+            n_seg = len(qsl_cpu) - 1
+            # 6K.16c: real prefill seq ids (one per prompt segment),
+            # count-checked; else per-segment block-local / legacy.
+            real_pre = stashed_real_seq_ids(attn_metadata, n_seg, prefill=True)
+            from kv_policy.phase5b_4c_paged_writer import apc_active as _apc
+            if real_pre is None and _apc():
+                # Contract C-ID: under APC, identity without the rid stash
+                # is unprovable — refuse loudly, never block-local.
+                raise RuntimeError(
+                    f"int4_protected APC: real-seq-id stash unavailable for "
+                    f"a {n_seg}-segment prefill — refusing block-local "
+                    f"identity (PHASE6K16_APC_CONTRACT.md C-ID)."
+                )
             partitions = []
-            for i in range(len(qsl_cpu) - 1):
+            for i in range(n_seg):
                 start, end = qsl_cpu[i], qsl_cpu[i + 1]
                 if end <= start:
                     continue
-                sid = prefill_seq_id_for_segment(
-                    slot_mapping_flat, start, end, BS, block_local=block_local)
-                if sid < 0:
-                    # All padding for this seg; skip.
-                    continue
+                if real_pre is not None:
+                    sid = real_pre[i]
+                else:
+                    sid = prefill_seq_id_for_segment(
+                        slot_mapping_flat, start, end, BS, block_local=block_local)
+                    if sid < 0:
+                        # All padding for this seg; skip.
+                        continue
                 partitions.append((sid, slice(start, end)))
             if partitions:
                 return partitions
         # Single-seq prefill.
+        from kv_policy.phase5b_4c_paged_writer import (
+            _prefix_dbg, apc_active as _apc_single,
+        )
         n = int(slot_mapping_flat.shape[0])
+        real_pre = stashed_real_seq_ids(attn_metadata, 1, prefill=True)
+        if real_pre is not None:
+            _prefix_dbg(f"prefill-write single-seg -> {real_pre[0]} "
+                        f"(src=real_stash)")
+            return [(real_pre[0], slice(0, n))]
+        if _apc_single():
+            raise RuntimeError(
+                "int4_protected APC: real-seq-id stash unavailable for a "
+                "single-seq prefill — refusing block-local identity "
+                "(PHASE6K16_APC_CONTRACT.md C-ID)."
+            )
         sid = prefill_seq_id_for_segment(
             slot_mapping_flat, 0, n, BS, block_local=block_local)
+        _prefix_dbg(f"prefill-write single-seg -> {sid} "
+                    f"(src={'block_local' if block_local else 'legacy'}, "
+                    f"prefill_stash=absent)")
         if sid >= 0:
             return [(sid, slice(0, n))]
 

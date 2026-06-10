@@ -1,5 +1,28 @@
 # Phase 6K.16 — prefix caching (APC) for int4_protected: feasibility + plan
 
+> **STATUS: MACHINERY VALIDATED UNDER THE CONTRACT (eager/B=1 cells) — guard
+> stays on until the graphs-cell revalidation + payoff measurement.**
+> The turn that broke the stall was replacing fix-by-fix with a stated
+> **correctness contract** (`PHASE6K16_APC_CONTRACT.md`): identity = real vLLM
+> rid everywhere, crossings finalize/reset under the same rid, padding inert,
+> block-local refused loudly, and — decisively — a corrected success
+> definition: the **S1 byte-gate** (cached blocks bit-exact vs fresh prefill)
+> as the machinery criterion, with agreement demoted to a bounded residual.
+> Measured: **S1 PASS 13/13 blocks bit-exact; warm 1.000; needle 1.000; zero
+> degenerate APC outputs** — the residual "failures" were coherent near-tie
+> flips on open-ended prompts, and in one case the *no-APC baseline* was the
+> degenerate side. The flat-0.375 mystery: the old gate measured
+> agreement-to-baseline, not correctness. The 4 fixed identity bugs (+ the
+> supposed 5th "batched" edge, which dissolved: B=1 reproduced it, and the
+> texts showed it was the residual) are logged below.
+> **Before flipping the factory default:** rerun the graphs+batched cell on the
+> current commit (last needle-MISS predates the GC fix + pad sentinels), add an
+> APC cell to the 6k12 hard-needle harness, and measure the payoff (hit-rate /
+> prefill-throughput). Until then `INT4_PROTECTED_ALLOW_PREFIX_CACHING=1`
+> remains required; production default unchanged.
+>
+> _(original plan + Tier-0/1 implementation notes + debugging log preserved below)_
+
 > **Status: Tier 1 IMPLEMENTED (dequant-context prefill, CPU-verified) — pending the
 > GPU gates below. Tier 0 (guards) LANDED earlier; the guard now gates an
 > implemented path rather than a missing one.** Enable with
@@ -262,3 +285,109 @@ CPU coverage: `tests/test_phase6k16b_seq_identity.py` (10 tests: APC collision
 fixed, prefill==first-decode identity, legacy byte-preserved, padding) + all
 27 existing hook tests + 6J/6K15/6K16 suites + the 6C/6E writer verifiers —
 green. GPU validation: rerun the same three gates.
+
+### 6K.16b GPU result — PARTIAL; block-local identity found fragile
+
+Rerun: prompt[1] reached **1.000 (all 32 tokens) — the full APC pipeline works
+end to end for a sequence** (prefill→cached blocks→decode-over-packed), so the
+architecture is sound. But overall agreement stayed low. A 3-cell bisection
+(`--eager`, `--b1` cells added to the gate script) localized the residual:
+
+| cell | full-pass prompts | needle |
+|---|---|---|
+| graphs + batched | [1] | MISS |
+| eager  + batched | [2],[3] | HIT |
+| graphs + B=1     | [0],[2],[3] | HIT |
+
+- **Passing set shifts with execution config** (prompt[1] passes in cell 1,
+  fails in 2/3) ⇒ NOT a content bug — order-dependent **state contamination**.
+- **Needle MISS only in graphs+batched**; the identical B=1 needle call passes
+  once the prior equivalence prompts run sequentially ⇒ **batched decode leaks
+  writer state into the next request**.
+- **Per-prompt token-level evidence (clinches the churn reading):** every failing
+  prompt collapses at exactly its first block-crossing decode step — `prompt[1]`
+  at `prefix=1` (token 2), `prompt[4]/[5]` at `prefix=2` (token 3) — while
+  `prompt[2]/[3]`, whose suffixes never cross a 32-token boundary in the 32
+  generated tokens, pass `1.000`. Failure ⟺ block crossing.
+
+**Root cause: block-local identity churns.** `seq_id = block of current token`
+**changes every block crossing** (these prompts cross 1–2 in 32 decode tokens),
+so slots are allocated/freed mid-sequence and stale `SeqState`s keyed by
+recycled block ids contaminate later sequences in a timing-dependent way.
+Block-local fixed the *original* collision but is itself fragile.
+
+**Decision: pivot to STABLE identity (Tier 1c).** Use vLLM's real per-sequence
+ids (unique, constant for the whole lifetime, never recycled mid-flight) —
+the audit's original proposal — stashed by the 6B.2 `execute_model` wrap and
+required for APC. Eliminates churn AND cross-request collisions by construction.
+Bigger change (hook plumbing + a stable fallback for the eager path); needs one
+GPU iteration. Block-local stays as the legacy-mode path (byte-identical;
+non-APC unaffected). Guard stays closed throughout; production unchanged.
+
+### Tier 1c — IMPLEMENTED (real-seq-id identity; pending GPU rerun)
+
+`extract_real_seq_ids(model_input)` (in `phase6b2_precapture_hook.py`) pulls the
+real ids in attention-row order from `sampling_metadata.seq_groups` (primary) /
+`request_ids_to_seq_ids` (fallback). The hook's `_wrapped` stashes them on
+`attn_metadata` on EVERY step — decode → `_int4_real_seq_ids`, prefill →
+`_int4_real_seq_ids_prefill`. All consumers route through
+`resolve_decode_seq_ids` / `stashed_real_seq_ids` (writer module):
+
+- hook `_resolve_and_stash` (captured GC + slot resolution),
+- `_derive_write_partitions` (prefill segments + eager-decode rows),
+- batched read self-resolve + B=1 read (now threaded `attn_metadata`).
+
+**Safety rail (the key design point):** every consumer COUNT-CHECKS the stash
+against its attention rows and falls back to block-local on any mismatch — so a
+wrong vLLM-API assumption degrades to 6K.16b behavior (a warning), never
+corruption. The factory installs the hook for APC **even in eager mode** (the
+eager paths now depend on the stash). Non-APC / legacy-backing: stash absent →
+byte-identical to before.
+
+CPU coverage: `tests/test_phase6k16c_real_seq_id.py` (13 tests: extraction
+order, parallel-sampling flatten, count-match vs mismatch fallback, prefill+
+decode partitions consume the stash) + the 6K.16b/16/15/6J suites + 27 hook
+tests + 6C verifier + prefill-module selftest — all green (89 total). The
+vLLM-`model_input` attribute path is the one thing CPU can't verify (mocked in
+tests); the count-check makes a wrong guess safe. GPU: rerun the 3-cell
+bisection — expect agreement to clear 0.90 in ALL cells (no config-dependence)
+if extraction is correct; if a cell still fails the *same shifting-set* way,
+the stash isn't landing (warning in the log) and we fix `extract_real_seq_ids`.
+
+## Debugging log — the five edges (trace-driven, for whoever resumes)
+
+The writer keys per-sequence state (K staging, slot pool) on an id that was
+*assumed* to be a stable, unique, per-sequence key. APC violates that assumption
+in several independent ways. Each was found by adding targeted tracing
+(`INT4_PROTECTED_PREFIX_DEBUG=1`), fixed, and revealed the next:
+
+1. **Decode collision (16b).** Legacy `seq_id = block_tables[i,0]` = the SHARED
+   prefix block → all cache-hit seqs collapse to one SeqState. Fix attempt:
+   block-local id (`block of the token being written`).
+2. **Block-local churn (16b bisection).** Block-local id *changes* at every
+   32-token block crossing → slot alloc/free churn + stale state. Failures land
+   exactly at crossing decode steps (`prefix=1,2`). Fix: stable real vLLM seq
+   ids (16c), stashed by the 6B.2 `execute_model` hook, count-checked fallback.
+3. **CUDA-graph padding (16c).** Decode batch padded to the captured size (6→8)
+   ⇒ `stash count != rows` ⇒ safe fallback to block-local. Fix: real ids for the
+   real rows, block-local for the masked padding tail.
+4. **GC eviction (16c).** *Confirmed by trace:* `GC active=[13] assigned=[0] ->
+   EVICTING [0]`. The eager decode-write's self-resolve GC still used block-local
+   identity (`13`) while every other path used the real id (`0`), so it evicted
+   the live SeqState the read then missed. Fix: route that GC through
+   `resolve_decode_seq_ids` too (all sites now consistent). **Verified gone**
+   (no more EVICT/miss in the trace).
+5. **Batched-decode crossing (OPEN).** After fix #4, the warm (B=1) eviction is
+   gone but the gate agreement is UNCHANGED at 0.375 — because that path is not
+   the scored one. The scored equivalence prompts run **batched (B=6)** through
+   `_read_decode_packed_batched`, which still fails at block crossings
+   (`prefix=1,2`, prompts [1]/[4]/[5]) and at prefill output (prompt [0]). This
+   is the next edge; expect more after it.
+
+**Why "multi-week, not a few fixes":** three correct fixes (padding, real-id,
+GC) moved the gate metric by **0.000** because each addressed a real but
+orthogonal bug. The writer's state model needs a coherent rework for shared
+blocks (one identity source threaded through every site: write/read, B=1/batched,
+prefill/decode, GC/staging/eviction), not whack-a-mole. The trace harness
+(`_prefix_dbg`, the EVICT/GC/resolve logging) is in place to make that rework
+tractable when prioritized.

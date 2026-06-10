@@ -185,6 +185,11 @@ def run_worker(mml, items_per_mode):
         else:
             os.environ.pop("PROTECT_MASK_PATH", None)    # legacy Qwen backend default
 
+    # 6K.16: NEEDLE_APC=1 runs the protected cell WITH prefix caching
+    # (eager-only by factory coupling) — the APC hard-tail cell. The
+    # needles don't share prefixes across items, so hits come only from
+    # vLLM's own block-hash reuse; quality must match the non-APC cell.
+    apc = os.environ.get("NEEDLE_APC", "").strip() in ("1", "true", "yes")
     from vllm import SamplingParams
     if cell == "bf16":
         from vllm import LLM
@@ -193,8 +198,15 @@ def run_worker(mml, items_per_mode):
                   max_num_seqs=8, enforce_eager=eager)
     else:
         from kv_policy.int4_protected import Int4ProtectedLLM
+        _kw = {}
+        if apc:
+            os.environ.setdefault("INT4_PROTECTED_ALLOW_PREFIX_CACHING", "1")
+            _kw["enable_prefix_caching"] = True
+            print(f"[6k12 {cell}] APC cell: enable_prefix_caching=True "
+                  f"(eager-only by factory coupling)", flush=True)
         llm = Int4ProtectedLLM(model=model, max_model_len=mml,
-                               gpu_memory_utilization=0.5, max_num_seqs=8, enforce_eager=eager)
+                               gpu_memory_utilization=0.5, max_num_seqs=8,
+                               enforce_eager=eager, **_kw)
 
     sp = SamplingParams(temperature=0.0, max_tokens=16)
     rng = random.Random(1234)
@@ -382,6 +394,9 @@ def main():
                     help="Naive (zero-protect) mask .pt for the naive cell (optional).")
     ap.add_argument("--cells", default=None,
                     help="Comma subset of bf16,naive,protected (default all three).")
+    ap.add_argument("--apc", action="store_true",
+                    help="6K.16: run the protected cell WITH prefix caching "
+                         "(eager-only by factory coupling) — the APC hard-tail cell.")
     args = ap.parse_args()
     # Env-thread model/mask/cells so both the driver and its worker subprocesses
     # (which copy os.environ) see them. Absent => legacy Qwen behavior, unchanged.
@@ -393,6 +408,8 @@ def main():
         os.environ["NAIVE_MASK_PATH"] = args.naive_mask
     if args.cells:
         os.environ["NEEDLE_CELLS"] = args.cells
+    if args.apc:
+        os.environ["NEEDLE_APC"] = "1"
     if args.selftest:
         return _selftest()
     if args.worker:

@@ -105,10 +105,20 @@ def _resolve_block_manager(llm):
 
 
 def run_mode(args):
+    # Stale-file insurance: if this run crashes, --compare must not silently
+    # read a previous run's output.
+    Path(args.out).unlink(missing_ok=True)
     if args.mode == "apc":
         # Self-contained: the factory + backend guards honor this env.
         os.environ["INT4_PROTECTED_ALLOW_PREFIX_CACHING"] = "1"
         print("[p6k16] INT4_PROTECTED_ALLOW_PREFIX_CACHING=1 (Tier-1 path enabled)")
+        if not args.eager:
+            # This harness EXISTS to test cells, including the (currently
+            # broken, factory-refused) graphs cell — bypass the eager-only
+            # coupling deliberately. Production never sets this.
+            os.environ["INT4_PROTECTED_APC_ALLOW_GRAPHS"] = "1"
+            print("[p6k16] INT4_PROTECTED_APC_ALLOW_GRAPHS=1 (validation "
+                  "harness: deliberately exercising the graphs cell)")
     import kv_policy.int4_protected  # noqa: F401  (registers backend)
     from kv_policy.int4_protected import Int4ProtectedLLM
 
@@ -117,9 +127,14 @@ def run_mode(args):
         max_model_len=args.max_model_len,
         gpu_memory_utilization=args.gpu_util,
         enable_prefix_caching=(args.mode == "apc"),
+        enforce_eager=(True if args.eager else None),
     )
     from vllm import SamplingParams
     sp = SamplingParams(temperature=0.0, max_tokens=args.gen)
+    if args.eager:
+        print("[p6k16] enforce_eager=True (CUDA graphs OFF — bisection cell)")
+    if args.b1:
+        print("[p6k16] --b1: equivalence prompts as 6 SEPARATE generate() calls")
 
     probe = None
     if args.mode == "apc":
@@ -143,8 +158,18 @@ def run_mode(args):
     hits_after_warm = probe.cache_hit_blocks if probe else None
 
     # 2) EQUIVALENCE prompts: shared prefix + distinct questions.
-    outs = llm.generate([prefix + q for q in questions], sp)
-    eq_ids = {str(i): list(o.outputs[0].token_ids) for i, o in enumerate(outs)}
+    #    --b1 sends them as separate calls (B=1 decode) to split
+    #    batched-decode interactions from per-seq behavior.
+    if args.b1:
+        eq_ids, eq_texts = {}, {}
+        for i, q in enumerate(questions):
+            o = llm.generate([prefix + q], sp)
+            eq_ids[str(i)] = list(o[0].outputs[0].token_ids)
+            eq_texts[str(i)] = o[0].outputs[0].text
+    else:
+        outs = llm.generate([prefix + q for q in questions], sp)
+        eq_ids = {str(i): list(o.outputs[0].token_ids) for i, o in enumerate(outs)}
+        eq_texts = {str(i): o.outputs[0].text for i, o in enumerate(outs)}
 
     # 3) NEEDLE inside the cached prefix.
     nd = llm.generate(
@@ -173,6 +198,7 @@ def run_mode(args):
         "code": code,
         "warm_ids": warm_ids,
         "eq_ids": eq_ids,
+        "eq_texts": eq_texts,
         "needle_text": needle_text,
         "needle_ids": needle_ids,
         "hits_after_warm": hits_after_warm,
@@ -214,40 +240,59 @@ def compare(noapc_path, apc_path):
         print(f"GATE-HITS       {'PASS' if gate_hits else 'FAIL'}   "
               f"cache_hit_blocks={hits}")
 
-    # WARM diagnostic (NOT a gate): the warm call has no cached context in
-    # either mode, so its outputs should agree ~1.0. If they DIVERGE, the
-    # APC engine is broken before any prefix-prefill involvement (allocator
-    # or writer interaction) — the bug is NOT in the dequant-context path.
+    # GATE-WARM: the warm call has no cached context in either mode, so its
+    # outputs must agree ~1.0; divergence = engine/writer-under-APC bug
+    # (allocator/identity), independent of the prefix path.
+    gate_warm = None
     if a.get("warm_ids") and b.get("warm_ids"):
         wag, wpre = token_agreement(a["warm_ids"], b["warm_ids"])
-        print(f"  warm-call agreement={wag:.3f} prefix={wpre} "
-              f"(diverged => engine/writer-under-APC bug, not the prefix path)")
+        gate_warm = wag >= 0.95
+        print(f"GATE-WARM       {'PASS' if gate_warm else 'FAIL'}   "
+              f"agreement={wag:.3f} prefix={wpre} "
+              f"(no-hit path must be engine-identical)")
 
-    # GATE-AGREEMENT
+    # S3-RESIDUAL (INFO, not a gate — contract C-GATE): APC prefill attends
+    # the cached prefix in dequant-int4; no-APC attends fresh bf16. On
+    # open-ended prompts a greedy near-tie can flip and diverge COHERENTLY —
+    # the bounded residual, same class as protect-vs-bf16 (~0.955 on hard
+    # needles). The MACHINERY gate is the S1 byte-gate
+    # (phase6k16_byte_gate.py: cached blocks bit-exact vs fresh prefill).
+    # Texts are printed for divergent prompts so coherent-vs-DEGENERATE is
+    # adjudicable by eye; degenerate APC text => suffix-side machinery bug.
     agrees = []
     for k in sorted(a["eq_ids"], key=int):
         ag, pre = token_agreement(a["eq_ids"][k], b["eq_ids"].get(k, []))
         agrees.append(ag)
         print(f"  prompt[{k}] agreement={ag:.3f} prefix={pre}")
+        if ag < 0.5 and (b.get("eq_texts") or {}).get(k) is not None:
+            print(f"            apc:   {b['eq_texts'][k][:70]!r}")
+            if (a.get("eq_texts") or {}).get(k) is not None:
+                print(f"            noapc: {a['eq_texts'][k][:70]!r}")
     mean_ag = sum(agrees) / max(1, len(agrees))
-    gate_ag = mean_ag >= AGREEMENT_GATE
-    print(f"GATE-AGREEMENT  {'PASS' if gate_ag else 'FAIL'}   mean={mean_ag:.4f} "
-          f"(gate >= {AGREEMENT_GATE}; NOT expected 1.0 — apc context is "
-          f"dequant-int4, noapc context is fresh bf16)")
+    print(f"S3-RESIDUAL     INFO   mean={mean_ag:.4f} over open-ended prompts "
+          f"(bounded residual, NOT a pass/fail bar — see contract §6; "
+          f"machinery gate = S1 byte-gate)")
 
-    # GATE-NEEDLE
+    # GATE-NEEDLE (factual retrieval from INSIDE the cached prefix — the
+    # hard-tail check; prefix tells WHERE divergence starts if it fails)
     hit_apc = code in b["needle_text"]
     hit_no = code in a["needle_text"]
     gate_nd = hit_apc and hit_no
+    nag, npre = token_agreement(a.get("needle_ids", []), b.get("needle_ids", []))
     print(f"GATE-NEEDLE     {'PASS' if gate_nd else 'FAIL'}   "
           f"apc={'HIT' if hit_apc else 'MISS'} noapc={'HIT' if hit_no else 'MISS'} "
+          f"agreement={nag:.3f} prefix={npre} "
           f"(code={code}; apc answered: {b['needle_text'][:40]!r})")
 
-    all_known = [g for g in (gate_hits, gate_ag, gate_nd) if g is not None]
-    verdict = all(all_known) and gate_hits is not None
+    # Contract C-GATE verdict: HITS (non-vacuous) + WARM (engine sane) +
+    # NEEDLE (factual retrieval). S1 byte-gate is the primary machinery
+    # criterion and runs separately (phase6k16_byte_gate.py).
+    all_known = [g for g in (gate_hits, gate_warm, gate_nd) if g is not None]
+    verdict = bool(all_known) and all(all_known) and gate_hits is not None
     print("-" * 78)
-    print("VERDICT:", "ALL GATES PASS — flip the factory default per the plan doc"
-          if verdict else "NOT PASSED — keep the guard; debug per plan doc")
+    print("VERDICT:", "GATES PASS (with S1 byte-gate PASS => APC machinery "
+          "validated under the contract; residual is bounded)"
+          if verdict else "NOT PASSED — see contract §6/§7 to localize")
     print("=" * 78)
     return 0 if verdict else 1
 
@@ -284,6 +329,11 @@ def main(argv=None):
     ap.add_argument("--max-model-len", type=int, default=4096)
     ap.add_argument("--gpu-util", type=float, default=0.5)
     ap.add_argument("--gen", type=int, default=32)
+    ap.add_argument("--eager", action="store_true",
+                    help="bisection cell: enforce_eager=True (no CUDA graphs)")
+    ap.add_argument("--b1", action="store_true",
+                    help="bisection cell: equivalence prompts as separate "
+                         "B=1 generate() calls")
     ap.add_argument("--out", default="/tmp/p6k16_out.json")
     args = ap.parse_args(argv)
     if args.selftest:

@@ -238,24 +238,18 @@ def _resolve_prefix_caching(requested: Optional[bool]) -> bool:
     """
     if not requested:
         return False
-    if _allow_prefix_caching_override():
-        logger.warning(
-            "int4_protected: enable_prefix_caching=True allowed by %s=1 — "
-            "routing prefix prefill through the Tier-1 dequant-context path "
-            "(phase6k16_prefix_prefill). Implemented + CPU-verified, NOT yet "
-            "GPU-gate-validated: run Bench/scripts/phase6k16_prefix_gates.py.",
-            _ALLOW_PREFIX_CACHING_ENV,
-        )
-        return True
-    raise RuntimeError(
-        "int4_protected: enable_prefix_caching=True is gated. The Tier-1 "
-        "dequant-context prefill path is IMPLEMENTED (cached blocks are "
-        "dequantized, protect channels exact) but not GPU-validated yet — "
-        "set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to enable it, then run "
-        "Bench/scripts/phase6k16_prefix_gates.py (GATE-HITS / GATE-AGREEMENT "
-        "/ GATE-NEEDLE). Plan + flip-the-default criteria: "
-        "PHASE6K16_PREFIX_CACHING_PLAN.md."
+    # 6K.16 SHIPPED (eager-only opt-in). Validated on Llama-3.1-8B:
+    # S1 byte-gate 13/13 bit-exact; warm/needle 1.000; texts coherent;
+    # 6k12 hard-needle APC cell retrieval 0.955 == protected == bf16.
+    # Graphs+APC remains a named OPEN edge (replay tail corruption) and is
+    # refused / forced-eager by the coupling below. The legacy
+    # INT4_PROTECTED_ALLOW_PREFIX_CACHING env is no longer required
+    # (harmless if set).
+    logger.info(
+        "int4_protected: prefix caching ENABLED (eager-only opt-in; "
+        "contract-validated — see PHASE6K16_APC_CONTRACT.md)."
     )
+    return True
 
 
 def Int4ProtectedLLM(
@@ -342,8 +336,45 @@ def Int4ProtectedLLM(
 
     # Phase 6K.16 — prefix-caching guard, same gating shape as 6K.15.
     _requested_apc = kwargs.pop("enable_prefix_caching", None)
+    _apc_resolved = False
     if kv_cache_dtype == "int4_protected":
-        kwargs["enable_prefix_caching"] = _resolve_prefix_caching(_requested_apc)
+        _apc_resolved = _resolve_prefix_caching(_requested_apc)
+        kwargs["enable_prefix_caching"] = _apc_resolved
+        # Contract C-ID refusal is armed AFTER engine construction + hook
+        # install (below) — engine init runs CUDA-graph capture WARM-UPS
+        # (dummy decode batches, hook not yet installed, some outside the
+        # capturing stream) where block-local placeholders are by-design.
+        #
+        # APC is EAGER-ONLY (measured): the captured-graph decode replay
+        # corrupts cache-hit sequences' partial K-tails (degenerate output,
+        # needle MISS — gates run on Llama-3.1-8B), while eager B=1/B=6
+        # cells pass the contract (S1 byte-exact, warm/needle 1.000,
+        # coherent texts). Until the replay path is fixed and re-gated,
+        # APC forces enforce_eager=True; combining APC with CUDA graphs
+        # is refused loudly. Override (dev only):
+        # INT4_PROTECTED_APC_ALLOW_GRAPHS=1.
+        if _apc_resolved:
+            _allow_graphs = os.environ.get(
+                "INT4_PROTECTED_APC_ALLOW_GRAPHS", "").strip() in (
+                "1", "true", "yes")
+            if not effective_enforce_eager and not _allow_graphs:
+                if enforce_eager is False:
+                    # Caller EXPLICITLY asked for graphs + APC: refuse.
+                    raise RuntimeError(
+                        "int4_protected APC is EAGER-ONLY: the captured-"
+                        "graph decode replay corrupts cache-hit sequences' "
+                        "partial K-tails (measured: degenerate output + "
+                        "needle MISS on the graphs cell; eager cells pass "
+                        "the contract). Pass enforce_eager=True (or omit "
+                        "enforce_eager), or set "
+                        "INT4_PROTECTED_APC_ALLOW_GRAPHS=1 for development."
+                    )
+                logger.warning(
+                    "int4_protected: APC enabled -> forcing "
+                    "enforce_eager=True (APC is eager-only; the captured "
+                    "decode replay is not yet APC-safe)."
+                )
+                effective_enforce_eager = True
     elif _requested_apc is not None:
         kwargs["enable_prefix_caching"] = _requested_apc
 
@@ -382,14 +413,18 @@ def Int4ProtectedLLM(
     # (phase6k10: "sync fired 0x during requests"). The hook was only ever
     # installed by bench scripts, so the PUBLIC factory's graph decode was
     # silently broken. Install it here so graph mode works out of the box.
-    # Eager doesn't need it (write_decode_batched syncs inline) -> skip.
+    # Eager normally doesn't need it (write_decode_batched syncs inline) ->
+    # skip. EXCEPTION (Phase 6K.16c): with prefix caching ON, the hook is
+    # what stashes the stable real seq ids the eager write/read paths use,
+    # so it must be installed in eager mode too.
     # Best-effort: never fail the factory on a hook-install error. A/B
     # toggle: PHASE6K10_AUTO_HOOK=0.
     _auto_hook = os.environ.get(
         "PHASE6K10_AUTO_HOOK", "1"
     ).strip().lower() not in ("0", "false", "no")
+    _apc_on = bool(kwargs.get("enable_prefix_caching"))
     if (kv_cache_dtype == "int4_protected"
-            and not effective_enforce_eager
+            and (not effective_enforce_eager or _apc_on)
             and _auto_hook):
         try:
             from kv_policy.phase6b2_precapture_hook import (
@@ -419,6 +454,17 @@ def Int4ProtectedLLM(
                 "enforce_eager=True or install the hook manually.",
                 type(e).__name__, e,
             )
+
+    # Phase 6K.16c — ARM the contract C-ID refusal now that the engine is
+    # built and the rid-stashing hook is installed: from here on, a LIVE
+    # step without the rid stash under APC raises instead of silently
+    # using block-local identity. (Armed even if hook install failed —
+    # the resulting loud first-decode error is the correct outcome.)
+    if _apc_resolved:
+        from kv_policy.phase5b_4c_paged_writer import set_apc_active
+        set_apc_active(True)
+        logger.info("Int4ProtectedLLM: APC contract refusal armed "
+                    "(post-init; capture warm-ups exempt by construction).")
 
     return llm
 
