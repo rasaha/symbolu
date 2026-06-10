@@ -639,6 +639,22 @@ if _VLLM_FA_AVAILABLE:
                     packed_n_protect=writer.n_protect,
                     **packed_v_kwargs,
                 )
+            # 6K.16d v4 replay-trace: retain refs to the READ's transient
+            # tensors. At CAPTURE these are graph-pool allocations with
+            # stable addresses — each replay re-executes the recorded ops
+            # into the SAME memory, so the post-step host window can read
+            # what the replayed gather+splice actually produced (the one
+            # surface no prior window could see). Env-gated; refs only.
+            import os as _os
+            if _os.environ.get("INT4_PROTECTED_REPLAY_TRACE", "").strip():
+                self._rt_read_refs = {
+                    "mode": "batched",
+                    "k_int4": view["k_int4"],
+                    "k_scale": view["k_scale"],
+                    "cache_seqlens": cache_seqlens_i32,
+                    "slot_idx": slot_idx_t,
+                    "BS": BS,
+                }
             return out
 
         def _read_decode_packed_one(
@@ -739,6 +755,18 @@ if _VLLM_FA_AVAILABLE:
                     packed_n_protect=writer.n_protect,
                     **packed_v_kwargs,
                 )
+            # 6K.16d v4 replay-trace: mirror of the batched-path ref stash
+            # (eager B=1 fast path) so the A/B compares like vs like.
+            import os as _os
+            if _os.environ.get("INT4_PROTECTED_REPLAY_TRACE", "").strip():
+                self._rt_read_refs = {
+                    "mode": "one",
+                    "k_int4": view["k_int4"],
+                    "k_scale": view["k_scale"],
+                    "cache_seqlens": cache_seqlens_i32,
+                    "slot_idx": None,
+                    "BS": BS,
+                }
             return out
 
         def _ensure_dummy_kv(self, S, H, D, device):

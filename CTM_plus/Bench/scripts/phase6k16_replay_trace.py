@@ -62,6 +62,18 @@ def _norm_post(r):
               "packed_sha": ((v or {}).get("packed_k") or {}).get("sha1"),
               "scale_sha": ((v or {}).get("k_scale") or {}).get("sha1")}
         for sid, v in fin.items()}
+    # v4: the replayed READ's transient output — per-row last-block view
+    # content (the spliced tail the kernel actually consumed) + the read's
+    # cache_seqlens/slot buffer VALUES. Rows with seq<=0 are padding.
+    vt = r.get("view_tail") or {}
+    out["view_tail"] = {
+        row: {"last_block": (v or {}).get("last_block"),
+              "k_int4_sha": ((v or {}).get("k_int4") or {}).get("sha1"),
+              "k_int4_norm": ((v or {}).get("k_int4") or {}).get("norm"),
+              "k_scale_sha": ((v or {}).get("k_scale") or {}).get("sha1")}
+        for row, v in vt.items()}
+    csl = r.get("read_cache_seqlens")
+    out["read_cache_seqlens"] = [s for s in (csl or []) if s > 0]
     return out
 
 
@@ -177,7 +189,8 @@ def compare(eager_path, graphs_path):
         ep, gp = e_post.get(es), g_post.get(gs)
         if ep and gp:
             _diff(_norm_post(ep), _norm_post(gp), "post",
-                  ("pool", "stage_sha", "stage_norm", "finalized"), diffs)
+                  ("pool", "stage_sha", "stage_norm", "finalized",
+                   "read_cache_seqlens", "view_tail"), diffs)
         if diffs:
             first = (k, es, gs, diffs)
             break

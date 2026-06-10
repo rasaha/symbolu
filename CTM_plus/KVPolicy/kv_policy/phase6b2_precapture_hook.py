@@ -698,6 +698,42 @@ def install_int4_protected_precapture_hook(
                     # crossing detection: a seq whose count dropped to 0
                     # this step finalized block X (its PRE block id) — dump
                     # the finalized block's bytes (S1-style, layer 0).
+                    # v4: the replayed READ's transient output — the spliced
+                    # view (graph-pool memory, stable address, refreshed by
+                    # every replay). Slice each live row's LAST block (the
+                    # tail) — comparable across eager-one and graphs-batched.
+                    _impl0 = (handle.install_time_impls or [None])[0]
+                    refs = getattr(_impl0, "_rt_read_refs", None) \
+                        if _impl0 is not None else None
+                    if refs is not None:
+                        try:
+                            BSr = refs["BS"]
+                            csl = refs["cache_seqlens"]
+                            rec["read_cache_seqlens"] = \
+                                csl.cpu().tolist()[:8]
+                            sit = refs.get("slot_idx")
+                            rec["read_slot_idx"] = (
+                                sit.cpu().tolist()[:8] if sit is not None
+                                else None)
+                            ki, ks = refs["k_int4"], refs["k_scale"]
+                            rec["view_tail"] = {}
+                            for row, s in enumerate(
+                                    rec["read_cache_seqlens"]):
+                                if row >= ki.shape[0] or s <= 0:
+                                    continue
+                                lb = (int(s) - 1) // BSr
+                                a, b2 = lb * BSr, (lb + 1) * BSr
+                                if b2 <= ki.shape[1]:
+                                    rec["view_tail"][str(row)] = {
+                                        "last_block": lb,
+                                        "k_int4": _rt_sig(
+                                            ki[row, a:b2].float()),
+                                        "k_scale": _rt_sig(ks[row, lb]
+                                                           if ks.dim() == 4
+                                                           else ks[row]),
+                                    }
+                        except Exception as _e2:
+                            rec["view_tail_error"] = str(_e2)[:80]
                     pre_c = _t_pre.get("counters_postsync") or {}
                     kvc = kv_caches[0] if kv_caches is not None and len(
                         kv_caches) > 0 else None
