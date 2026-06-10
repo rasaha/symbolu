@@ -303,6 +303,17 @@ sidecars** (CUDA-graph pools sit outside `max_memory_allocated`). NB: the
 earlier 0.82 / 0.65 GB figures were the Phase 6G audit at **mml=32K in
 binary GiB** — a different config, not the live 8K numbers above.
 
+**Critically, the sidecar tax is FLAT with context length** — measured
+constant at +4.4–4.7 GB across mml = 8K / 16K / 32K (the capacity table
+above). All five reconstruction sidecars are indexed by the *KV block pool*
+(`NB`, fixed at init by `gpu_memory_utilization`), not by any request's
+length, so a longer context consumes more of the same pre-allocated pool
+and allocates **zero** new sidecar. The density advantage therefore does
+**not** decay as context grows. The two knobs that *do* move the tax are
+`gpu_memory_utilization` (proportional) and `max_num_seqs` staging
+(~24 MB/slot, ~6 GB at 256). Full scaling analysis: **Page 8 — Technical
+Understanding §3.**
+
 ### Throughput (Qwen-7B, A100-80GB) — a WORKLOAD CURVE, not one number
 
 int4_protected's decode throughput is below bf16 at every operating point, but
@@ -748,6 +759,30 @@ dominant bottleneck) and gives the quality-preserving KV shrink a second use
 (transported/cached KV) — provided the multi-GPU and disaggregated legs stay labeled
 **projected** until built.
 
+### Where int4_protected sits in the memory stack
+
+The serving bottleneck *is* the memory hierarchy — **"AI is only as fast as the
+memory feeding it."** int4_protected has a clear primary home in that stack, a
+strong secondary lever, and honest zones of no influence. Mapped to the five
+layers (it doesn't make any layer intrinsically *faster* — it **reduces the
+demand** on the ones that bind):
+
+| Layer | Influence | How |
+|---|---|---|
+| **① SRAM** — on-chip cache | **None — and a small cost** | The 4-bit→bf16 dequant runs in registers/compute; this is the *source* of the throughput tax, not a saving. |
+| **② HBM / DRAM** — the fuel line | **PRIMARY — maximum influence** | The KV-cache lives here and **exceeds weight memory past ~32K**. **Capacity:** 2× KV density (1.83× net) → ~2× more concurrent users / longer context in the same HBM. **Bandwidth:** decode is HBM-bound — 4-bit KV moves **~1.8× fewer bytes/token** to compute (the literal "lighter feed"). |
+| **③④ NAND/SSD + HDD** — active + archive | **Indirect — cheaper at every tier below HBM** | A 4-bit, quality-preserving KV is ~1.8× smaller to spill or archive; warm-tier CPU swap-restore is **byte-clean** (TIER5A). When the hot tier overflows, the offload payload shrinks and restore is faster — the right payload to *move and cache* as KV becomes transported data. |
+| **⑤ Controllers** — traffic system | **Strong secondary — via read-skip** | read-skip *is* a memory-traffic controller: it moves only the KV positions worth reading (**95% fewer at 32K, needle 1.0/1.0**) — "optimizes flow, prevents bottlenecks," layered *on* the Layer-2 compression. Deployment routing (short-output→int4, long-form→bf16) is controller logic too. |
+| **Model weights** | **Not its lever** | Weight footprint is AWQ's domain; int4_protected composes with it but owns only the *KV* term. |
+
+**One line:** int4_protected's say is at **Layer 2** — it makes the KV-cache (the
+dominant thing the fuel line carries at long context) **~2× denser and ~1.8×
+lighter to move**, with read-skip (Layer 5) cutting *positions* moved by ~95%.
+It's a **capacity-and-bandwidth play, not a raw-speed one** (it spends some
+Layer-1 compute on dequant — the disclosed tax). In the stack's own terms: *it
+doesn't make the fuel line faster — it makes the engine sip instead of guzzle,
+and packs 2× the fuel in the tank, without losing octane (quality).*
+
 ### Target customer profile
 
 The shippable product fits any of:
@@ -780,6 +815,168 @@ serving solution."
 
 ---
 
+## Page 8 — Technical Understanding (the mechanisms behind the moat)
+
+Every exclusivity claim in this brief rests on a mechanism a technical
+reviewer can verify *independently of our benchmarks*. This page states the
+"why" behind each — so the moat is auditable, not asserted, and the honest
+limits are stated alongside the wins.
+
+### 1. The core IP — why protecting 4% of K channels restores near-bf16 fidelity
+
+KV-cache **K-vectors have highly heterogeneous channel importance**: the
+attention score `Q·K` is dominated by a small set of high-magnitude K
+channels per `(layer, head)`; the rest carry diffuse, low-magnitude signal.
+Uniform int4 quantizes all `D` channels onto one 4-bit grid under a single
+per-block scale, so the few high-dynamic-range channels — the ones the inner
+product actually depends on — are the first to be crushed. int4_protected
+keeps the **top `N = round(D × 4%)` (= 5 at D=128) highest-magnitude channels
+per `(layer, h_kv)` at bf16** and quantizes the rest to int4: the protected
+channels carry the inner-product signal at full precision, the int4 bulk
+carries the cheap remainder.
+
+- **Per-`(layer, head)`, not global** — the important channels differ by
+  layer and head (measured channel-overlap IoU: Qwen-7B L0-vs-L1 = 11.1%,
+  Qwen-14B = 2.6% — *more* specialization at scale). One global mask would
+  protect the wrong channels in most heads.
+- **Static, frozen at calibration** — importance is a property of the trained
+  weights, not the prompt, so a one-time 30-second profiling pass suffices and
+  the runtime stays cheap (no per-step adaptation).
+- **Why this *is* the moat** — the failure it defends against is **K-bound**:
+  long-range retrieval depends on precise K, so any scheme that drops protected
+  K collapses on the hard tail. That is exactly where every competitor without
+  protect fails — naive int4 (5 misses, K- and V-bound), fp8 (1/15 needle),
+  KVarN (0.062 at 32K, K-bound, *worsening with context*). Protect removes the
+  K-bound miss (hard-needle 5→2; 0.964 vs naive 0.915; == bf16 head-to-head vs
+  KVarN). **Exclusivity defended: the entire quality story.**
+
+### 2. Density ≠ compression — why the honest number is 2× (1.83× net)
+
+Two distinct quantities, routinely conflated:
+- **Compression** = bytes to store *the same* KV (`bf16 / int4`, per token).
+- **Density** = sequences per **GB of total HBM** (the operator's number).
+
+They relate by `density ≈ compression × (KV's share of the memory being
+compressed)`, because total HBM = weights (fixed) + KV + sidecars and
+compression shrinks only the KV term. **They converge only when KV dominates
+memory** — precisely int4_protected's regime (long context 32K+, where KV
+exceeds weight memory).
+
+For int4_protected both land near 2× for two *stacked* reasons: (1) the 4-bit
+nibbles are **4× denser at the element level, but the protect/scale/xmin
+sidecars are themselves stored bytes**, so the realized KV *compression* is
+~2×, not 4×; (2) that ~2× compression carries through to **~2× concurrency**
+because KV dominates long-context memory. They are **not** identical — the
+brief reports both on purpose: **2.0× = KV-block density** (sidecar-excluded)
+vs **1.83× = net seq/GB** (sidecar-included). **That 2.0 → 1.83 (~8%) gap *is*
+"compression minus density"** — the 4.38 GB sidecar tax is fixed overhead that
+does not scale with concurrency. At short context (weights-dominant) the gap
+blows open; int4_protected is deployed long-context specifically so the
+compression carries through. **The defensible headline is 2× density (1.83×
+net) — never 4×.**
+
+### 3. The sidecar tax is structural — and FLAT with context length
+
+All five reconstruction sidecars are indexed by `NB` = the **paged KV block
+pool** (sized once at engine init by `gpu_memory_utilization`), not by any
+request's length:
+
+```
+k_scale_ext   (NB, H, D)            k_protect_ext (NB, BS, H, n_protect)
+k_xmin_ext    (NB, H, D)            v_scale_ext   (NB, BS, H, v_n_groups)
+                                    v_xmin_ext    (NB, BS, H, v_n_groups)
+```
+
+A longer-context request therefore consumes more of the **same pre-allocated**
+pool (fewer concurrent sequences) and allocates **zero** new sidecar —
+**measured flat at +4.4–4.7 GB across mml = 8K / 16K / 32K.** The density
+advantage does **not** decay as context grows (a selling point, not just a
+cost). What the tax *does* scale with:
+
+| Condition | Effect | Tensors |
+|---|---|---|
+| **KV pool size (`gpu_memory_utilization`)** — primary | proportional (~fixed fraction of the KV blocks) | all 5 (∝ `NB`) |
+| **Model size** (`n_layers` × `H_kv` × `D`) | per-layer sidecar set; per-block bytes ∝ `H_kv·D` | all 5 |
+| **`max_num_seqs`** (concurrency) | **staging pool only** — `_k_stage_pool ∝ B`, ~24 MB/slot (~6 GB at B=256, *on top of* the ~4.4 GB) | `_k_stage_pool` |
+| **`protect_fraction`** | `k_protect_ext ∝ n_protect` (4% → 8% ~doubles the 1.0 GB piece) | `k_protect_ext` |
+| **V group size (`v_n_groups`)** | the "sidecar diet" lever (option C) | `v_scale/xmin_ext` |
+
+The two knobs that surprise deployers: **`gpu_util`** (proportional, expected)
+and **`max_num_seqs` staging** (~6 GB at 256) — pin `PHASE6_MAX_ACTIVE_SLOTS`
+to actual concurrency. **Exclusivity implication: the density win is invariant
+to context length, the axis competitors degrade on.**
+
+### 4. APC-compatible by construction — and the graph-safety boundary
+
+vLLM's prefix caching shares full immutable KV blocks across requests by
+content hash. int4_protected is APC-compatible **by construction**: (a) quant
+groups are **block-local** (`group_size = block_size = 32`), so a block's
+nibbles + per-block scale/xmin depend only on that block's tokens — *identical*
+regardless of which request produced it; (b) the sidecars are **keyed by global
+`block_id`**, so a shared block's sidecars travel with it automatically.
+**Validated bit-exact**: S1 byte-gate — 13/13 cached blocks byte-identical to a
+fresh no-APC prefill.
+
+- **Payoff**: a prefix-cache hit *skips prefill compute* — **the first lever
+  that reduces the throughput tax** — and density compounds it (2× blocks ⇒
+  ~2× cacheable prefix). Most valuable on the **target segment** (high-fan-out
+  shared-prefix agentic/RAG traffic).
+- **Shipped eager-only** (Phase 6K.16). **graphs+APC is gated off**: this
+  quarter root-caused the corruption to the **int4 attention kernel not being
+  CUDA-graph-safe at B>1** — identical K/V inputs produce ~1.8× divergent
+  output under graph replay, while the entire Python state machine (identity,
+  GC, masking, protect, splice, dequant) was *measured equal* eager-vs-graphs.
+  Low-ROI to chase because int4 is **kernel-bound** — graphs cut launch
+  overhead, which is not the bottleneck (6M.3: graphs neutral at saturation).
+  *(Honest flag: the kernel is shared with non-APC graphs; non-APC graphs at
+  B>1 is a revalidation item — prior runs showed no COLLAPSE, so likely an
+  APC-read-path trigger, but unconfirmed against this failure mode.)*
+
+### 5. Why the calibration transfers across families and scales
+
+The protected-channel mask is computed by max-abs profiling of prefill K over a
+55-prompt corpus — a *measurement of the trained weights' channel structure*,
+not a fit to a benchmark. Because channel importance is a weight property, **one
+4% mask transfers across Qwen / Mistral / Llama with no per-family tuning**
+(15/15 needle each, 2-of-2 seeds) and across 7B / 8B / 14B. Larger models show
+*more* per-layer specialization (lower cross-layer IoU) — consistent with the
+mechanism (deeper feature specialization ⇒ the mask does *more* work, not less).
+Any `D=128` GQA/MHA architecture works unchanged; other head dims need only a
+kernel recompile, not a methodology change. **Exclusivity: a single shipping
+backend covers ~80% of open-weights serving traffic by category.**
+
+### 6. Orthogonality — why it composes with weight-quant and read-skip
+
+int4_protected attacks one of the three HBM-traffic terms of decode and
+**composes additively** with levers on the other two (two of three already
+measured):
+
+| Decode HBM-traffic term | Lever | Why orthogonal |
+|---|---|---|
+| weight movement | AWQ weight-quant | disjoint budget — weights, not KV (measured: AWQ 14.25 → 5.57 GB *identical* under bf16 and int4 KV) |
+| KV bytes per position | **int4_protected** | the KV-cache itself — AWQ / GPTQ cannot touch this |
+| KV positions read per step | read-skip | bounded retained set vs linear-growing attention → throughput-positive at long context (measured +25% @32K → +72% @60K, needle 1.0/1.0) |
+
+Because the three target disjoint terms, the savings **add** — AWQ shrinks
+weights *and* int4_protected shrinks KV in the same run with quality preserved
+(MMLU 56% stacked vs 55% each alone). **Exclusivity: int4_protected owns the KV
+term — the one budget weight-quant and spec-decode cannot address — and stacks
+cleanly on top of them.**
+
+### Honest technical limits (stated alongside the moat)
+
+| Limit | Mechanism |
+|---|---|
+| **Throughput-negative (0.22–0.54× bf16)** | int4 is *kernel-bound* — per-token paged gather + on-the-fly dequant of packed KV + sidecars. Recoverable headroom is **bounded ~0.27–0.30×, not parity** (int4 fundamentally reads more tensors per token). This is also why CUDA graphs (launch-overhead reduction) buy little. |
+| **+4.4 GB total HBM vs bf16** | structural sidecar tax (§3); diet levers (fp8 sidecars, coarser V groups) save ~2.5 GB but can't reach HBM parity without a different KV layout. |
+| **graphs+APC gated; only D=128; V0 fork; TP unvalidated** | kernel/engineering scope items (§4 + Roadmap), not quality or methodology gaps. |
+
+The through-line: **every win is a verifiable mechanism, and every limit is a
+named, bounded cost** — the quality moat (§1) is fundamental; the throughput
+drag is the disclosed price of reading 4-bit KV + sidecars per token.
+
+---
+
 ## Appendix — Pointers
 
 | Topic | Reference |
@@ -799,6 +996,8 @@ serving solution."
 | Three correctness bug fixes (6K.7/6K.9/6K.10) | `CTM_plus/Bench/scripts/PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` |
 | Slot lifecycle fix (6K.14) + capacity saturation driver | `CTM_plus/Bench/scripts/PHASE_6K14_SLOT_LIFECYCLE_FINDINGS.md`, `phase6k14_saturation.py` |
 | Sidecar overhead audit + diet ceiling | `CTM_plus/Bench/scripts/PHASE_6G_SIDECAR_DIET_FINDINGS.md` |
+| APC correctness contract + graphs+APC root cause (Page 8 §4) | `CTM_plus/Bench/scripts/PHASE6K16_APC_CONTRACT.md`, `PHASE6K16_PREFIX_CACHING_PLAN.md` |
+| Sidecar tensor shapes (Page 8 §3) | `CTM_plus/KVPolicy/kv_policy/phase5b_4c_paged_writer.py:1530` (`*_ext` allocations) |
 | VC brief replication audit | `CTM_plus/Bench/scripts/VC_BRIEF_REPLICATION_AUDIT.md` |
 
 ---
