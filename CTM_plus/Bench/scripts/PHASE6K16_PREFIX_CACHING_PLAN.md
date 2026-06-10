@@ -1,7 +1,10 @@
 # Phase 6K.16 — prefix caching (APC) for int4_protected: feasibility + plan
 
-> **STATUS: MACHINERY VALIDATED UNDER THE CONTRACT (eager/B=1 cells) — guard
-> stays on until the graphs-cell revalidation + payoff measurement.**
+> **STATUS: BANKED — APC ships EAGER-ONLY. Root cause of graphs+APC corruption
+> is the int4 attention KERNEL (not graph-safe at B>1), NOT our state machine;
+> see PHASE6K16_APC_CONTRACT.md "ROOT FOUND". Our Python machinery is validated
+> (eager all B, graphs B=1); the kernel fix is low-ROI (int4 is kernel-bound)
+> and out of repo scope. Diagnostic instruments retained, env-gated.**
 > The turn that broke the stall was replacing fix-by-fix with a stated
 > **correctness contract** (`PHASE6K16_APC_CONTRACT.md`): identity = real vLLM
 > rid everywhere, crossings finalize/reset under the same rid, padding inert,

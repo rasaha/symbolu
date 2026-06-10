@@ -1,5 +1,16 @@
 # Phase 6K.16 — APC correctness contract (the math, not another patch)
 
+> **FINAL VERDICT (2026-06-10): APC ships EAGER-ONLY. The graphs+APC corruption
+> is the int4 attention KERNEL, not our state machine — `flash_attn_with_int4_kvcache`
+> is not CUDA-graph-safe at B>1 (identical inputs → ~1.8× inflated output under
+> replay; full input-vs-kernel proof in the "ROOT FOUND" note below). Every
+> Python-layer hypothesis — collision, identity, GC, padding, partial-tail,
+> masking, protect, FP-reduction — was eliminated by measurement. Status:
+> BANKED. The eager-only ship is correct and validated; a kernel fix is
+> low-ROI (int4 is kernel-bound, so CUDA graphs buy little) and needs the
+> vLLM-flash-attn fork source. The env-gated replay-trace/byte-gate/prefix-debug
+> instruments are retained for whoever revisits the kernel.**
+
 > **MEASURED (pod, Llama-3.1-8B): THE CONTRACT IS SATISFIED (eager/B=1 cells).**
 > - **S1 byte-gate: PASS — 13/13 prefix blocks bit-exact** (packed K + packed V
 >   + all five sidecars) vs a fresh no-APC prefill. P1 holds.
