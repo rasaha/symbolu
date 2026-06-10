@@ -151,13 +151,15 @@ def run_mode(args):
     #    --b1 sends them as separate calls (B=1 decode) to split
     #    batched-decode interactions from per-seq behavior.
     if args.b1:
-        eq_ids = {}
+        eq_ids, eq_texts = {}, {}
         for i, q in enumerate(questions):
             o = llm.generate([prefix + q], sp)
             eq_ids[str(i)] = list(o[0].outputs[0].token_ids)
+            eq_texts[str(i)] = o[0].outputs[0].text
     else:
         outs = llm.generate([prefix + q for q in questions], sp)
         eq_ids = {str(i): list(o.outputs[0].token_ids) for i, o in enumerate(outs)}
+        eq_texts = {str(i): o.outputs[0].text for i, o in enumerate(outs)}
 
     # 3) NEEDLE inside the cached prefix.
     nd = llm.generate(
@@ -186,6 +188,7 @@ def run_mode(args):
         "code": code,
         "warm_ids": warm_ids,
         "eq_ids": eq_ids,
+        "eq_texts": eq_texts,
         "needle_text": needle_text,
         "needle_ids": needle_ids,
         "hits_after_warm": hits_after_warm,
@@ -242,6 +245,13 @@ def compare(noapc_path, apc_path):
         ag, pre = token_agreement(a["eq_ids"][k], b["eq_ids"].get(k, []))
         agrees.append(ag)
         print(f"  prompt[{k}] agreement={ag:.3f} prefix={pre}")
+        # Coherent-but-different (= the bounded S3 quant residual flipping a
+        # greedy near-tie) vs DEGENERATE (= machinery bug). Print both texts
+        # for divergent prompts so the difference is adjudicable by eye.
+        if ag < 0.5 and (b.get("eq_texts") or {}).get(k) is not None:
+            print(f"            apc:   {b['eq_texts'][k][:70]!r}")
+            if (a.get("eq_texts") or {}).get(k) is not None:
+                print(f"            noapc: {a['eq_texts'][k][:70]!r}")
     mean_ag = sum(agrees) / max(1, len(agrees))
     gate_ag = mean_ag >= AGREEMENT_GATE
     print(f"GATE-AGREEMENT  {'PASS' if gate_ag else 'FAIL'}   mean={mean_ag:.4f} "

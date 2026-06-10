@@ -441,6 +441,73 @@ def stashed_real_seq_ids(attn_metadata: "Any", expected_count: int,
     return list(ids)
 
 
+# ---- APC-active flag + pad sentinels (contract C-ID / B2 / B3) ---------
+#
+# When APC is enabled, the contract FORBIDS block-local identity on the
+# live path: if the rid stash is missing, identity is unprovable and we
+# must refuse loudly, never silently fall back (PHASE6K16_APC_CONTRACT.md
+# §3). The factory sets this flag when enable_prefix_caching resolves True.
+#
+# Padding rows (CUDA-graph batch padding) get DEDICATED SENTINEL ids from
+# a negative namespace that can never collide with vLLM rids (small
+# non-negative ints) nor block ids: pad row i -> _PAD_SEQ_ID_BASE - i.
+# Sentinels are excluded from the GC active set, never create SeqStates,
+# and resolve to the writer's reserved scratch slot (B2: pads are inert).
+_APC_ACTIVE = [False]
+_PAD_SEQ_ID_BASE = -1_000_000
+
+
+def set_apc_active(active: bool) -> None:
+    _APC_ACTIVE[0] = bool(active)
+
+
+def apc_active() -> bool:
+    return _APC_ACTIVE[0]
+
+
+def is_pad_seq_id(sid: Any) -> bool:
+    return isinstance(sid, int) and sid <= _PAD_SEQ_ID_BASE
+
+
+# ---- S1 byte-gate dump (contract C-GATE / P1) ---------------------------
+#
+# INT4_PROTECTED_DUMP_BLOCKS=/path.pt makes the FIRST writer to finalize a
+# K block (== layer 0) record the complete bytes of its first N finalized
+# blocks: packed K + packed V nibbles and all five sidecars. Run the SAME
+# warm prompt in a no-APC engine and an APC engine: the first N finalize
+# events are the same prefix blocks in the same order, so byte-comparing
+# the two dumps tests P1 (a cached block == a fresh prefill's block)
+# EXACTLY, independent of the int4-vs-bf16 quant residual. Compare with
+# Bench/scripts/phase6k16_byte_gate.py --compare.
+_DUMP_ENV = "INT4_PROTECTED_DUMP_BLOCKS"
+_DUMP_STATE: Dict[str, Any] = {"writer": None, "events": [], "max": 16}
+
+
+def _maybe_dump_block(writer: Any, kv_cache: "Any", block_id: int) -> None:
+    path = os.environ.get(_DUMP_ENV, "").strip()
+    if not path:
+        return
+    st = _DUMP_STATE
+    if st["writer"] is None:
+        st["writer"] = id(writer)        # arm to the first finalizing writer
+    if st["writer"] != id(writer) or len(st["events"]) >= st["max"]:
+        return
+    b = int(block_id)
+    half_D = writer.D // 2
+    st["events"].append({
+        "event": len(st["events"]),
+        "packed_k": kv_cache[0, b, :, :, :half_D].detach().cpu().clone(),
+        "packed_v": kv_cache[1, b, :, :, :half_D].detach().cpu().clone(),
+        "k_scale": writer.k_scale_ext[b].detach().cpu().clone(),
+        "k_xmin": writer.k_xmin_ext[b].detach().cpu().clone(),
+        "k_protect": writer.k_protect_ext[b].detach().cpu().clone(),
+        "v_scale": writer.v_scale_ext[b].detach().cpu().clone(),
+        "v_xmin": writer.v_xmin_ext[b].detach().cpu().clone(),
+    })
+    torch.save(st["events"], path)
+    _prefix_dbg(f"S1-dump event={len(st['events']) - 1} block={b} -> {path}")
+
+
 def resolve_decode_seq_ids(
     attn_metadata: "Any",
     block_tables: "Any",
@@ -449,37 +516,37 @@ def resolve_decode_seq_ids(
     *,
     block_local: bool,
 ) -> list:
-    """Decode-row seq ids: prefer the stable real-id stash (6K.16c), else
-    block-local / legacy (6K.16b / pre-6K.16b).
+    """Decode-row seq ids: the stable real-id stash (6K.16c), with pad
+    SENTINELS for graph-padding rows; block-local/legacy only when APC is
+    OFF (contract C-ID: under APC a missing stash is a loud refusal).
 
     CUDA-graph note: vLLM pads the decode batch up to the nearest captured
-    graph size, so block_tables can have MORE rows than there are real
-    sequences (e.g. 6 real -> 8 padded). vLLM appends the padding rows and
-    masks them (slot_mapping=-1 on write, seq_lens-masked on read), and the
-    real sequences occupy the first ``len(real)`` rows in seq_groups order.
-    So: use the real ids for those rows, block-local for the padding tail
-    (harmless — masked). Only a stash LONGER than the row count is a true
-    mismatch (warns + full fallback)."""
+    graph size, so block_tables can have MORE rows than real sequences
+    (e.g. 6 real -> 8 padded); the real sequences occupy the first
+    ``len(real)`` rows in seq_groups order. Padding rows are masked by
+    vLLM (slot_mapping=-1 on write, seq_lens on read) and get sentinel ids
+    here so they can never collide with a live rid (B2)."""
     n_rows = int(block_tables.shape[0])
     real = getattr(attn_metadata, _REAL_SEQ_IDS_ATTR, None) \
         if attn_metadata is not None else None
     if real is not None and 0 < len(real) <= n_rows:
-        if len(real) == n_rows:
-            _prefix_dbg(f"decode-resolve rows={n_rows} -> {list(real)[:6]} "
-                        f"(src=real_stash)")
-            return list(real)
-        # padded decode batch — real first, block-local for the masked tail.
-        tail = decode_seq_ids_from_meta(
-            block_tables, seq_lens_tensor, BS, block_local=block_local)
-        out = list(real) + tail[len(real):]
+        out = list(real) + [_PAD_SEQ_ID_BASE - i
+                            for i in range(n_rows - len(real))]
         _prefix_dbg(f"decode-resolve rows={n_rows} -> {out[:6]} "
-                    f"(src=real_stash+pad, real={len(real)})")
+                    f"(src=real_stash, pads={n_rows - len(real)})")
         return out
     if real is not None and len(real) > n_rows:
         logger.warning(
-            "int4_protected real-seq-id stash count %d > %d decode rows; "
-            "falling back to block-local (unexpected batch shape).",
-            len(real), n_rows)
+            "int4_protected real-seq-id stash count %d > %d decode rows "
+            "(unexpected batch shape).", len(real), n_rows)
+    if apc_active():
+        # Contract C-ID: no silent block-local under APC.
+        raise RuntimeError(
+            "int4_protected APC: real-seq-id stash unavailable for a decode "
+            "step (rows=%d, stash=%s) — identity is unprovable, refusing "
+            "rather than risking SeqState corruption. The 6B.2 hook must be "
+            "installed and stashing rids every step under prefix caching."
+            % (n_rows, "absent" if real is None else len(real)))
     bl = decode_seq_ids_from_meta(
         block_tables, seq_lens_tensor, BS, block_local=block_local)
     _prefix_dbg(f"decode-resolve rows={n_rows} -> {bl[:6]} "
@@ -1058,6 +1125,14 @@ class PagedKVWriter:
         longer used (pool tensors live on the writer; their device was
         set at `_lazy_alloc` time).
         """
+        if is_pad_seq_id(seq_id):
+            # Contract B2: padding rows are inert — they must never create
+            # or own per-sequence state. Callers route them to the
+            # pad scratch slot via slot_indices_for.
+            raise RuntimeError(
+                f"ensure_seq_state called with PAD sentinel {seq_id}; "
+                f"pads are inert (use pad_scratch_slot())."
+            )
         s = self._seq_states.get(seq_id)
         if s is not None:
             return s
@@ -1146,6 +1221,9 @@ class PagedKVWriter:
         """
         if not _evict_on_decode_enabled():
             return 0
+        # Contract B3: the active set is exactly the LIVE rids — pad
+        # sentinels are inert and must not participate in GC decisions.
+        active_seq_ids = [s for s in active_seq_ids if not is_pad_seq_id(s)]
         leaked = _leaked_seq_ids(list(self._slot_map.keys()), active_seq_ids)
         if leaked:
             _act = sorted(active_seq_ids)[:6] if not isinstance(
@@ -1163,19 +1241,35 @@ class PagedKVWriter:
     # tensor for device-indexed gathers into the pool tensors.
     # ------------------------------------------------------------------
 
+    def pad_scratch_slot(self) -> int:
+        """Contract B2: the reserved slot for graph-padding rows. It is the
+        LAST pool index, never enters _free_slots/_slot_map, and is never
+        GC'd — any masked-row pool write lands here harmlessly instead of
+        aliasing a live sequence's slot."""
+        if not self._allocated:
+            raise RuntimeError("pad_scratch_slot before _lazy_alloc")
+        return self._k_stage_pool.shape[0] - 1
+
     def slot_indices_for(self, seq_ids: "list") -> "list":
         """Resolve a list of seq_ids to a list of slot ints.
 
-        KeyErrors here mean a sequence has writes but no allocated slot
-        — should never happen if ensure_seq_state was called before.
+        Pad sentinels (contract B2) resolve to the reserved scratch slot.
+        KeyErrors otherwise mean a sequence has writes but no allocated
+        slot — should never happen if ensure_seq_state was called before.
         """
-        try:
-            return [self._slot_map[sid] for sid in seq_ids]
-        except KeyError as e:
-            raise RuntimeError(
-                f"seq_id {e.args[0]!r} has no slot assignment; "
-                f"slot_map keys: {list(self._slot_map.keys())}"
-            )
+        out = []
+        for sid in seq_ids:
+            if is_pad_seq_id(sid):
+                out.append(self.pad_scratch_slot())
+                continue
+            try:
+                out.append(self._slot_map[sid])
+            except KeyError:
+                raise RuntimeError(
+                    f"seq_id {sid!r} has no slot assignment; "
+                    f"slot_map keys: {list(self._slot_map.keys())}"
+                )
+        return out
 
     def get_bf16_backing_batched_by_slots(
         self,
@@ -1382,7 +1476,11 @@ class PagedKVWriter:
         # current per-seq lazy-alloc footprint (~256 MB per writer at
         # max_S=4096).
         max_S = self._bf16_backing_max_seqlen
-        n_slots = self._max_active_slots
+        # Contract B2 (6K.16c): +1 reserved PAD SCRATCH slot at the last
+        # index — graph-padding rows resolve there (pad_scratch_slot()),
+        # never enter _free_slots/_slot_map, and any masked pool write
+        # lands harmlessly instead of aliasing a live sequence's slot.
+        n_slots = self._max_active_slots + 1
         self._k_stage_pool = torch.zeros(
             (n_slots, BS, H, D), dtype=dtype, device=device,
         )
@@ -1427,8 +1525,9 @@ class PagedKVWriter:
         # surfaced as pool exhaustion at the documented B=8 ship target
         # when none of vLLM's 8 fresh seq_ids happened to equal 0).
         # First write through ensure_seq_state(DEFAULT_SEQ_ID) allocates
-        # it lazily, like any other seq.
-        self._free_slots = list(range(n_slots))
+        # it lazily, like any other seq. The LAST index is the reserved
+        # pad scratch slot (contract B2) — excluded from the free list.
+        self._free_slots = list(range(n_slots - 1))
         self._allocated = True
 
         logger.info(
@@ -2126,6 +2225,9 @@ class PagedKVWriter:
         kv_cache[0, full_block_ids, :, :, :half_D] = packed
         self.k_scale_ext[full_block_ids] = scale.to(dtype)
         self.k_xmin_ext [full_block_ids] = x_min.to(dtype)
+        if os.environ.get(_DUMP_ENV, "").strip():        # S1 byte-gate
+            for _b in full_block_ids.cpu().tolist():
+                _maybe_dump_block(self, kv_cache, _b)
 
         # If THIS seq's staging buffer was tracking one of these now-
         # finalized blocks, mark its count as 0 (block is done; next
@@ -2236,6 +2338,8 @@ class PagedKVWriter:
         # Write per-(h, d) scale + xmin to externals (per-layer, shared).
         self.k_scale_ext[block_id] = scale.to(self.sidecar_dtype)
         self.k_xmin_ext [block_id] = x_min.to(self.sidecar_dtype)
+        if os.environ.get(_DUMP_ENV, "").strip():        # S1 byte-gate
+            _maybe_dump_block(self, kv_cache, block_id)
 
     # ------------------------------------------------------------------
     # Introspection helpers (for verify scripts).

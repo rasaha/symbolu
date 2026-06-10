@@ -303,7 +303,10 @@ def _resolve_and_stash(
         # seq_id. All writers see seq_ids in the same order; each
         # writer's _free_slots is popped in the same order; so the
         # _slot_map mappings align deterministically.
+        from kv_policy.phase5b_4c_paged_writer import is_pad_seq_id as _is_pad
         for sid in seq_ids:
+            if _is_pad(sid):
+                continue   # contract B2: pads never create SeqStates
             for w in writers:
                 if w._allocated:
                     w.ensure_seq_state(sid, device)

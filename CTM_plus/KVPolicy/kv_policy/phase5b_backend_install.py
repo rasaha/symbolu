@@ -1034,7 +1034,12 @@ if _VLLM_FA_AVAILABLE:
                                     # Ensure SeqState exists for each decode
                                     # seq (allocates a pool slot lazily on
                                     # first write).
+                                    from kv_policy.phase5b_4c_paged_writer import (
+                                        is_pad_seq_id as _is_pad,
+                                    )
                                     for sid in seq_ids:
+                                        if _is_pad(sid):
+                                            continue  # B2: pads inert
                                         writer.ensure_seq_state(sid, kv_cache.device)
                                     slot_idx_list = writer.slot_indices_for(seq_ids)
                                     # Phase 6B.3 (Option X): use the
@@ -1472,6 +1477,15 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
             # 6K.16c: real prefill seq ids (one per prompt segment),
             # count-checked; else per-segment block-local / legacy.
             real_pre = stashed_real_seq_ids(attn_metadata, n_seg, prefill=True)
+            from kv_policy.phase5b_4c_paged_writer import apc_active as _apc
+            if real_pre is None and _apc():
+                # Contract C-ID: under APC, identity without the rid stash
+                # is unprovable — refuse loudly, never block-local.
+                raise RuntimeError(
+                    f"int4_protected APC: real-seq-id stash unavailable for "
+                    f"a {n_seg}-segment prefill — refusing block-local "
+                    f"identity (PHASE6K16_APC_CONTRACT.md C-ID)."
+                )
             partitions = []
             for i in range(n_seg):
                 start, end = qsl_cpu[i], qsl_cpu[i + 1]
@@ -1489,13 +1503,21 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
             if partitions:
                 return partitions
         # Single-seq prefill.
-        from kv_policy.phase5b_4c_paged_writer import _prefix_dbg
+        from kv_policy.phase5b_4c_paged_writer import (
+            _prefix_dbg, apc_active as _apc_single,
+        )
         n = int(slot_mapping_flat.shape[0])
         real_pre = stashed_real_seq_ids(attn_metadata, 1, prefill=True)
         if real_pre is not None:
             _prefix_dbg(f"prefill-write single-seg -> {real_pre[0]} "
                         f"(src=real_stash)")
             return [(real_pre[0], slice(0, n))]
+        if _apc_single():
+            raise RuntimeError(
+                "int4_protected APC: real-seq-id stash unavailable for a "
+                "single-seq prefill — refusing block-local identity "
+                "(PHASE6K16_APC_CONTRACT.md C-ID)."
+            )
         sid = prefill_seq_id_for_segment(
             slot_mapping_flat, 0, n, BS, block_local=block_local)
         _prefix_dbg(f"prefill-write single-seg -> {sid} "

@@ -88,9 +88,10 @@ class TestWiring(unittest.TestCase):
         src = inspect.getsource(ip.Int4ProtectedLLM)
         self.assertIn("_resolve_prefix_caching", src)
         self.assertIn('kwargs.pop("enable_prefix_caching"', src)
-        idx_gate = src.index('if kv_cache_dtype == "int4_protected":\n'
-                             '        kwargs["enable_prefix_caching"]')
-        self.assertGreater(idx_gate, 0)
+        # int4-gated resolution + the 6K.16c contract flag are both wired:
+        gate = src.index('if kv_cache_dtype == "int4_protected":')
+        self.assertGreater(src.index("_resolve_prefix_caching", gate), gate)
+        self.assertIn("set_apc_active(_apc_resolved)", src)
 
     def test_backend_branch_guarded_and_rewired(self):
         # Tier 1: inside the prefix-enabled prefill branch (between the

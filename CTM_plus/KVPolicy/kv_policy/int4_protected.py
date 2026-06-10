@@ -343,7 +343,14 @@ def Int4ProtectedLLM(
     # Phase 6K.16 — prefix-caching guard, same gating shape as 6K.15.
     _requested_apc = kwargs.pop("enable_prefix_caching", None)
     if kv_cache_dtype == "int4_protected":
-        kwargs["enable_prefix_caching"] = _resolve_prefix_caching(_requested_apc)
+        _apc_resolved = _resolve_prefix_caching(_requested_apc)
+        kwargs["enable_prefix_caching"] = _apc_resolved
+        # Contract C-ID (PHASE6K16_APC_CONTRACT.md): under APC, block-local
+        # identity is forbidden on the live path — the writer's resolvers
+        # RAISE instead of silently falling back when the rid stash is
+        # missing. The flag arms that refusal.
+        from kv_policy.phase5b_4c_paged_writer import set_apc_active
+        set_apc_active(_apc_resolved)
     elif _requested_apc is not None:
         kwargs["enable_prefix_caching"] = _requested_apc
 

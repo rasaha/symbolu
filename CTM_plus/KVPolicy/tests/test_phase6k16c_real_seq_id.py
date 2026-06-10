@@ -123,18 +123,49 @@ class TestStashFallback(unittest.TestCase):
             resolve_decode_seq_ids(SimpleNamespace(), bt, sl, BS, block_local=True),
             [100, 101])
 
-    def test_cudagraph_padding_real_first_blocklocal_tail(self):
+    def test_cudagraph_padding_real_first_sentinel_tail(self):
         # 2 real seqs, decode batch padded to 4 rows (graph capture size).
-        # Rows 0-1 real (stash), rows 2-3 padding -> block-local tail.
+        # Rows 0-1 real (stash); rows 2-3 padding -> PAD SENTINELS from a
+        # negative namespace (contract B2: can never collide with a rid).
+        from kv_policy.phase5b_4c_paged_writer import (
+            is_pad_seq_id, _PAD_SEQ_ID_BASE,
+        )
         bt = torch.tensor([[7, 8, 100], [7, 8, 101],
                           [0, 0, 0], [0, 0, 0]], dtype=torch.int32)
         sl = torch.tensor([70, 90, 1, 1], dtype=torch.int32)
         md = SimpleNamespace()
         setattr(md, _REAL_SEQ_IDS_ATTR, [555, 666])
         ids = resolve_decode_seq_ids(md, bt, sl, BS, block_local=True)
-        # real for the first two, block-local (block of token) for the pad:
-        # (1-1)//32 = 0 -> block_tables[row,0] = 0.
-        self.assertEqual(ids, [555, 666, 0, 0])
+        self.assertEqual(ids[:2], [555, 666])
+        self.assertTrue(all(is_pad_seq_id(s) for s in ids[2:]))
+        self.assertEqual(len(set(ids)), 4)    # I3 incl. pads
+
+    def test_apc_refusal_when_stash_absent(self):
+        # Contract C-ID: under APC, no stash -> loud refusal.
+        from kv_policy.phase5b_4c_paged_writer import set_apc_active
+        bt = torch.tensor([[7, 8, 100]], dtype=torch.int32)
+        sl = torch.tensor([70], dtype=torch.int32)
+        set_apc_active(True)
+        try:
+            with self.assertRaises(RuntimeError) as cm:
+                resolve_decode_seq_ids(SimpleNamespace(), bt, sl, BS,
+                                       block_local=True)
+            self.assertIn("refusing", str(cm.exception))
+        finally:
+            set_apc_active(False)
+        # APC off: block-local fallback intact (legacy unchanged).
+        self.assertEqual(
+            resolve_decode_seq_ids(SimpleNamespace(), bt, sl, BS,
+                                   block_local=True),
+            [100])
+
+    def test_pad_never_creates_seqstate(self):
+        from kv_policy.phase5b_4c_paged_writer import (
+            PagedKVWriter, _PAD_SEQ_ID_BASE,
+        )
+        w = PagedKVWriter.__new__(PagedKVWriter)   # no alloc needed
+        with self.assertRaises(RuntimeError):
+            PagedKVWriter.ensure_seq_state(w, _PAD_SEQ_ID_BASE - 1, None)
 
     def test_stash_longer_than_rows_full_fallback(self):
         bt = torch.tensor([[7, 8, 100], [7, 8, 101]], dtype=torch.int32)
