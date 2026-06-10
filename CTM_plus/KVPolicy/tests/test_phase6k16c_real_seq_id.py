@@ -123,6 +123,28 @@ class TestStashFallback(unittest.TestCase):
             resolve_decode_seq_ids(SimpleNamespace(), bt, sl, BS, block_local=True),
             [100, 101])
 
+    def test_cudagraph_padding_real_first_blocklocal_tail(self):
+        # 2 real seqs, decode batch padded to 4 rows (graph capture size).
+        # Rows 0-1 real (stash), rows 2-3 padding -> block-local tail.
+        bt = torch.tensor([[7, 8, 100], [7, 8, 101],
+                          [0, 0, 0], [0, 0, 0]], dtype=torch.int32)
+        sl = torch.tensor([70, 90, 1, 1], dtype=torch.int32)
+        md = SimpleNamespace()
+        setattr(md, _REAL_SEQ_IDS_ATTR, [555, 666])
+        ids = resolve_decode_seq_ids(md, bt, sl, BS, block_local=True)
+        # real for the first two, block-local (block of token) for the pad:
+        # (1-1)//32 = 0 -> block_tables[row,0] = 0.
+        self.assertEqual(ids, [555, 666, 0, 0])
+
+    def test_stash_longer_than_rows_full_fallback(self):
+        bt = torch.tensor([[7, 8, 100], [7, 8, 101]], dtype=torch.int32)
+        sl = torch.tensor([70, 90], dtype=torch.int32)
+        md = SimpleNamespace()
+        setattr(md, _REAL_SEQ_IDS_ATTR, [1, 2, 3])    # 3 > 2 rows -> fallback
+        self.assertEqual(
+            resolve_decode_seq_ids(md, bt, sl, BS, block_local=True),
+            [100, 101])
+
 
 @unittest.skipUnless(_HAVE_TORCH, "torch required")
 class TestPartitionsConsumeStash(unittest.TestCase):

@@ -435,10 +435,31 @@ def resolve_decode_seq_ids(
     block_local: bool,
 ) -> list:
     """Decode-row seq ids: prefer the stable real-id stash (6K.16c), else
-    block-local / legacy (6K.16b / pre-6K.16b)."""
-    real = stashed_real_seq_ids(attn_metadata, int(block_tables.shape[0]))
-    if real is not None:
-        return real
+    block-local / legacy (6K.16b / pre-6K.16b).
+
+    CUDA-graph note: vLLM pads the decode batch up to the nearest captured
+    graph size, so block_tables can have MORE rows than there are real
+    sequences (e.g. 6 real -> 8 padded). vLLM appends the padding rows and
+    masks them (slot_mapping=-1 on write, seq_lens-masked on read), and the
+    real sequences occupy the first ``len(real)`` rows in seq_groups order.
+    So: use the real ids for those rows, block-local for the padding tail
+    (harmless — masked). Only a stash LONGER than the row count is a true
+    mismatch (warns + full fallback)."""
+    n_rows = int(block_tables.shape[0])
+    real = getattr(attn_metadata, _REAL_SEQ_IDS_ATTR, None) \
+        if attn_metadata is not None else None
+    if real is not None and 0 < len(real) <= n_rows:
+        if len(real) == n_rows:
+            return list(real)
+        # padded decode batch — real first, block-local for the masked tail.
+        tail = decode_seq_ids_from_meta(
+            block_tables, seq_lens_tensor, BS, block_local=block_local)
+        return list(real) + tail[len(real):]
+    if real is not None and len(real) > n_rows:
+        logger.warning(
+            "int4_protected real-seq-id stash count %d > %d decode rows; "
+            "falling back to block-local (unexpected batch shape).",
+            len(real), n_rows)
     return decode_seq_ids_from_meta(
         block_tables, seq_lens_tensor, BS, block_local=block_local)
 
