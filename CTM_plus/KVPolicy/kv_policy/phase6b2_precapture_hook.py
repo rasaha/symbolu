@@ -716,6 +716,25 @@ def install_int4_protected_precapture_hook(
                                 sit.cpu().tolist()[:8] if sit is not None
                                 else None)
                             ki, ks = refs["k_int4"], refs["k_scale"]
+
+                            def _psig(t, sl=None):
+                                # Per-field guard: a shape surprise on a v5
+                                # field must not wipe the v4 view_tail data.
+                                try:
+                                    if t is None:
+                                        return None
+                                    x = t if sl is None else t[sl]
+                                    return _rt_sig(
+                                        x.float() if x.is_floating_point()
+                                        else x)
+                                except Exception:
+                                    return None
+
+                            kp = refs.get("k_protect_bf16")
+                            ps = refs.get("protect_slot")
+                            bk = refs.get("bf16_k")
+                            vk = refs.get("v_kernel")
+                            ou = refs.get("out")
                             rec["view_tail"] = {}
                             for row, s in enumerate(
                                     rec["read_cache_seqlens"]):
@@ -724,14 +743,45 @@ def install_int4_protected_precapture_hook(
                                 lb = (int(s) - 1) // BSr
                                 a, b2 = lb * BSr, (lb + 1) * BSr
                                 if b2 <= ki.shape[1]:
-                                    rec["view_tail"][str(row)] = {
+                                    ent = {
                                         "last_block": lb,
                                         "k_int4": _rt_sig(
                                             ki[row, a:b2].float()),
                                         "k_scale": _rt_sig(ks[row, lb]
                                                            if ks.dim() == 4
                                                            else ks[row]),
+                                        # v5: the unobserved kernel surface.
+                                        # protect_bf16/protect_slot = the
+                                        # protected-channel overlay; bf16_k =
+                                        # the positional bf16 K backing/stub;
+                                        # v_kernel = the V the kernel read;
+                                        # out = the per-row attention result
+                                        # (the integral screen).
+                                        "k_protect_bf16": _psig(
+                                            kp, row if kp is not None
+                                            else None),
+                                        "protect_slot": _psig(
+                                            ps, row if ps is not None
+                                            else None),
+                                        "bf16_k": _psig(
+                                            bk, (row, slice(a, b2))
+                                            if (bk is not None
+                                                and bk.dim() >= 2
+                                                and b2 <= bk.shape[1])
+                                            else (row if bk is not None
+                                                  else None)),
+                                        "v_kernel": _psig(
+                                            vk, (row, slice(a, b2))
+                                            if (vk is not None
+                                                and vk.dim() >= 2
+                                                and b2 <= vk.shape[1])
+                                            else (row if vk is not None
+                                                  else None)),
+                                        "out": _psig(
+                                            ou, row if ou is not None
+                                            else None),
                                     }
+                                    rec["view_tail"][str(row)] = ent
                         except Exception as _e2:
                             rec["view_tail_error"] = str(_e2)[:80]
                     pre_c = _t_pre.get("counters_postsync") or {}

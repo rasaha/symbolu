@@ -651,6 +651,21 @@ if _VLLM_FA_AVAILABLE:
                     "mode": "batched",
                     "k_int4": view["k_int4"],
                     "k_scale": view["k_scale"],
+                    # v5: the previously-unobserved kernel inputs. The
+                    # protect channels are the int4_PROTECTED differentiator
+                    # (top-n_protect K dims carried at bf16); k_int4/k_scale
+                    # alone (v4) reconstruct the lossy bulk but NOT the
+                    # protected overlay. These ride in the gathered `view`
+                    # (graph-pool memory, stable address) so the post-step
+                    # window reads what the replayed gather produced. `out`
+                    # is the kernel integral — the screen for "did the read
+                    # actually diverge" independent of which input caused it.
+                    "k_protect_bf16": view.get("k_protect_bf16"),
+                    "protect_slot": view.get("protect_slot"),
+                    "k_xmin": view.get("k_xmin"),
+                    "bf16_k": bf16_k_batch,
+                    "v_kernel": v_for_kernel,
+                    "out": out,
                     "cache_seqlens": cache_seqlens_i32,
                     "slot_idx": slot_idx_t,
                     "BS": BS,
@@ -763,6 +778,13 @@ if _VLLM_FA_AVAILABLE:
                     "mode": "one",
                     "k_int4": view["k_int4"],
                     "k_scale": view["k_scale"],
+                    # v5: mirror of the batched stash (see batched path).
+                    "k_protect_bf16": view.get("k_protect_bf16"),
+                    "protect_slot": view.get("protect_slot"),
+                    "k_xmin": view.get("k_xmin"),
+                    "bf16_k": dummy,
+                    "v_kernel": v_for_kernel,
+                    "out": out,
                     "cache_seqlens": cache_seqlens_i32,
                     "slot_idx": None,
                     "BS": BS,

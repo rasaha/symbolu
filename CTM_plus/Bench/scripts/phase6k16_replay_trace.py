@@ -66,11 +66,28 @@ def _norm_post(r):
     # content (the spliced tail the kernel actually consumed) + the read's
     # cache_seqlens/slot buffer VALUES. Rows with seq<=0 are padding.
     vt = r.get("view_tail") or {}
+
+    def _sha(v, key):
+        return ((v or {}).get(key) or {}).get("sha1")
+
+    def _nrm(v, key):
+        return ((v or {}).get(key) or {}).get("norm")
+
     out["view_tail"] = {
         row: {"last_block": (v or {}).get("last_block"),
-              "k_int4_sha": ((v or {}).get("k_int4") or {}).get("sha1"),
-              "k_int4_norm": ((v or {}).get("k_int4") or {}).get("norm"),
-              "k_scale_sha": ((v or {}).get("k_scale") or {}).get("sha1")}
+              "k_int4_sha": _sha(v, "k_int4"),
+              "k_int4_norm": _nrm(v, "k_int4"),
+              "k_scale_sha": _sha(v, "k_scale"),
+              # v5: the kernel surface v4 couldn't see. A divergence here
+              # NAMES the buffer: protect_bf16/protect_slot = protected
+              # overlay; bf16_k = positional K backing; v_kernel = V input;
+              # out = the per-row attention result (integral screen).
+              "protect_bf16_sha": _sha(v, "k_protect_bf16"),
+              "protect_slot_sha": _sha(v, "protect_slot"),
+              "bf16_k_sha": _sha(v, "bf16_k"),
+              "v_kernel_sha": _sha(v, "v_kernel"),
+              "out_sha": _sha(v, "out"),
+              "out_norm": _nrm(v, "out")}
         for row, v in vt.items()}
     csl = r.get("read_cache_seqlens")
     out["read_cache_seqlens"] = [s for s in (csl or []) if s > 0]
