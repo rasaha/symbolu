@@ -350,6 +350,37 @@ def Int4ProtectedLLM(
         # install (below) — engine init runs CUDA-graph capture WARM-UPS
         # (dummy decode batches, hook not yet installed, some outside the
         # capturing stream) where block-local placeholders are by-design.
+        #
+        # APC is EAGER-ONLY (measured): the captured-graph decode replay
+        # corrupts cache-hit sequences' partial K-tails (degenerate output,
+        # needle MISS — gates run on Llama-3.1-8B), while eager B=1/B=6
+        # cells pass the contract (S1 byte-exact, warm/needle 1.000,
+        # coherent texts). Until the replay path is fixed and re-gated,
+        # APC forces enforce_eager=True; combining APC with CUDA graphs
+        # is refused loudly. Override (dev only):
+        # INT4_PROTECTED_APC_ALLOW_GRAPHS=1.
+        if _apc_resolved:
+            _allow_graphs = os.environ.get(
+                "INT4_PROTECTED_APC_ALLOW_GRAPHS", "").strip() in (
+                "1", "true", "yes")
+            if not effective_enforce_eager and not _allow_graphs:
+                if enforce_eager is False:
+                    # Caller EXPLICITLY asked for graphs + APC: refuse.
+                    raise RuntimeError(
+                        "int4_protected APC is EAGER-ONLY: the captured-"
+                        "graph decode replay corrupts cache-hit sequences' "
+                        "partial K-tails (measured: degenerate output + "
+                        "needle MISS on the graphs cell; eager cells pass "
+                        "the contract). Pass enforce_eager=True (or omit "
+                        "enforce_eager), or set "
+                        "INT4_PROTECTED_APC_ALLOW_GRAPHS=1 for development."
+                    )
+                logger.warning(
+                    "int4_protected: APC enabled -> forcing "
+                    "enforce_eager=True (APC is eager-only; the captured "
+                    "decode replay is not yet APC-safe)."
+                )
+                effective_enforce_eager = True
     elif _requested_apc is not None:
         kwargs["enable_prefix_caching"] = _requested_apc
 

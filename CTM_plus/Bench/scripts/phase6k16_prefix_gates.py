@@ -112,6 +112,13 @@ def run_mode(args):
         # Self-contained: the factory + backend guards honor this env.
         os.environ["INT4_PROTECTED_ALLOW_PREFIX_CACHING"] = "1"
         print("[p6k16] INT4_PROTECTED_ALLOW_PREFIX_CACHING=1 (Tier-1 path enabled)")
+        if not args.eager:
+            # This harness EXISTS to test cells, including the (currently
+            # broken, factory-refused) graphs cell — bypass the eager-only
+            # coupling deliberately. Production never sets this.
+            os.environ["INT4_PROTECTED_APC_ALLOW_GRAPHS"] = "1"
+            print("[p6k16] INT4_PROTECTED_APC_ALLOW_GRAPHS=1 (validation "
+                  "harness: deliberately exercising the graphs cell)")
     import kv_policy.int4_protected  # noqa: F401  (registers backend)
     from kv_policy.int4_protected import Int4ProtectedLLM
 
