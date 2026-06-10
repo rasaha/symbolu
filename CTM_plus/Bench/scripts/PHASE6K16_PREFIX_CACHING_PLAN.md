@@ -262,3 +262,36 @@ CPU coverage: `tests/test_phase6k16b_seq_identity.py` (10 tests: APC collision
 fixed, prefill==first-decode identity, legacy byte-preserved, padding) + all
 27 existing hook tests + 6J/6K15/6K16 suites + the 6C/6E writer verifiers —
 green. GPU validation: rerun the same three gates.
+
+### 6K.16b GPU result — PARTIAL; block-local identity found fragile
+
+Rerun: prompt[1] reached **1.000 (all 32 tokens) — the full APC pipeline works
+end to end for a sequence** (prefill→cached blocks→decode-over-packed), so the
+architecture is sound. But overall agreement stayed low. A 3-cell bisection
+(`--eager`, `--b1` cells added to the gate script) localized the residual:
+
+| cell | full-pass prompts | needle |
+|---|---|---|
+| graphs + batched | [1] | MISS |
+| eager  + batched | [2],[3] | HIT |
+| graphs + B=1     | [0],[2],[3] | HIT |
+
+- **Passing set shifts with execution config** (prompt[1] passes in cell 1,
+  fails in 2/3) ⇒ NOT a content bug — order-dependent **state contamination**.
+- **Needle MISS only in graphs+batched**; the identical B=1 needle call passes
+  once the prior equivalence prompts run sequentially ⇒ **batched decode leaks
+  writer state into the next request**.
+
+**Root cause: block-local identity churns.** `seq_id = block of current token`
+**changes every block crossing** (these prompts cross 1–2 in 32 decode tokens),
+so slots are allocated/freed mid-sequence and stale `SeqState`s keyed by
+recycled block ids contaminate later sequences in a timing-dependent way.
+Block-local fixed the *original* collision but is itself fragile.
+
+**Decision: pivot to STABLE identity (Tier 1c).** Use vLLM's real per-sequence
+ids (unique, constant for the whole lifetime, never recycled mid-flight) —
+the audit's original proposal — stashed by the 6B.2 `execute_model` wrap and
+required for APC. Eliminates churn AND cross-request collisions by construction.
+Bigger change (hook plumbing + a stable fallback for the eager path); needs one
+GPU iteration. Block-local stays as the legacy-mode path (byte-identical;
+non-APC unaffected). Guard stays closed throughout; production unchanged.
