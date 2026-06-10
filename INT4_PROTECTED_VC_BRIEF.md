@@ -36,7 +36,7 @@
 >   **extrapolate to cross near ~50K**, where read-skip turns throughput-positive
 >   (a YaRN-extended run to convert that extrapolation into a measured number is
 >   the next gate). Realized value today is **density + flat decode-scaling that
->   compounds on int4** — store 4× the context per GB and hold per-token decode
+>   compounds on int4** — store ~2× the context per GB (1.83× net of the sidecar tax) and hold per-token decode
 >   ~flat as context grows, not a sub-32K speed win. Software-capturable, not a
 >   hardware mandate.
 >
@@ -262,11 +262,12 @@ superseded.
   CUDA-graph private pools). This is the sidecar overhead (protection
   tensors for scale, xmin, and protected channels) — int4_protected does
   **not** shrink the absolute HBM footprint; it costs more.
-- **max_concurrency is 2×** because int4 packs ~4× tokens per block
-  (block_size=32, groups of 32 with 4-bit nibbles), so the same KV
-  budget holds ~2× the full-context sequences. This is the
-  **concurrency density** win — 2× more sequences per fixed KV
-  allocation.
+- **max_concurrency is 2×** because int4's 4-bit nibbles are 4× denser
+  than bf16 *at the element level*, but the per-block scale/xmin sidecars
+  + 4% bf16 protect channels consume ~half of that — so the same KV budget
+  **nets ~2×** the full-context sequences (block_size=32 vs bf16's 16). This
+  is the **concurrency density** win — 2× more sequences per fixed KV
+  allocation; the raw 4× is the nibble ratio before the sidecar tax.
 - **Net capacity density** (accounting for the sidecar overhead) —
   **now DEMONSTRATED under sustained saturation (Phase 6L)**: at
   mml=8K, B=128, both cells hit 100% KV-block utilization with
