@@ -1,5 +1,19 @@
 # Phase 6K.16 — prefix caching (APC) for int4_protected: feasibility + plan
 
+> **STATUS: GATED OFF — feasibility established, full integration is multi-week.**
+> Storage is APC-compatible by construction; the dequant-context prefill path
+> works (a sequence runs 1.000 end-to-end). But the V0 writer's per-sequence
+> identity/lifecycle has MULTIPLE independent bugs under shared blocks. Four were
+> found + fixed via trace-driven debugging (collision, churn, graph-padding,
+> GC-eviction — see "Debugging log" below), each correct, yet the gate agreement
+> held flat at **0.375** across the last three because each bug was orthogonal to
+> the next. A fifth (batched-decode crossing) remains. Conclusion: finishing APC
+> is a focused multi-week rework of the writer's state model, not a few fixes.
+> The guard stays closed (`INT4_PROTECTED_ALLOW_PREFIX_CACHING` required);
+> production is unaffected. Resume only if APC is prioritized vs other work.
+>
+> _(original plan + Tier-0/1 implementation notes preserved below)_
+
 > **Status: Tier 1 IMPLEMENTED (dequant-context prefill, CPU-verified) — pending the
 > GPU gates below. Tier 0 (guards) LANDED earlier; the guard now gates an
 > implemented path rather than a missing one.** Enable with
@@ -330,3 +344,41 @@ tests); the count-check makes a wrong guess safe. GPU: rerun the 3-cell
 bisection — expect agreement to clear 0.90 in ALL cells (no config-dependence)
 if extraction is correct; if a cell still fails the *same shifting-set* way,
 the stash isn't landing (warning in the log) and we fix `extract_real_seq_ids`.
+
+## Debugging log — the five edges (trace-driven, for whoever resumes)
+
+The writer keys per-sequence state (K staging, slot pool) on an id that was
+*assumed* to be a stable, unique, per-sequence key. APC violates that assumption
+in several independent ways. Each was found by adding targeted tracing
+(`INT4_PROTECTED_PREFIX_DEBUG=1`), fixed, and revealed the next:
+
+1. **Decode collision (16b).** Legacy `seq_id = block_tables[i,0]` = the SHARED
+   prefix block → all cache-hit seqs collapse to one SeqState. Fix attempt:
+   block-local id (`block of the token being written`).
+2. **Block-local churn (16b bisection).** Block-local id *changes* at every
+   32-token block crossing → slot alloc/free churn + stale state. Failures land
+   exactly at crossing decode steps (`prefix=1,2`). Fix: stable real vLLM seq
+   ids (16c), stashed by the 6B.2 `execute_model` hook, count-checked fallback.
+3. **CUDA-graph padding (16c).** Decode batch padded to the captured size (6→8)
+   ⇒ `stash count != rows` ⇒ safe fallback to block-local. Fix: real ids for the
+   real rows, block-local for the masked padding tail.
+4. **GC eviction (16c).** *Confirmed by trace:* `GC active=[13] assigned=[0] ->
+   EVICTING [0]`. The eager decode-write's self-resolve GC still used block-local
+   identity (`13`) while every other path used the real id (`0`), so it evicted
+   the live SeqState the read then missed. Fix: route that GC through
+   `resolve_decode_seq_ids` too (all sites now consistent). **Verified gone**
+   (no more EVICT/miss in the trace).
+5. **Batched-decode crossing (OPEN).** After fix #4, the warm (B=1) eviction is
+   gone but the gate agreement is UNCHANGED at 0.375 — because that path is not
+   the scored one. The scored equivalence prompts run **batched (B=6)** through
+   `_read_decode_packed_batched`, which still fails at block crossings
+   (`prefix=1,2`, prompts [1]/[4]/[5]) and at prefill output (prompt [0]). This
+   is the next edge; expect more after it.
+
+**Why "multi-week, not a few fixes":** three correct fixes (padding, real-id,
+GC) moved the gate metric by **0.000** because each addressed a real but
+orthogonal bug. The writer's state model needs a coherent rework for shared
+blocks (one identity source threaded through every site: write/read, B=1/batched,
+prefill/decode, GC/staging/eviction), not whack-a-mole. The trace harness
+(`_prefix_dbg`, the EVICT/GC/resolve logging) is in place to make that rework
+tractable when prioritized.
