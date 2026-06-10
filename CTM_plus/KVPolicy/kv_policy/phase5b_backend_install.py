@@ -1004,18 +1004,20 @@ if _VLLM_FA_AVAILABLE:
                                         "write_decode_batched_via_hook_calls"
                                     ] += 1
                                 else:
-                                    # Hook NOT installed (CPU tests, pre-
-                                    # hook deployments). Self-resolve as
-                                    # in 6B.1. The seq_id derivation
-                                    # mirrors _derive_write_partitions's
-                                    # decode branch (6K.16b: block-local
-                                    # when backing-skip; legacy [:,0]
-                                    # otherwise).
+                                    # Hook stash absent for this step. Self-
+                                    # resolve as in 6B.1. 6K.16c: MUST use the
+                                    # same resolver as the read path / hook —
+                                    # prefer the stable real-id stash, else
+                                    # block-local. (Using block-local here while
+                                    # the read used real-stash made THIS GC evict
+                                    # the real-id SeqState the read then missed —
+                                    # the 6K.16c decode-eviction bug.)
                                     from kv_policy.phase5b_4c_paged_writer import (
                                         block_local_seq_ids_enabled as _bl_ids,
-                                        decode_seq_ids_from_meta as _dec_ids,
+                                        resolve_decode_seq_ids as _resolve_ids,
                                     )
-                                    seq_ids = _dec_ids(
+                                    seq_ids = _resolve_ids(
+                                        attn_metadata,
                                         dec_meta.block_tables,
                                         getattr(dec_meta, "seq_lens_tensor", None),
                                         BS, block_local=_bl_ids(writer),
