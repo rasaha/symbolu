@@ -114,6 +114,14 @@ Architecture support matrix:
   - Sliding window attention: passes through unchanged
   - Number of layers: any (PagedKVWriter is per-layer; pool tensors scale)
   - Head dim D != 128: NOT supported (kernel constraint)
+  - Preemption: **recompute ONLY** (Phase 6K.15). The quantization
+    sidecars (scales/xmin/protect/staging) are NOT migrated by vLLM's
+    swap_out/swap_in, so a swap-preempted sequence resumes with corrupted
+    KV. The factory forces `preemption_mode="recompute"` and REFUSES
+    `"swap"` at init (vLLM V0's dynamic default picks SWAP for multi-seq
+    groups, so leaving it unset was not safe). Do NOT point swap-driving
+    harnesses (e.g. `runner_vllm_streaming`'s swap-telemetry mode) at an
+    int4_protected engine.
 
 ## What you get
 
@@ -234,6 +242,7 @@ explicit layer-idx pre-assignment.
 | `PROTECT_MASK_PATH` | `/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt` | Path to calibrated per-model protect-mask artifact. |
 | `PHASE5B_4C_BF16_BACKING_MAX_SEQLEN` | `4096` | Size of per-layer BF16 K/V backing buffer. Increase for longer contexts. |
 | `PHASE5B_4C_BF16_V` | unset | Debug switch — stash V as bf16 instead of packing. Used during 5B.4c.3 V-isolation. Production runs leave unset. |
+| `INT4_PROTECTED_ALLOW_SWAP` | unset | Phase 6K.15 escape hatch — `1` lets `preemption_mode="swap"` through the factory's refusal (with a corruption warning). For breakage repro / sidecar-migration development ONLY; never production. |
 
 ## What's deferred (post-v1 follow-ups)
 

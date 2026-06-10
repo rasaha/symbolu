@@ -85,7 +85,27 @@ logger = logging.getLogger(__name__)
 # Phase 5C: auto-register on import. Idempotent (enable is no-op if
 # already enabled). The 'enabled' state lives at module level inside
 # phase5b_backend_install; calling enable a second time is cheap.
-enable_int4_protected_backend()
+#
+# Phase 6K.15: gated on vllm being importable AT ALL, so this module
+# imports cleanly in CPU-only dev/test envs (matching the package's
+# guarded-import convention). Distinguish two failure shapes:
+#   - vllm entirely absent  -> soft skip (factory raises ImportError at
+#     call time anyway; nothing to register against).
+#   - vllm present but the FA backend enable fails -> still raise, loudly
+#     (that is a real breakage on a serving pod, not a dev env).
+try:
+    import vllm as _vllm_probe  # noqa: F401
+    _VLLM_IMPORTABLE = True
+except ImportError:
+    _VLLM_IMPORTABLE = False
+
+if _VLLM_IMPORTABLE:
+    enable_int4_protected_backend()
+else:
+    logger.info(
+        "vllm not importable; int4_protected backend not registered "
+        "(CPU dev mode — Int4ProtectedLLM will raise ImportError if called)."
+    )
 
 
 # ----------------------------------------------------------------------
@@ -124,6 +144,71 @@ def _resolve_enforce_eager(requested: Optional[bool]) -> bool:
     return False
 
 
+# Phase 6K.15 — swap-preemption guard. The paged writer's sidecars
+# (k_scale/k_xmin/k_protect/v_scale/v_xmin externals + per-slot K staging)
+# live OUTSIDE vLLM's paged KV tensor and are NOT migrated by the V0
+# CacheEngine swap_out/swap_in path. If the scheduler swap-preempts a
+# sequence, its GPU blocks round-trip through CPU but the sidecars are
+# dropped/stale -> silent KV corruption on resume. Recompute-style
+# preemption is safe: the KV is re-prefilled from scratch and the
+# 6K.9/6K.14 evictions reset the writer's per-seq state. vLLM V0's
+# DEFAULT policy picks SWAP for multi-seq groups (parallel sampling /
+# beam search), so "leave it unset" is not safe — the factory forces
+# preemption_mode="recompute" and refuses an explicit "swap" loudly.
+# INT4_PROTECTED_ALLOW_SWAP=1 bypasses the refusal (deliberate breakage
+# repro / future sidecar-migration work) with a warning.
+_ALLOW_SWAP_ENV = "INT4_PROTECTED_ALLOW_SWAP"
+_VALID_PREEMPTION_MODES = ("recompute", "swap")
+
+
+def _allow_swap_override() -> bool:
+    raw = os.environ.get(_ALLOW_SWAP_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
+def _resolve_preemption_mode(requested: Optional[str]) -> str:
+    """Resolve the effective vLLM ``preemption_mode`` for int4_protected.
+
+    Priority order:
+      1. None (caller didn't choose): force "recompute" — vLLM's dynamic
+         default may pick SWAP, which corrupts the non-migrated sidecars.
+      2. "recompute": honored.
+      3. "swap": REFUSED (RuntimeError) unless INT4_PROTECTED_ALLOW_SWAP
+         is set, in which case it is honored with a loud warning.
+      4. Anything else: ValueError (fail fast with the valid options).
+
+    Returns the resolved mode string to pass to vllm.LLM.
+    """
+    if requested is None:
+        return "recompute"
+    mode = requested.strip().lower()
+    if mode not in _VALID_PREEMPTION_MODES:
+        raise ValueError(
+            f"preemption_mode={requested!r} is not valid; expected one of "
+            f"{_VALID_PREEMPTION_MODES} (int4_protected default: 'recompute')."
+        )
+    if mode == "swap":
+        if _allow_swap_override():
+            logger.warning(
+                "int4_protected: preemption_mode='swap' allowed by "
+                "%s=1 — the paged writer's sidecars are NOT migrated on "
+                "swap; any swap-preempted sequence WILL resume with "
+                "corrupted KV. This is for breakage repro / migration "
+                "development only.", _ALLOW_SWAP_ENV,
+            )
+            return "swap"
+        raise RuntimeError(
+            "int4_protected does not support preemption_mode='swap': the "
+            "quantization sidecars (scales/xmin/protect/staging) live "
+            "outside vLLM's paged KV tensor and are not migrated by "
+            "CacheEngine swap_out/swap_in, so swapped sequences resume "
+            "with corrupted KV. Use preemption_mode='recompute' (the "
+            "factory default), or set " + _ALLOW_SWAP_ENV + "=1 to bypass "
+            "this guard for deliberate breakage reproduction."
+        )
+    return "recompute"
+
+
 def Int4ProtectedLLM(
     model: str,
     *,
@@ -158,11 +243,22 @@ def Int4ProtectedLLM(
             kill-switch overrides EITHER path and forces eager mode
             (used by the 6B.3 GPU smoke's eager cell + by operators
             who need to bisect a capture regression in production).
+        preemption_mode (via **kwargs): Phase 6K.15 — forced to
+            "recompute" for int4_protected (vLLM's dynamic default may
+            pick SWAP for multi-seq groups, and the writer's sidecars
+            are NOT migrated on swap -> silent KV corruption on resume).
+            Passing "swap" raises unless INT4_PROTECTED_ALLOW_SWAP=1.
+            NB: recompute + parallel sampling (n>1 / beam) under
+            preemption pressure hits vLLM V0's single-seq recompute
+            assert — a LOUD failure, never silent corruption.
         **kwargs: anything else accepted by `vllm.LLM`.
 
     Raises:
         ValueError: if block_size != 32 and kv_cache_dtype is the
-            int4_protected variant.
+            int4_protected variant; or if preemption_mode is not one of
+            "recompute" / "swap".
+        RuntimeError: if preemption_mode="swap" is requested for
+            int4_protected without INT4_PROTECTED_ALLOW_SWAP=1.
         ImportError: if vllm isn't importable in this env.
 
     Returns:
@@ -180,6 +276,15 @@ def Int4ProtectedLLM(
 
     # Phase 6B.3 — resolve enforce_eager with env-override priority.
     effective_enforce_eager = _resolve_enforce_eager(enforce_eager)
+
+    # Phase 6K.15 — swap-preemption guard. Only when actually running the
+    # int4_protected backend: a stock run via this factory
+    # (kv_cache_dtype="auto") keeps vLLM's own preemption policy.
+    _requested_preemption = kwargs.pop("preemption_mode", None)
+    if kv_cache_dtype == "int4_protected":
+        kwargs["preemption_mode"] = _resolve_preemption_mode(_requested_preemption)
+    elif _requested_preemption is not None:
+        kwargs["preemption_mode"] = _requested_preemption
 
     # Lazy import so the kv_policy package remains importable in
     # environments without vLLM (eg. CPU-only dev).
