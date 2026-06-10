@@ -97,6 +97,7 @@ def run_mode(args):
 
     kw = dict(model=args.model, max_model_len=args.max_model_len,
               gpu_memory_utilization=args.gpu_util,
+              max_num_seqs=args.max_num_seqs,
               enable_prefix_caching=True)
     if args.mode == "graphs":
         os.environ["INT4_PROTECTED_APC_ALLOW_GRAPHS"] = "1"
@@ -270,7 +271,10 @@ def main(argv=None):
     ap.add_argument("--trace", default="/tmp/rt.jsonl")
     ap.add_argument("--model", default="NousResearch/Meta-Llama-3.1-8B-Instruct")
     ap.add_argument("--max-model-len", type=int, default=4096)
-    ap.add_argument("--gpu-util", type=float, default=0.5)
+    ap.add_argument("--gpu-util", type=float, default=0.4)
+    ap.add_argument("--max-num-seqs", type=int, default=8,
+                    help="B=1 workload; smaller captures fewer/narrower "
+                         "graph shapes -> much lower capture memory.")
     ap.add_argument("--gen", type=int, default=40)
     args = ap.parse_args(argv)
     if args.selftest:
