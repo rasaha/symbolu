@@ -53,6 +53,21 @@ except ImportError:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 
+# Phase 6K.16 — prefix-caching guard. The inherited prefix-enabled prefill
+# branch passes key_cache/value_cache to flash_attn_varlen_func, but under
+# int4_protected those paged tensors hold PACKED uint8 nibbles — the varlen
+# kernel would read them as bf16 -> garbage attention (or a dtype assert) on
+# the cached-prefix region. Until the dequant-context prefill path lands
+# (PHASE6K16_PREFIX_CACHING_PLAN.md), that branch refuses loudly. It only
+# fires with enable_prefix_caching=True (or chunked prefill, likewise off).
+_ALLOW_PREFIX_CACHING_ENV = "INT4_PROTECTED_ALLOW_PREFIX_CACHING"
+
+
+def _allow_prefix_caching_override() -> bool:
+    raw = os.environ.get(_ALLOW_PREFIX_CACHING_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
 # ----------------------------------------------------------------------
 # Decode-path profiler (Phase 6 v2 Option D step 3 prep).
 #
@@ -1101,6 +1116,20 @@ if _VLLM_FA_AVAILABLE:
                     # Prefix-enabled attention (Q current, K/V from cache).
                     assert attn_type == AttentionType.DECODER, (
                         "Only decoder-only models support prefix caching")
+                    # Phase 6K.16 guard: key_cache/value_cache are int4-PACKED
+                    # uint8 here; this varlen call would read them as bf16.
+                    # Refuse until the dequant-context prefill path lands.
+                    if not _allow_prefix_caching_override():
+                        raise RuntimeError(
+                            "int4_protected: prefix-aware prefill is not "
+                            "supported yet — the paged KV cache is int4-packed "
+                            "and flash_attn_varlen_func would read it as bf16 "
+                            "(garbage attention over the cached prefix). Run "
+                            "with enable_prefix_caching=False (the default) "
+                            "and chunked prefill off, or set "
+                            + _ALLOW_PREFIX_CACHING_ENV + "=1 to bypass for "
+                            "development. Plan: PHASE6K16_PREFIX_CACHING_PLAN.md"
+                        )
                     assert prefill_meta.seq_lens is not None
                     max_seq_len = max(prefill_meta.seq_lens)
                     flash_attn_varlen_func(

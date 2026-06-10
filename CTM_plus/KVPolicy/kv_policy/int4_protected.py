@@ -209,6 +209,54 @@ def _resolve_preemption_mode(requested: Optional[str]) -> str:
     return "recompute"
 
 
+# Phase 6K.16 — prefix-caching guard (factory side). The storage layer is
+# APC-compatible by construction (block-local quantization: group_size ==
+# block_size == 32, sidecars keyed by global block_id so shared blocks
+# carry their scales/xmin/protect with them), but the prefill-with-context
+# ATTENTION path is not: it would read the int4-packed paged cache as bf16.
+# The backend ALSO refuses at the exact branch (phase5b_backend_install);
+# this factory check just fails at init instead of on the first cache-hit
+# request. Same env escape hatch as the backend-side guard.
+# Full implementation plan: Bench/scripts/PHASE6K16_PREFIX_CACHING_PLAN.md
+_ALLOW_PREFIX_CACHING_ENV = "INT4_PROTECTED_ALLOW_PREFIX_CACHING"
+
+
+def _allow_prefix_caching_override() -> bool:
+    raw = os.environ.get(_ALLOW_PREFIX_CACHING_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
+def _resolve_prefix_caching(requested: Optional[bool]) -> bool:
+    """Resolve the effective ``enable_prefix_caching`` for int4_protected.
+
+    Priority order:
+      1. None / False (caller didn't opt in): False — explicit, so the
+         engine arg is self-documenting in init logs.
+      2. True: REFUSED (RuntimeError) unless INT4_PROTECTED_ALLOW_PREFIX_
+         CACHING is set, in which case honored with a loud warning (the
+         backend's prefix-prefill branch then runs UNSUPPORTED math).
+    """
+    if not requested:
+        return False
+    if _allow_prefix_caching_override():
+        logger.warning(
+            "int4_protected: enable_prefix_caching=True allowed by %s=1 — "
+            "the prefix-prefill path reads the int4-packed cache as bf16; "
+            "cached-prefix attention WILL be garbage. Development only.",
+            _ALLOW_PREFIX_CACHING_ENV,
+        )
+        return True
+    raise RuntimeError(
+        "int4_protected does not support enable_prefix_caching=True yet: "
+        "prefill-with-context would read the int4-packed paged KV as bf16. "
+        "The storage layer is prefix-compatible (block-local quant groups, "
+        "block_id-keyed sidecars); the dequant-context prefill path is the "
+        "missing piece — see PHASE6K16_PREFIX_CACHING_PLAN.md. Use the "
+        "default (False), or set " + _ALLOW_PREFIX_CACHING_ENV + "=1 to "
+        "bypass for development."
+    )
+
+
 def Int4ProtectedLLM(
     model: str,
     *,
@@ -251,6 +299,11 @@ def Int4ProtectedLLM(
             NB: recompute + parallel sampling (n>1 / beam) under
             preemption pressure hits vLLM V0's single-seq recompute
             assert — a LOUD failure, never silent corruption.
+        enable_prefix_caching (via **kwargs): Phase 6K.16 — forced to
+            False for int4_protected; True raises unless
+            INT4_PROTECTED_ALLOW_PREFIX_CACHING=1 (the prefix-prefill
+            branch would read the packed cache as bf16). Plan:
+            PHASE6K16_PREFIX_CACHING_PLAN.md.
         **kwargs: anything else accepted by `vllm.LLM`.
 
     Raises:
@@ -285,6 +338,13 @@ def Int4ProtectedLLM(
         kwargs["preemption_mode"] = _resolve_preemption_mode(_requested_preemption)
     elif _requested_preemption is not None:
         kwargs["preemption_mode"] = _requested_preemption
+
+    # Phase 6K.16 — prefix-caching guard, same gating shape as 6K.15.
+    _requested_apc = kwargs.pop("enable_prefix_caching", None)
+    if kv_cache_dtype == "int4_protected":
+        kwargs["enable_prefix_caching"] = _resolve_prefix_caching(_requested_apc)
+    elif _requested_apc is not None:
+        kwargs["enable_prefix_caching"] = _requested_apc
 
     # Lazy import so the kv_policy package remains importable in
     # environments without vLLM (eg. CPU-only dev).
