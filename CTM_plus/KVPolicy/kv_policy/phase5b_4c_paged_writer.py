@@ -279,6 +279,110 @@ def _leaked_seq_ids(assigned_seq_ids: "Any", active_seq_ids: "Any") -> list:
     return [sid for sid in assigned_seq_ids if sid not in active]
 
 
+# ----------------------------------------------------------------------
+# Phase 6K.16b — sequence identity helpers.
+#
+# The legacy identity (block_tables[i, 0] / first written block) rests on
+# an invariant that PREFIX CACHING falsifies: under APC, every sequence
+# sharing a cached prefix has the SAME first block (decode collision ->
+# one SeqState shared by the whole batch), and a cache-hit sequence's
+# prefill writes start at its first SUFFIX block while decode looks up
+# block_tables[i, 0] (identity mismatch -> the staged suffix tail is
+# orphaned + GC'd mid-flight). Both corrupt decode (the degenerate
+# "old-old-old" collapse on the first 6K.16 GPU run; see
+# PHASE6K16_PREFIX_CACHING_PLAN.md "AUDIT RESULT").
+#
+# The fix: identity = THE BLOCK HOLDING THE TOKEN BEING WRITTEN
+# (slot // BS; equivalently block_tables[i, (seq_len-1) // BS]).
+#   * unique per live sequence under APC (only FULL immutable blocks are
+#     shared; the block being written is private),
+#   * prefill's last-token block == decode step-1's block (the staged
+#     partial block), so the staged tail is FOUND again,
+#   * when a block fills, staging resets — in backing-skip mode NO writer
+#     state crosses a block boundary, so a fresh state per block is
+#     CORRECT, and the 6K.14 GC (active set = current block ids) frees
+#     rolled-over keys the same step, before allocation.
+#
+# Gated on backing-skip mode (the default): the legacy bf16 backing pool
+# indexes by seq_pos and DOES carry state across blocks, so it keeps the
+# legacy identity (and APC is refused there anyway).
+# ----------------------------------------------------------------------
+
+def block_local_seq_ids_enabled(writer: Any) -> bool:
+    """True when the writer runs in Phase 6C backing-skip mode (default),
+    where block-local sequence identity is sound (no cross-block writer
+    state). Before _lazy_alloc the instance flag isn't set yet — resolve
+    from the same env the allocation will use, so identity is consistent
+    across the first forward."""
+    flag = getattr(writer, "_bf16_backing_skipped", None)
+    if flag is not None:
+        return bool(flag)
+    return _bf16_backing_skip()
+
+
+def decode_seq_ids_from_meta(
+    block_tables: "Any",               # (B, max_blocks) int tensor
+    seq_lens_tensor: "Any",            # (B,) int tensor (incl. current tok)
+    BS: int,
+    *,
+    block_local: bool,
+) -> list:
+    """Per-row sequence ids for a decode step. One coalesced host sync
+    (same cost class as the legacy ``block_tables[:, 0].cpu()``).
+
+    block_local=False -> legacy: first block id per row.
+    block_local=True  -> block holding the token written this step:
+                         ``block_tables[i, (seq_len_i - 1) // BS]``.
+    """
+    if not block_local or seq_lens_tensor is None:
+        if block_local and seq_lens_tensor is None:
+            logger.warning(
+                "decode_seq_ids_from_meta: seq_lens_tensor unavailable; "
+                "falling back to legacy first-block identity (UNSAFE "
+                "under prefix caching)."
+            )
+        return block_tables[:, 0].cpu().tolist()
+    if not _evict_on_decode_enabled():
+        # Block-local ids RELY on the 6K.14 GC to free rolled-over keys;
+        # with GC disabled the pool leaks one slot per filled block.
+        logger.warning(
+            "block-local seq ids with %s=0: slot pool will leak one slot "
+            "per filled block per sequence — re-enable the decode GC.",
+            _EVICT_ON_DECODE_ENV,
+        )
+    bt = block_tables.cpu()
+    sl = seq_lens_tensor.cpu()
+    out = []
+    for i in range(bt.shape[0]):
+        last_idx = max(0, (int(sl[i]) - 1) // BS)
+        out.append(int(bt[i, last_idx]))
+    return out
+
+
+def prefill_seq_id_for_segment(
+    slot_mapping_flat: "Any",
+    start: int,
+    end: int,
+    BS: int,
+    *,
+    block_local: bool,
+) -> int:
+    """Sequence id for one prefill segment [start, end) of slot_mapping.
+
+    block_local=False -> legacy: FIRST non-padding slot's block.
+    block_local=True  -> LAST non-padding slot's block (the block the
+                         writer leaves staged / just finalized — what the
+                         first decode step will look up).
+    Returns -1 when the segment is all padding.
+    """
+    rng = range(end - 1, start - 1, -1) if block_local else range(start, end)
+    for j in rng:
+        v = int(slot_mapping_flat[j].item())
+        if v >= 0:
+            return v // BS
+    return -1
+
+
 def _in_cuda_graph_capture() -> bool:
     """Phase 6B.3 (Option X) — detect whether the current CUDA stream
     is in graph capture. Returns False if CUDA isn't available or

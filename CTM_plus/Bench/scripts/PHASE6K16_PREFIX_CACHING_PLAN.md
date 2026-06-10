@@ -226,12 +226,39 @@ prefill attention; the warm call (no hits) is unaffected — consistent with the
 gate pattern. The rerun instrumentation now serves as CONFIRMATION (expect:
 branch fired, `k_scale` sane, warm agreement ≈ 1.0).
 
-**Fix design (Tier 1b — real sequence identity).** Thread vLLM's actual seq
-ids instead of block-table surrogates: extend the 6B.2 `execute_model` wrap to
-stash an ordered per-batch list of real seq ids on `attn_metadata`
-(`model_input.request_ids_to_seq_ids` is available outside the captured
-region); `_derive_write_partitions`, the decode self-resolve, and the read
-path PREFER the stash and fall back to the legacy block-table derivation
-byte-identically when absent — non-APC behavior unchanged. Install the hook
-whenever APC is enabled (including eager). CPU-testable: fake metadata with
-shared `block_tables[:,0]` + stash → unique ids; no stash → legacy ids.
+**Diagnosis CONFIRMED by the instrumented rerun:** `prefix_prefill_calls=64`
+(branch fired), **warm-call agreement = 1.000** (engine byte-identical until a
+hit is involved), and — decisive — **`prefix=1` on 4/6 hit prompts**: token 1,
+the only token produced by the dequant-context prefill, MATCHED; corruption
+begins at token 2 = the first DECODE step, exactly where the broken identity
+lookup first fires. The prefill path is exonerated; the write-path identity is
+the bug.
+
+**Fix (Tier 1b — IMPLEMENTED): block-local sequence identity.** Simpler and
+fully local vs the original real-seq-id plumbing idea, from one observation:
+in backing-skip mode (default, required for APC) **no writer state crosses a
+block boundary** (staging resets when a block fills), so identity only needs
+to be stable within the current block. New rule, applied uniformly:
+
+> **seq id = the block holding the token being written**
+> (prefill: LAST non-padding slot's block — the staged block;
+>  decode: `block_tables[i, (seq_len−1)//BS]` ≡ `slot // BS`).
+
+Why it is sound under APC: the block being written is always PRIVATE (APC
+shares only full immutable blocks) → unique per live sequence (kills the
+collision); prefill's last-token block == decode step-1's block (kills the
+orphaned-staging mismatch); rolled-over keys are freed by the 6K.14 GC in the
+same step, BEFORE allocation (no slot overshoot — GC is now load-bearing; a
+warning fires if `PHASE6K14_EVICT_ON_DECODE=0`). Legacy bf16-backing mode
+keeps the OLD derivation byte-identically (it carries `seq_pos` across blocks;
+APC is refused there anyway).
+
+Touched sites (all selected by `block_local_seq_ids_enabled(writer)`):
+helpers in `phase5b_4c_paged_writer.py` (`decode_seq_ids_from_meta`,
+`prefill_seq_id_for_segment`); `_derive_write_partitions` (+ its call site);
+the 6B.1 decode self-resolve; the batched read's seq_ids; the B=1 read's
+seq_id; the 6B.2 pre-capture hook (`phase6b2_precapture_hook.py`).
+CPU coverage: `tests/test_phase6k16b_seq_identity.py` (10 tests: APC collision
+fixed, prefill==first-decode identity, legacy byte-preserved, padding) + all
+27 existing hook tests + 6J/6K15/6K16 suites + the 6C/6E writer verifiers —
+green. GPU validation: rerun the same three gates.
