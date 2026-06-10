@@ -404,6 +404,21 @@ def prefill_seq_id_for_segment(
 _REAL_SEQ_IDS_ATTR = "_int4_real_seq_ids"                  # decode-row order
 _REAL_SEQ_IDS_PREFILL_ATTR = "_int4_real_seq_ids_prefill"  # prefill-seg order
 
+# 6K.16c identity-lifecycle tracer. Bounded so it captures the warm
+# prompt's prefill + first decodes without spamming the whole run.
+_PREFIX_DBG_BUDGET = [0]
+_PREFIX_DBG_MAX = 100
+
+
+def _prefix_dbg(msg: str) -> None:
+    if os.environ.get("INT4_PROTECTED_PREFIX_DEBUG", "").strip() not in (
+            "1", "true", "yes"):
+        return
+    if _PREFIX_DBG_BUDGET[0] >= _PREFIX_DBG_MAX:
+        return
+    _PREFIX_DBG_BUDGET[0] += 1
+    logger.warning("[6K.16c-trace] %s", msg)
+
 
 def stashed_real_seq_ids(attn_metadata: "Any", expected_count: int,
                          *, prefill: bool = False) -> "Optional[list]":
@@ -450,18 +465,27 @@ def resolve_decode_seq_ids(
         if attn_metadata is not None else None
     if real is not None and 0 < len(real) <= n_rows:
         if len(real) == n_rows:
+            _prefix_dbg(f"decode-resolve rows={n_rows} -> {list(real)[:6]} "
+                        f"(src=real_stash)")
             return list(real)
         # padded decode batch — real first, block-local for the masked tail.
         tail = decode_seq_ids_from_meta(
             block_tables, seq_lens_tensor, BS, block_local=block_local)
-        return list(real) + tail[len(real):]
+        out = list(real) + tail[len(real):]
+        _prefix_dbg(f"decode-resolve rows={n_rows} -> {out[:6]} "
+                    f"(src=real_stash+pad, real={len(real)})")
+        return out
     if real is not None and len(real) > n_rows:
         logger.warning(
             "int4_protected real-seq-id stash count %d > %d decode rows; "
             "falling back to block-local (unexpected batch shape).",
             len(real), n_rows)
-    return decode_seq_ids_from_meta(
+    bl = decode_seq_ids_from_meta(
         block_tables, seq_lens_tensor, BS, block_local=block_local)
+    _prefix_dbg(f"decode-resolve rows={n_rows} -> {bl[:6]} "
+                f"(src={'block_local' if block_local else 'legacy'}, "
+                f"stash={'absent' if real is None else len(real)})")
+    return bl
 
 
 def _in_cuda_graph_capture() -> bool:
@@ -1053,6 +1077,8 @@ class PagedKVWriter:
         s = SeqState(self, slot_idx)
         self._seq_states[seq_id] = s
         self._slot_map[seq_id] = slot_idx
+        _prefix_dbg(f"ensure_seq_state NEW id={seq_id} -> slot={slot_idx} "
+                    f"(now assigned={list(self._slot_map.keys())[:8]})")
         return s
 
     def evict_sequence(self, seq_id: Any) -> None:

@@ -668,9 +668,15 @@ if _VLLM_FA_AVAILABLE:
                     # a freshly-ensured state has empty staging, so this read's
                     # partial tail may be wrong for the affected sequence; the
                     # warning quantifies how often it fires.
+                    from kv_policy.phase5b_4c_paged_writer import _prefix_dbg
                     try:
                         seq_state = writer.get_seq_state(seq_id)
+                        _prefix_dbg(f"B1-read seqlen={seqlen} tail={tail_len} "
+                                    f"seq_id={seq_id} -> SeqState FOUND")
                     except KeyError:
+                        _prefix_dbg(f"B1-read seqlen={seqlen} tail={tail_len} "
+                                    f"seq_id={seq_id} -> SeqState MISS "
+                                    f"(have={list(writer._slot_map.keys())[:8]})")
                         import logging as _lg
                         _lg.getLogger(__name__).warning(
                             "[6K.16c] B=1 read: no SeqState for seq_id=%s "
@@ -1483,12 +1489,18 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
             if partitions:
                 return partitions
         # Single-seq prefill.
+        from kv_policy.phase5b_4c_paged_writer import _prefix_dbg
         n = int(slot_mapping_flat.shape[0])
         real_pre = stashed_real_seq_ids(attn_metadata, 1, prefill=True)
         if real_pre is not None:
+            _prefix_dbg(f"prefill-write single-seg -> {real_pre[0]} "
+                        f"(src=real_stash)")
             return [(real_pre[0], slice(0, n))]
         sid = prefill_seq_id_for_segment(
             slot_mapping_flat, 0, n, BS, block_local=block_local)
+        _prefix_dbg(f"prefill-write single-seg -> {sid} "
+                    f"(src={'block_local' if block_local else 'legacy'}, "
+                    f"prefill_stash=absent)")
         if sid >= 0:
             return [(sid, slice(0, n))]
 
