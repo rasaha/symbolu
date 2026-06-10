@@ -528,12 +528,19 @@ def install_int4_protected_precapture_hook(
                     _REAL_SEQ_IDS_ATTR, _REAL_SEQ_IDS_PREFILL_ATTR,
                 )
                 real_ids = extract_real_seq_ids(model_input)
+                is_dec = _is_pure_decode_step(attn_metadata)
                 if real_ids is not None:
-                    is_dec = _is_pure_decode_step(attn_metadata)
                     setattr(attn_metadata,
                             _REAL_SEQ_IDS_ATTR if is_dec
                             else _REAL_SEQ_IDS_PREFILL_ATTR,
                             real_ids)
+                if os.environ.get("INT4_PROTECTED_PREFIX_DEBUG", "").strip() \
+                        in ("1", "true", "yes"):
+                    n = None if real_ids is None else len(real_ids)
+                    head = None if real_ids is None else real_ids[:6]
+                    logger.warning("[6K.16c-dbg] %s step: extract -> count=%s "
+                                   "head=%s", "decode" if is_dec else "prefill",
+                                   n, head)
             except Exception as _e:  # never break the forward over this
                 logger.warning("6K.16c seq-id stash skipped: %s", _e)
         if _is_pure_decode_step(attn_metadata):

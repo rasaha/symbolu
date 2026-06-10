@@ -661,7 +661,22 @@ if _VLLM_FA_AVAILABLE:
             with _maybe_region("one.splice"):
                 tail_len = seqlen % BS
                 if tail_len != 0:
-                    seq_state = writer.get_seq_state(seq_id)
+                    # 6K.16c diagnostic: under APC the prefill/decode identity
+                    # handoff can miss (prefill registered the partial tail
+                    # under a different id). Don't CRASH — ensure a state so the
+                    # run completes and we can read the agreement number. NOTE:
+                    # a freshly-ensured state has empty staging, so this read's
+                    # partial tail may be wrong for the affected sequence; the
+                    # warning quantifies how often it fires.
+                    try:
+                        seq_state = writer.get_seq_state(seq_id)
+                    except KeyError:
+                        import logging as _lg
+                        _lg.getLogger(__name__).warning(
+                            "[6K.16c] B=1 read: no SeqState for seq_id=%s "
+                            "(prefill/decode identity miss) — ensuring empty; "
+                            "this read's K-tail may be wrong.", seq_id)
+                        seq_state = writer.ensure_seq_state(seq_id, query_q.device)
                     _splice_k_partial_tail(
                         view, writer, last_block_idx=n_blocks_used - 1,
                         state=seq_state,
