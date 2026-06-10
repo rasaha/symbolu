@@ -156,3 +156,35 @@ python Bench/scripts/phase6k16_prefix_gates.py --compare /tmp/p6k16_noapc.json /
   legal without the env (keep `False` as the default until a hit-rate +
   throughput win is measured); add an APC cell to the 6k12 hard-needle harness
   for the full-strength version of GATE-NEEDLE.
+
+## First GPU run — FAILED (triage in progress; honest record)
+
+First pod run (Llama-3.1-8B): **all three gates failed** — agreement 0.094,
+needle apc=MISS with degenerate output ("old-old-old…"), probe
+`cache_hit_blocks=0`. Read carefully, the evidence is internally inconsistent in
+an informative way: NO exception fired (so if the prefix branch ran, ctx was
+32-aligned and the writer present), outputs are garbage from token 1 (prefill
+attention wrong), yet the allocator probe counted zero hits (either no hits —
+then the apc engine corrupts WITHOUT our path — or the Phase 3A probe doesn't
+count this allocator correctly).
+
+**Instrumentation added for the decisive rerun** (one apc run localizes it):
+1. `call_stats` in the gate payload — `prefix_prefill_calls` is the real
+   "branch fired" signal; GATE-HITS now keys on it (probe demoted to info).
+2. **Warm-call agreement** printed by `--compare` — warm has NO cached context
+   in either mode, so divergence there means the APC engine/writer interaction
+   is broken BEFORE any prefix-prefill involvement (bug NOT in the dequant path).
+3. `INT4_PROTECTED_PREFIX_DEBUG=1` — per-hit-seq prints inside
+   `run_prefix_prefill`: ctx lens, block ids, **`k_scale` stats of the first
+   context block** (mean ~1e-8 ⇒ blocks never finalized by the writer ⇒ cache
+   content is not what we assume), dequant norms, `cu_seqlens`.
+
+Decision tree for the rerun:
+- `prefix_prefill_calls == 0` **and** warm diverges → APC-allocator × writer
+  interaction bug (block-id churn / dedup vs SeqState); prefix path exonerated.
+- branch fired, `k_scale ≈ 1e-8` → context blocks unfinalized → write-path /
+  hash-alignment investigation (which blocks does APC consider computed vs
+  which did the writer finalize).
+- branch fired, scales sane, norms sane → the varlen call itself (layout /
+  causal alignment) — next probe: replace `causal=True` semantics check with a
+  1-seq micro-test comparing against the no-cache branch on the same tokens.

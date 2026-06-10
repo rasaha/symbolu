@@ -153,6 +153,21 @@ def run_mode(args):
     needle_ids = list(nd[0].outputs[0].token_ids)
 
     hits_total = probe.cache_hit_blocks if probe else None
+    # Ground truth on which write/attention paths actually fired — the
+    # impl's class-level counters. prefix_prefill_calls > 0 is the REAL
+    # "hits happened" signal (the probe is auxiliary; its allocator walk
+    # proved unreliable on the first GPU run).
+    call_stats = {}
+    try:
+        from kv_policy.phase5b_backend_install import Int4ProtectedAttentionImpl
+        cs = Int4ProtectedAttentionImpl._call_stats
+        call_stats = {k: cs.get(k, 0) for k in (
+            "prefix_prefill_calls", "prefill_calls", "write_path_calls",
+            "write_path_fallback", "write_decode_batched_calls",
+            "write_legacy_loop_calls")}
+        print(f"[p6k16] call_stats: {call_stats}")
+    except Exception as e:
+        print(f"[p6k16] WARN: call_stats unavailable: {type(e).__name__}: {e}")
     payload = {
         "mode": args.mode, "model": args.model, "gen": args.gen,
         "code": code,
@@ -162,6 +177,7 @@ def run_mode(args):
         "needle_ids": needle_ids,
         "hits_after_warm": hits_after_warm,
         "hits_total": hits_total,
+        "call_stats": call_stats,
         "prefix_blocks_possible": N_PREFIX_BLOCKS,
     }
     Path(args.out).write_text(json.dumps(payload))
@@ -181,15 +197,31 @@ def compare(noapc_path, apc_path):
     print(f"PHASE 6K.16 GATES — APC on int4_protected ({b['model']})")
     print("=" * 78)
 
-    # GATE-HITS
+    # GATE-HITS — primary signal: did the prefix-prefill branch FIRE?
+    # (the impl's own counter; the allocator probe is auxiliary/unreliable)
+    ppc = (b.get("call_stats") or {}).get("prefix_prefill_calls")
     hits = b.get("hits_total")
-    if hits is None:
-        print("GATE-HITS       n/a (probe unavailable) — check engine logs / rerun")
+    if ppc is not None:
+        gate_hits = ppc > 0
+        print(f"GATE-HITS       {'PASS' if gate_hits else 'FAIL'}   "
+              f"prefix_prefill_calls={ppc} (layers x hit-steps; "
+              f"probe cache_hit_blocks={hits})")
+    elif hits is None:
+        print("GATE-HITS       n/a (no counters) — rerun with updated script")
         gate_hits = None
     else:
         gate_hits = hits > 0
         print(f"GATE-HITS       {'PASS' if gate_hits else 'FAIL'}   "
               f"cache_hit_blocks={hits}")
+
+    # WARM diagnostic (NOT a gate): the warm call has no cached context in
+    # either mode, so its outputs should agree ~1.0. If they DIVERGE, the
+    # APC engine is broken before any prefix-prefill involvement (allocator
+    # or writer interaction) — the bug is NOT in the dequant-context path.
+    if a.get("warm_ids") and b.get("warm_ids"):
+        wag, wpre = token_agreement(a["warm_ids"], b["warm_ids"])
+        print(f"  warm-call agreement={wag:.3f} prefix={wpre} "
+              f"(diverged => engine/writer-under-APC bug, not the prefix path)")
 
     # GATE-AGREEMENT
     agrees = []

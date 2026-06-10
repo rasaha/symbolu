@@ -209,6 +209,10 @@ def run_prefix_prefill(
     ctx_list = ctx_lens.long().tolist()
     bt = prefill_meta.block_tables
 
+    import os as _os
+    _debug = _os.environ.get("INT4_PROTECTED_PREFIX_DEBUG", "").strip() in (
+        "1", "true", "yes")
+
     ctx_kv: List[Tuple[Optional["torch.Tensor"], Optional["torch.Tensor"]]] = []
     for i, c in enumerate(ctx_list):
         if c <= 0:
@@ -216,9 +220,31 @@ def run_prefix_prefill(
         else:
             ctx_kv.append(gather_context_kv(
                 kv_cache, writer, bt[i], int(c), query.dtype))
+            if _debug:
+                # Triage prints (first hit seq is usually enough; cheap and
+                # env-gated). Scales ~1e-8 ==> ctx blocks were NEVER
+                # finalized by the writer (cache content is not what we
+                # think); sane scales + sane norms ==> suspect the varlen
+                # call itself.
+                blk0 = int(bt[i][0].item())
+                s = writer.k_scale_ext[blk0].float()
+                kc, vc = ctx_kv[-1]
+                print(f"[p6k16-dbg] seq{i}: ctx={c} blocks={bt[i][:max(1, int(c)//writer.BS)].tolist()} "
+                      f"k_scale[blk{blk0}] mean={s.mean().item():.3e} "
+                      f"min={s.min().item():.3e} max={s.max().item():.3e} | "
+                      f"|K_ctx|={kc.float().norm().item():.1f} "
+                      f"|V_ctx|={vc.float().norm().item():.1f}", flush=True)
 
     k_full, v_full, cu_k, max_k = build_prefix_varlen_inputs(
         new_key, new_value, ctx_kv, prefill_meta.query_start_loc)
+
+    if _debug:
+        qsl = prefill_meta.query_start_loc.tolist()
+        print(f"[p6k16-dbg] B={len(ctx_list)} ctx={ctx_list} "
+              f"cu_q={qsl[:8]} cu_k={cu_k.tolist()[:8]} "
+              f"max_q={prefill_meta.max_query_len} max_k={max_k} "
+              f"q={tuple(query.shape)} k_full={tuple(k_full.shape)} "
+              f"|new_k|={new_key.float().norm().item():.1f}", flush=True)
 
     flash_attn_varlen_func(
         q=query,
