@@ -34,17 +34,35 @@ for _root in ROOT_CANDIDATES:
         sys.path.insert(0, str(kvp))
         break
 
-# Fields whose VALUES must match for the same (live_sids, seq_lens) step
-# between eager and graphs (until the first true divergence). NB
-# stash_seq_ids is graphs-only (eager self-resolves) and seq_lens_id /
-# bt_id / stash_slot_idx_id legitimately drift per step (vLLM rebuilds
-# host metadata objects; the stash tensor is fresh by design) — only the
-# pools + impl slot buffer must be identity-stable (the recorded ops
-# close over THOSE objects).
-VALUE_FIELDS = ("is_decode", "slot_mapping", "bt_tail",
-                "counters_presync", "counters_postsync")
+# Cross-mode comparison is SEMANTIC, not raw: eager and graphs differ
+# legitimately in (a) slot numbers (capture dummies consume slots first),
+# (b) SeqState ints (graphs: pool canonical, ints stale by design),
+# (c) sync timing (eager syncs inside the forward, after the pre dump).
+# What MUST match per (live_sids, seq_lens) step: the step INPUTS
+# (slot_mapping, block-table tails) and the post-step SEMANTIC state —
+# pool [count, block, seq_pos] per sid, stage content hash per sid, and
+# finalized-block bytes at crossings. presync/postsync stay in the dump
+# for human reading but are excluded from the cross-diff.
+VALUE_FIELDS = ("is_decode", "slot_mapping", "bt_tail")
 POST_FIELDS = ("counters_post", "stage_sig", "finalized")
 ID_FIELDS = ("pool_ids", "impl0_slot_buf_id")
+
+
+def _norm_post(r):
+    """Mode-invariant view of a post record."""
+    out = {}
+    c = r.get("counters_post") or {}
+    out["pool"] = {sid: (v or {}).get("pool") for sid, v in c.items()}
+    sg = r.get("stage_sig") or {}
+    out["stage_sha"] = {sid: (v or {}).get("sha1") for sid, v in sg.items()}
+    out["stage_norm"] = {sid: (v or {}).get("norm") for sid, v in sg.items()}
+    fin = r.get("finalized") or {}
+    out["finalized"] = {
+        sid: {"block": (v or {}).get("block"),
+              "packed_sha": ((v or {}).get("packed_k") or {}).get("sha1"),
+              "scale_sha": ((v or {}).get("k_scale") or {}).get("sha1")}
+        for sid, v in fin.items()}
+    return out
 
 
 def _align_key(r):
@@ -158,7 +176,8 @@ def compare(eager_path, graphs_path):
         _diff(e_pre[es], g_pre[gs], "pre", VALUE_FIELDS, diffs)
         ep, gp = e_post.get(es), g_post.get(gs)
         if ep and gp:
-            _diff(ep, gp, "post", POST_FIELDS, diffs)
+            _diff(_norm_post(ep), _norm_post(gp), "post",
+                  ("pool", "stage_sha", "stage_norm", "finalized"), diffs)
         if diffs:
             first = (k, es, gs, diffs)
             break
