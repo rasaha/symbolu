@@ -799,6 +799,9 @@ def install_int4_protected_precapture_hook(
                         csl_buf = getattr(
                             _impl0, "_phase5b_cache_seqlens_i32", None) \
                             if _impl0 is not None else None
+                        # v7: per-row VALID-position input norms [k_int4, v].
+                        comp = getattr(_impl0, "_rt_comp_buf", None) \
+                            if _impl0 is not None else None
                         # Live rows/seqlens from the pre-dump's decode metadata
                         # — present in BOTH eager and graphs. (v6 used the
                         # stash count, which is graphs-only and zeroed eager.)
@@ -810,11 +813,17 @@ def install_int4_protected_precapture_hook(
                                 _ks = (int(csl_buf[i].item())
                                        if csl_buf is not None
                                        and i < csl_buf.shape[0] else None)
-                                rec["row_out"][str(i)] = {
+                                _ent = {
                                     "seqlen": _seqlens[i],
                                     "kernel_seqlen": _ks,
                                     "out": _rt_sig(ob[i].float()),
                                 }
+                                if comp is not None and i < comp.shape[0]:
+                                    _ent["ki_norm"] = round(
+                                        float(comp[i, 0].item()), 4)
+                                    _ent["v_norm"] = round(
+                                        float(comp[i, 1].item()), 4)
+                                rec["row_out"][str(i)] = _ent
                     except Exception as _e4:
                         rec["row_out_error"] = str(_e4)[:80]
                     pre_c = _t_pre.get("counters_postsync") or {}

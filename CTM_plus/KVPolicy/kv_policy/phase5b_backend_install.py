@@ -357,6 +357,16 @@ if _VLLM_FA_AVAILABLE:
                     (max(B, 256), HD), dtype=dtype, device=device)
             return self._rt_out_buf
 
+        def _ensure_rt_comp_buf(self, B, device):
+            """v7: persistent per-row component-norm buffer [ki_valid, v_valid]
+            — captured copies refresh it every replay (same trick as the OUT
+            mirror). Protect is ruled out; this names input-vs-kernel."""
+            cur = getattr(self, "_rt_comp_buf", None)
+            if cur is None or cur.shape[0] < B or cur.device != device:
+                self._rt_comp_buf = torch.zeros(
+                    (max(B, 256), 2), dtype=torch.float32, device=device)
+            return self._rt_comp_buf
+
         def _ensure_protect_mask_bhd(self, B: int, writer):
             """(Re-)allocate the (B, H, D) int8 protect_mask buffer if
             needed. Content is per-model-frozen (writer.protect_mask is
@@ -692,6 +702,29 @@ if _VLLM_FA_AVAILABLE:
                 _hd = out.reshape(B, -1).shape[1]
                 _ob = self._ensure_rt_out_buf(B, _hd, out.device, out.dtype)
                 _ob[:B].copy_(out.reshape(B, -1), non_blocking=True)
+                # v7: per-row VALID-position norms of the kernel's K/V inputs.
+                # If these match eager-vs-graphs but `out` doesn't, the bug is
+                # in the KERNEL; if k_int4 or v diverges, it's our gather.
+                try:
+                    _B7, _S7, _H7, _hd7 = view["k_int4"].shape
+                    _vm = (torch.arange(_S7, device=out.device).unsqueeze(0)
+                           < cache_seqlens_long_t.unsqueeze(1)
+                           ).float().view(_B7, _S7, 1, 1)
+                    _ki7 = (view["k_int4"].float() * _vm
+                            ).reshape(_B7, -1).norm(dim=1)
+                    _vsrc = view.get("v_bf16")
+                    if _vsrc is None:
+                        _vsrc = view.get("v_int4")
+                    if (_vsrc is not None and _vsrc.dim() == 4
+                            and _vsrc.shape[1] == _S7):
+                        _v7 = (_vsrc.float() * _vm).reshape(_B7, -1).norm(dim=1)
+                    else:
+                        _v7 = torch.zeros(_B7, device=out.device)
+                    _cb7 = self._ensure_rt_comp_buf(B, out.device)
+                    _cb7[:B, 0].copy_(_ki7)
+                    _cb7[:B, 1].copy_(_v7)
+                except Exception:
+                    pass
             return out
 
         def _read_decode_packed_one(
