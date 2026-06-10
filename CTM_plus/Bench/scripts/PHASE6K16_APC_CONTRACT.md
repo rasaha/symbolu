@@ -14,10 +14,24 @@
 >   gate measured the wrong thing. The gates script now implements C-GATE
 >   (HITS + WARM + NEEDLE gates; agreement = bounded-residual INFO).
 >
-> **Remaining before flipping the factory default:** revalidate the
-> graphs+batched cell on the current commit (its last needle-MISS predates the
-> GC fix + pad sentinels), an APC cell on the 6k12 hard-needle harness, and the
-> payoff measurement (hit-rate / prefill-throughput). Machinery: validated.
+> **Graphs cell REVALIDATED on current code: STILL FAILS — and the texts prove
+> machinery corruption** (degenerate `…-old-old` output on 5/6 prompts + needle
+> MISS; only the no-partial-tail prompt survives), while eager B=1/B=6 pass with
+> coherent texts. With S1 byte-exact (storage correct) and warm=1.000 (no-hit
+> replay correct), the defect is localized to the **captured-graph decode
+> REPLAY's handling of cache-hit sequences' partial K-tails**. Audit of the
+> captured read (`_read_decode_packed_batched` capture branch + the
+> unconditional splice + inline pool write + hook sync) shows the architecture
+> is replay-variable BY DESIGN (device tensors + hook-populated buffers) and
+> handles non-APC tails under replay (6K.10–14 validations) — so this is **NOT
+> inherent**: it is a replay-variability defect (a capture-frozen quantity or a
+> stale-stash/sync interaction) in one of ~3 candidate functions. Contract
+> extension implied: a §5b "what capture may freeze" clause.
+> **Ship posture (implemented):** APC is **EAGER-ONLY** — the factory forces
+> `enforce_eager=True` under APC and refuses an explicit graphs request
+> (`INT4_PROTECTED_APC_ALLOW_GRAPHS=1` = dev override used by the gates
+> harness). Remaining for eager-only default-flip: the 6k12 `--apc` hard-tail
+> cell + the payoff measurement. Graphs+APC = named OPEN edge, gated off.
 
 > **Why this exists.** Four trace-driven fixes (collision → churn → padding →
 > GC-eviction) were each *correct* yet moved the gate metric by 0.000, because
