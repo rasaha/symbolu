@@ -671,8 +671,6 @@ if _VLLM_FA_AVAILABLE:
                     from kv_policy.phase5b_4c_paged_writer import _prefix_dbg
                     try:
                         seq_state = writer.get_seq_state(seq_id)
-                        _prefix_dbg(f"B1-read seqlen={seqlen} tail={tail_len} "
-                                    f"seq_id={seq_id} -> SeqState FOUND")
                     except KeyError:
                         _prefix_dbg(f"B1-read seqlen={seqlen} tail={tail_len} "
                                     f"seq_id={seq_id} -> SeqState MISS "

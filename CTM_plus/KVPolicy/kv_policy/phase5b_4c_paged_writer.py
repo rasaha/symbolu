@@ -407,7 +407,7 @@ _REAL_SEQ_IDS_PREFILL_ATTR = "_int4_real_seq_ids_prefill"  # prefill-seg order
 # 6K.16c identity-lifecycle tracer. Bounded so it captures the warm
 # prompt's prefill + first decodes without spamming the whole run.
 _PREFIX_DBG_BUDGET = [0]
-_PREFIX_DBG_MAX = 100
+_PREFIX_DBG_MAX = 400
 
 
 def _prefix_dbg(msg: str) -> None:
@@ -1090,8 +1090,12 @@ class PagedKVWriter:
         zero the pool entry — the next `ensure_seq_state` reset() (or
         write through that slot) will overwrite the stale data.
         """
+        _had = seq_id in self._slot_map
         self._seq_states.pop(seq_id, None)
         slot = self._slot_map.pop(seq_id, None)
+        if _had:
+            _prefix_dbg(f"EVICT id={seq_id} (freed slot={slot}); "
+                        f"remaining={list(self._slot_map.keys())[:8]}")
         if slot is not None:
             self._free_slots.append(slot)
             # Phase 6B.1 — also reset the device-side pool counters for
@@ -1143,6 +1147,11 @@ class PagedKVWriter:
         if not _evict_on_decode_enabled():
             return 0
         leaked = _leaked_seq_ids(list(self._slot_map.keys()), active_seq_ids)
+        if leaked:
+            _act = sorted(active_seq_ids)[:6] if not isinstance(
+                active_seq_ids, (list, tuple)) else list(active_seq_ids)[:6]
+            _prefix_dbg(f"GC active={_act} assigned="
+                        f"{list(self._slot_map.keys())[:8]} -> EVICTING {leaked[:8]}")
         for sid in leaked:
             self.evict_sequence(sid)
         return len(leaked)
