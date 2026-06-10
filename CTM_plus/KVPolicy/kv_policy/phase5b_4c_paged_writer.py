@@ -383,6 +383,66 @@ def prefill_seq_id_for_segment(
     return -1
 
 
+# ----------------------------------------------------------------------
+# Phase 6K.16c — STABLE real-sequence identity (the APC fix).
+#
+# Block-local identity (6K.16b) eliminated the decode COLLISION but churns:
+# the id changes at every block crossing, so slots are allocated/freed
+# mid-sequence and stale state leaks across sequences/requests in a
+# timing-dependent way (the 6K.16b bisection). The robust answer is the id
+# vLLM itself uses: a real per-sequence id, UNIQUE and CONSTANT for the
+# whole lifetime, never recycled mid-flight. Only the 6B.2 execute_model
+# wrap can see it (model_input); it stashes an ordered list on
+# attn_metadata that the write/read paths consult here.
+#
+# Safety: the stash is COUNT-CHECKED against the attention rows; any
+# mismatch (wrong vLLM-API assumption / unexpected batch shape) falls back
+# to block-local, so this is never WORSE than 6K.16b — worst case is "no
+# improvement", flagged by a warning, not corruption.
+# ----------------------------------------------------------------------
+
+_REAL_SEQ_IDS_ATTR = "_int4_real_seq_ids"                  # decode-row order
+_REAL_SEQ_IDS_PREFILL_ATTR = "_int4_real_seq_ids_prefill"  # prefill-seg order
+
+
+def stashed_real_seq_ids(attn_metadata: "Any", expected_count: int,
+                         *, prefill: bool = False) -> "Optional[list]":
+    """Return the hook-stashed real seq ids iff present AND their count
+    matches the attention rows; else None (caller falls back)."""
+    if attn_metadata is None:
+        return None
+    attr = _REAL_SEQ_IDS_PREFILL_ATTR if prefill else _REAL_SEQ_IDS_ATTR
+    ids = getattr(attn_metadata, attr, None)
+    if ids is None:
+        return None
+    if len(ids) != expected_count:
+        logger.warning(
+            "int4_protected real-seq-id stash count %d != %d %s rows; "
+            "falling back to block-local identity (the 6B.2 hook's id "
+            "extraction is mis-ordered for this batch shape).",
+            len(ids), expected_count, "prefill" if prefill else "decode",
+        )
+        return None
+    return list(ids)
+
+
+def resolve_decode_seq_ids(
+    attn_metadata: "Any",
+    block_tables: "Any",
+    seq_lens_tensor: "Any",
+    BS: int,
+    *,
+    block_local: bool,
+) -> list:
+    """Decode-row seq ids: prefer the stable real-id stash (6K.16c), else
+    block-local / legacy (6K.16b / pre-6K.16b)."""
+    real = stashed_real_seq_ids(attn_metadata, int(block_tables.shape[0]))
+    if real is not None:
+        return real
+    return decode_seq_ids_from_meta(
+        block_tables, seq_lens_tensor, BS, block_local=block_local)
+
+
 def _in_cuda_graph_capture() -> bool:
     """Phase 6B.3 (Option X) — detect whether the current CUDA stream
     is in graph capture. Returns False if CUDA isn't available or

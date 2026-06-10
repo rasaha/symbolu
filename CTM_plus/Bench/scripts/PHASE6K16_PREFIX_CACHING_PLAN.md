@@ -295,3 +295,33 @@ required for APC. Eliminates churn AND cross-request collisions by construction.
 Bigger change (hook plumbing + a stable fallback for the eager path); needs one
 GPU iteration. Block-local stays as the legacy-mode path (byte-identical;
 non-APC unaffected). Guard stays closed throughout; production unchanged.
+
+### Tier 1c — IMPLEMENTED (real-seq-id identity; pending GPU rerun)
+
+`extract_real_seq_ids(model_input)` (in `phase6b2_precapture_hook.py`) pulls the
+real ids in attention-row order from `sampling_metadata.seq_groups` (primary) /
+`request_ids_to_seq_ids` (fallback). The hook's `_wrapped` stashes them on
+`attn_metadata` on EVERY step — decode → `_int4_real_seq_ids`, prefill →
+`_int4_real_seq_ids_prefill`. All consumers route through
+`resolve_decode_seq_ids` / `stashed_real_seq_ids` (writer module):
+
+- hook `_resolve_and_stash` (captured GC + slot resolution),
+- `_derive_write_partitions` (prefill segments + eager-decode rows),
+- batched read self-resolve + B=1 read (now threaded `attn_metadata`).
+
+**Safety rail (the key design point):** every consumer COUNT-CHECKS the stash
+against its attention rows and falls back to block-local on any mismatch — so a
+wrong vLLM-API assumption degrades to 6K.16b behavior (a warning), never
+corruption. The factory installs the hook for APC **even in eager mode** (the
+eager paths now depend on the stash). Non-APC / legacy-backing: stash absent →
+byte-identical to before.
+
+CPU coverage: `tests/test_phase6k16c_real_seq_id.py` (13 tests: extraction
+order, parallel-sampling flatten, count-match vs mismatch fallback, prefill+
+decode partitions consume the stash) + the 6K.16b/16/15/6J suites + 27 hook
+tests + 6C verifier + prefill-module selftest — all green (89 total). The
+vLLM-`model_input` attribute path is the one thing CPU can't verify (mocked in
+tests); the count-check makes a wrong guess safe. GPU: rerun the 3-cell
+bisection — expect agreement to clear 0.90 in ALL cells (no config-dependence)
+if extraction is correct; if a cell still fails the *same shifting-set* way,
+the stash isn't landing (warning in the log) and we fix `extract_real_seq_ids`.

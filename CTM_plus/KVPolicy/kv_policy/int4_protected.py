@@ -382,14 +382,18 @@ def Int4ProtectedLLM(
     # (phase6k10: "sync fired 0x during requests"). The hook was only ever
     # installed by bench scripts, so the PUBLIC factory's graph decode was
     # silently broken. Install it here so graph mode works out of the box.
-    # Eager doesn't need it (write_decode_batched syncs inline) -> skip.
+    # Eager normally doesn't need it (write_decode_batched syncs inline) ->
+    # skip. EXCEPTION (Phase 6K.16c): with prefix caching ON, the hook is
+    # what stashes the stable real seq ids the eager write/read paths use,
+    # so it must be installed in eager mode too.
     # Best-effort: never fail the factory on a hook-install error. A/B
     # toggle: PHASE6K10_AUTO_HOOK=0.
     _auto_hook = os.environ.get(
         "PHASE6K10_AUTO_HOOK", "1"
     ).strip().lower() not in ("0", "false", "no")
+    _apc_on = bool(kwargs.get("enable_prefix_caching"))
     if (kv_cache_dtype == "int4_protected"
-            and not effective_enforce_eager
+            and (not effective_enforce_eager or _apc_on)
             and _auto_hook):
         try:
             from kv_policy.phase6b2_precapture_hook import (

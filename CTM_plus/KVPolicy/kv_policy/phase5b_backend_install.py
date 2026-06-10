@@ -394,7 +394,8 @@ if _VLLM_FA_AVAILABLE:
             self._phase5b_paged_writer = writer
             return writer
 
-        def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer):
+        def _read_decode_packed(self, query_q, kv_cache, decode_meta, layer,
+                                attn_metadata=None):
             """Phase 5B.4c.2 / 5B.6 step 3: packed decode read path.
             Now handles batch>=1 by looping over sequences.
 
@@ -418,14 +419,16 @@ if _VLLM_FA_AVAILABLE:
                 # degenerate case); `_read_decode_packed_one` has .item()
                 # calls that are forbidden inside torch.cuda.graph context.
                 _seqlen0 = int(cache_seqlens_orig[0].item())
-                # 6K.16b: same identity rule as the write path.
+                # 6K.16c: stable real-id stash if present, else 6K.16b
+                # block-local / legacy — must match the write path.
                 from kv_policy.phase5b_4c_paged_writer import (
                     block_local_seq_ids_enabled as _bl_ids,
+                    resolve_decode_seq_ids as _resolve_ids,
                 )
-                if _bl_ids(writer):
-                    _sid0 = int(block_table[0][max(0, (_seqlen0 - 1) // writer.BS)].item())
-                else:
-                    _sid0 = _seq_id_from_block_table_row(block_table[0])
+                _sid0 = _resolve_ids(
+                    attn_metadata, block_table, cache_seqlens_orig,
+                    writer.BS, block_local=_bl_ids(writer),
+                )[0]
                 return self._read_decode_packed_one(
                     query_q, kv_cache, layer, writer,
                     bt=block_table[0],
@@ -442,11 +445,12 @@ if _VLLM_FA_AVAILABLE:
                 query_q, kv_cache, layer, writer,
                 block_table=block_table,
                 cache_seqlens_orig=cache_seqlens_orig,
+                attn_metadata=attn_metadata,
             )
 
         def _read_decode_packed_batched(
             self, query_q, kv_cache, layer, writer, *,
-            block_table, cache_seqlens_orig,
+            block_table, cache_seqlens_orig, attn_metadata=None,
         ):
             """Multi-seq packed decode in a SINGLE kernel call.
 
@@ -495,14 +499,14 @@ if _VLLM_FA_AVAILABLE:
                 n_blocks_max = block_table.shape[1]
                 if not _in_capture_read:
                     # CAPTURE-EXEMPT: pre-capture host sync for seq_ids.
-                    # 6K.16b: block-local identity (APC-sound) when the
-                    # writer runs backing-skip; legacy [:,0] otherwise.
+                    # 6K.16c: stable real-id stash if present, else 6K.16b
+                    # block-local / legacy. Must match the write path.
                     from kv_policy.phase5b_4c_paged_writer import (
                         block_local_seq_ids_enabled as _bl_ids,
-                        decode_seq_ids_from_meta as _dec_ids,
+                        resolve_decode_seq_ids as _resolve_ids,
                     )
-                    seq_ids = _dec_ids(
-                        block_table, cache_seqlens_orig, BS,
+                    seq_ids = _resolve_ids(
+                        attn_metadata, block_table, cache_seqlens_orig, BS,
                         block_local=_bl_ids(writer),
                     )
                 else:
@@ -1220,6 +1224,7 @@ if _VLLM_FA_AVAILABLE:
                             kv_cache=kv_cache,
                             decode_meta=decode_meta,
                             layer=layer,
+                            attn_metadata=attn_metadata,
                         )
                         decode_output.copy_(out_packed.squeeze(1))
                     else:
@@ -1415,8 +1420,9 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
     """
     from kv_policy.phase5b_4c_paged_writer import (
         block_local_seq_ids_enabled,
-        decode_seq_ids_from_meta,
+        resolve_decode_seq_ids,
         prefill_seq_id_for_segment,
+        stashed_real_seq_ids,
     )
     block_local = writer is not None and block_local_seq_ids_enabled(writer)
 
@@ -1426,8 +1432,10 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
     if (dec_meta is not None
             and getattr(dec_meta, "block_tables", None) is not None
             and dec_meta.block_tables.numel() > 0):
-        ids = decode_seq_ids_from_meta(
-            dec_meta.block_tables,
+        # 6K.16c stable real-id stash (if present + count-matched), else
+        # 6K.16b block-local / legacy.
+        ids = resolve_decode_seq_ids(
+            attn_metadata, dec_meta.block_tables,
             getattr(dec_meta, "seq_lens_tensor", None),
             BS, block_local=block_local,
         )
@@ -1439,21 +1447,31 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
         qsl = getattr(pre_meta, "query_start_loc", None)
         if qsl is not None and qsl.shape[0] > 2:
             qsl_cpu = qsl.cpu().tolist()
+            n_seg = len(qsl_cpu) - 1
+            # 6K.16c: real prefill seq ids (one per prompt segment),
+            # count-checked; else per-segment block-local / legacy.
+            real_pre = stashed_real_seq_ids(attn_metadata, n_seg, prefill=True)
             partitions = []
-            for i in range(len(qsl_cpu) - 1):
+            for i in range(n_seg):
                 start, end = qsl_cpu[i], qsl_cpu[i + 1]
                 if end <= start:
                     continue
-                sid = prefill_seq_id_for_segment(
-                    slot_mapping_flat, start, end, BS, block_local=block_local)
-                if sid < 0:
-                    # All padding for this seg; skip.
-                    continue
+                if real_pre is not None:
+                    sid = real_pre[i]
+                else:
+                    sid = prefill_seq_id_for_segment(
+                        slot_mapping_flat, start, end, BS, block_local=block_local)
+                    if sid < 0:
+                        # All padding for this seg; skip.
+                        continue
                 partitions.append((sid, slice(start, end)))
             if partitions:
                 return partitions
         # Single-seq prefill.
         n = int(slot_mapping_flat.shape[0])
+        real_pre = stashed_real_seq_ids(attn_metadata, 1, prefill=True)
+        if real_pre is not None:
+            return [(real_pre[0], slice(0, n))]
         sid = prefill_seq_id_for_segment(
             slot_mapping_flat, 0, n, BS, block_local=block_local)
         if sid >= 0:

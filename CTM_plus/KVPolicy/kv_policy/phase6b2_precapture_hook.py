@@ -121,6 +121,54 @@ def clear_stash(attn_metadata: Any) -> None:
 
 
 # ---------------------------------------------------------------------- #
+# Phase 6K.16c — real per-sequence id extraction (for prefix caching).
+#
+# Only the execute_model wrap sees model_input, which carries the real
+# vLLM seq ids. We extract them in ATTENTION-ROW ORDER and stash an
+# ordered list on attn_metadata; the write/read paths consult it (with a
+# count-check fallback to block-local). vLLM 0.7.3 V0 default has no
+# chunked prefill, so a step is all-prefill OR all-decode — one ordered
+# list per step is sufficient.
+#
+# Source preference (defensive — the consumer count-checks, so a wrong
+# guess degrades to block-local, never corrupts):
+#   1. model_input.sampling_metadata.seq_groups[*].seq_ids  (flattened)
+#   2. model_input.request_ids_to_seq_ids (dict; values flattened)
+# Returns None when neither is available/usable.
+# ---------------------------------------------------------------------- #
+
+
+def extract_real_seq_ids(model_input: Any) -> Optional[List[int]]:
+    """Ordered real seq ids for this step's attention rows, or None."""
+    # 1. sampling_metadata.seq_groups — the canonical V0 per-group order.
+    sm = getattr(model_input, "sampling_metadata", None)
+    seq_groups = getattr(sm, "seq_groups", None) if sm is not None else None
+    if seq_groups:
+        out: List[int] = []
+        ok = True
+        for g in seq_groups:
+            sids = getattr(g, "seq_ids", None)
+            if sids is None:
+                ok = False
+                break
+            out.extend(int(s) for s in sids)
+        if ok and out:
+            return out
+    # 2. request_ids_to_seq_ids fallback (ordered dict of lists).
+    r2s = getattr(model_input, "request_ids_to_seq_ids", None)
+    if isinstance(r2s, dict) and r2s:
+        out = []
+        for sids in r2s.values():
+            try:
+                out.extend(int(s) for s in sids)
+            except TypeError:
+                out.append(int(sids))
+        if out:
+            return out
+    return None
+
+
+# ---------------------------------------------------------------------- #
 # Pure-decode-step predicate (matches _is_pure_decode_write from
 # phase5b_backend_install, but checks the step-level shape instead
 # of per-impl call shape).
@@ -208,23 +256,21 @@ def _resolve_and_stash(
     block_tables = dec_meta.block_tables
     # One coalesced host sync per step. Pre-capture-hoistable; the
     # captured region never sees it.
-    # 6K.16b: identity = block of the token being written (APC-sound)
-    # when the writers run backing-skip mode; legacy [:,0] otherwise.
-    # MUST match the write/read-path derivations exactly — the pool
-    # counters synced below are keyed by these ids.
+    # 6K.16c: prefer the STABLE real-seq-id stash (set by _wrapped above);
+    # else 6K.16b block-local (backing-skip) / legacy [:,0]. MUST match
+    # the write/read-path derivations exactly — the pool counters synced
+    # below are keyed by these ids.
     from kv_policy.phase5b_4c_paged_writer import (
         block_local_seq_ids_enabled as _bl_ids,
-        decode_seq_ids_from_meta as _dec_ids,
+        resolve_decode_seq_ids as _resolve_ids,
     )
     _primary_w = writers[0] if writers else None
-    if _primary_w is not None and _bl_ids(_primary_w):
-        seq_ids = _dec_ids(
-            block_tables,
-            getattr(dec_meta, "seq_lens_tensor", None),
-            int(_primary_w.BS), block_local=True,
-        )
-    else:
-        seq_ids = block_tables[:, 0].cpu().tolist()
+    seq_ids = _resolve_ids(
+        attn_metadata, block_tables,
+        getattr(dec_meta, "seq_lens_tensor", None),
+        int(_primary_w.BS) if _primary_w is not None else 32,
+        block_local=(_primary_w is not None and _bl_ids(_primary_w)),
+    )
 
     # The hook fires from `worker.execute_model` -> our wrap, which
     # runs OUTSIDE vLLM's `@torch.inference_mode()` decorator (that
@@ -470,6 +516,26 @@ def install_int4_protected_precapture_hook(
 
     def _wrapped(model_input, kv_caches, *args, **kwargs):
         attn_metadata = getattr(model_input, "attn_metadata", None)
+        # Phase 6K.16c: stash real seq ids in attention-row order on EVERY
+        # step (prefill OR decode), so the write/read paths can use stable
+        # identity under prefix caching. Decode -> _int4_real_seq_ids;
+        # prefill -> _int4_real_seq_ids_prefill (one per prompt segment).
+        # Best-effort; the consumers count-check and fall back to
+        # block-local. Skipped silently when extraction yields nothing.
+        if attn_metadata is not None:
+            try:
+                from kv_policy.phase5b_4c_paged_writer import (
+                    _REAL_SEQ_IDS_ATTR, _REAL_SEQ_IDS_PREFILL_ATTR,
+                )
+                real_ids = extract_real_seq_ids(model_input)
+                if real_ids is not None:
+                    is_dec = _is_pure_decode_step(attn_metadata)
+                    setattr(attn_metadata,
+                            _REAL_SEQ_IDS_ATTR if is_dec
+                            else _REAL_SEQ_IDS_PREFILL_ATTR,
+                            real_ids)
+            except Exception as _e:  # never break the forward over this
+                logger.warning("6K.16c seq-id stash skipped: %s", _e)
         if _is_pure_decode_step(attn_metadata):
             # Walk writers list ONCE per step to determine the right
             # device. All writers share the same kv_cache device.
