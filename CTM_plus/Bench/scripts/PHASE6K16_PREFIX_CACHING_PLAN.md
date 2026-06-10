@@ -281,6 +281,11 @@ architecture is sound. But overall agreement stayed low. A 3-cell bisection
 - **Needle MISS only in graphs+batched**; the identical B=1 needle call passes
   once the prior equivalence prompts run sequentially ⇒ **batched decode leaks
   writer state into the next request**.
+- **Per-prompt token-level evidence (clinches the churn reading):** every failing
+  prompt collapses at exactly its first block-crossing decode step — `prompt[1]`
+  at `prefix=1` (token 2), `prompt[4]/[5]` at `prefix=2` (token 3) — while
+  `prompt[2]/[3]`, whose suffixes never cross a 32-token boundary in the 32
+  generated tokens, pass `1.000`. Failure ⟺ block crossing.
 
 **Root cause: block-local identity churns.** `seq_id = block of current token`
 **changes every block crossing** (these prompts cross 1–2 in 32 decode tokens),
