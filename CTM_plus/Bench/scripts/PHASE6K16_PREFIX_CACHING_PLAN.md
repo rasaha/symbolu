@@ -188,3 +188,50 @@ Decision tree for the rerun:
 - branch fired, scales sane, norms sane → the varlen call itself (layout /
   causal alignment) — next probe: replace `causal=True` semantics check with a
   1-seq micro-test comparing against the no-cache branch on the same tokens.
+
+## AUDIT RESULT (code-level root cause — found before the rerun)
+
+**The blocker is a PRE-EXISTING sequence-identity invariant in the 5B.6 write
+path that APC falsifies — NOT the dequant-context prefill math.**
+
+The writer keys all per-sequence state (SeqState slots: K staging, counters) on
+a block-table-derived "seq id" (`_derive_write_partitions`,
+`phase5b_backend_install.py:1363-1420`):
+
+- PREFILL: `seq_id = slot_mapping[seq_start] // BS` (first block *written*)
+- DECODE:  `seq_id = block_tables[i, 0]` (also `:424` read path, `:971`
+  6B.1 self-resolve, and the 6B.2 hook)
+
+The docstring's invariant — *"both forms collapse to `block_table[0]` …
+stable across that sequence's lifetime"* — holds **only without prefix
+caching**. Under APC it breaks twice:
+
+1. **Decode collision.** Every sequence sharing a cached prefix has the SAME
+   `block_tables[i, 0]` → all live hit-sequences resolve to ONE seq id → ONE
+   SeqState/slot shared by the whole batch → decode staging interleaves across
+   sequences → partial-block requant garbage → the degenerate "old-old-old"
+   collapse (the documented pérdida signature of shared/stale SeqState, cf.
+   the 6K.9 note). Matches the observed all-prompts degeneration exactly.
+2. **Prefill→decode identity mismatch (corrupts even B=1).** A hit sequence's
+   prefill writes start at its first SUFFIX block, so it registers under
+   `suffix_block_id`; its decode then looks up `block_tables[i,0]` = the
+   SHARED block id — a different key. The prefill-staged partial suffix block
+   is orphaned under the old key (and freed by the 6K.14 GC on the next
+   pure-decode step, since that id never appears in a decode batch), so the
+   suffix tail requant is garbage even for a single cache-hit sequence —
+   matching the B=1 needle MISS.
+
+Both corruptions are in the WRITE path and fire regardless of the prefix
+prefill attention; the warm call (no hits) is unaffected — consistent with the
+gate pattern. The rerun instrumentation now serves as CONFIRMATION (expect:
+branch fired, `k_scale` sane, warm agreement ≈ 1.0).
+
+**Fix design (Tier 1b — real sequence identity).** Thread vLLM's actual seq
+ids instead of block-table surrogates: extend the 6B.2 `execute_model` wrap to
+stash an ordered per-batch list of real seq ids on `attn_metadata`
+(`model_input.request_ids_to_seq_ids` is available outside the captured
+region); `_derive_write_partitions`, the decode self-resolve, and the read
+path PREFER the stash and fall back to the legacy block-table derivation
+byte-identically when absent — non-APC behavior unchanged. Install the hook
+whenever APC is enabled (including eager). CPU-testable: fake metadata with
+shared `block_tables[:,0]` + stash → unique ids; no stash → legacy ids.
