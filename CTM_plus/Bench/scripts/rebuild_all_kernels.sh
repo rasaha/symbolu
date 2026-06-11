@@ -3,6 +3,11 @@
 # Rebuild all custom CUDA kernels for the int4_protected project.
 #
 # Performs in order:
+#   0. Enforce the stack pins (vllm==0.7.3, torch==2.5.1+cu121) BEFORE building —
+#      install/restore if drifted (a wrong stack builds but won't import / runs
+#      garbage). Skip with SKIP_VERSION_CHECK=1.
+#   0b. If the fork dev tree is missing, create /workspace/dev and untar the fork
+#       tarball — just drop vllm-flash-attn-dev-src.tar.gz under /workspace.
 #   1. Apply the Phase 6K patch to vllm-flash-attn-dev (idempotent).
 #   2. (--clean only) Wipe build artifacts: build/ dir, *.so, *.egg-info.
 #   3. Rebuild vllm-flash-attn-dev with --no-build-isolation.
@@ -20,7 +25,12 @@
 #
 # Env overrides:
 #   VLLM_FA_DIR        — default /workspace/dev/vllm-flash-attn-dev
+#   FA_TARBALL         — default /workspace/vllm-flash-attn-dev-src.tar.gz
+#                        (untarred into /workspace/dev when VLLM_FA_DIR is missing)
 #   INT4_PROT_C_DIR    — default <symbolu>/CTM_plus/CUDA_int4_protected
+#   REQUIRE_VLLM       — default 0.7.3   (enforced before build)
+#   REQUIRE_TORCH      — default 2.5.1   (enforced before build, cu121 index)
+#   SKIP_VERSION_CHECK=1 — skip the pin enforcement (step 0)
 #   SKIP_PATCH=1       — skip the Phase 6K patch step
 
 set -euo pipefail
@@ -29,8 +39,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SYMBOLU_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 VLLM_FA_DIR="${VLLM_FA_DIR:-/workspace/dev/vllm-flash-attn-dev}"
+FA_TARBALL="${FA_TARBALL:-/workspace/vllm-flash-attn-dev-src.tar.gz}"
 INT4_PROT_C_DIR="${INT4_PROT_C_DIR:-${SYMBOLU_ROOT}/CTM_plus/CUDA_int4_protected}"
 SKIP_PATCH="${SKIP_PATCH:-0}"
+SKIP_VERSION_CHECK="${SKIP_VERSION_CHECK:-0}"
+REQUIRE_VLLM="${REQUIRE_VLLM:-0.7.3}"
+REQUIRE_TORCH="${REQUIRE_TORCH:-2.5.1}"
+TORCH_INDEX="${TORCH_INDEX:-https://download.pytorch.org/whl/cu121}"
 
 # Parse flags.
 DO_CLEAN=0
@@ -40,7 +55,7 @@ for arg in "$@"; do
         --clean)         DO_CLEAN=1 ;;
         --verify-source) DO_VERIFY_SOURCE=1 ;;
         -h|--help)
-            sed -n '2,30p' "${BASH_SOURCE[0]}"
+            sed -n '2,44p' "${BASH_SOURCE[0]}"
             exit 0 ;;
         *)
             echo "FAIL: unknown flag '$arg'"
@@ -62,15 +77,80 @@ if [[ "${VIRTUAL_ENV:-}" == "" ]]; then
     echo "         Continuing, but pip install -e may not target the right env."
 fi
 
+# ----- Step 0: enforce the stack pins BEFORE building. A kernel built against
+# the wrong torch/vllm builds fine but then fails to import (ABI mismatch) or
+# runs garbage. Order matters: installing vllm can SWAP torch, so fix vllm
+# FIRST, then restore torch. -----
+echo
+if [[ "${SKIP_VERSION_CHECK}" == "1" ]]; then
+    echo "[0/5] Pin enforcement SKIPPED (SKIP_VERSION_CHECK=1)"
+else
+    echo "[0/5] Enforcing pins: vllm==${REQUIRE_VLLM}, torch==${REQUIRE_TORCH} (cu121)..."
+    _pkg_ver() { python -c "import ${1}; print(${1}.__version__)" 2>/dev/null || echo ""; }
+
+    cur_vllm="$(_pkg_ver vllm)"
+    if [[ "${cur_vllm}" != "${REQUIRE_VLLM}" ]]; then
+        echo "    vllm is '${cur_vllm:-<none>}' != ${REQUIRE_VLLM} -> installing vllm==${REQUIRE_VLLM}..."
+        pip install "vllm==${REQUIRE_VLLM}" 2>&1 | tail -5 \
+            || { echo "FAIL: could not install vllm==${REQUIRE_VLLM}."; exit 2; }
+    else
+        echo "    vllm ${cur_vllm}: OK"
+    fi
+
+    # torch AFTER vllm (vllm's install can pull a different torch). Compare on the
+    # base version (ignore the +cuXXX local tag) so 2.5.1 == 2.5.1+cu121.
+    cur_torch="$(_pkg_ver torch)"
+    if [[ "${cur_torch%%+*}" != "${REQUIRE_TORCH}" ]]; then
+        echo "    torch is '${cur_torch:-<none>}' != ${REQUIRE_TORCH} -> restoring torch==${REQUIRE_TORCH} (--no-deps, cu121)..."
+        pip install --no-deps --force-reinstall "torch==${REQUIRE_TORCH}" --index-url "${TORCH_INDEX}" 2>&1 | tail -5 \
+            || { echo "FAIL: could not install torch==${REQUIRE_TORCH}."; exit 2; }
+    else
+        echo "    torch ${cur_torch}: OK"
+    fi
+
+    # Assert both are correct now — a mismatch here means the rebuild is unsafe.
+    fin_vllm="$(_pkg_ver vllm)"; fin_torch="$(_pkg_ver torch)"
+    echo "    -> vllm=${fin_vllm:-<none>}  torch=${fin_torch:-<none>}"
+    [[ "${fin_vllm}" == "${REQUIRE_VLLM}" ]] \
+        || { echo "FAIL: vllm is ${fin_vllm:-<none>} after fix (want ${REQUIRE_VLLM})."; exit 2; }
+    [[ "${fin_torch%%+*}" == "${REQUIRE_TORCH}" ]] \
+        || { echo "FAIL: torch is ${fin_torch:-<none>} after fix (want ${REQUIRE_TORCH})."; exit 2; }
+fi
+
 # Sanity: GPU visible? (build doesn't require it but bench will.)
 if command -v nvidia-smi &>/dev/null; then
     GPU_LINE=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | head -1)
     echo "GPU: ${GPU_LINE:-none detected}"
 fi
 
-# Sanity: source dirs exist?
+# ----- Step 0b: ensure the fork dev tree exists; untar it if missing. The fork
+# is a vendored working copy (NOT in the GitHub repo) — drop the tarball under
+# /workspace and this creates /workspace/dev and unpacks it. -----
+echo
 if [[ ! -d "${VLLM_FA_DIR}" ]]; then
-    echo "FAIL: ${VLLM_FA_DIR} does not exist."
+    if [[ -f "${FA_TARBALL}" ]]; then
+        FA_PARENT="$(dirname "${VLLM_FA_DIR}")"
+        echo "[0b] ${VLLM_FA_DIR} missing -> creating ${FA_PARENT} and untarring ${FA_TARBALL}..."
+        mkdir -p "${FA_PARENT}"
+        (cd "${FA_PARENT}" && tar xzf "${FA_TARBALL}") \
+            || { echo "FAIL: untar of ${FA_TARBALL} failed."; exit 2; }
+        if [[ ! -d "${VLLM_FA_DIR}" ]]; then
+            echo "FAIL: ${FA_TARBALL} did not unpack to ${VLLM_FA_DIR}."
+            echo "      Either re-pack so it extracts to '$(basename "${VLLM_FA_DIR}")/',"
+            echo "      or point VLLM_FA_DIR at the unpacked path."
+            exit 2
+        fi
+    else
+        echo "FAIL: ${VLLM_FA_DIR} does not exist and no tarball at ${FA_TARBALL}."
+        echo "      Place vllm-flash-attn-dev-src.tar.gz under /workspace (or set FA_TARBALL)."
+        exit 2
+    fi
+else
+    echo "[0b] Fork dev tree present: ${VLLM_FA_DIR}"
+fi
+# The fork must look complete — the patched kernel header has to be there.
+if [[ ! -f "${VLLM_FA_DIR}/csrc/flash_attn/src/flash_fwd_kernel.h" ]]; then
+    echo "FAIL: fork at ${VLLM_FA_DIR} looks incomplete (missing csrc/flash_attn/src/flash_fwd_kernel.h)."
     exit 2
 fi
 if [[ ! -d "${INT4_PROT_C_DIR}" ]]; then
