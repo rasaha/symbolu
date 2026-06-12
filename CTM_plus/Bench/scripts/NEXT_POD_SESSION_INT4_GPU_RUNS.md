@@ -125,14 +125,35 @@ python -c "import vllm; from vllm.vllm_flash_attn import flash_attn_with_int4_kv
 #     int4C_build_*.log — read those on failure, the console only tails.
 ```
 
-## TASK 6N — prot-int8 gates (BUILT 2026-06-12, CPU-validated; NO GPU numbers)
+## TASK 6N ✅ ALL GATES GREEN 2026-06-12 (A100-SXM4-80G, same pod)
 
-Phase 6N (asym-static int8 protected channels) is implemented behind
-`INT4_PROTECTED_PROT_INT8` (default OFF; unset = byte-identical bf16
-build). Run the gates IN ORDER; the flag stays default-OFF and no doc
-number moves until every one is green. Expected if the probe holds:
-sidecar -1.0-1.1 GiB at the max-util pool, net density ~1.78x, quality
-deltas below gate resolution.
+Phase 6N (asym-static int8 protected channels) behind
+`INT4_PROTECTED_PROT_INT8` (default REMAINS OFF — rollout decision
+separate from the banked measurement). MEASURED RESULTS, gates in order:
+
+1. Recalibration reproduced the deployed mask BYTE-IDENTICALLY (two
+   independent runs: pre-sync v1 script and v2 script) + emitted
+   k_min/k_max (margin 1.1; artifact 35,733 B -> ~167 KB).
+2. All selftests/guard tests/capture-safety GREEN on pod.
+3. Savings probe A/B (util 0.85, mml 32768, 24,987 blocks): needle
+   RETRIEVED both cells; sidecar_bytes 8,867,932,672 -> 7,844,475,392
+   = **-0.953 GiB**, matching 1280 B/block x 24,987 x 32 layers minus
+   the 10,240 B of dequant constants TO THE BYTE.
+4. Greedy A/B: **6/6 BIT-IDENTICAL** ON vs OFF (driver activation guard:
+   32/32 layers ON-cell, 0/32 OFF-cell).
+5. S1 APC byte-gate 13/13 byte-exact, both engines confirmed under
+   `prot_int8_asym_static` markers; 6k12 hard needle: protected ==
+   bf16 bucket-for-bucket (strict 0.875 / retrieval 0.955, 0 ERROR) in
+   BOTH flag states. Two invalid 6k12 runs first — driver needs
+   --model AND --protect-mask (it POPS $PROTECT_MASK_PATH); without
+   them int4 cells ERROR 24/24 on the legacy Qwen artifact paths.
+6. Demo flag-ON: density line **~1.78x net** (sidecars 7.3 GiB vs 8.3
+   flag-off at the same pool); APC rows quality 1.00/1.00, TTFT -79%
+   @4000 / 1.81x — in family with the flag-off sweeps.
+
+Docs updated post-gates: PHASE6N_PROT_INT8_DESIGN.md (status GATED +
+checklist results), deploy/INT4_PROTECTED_DESIGN.md §6 (density row +
+customer statement carry 1.78x-with-flag). Reproduction commands below.
 
 ```bash
 # 0) preamble as above ($M, PROTECT_MASK_PATH, import check).
