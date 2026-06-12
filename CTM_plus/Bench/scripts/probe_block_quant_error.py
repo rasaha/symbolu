@@ -64,8 +64,14 @@ def _quant_err(x, bits, group=GROUP):
     return (x.to(torch.float32) - dq).abs()
 
 
-def policy_errors(k, mask):
+def policy_errors(k, mask, static_absmax=None):
     """k: (S,H,D) float; mask: (H,D) bool (protected=True).
+    static_absmax: optional (H,D) corpus max-abs — adds the
+    'prot_int8_static' policy: protected channels at int8 SYMMETRIC with a
+    STATIC per-channel scale (absmax/127). This is the no-streaming-changes
+    implementation variant (per-token writes quantize independently; the
+    scale is a calibration constant like the mask). NB measured on the same
+    corpus the scale came from -> lower bound on real error (labeled).
     Returns dict of policy -> per-element |err| (S,H,D)."""
     import torch
     S = (k.shape[0] // GROUP) * GROUP
@@ -78,10 +84,18 @@ def policy_errors(k, mask):
         cur[:, m] = 0.0                                   # bf16 protect = exact
         out["cur_bf16"] = cur
         if m.any():
-            err8 = _quant_err(k, bits=8)                  # int8, same groups
+            err8 = _quant_err(k, bits=8)                  # int8, dynamic groups
             p8 = err4.clone()
             p8[:, m] = err8[:, m]                         # protected -> int8 err
             out["prot_int8"] = p8
+            if static_absmax is not None:
+                sc = (static_absmax.to(k.device).to(torch.float32) / 127.0
+                      ).clamp(min=1e-8)                   # (H,D) static scale
+                qs = (k / sc).round().clamp(-127, 127) * sc
+                err_static = (k - qs).abs()
+                ps = err4.clone()
+                ps[:, m] = err_static[:, m]
+                out["prot_int8_static"] = ps
     return out
 
 
@@ -227,7 +241,7 @@ def run_gpu(args):
         qmean = qs.abs().mean(dim=0).view(H, gqa, D).mean(dim=1)   # (H,D)
 
         amask = art_mask[li].to(dev) if art_mask is not None else fresh_mask(chan_max, 0.04)
-        errs = policy_errors(k, amask)
+        errs = policy_errors(k, amask, static_absmax=chan_max)
         chan_err_nop = errs["noprot"].mean(dim=0)         # (H,D)
         smask = fresh_mask(qmean * chan_err_nop, 0.04)
 
@@ -276,7 +290,7 @@ def run_gpu(args):
         chan_rows.append(torch.stack([chan_max, qmean, chan_err_nop,
                                       amask.float(), smask.float()]).to("cpu", torch.float16))
         summary["per_layer"][str(li)] = row
-        for nm in ("noprot", "cur_bf16", "prot_int8"):
+        for nm in ("noprot", "cur_bf16", "prot_int8", "prot_int8_static"):
             if nm in row:
                 glob.setdefault(nm, []).append(row[nm]["mean"])
         del k, v, qs, errs, delta
@@ -284,6 +298,7 @@ def run_gpu(args):
             torch.cuda.empty_cache()
         print(f"[qerr] layer {li:2d}: cur={row['cur_bf16']['mean']:.5f} "
               f"noprot={row['noprot']['mean']:.5f} int8prot={row['prot_int8']['mean']:.5f} "
+              f"int8static={row.get('prot_int8_static', {}).get('mean', float('nan')):.5f} "
               f"snr={row['score']['snr']:.0f}", flush=True)
 
     # ---- dynamic-protect CDF over ALL blocks (current policy) ----
@@ -326,7 +341,7 @@ def _print_report(s):
           f"({s['tokens']} tokens, {s['layers']} layers, group={s['group']})")
     print("=" * 90)
     base = pm.get("noprot", 1e-9)
-    for nm in ("noprot", "cur_bf16", "prot_int8"):
+    for nm in ("noprot", "cur_bf16", "prot_int8", "prot_int8_static"):
         if nm in pm:
             print(f"  {nm:<10} mean|err| = {pm[nm]:.5f}   "
                   f"({pm[nm]/base*100:5.1f}% of no-protect)")
@@ -365,6 +380,14 @@ def _selftest():
     check("int8-protect within 5% of bf16-protect mean err",
           errs["prot_int8"].mean() <= errs["cur_bf16"].mean() * 1.05
           + 0.02 * errs["noprot"].mean())
+    errs_s = policy_errors(k, mask, static_absmax=k.abs().amax(dim=0))
+    check("static-scale int8-protect present and bounded",
+          "prot_int8_static" in errs_s
+          and errs_s["prot_int8_static"].mean()
+          <= errs_s["noprot"].mean() * 1.05)
+    check("static int8 err >= dynamic int8 err (coarser scale)",
+          errs_s["prot_int8_static"][:, mask].mean()
+          >= errs_s["prot_int8"][:, mask].mean() * 0.99)
     means = []
     chan_max = k.abs().amax(dim=0)
     for pct in PCT_SWEEP:

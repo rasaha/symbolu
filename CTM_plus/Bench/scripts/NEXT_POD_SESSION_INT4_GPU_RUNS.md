@@ -294,3 +294,10 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   population from exact to ~16x-finer-than-int4). OPTIONAL closer: a
   no-protect end-to-end ablation (needle 32-60K + 6-prompt greedy,
   ~10 min) would convert the 89% proxy into a measured claim.
+- PROT-INT8 (Phase 6N): NOT integrated — probe evidence only; shipping
+  path still stores protect at bf16. Design doc: PHASE6N_PROT_INT8_DESIGN.md
+  (touch points, static-vs-dynamic scale decision, byte-gate contract note,
+  gate checklist). Probe gained 'prot_int8_static' policy: rerun probe
+  (~5 min) — if static ~= dynamic int8, Variant A (no streaming changes,
+  1-2 days + gates) proceeds; build belongs in a pod session, flag
+  INT4_PROTECTED_PROT_INT8 default OFF until gated.
