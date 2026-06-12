@@ -19,9 +19,12 @@ python -c "import vllm; from vllm.vllm_flash_attn import flash_attn_with_int4_kv
 #   export TORCH_CUDA_ARCH_LIST=8.0   # A100; 9.0 for H100
 #   bash CTM_plus/Bench/scripts/rebuild_all_kernels.sh --clean --verify-source
 # Build notes (learned 2026-06 on a 256-vCPU A100 pod):
-#   * the script now caps MAX_JOBS at min(nproc,16) — the old nproc default
-#     (-j=256) OOM-killed the compilers AND a background training run.
-#     RAM-tight pod: MAX_JOBS=8 bash ... --clean
+#   * the script now auto-sizes MAX_JOBS from MemAvailable (~6GB/nvcc-job,
+#     clamp [4,32], <=nproc) — the old nproc default (-j=256) OOMed the build.
+#     Pin explicitly on shared/RAM-tight pods: MAX_JOBS=8 bash ... --clean
+#   * before retrying a failed build, check whether it WAS an OOM:
+#     dmesg -T | grep -iE 'out of memory|oom-kill|killed process' | tail
+#     (no OOM lines => real compile error => read the full log instead)
 #   * do NOT run training jobs on the box during the build (they fight for RAM
 #     and the OOM killer shoots the biggest process).
 #   * full build logs: /workspace/dev/build-logs/fa_wheel_build_*.log /

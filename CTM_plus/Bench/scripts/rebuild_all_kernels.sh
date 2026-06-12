@@ -32,12 +32,12 @@
 #   REQUIRE_TORCH      — default 2.5.1   (enforced before build, cu121 index)
 #   SKIP_VERSION_CHECK=1 — skip the pin enforcement (step 0)
 #   SKIP_PATCH=1       — skip the Phase 6K patch step
-#   MAX_JOBS           — cmake/nvcc build parallelism. Default: min(nproc, 16).
-#                        The fork's setup.py otherwise defaults to nproc, and on
-#                        a 128-256 vCPU pod that many parallel nvcc jobs
-#                        (~2-4 GB each) OOMs the box — the OOM killer shoots the
-#                        compilers AND whatever else is big (seen: a training
-#                        run). Lower to 8 on RAM-tight pods.
+#   MAX_JOBS           — cmake/nvcc build parallelism. Default: auto-sized from
+#                        MemAvailable at ~6 GB per nvcc job, clamped [4, 32]
+#                        and <= nproc. The fork's setup.py otherwise defaults
+#                        to nproc, and on a 128-256 vCPU pod that many parallel
+#                        nvcc jobs (~2-6 GB each) OOMs the box. Pin explicitly
+#                        (e.g. MAX_JOBS=8) on RAM-tight or shared pods.
 #   NVCC_THREADS       — optional, forwarded to the fork's build if set.
 #
 # Full build logs land in /workspace/dev/build-logs/ — read THOSE on failure;
@@ -226,16 +226,30 @@ echo
 echo "[3/5] Rebuilding vllm-flash-attn-dev (wheel) + installing into vendored slot..."
 echo "      (~10-15 min first build; set TORCH_CUDA_ARCH_LIST=8.0 to scope to A100)"
 
-# Parallelism guard. The fork's setup.py passes -j=<MAX_JOBS or nproc> to cmake;
-# on a 256-vCPU pod the nproc default launches hundreds of nvcc jobs (~2-4 GB
-# each) and the OOM killer ends the build (cmake exit 2, compilers/other procs
-# 'Killed'). Cap it unless the operator pinned a value.
+# Parallelism guard. The fork's setup.py passes -j=<MAX_JOBS or nproc> to cmake.
+# The binding constraint is RAM, not cores: each parallel nvcc job compiling the
+# cutlass-templated FA TUs peaks ~2-6 GB (cicc/ptxas stage), so -j=nproc on a
+# 256-vCPU pod asks for ~0.5-1 TB and the OOM killer ends the build. Unless the
+# operator pinned MAX_JOBS, size it from MemAvailable at ~6 GB/job, clamped to
+# [4, 32] and <= nproc (past ~32 the finite TU count + link contention give
+# diminishing returns anyway, single-digit minutes at best).
 if [[ -z "${MAX_JOBS:-}" ]]; then
     _NPROC="$(nproc 2>/dev/null || echo 16)"
-    MAX_JOBS=$(( _NPROC < 16 ? _NPROC : 16 ))
+    _MEM_GB="$(awk '/MemAvailable/ {printf "%d", $2/1048576}' /proc/meminfo 2>/dev/null || echo 0)"
+    if [[ "${_MEM_GB}" -gt 0 ]]; then
+        MAX_JOBS=$(( _MEM_GB / 6 ))
+    else
+        MAX_JOBS=16
+    fi
+    if (( MAX_JOBS > 32 )); then MAX_JOBS=32; fi
+    if (( MAX_JOBS > _NPROC )); then MAX_JOBS=${_NPROC}; fi
+    if (( MAX_JOBS < 4 )); then MAX_JOBS=4; fi
+    echo "      MAX_JOBS=${MAX_JOBS} (auto: MemAvailable=${_MEM_GB}GB at ~6GB/nvcc-job, clamped [4,32], <=nproc=${_NPROC})"
+else
+    echo "      MAX_JOBS=${MAX_JOBS} (operator-pinned)"
 fi
 export MAX_JOBS
-echo "      MAX_JOBS=${MAX_JOBS} (export MAX_JOBS to override; lower to 8 if RAM-tight)"
+echo "      (override: MAX_JOBS=N bash ${BASH_SOURCE[0]} ...; leave headroom if other RAM-hungry jobs share the box)"
 
 # Full build logs: the real compiler error is never in the last 12 lines.
 LOG_DIR="${LOG_DIR:-/workspace/dev/build-logs}"
