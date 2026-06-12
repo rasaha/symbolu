@@ -49,9 +49,12 @@ def main() -> int:
     cfg = {tier: make_tier_config(base_cfg, os.path.join(out_dir, f"ssd_{tier}.xml"), t_r)
            for tier, t_r in TIER_T_R_US.items()}
 
-    print("Running MQSim per tier ...")
+    print("Running MQSim per tier (3 sequential sims, ~20–60s each) ...", flush=True)
+    print("  [1/3] uniform on TLC ...", flush=True)
     uni = run_mqsim(t["uniform_trace"], mqsim_dir=mqsim_dir, ssdconfig=cfg["TLC"])
+    print("  [2/3] protected/hot on SLC ...", flush=True)
     slc = run_mqsim(t["tier_slc_trace"], mqsim_dir=mqsim_dir, ssdconfig=cfg["SLC"])
+    print("  [3/3] bulk/cold on QLC ...", flush=True)
     qlc = run_mqsim(t["tier_qlc_trace"], mqsim_dir=mqsim_dir, ssdconfig=cfg["QLC"])
 
     # Volume-weighted tiered latency (tiers are independent parallel regions).
