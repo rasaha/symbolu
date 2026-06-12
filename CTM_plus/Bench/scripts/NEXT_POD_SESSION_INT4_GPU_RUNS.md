@@ -8,14 +8,24 @@ fixture JSONs on 2026-06-12 — cross-file JSON contracts checked field-by-field
 ## Preamble (every run)
 
 ```bash
-source /workspace/venv-vllm/bin/activate
+source /workspace/venv-vllm/bin/activate 2>/dev/null || true   # fresh pods may have NO venv —
+# that's fine: system python works IF the import check below passes (seen 2026-06:
+# pod b628c63c system python3.12 already carried vllm==0.7.3 + torch==2.5.1+cu121).
 M=NousResearch/Meta-Llama-3.1-8B-Instruct
 export PROTECT_MASK_PATH=/workspace/dev/build-logs/meta_llama_3_1_8b_instruct_protect_mask_4pct.pt
 pkill -9 -f vllm; sleep 2          # clear orphans
 python -c "import vllm; from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache; print('ok', vllm.__version__)"
 # if that import fails:
+#   export TORCH_CUDA_ARCH_LIST=8.0   # A100; 9.0 for H100
 #   bash CTM_plus/Bench/scripts/rebuild_all_kernels.sh --clean --verify-source
-#   (TORCH_CUDA_ARCH_LIST=8.0 for A100, 9.0 for H100)
+# Build notes (learned 2026-06 on a 256-vCPU A100 pod):
+#   * the script now caps MAX_JOBS at min(nproc,16) — the old nproc default
+#     (-j=256) OOM-killed the compilers AND a background training run.
+#     RAM-tight pod: MAX_JOBS=8 bash ... --clean
+#   * do NOT run training jobs on the box during the build (they fight for RAM
+#     and the OOM killer shoots the biggest process).
+#   * full build logs: /workspace/dev/build-logs/fa_wheel_build_*.log /
+#     int4C_build_*.log — read those on failure, the console only tails.
 ```
 
 ## 1) Deploy package end-to-end
