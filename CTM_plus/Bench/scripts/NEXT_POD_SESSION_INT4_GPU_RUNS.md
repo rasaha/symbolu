@@ -177,7 +177,7 @@ python CTM_plus/Bench/scripts/phase6n_prot_int8_gate.py --compare /tmp/p6n_off.j
 INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --mode noapc --dump /tmp/s1_noapc.pt --model $M
 INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --mode apc   --dump /tmp/s1_apc.pt   --model $M
 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --compare /tmp/s1_noapc.pt /tmp/s1_apc.pt
-INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --mml 8192 2>&1 | tee /tmp/p6n_6k12.log
+INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --model $M --mml 8192 2>&1 | tee /tmp/p6n_6k12.log
 
 # 6) Demo with the flag ON — density line should read ~1.78x net:
 INT4_PROTECTED_PROT_INT8=1 bash deploy/customer_savings_demo.sh --model $M --quick
