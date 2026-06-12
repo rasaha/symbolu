@@ -1,7 +1,7 @@
 # int4_protected — VC Brief
 
 **Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16)*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026*
 
 ---
 
@@ -506,8 +506,11 @@ recompile, not a methodology change.
 - **Prefix caching (APC), eager-only** (Phase 6K.16): shipped +
   validated bit-exact (S1 byte-gate 13/13 cached blocks byte-identical
   to a fresh prefill; hard-needle with APC 0.955 = bf16; zero degenerate
-  outputs). The first throughput-tax reducer — cache hits skip prefill,
-  compounding with density. graphs+APC gated off (int4 kernel not
+  outputs). The first throughput-tax reducer — measured (Llama-3.1-8B,
+  A100-80G, June 2026): **TTFT −53/56/78/86% per cache hit** at
+  1K/2K/4K/8K shared prefixes, **1.85× batch throughput** at 94% hit
+  rate (1.54× at 75%), quality 1.00 == APC-off in every cell — net of
+  the eager tax. graphs+APC gated off (int4 kernel not
   graph-safe at B>1 — see Page 6).
 
 ### What v2 unlocks (in priority order)
@@ -629,7 +632,7 @@ every cell × mml.
 | **Capacity now DEMONSTRATED (Phase 6L) — residual: single-mml** | Was a block-budget estimate; Phase 6L confirmed it under sustained `--resident-pressure` load at mml=8K B=128 (1.83× seq/GB net, 2.02× raw live). Residual: only mml=8K tested; 16K/32K robustness pending |
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
 | **Swap-to-CPU preemption unsupported — now GUARDED (Phase 6K.15)** | The quantization sidecars (scales/xmin/protect/staging) live outside vLLM's paged KV tensor and are **not migrated** by `swap_out/swap_in`; a swapped sequence would resume with silently corrupted KV. vLLM V0's *default* policy picks SWAP for multi-seq groups (parallel sampling / beam), so this was a correctness landmine behind a config default. Fixed: the factory now forces `preemption_mode="recompute"` and refuses `"swap"` at init (loud error; `INT4_PROTECTED_ALLOW_SWAP=1` dev escape hatch). Residual: recompute + parallel sampling under preemption pressure hits vLLM's single-seq recompute assert — a loud failure, not corruption. True sidecar migration = future work, only needed if swap-preemption serving is a requirement. |
-| **Slot-pool staging memory scales with `max_num_seqs`** | Multi-batch decode is implemented + proven (slot pool, Phase 6K.14 auto-bump/GC; measured at B=128 / 117 live seqs in Phase 6L), but each slot carries ~24 MB staging state — `max_num_seqs=256` adds ~6 GB on top of the 4.38 GB sidecar tax. The auto-bump makes this implicit; deployments should pin `PHASE6_MAX_ACTIVE_SLOTS` to actual concurrency. **Prefix caching (APC) now SHIPS eager-only** (Phase 6K.16) — validated bit-exact: S1 byte-gate **13/13 cached prefix blocks byte-identical** to a fresh no-APC prefill (packed K + packed V + all five sidecars), hard-needle with APC **0.955 = bf16**, zero degenerate outputs. The storage layer was APC-compatible *by construction* (block-local quant groups = block size; sidecars keyed by block_id travel with shared blocks), so the eager ship was the Tier-1 (days) item it was scoped as. This is **the first lever that reduces the throughput tax**: prefix-cache hits *skip prefill compute*, and density compounds it (2× blocks ⇒ ~2× cacheable prefix), so high-fan-out shared-prefix workloads (agentic / RAG — the target segment) pay the int4 tax on fewer tokens. **graphs+APC is gated off** (factory forces `enforce_eager=True` under APC): root-caused this quarter to the **int4 FA kernel not being CUDA-graph-safe at B>1** (see the negative-results table) — low-ROI to chase since int4 is kernel-bound (graphs neutral at saturation, 6M.3). Chunked prefill remains off. |
+| **Slot-pool staging memory scales with `max_num_seqs`** | Multi-batch decode is implemented + proven (slot pool, Phase 6K.14 auto-bump/GC; measured at B=128 / 117 live seqs in Phase 6L), but each slot carries ~24 MB staging state — `max_num_seqs=256` adds ~6 GB on top of the sidecar tax — which scales with the KV pool (~16–17%): 4.38 GB at a mid-size pool, **8.3 GiB measured at a max-util 48.8 GiB pool** (June 2026). The auto-bump makes this implicit; deployments should pin `PHASE6_MAX_ACTIVE_SLOTS` to actual concurrency. **Prefix caching (APC) now SHIPS eager-only** (Phase 6K.16) — validated bit-exact: S1 byte-gate **13/13 cached prefix blocks byte-identical** to a fresh no-APC prefill (packed K + packed V + all five sidecars), hard-needle with APC **0.955 = bf16**, zero degenerate outputs. The storage layer was APC-compatible *by construction* (block-local quant groups = block size; sidecars keyed by block_id travel with shared blocks), so the eager ship was the Tier-1 (days) item it was scoped as. This is **the first lever that reduces the throughput tax — now measured** (Llama-3.1-8B, A100-80G, June 2026): TTFT −53→−86% per cache hit as shared prefixes grow 1K→8K, batch throughput 1.19–1.85× at 94% hit rate (1.28–1.54× at 75%), quality 1.00 == APC-off in every cell, net of the eager tax; density compounds it (2× blocks ⇒ ~2× cacheable prefix), so high-fan-out shared-prefix workloads (agentic / RAG — the target segment) pay the int4 tax on fewer tokens. **graphs+APC is gated off** (factory forces `enforce_eager=True` under APC): root-caused this quarter to the **int4 FA kernel not being CUDA-graph-safe at B>1** (see the negative-results table) — low-ROI to chase since int4 is kernel-bound (graphs neutral at saturation, 6M.3). Chunked prefill remains off. |
 | **vLLM 0.7.3 V0 fork vendored at SHA `720c948`** | Upstream vLLM has moved to V1; forward-port is 1-2 weeks of maintenance (Tier 2 v2) |
 | **Only D=128 head dim supported** | Kernel constraint; Phi-3.5 (D=96) and similar need a kernel recompile (Tier 2 v2) |
 | **Quality bench: needle + token-agreement + hard-needle + MMLU (1K)** | **MMLU 0.0 pt + 100% per-question agreement at 1,000 Q (Phase 6N.2)** — the agreement diagnostic rules out compensating flips that aggregate parity could hide. Residual: 100% agreement on 4-way MC proves argmax unchanged, not bitwise-identical logits; HumanEval pass@1 (sandboxed) + LongBench F1 are runner-ready but not yet executed |
@@ -917,10 +920,14 @@ regardless of which request produced it; (b) the sidecars are **keyed by global
 **Validated bit-exact**: S1 byte-gate — 13/13 cached blocks byte-identical to a
 fresh no-APC prefill.
 
-- **Payoff**: a prefix-cache hit *skips prefill compute* — **the first lever
-  that reduces the throughput tax** — and density compounds it (2× blocks ⇒
-  ~2× cacheable prefix). Most valuable on the **target segment** (high-fan-out
-  shared-prefix agentic/RAG traffic).
+- **Payoff — measured** (Llama-3.1-8B, A100-80G, N=16, gen=32, June 2026):
+  a cache hit skips the prefix's prefill — **TTFT −53/−56/−78/−86%** at
+  1K/2K/4K/8K shared prefixes (miss-TTFT grows linearly 142→704 ms while
+  hit-TTFT stays ~66–98 ms: the mechanism is visible in the raw data), and
+  **1.19–1.85× batch throughput** at 94% hit rate (1.28–1.54× at 75%),
+  quality 1.00 == APC-off in every cell, net of the eager tax. Density
+  compounds it (2× blocks ⇒ ~2× cacheable prefix). Most valuable on the
+  **target segment** (high-fan-out shared-prefix agentic/RAG traffic).
 - **Shipped eager-only** (Phase 6K.16). **graphs+APC is gated off**: this
   quarter root-caused the corruption to the **int4 attention kernel not being
   CUDA-graph-safe at B>1** — identical K/V inputs produce ~1.8× divergent

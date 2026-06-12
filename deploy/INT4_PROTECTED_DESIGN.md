@@ -127,9 +127,9 @@ A deployment realizes value on three axes; one cost is disclosed.
 
 | Axis | What you get | Status |
 |---|---|---|
-| **Density** (the $ saving) | **2.0× concurrency / 1.83× seq/GB** net of the sidecar tax — ~2× more concurrent or longer-context users per GPU | DEMONSTRATED (Phase 6L, saturation) |
-| **Quality** (the differentiator) | near-bf16: needle == bf16; MMLU 0.0 pt; hard-needle 0.964 | MEASURED, 4 models |
-| **APC prefill** (shared-prefix) | TTFT cut per cache hit (prefill skipped); grows with prefix length; compounds with density | mechanism shipped; **payoff measured by `apc_payoff_sweep.py`** |
+| **Density** (the $ saving) | **2.00× raw pool measured live** (399,792 → 799,584 token-slots, A100-80G, util 0.85, mml 32K); **~1.75× net** of the measured **8.3 GiB** out-of-pool sidecar tax at equal total VRAM. Net is util-dependent (tax ~16% of pool): 1.83× at smaller pools | LIVE-MEASURED (savings demo, June 2026) |
+| **Quality** (the differentiator) | near-bf16: needle == bf16 (live: RETRIEVED at ctx=16K); MMLU 0.0 pt; hard-needle 0.964 | MEASURED, 4 models |
+| **APC prefill** (shared-prefix) | **Measured** (Llama-3.1-8B, N=16, gen=32): TTFT **−53/−56/−78/−86%** per cache hit at 1K/2K/4K/8K prefixes; batch throughput **1.19–1.85×** at 94% hit rate, 1.28–1.54× at 75%; quality 1.00 == APC-off in every cell; net of the eager tax. Compounds with density | MEASURED (apc_payoff_sweep, June 2026) |
 | **Decode throughput** (the cost) | **0.22–0.67× bf16** — kernel-bound; recoverable ceiling ~0.27–0.30×, NOT parity | DISCLOSED |
 
 **Where it wins:** throughput-insensitive density-bound serving (many concurrent
@@ -137,8 +137,9 @@ long-context users; batch/offline) **and** shared-prefix / short-output workload
 (agentic, RAG, multi-turn) where APC's prefill saving offsets the decode tax.
 **Where it doesn't:** latency-critical, long-generation single-stream chat.
 
-**The customer-facing savings statement:** *"~2× the users (or context) per GPU at
-near-bf16 quality, plus prefill savings on shared-prefix traffic — at a disclosed
+**The customer-facing savings statement:** *"~2× the users (or context) per GPU
+(1.75× net of sidecars, measured live) at near-bf16 quality, plus a measured
+53–86% TTFT cut per cache hit on shared-prefix traffic — at a disclosed
 decode-throughput cost."*
 
 ---
