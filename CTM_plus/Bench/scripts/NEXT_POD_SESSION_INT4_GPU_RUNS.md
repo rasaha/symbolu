@@ -173,11 +173,18 @@ python CTM_plus/Bench/scripts/phase6n_prot_int8_gate.py --compare /tmp/p6n_off.j
 
 # 5) APC S1 byte-gate with the flag ON in BOTH engines (dumps carry a
 #    k_protect format marker; mixed-format dumps refuse loudly), then the
-#    6k12 hard-needle cell flag-on:
+#    6k12 hard-needle cell, flag OFF then ON. 6k12 GOTCHA (hit live
+#    2026-06-12, twice): the worker POPS $PROTECT_MASK_PATH and honors
+#    only --protect-mask/--naive-mask (legacy Qwen defaults otherwise —
+#    Llama cells ERROR 24/24 on mask-shape at _lazy_alloc); pass
+#    --cells bf16,protected unless a Llama naive mask exists:
 INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --mode noapc --dump /tmp/s1_noapc.pt --model $M
 INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --mode apc   --dump /tmp/s1_apc.pt   --model $M
 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --compare /tmp/s1_noapc.pt /tmp/s1_apc.pt
-INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --model $M --mml 8192 2>&1 | tee /tmp/p6n_6k12.log
+python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --model $M \
+  --protect-mask $PROTECT_MASK_PATH --cells bf16,protected --mml 8192 2>&1 | tee /tmp/p6n_6k12_off.log
+INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --model $M \
+  --protect-mask $PROTECT_MASK_PATH --cells bf16,protected --mml 8192 2>&1 | tee /tmp/p6n_6k12_on.log
 
 # 6) Demo with the flag ON — density line should read ~1.78x net:
 INT4_PROTECTED_PROT_INT8=1 bash deploy/customer_savings_demo.sh --model $M --quick
