@@ -159,3 +159,56 @@ churn-based placement.
 vendor silicon; the QLC-eligible bulk fraction φ and the int4_protected internal split are
 parameterized (the 1.80× net density is the measured anchor). A real QLC RBER + ECC-budget
 measurement on the target media is required before any of these numbers anchor a decision.*
+
+---
+
+## 8. Sensitivity sweeps + iso-reliability baseline
+
+`ndol/sim/w3_sensitivity.py` (`python -m ndol.sim.w3_sensitivity`) extends the model with
+differentiated per-region ECC strength, per-page packing, replication, protected-tier
+choice, K/V split, metadata policy, DWPD gating — and the **iso-reliability baseline** you
+asked for: *the densest uniform layout that meets the protected UBER on every bit* (= all-QLC
+at the protected target), not raw capacity. **W3 must beat that to claim a real win.**
+
+**Headline: against the fair iso-reliability baseline (recomputed per layout — same data,
+only placement/ECC differ), the best honest W3 marginal is ~1.14× — it does NOT exceed
+1.25×, and is nowhere near 1.5×.** (The looser "vs naive int4_protected/TLC" baseline gives
+up to ~1.36×, but that baseline is not the fair comparison.)
+
+| dimension | result (×iso-reliability) |
+|---|---|
+| protected fraction p | 1%→1.09, 4%→1.06, 8%→1.03, 10%→1.01, ≥15%→**<1 (loses)** |
+| protected tier | SLC 0.81, TLC 1.06, **high-ECC QLC 1.09**, replicated-QLC 0.97 |
+| page packing | mixed **0.97 (loses)**, compacted **1.06** — compaction is *required* to break even |
+| K/V split | sets p: selected-heads ⅛ (p=1%) → 1.09; both K+V (p=8%) → 1.03 |
+| metadata policy | raw/replicated/parity all <1.5% of footprint — negligible |
+| most-favorable-honest | p=1%, all-QLC, bulk UBER 1e-4, compacted → **1.14×** |
+
+**Largest lift — differentiated bulk ECC, enabled by compacted pages** (NOT cross-tier
+placement): compaction lets the error-tolerant bulk pages target a relaxed UBER, which is
+the only structural sign-flip (mixed 0.97 → compacted 1.06), and relaxing the bulk target
+to the 1e-4 cap takes it to 1.14×. The protected *fraction* is now a weak lever (1.09 at
+1% vs 1.03 at 8%) — the earlier "small p → 1.18" was a baseline artifact (different-p W3 vs
+a fixed-p baseline); with the data held fixed it nearly washes out.
+
+**Two findings that retire the cross-tier framing:**
+- The best protected placement is **high-ECC QLC**, i.e. the winning layout is *all-QLC with
+  per-page-differentiated ECC*, **not** placement across SLC/TLC/QLC. SLC for protected is
+  the worst option (0.81×). So the surviving mechanism is **unequal error protection on a
+  single dense tier** — which is itself prior art (approximate storage / UEP), not novel.
+- **Endurance gates it out for hot KV:** at DWPD ≥ 1, QLC is endurance-dead (3-yr life), so
+  the bulk cannot use QLC at all — tiering is then forced by *endurance*, not capacity, and
+  the capacity gain is zero. QLC-bulk is viable only at **DWPD ≤ ~0.3** (cold/reused KV).
+
+**Honesty check: yes, conservative.** The 1.22× ceiling uses an iso-reliability baseline
+(fair), caps bulk ECC relaxation at UBER 1e-4 (no raw-QLC), and the QLC/TLC density edge is
+RBER-limited. The misleading "raw all-QLC" comparison would report W3/raw = **0.77×** (W3
+*worse* than raw QLC) — confirming raw capacity is the wrong baseline and the fair one is
+binding.
+
+**Verdict (unchanged, reinforced): not patent-worthy.** The W3-specific marginal is
+≤1.14× under the fair baseline, only in a narrow regime (compacted, cold/low-DWPD,
+warm-reused KV), and the surviving mechanism (per-page UEP for lossy bulk) is prior art.
+The genuine, realized value remains the **int4_protected quantization itself (~1.8×)** — an
+existing asset, not W3. Recommendation stands: **defensive publication + product
+differentiator**, no standalone W3 capacity filing.
