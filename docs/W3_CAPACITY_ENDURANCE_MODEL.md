@@ -18,6 +18,55 @@ is deterministic, so this is an analytical model — the right tool; all inputs 
 
 ---
 
+## 0. Why this hits a wall — NAND physics in plain language
+
+**One sentence:** you can make a flash cell hold more bits, but the more bits you cram in,
+the more read errors it makes, and the error-correction needed to fix those errors eats back
+most of the space you gained — so "denser" flash gives far less *usable* extra room than its
+bit-count suggests. **That gap is the entire ceiling, and no algorithm can move it.**
+
+**How flash stores bits.** Each NAND cell holds an electrical charge; the controller reads the
+charge level to recover the data:
+- **SLC** = 2 levels = **1 bit/cell**
+- **TLC** = 8 levels = **3 bits/cell**
+- **QLC** = 16 levels = **4 bits/cell**
+
+On paper, QLC holds 4/3 = **1.33×** more than TLC.
+
+**Why denser isn't free.** Cramming 16 levels into one cell is like drawing 16 lines in the
+space you used for 8 — the levels sit so close that tiny charge drift (from reads, age, wear,
+heat) flips a cell into a neighboring level. So QLC's raw error rate is ~10–100× worse than
+TLC's.
+
+**Error-correction is the tax.** To hand back correct data, the drive stores extra check bits
+(ECC) — and those live in cells too. The worse the error rate, the more check bits you must
+spend. QLC's higher error rate forces so much extra ECC that its real usable gain over TLC
+falls from the paper 1.33× to about **1.20×** — most of the "extra bit" is burned correcting
+the errors that bit caused. For data that can tolerate a few errors (our lossy 4-bit "bulk")
+you can relax the correction and claw a little back, to about **1.14×**. **That's the ceiling.**
+
+**Why tiering can't beat it.** "Tiering" only decides *which* data sits in the denser cells.
+The most it can ever capture is that leftover ~1.14–1.20× usable-density gap between QLC and
+TLC. That number is fixed by the silicon and its error rates — a smarter placement policy,
+quantizer, or scheduler cannot outrun it. (This is exactly why every sweep in §8 lands at
+~1.1×.)
+
+**Two more hard limits from the same physics:**
+- **Wear (endurance).** Every write slowly damages a cell; each cell survives only so many
+  erase/rewrite cycles before it dies — roughly SLC ~60,000, TLC ~3,000, **QLC ~1,000**. Denser
+  = more fragile. QLC is fine for *write-once, read-many* data, but data rewritten often wears
+  QLC out in **months** (§6). Packing tighter trades lifetime for space.
+- **Retention.** Dense cells leak charge and lose data faster (weeks–months for QLC), which
+  normally forces periodic rewrites — but a KV cache lives for *seconds*, far below retention
+  time, so this one limit doesn't bite us. (The single place the physics is on our side.)
+
+**Bottom line of the physics:** the usable-capacity advantage of denser flash is a small,
+fixed number set by the cell-error-vs-ECC tradeoff, and writing to dense flash costs lifetime.
+Software chooses *what* goes *where*; it cannot change *how much* denser flash actually buys.
+**That hardware ceiling — not any algorithm — is what caps W3 at ~1.14×.**
+
+---
+
 ## 1. Systems compared
 
 | # | System | Placement |
