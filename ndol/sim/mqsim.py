@@ -155,6 +155,74 @@ def _retained_set(step: int, n_blocks: int, retained: int) -> list[int]:
     return list(range(hot)) + list(range(hot + start, hot + start + window))
 
 
+def make_tier_config(base_ssdconfig: str, out_path: str, t_r_us: float) -> str:
+    """Write an ssdconfig variant whose every Page_Read_Latency_* equals `t_r_us`
+    (µs → ns). Models an SLC/TLC/QLC tier by its array read time t_R — the term
+    §2 says dominates a read. Everything else (geometry, program/erase) is held
+    fixed so t_R is the only variable."""
+    tree = ET.parse(base_ssdconfig)
+    ns = int(t_r_us * 1000)
+    for el in tree.getroot().iter():
+        if el.tag.startswith("Page_Read_Latency"):
+            el.text = str(ns)
+    tree.write(out_path)
+    return out_path
+
+
+# Tier array-read times (µs): SLC fast/low-density, QLC slow/high-density.
+TIER_T_R_US = {"SLC": 25.0, "TLC": 50.0, "QLC": 100.0}
+
+
+def tiered_kv_traces(
+    out_dir: str,
+    *,
+    n_protected: int = 8,
+    n_bulk_window: int = 24,
+    n_bulk_total: int = 256,
+    n_steps: int = 32,
+    block_sectors: int = 8,
+    step_interval_ns: int = 300_000,
+) -> dict:
+    """Emit traces for the W3 protect-mask tiering experiment.
+
+    Access model (the attention shape that makes tiering pay off):
+      * protected / hot blocks  — re-read EVERY step (persistent heavy hitters)
+      * bulk / cold blocks       — read once, via a sliding recency window
+
+    Produces three read streams from the SAME workload:
+      uniform.trace  — protected + bulk together (for a uniform-TLC baseline)
+      tier_slc.trace — protected (hot) reads only  (→ run on the SLC config)
+      tier_qlc.trace — bulk (cold) reads only       (→ run on the QLC config)
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    uniform, slc, qlc = MQSimTrace(), MQSimTrace(), MQSimTrace()
+    base_lba = (n_protected + 1) * block_sectors  # bulk LBAs start past protected
+
+    for s in range(n_steps):
+        burst = s * step_interval_ns
+        for i in range(n_protected):                       # hot: re-read every step
+            lba = i * block_sectors
+            uniform.add(burst + i, lba, block_sectors, is_read=True)
+            slc.add(burst + i, lba, block_sectors, is_read=True)
+        start = (s * n_bulk_window) % max(1, n_bulk_total - n_bulk_window)
+        for j in range(n_bulk_window):                     # cold: read once (sliding)
+            lba = base_lba + (start + j) * block_sectors
+            uniform.add(burst + n_protected + j, lba, block_sectors, is_read=True)
+            qlc.add(burst + n_protected + j, lba, block_sectors, is_read=True)
+
+    paths = {
+        "uniform_trace": os.path.join(out_dir, "uniform.trace"),
+        "tier_slc_trace": os.path.join(out_dir, "tier_slc.trace"),
+        "tier_qlc_trace": os.path.join(out_dir, "tier_qlc.trace"),
+    }
+    return {
+        **paths,
+        "uniform_requests": uniform.write(paths["uniform_trace"]),
+        "slc_requests": slc.write(paths["tier_slc_trace"]),
+        "qlc_requests": qlc.write(paths["tier_qlc_trace"]),
+    }
+
+
 def kv_read_skip_traces(
     out_dir: str,
     *,

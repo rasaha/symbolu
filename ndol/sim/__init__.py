@@ -6,6 +6,22 @@ NDOL emits the *physical* request stream it would issue to the device
 validated FTL + flash-timing model and reports measured latency. The speedup
 then comes from MQSim, not from `ndol.model.NANDModel` arithmetic.
 """
-from .mqsim import MQSimTrace, MQSimResult, run_mqsim, kv_read_skip_traces
+from .mqsim import (
+    MQSimTrace,
+    MQSimResult,
+    run_mqsim,
+    kv_read_skip_traces,
+    tiered_kv_traces,
+    make_tier_config,
+    TIER_T_R_US,
+)
 
-__all__ = ["MQSimTrace", "MQSimResult", "run_mqsim", "kv_read_skip_traces"]
+__all__ = [
+    "MQSimTrace",
+    "MQSimResult",
+    "run_mqsim",
+    "kv_read_skip_traces",
+    "tiered_kv_traces",
+    "make_tier_config",
+    "TIER_T_R_US",
+]
