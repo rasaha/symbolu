@@ -31,8 +31,36 @@ Mechanism signature visible in the data: miss-TTFT linear in prefix,
 hit-TTFT ~flat (~66-98 ms). 78%@4000 replicates the quick run's 79% at a
 different gpu_util -> util change measurement-neutral, as claimed.
 
-Still to run: task 3 mixed (groups=4), task 2 headroom verdicts, task 4
-(optional); docs update (task 5) after 2+3.
+## TASK 3 (mixed, groups=4, hit 75%) ✅ MEASURED 2026-06-12
+
+| prefix | TTFT miss -> hit | saved | tput off -> apc | speedup | quality |
+|-------:|-----------------:|------:|----------------:|--------:|---------|
+|   2000 | 215.7 -> 88.5 ms |  59%  |      76 -> 97   |  1.28x  | 1.00/1.00 |
+|   4000 | 359.0 -> 72.6 ms |  80%  |      49 -> 75   |  1.54x  | 1.00/1.00 |
+
+Miss-TTFT matches the groups=1 sweep at both prefixes (same prefill cost,
+independent run) — internal consistency check passed.
+
+## TASK 2 (gather-fusion headroom, B=1, gen=64) ✅ MEASURED 2026-06-12
+
+- ctx=8000:  FUSEABLE **59.9%** (gather 469ms + splice 484ms + prep 112ms +
+  backing 39ms) vs KERNEL 40.1% (739ms) -> **GO**. Splice as costly as the
+  gather at this regime — 6F must absorb both. All regions GPU-bound
+  (cpu/gpu 0.2-1.0x) -> CUDA fusion, not python vectorization.
+- ctx=32000: FUSEABLE **42.0%** (gather alone 35.6% = 1.31s) vs KERNEL
+  58.0% (2.14s) -> **GO**, narrowing: kernel grows faster than gather.
+  Small regions flip CPU-bound at 32K (kernel_prep 8.8x, splice 2.6x) but
+  are only ~230ms combined — secondary vectorization targets.
+- ctx=16000: pending paste (interpolates; verdict unchanged unless surprise).
+
+RECOMMENDATION: **BUILD 6F** (in-kernel paged gather + K-tail splice).
+Measured headroom 60%@8K -> 42%@32K, GO at both ends (threshold 35%);
+biggest relative win at short-mid context; realized < headroom; decode
+ceiling ~0.27-0.30x unchanged until built.
+
+Task 4 (crossover >32K) optional, not yet run. Docs (task 5) DONE for
+density + APC + headroom (brief + DESIGN section 6 updated with measured
+numbers).
 
 
 Status: every script below is **CPU-validated only** (selftests ALL PASS, dry-runs
