@@ -26,7 +26,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BENCH="${REPO_ROOT}/CTM_plus/Bench/scripts"
-PY="$(command -v python)"
+PY="$(command -v python || command -v python3)"
+[[ -n "${PY}" ]] || { echo "FAIL: no python/python3 on PATH (activate the venv first)"; exit 2; }
 
 MODEL="${MODEL:-NousResearch/Meta-Llama-3.1-8B-Instruct}"
 MML="${MML:-32768}"
@@ -138,7 +139,8 @@ print("-" * 78)
 if isinstance(i4_slots, (int, float)) and isinstance(bs_slots, (int, float)) and bs_slots:
     print(f"NET     :  ~{i4_slots/bs_slots:.1f}x the users/context per GPU at near-bf16 quality,")
 else:
-    print("NET     :  ~2x the users/context per GPU at near-bf16 quality (density-bound),")
+    print("NET     :  density NOT measured this run (probe incomplete) — prior-measured")
+    print("           reference is ~2x (1.83x net of sidecars); re-run the density step,")
 print("           plus prefill savings on shared-prefix traffic, at a disclosed decode cost.")
 print("=" * 78)
 print(f"artifacts: {outdir}  (cap_bf16/cap_int4.json, apc/apc_payoff_summary.json)")
