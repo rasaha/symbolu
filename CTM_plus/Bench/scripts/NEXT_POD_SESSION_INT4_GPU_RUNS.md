@@ -125,6 +125,68 @@ python -c "import vllm; from vllm.vllm_flash_attn import flash_attn_with_int4_kv
 #     int4C_build_*.log — read those on failure, the console only tails.
 ```
 
+## TASK 6N — prot-int8 gates (BUILT 2026-06-12, CPU-validated; NO GPU numbers)
+
+Phase 6N (asym-static int8 protected channels) is implemented behind
+`INT4_PROTECTED_PROT_INT8` (default OFF; unset = byte-identical bf16
+build). Run the gates IN ORDER; the flag stays default-OFF and no doc
+number moves until every one is green. Expected if the probe holds:
+sidecar -1.0-1.1 GiB at the max-util pool, net density ~1.78x, quality
+deltas below gate resolution.
+
+```bash
+# 0) preamble as above ($M, PROTECT_MASK_PATH, import check).
+
+# 1) Recalibrate -> v2 artifact (adds per-channel k_min/k_max; mask math
+#    unchanged). Back up the deployed artifact first and CHECK the mask
+#    itself is unchanged — if it isn't, STOP (corpus/model drift would
+#    confound every A/B below):
+cp $PROTECT_MASK_PATH ${PROTECT_MASK_PATH}.pre6n
+python CTM_plus/Bench/scripts/calibrate_phase5b_protect_mask.py \
+  --model $M --output $PROTECT_MASK_PATH
+python - <<'EOF'
+import os, torch
+new = torch.load(os.environ["PROTECT_MASK_PATH"], weights_only=False)
+old = torch.load(os.environ["PROTECT_MASK_PATH"] + ".pre6n", weights_only=False)
+assert torch.equal(new["mask"], old["mask"]), "MASK CHANGED — stop, investigate"
+assert "k_min" in new and "k_max" in new, "v2 keys missing"
+print("mask unchanged; v2 minmax present; margin", new.get("minmax_margin"))
+EOF
+
+# 2) Selftests + guard tests (incl. the new 6N suite):
+python CTM_plus/KVPolicy/tests/test_phase6n_prot_int8.py
+for t in CTM_plus/KVPolicy/tests/test_*.py; do python $t || break; done
+python CTM_plus/KVPolicy/kv_policy/phase6k16_prefix_prefill.py
+python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --selftest
+(cd CTM_plus/Bench && PYTHONPATH=../KVPolicy python scripts/verify_phase6_b_pre5_write_path_capture_safe.py)
+
+# 3) Savings probe A/B at mml 32768 (needle RETRIEVED in BOTH cells;
+#    sidecar_bytes drops ~1 GiB flag-on; PASTE BOTH JSONs):
+python deploy/_savings_probe.py --backend int4 --model $M --mml 32768 --needle --out /tmp/p6n_cap_off.json
+INT4_PROTECTED_PROT_INT8=1 python deploy/_savings_probe.py --backend int4 --model $M --mml 32768 --needle --out /tmp/p6n_cap_on.json
+
+# 4) 6-prompt greedy bitexact, flag ON vs OFF (driver verifies prot-int8
+#    actually activated on ALL layers — a bf16 fallback cell refuses):
+python CTM_plus/Bench/scripts/phase6n_prot_int8_gate.py --cell off --model $M --out /tmp/p6n_off.json
+python CTM_plus/Bench/scripts/phase6n_prot_int8_gate.py --cell on  --model $M --out /tmp/p6n_on.json
+python CTM_plus/Bench/scripts/phase6n_prot_int8_gate.py --compare /tmp/p6n_off.json /tmp/p6n_on.json
+
+# 5) APC S1 byte-gate with the flag ON in BOTH engines (dumps carry a
+#    k_protect format marker; mixed-format dumps refuse loudly), then the
+#    6k12 hard-needle cell flag-on:
+INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --mode noapc --dump /tmp/s1_noapc.pt --model $M
+INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --mode apc   --dump /tmp/s1_apc.pt   --model $M
+python CTM_plus/Bench/scripts/phase6k16_byte_gate.py --compare /tmp/s1_noapc.pt /tmp/s1_apc.pt
+INT4_PROTECTED_PROT_INT8=1 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py --mml 8192 2>&1 | tee /tmp/p6n_6k12.log
+
+# 6) Demo with the flag ON — density line should read ~1.78x net:
+INT4_PROTECTED_PROT_INT8=1 bash deploy/customer_savings_demo.sh --model $M --quick
+```
+
+ONLY after 1-6 are green: update PHASE6N_PROT_INT8_DESIGN.md status, the
+ledger, and DESIGN §6's density row (1.75x -> measured ~1.78x). If any
+gate fails: fix or revert — the flag ships default-OFF either way.
+
 ## 1) Deploy package end-to-end
 
 ```bash

@@ -16,6 +16,12 @@ Strategy:
      accumulated max-abs.
   5. Save the resulting mask as a `.pt` file with metadata header.
 
+Phase 6N (artifact v2): also accumulates per-channel SIGNED min/max and
+saves them (widened by --minmax-margin) as `k_min`/`k_max` — the static
+asymmetric scales for prot-int8 protected-channel storage
+(PHASE6N_PROT_INT8_DESIGN.md). Old artifacts (no k_min/k_max) keep
+working everywhere; they simply leave prot-int8 disabled.
+
 Lock from KERNEL_6C3C_PHASE5B5C_DESIGN.md Q1:
   - Per-model mask (not per-sequence).
   - Per-(layer, h_kv) granularity (not per-head-group).
@@ -270,10 +276,15 @@ def _find_inner_model(llm):
 
 
 class CalibrationAccumulator:
-    """Per-(layer, h_kv, d) max-abs accumulator across all prompts."""
+    """Per-(layer, h_kv, d) accumulators across all prompts: max-abs
+    (mask selection) and, since Phase 6N, signed min/max (prot-int8
+    static scales)."""
     def __init__(self) -> None:
         # layer_name -> (H_kv, D) float tensor on CUDA
         self.layer_maxabs: Dict[str, "torch.Tensor"] = {}
+        # Phase 6N: per-channel signed extremes (same shapes/keys).
+        self.layer_min: Dict[str, "torch.Tensor"] = {}
+        self.layer_max: Dict[str, "torch.Tensor"] = {}
         # Stable ordered list of layer names (insertion order from
         # named_modules walk → corresponds to model layer order).
         self.layer_order: List[str] = []
@@ -284,16 +295,28 @@ class CalibrationAccumulator:
         self.bail_outs = 0
 
     def update(self, layer_name: str, k_3d) -> None:
-        """k_3d is (T, H_kv, D). Take per-channel max-abs across T,
-        merge into the layer's accumulator with elementwise maximum."""
+        """k_3d is (T, H_kv, D). Take per-channel max-abs (and signed
+        min/max) across T, merge into the layer's accumulators
+        elementwise."""
         import torch
-        mag = k_3d.float().abs().amax(dim=0)  # (H_kv, D)
+        kf = k_3d.float()
+        mag = kf.abs().amax(dim=0)            # (H_kv, D)
+        kmin = kf.amin(dim=0)                 # (H_kv, D)
+        kmax = kf.amax(dim=0)                 # (H_kv, D)
         if layer_name not in self.layer_maxabs:
             self.layer_maxabs[layer_name] = mag.clone()
+            self.layer_min[layer_name] = kmin.clone()
+            self.layer_max[layer_name] = kmax.clone()
             self.layer_order.append(layer_name)
         else:
             self.layer_maxabs[layer_name] = torch.maximum(
                 self.layer_maxabs[layer_name], mag,
+            )
+            self.layer_min[layer_name] = torch.minimum(
+                self.layer_min[layer_name], kmin,
+            )
+            self.layer_max[layer_name] = torch.maximum(
+                self.layer_max[layer_name], kmax,
             )
 
 
@@ -386,7 +409,45 @@ def _build_mask_from_accumulator(
     return mask, n_protect
 
 
-def _print_summary(mask, accumulator: CalibrationAccumulator, n_protect: int) -> None:
+def _widen_minmax(k_min, k_max, margin: float):
+    """Phase 6N deployment margin: push each per-channel bound OUTWARD by
+    (margin - 1) x the observed range, so live values slightly past the
+    calibration extremes still land inside the int8 grid instead of
+    clipping. margin=1.1 => 10% of the range added on EACH side (total
+    range x1.2 => prot-int8 step x1.2 — the design doc's expected
+    ~95.9% -> ~96.0-96.1% deployment delta). Degenerate (constant)
+    channels keep a zero range; the writer's scale clamp handles them.
+    """
+    if margin < 1.0:
+        raise ValueError(f"minmax margin must be >= 1.0; got {margin}")
+    pad = (margin - 1.0) * (k_max - k_min)
+    return k_min - pad, k_max + pad
+
+
+def _build_minmax_from_accumulator(
+    accumulator: CalibrationAccumulator,
+    margin: float,
+):
+    """Stack per-layer signed min/max -> two (num_layers, H_kv, D) fp16
+    tensors, widened by `margin` (Phase 6N prot-int8 constants). Full-D
+    (not just protected channels): the writer gathers the protected
+    subset itself, and full-D keeps the artifact reusable if the mask is
+    ever re-ranked. fp16 keeps the pair at ~2 x L x H x D x 2 bytes
+    (~256 KB for an 8B model) — negligible next to the mask.
+    """
+    import torch
+    mins, maxs = [], []
+    for name in accumulator.layer_order:
+        lo, hi = _widen_minmax(
+            accumulator.layer_min[name], accumulator.layer_max[name], margin)
+        mins.append(lo.cpu())
+        maxs.append(hi.cpu())
+    return (torch.stack(mins).to(torch.float16),
+            torch.stack(maxs).to(torch.float16))
+
+
+def _print_summary(mask, accumulator: CalibrationAccumulator, n_protect: int,
+                   minmax=None) -> None:
     """Sanity report: per-layer channel selection counts."""
     import torch
     num_layers, H_kv, D = mask.shape
@@ -394,6 +455,19 @@ def _print_summary(mask, accumulator: CalibrationAccumulator, n_protect: int) ->
     expected = H_kv * n_protect
     print(f"  Mask shape:       ({num_layers}, {H_kv}, {D}) int8")
     print(f"  n_protect:        {n_protect} channels per (layer, h_kv)")
+    if minmax is not None:
+        # Phase 6N: widened range stats on the PROTECTED channels (the
+        # ones the int8 grid will actually carry). A zero/degenerate
+        # range here would mean a constant channel won protection —
+        # worth eyeballing, not an error (writer clamps the scale).
+        k_min, k_max = minmax
+        rng = (k_max.float() - k_min.float())                 # (L, H, D)
+        m = mask.bool()
+        prot_rng = rng[m]
+        print(f"  prot-int8 widened range (protected channels): "
+              f"min={prot_rng.min().item():.4f} "
+              f"mean={prot_rng.mean().item():.4f} "
+              f"max={prot_rng.max().item():.4f}")
     print(f"  Expected sum per layer: {expected}")
     print(f"  Observed (min/max/mean): {per_layer_counts.min().item()}/"
           f"{per_layer_counts.max().item()}/{per_layer_counts.float().mean().item():.1f}")
@@ -432,6 +506,11 @@ def main(argv) -> int:
     parser.add_argument("--corpus-multiplier", type=int, default=1,
                         help="Run the corpus this many times (each prompt seen "
                              "N times). Default 1.")
+    parser.add_argument("--minmax-margin", type=float, default=1.1,
+                        help="Phase 6N prot-int8: widen each per-channel "
+                             "signed bound outward by (margin-1) x range "
+                             "before saving (clip headroom for live values "
+                             "past the calibration extremes). Default 1.1.")
     args = parser.parse_args(argv)
 
     if args.output is None:
@@ -504,10 +583,16 @@ def main(argv) -> int:
     mask, n_protect = _build_mask_from_accumulator(accumulator, args.protect_fraction)
     print(f"  mask built: {tuple(mask.shape)} int8")
 
+    # ---- Build per-channel signed min/max (Phase 6N prot-int8) ---
+    k_min, k_max = _build_minmax_from_accumulator(
+        accumulator, args.minmax_margin)
+    print(f"  k_min/k_max built: {tuple(k_min.shape)} fp16 x2 "
+          f"(margin {args.minmax_margin}x)")
+
     # ---- Print summary ------------------------------------------
     print()
     print("Summary:")
-    _print_summary(mask, accumulator, n_protect)
+    _print_summary(mask, accumulator, n_protect, minmax=(k_min, k_max))
 
     # ---- Save artifact ------------------------------------------
     output_path = Path(args.output)
@@ -526,6 +611,16 @@ def main(argv) -> int:
         "phase":                "5B.0",
         # Layer name ordering preserved so consumers can verify.
         "layer_order":          accumulator.layer_order,
+        # ---- v2 (Phase 6N prot-int8) ------------------------------
+        # Per-channel signed extremes over the calibration corpus,
+        # ALREADY widened by minmax_margin (the writer uses them as-is:
+        # scale = (k_max - k_min)/255). Older consumers ignore these
+        # keys; older artifacts lack them and the writer falls back to
+        # bf16 protect (backward compatible by construction).
+        "artifact_version":     2,
+        "k_min":                k_min,        # (num_layers, H_kv, D) fp16
+        "k_max":                k_max,        # (num_layers, H_kv, D) fp16
+        "minmax_margin":        args.minmax_margin,
     }
     import torch
     torch.save(artifact, output_path)

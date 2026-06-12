@@ -1,8 +1,18 @@
 # PHASE 6N — int8 protected channels (prot-int8) DESIGN
 
-Status: DESIGN + probe evidence. NOT implemented in the shipping path —
-`k_protect_ext` is bf16 everywhere today. Build gated on the static-scale
-probe run below.
+Status: BUILT 2026-06-12 behind `INT4_PROTECTED_PROT_INT8` (DEFAULT OFF —
+flag unset = byte-identical bf16-protect build; the store/view converters
+are identity passthroughs). CPU-validated only: unit tests
+(tests/test_phase6n_prot_int8.py, incl. bit-exact parity with the probe's
+prot_int8_static_asym policy math), extended selftests
+(phase6k16_prefix_prefill, phase6k16_byte_gate), and the capture-safety
+verifier are green; the A/B gate driver is
+Bench/scripts/phase6n_prot_int8_gate.py. **POD GATES NOT RUN** — the
+checklist below is mandatory before the flag default, the ledger, or any
+density number moves (runbook: NEXT_POD_SESSION_INT4_GPU_RUNS.md TASK 6N).
+Storage note: codes are uint8 0..255 with the xmin offset (the probe's
+exact math and the int4 path's existing asym convention) — "int8" in this
+doc means 8-bit integer storage; the byte count is identical.
 
 ## Evidence (probe_block_quant_error, 2026-06-12, 26,629 tokens x 32 layers)
 
