@@ -69,6 +69,38 @@ in dense QLC at preserved quality — int4_protected's thesis), and the latency
 effect is conditional, not a given. Do not claim a tiering latency speedup
 unconditionally.
 
+## W3 — capacity / density (the robust, unconditional half)
+
+```bash
+python -m ndol.sim.density
+```
+
+Capacity is deterministic, so this is an **analytical model**, not a simulation.
+Two quality-preserving density levers compound: int4_protected quantization
+(~1.8× over bf16, measured) × QLC cell density for the error-tolerant bulk
+(4 bits/cell vs TLC's 3). KV tokens per fixed ~1 TB-class silicon budget:
+
+| placement | ×bf16 | ×int4_protected |
+|---|---|---|
+| bf16 / TLC (baseline) | 1.00 | 0.56 |
+| int4_protected / TLC | 1.80 | 1.00 |
+| int4_protected / **tiered** (protected→TLC, bulk→QLC) | **2.22** | **1.23** |
+| int4_protected / all-QLC (reliability-aggressive) | 2.40 | 1.33 |
+
+(Model sanity check: int4_protected/TLC = exactly the 1.80× input, confirming
+consistency.)
+
+**W3 marginal capacity gain = 1.23×** (at φ=0.25 protected bit-fraction), and it
+is **unconditional** — monotone in the bulk fraction, no access-pattern
+dependence — unlike the conditional latency result above. This is where W3's
+real, robust value lives.
+
+**Honest nuance the model surfaces:** SLC (1 bit/cell) is the *worst* tier for
+capacity, so the capacity-optimal placement puts protected on **TLC** — the
+*opposite* of the latency-optimal placement (protected→**SLC** for speed). The
+protect mask is the placement *signal*; the chosen tier depends on the
+objective. The one objective-independent win is **bulk → QLC**.
+
 ## Honest notes
 
 - **Flash timing lives in `ssdconfig.xml`** (`Flash_Parameter_Set`: `Page_Read_Latency`, etc.), not in NDOL. To model TLC/QLC specifically, edit that file — the measured numbers will move accordingly.

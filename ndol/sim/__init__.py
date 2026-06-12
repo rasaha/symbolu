@@ -15,6 +15,14 @@ from .mqsim import (
     make_tier_config,
     TIER_T_R_US,
 )
+from .density import (
+    KVGeometry,
+    ProtectScheme,
+    cells_per_token,
+    tokens_per_silicon,
+    BITS_PER_CELL,
+    MODELS,
+)
 
 __all__ = [
     "MQSimTrace",
@@ -24,4 +32,10 @@ __all__ = [
     "tiered_kv_traces",
     "make_tier_config",
     "TIER_T_R_US",
+    "KVGeometry",
+    "ProtectScheme",
+    "cells_per_token",
+    "tokens_per_silicon",
+    "BITS_PER_CELL",
+    "MODELS",
 ]

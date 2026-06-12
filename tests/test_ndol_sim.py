@@ -101,3 +101,43 @@ def test_mqsim_slc_faster_than_qlc(tmp_path):
     slc = run_mqsim(out["tier_slc_trace"], mqsim_dir=d, ssdconfig=slc_cfg, timeout_s=300)
     qlc = run_mqsim(out["tier_qlc_trace"], mqsim_dir=d, ssdconfig=qlc_cfg, timeout_s=300)
     assert slc.device_response_time_us < qlc.device_response_time_us
+
+
+# ------------------------- W3 capacity / density --------------------------- #
+def test_density_model_matches_measured_net_density():
+    from ndol.sim import KVGeometry, ProtectScheme, tokens_per_silicon
+
+    g = KVGeometry("t", layers=32, kv_heads=8, head_dim=128)
+    s = ProtectScheme(net_density_vs_bf16=1.80, protected_bit_fraction=0.25)
+    base = tokens_per_silicon(g, s, "bf16_tlc", 1e12)
+    uni = tokens_per_silicon(g, s, "int4prot_tlc", 1e12)
+    # int4_protected on the same tier must equal the measured quantization density.
+    assert abs(uni / base - 1.80) < 1e-9
+
+
+def test_tiering_is_unconditional_capacity_win():
+    from ndol.sim import KVGeometry, ProtectScheme, tokens_per_silicon
+
+    g = KVGeometry("t", layers=32, kv_heads=8, head_dim=128)
+    s = ProtectScheme()
+    uni = tokens_per_silicon(g, s, "int4prot_tlc", 1e12)
+    tiered = tokens_per_silicon(g, s, "tiered", 1e12)
+    qlc = tokens_per_silicon(g, s, "int4prot_qlc", 1e12)
+    assert uni < tiered <= qlc          # bulk→QLC always helps capacity
+
+
+def test_lower_protected_fraction_packs_more():
+    from ndol.sim import KVGeometry, ProtectScheme, tokens_per_silicon
+
+    g = KVGeometry("t", layers=32, kv_heads=8, head_dim=128)
+    more_bulk = tokens_per_silicon(g, ProtectScheme(protected_bit_fraction=0.10), "tiered", 1e12)
+    less_bulk = tokens_per_silicon(g, ProtectScheme(protected_bit_fraction=0.40), "tiered", 1e12)
+    assert more_bulk > less_bulk        # monotone: more QLC-eligible bulk → more tokens
+
+
+def test_cells_per_token_bf16_matches_geometry():
+    from ndol.sim import BITS_PER_CELL, KVGeometry, ProtectScheme, cells_per_token
+
+    g = KVGeometry("t", layers=32, kv_heads=8, head_dim=128)
+    expected = g.elements_per_token() * 16 / BITS_PER_CELL["TLC"]
+    assert cells_per_token(g, ProtectScheme(), "bf16_tlc") == expected
