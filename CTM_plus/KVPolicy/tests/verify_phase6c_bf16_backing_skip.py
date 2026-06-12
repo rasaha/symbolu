@@ -93,7 +93,9 @@ class Phase6CSkipMode(unittest.TestCase):
     def test_legacy_mode_allocates_full_pools(self):
         w, NB, BS, H, D = _fresh_writer("0")
         self.assertFalse(w._bf16_backing_skipped)
-        n_slots = w._max_active_slots
+        # 6K.16c added the reserved pad-scratch slot at the last index,
+        # so the pool carries max_active_slots + 1 entries.
+        n_slots = w._max_active_slots + 1
         max_S = w._bf16_backing_max_seqlen
         self.assertEqual(w._bf16_k_backing_pool.shape, (n_slots, max_S, H, D))
         self.assertEqual(w._bf16_v_backing_pool.shape, (n_slots, max_S, H, D))

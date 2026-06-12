@@ -1,8 +1,44 @@
 # PHASE 6N — int8 protected channels (prot-int8) DESIGN
 
-Status: DESIGN + probe evidence. NOT implemented in the shipping path —
-`k_protect_ext` is bf16 everywhere today. Build gated on the static-scale
-probe run below.
+Status: **GATED 2026-06-12** (A100-SXM4-80G pod, all checklist gates green
+— results below). Shipped behind `INT4_PROTECTED_PROT_INT8` (DEFAULT
+remains OFF — flag unset = byte-identical bf16-protect build; flipping
+the default is a separate rollout decision, the measurement basis is
+banked). Measured at the max-util pool (util 0.85, mml 32K, 24,987
+blocks): sidecar tax 8.259 -> 7.306 GiB = **-0.953 GiB** (matches
+1280 B/block x 24,987 x 32 layers minus the 10,240 B of dequant
+constants TO THE BYTE); demo net density line **1.75x -> ~1.78x**.
+Quality: greedy 6/6 BIT-IDENTICAL flag-ON vs OFF (32/32 layers active,
+guard-verified); needle RETRIEVED at 16K both cells; S1 APC byte-gate
+13/13 byte-exact under the `prot_int8_asym_static` marker; 6k12 hard
+needle protected == bf16 bucket-for-bucket (0.875/0.955) in BOTH flag
+states; recalibration reproduced the deployed mask byte-identically
+(v2 artifact adds k_min/k_max, margin 1.1).
+Storage note: codes are uint8 0..255 with the xmin offset (the probe's
+exact math and the int4 path's existing asym convention) — "int8" in this
+doc means 8-bit integer storage; the byte count is identical.
+MODEL SCOPE: the full gate set above is **Llama-3.1-8B**. The mechanism
+is per-model by construction (each model's own v2 calibration supplies
+its min/max); protect's weight is model-specific, so each model gets the
+short check before the flag is enabled there: recalibrate v2 ->
+probe_block_quant_error (prot_int8_static_asym for THAT model) ->
+phase6n_prot_int8_gate greedy A/B -> savings-probe needle A/B.
+
+| model (short check 2026-06-12, same pod) | probe: cur_bf16 / asym-static (benefit retained) | greedy A/B | needle A/B | sidecar delta |
+|---|---|---|---|---|
+| Llama-3.1-8B (full gates) | 95.0% / 95.9% (**82%**) | 6/6 identical, 32/32 active | OK both | **-0.953 GiB** @24,987 blk (byte-exact) |
+| Qwen2.5-7B | 93.9% / 94.7% (**87%**) | 6/6 identical, 28/28 active | OK both | **-0.991 GiB** @59,388 blk (byte-exact) |
+| Mistral-7B-v0.3 | 93.7% / 94.6% (**86%**) | 6/6 identical, 32/32 active | OK both | **-1.015 GiB** @26,609 blk (byte-exact) |
+
+THREE-MODEL READ: benefit retained 82-87% everywhere; greedy 18/18
+prompts bit-identical across the three ON/OFF pairs; needles clean; all
+three sidecar deltas match the byte arithmetic EXACTLY (the saving is
+~1 GiB/model at util-0.85 pools despite different shapes — Qwen's
+half-size per-block saving is offset by its 2.4x bigger pool). Mistral's
+thin margins on unrelated gates did NOT materialize for prot-int8.
+Lineage note: the Qwen and Mistral masks were freshly calibrated on this
+pod (no prior artifacts existed here) — their A/Bs are internally
+consistent but not comparable against historical pods' numbers.
 
 ## Evidence (probe_block_quant_error, 2026-06-12, 26,629 tokens x 32 layers)
 
@@ -53,15 +89,24 @@ problem the streaming K/V quantizers solve). Two variants:
 - Rollout: env flag `INT4_PROTECTED_PROT_INT8=1`, default OFF until gates.
 - Swap/preemption guards (6K.15/17) unaffected (sidecars still not migrated).
 
-## Gate checklist (build session, pod)
+## Gate checklist — ALL GREEN 2026-06-12 (A100-80G pod)
 
 1. ~~probe static ~= dynamic~~ DONE (verdict above: asym-static, 95.9%).
-2. Selftests + guard tests still green.
-3. Needle 16K/32K (savings probe) + 6-prompt greedy bit-exactness vs the
-   bf16-protect build (expect: same identical-count, overlap within noise).
-4. APC S1 byte-gate (with the contract note above) + hard-needle 6k12 cell.
-5. Sidecar measurement (savings probe) confirms ~-1 GiB; density line moves
-   1.75x -> ~1.78x in the demo report.
+2. ~~Selftests + guard tests still green.~~ DONE — all 8 test files, all
+   module selftests, capture-safety verifier GREEN on pod.
+3. ~~Needle + greedy bit-exactness~~ DONE — needle RETRIEVED at ctx=16384
+   in BOTH flag states (savings probe, mml 32768); greedy **6/6
+   BIT-IDENTICAL** ON vs OFF, 100% overlap (phase6n_prot_int8_gate,
+   activation guard 32/32 ON / 0/32 OFF).
+4. ~~APC S1 byte-gate + hard-needle 6k12~~ DONE — S1 13/13 events
+   byte-exact, both engines under `prot_int8_asym_static`; 6k12
+   protected == bf16 (strict 0.875 / retrieval 0.955, 0 ERROR) in BOTH
+   flag states. (Driver gotcha recorded in the runbook: 6k12 needs
+   --model AND --protect-mask — it pops $PROTECT_MASK_PATH.)
+5. ~~Sidecar measurement~~ DONE — 8,867,932,672 -> 7,844,475,392 B
+   (**-0.953 GiB**, exact to the byte vs the 1280 B/block arithmetic
+   incl. +10,240 B constants); demo density line reads **~1.78x net**
+   (sidecars 8.3 -> 7.3 GiB at the same 24,987-block pool).
 
 ## Probe verdict — FINAL (2026-06-12, three runs, 26,629 tokens x 32 layers)
 

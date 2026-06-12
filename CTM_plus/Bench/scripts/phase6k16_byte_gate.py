@@ -85,6 +85,17 @@ def compare(noapc_path, apc_path):
     all_ok = True
     for i in range(n):
         bad = []
+        # Phase 6N contract: k_protect is recorded DEQUANTED (bf16) plus a
+        # format marker. Comparing a prot-int8 dump against a bf16-protect
+        # dump would diff the quant residual, not the APC machinery —
+        # refuse loudly instead of reporting a confusing element diff.
+        # Dumps that predate the marker are bf16-format by definition.
+        fa = a[i].get("k_protect_format", "bf16")
+        fb = b[i].get("k_protect_format", "bf16")
+        if fa != fb:
+            bad.append(f"k_protect_format({fa} != {fb}: dumps taken under "
+                       f"different INT4_PROTECTED_PROT_INT8 settings — rerun "
+                       f"both modes with the same flag)")
         for f in FIELDS:
             ta, tb = a[i][f], b[i][f]
             if ta.shape != tb.shape:
@@ -133,6 +144,19 @@ def selftest():
     same[1]["k_scale"][0, 0] ^= 1
     torch.save(same, p2)
     check("1-byte diff FAILS", compare(p1, p2) == 1)
+    # Phase 6N: a prot-int8 dump vs a bf16 dump must FAIL on the format
+    # marker (versioned contract), not silently diff quant residuals.
+    mixed = copy.deepcopy(ev)
+    mixed[0]["k_protect_format"] = "prot_int8_asym_static"
+    torch.save(mixed, p2)
+    check("protect-format mismatch FAILS", compare(p1, p2) == 1)
+    for e in ev:
+        e["k_protect_format"] = "prot_int8_asym_static"
+    for e in mixed:
+        e["k_protect_format"] = "prot_int8_asym_static"
+    torch.save(ev, p1)
+    torch.save(mixed, p2)
+    check("matching prot-int8 markers PASS", compare(p1, p2) == 0)
     # pad/refusal helpers (contract C-ID/B2) are importable + behave:
     from kv_policy.phase5b_4c_paged_writer import (
         is_pad_seq_id, _PAD_SEQ_ID_BASE, set_apc_active, apc_active,

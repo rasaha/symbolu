@@ -558,13 +558,22 @@ def _maybe_dump_block(writer: Any, kv_cache: "Any", block_id: int) -> None:
         return
     b = int(block_id)
     half_D = writer.D // 2
+    # Phase 6N contract note (PHASE6N_PROT_INT8_DESIGN.md): the dump
+    # records DEQUANTED protect values (bf16 under both formats) plus an
+    # explicit format marker — the byte-gate compares like vs like and
+    # refuses loudly on a format mismatch instead of diffing int8 codes
+    # against bf16 bytes. Dequant is deterministic, so byte-equality of
+    # the dequanted values <=> byte-equality of the stored codes.
+    _prot_int8 = getattr(writer, "_prot_int8_active", False)
     st["events"].append({
         "event": len(st["events"]),
         "packed_k": kv_cache[0, b, :, :, :half_D].detach().cpu().clone(),
         "packed_v": kv_cache[1, b, :, :, :half_D].detach().cpu().clone(),
         "k_scale": writer.k_scale_ext[b].detach().cpu().clone(),
         "k_xmin": writer.k_xmin_ext[b].detach().cpu().clone(),
-        "k_protect": writer.k_protect_ext[b].detach().cpu().clone(),
+        "k_protect": writer._protect_view_bf16(
+            writer.k_protect_ext[b]).detach().cpu().clone(),
+        "k_protect_format": _PROT_INT8_FORMAT if _prot_int8 else _PROT_BF16_FORMAT,
         "v_scale": writer.v_scale_ext[b].detach().cpu().clone(),
         "v_xmin": writer.v_xmin_ext[b].detach().cpu().clone(),
     })
@@ -650,6 +659,71 @@ def _in_cuda_graph_capture() -> bool:
 # from Phase 5B.0). Override via PROTECT_MASK_PATH=...
 _PROTECT_MASK_ENV = "PROTECT_MASK_PATH"
 _PROTECT_MASK_DEFAULT = "/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt"
+
+# ----------------------------------------------------------------------
+# Phase 6N — prot-int8: protected K channels stored at 8 bits with
+# ASYMMETRIC STATIC per-(layer, head, channel) scales (the probe's
+# 'prot_int8_static_asym' policy, PHASE6N_PROT_INT8_DESIGN.md).
+#
+#   scale = (x_max - x_min) / 255, clamped >= 1e-8        (f32 constant)
+#   code  = round((x - x_min) / scale).clamp(0, 255)      (stored uint8)
+#   x'    = code * scale + x_min                          (dequant, f32)
+#
+# x_min / x_max come from the v2 calibration artifact (per-channel signed
+# min/max over the calibration corpus, widened by a margin at calibration
+# time). The codes are UNSIGNED 0..255 — "int8" in the design doc means
+# 8-bit integer storage; unsigned codes + xmin offset is the same
+# asymmetric convention the int4 K/V path already uses (q in 0..15).
+#
+# Flag-gated, DEFAULT OFF: with the env unset the sidecar stays bf16 and
+# every path is byte-identical to the pre-6N build. With the flag set but
+# the artifact lacking min/max (pre-v2 calibration), the writer warns
+# once and stays on bf16 — never silent corruption.
+#
+# Prize: k_protect_ext (NB, BS, H, n_protect) bf16 -> uint8 halves the
+# protect sidecar (2560 -> 1280 B/block at H=8, n_protect=5) for ~10 KB
+# of per-model dequant constants. The kernel is UNCHANGED — read paths
+# dequant to bf16 before the kernel sees the buffer.
+# ----------------------------------------------------------------------
+_PROT_INT8_ENV = "INT4_PROTECTED_PROT_INT8"
+_PROT_INT8_DIV = 255.0
+_PROT_INT8_SCALE_CLAMP = 1e-8     # matches the probe's policy math
+_PROT_INT8_FORMAT = "prot_int8_asym_static"   # S1 dump contract marker
+_PROT_BF16_FORMAT = "bf16"
+
+
+def prot_int8_enabled() -> bool:
+    """Phase 6N rollout flag. Default OFF (bf16 protect, byte-identical
+    to the pre-6N build)."""
+    raw = os.environ.get(_PROT_INT8_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes")
+
+
+def prot_int8_constants(k_min: "torch.Tensor", k_max: "torch.Tensor"):
+    """(qmin, qscale) f32 from per-channel min/max — the probe's
+    'prot_int8_static_asym' scale derivation, verbatim:
+    sca = ((mx - mn) / 255).clamp(min=1e-8)."""
+    qmin = k_min.to(torch.float32)
+    qscale = ((k_max.to(torch.float32) - qmin) / _PROT_INT8_DIV).clamp(
+        min=_PROT_INT8_SCALE_CLAMP)
+    return qmin, qscale
+
+
+def prot_int8_quantize(x: "torch.Tensor", qmin: "torch.Tensor",
+                       qscale: "torch.Tensor") -> "torch.Tensor":
+    """Values (..., H, n_protect) -> uint8 codes. Pure device ops
+    (capture-safe). Math mirrors probe_block_quant_error.policy_errors:
+    qa_codes = round((k - mn) / sca).clamp(0, 255)."""
+    q = ((x.to(torch.float32) - qmin) / qscale).round().clamp_(0.0, _PROT_INT8_DIV)
+    return q.to(torch.uint8)
+
+
+def prot_int8_dequantize(q: "torch.Tensor", qmin: "torch.Tensor",
+                         qscale: "torch.Tensor",
+                         out_dtype: "torch.dtype") -> "torch.Tensor":
+    """uint8 codes -> values in out_dtype (f32 intermediate, like the
+    probe's qa = codes * sca + mn). Pure device ops (capture-safe)."""
+    return (q.to(torch.float32) * qscale + qmin).to(out_dtype)
 
 
 # ----------------------------------------------------------------------
@@ -748,6 +822,47 @@ def _slice_mask_for_layer(mask: "torch.Tensor", layer_idx: int, path: str) -> "t
     return mask[layer_idx].to(torch.int8)
 
 
+def load_protect_minmax_for_layer(
+    layer_idx: int,
+) -> Optional[Tuple["torch.Tensor", "torch.Tensor"]]:
+    """Phase 6N: per-channel signed (k_min, k_max) for `layer_idx` from
+    the v2 calibration artifact (keys "k_min"/"k_max", (num_layers, H_kv,
+    D) each, already widened by the calibration margin).
+
+    Returns (k_min, k_max) as float32 (H_kv, D) tensors, or None when the
+    artifact predates v2 (bare tensor / dict without the keys) or the
+    file is missing — callers treat None as "prot-int8 unavailable" and
+    keep bf16 protect. Malformed v2 keys raise (loud, like the mask
+    loader): a half-written artifact must not half-enable the feature.
+    """
+    path = os.environ.get(_PROTECT_MASK_ENV, _PROTECT_MASK_DEFAULT)
+    if not os.path.exists(path):
+        return None
+    raw = torch.load(path, map_location="cpu", weights_only=False)
+    if not isinstance(raw, dict):
+        return None                      # bare-tensor artifact: pre-v2
+    k_min = raw.get("k_min")
+    k_max = raw.get("k_max")
+    if k_min is None or k_max is None:
+        return None                      # v1 artifact: no minmax emitted
+    if not (isinstance(k_min, torch.Tensor) and isinstance(k_max, torch.Tensor)):
+        raise TypeError(
+            f"Artifact '{path}' k_min/k_max are "
+            f"{type(k_min).__name__}/{type(k_max).__name__}; expected Tensors"
+        )
+    if k_min.shape != k_max.shape or k_min.ndim != 3:
+        raise ValueError(
+            f"Artifact '{path}' k_min/k_max shapes {tuple(k_min.shape)}/"
+            f"{tuple(k_max.shape)} != (num_layers, H_kv, D)"
+        )
+    if layer_idx < 0 or layer_idx >= k_min.shape[0]:
+        raise IndexError(
+            f"layer_idx={layer_idx} out of range for k_min num_layers="
+            f"{k_min.shape[0]}"
+        )
+    return k_min[layer_idx].to(torch.float32), k_max[layer_idx].to(torch.float32)
+
+
 # ----------------------------------------------------------------------
 # Phase 6E — fused decode write reference implementation.
 #
@@ -838,6 +953,9 @@ def _phase6e_fused_decode_write_python_ref(
         and kv_cache.is_cuda
         and writer._bf16_backing_skipped      # CUDA path assumes skip mode.
         and not _bf16_v_mode()                # CUDA V kernel handles int4 only.
+        and not writer._prot_int8_active      # 6N: CUDA K kernel writes bf16
+                                              # protect; int8 mode needs the
+                                              # Python chain's quantize step.
     )
 
     # ===== BF16 K/V backing scatter (skipped in 6C default) =====
@@ -914,7 +1032,7 @@ def _phase6e_fused_decode_write_python_ref(
     # ===== K protect gather + scatter =====
     protect_idx = writer.protected_d_per_head.unsqueeze(0).expand(B, -1, -1)
     k_protect = torch.gather(key, dim=-1, index=protect_idx)
-    writer.k_protect_ext[block_ids, positions] = k_protect
+    writer.k_protect_ext[block_ids, positions] = writer._protect_store(k_protect)
 
     # ===== K staging: unconditional update + conditional finalize =====
     prior_block_id = writer._k_stage_block_id_pool[slot_idx_t]
@@ -1098,6 +1216,7 @@ class PagedKVWriter:
         layer_idx: int,
         *,
         protect_mask: Optional["torch.Tensor"] = None,
+        protect_minmax: Optional[Tuple["torch.Tensor", "torch.Tensor"]] = None,
         v_group_size: int = _DEFAULT_V_GROUP_SIZE,
         sidecar_dtype: "torch.dtype" = None,
     ) -> None:
@@ -1110,6 +1229,10 @@ class PagedKVWriter:
         self.sidecar_dtype = sidecar_dtype
         # protect_mask supplied or load lazily on first write.
         self._protect_mask_cpu: Optional[torch.Tensor] = protect_mask
+        # Phase 6N — per-channel (k_min, k_max) (H, D) for prot-int8.
+        # Supplied (tests) or loaded from the v2 artifact at _lazy_alloc.
+        # Only consulted when $INT4_PROTECTED_PROT_INT8 is set.
+        self._protect_minmax_cpu = protect_minmax
 
         # Device-bound state — populated by _lazy_alloc.
         self._allocated = False
@@ -1127,9 +1250,18 @@ class PagedKVWriter:
         # Per-LAYER (shared across sequences via block_id indexing).
         self.k_scale_ext: Optional[torch.Tensor] = None   # (NB, H, D) bf16
         self.k_xmin_ext:  Optional[torch.Tensor] = None   # (NB, H, D) bf16
-        self.k_protect_ext: Optional[torch.Tensor] = None # (NB, BS, H, n_protect) bf16
+        # bf16 (default) or uint8 codes when prot-int8 is active (6N).
+        self.k_protect_ext: Optional[torch.Tensor] = None # (NB, BS, H, n_protect)
         self.v_scale_ext: Optional[torch.Tensor] = None   # (NB, BS, H, v_n_groups) bf16
         self.v_xmin_ext:  Optional[torch.Tensor] = None   # (NB, BS, H, v_n_groups) bf16
+
+        # Phase 6N — prot-int8 state. Resolved at _lazy_alloc: active only
+        # when the flag is set AND calibration min/max exist. The (H,
+        # n_protect) f32 constants are the ONLY extra device memory
+        # (~320 B/layer at H=8, n_protect=5).
+        self._prot_int8_active: bool = False
+        self._prot_qmin: Optional[torch.Tensor] = None    # (H, n_protect) f32
+        self._prot_qscale: Optional[torch.Tensor] = None  # (H, n_protect) f32
 
         # Per-SEQUENCE state container. seq_id -> SeqState. Created
         # lazily on first write to each sequence. The default seq
@@ -1523,13 +1655,50 @@ class PagedKVWriter:
             self.protect_mask, n_protect,
         )
 
+        # Phase 6N — resolve prot-int8 BEFORE allocating k_protect_ext.
+        # Flag unset => inactive => bf16 sidecar, byte-identical build.
+        # Flag set but no calibration min/max => warn once, stay bf16
+        # (an old artifact must never half-enable the feature).
+        self._prot_int8_active = False
+        if prot_int8_enabled():
+            minmax = self._protect_minmax_cpu
+            if minmax is None:
+                minmax = load_protect_minmax_for_layer(self.layer_idx)
+            if minmax is None:
+                logger.warning(
+                    "Phase 6N: $%s is set but the protect-mask artifact has "
+                    "no k_min/k_max (pre-v2 calibration) — layer %d keeps "
+                    "bf16 protect. Recalibrate with the 6N "
+                    "calibrate_phase5b_protect_mask.py to enable prot-int8.",
+                    _PROT_INT8_ENV, self.layer_idx,
+                )
+            else:
+                k_min_full, k_max_full = minmax
+                if tuple(k_min_full.shape) != (H, D):
+                    raise ValueError(
+                        f"protect minmax shape {tuple(k_min_full.shape)} != "
+                        f"({H}, {D})"
+                    )
+                # Gather the protected channels' constants in protect_slot
+                # order — the SAME (H, n_protect) layout k_protect_ext uses.
+                pd = self.protected_d_per_head.cpu()
+                qmin, qscale = prot_int8_constants(
+                    torch.gather(k_min_full.to(torch.float32), 1, pd),
+                    torch.gather(k_max_full.to(torch.float32), 1, pd),
+                )
+                self._prot_qmin = qmin.to(device=device)
+                self._prot_qscale = qscale.to(device=device)
+                self._prot_int8_active = True
+
         v_n_groups = D // self.v_group_size
 
-        # External sidecars.
+        # External sidecars. k_protect_ext: uint8 codes under prot-int8
+        # (halves the protect sidecar), bf16 values otherwise.
         dtype = self.sidecar_dtype
+        prot_dtype = torch.uint8 if self._prot_int8_active else dtype
         self.k_scale_ext   = torch.zeros((NB, H, D),                 dtype=dtype, device=device)
         self.k_xmin_ext    = torch.zeros((NB, H, D),                 dtype=dtype, device=device)
-        self.k_protect_ext = torch.zeros((NB, BS, H, n_protect),     dtype=dtype, device=device)
+        self.k_protect_ext = torch.zeros((NB, BS, H, n_protect),     dtype=prot_dtype, device=device)
         self.v_scale_ext   = torch.zeros((NB, BS, H, v_n_groups),    dtype=dtype, device=device)
         self.v_xmin_ext    = torch.zeros((NB, BS, H, v_n_groups),    dtype=dtype, device=device)
 
@@ -1606,10 +1775,33 @@ class PagedKVWriter:
 
         logger.info(
             "PagedKVWriter layer=%d allocated: NB=%d BS=%d H=%d D=%d "
-            "n_protect=%d v_n_groups=%d max_active_slots=%d",
+            "n_protect=%d v_n_groups=%d max_active_slots=%d prot_int8=%s",
             self.layer_idx, NB, BS, H, D,
-            n_protect, v_n_groups, n_slots,
+            n_protect, v_n_groups, n_slots, self._prot_int8_active,
         )
+
+    # ------------------------------------------------------------------
+    # Phase 6N — prot-int8 store/view converters. Pure device ops
+    # (capture-safe; called from the captured decode region). Both are
+    # identity passthroughs when prot-int8 is inactive, so the flag-off
+    # build executes the exact pre-6N op chain.
+    # ------------------------------------------------------------------
+
+    def _protect_store(self, k_protect: "torch.Tensor") -> "torch.Tensor":
+        """Value to scatter into k_protect_ext: the bf16 values
+        themselves (default), or their uint8 codes under prot-int8."""
+        if not self._prot_int8_active:
+            return k_protect
+        return prot_int8_quantize(k_protect, self._prot_qmin, self._prot_qscale)
+
+    def _protect_view_bf16(self, raw: "torch.Tensor") -> "torch.Tensor":
+        """Gathered k_protect_ext values for the read paths: passthrough
+        (default), or dequantized to sidecar_dtype under prot-int8. The
+        kernel contract is unchanged — it always receives bf16."""
+        if not self._prot_int8_active:
+            return raw
+        return prot_int8_dequantize(
+            raw, self._prot_qmin, self._prot_qscale, self.sidecar_dtype)
 
     def reset_sequence(self, seq_id: Any = None) -> None:
         """Reset streaming state for one sequence (default seq if None)
@@ -1799,7 +1991,7 @@ class PagedKVWriter:
         protect_idx = self.protected_d_per_head.unsqueeze(0).expand(n_real, -1, -1)
         # (n_real, H, n_protect) long
         k_protect = torch.gather(real_key, dim=-1, index=protect_idx)
-        self.k_protect_ext[block_ids, positions] = k_protect
+        self.k_protect_ext[block_ids, positions] = self._protect_store(k_protect)
 
         # ===== K staging + finalize =====
         # Identify unique blocks and which are FULL (count == BS) vs PARTIAL.
@@ -2161,7 +2353,7 @@ class PagedKVWriter:
         # ===== K protect gather + scatter (same as legacy) =====
         protect_idx = self.protected_d_per_head.unsqueeze(0).expand(B, -1, -1)
         k_protect = torch.gather(key, dim=-1, index=protect_idx)
-        self.k_protect_ext[block_ids, positions] = k_protect
+        self.k_protect_ext[block_ids, positions] = self._protect_store(k_protect)
 
         # ===== K staging: unconditional update + conditional finalize =====
         # Detect block boundary via device tensor compare.
@@ -2469,6 +2661,7 @@ class PagedKVWriter:
             "k_stage_count":     self.k_stage_count,
             "k_stage_block_id":  self.k_stage_block_id,
             "seq_pos":           self.seq_pos,
+            "prot_int8_active":  self._prot_int8_active,
         }
 
     def get_packed_view(
@@ -2499,10 +2692,12 @@ class PagedKVWriter:
         k_nibbles = k_blocks[..., :half_D].contiguous().view(1, S, self.H, half_D)
         v_nibbles = v_blocks[..., :half_D].contiguous().view(1, S, self.H, half_D)
 
-        # Gather externals.
+        # Gather externals. Protect: dequant to bf16 under prot-int8 (6N)
+        # — the kernel contract is bf16 either way.
         k_scale = self.k_scale_ext[block_ids].unsqueeze(0)         # (1, n, H, D)
         k_xmin  = self.k_xmin_ext [block_ids].unsqueeze(0)
-        k_prot  = self.k_protect_ext[block_ids].view(1, S, self.H, self.n_protect)
+        k_prot  = self._protect_view_bf16(
+            self.k_protect_ext[block_ids]).view(1, S, self.H, self.n_protect)
         v_scale = self.v_scale_ext[block_ids].view(1, S, self.H, self.v_n_groups)
         v_xmin  = self.v_xmin_ext [block_ids].view(1, S, self.H, self.v_n_groups)
 
@@ -2586,10 +2781,12 @@ class PagedKVWriter:
         k_nibbles = k_blocks[..., :half_D].contiguous().view(B, S, H, half_D)
         v_nibbles = v_blocks[..., :half_D].contiguous().view(B, S, H, half_D)
 
-        # Gather sidecars in ONE shot too.
+        # Gather sidecars in ONE shot too. Protect: dequant to bf16 under
+        # prot-int8 (6N) — the kernel contract is bf16 either way.
         k_scale = self.k_scale_ext[block_ids_long]                              # (B, n_blocks_max, H, D)
         k_xmin  = self.k_xmin_ext [block_ids_long]                              # (B, n_blocks_max, H, D)
-        k_prot  = self.k_protect_ext[block_ids_long].view(B, S, H, self.n_protect)
+        k_prot  = self._protect_view_bf16(
+            self.k_protect_ext[block_ids_long]).view(B, S, H, self.n_protect)
         v_scale = self.v_scale_ext[block_ids_long].view(B, S, H, self.v_n_groups)
         v_xmin  = self.v_xmin_ext [block_ids_long].view(B, S, H, self.v_n_groups)
 

@@ -127,7 +127,7 @@ A deployment realizes value on three axes; one cost is disclosed.
 
 | Axis | What you get | Status |
 |---|---|---|
-| **Density** (the $ saving) | **2.00× raw pool measured live** (399,792 → 799,584 token-slots, A100-80G, util 0.85, mml 32K); **~1.75× net** of the measured **8.3 GiB** out-of-pool sidecar tax at equal total VRAM. Net is util-dependent (tax ~16% of pool): 1.83× at smaller pools | LIVE-MEASURED (savings demo, June 2026) |
+| **Density** (the $ saving) | **2.00× raw pool measured live** (399,792 → 799,584 token-slots, A100-80G, util 0.85, mml 32K); **~1.75× net** of the measured **8.3 GiB** out-of-pool sidecar tax at equal total VRAM — **~1.78× net with prot-int8** (`INT4_PROTECTED_PROT_INT8=1`, default OFF: protect sidecar at static-scale int8 cuts the tax to **7.3 GiB**, −0.953 GiB measured; all quality gates clean — see PHASE6N_PROT_INT8_DESIGN.md). Net is util-dependent (tax ~16% of pool): 1.83× at smaller pools | LIVE-MEASURED (savings demo, June 2026; prot-int8 gated June 2026) |
 | **Quality** (the differentiator) | near-bf16: needle == bf16 (live: RETRIEVED at ctx=16K); MMLU 0.0 pt; hard-needle 0.964 | MEASURED, 4 models |
 | **APC prefill** (shared-prefix) | **Measured** (Llama-3.1-8B, N=16, gen=32): TTFT **−53/−56/−78/−86%** per cache hit at 1K/2K/4K/8K prefixes; batch throughput **1.19–1.85×** at 94% hit rate, 1.28–1.54× at 75%; quality 1.00 == APC-off in every cell; net of the eager tax. Compounds with density | MEASURED (apc_payoff_sweep, June 2026) |
 | **Decode throughput** (the cost) | **0.13–0.67× bf16** (floor: B=1 eager 100K ctx; quality 1.0 measured to 100K, June 2026) — kernel-bound; recoverable ceiling ~0.27–0.30×, NOT parity. Fusion headroom measured June 2026: pre-kernel gather+splice = **60% / 42%** of the B=1 read path at 8K / 32K ctx → the 6F in-kernel gather is **GO** (realized < headroom) | DISCLOSED |
@@ -138,9 +138,9 @@ long-context users; batch/offline) **and** shared-prefix / short-output workload
 **Where it doesn't:** latency-critical, long-generation single-stream chat.
 
 **The customer-facing savings statement:** *"~2× the users (or context) per GPU
-(1.75× net of sidecars, measured live) at near-bf16 quality, plus a measured
-53–86% TTFT cut per cache hit on shared-prefix traffic — at a disclosed
-decode-throughput cost."*
+(1.75× net of sidecars measured live; 1.78× with the gated prot-int8 flag) at
+near-bf16 quality, plus a measured 53–86% TTFT cut per cache hit on
+shared-prefix traffic — at a disclosed decode-throughput cost."*
 
 ---
 

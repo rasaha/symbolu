@@ -58,14 +58,26 @@ def dequant_k_blocks(
     packed_k: "torch.Tensor",          # (n_blk, BS, H, D/2) uint8
     k_scale: "torch.Tensor",           # (n_blk, H, D)
     k_xmin: "torch.Tensor",            # (n_blk, H, D)
-    k_protect: "torch.Tensor",         # (n_blk, BS, H, n_protect)
+    k_protect: "torch.Tensor",         # (n_blk, BS, H, n_protect) VALUES
     protected_d_per_head: "torch.Tensor",  # (H, n_protect) long
 ) -> "torch.Tensor":
     """Reconstruct bf16-equivalent K for full cached blocks.
-    Returns (n_blk, BS, H, D) float32 (caller casts)."""
+    Returns (n_blk, BS, H, D) float32 (caller casts).
+
+    ``k_protect`` must hold protect VALUES (bf16/float). Under prot-int8
+    (Phase 6N) the sidecar stores uint8 codes — the caller dequantizes
+    first (writer._protect_view_bf16); scattering raw codes would be
+    silent corruption, so refuse them loudly here.
+    """
+    if k_protect.dtype == torch.uint8:
+        raise RuntimeError(
+            "dequant_k_blocks received raw prot-int8 codes (uint8); the "
+            "caller must dequantize first (writer._protect_view_bf16)."
+        )
     q = unpack_nibbles(packed_k).float()                       # (n_blk, BS, H, D)
     k = q * k_scale.float().unsqueeze(1) + k_xmin.float().unsqueeze(1)
-    # Protect merge: protected channels carry their EXACT stored values.
+    # Protect merge: protected channels carry their stored values (exact
+    # bf16 by default; int8-roundtripped under prot-int8).
     n_blk, BS, H, _ = q.shape
     idx = protected_d_per_head.long().view(1, 1, H, -1).expand(n_blk, BS, H, -1)
     k.scatter_(-1, idx, k_protect.float())
@@ -110,11 +122,18 @@ def gather_context_kv(
 
     packed_k = kv_cache[0, blocks, :, :, :half_D]              # (n_blk, BS, H, D/2)
     packed_v = kv_cache[1, blocks, :, :, :half_D]
+    # Phase 6N: under prot-int8 the protect sidecar holds uint8 codes —
+    # dequant to values before the scatter-merge. getattr keeps older /
+    # minimal writer stand-ins (no 6N surface) on the raw-bf16 path.
+    k_prot = writer.k_protect_ext[blocks]
+    _prot_dq = getattr(writer, "_protect_view_bf16", None)
+    if _prot_dq is not None:
+        k_prot = _prot_dq(k_prot)
     k = dequant_k_blocks(
         packed_k,
         writer.k_scale_ext[blocks],
         writer.k_xmin_ext[blocks],
-        writer.k_protect_ext[blocks],
+        k_prot,
         writer.protected_d_per_head,
     )
     v = dequant_v_blocks(
@@ -273,6 +292,17 @@ _ASYM_DIV = 15.0      # mirror of phase5b_4c_paged_writer
 _SCALE_CLAMP = 1e-8
 
 
+def _writer_module():
+    """The paged-writer module (Phase 6N prot-int8 helpers live there —
+    single source of truth for the quant math). Package import first;
+    sibling import covers running this file as a script (selftest)."""
+    try:
+        from kv_policy import phase5b_4c_paged_writer as pw
+    except ImportError:                                # pragma: no cover
+        import phase5b_4c_paged_writer as pw           # type: ignore
+    return pw
+
+
 def _ref_quant_k_block(k_block, protected_d):                   # (BS,H,D)
     f = k_block.float()
     x_max, x_min = f.amax(dim=0), f.amin(dim=0)                 # (H,D)
@@ -297,9 +327,15 @@ def _ref_quant_v_block(v_block, G):                              # (BS,H,D)
 
 
 class _FakeWriter:
-    """Minimal stand-in exposing the attrs gather_context_kv uses."""
+    """Minimal stand-in exposing the attrs gather_context_kv uses.
 
-    def __init__(self, NB, BS, H, D, n_protect, G, device="cpu"):
+    ``prot_minmax=(k_min, k_max)`` (each (H, D)) switches the protect
+    sidecar to Phase 6N prot-int8 mode: uint8 codes + the writer module's
+    exact quant/dequant helpers (single source of truth for the math).
+    """
+
+    def __init__(self, NB, BS, H, D, n_protect, G, device="cpu",
+                 prot_minmax=None):
         self.NB, self.BS, self.H, self.D = NB, BS, H, D
         self.v_group_size = G
         self.n_protect = n_protect
@@ -308,11 +344,33 @@ class _FakeWriter:
         dt = torch.bfloat16
         self.k_scale_ext = torch.zeros((NB, H, D), dtype=dt)
         self.k_xmin_ext = torch.zeros((NB, H, D), dtype=dt)
-        self.k_protect_ext = torch.zeros((NB, BS, H, n_protect), dtype=dt)
         self.v_scale_ext = torch.zeros((NB, BS, H, D // G), dtype=dt)
         self.v_xmin_ext = torch.zeros((NB, BS, H, D // G), dtype=dt)
         self.protected_d_per_head = torch.stack(
             [torch.randperm(D)[:n_protect].sort().values for _ in range(H)])
+        self._prot_int8_active = prot_minmax is not None
+        if self._prot_int8_active:
+            pw = _writer_module()
+            k_min, k_max = prot_minmax
+            self._prot_qmin, self._prot_qscale = pw.prot_int8_constants(
+                torch.gather(k_min.float(), 1, self.protected_d_per_head),
+                torch.gather(k_max.float(), 1, self.protected_d_per_head))
+            self.k_protect_ext = torch.zeros(
+                (NB, BS, H, n_protect), dtype=torch.uint8)
+        else:
+            self.k_protect_ext = torch.zeros((NB, BS, H, n_protect), dtype=dt)
+
+    def _protect_store(self, k_protect):
+        if not self._prot_int8_active:
+            return k_protect
+        return _writer_module().prot_int8_quantize(
+            k_protect, self._prot_qmin, self._prot_qscale)
+
+    def _protect_view_bf16(self, raw):
+        if not self._prot_int8_active:
+            return raw
+        return _writer_module().prot_int8_dequantize(
+            raw, self._prot_qmin, self._prot_qscale, torch.bfloat16)
 
 
 def selftest() -> int:
@@ -428,6 +486,57 @@ def selftest() -> int:
         check("legacy backing refused", False)
     except RuntimeError:
         check("legacy backing refused", True)
+    w._bf16_backing_skipped = True
+
+    # 5) Phase 6N prot-int8: same blocks, protect sidecar at uint8 codes.
+    k_min = k_true.float().amin(dim=0)                 # (H, D) same-corpus
+    k_max = k_true.float().amax(dim=0)
+    w8 = _FakeWriter(NB, BS, H, D, n_p, G, prot_minmax=(k_min, k_max))
+    w8.protected_d_per_head = w.protected_d_per_head   # same channels
+    pw = _writer_module()
+    w8._prot_qmin, w8._prot_qscale = pw.prot_int8_constants(
+        torch.gather(k_min, 1, w8.protected_d_per_head),
+        torch.gather(k_max, 1, w8.protected_d_per_head))
+    for j, b in enumerate(ctx_blocks):
+        kb = k_true[j * BS:(j + 1) * BS]
+        vb = v_true[j * BS:(j + 1) * BS]
+        pk, ks, kx, kp = _ref_quant_k_block(kb, w8.protected_d_per_head)
+        pv, vs, vx = _ref_quant_v_block(vb, G)
+        kv_cache[0, b, :, :, :D // 2] = pk
+        kv_cache[1, b, :, :, :D // 2] = pv
+        w8.k_scale_ext[b] = ks.to(torch.bfloat16)
+        w8.k_xmin_ext[b] = kx.to(torch.bfloat16)
+        w8.k_protect_ext[b] = w8._protect_store(kp)    # uint8 codes
+        w8.v_scale_ext[b] = vs.to(torch.bfloat16)
+        w8.v_xmin_ext[b] = vx.to(torch.bfloat16)
+    check("prot-int8 sidecar is uint8 (half bytes)",
+          w8.k_protect_ext.dtype == torch.uint8
+          and w8.k_protect_ext.element_size() == 1)
+    k_dq8, _ = gather_context_kv(kv_cache, w8, bt_row, ctx_len, torch.bfloat16)
+    k_dq8_p = torch.gather(k_dq8.view(ctx_len, H, D), -1,
+                           idx.view(1, H, n_p).expand(ctx_len, -1, -1))
+    # Protected channels: no longer bit-exact, but within the static-
+    # scale int8 step (scale/2 rounding + bf16 cast of the dequant).
+    tol8 = (w8._prot_qscale * 0.5).view(1, H, n_p) \
+        + 0.01 * k_tr_p.float().abs() + 1e-3
+    err8 = (k_dq8_p.float() - k_tr_p.float()).abs()
+    check("prot-int8 protect within scale/2 of true",
+          bool((err8 <= tol8).all()))
+    # And EXACTLY equal to the explicit dequant of the stored codes —
+    # the read path adds no extra error beyond the quantizer itself.
+    codes = torch.stack([w8.k_protect_ext[b] for b in ctx_blocks])
+    expect = w8._protect_view_bf16(codes).view(ctx_len, H, n_p)
+    check("prot-int8 read == dequant(stored codes) bit-exact",
+          bool((k_dq8_p == expect).all()))
+    # Rail: raw codes refused by dequant_k_blocks.
+    try:
+        dequant_k_blocks(
+            kv_cache[0, blocks_l, :, :, :D // 2],
+            w8.k_scale_ext[blocks_l], w8.k_xmin_ext[blocks_l],
+            w8.k_protect_ext[blocks_l], w8.protected_d_per_head)
+        check("raw uint8 codes refused", False)
+    except RuntimeError:
+        check("raw uint8 codes refused", True)
 
     print(f"\n{'ALL PASS' if not fails else f'{len(fails)} FAIL: ' + ', '.join(fails)}")
     return 0 if not fails else 1
