@@ -141,6 +141,9 @@ def run_mqsim(
         cwd=mqsim_dir,
         check=True,
         capture_output=True,
+        # MQSim ends with a blocking "Press any key to exit" read on stdin; on an
+        # interactive TTY that hangs forever. Feed it EOF so it exits immediately.
+        stdin=subprocess.DEVNULL,
         timeout=timeout_s,
     )
     result_xml = workload[: -len(".xml")] + "_scenario_1.xml"
