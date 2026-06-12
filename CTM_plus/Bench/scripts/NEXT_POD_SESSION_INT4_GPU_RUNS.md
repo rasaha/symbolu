@@ -264,3 +264,17 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   score-space SNR per layer (|q.dk| vs std(q.K), GQA-mapped). Artifacts:
   summary.json + blocks.npz + channels.npz — sized so NO re-runs are
   needed for later threshold/mask questions. Selftest needs torch (pod).
+- QUANT-ERROR PROBE MEASURED 2026-06-12 (26,629 tokens x 32 layers, real
+  activations, exact validated quantizer): mean|err| noprot 0.0611,
+  cur(4% bf16-protect) 0.0578 (94.7%), protect@int8 0.0580 (95.0%).
+  VERDICTS: (1) int8-protect adds only 0.3pp vs bf16-protect -> the ~1 GB
+  sidecar saving is mathematically nearly free; graduate to gates.
+  (2) dynamic-protect: WEAK — block max-err tail is mild (p50 0.283,
+  p99 0.450 = 1.6x median; tagging worst 1% costs 15 MB/100K but no
+  catastrophic-block population exists to catch). Don't build on this
+  evidence. (3) REFRAME: the 4% mask removes only 5.3% of mean
+  element error (1.3x its share) — with per-channel-per-block scales
+  there is no cross-channel contamination, so protect's value must be
+  score-space (|k_d| x |q_d| weighting), not element-space; the per-layer
+  score SNR + sensitivity-mask overlap live in /tmp/qerr/summary.json
+  (offline analysis; no GPU rerun needed by design).
