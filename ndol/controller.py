@@ -19,6 +19,7 @@ from typing import Callable
 from .benefit import BenefitFunction
 from .model import Metrics, NANDModel, ReadCost, Regime, RegimeDetector, T_R_US, Tier
 from .primitives import Compressor, NearDataCompute, Speculator, TierPlacer
+from .scheduler import PhaseScheduler, ScheduleResult
 from .store import BackingStore, DictStore
 
 
@@ -33,8 +34,9 @@ class NDOLController:
         prefetch_k: int = 4,
         host_gops: float = 50.0,
         fabric_gops: float = 10.0,
+        use_scheduler: bool = True,
     ) -> None:
-        self.store = store or DictStore()
+        self.store = store if store is not None else DictStore()
         self.model = model or NANDModel()
         self.regime = RegimeDetector(n_dies=n_dies)
         self.benefit = BenefitFunction(self.model)
@@ -42,13 +44,16 @@ class NDOLController:
         self.spec = Speculator()
         self.tier = TierPlacer(slc_capacity=slc_capacity)
         self.compute = NearDataCompute()
+        self.scheduler = PhaseScheduler()
         self.metrics = Metrics()
 
         self.prefetch_k = prefetch_k
         self.host_gops = host_gops
         self.fabric_gops = fabric_gops
+        self.use_scheduler = use_scheduler
         self._raw_size: dict[int, int] = {}
         self.last_scan_pushdown: bool | None = None
+        self.last_schedule: ScheduleResult | None = None
 
     # ----------------------------- writes ------------------------------- #
     def write(self, lba: int, data: bytes) -> None:
@@ -99,7 +104,17 @@ class NDOLController:
         # but only if the array isn't the bottleneck (enough dies, latency-bound).
         if regime is Regime.LATENCY_BOUND and backing and self.regime.n_dies >= len(backing):
             exposed_tr = max(c.t_r for c in backing)
-            return exposed_tr + total_xfer
+            # USE splay scheduler (§6.5): stagger transfer windows on the shared
+            # bus; any residual collision is added as contention. For homogeneous
+            # windows the splay state is collision-free and this reduces exactly
+            # to the static interleave bound.
+            contention = 0.0
+            if self.use_scheduler:
+                self.last_schedule = self.scheduler.schedule(
+                    [c.t_r for c in backing], [c.t_xfer for c in backing]
+                )
+                contention = self.last_schedule.contention_us
+            return exposed_tr + total_xfer + contention
         # Bandwidth-bound or too few dies: reads serialise.
         return sum(c.total for c in costs)
 

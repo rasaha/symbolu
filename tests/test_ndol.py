@@ -6,13 +6,16 @@ Two kinds of assertions:
 """
 from __future__ import annotations
 
+import math
 import os
 
 from ndol import (
     BenefitFunction,
     Compressor,
+    FileStore,
     NANDModel,
     NDOLController,
+    PhaseScheduler,
     Regime,
     RegimeDetector,
     StridePredictor,
@@ -153,3 +156,89 @@ def test_regime_detector_saturation_point():
     assert rd.classify(1) is Regime.LATENCY_BOUND
     assert rd.classify(16) is Regime.BANDWIDTH_BOUND
     assert rd.idle_dies(4) == 12
+
+
+# ------------------------------ USE scheduler ------------------------------ #
+def test_scheduler_converges_to_collision_free_splay_homogeneous():
+    # Equal windows → splay state tiles the bus with zero contention.
+    s = PhaseScheduler()
+    res = s.schedule(t_r=[50.0] * 8, t_xfer=[5.0] * 8)
+    assert res.converged
+    assert res.contention_us < 1e-6
+    # Splay state's mean pairwise coherence is -1/(N-1) ≈ -0.14, well below the
+    # fully-aligned value of +1 — i.e. maximally spread.
+    assert res.coherence < 0.0
+
+
+def test_scheduler_weighted_splay_beats_equal_spacing_when_heterogeneous():
+    # Mixed-tier dies: unequal transfer windows. The weighted repulsive update
+    # must not be worse than naive equal spacing (2πi/N).
+    s = PhaseScheduler()
+    t_r = [25.0, 50.0, 100.0, 50.0]
+    t_xfer = [16.0, 8.0, 2.0, 8.0]
+    res = s.schedule(t_r, t_xfer)
+    t_cycle = max(tr + tx for tr, tx in zip(t_r, t_xfer))
+    widths = [tx / t_cycle for tx in t_xfer]
+    equal = [2 * math.pi * i / 4 for i in range(4)]
+    c_equal = s.contention(equal, widths, t_cycle)
+    assert res.converged
+    assert res.contention_us <= c_equal + 1e-9
+
+
+def test_scheduler_can_be_disabled():
+    c = NDOLController(use_scheduler=False)
+    for lba in range(8):
+        c.write(lba, os.urandom(16384))
+    c.metrics.__init__()
+    c.read_many(list(range(8)), queue_depth=8)
+    assert c.last_schedule is None
+
+
+# ------------------------------ FileStore ---------------------------------- #
+def test_filestore_roundtrip_and_persistence(tmp_path):
+    path = str(tmp_path / "ndol.dat")
+    c = NDOLController(store=FileStore(path))
+    payloads = {i: os.urandom(4096) for i in range(30)}
+    for lba, data in payloads.items():
+        c.write(lba, data)
+    for lba, data in payloads.items():
+        assert c.read(lba) == data
+    c.store.close()
+
+    # Reopen: the FTL index sidecar survives, data still byte-exact.
+    c2 = NDOLController(store=FileStore(path))
+    for lba, data in payloads.items():
+        assert c2.read(lba) == data
+    c2.store.close()
+
+
+def test_filestore_overwrite_returns_latest():
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        store = FileStore(os.path.join(d, "x.dat"))
+        c = NDOLController(store=store)
+        c.write(5, b"old" * 100)
+        c.write(5, b"new" * 100)
+        assert c.read(5) == b"new" * 100
+        store.close()
+
+
+# ------------------------------ benchmark ---------------------------------- #
+def test_bench_sequential_beats_random():
+    from ndol.bench import replay, trace_random, trace_sequential
+
+    span = 256
+    seq = replay("seq", trace_sequential(512), span=span)
+    rnd = replay("rnd", trace_random(512, span), span=span)
+    assert seq.speedup >= 1.5
+    assert seq.speedup > rnd.speedup  # predictable access prefetches better
+
+
+def test_bench_incs_boundary_is_monotone_and_flips():
+    from ndol.bench import incs_boundary
+
+    rows = incs_boundary()
+    # Low ops/byte pushes down; high ops/byte refuses (corrected §3.5).
+    assert rows[0][1] is True
+    assert rows[-1][1] is False

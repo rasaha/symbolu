@@ -13,8 +13,9 @@ No hardware: correctness runs on a real in-process backing store; performance
 is scored against the analytical NAND latency model in `model.py`.
 """
 from .model import NANDModel, Tier, Regime, RegimeDetector, Metrics, ReadCost, T_R_US
-from .store import BackingStore, DictStore
+from .store import BackingStore, DictStore, FileStore
 from .benefit import BenefitFunction, BenefitWeights, REGIME_WEIGHTS
+from .scheduler import PhaseScheduler, ScheduleResult
 from .primitives import (
     StridePredictor,
     Speculator,
@@ -35,9 +36,12 @@ __all__ = [
     "T_R_US",
     "BackingStore",
     "DictStore",
+    "FileStore",
     "BenefitFunction",
     "BenefitWeights",
     "REGIME_WEIGHTS",
+    "PhaseScheduler",
+    "ScheduleResult",
     "StridePredictor",
     "Speculator",
     "TierPlacer",
