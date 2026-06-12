@@ -1,9 +1,52 @@
 # PHASE 6K.18 — chunked prefill for int4_protected DESIGN
 
-Status: SCOPED 2026-06-12. NOT implemented — chunked prefill is factory-
-pinned OFF today (the 6K.17 guard). This doc locks the design + the
-probes that must run BEFORE the build, in the 6N pattern (decision by
-measurement, flag default OFF until every gate passes).
+Status: BUILT 2026-06-12 (CPU-gated only) — **POD PROBES + GATES NOT
+RUN; NO MEASURED NUMBERS EXIST.** D1-D4 implemented per the touch-point
+table below; factory DEFAULT remains pinned False (no behavior change
+for existing deploys); `Int4ProtectedLLM(enable_chunked_prefill=True)`
+constructs and arms the contract but logs a POD-GATES-PENDING warning at
+init (deliberate friction — downgrade to info ONLY after G1-G6 are
+green). The build session had no GPU: probes P1/P2 and gates G2-G6 are
+the FIRST work item of the next pod session — runbook commands are in
+NEXT_POD_SESSION_INT4_GPU_RUNS.md (TASK 6K.18). The P2 STOP rule still
+applies: if chunking does not restore util 0.85 at 100K on stock bf16,
+re-scope the claim before quoting any prize (the code can stay — it is
+additive and default-off — but the long-context story must not).
+
+CPU evidence banked (green): writer byte-exactness across chunk
+boundaries incl. prot-int8 (the G2 invariant at the storage layer, real
+writer, monolithic vs 2/3-chunk splits); D1 staged/finalized tail legs +
+all refusal rails (selftest §6 + 30 unit tests in
+tests/test_phase6k18_chunked_prefill.py); every pre-existing suite
+(6K.16/16b/16c/17 guards, 6N) still green, 6K.17 default-off pins
+verbatim.
+
+Build deltas vs the scoped design (found by "verify, don't assume" —
+the write path needed three guarded changes, not zero):
+  1. The 6K.9 reset-on-prefill evicts EVERY prefill partition's SeqState
+     — it would destroy chunk 1's staged tail. Under chunked_active the
+     reset applies only to ctx==0 segments (fresh starts, incl.
+     recompute-preempted restarts); ctx>0 continuations are preserved.
+     Non-chunked behavior verbatim.
+  2. `_derive_write_partitions` mishandled MIXED steps (decode rows +
+     chunk segments — a shape only the chunked scheduler builds): the
+     decode-first early-return now fires only for pure-decode; mixed
+     steps partition prefill segments at [0, npt) + decode rows at
+     npt+i, refusing loudly on unprovable shapes.
+  3. `gc_completed_slots`' premise ("decode batch == running set") is
+     false under chunking — a mid-chunked-prefill seq would be evicted
+     by a pure-decode step. Chunk writes mark `prefill_open`;
+     chunked-gated GC exemption, cleared on first decode appearance.
+     Known cost: a request aborted mid-chunked-prefill leaks its slot
+     (bounded, loud at pool exhaustion; documented in the GC docstring).
+  Also: the 6B.2 hook stash is SPLIT at num_prefills on mixed steps
+  (prefills-first batch order), and the S1 dump records block_id so the
+  G2 compare aligns by block (chunked finalize order legitimately
+  differs); decode-side C-ID refusal extended to chunked_active.
+
+This doc remains the gate contract: the checklist below is unchanged and
+binding. History: SCOPED 2026-06-12 (probes-first, 6N pattern — decision
+by measurement, flag default OFF until every gate passes).
 
 ## Why (the honest prize — and its bound)
 

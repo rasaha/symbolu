@@ -478,6 +478,43 @@ def apc_active() -> bool:
     return _APC_ACTIVE[0]
 
 
+# ---- Chunked-prefill-active flag (Phase 6K.18, contract C-ID extended) --
+#
+# Mirrors _APC_ACTIVE: the factory sets this when enable_chunked_prefill
+# resolves True (D2/D3 of PHASE6K18_CHUNKED_PREFILL_DESIGN.md). Chunk 2+
+# of a chunked prompt MUST find chunk 1's SeqState (the staged K tail of
+# the boundary block) — block-local identity changes across chunks and
+# would re-stage the boundary block from zeros (silent corruption at
+# finalize). So when armed, the SAME C-ID refusals as APC apply: no rid
+# stash on a live step => loud RuntimeError, never a silent fallback.
+# The flag also gates the chunked-only write-path behaviors (ctx==0-only
+# prefill reset, mid-prefill GC exemption) so that non-chunked deploys
+# are behavior-identical with the flag off.
+_CHUNKED_ACTIVE = [False]
+
+
+def set_chunked_active(active: bool) -> None:
+    _CHUNKED_ACTIVE[0] = bool(active)
+
+
+def chunked_active() -> bool:
+    return _CHUNKED_ACTIVE[0]
+
+
+# Raw dev bypass (the 6K.17 escape hatch, kept by 6K.18 D3): lets chunked
+# shapes run WITHOUT the factory arming. Identity is then UNPROVEN (no
+# 6B.2 rid-stash hook installed) — gap repro / probes only; the supported
+# path is Int4ProtectedLLM(enable_chunked_prefill=True). Defined here
+# (not int4_protected.py) so the backend + read path can consult it
+# without an import cycle; int4_protected.py reads the same env name.
+_ALLOW_CHUNKED_PREFILL_ENV = "INT4_PROTECTED_ALLOW_CHUNKED_PREFILL"
+
+
+def allow_chunked_prefill_override() -> bool:
+    raw = os.environ.get(_ALLOW_CHUNKED_PREFILL_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
 def is_pad_seq_id(sid: Any) -> bool:
     return isinstance(sid, int) and sid <= _PAD_SEQ_ID_BASE
 
@@ -567,6 +604,11 @@ def _maybe_dump_block(writer: Any, kv_cache: "Any", block_id: int) -> None:
     _prot_int8 = getattr(writer, "_prot_int8_active", False)
     st["events"].append({
         "event": len(st["events"]),
+        # 6K.18: chunked finalize ORDER legitimately differs from
+        # monolithic (a boundary block finalizes from staging after the
+        # next chunk's full blocks) — record the block id so the chunked
+        # byte-gate can align events by block instead of by index.
+        "block_id": b,
         "packed_k": kv_cache[0, b, :, :, :half_D].detach().cpu().clone(),
         "packed_v": kv_cache[1, b, :, :, :half_D].detach().cpu().clone(),
         "k_scale": writer.k_scale_ext[b].detach().cpu().clone(),
@@ -612,18 +654,23 @@ def resolve_decode_seq_ids(
         logger.warning(
             "int4_protected real-seq-id stash count %d > %d decode rows "
             "(unexpected batch shape).", len(real), n_rows)
-    if apc_active() and not _in_cuda_graph_capture():
+    if (apc_active() or chunked_active()) and not _in_cuda_graph_capture():
         # Contract C-ID: no silent block-local under APC — on LIVE steps.
+        # Phase 6K.18 extends the same refusal to chunked prefill (a
+        # chunked seq's trailing staged block must be found by decode
+        # reads under the SAME rid its chunks wrote with).
         # CUDA-graph CAPTURE is exempt: it runs DUMMY decode batches during
         # engine init (before the 6B.2 hook exists); capture-time identities
         # are throwaway placeholders that the hook re-resolves at every
         # replay, so block-local there is by-design and corrupts nothing.
         raise RuntimeError(
-            "int4_protected APC: real-seq-id stash unavailable for a LIVE "
+            "int4_protected %s: real-seq-id stash unavailable for a LIVE "
             "decode step (rows=%d, stash=%s) — identity is unprovable, "
             "refusing rather than risking SeqState corruption. The 6B.2 hook "
             "must be installed and stashing rids every step under prefix "
-            "caching." % (n_rows, "absent" if real is None else len(real)))
+            "caching / chunked prefill." % (
+                "APC" if apc_active() else "chunked prefill",
+                n_rows, "absent" if real is None else len(real)))
     bl = decode_seq_ids_from_meta(
         block_tables, seq_lens_tensor, BS, block_local=block_local)
     _prefix_dbg(f"decode-resolve rows={n_rows} -> {bl[:6]} "
@@ -1126,6 +1173,10 @@ class SeqState:
         "k_stage_count",      # int 0..BS
         "k_stage_block_id",   # int — block being filled
         "seq_pos",            # int — non-padding tokens written so far in this seq
+        "prefill_open",       # bool — Phase 6K.18: seq is mid-CHUNKED-prefill
+                              # (set by the backend on chunk writes, cleared on
+                              # the seq's first decode appearance). Consulted
+                              # ONLY by gc_completed_slots under chunked_active.
     )
 
     def __init__(self, writer: "PagedKVWriter", slot_idx: int) -> None:
@@ -1136,6 +1187,7 @@ class SeqState:
         self.k_stage_count = 0
         self.k_stage_block_id = -1
         self.seq_pos = 0
+        self.prefill_open = False
 
     # Tensor accessors — views into writer-level pools. Reading these
     # returns a tensor at a stable address (the pool slice never moves).
@@ -1177,6 +1229,7 @@ class SeqState:
         self.k_stage_count = 0
         self.k_stage_block_id = -1
         self.seq_pos = 0
+        self.prefill_open = False
 
 
 # ----------------------------------------------------------------------
@@ -1424,7 +1477,31 @@ class PagedKVWriter:
         # Contract B3: the active set is exactly the LIVE rids — pad
         # sentinels are inert and must not participate in GC decisions.
         active_seq_ids = [s for s in active_seq_ids if not is_pad_seq_id(s)]
+        # Phase 6K.18: a rid in a decode batch has begun decoding — its
+        # prefill is closed (clears the chunked GC exemption below).
+        for _sid in active_seq_ids:
+            _st = self._seq_states.get(_sid)
+            if _st is not None and _st.prefill_open:
+                _st.prefill_open = False
         leaked = _leaked_seq_ids(list(self._slot_map.keys()), active_seq_ids)
+        if leaked and chunked_active():
+            # Phase 6K.18: "decode batch == running set" — the premise this
+            # GC stands on — is FALSE under chunked prefill: a seq mid-
+            # chunked-prefill is RUNNING but has no decode row yet (and a
+            # budget-exhausted step can be pure-decode while it waits).
+            # Evicting it would destroy the staged K tail between chunks.
+            # The backend marks chunk writes prefill_open; exempt those.
+            # Known cost: a request ABORTED mid-chunked-prefill leaks its
+            # slot until the pool exhausts (loudly) — same leak class the
+            # 6K.13/6K.14 work bounded; acceptable for the gated opt-in.
+            _kept = [s for s in leaked
+                     if (self._seq_states.get(s) is not None
+                         and self._seq_states[s].prefill_open)]
+            if _kept:
+                _prefix_dbg(f"GC: exempting {len(_kept)} mid-chunked-prefill "
+                            f"seq(s) {_kept[:6]} (prefill_open)")
+                _kept_set = set(_kept)
+                leaked = [s for s in leaked if s not in _kept_set]
         if leaked:
             _act = sorted(active_seq_ids)[:6] if not isinstance(
                 active_seq_ids, (list, tuple)) else list(active_seq_ids)[:6]
@@ -1433,6 +1510,15 @@ class PagedKVWriter:
         for sid in leaked:
             self.evict_sequence(sid)
         return len(leaked)
+
+    def mark_prefill_open(self, seq_id: Any, open_: bool = True) -> None:
+        """Phase 6K.18: flag `seq_id` as mid-chunked-prefill (GC-exempt
+        under chunked_active; see gc_completed_slots) or clear the flag.
+        No-op for unknown seq_ids — the caller marks right after write(),
+        which guarantees the SeqState exists on the live path."""
+        st = self._seq_states.get(seq_id)
+        if st is not None:
+            st.prefill_open = bool(open_)
 
     # ------------------------------------------------------------------
     # Phase 6 v2 Option B pre-flight (B-pre-1): slot-tensor-based read

@@ -68,6 +68,20 @@ def _allow_prefix_caching_override() -> bool:
     return raw in ("1", "true", "True", "yes", "Yes")
 
 
+# Phase 6K.18 — chunked-prefill raw bypass (the 6K.17 escape hatch, kept
+# by D3 as a dev-only path). The SUPPORTED path is
+# Int4ProtectedLLM(enable_chunked_prefill=True), which arms the 6B.2
+# rid-stash hook + chunked_active; this env only lets the prefix-aware
+# branch run for non-factory construction (gap repro / probes) where
+# identity is UNPROVEN. Same env name as int4_protected's resolver.
+_ALLOW_CHUNKED_PREFILL_ENV = "INT4_PROTECTED_ALLOW_CHUNKED_PREFILL"
+
+
+def _allow_chunked_prefill_override() -> bool:
+    raw = os.environ.get(_ALLOW_CHUNKED_PREFILL_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
 # ----------------------------------------------------------------------
 # Decode-path profiler (Phase 6 v2 Option D step 3 prep).
 #
@@ -1186,10 +1200,17 @@ if _VLLM_FA_AVAILABLE:
                             ] += 1
                         else:
                             # Legacy partition + per-seq write (eager).
+                            # 6K.18: with_ctx labels each partition
+                            # (-1 decode row | 0 fresh prefill | >0
+                            # continuation) for the chunked rules below.
                             partitions = _derive_write_partitions(
                                 attn_metadata, slot_mapping_flat, BS,
-                                writer=writer,
+                                writer=writer, with_ctx=True,
                             )
+                            from kv_policy.phase5b_4c_paged_writer import (
+                                chunked_active as _chunked_w,
+                            )
+                            _chunked_on = _chunked_w()
                             # Phase 6K.9 fix: clear stale per-sequence writer
                             # state at the PREFILL boundary. seq_id is derived
                             # from the RECYCLED block table, so a new sequence
@@ -1206,10 +1227,15 @@ if _VLLM_FA_AVAILABLE:
                             # decode's sentinel-gated pool sync then fires off a
                             # clean -1 block-id). Gated to prefill-only forwards
                             # (no decode metadata) so a mid-flight decode
-                            # sequence is never reset; assumes non-chunked
-                            # prefill (chunked_prefill is off for this backend).
+                            # sequence is never reset. NON-CHUNKED ONLY: under
+                            # chunked_active a prefill partition can be chunk
+                            # 2+ of a LIVE sequence whose SeqState carries the
+                            # staged K tail — evicting it would zero rows
+                            # 0..tail-1 of the boundary block at finalize.
+                            # The 6K.18 per-segment rule below replaces this
+                            # block for chunked (ctx==0 segments only).
                             # A/B toggle: PHASE6K9_RESET_ON_PREFILL=0.
-                            if os.environ.get(
+                            if not _chunked_on and os.environ.get(
                                 "PHASE6K9_RESET_ON_PREFILL", "1"
                             ).strip().lower() not in ("0", "false", "no"):
                                 _dm = getattr(attn_metadata, "decode_metadata", None)
@@ -1222,9 +1248,22 @@ if _VLLM_FA_AVAILABLE:
                                     )
                                 )
                                 if _prefill_only:
-                                    for _sid, _sl in partitions:
+                                    for _sid, _sl, _ctx in partitions:
                                         writer.evict_sequence(_sid)
-                            for seq_id, sl in partitions:
+                            if _chunked_on:
+                                # Phase 6K.18 reset rule: a prefill segment
+                                # with ctx==0 is a FRESH prompt start (chunk
+                                # 1, or a recompute-preempted seq restarting
+                                # from token 0) — reset stale state, same
+                                # intent as 6K.9. ctx>0 segments are
+                                # CONTINUATIONS (chunk 2+ / APC hit): their
+                                # SeqState must survive. Applied per segment
+                                # in ANY step shape (mixed steps included,
+                                # which the 6K.9 prefill-only gate can't see).
+                                for _sid, _sl, _ctx in partitions:
+                                    if _ctx == 0:
+                                        writer.evict_sequence(_sid)
+                            for seq_id, sl, _ctx in partitions:
                                 writer.write(
                                     key=key[sl],
                                     value=value[sl],
@@ -1232,6 +1271,13 @@ if _VLLM_FA_AVAILABLE:
                                     slot_mapping=slot_mapping_flat[sl],
                                     seq_id=seq_id,
                                 )
+                                if _chunked_on:
+                                    # GC exemption marker (see
+                                    # gc_completed_slots): a prefill segment
+                                    # is (still) mid-prefill; a decode row
+                                    # means the seq has begun decoding.
+                                    writer.mark_prefill_open(
+                                        seq_id, open_=(_ctx >= 0))
                             Int4ProtectedAttentionImpl._call_stats[
                                 "write_legacy_loop_calls"
                             ] += 1
@@ -1289,23 +1335,34 @@ if _VLLM_FA_AVAILABLE:
                     # key_cache/value_cache with block_table=) would read
                     # nibbles as bf16 — it is REPLACED by the dequant-context
                     # path: cached blocks are dequantized (protect channels
-                    # exact) and passed explicitly. Allowed when the FACTORY
-                    # armed APC (apc_active(); installs the rid-stash hook +
-                    # eager coupling) or the legacy env override is set.
-                    # A raw LLM(enable_prefix_caching=True) bypassing the
-                    # factory is REFUSED: without the 6B.2 hook the rid stash
-                    # never exists and identity is unprovable (contract C-ID).
+                    # exact) and passed explicitly. Phase 6K.18: chunk 2+ of
+                    # a chunked prompt lands here too (prefill-with-context;
+                    # non-block-aligned ctx handled by the D1 tail splice).
+                    # Allowed when the FACTORY armed APC or chunked prefill
+                    # (each installs the rid-stash hook + eager coupling),
+                    # or a raw dev-bypass env is set (identity UNPROVEN —
+                    # gap repro / probes only). A raw LLM(...) with either
+                    # feature and no env is REFUSED: without the 6B.2 hook
+                    # the rid stash never exists and identity is unprovable
+                    # (contract C-ID).
                     from kv_policy.phase5b_4c_paged_writer import (
                         apc_active as _apc_armed,
+                        chunked_active as _chunked_armed,
                     )
-                    if not (_apc_armed() or _allow_prefix_caching_override()):
+                    if not (_apc_armed() or _chunked_armed()
+                            or _allow_prefix_caching_override()
+                            or _allow_chunked_prefill_override()):
                         raise RuntimeError(
                             "int4_protected: prefix-aware prefill reached "
                             "WITHOUT factory arming — construct via "
                             "Int4ProtectedLLM(enable_prefix_caching=True) "
-                            "(installs the required rid-stash hook + "
-                            "eager-only coupling). Raw LLM(...) with APC is "
-                            "unsupported. Contract: PHASE6K16_APC_CONTRACT.md"
+                            "for APC or Int4ProtectedLLM("
+                            "enable_chunked_prefill=True) for chunked "
+                            "prefill (each installs the required rid-stash "
+                            "hook + eager-only coupling). Raw LLM(...) with "
+                            "either feature is unsupported. Contracts: "
+                            "PHASE6K16_APC_CONTRACT.md (C-ID), "
+                            "PHASE6K18_CHUNKED_PREFILL_DESIGN.md (D2)."
                         )
                     writer = getattr(self, "_phase5b_paged_writer", None)
                     if writer is None:
@@ -1330,6 +1387,10 @@ if _VLLM_FA_AVAILABLE:
                         logits_soft_cap=logits_soft_cap,
                         out=prefill_output,
                         fa_version=self.vllm_flash_attn_version,
+                        # 6K.18: the FULL step metadata (not the prefill
+                        # slice) — carries the 6B.2 prefill rid stash the
+                        # tail splice resolves SeqStates with.
+                        attn_metadata=attn_metadata,
                     )
 
             # ---- Decode attention (5B.4c will replace inner kernel call) ----
@@ -1535,12 +1596,17 @@ def _is_pure_decode_write(attn_metadata: Any, T_total: int) -> bool:
 
 
 def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tensor", BS: int,
-                             writer: Any = None):
+                             writer: Any = None, with_ctx: bool = False):
     """Phase 5B.6 step 3 fix: partition a multi-token write call across
     sequences so each seq's SeqState (bf16 backing, K staging) receives
     its own data.
 
-    Returns: list of (seq_id, slice) tuples.
+    Returns: list of (seq_id, slice) tuples. With ``with_ctx=True``
+    (Phase 6K.18), list of (seq_id, slice, ctx) triples instead, where
+    ctx is -1 for a decode row, else the prefill segment's computed-
+    context length (0 = fresh prompt start; >0 = continuation — a
+    chunk 2+ segment or an APC cache hit). The chunked write loop keys
+    its reset/marking rules on ctx.
 
     Phase 6K.16b — sequence identity. TWO derivations, selected by
     ``block_local_seq_ids_enabled(writer)`` (backing-skip mode, the
@@ -1558,50 +1624,98 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
         The legacy invariant ("both collapse to block_table[0], stable
         for the sequence's lifetime") is FALSE under prefix caching —
         which is why APC requires backing-skip + block-local ids.
+
+    Phase 6K.18 — MIXED steps (decode rows + prefill-chunk segments in
+    ONE batch; only the V0 chunked-prefill scheduler builds this shape):
+    token order is [prefill tokens ..., decode tokens] — the V0
+    invariant the attention backend itself slices the query by — so
+    prefill segments partition [0, npt) and each decode row is a single-
+    token partition at npt + i. The legacy decode-first early-return
+    would have attributed the FIRST B_decode prefill tokens to the
+    decode seqs' ids (and never written the rest); it now fires only for
+    pure-decode shapes, which is the only shape it ever actually saw.
     """
     from kv_policy.phase5b_4c_paged_writer import (
         block_local_seq_ids_enabled,
         resolve_decode_seq_ids,
         prefill_seq_id_for_segment,
         stashed_real_seq_ids,
+        apc_active as _apc,
+        chunked_active as _chunked,
+        is_pad_seq_id as _is_pad,
+        _prefix_dbg,
     )
     block_local = writer is not None and block_local_seq_ids_enabled(writer)
 
     dec_meta = getattr(attn_metadata, "decode_metadata", None)
     pre_meta = getattr(attn_metadata, "prefill_metadata", None)
 
-    if (dec_meta is not None
-            and getattr(dec_meta, "block_tables", None) is not None
-            and dec_meta.block_tables.numel() > 0):
+    def _strip(parts):
+        return parts if with_ctx else [(sid, sl) for sid, sl, _c in parts]
+
+    # Prefill token count for this step (0 when there is no prefill).
+    qsl = getattr(pre_meta, "query_start_loc", None) \
+        if pre_meta is not None else None
+    n_prefill_tokens = 0
+    if qsl is not None and qsl.shape[0] >= 2:
+        n_prefill_tokens = int(qsl[-1].item())
+
+    has_decode_rows = (
+        dec_meta is not None
+        and getattr(dec_meta, "block_tables", None) is not None
+        and dec_meta.block_tables.numel() > 0)
+
+    def _decode_parts(offset: int, skip_pads: bool):
         # 6K.16c stable real-id stash (if present + count-matched), else
-        # 6K.16b block-local / legacy.
+        # 6K.16b block-local / legacy. In the MIXED branch pad-sentinel
+        # rows are skipped: their writes are no-ops by contract B2
+        # (slot_mapping=-1) and write()'s ensure_seq_state refuses
+        # sentinel ids. The pure-decode return keeps them (verbatim
+        # pre-6K.18 shape; mixed steps are eager-only so pads can't
+        # occur there anyway — the skip is defensive).
         ids = resolve_decode_seq_ids(
             attn_metadata, dec_meta.block_tables,
             getattr(dec_meta, "seq_lens_tensor", None),
             BS, block_local=block_local,
         )
-        return [(sid, slice(i, i + 1)) for i, sid in enumerate(ids)]
+        return [(sid, slice(offset + i, offset + i + 1), -1)
+                for i, sid in enumerate(ids)
+                if not (skip_pads and _is_pad(sid))]
 
-    if pre_meta is not None:
-        # Multi-seq prefill (rare in V0 default; happens with batched
-        # prefill / chunked prefill). Partition via query_start_loc.
-        qsl = getattr(pre_meta, "query_start_loc", None)
+    if has_decode_rows and n_prefill_tokens <= 0:
+        # Pure decode — the pre-6K.18 early-return, behavior unchanged.
+        return _strip(_decode_parts(0, skip_pads=False))
+
+    pre_parts = []
+    if pre_meta is not None and n_prefill_tokens > 0:
+        # Per-segment computed context (chunk 2+ / APC hit detection).
+        ctx_cpu = None
+        _clt = getattr(pre_meta, "context_lens_tensor", None)
+        if _clt is not None and _clt.numel() > 0:
+            ctx_cpu = _clt.cpu().long().tolist()
+
+        def _seg_ctx(i: int) -> int:
+            if ctx_cpu is None or i >= len(ctx_cpu):
+                return 0
+            return max(0, int(ctx_cpu[i]))
+
         if qsl is not None and qsl.shape[0] > 2:
+            # Multi-seq prefill (batched prefill / chunked prefill).
             qsl_cpu = qsl.cpu().tolist()
             n_seg = len(qsl_cpu) - 1
             # 6K.16c: real prefill seq ids (one per prompt segment),
             # count-checked; else per-segment block-local / legacy.
             real_pre = stashed_real_seq_ids(attn_metadata, n_seg, prefill=True)
-            from kv_policy.phase5b_4c_paged_writer import apc_active as _apc
-            if real_pre is None and _apc():
-                # Contract C-ID: under APC, identity without the rid stash
-                # is unprovable — refuse loudly, never block-local.
+            if real_pre is None and (_apc() or _chunked()):
+                # Contract C-ID (6K.18-extended): under APC or chunked
+                # prefill, identity without the rid stash is unprovable —
+                # refuse loudly, never block-local.
                 raise RuntimeError(
-                    f"int4_protected APC: real-seq-id stash unavailable for "
-                    f"a {n_seg}-segment prefill — refusing block-local "
-                    f"identity (PHASE6K16_APC_CONTRACT.md C-ID)."
+                    f"int4_protected {'APC' if _apc() else 'chunked prefill'}: "
+                    f"real-seq-id stash unavailable for a {n_seg}-segment "
+                    f"prefill — refusing block-local identity "
+                    f"(PHASE6K16_APC_CONTRACT.md C-ID, extended by 6K.18 D2)."
                 )
-            partitions = []
             for i in range(n_seg):
                 start, end = qsl_cpu[i], qsl_cpu[i + 1]
                 if end <= start:
@@ -1614,35 +1728,55 @@ def _derive_write_partitions(attn_metadata: Any, slot_mapping_flat: "torch.Tenso
                     if sid < 0:
                         # All padding for this seg; skip.
                         continue
-                partitions.append((sid, slice(start, end)))
-            if partitions:
-                return partitions
-        # Single-seq prefill.
-        from kv_policy.phase5b_4c_paged_writer import (
-            _prefix_dbg, apc_active as _apc_single,
-        )
-        n = int(slot_mapping_flat.shape[0])
-        real_pre = stashed_real_seq_ids(attn_metadata, 1, prefill=True)
-        if real_pre is not None:
-            _prefix_dbg(f"prefill-write single-seg -> {real_pre[0]} "
-                        f"(src=real_stash)")
-            return [(real_pre[0], slice(0, n))]
-        if _apc_single():
+                pre_parts.append((sid, slice(start, end), _seg_ctx(i)))
+        else:
+            # Single-seq prefill. In a MIXED step the prefill tokens are
+            # the FIRST n_prefill_tokens of the flat batch (never the
+            # whole batch).
+            n = n_prefill_tokens if has_decode_rows \
+                else int(slot_mapping_flat.shape[0])
+            real_pre = stashed_real_seq_ids(attn_metadata, 1, prefill=True)
+            if real_pre is not None:
+                _prefix_dbg(f"prefill-write single-seg -> {real_pre[0]} "
+                            f"(src=real_stash)")
+                pre_parts.append((real_pre[0], slice(0, n), _seg_ctx(0)))
+            elif _apc() or _chunked():
+                raise RuntimeError(
+                    f"int4_protected "
+                    f"{'APC' if _apc() else 'chunked prefill'}: real-seq-id "
+                    f"stash unavailable for a single-seq prefill — refusing "
+                    f"block-local identity (PHASE6K16_APC_CONTRACT.md C-ID, "
+                    f"extended by 6K.18 D2)."
+                )
+            else:
+                sid = prefill_seq_id_for_segment(
+                    slot_mapping_flat, 0, n, BS, block_local=block_local)
+                _prefix_dbg(f"prefill-write single-seg -> {sid} "
+                            f"(src={'block_local' if block_local else 'legacy'}, "
+                            f"prefill_stash=absent)")
+                if sid >= 0:
+                    pre_parts.append((sid, slice(0, n), _seg_ctx(0)))
+
+    if has_decode_rows and n_prefill_tokens > 0:
+        # Phase 6K.18 MIXED step. Refuse loudly on a shape we can't
+        # prove (decode rows must be exactly one token each here).
+        n_dec_tokens = int(slot_mapping_flat.shape[0]) - n_prefill_tokens
+        n_rows = int(dec_meta.block_tables.shape[0])
+        if n_dec_tokens != n_rows:
             raise RuntimeError(
-                "int4_protected APC: real-seq-id stash unavailable for a "
-                "single-seq prefill — refusing block-local identity "
-                "(PHASE6K16_APC_CONTRACT.md C-ID)."
+                f"int4_protected: mixed-step write with {n_dec_tokens} "
+                f"decode tokens != {n_rows} decode rows (multi-token "
+                f"decode in a mixed batch is unsupported) — refusing "
+                f"rather than mis-attributing writes (6K.18)."
             )
-        sid = prefill_seq_id_for_segment(
-            slot_mapping_flat, 0, n, BS, block_local=block_local)
-        _prefix_dbg(f"prefill-write single-seg -> {sid} "
-                    f"(src={'block_local' if block_local else 'legacy'}, "
-                    f"prefill_stash=absent)")
-        if sid >= 0:
-            return [(sid, slice(0, n))]
+        return _strip(pre_parts + _decode_parts(n_prefill_tokens,
+                                                skip_pads=True))
+
+    if pre_parts:
+        return _strip(pre_parts)
 
     # Fallback: no metadata, no valid slots. Use the default seq.
-    return [(0, slice(0, int(slot_mapping_flat.shape[0])))]
+    return _strip([(0, slice(0, int(slot_mapping_flat.shape[0])), 0)])
 
 
 def _seq_id_from_block_table_row(bt_row: "torch.Tensor") -> int:

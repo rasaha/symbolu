@@ -23,13 +23,21 @@ WHY THE STORAGE INVERTS EXACTLY (the design locks that make this small):
     (Gap 2 of the plan collapsed on inspection — see PLAN doc update).
 
 SAFETY RAILS (enforced here):
-  * ``ctx_len % BS == 0`` asserted per sequence (vLLM V0 guarantees it).
+  * ``ctx_len % BS == 0`` asserted per sequence UNLESS the caller is
+    chunked-armed (Phase 6K.18 ``allow_tail``): chunk 2+ of a chunked
+    prompt legally ends mid-block; the trailing ``ctx_len % BS`` K rows
+    are spliced EXACT (bf16) from that sequence's staging buffer
+    (``state.k_stage``) when still staged, or dequantized from the
+    finalized boundary block when this step's write completed it. A tail
+    block that is NEITHER staged NOR finalized = broken identity chain ->
+    loud refusal. See PHASE6K18_CHUNKED_PREFILL_DESIGN.md (D1/D2).
   * Legacy bf16-backing mode (``PHASE6C_BF16_BACKING_SKIP=0``) is REFUSED:
     its pool writes index by ``seq_pos`` (suffix-relative), which is wrong
     under APC. Default skip mode has no backing at all.
 
 STATUS: CPU-selftested against a replica of the writer's exact quant math
 (``--selftest``). GPU validation gates: ``Bench/scripts/phase6k16_prefix_gates.py``.
+Chunked-prefill pod gates (NOT yet run): PHASE6K18_CHUNKED_PREFILL_DESIGN.md.
 """
 from __future__ import annotations
 
@@ -99,27 +107,13 @@ def dequant_v_blocks(
     return v.view(n_blk, BS, H, D)
 
 
-def gather_context_kv(
-    kv_cache: "torch.Tensor",          # (2, NB, BS, H, D) uint8
-    writer: Any,                       # PagedKVWriter (this layer's)
-    block_table_row: "torch.Tensor",   # (max_blocks,) int — this seq's row
-    ctx_len: int,
-    out_dtype: "torch.dtype",
+def _dequant_full_blocks(
+    kv_cache: "torch.Tensor",
+    writer: Any,
+    blocks: "torch.Tensor",            # (n_blk,) long — FINALIZED block ids
 ) -> Tuple["torch.Tensor", "torch.Tensor"]:
-    """Dequantize one sequence's cached context. Returns K_ctx, V_ctx of
-    shape (ctx_len, H, D) in ``out_dtype``."""
-    BS = writer.BS
-    if ctx_len % BS != 0:
-        raise RuntimeError(
-            f"prefix context_len={ctx_len} is not a multiple of "
-            f"block_size={BS}; vLLM V0 APC shares only full blocks, so "
-            f"this indicates a metadata bug or an unsupported scheduler "
-            f"path (chunked prefill?)."
-        )
-    n_blk = ctx_len // BS
-    blocks = block_table_row[:n_blk].long()
+    """Dequantize finalized blocks. Returns K, V (n_blk, BS, H, D) f32."""
     half_D = writer.D // 2
-
     packed_k = kv_cache[0, blocks, :, :, :half_D]              # (n_blk, BS, H, D/2)
     packed_v = kv_cache[1, blocks, :, :, :half_D]
     # Phase 6N: under prot-int8 the protect sidecar holds uint8 codes —
@@ -142,9 +136,110 @@ def gather_context_kv(
         writer.v_xmin_ext[blocks],
         writer.v_group_size,
     )
+    return k, v
+
+
+def gather_context_kv(
+    kv_cache: "torch.Tensor",          # (2, NB, BS, H, D) uint8
+    writer: Any,                       # PagedKVWriter (this layer's)
+    block_table_row: "torch.Tensor",   # (max_blocks,) int — this seq's row
+    ctx_len: int,
+    out_dtype: "torch.dtype",
+    *,
+    state: Any = None,                 # this seq's SeqState (rid-resolved)
+    allow_tail: bool = False,          # Phase 6K.18: chunked-armed callers
+) -> Tuple["torch.Tensor", "torch.Tensor"]:
+    """Dequantize one sequence's cached context. Returns K_ctx, V_ctx of
+    shape (ctx_len, H, D) in ``out_dtype``.
+
+    Phase 6K.18 (chunked prefill, design D1): ``ctx_len % BS != 0`` is
+    legal iff ``allow_tail`` (the caller is chunked-armed) — the trailing
+    ``tail = ctx_len % BS`` rows are the part of the BOUNDARY block
+    written by prior chunks. The forward() order is write-then-attend, so
+    by attention time the current chunk's write has already run and the
+    boundary block is in exactly one of two sound states:
+
+      1. STILL STAGED — the current chunk did not complete it: its K rows
+         live ONLY in this seq's staging buffer (cache nibbles for the
+         block are not yet written). Splice ``state.k_stage[:tail]`` —
+         exact bf16, bit-equal to what monolithic attention would see.
+      2. FINALIZED — the current chunk completed it (staging moved on):
+         cache nibbles + scale/xmin are valid for the whole block.
+         Dequantize and slice ``[:tail]`` — quantized, the same bounded
+         S3 residual class as the full APC context blocks.
+
+    Neither staged NOR ever-finalized (k_scale still zero-init) means the
+    identity chain is broken (the tail rows were staged under a different
+    SeqState) — REFUSE loudly; reading the cache there would be silent
+    garbage. V and protect tail rows need no staging: both are written
+    per token (valid for partial blocks by construction).
+
+    Without ``allow_tail`` a non-aligned ctx_len keeps the 6K.16 refusal
+    VERBATIM: under pure APC it indicates a metadata bug, never a legal
+    shape.
+    """
+    BS = writer.BS
     H, D = writer.H, writer.D
-    return (k.view(n_blk * BS, H, D).to(out_dtype),
-            v.view(n_blk * BS, H, D).to(out_dtype))
+    tail = ctx_len % BS
+    if tail and not allow_tail:
+        raise RuntimeError(
+            f"prefix context_len={ctx_len} is not a multiple of "
+            f"block_size={BS}; vLLM V0 APC shares only full blocks, so "
+            f"this indicates a metadata bug or an unsupported scheduler "
+            f"path (chunked prefill?)."
+        )
+    n_blk = ctx_len // BS
+
+    k_parts: List["torch.Tensor"] = []
+    v_parts: List["torch.Tensor"] = []
+    if n_blk:
+        blocks = block_table_row[:n_blk].long()
+        k, v = _dequant_full_blocks(kv_cache, writer, blocks)
+        k_parts.append(k.view(n_blk * BS, H, D).to(out_dtype))
+        v_parts.append(v.view(n_blk * BS, H, D).to(out_dtype))
+
+    if tail:
+        tb = int(block_table_row[n_blk].item())
+        tb_t = torch.tensor([tb], dtype=torch.long,
+                            device=block_table_row.device)
+        # K tail: staged (exact) -> finalized (quantized) -> refuse.
+        staged = (
+            state is not None
+            and getattr(state, "k_stage_block_id", -1) == tb
+            and getattr(state, "k_stage_count", 0) >= tail
+        )
+        if staged:
+            k_parts.append(state.k_stage[:tail].to(out_dtype))
+        else:
+            if not bool((writer.k_scale_ext[tb_t].float() != 0).any()):
+                raise RuntimeError(
+                    f"int4_protected chunked prefill: boundary block {tb} "
+                    f"(ctx_len={ctx_len}, tail={tail}) was never finalized "
+                    f"AND is not in this sequence's staging buffer "
+                    f"(staged block="
+                    f"{getattr(state, 'k_stage_block_id', None)}, count="
+                    f"{getattr(state, 'k_stage_count', None)}) — the tail "
+                    f"rows were staged under a different SeqState, i.e. "
+                    f"the rid identity chain is broken. Refusing rather "
+                    f"than reading uninitialized cache (contract C-ID, "
+                    f"PHASE6K18_CHUNKED_PREFILL_DESIGN.md D1/D2)."
+                )
+            k_tail_blk, _ = _dequant_full_blocks(kv_cache, writer, tb_t)
+            k_parts.append(k_tail_blk[0, :tail].to(out_dtype))
+        # V tail: per-token quant — sidecars are valid for rows < tail
+        # regardless of K finalization; dequant the block, slice the tail.
+        half_D = D // 2
+        v_tail_blk = dequant_v_blocks(
+            kv_cache[1, tb_t, :, :, :half_D],
+            writer.v_scale_ext[tb_t],
+            writer.v_xmin_ext[tb_t],
+            writer.v_group_size,
+        )
+        v_parts.append(v_tail_blk[0, :tail].to(out_dtype))
+
+    if len(k_parts) == 1:
+        return k_parts[0], v_parts[0]
+    return torch.cat(k_parts, dim=0), torch.cat(v_parts, dim=0)
 
 
 def build_prefix_varlen_inputs(
@@ -209,6 +304,7 @@ def run_prefix_prefill(
     logits_soft_cap: Any,
     out: "torch.Tensor",
     fa_version: Any,
+    attn_metadata: Any = None,
 ) -> None:
     """Orchestrate the dequant-context varlen prefill for one layer.
 
@@ -216,6 +312,14 @@ def run_prefix_prefill(
     block_table=...)`` call: K/V context is dequantized to ``query.dtype``
     and passed EXPLICITLY (no block_table), with the same bottom-right-
     aligned causal semantics the stock prefix path relies on.
+
+    Phase 6K.18: ``attn_metadata`` (the FULL step metadata, not the
+    prefill slice) carries the 6B.2 prefill rid stash. It is consulted
+    ONLY when a segment's ctx_len is non-block-aligned (a chunk-2+
+    boundary) — the staged K tail lives in that seq's SeqState, so per-
+    seq identity is REQUIRED there (contract C-ID, extended by 6K.18 D2:
+    refuse loudly without the stash). Block-aligned batches (pure APC)
+    never touch the stash here — zero behavior change.
     """
     check_writer_apc_compatible(writer)
     if not writer._allocated:
@@ -232,13 +336,50 @@ def run_prefix_prefill(
     _debug = _os.environ.get("INT4_PROTECTED_PREFIX_DEBUG", "").strip() in (
         "1", "true", "yes")
 
+    # ---- Phase 6K.18 (D1/D2): resolve per-seq SeqStates for tail splices.
+    pw = _writer_module()
+    tail_idx = [i for i, c in enumerate(ctx_list)
+                if c > 0 and int(c) % writer.BS != 0]
+    states: List[Any] = [None] * len(ctx_list)
+    allow_tail = False
+    if tail_idx:
+        allow_tail = pw.chunked_active() or pw.allow_chunked_prefill_override()
+        # If not chunked-armed, leave allow_tail False: gather_context_kv
+        # raises the original 6K.16 alignment rail (a non-aligned ctx
+        # under pure APC is a metadata bug, not a legal shape).
+        if allow_tail:
+            rids = pw.stashed_real_seq_ids(
+                attn_metadata, len(ctx_list), prefill=True)
+            if rids is None:
+                raise RuntimeError(
+                    "int4_protected chunked prefill: real-seq-id stash "
+                    "unavailable for a %d-segment prefill-with-context "
+                    "with non-block-aligned ctx (segments %s) — the staged "
+                    "K tail can only be located via stable per-seq "
+                    "identity. Construct via Int4ProtectedLLM("
+                    "enable_chunked_prefill=True), which installs the 6B.2 "
+                    "rid-stash hook (contract C-ID, "
+                    "PHASE6K16_APC_CONTRACT.md §3, extended by 6K.18 D2)."
+                    % (len(ctx_list), tail_idx[:8]))
+            for i in tail_idx:
+                st = writer._seq_states.get(rids[i])
+                if st is None:
+                    raise RuntimeError(
+                        "int4_protected chunked prefill: no SeqState for "
+                        "rid=%r (segment %d, ctx_len=%d) — chunk 1's write "
+                        "must have created it under this rid; the identity "
+                        "chain is broken (contract C-ID / 6K.18 D2)."
+                        % (rids[i], i, int(ctx_list[i])))
+                states[i] = st
+
     ctx_kv: List[Tuple[Optional["torch.Tensor"], Optional["torch.Tensor"]]] = []
     for i, c in enumerate(ctx_list):
         if c <= 0:
             ctx_kv.append((None, None))
         else:
             ctx_kv.append(gather_context_kv(
-                kv_cache, writer, bt[i], int(c), query.dtype))
+                kv_cache, writer, bt[i], int(c), query.dtype,
+                state=states[i], allow_tail=allow_tail))
             if _debug:
                 # Triage prints (first hit seq is usually enough; cheap and
                 # env-gated). Scales ~1e-8 ==> ctx blocks were NEVER
@@ -537,6 +678,136 @@ def selftest() -> int:
         check("raw uint8 codes refused", False)
     except RuntimeError:
         check("raw uint8 codes refused", True)
+
+    # 6) Phase 6K.18 (D1) — chunked tail splice. Context = 2 full blocks
+    #    + a 12-row tail on a boundary block, the three tail states:
+    #    staged (exact bf16), finalized (quantized), neither (refused).
+    class _FakeState:
+        def __init__(self, BS, H, D):
+            self.k_stage = torch.zeros((BS, H, D), dtype=torch.bfloat16)
+            self.k_stage_block_id = -1
+            self.k_stage_count = 0
+
+    TAIL, TB = 12, 4                       # boundary block id 4 (unused above)
+    bt_tail = torch.tensor([2, 5, TB, 0, 0, 0, 0, 0], dtype=torch.int32)
+    ctx_t = 2 * BS + TAIL
+    k_tail_true = torch.randn(BS, H, D, dtype=torch.bfloat16) * 3
+    v_tail_true = torch.randn(BS, H, D, dtype=torch.bfloat16)
+    # V/protect tail rows are per-token: sidecars valid for rows < TAIL
+    # even though K is not finalized. (The replica's V quant is per-token
+    # per-group, so writing the full block's V is the same math.)
+    pv_t, vs_t, vx_t = _ref_quant_v_block(v_tail_true, G)
+    kv_cache[1, TB, :, :, :D // 2] = pv_t
+    w.v_scale_ext[TB] = vs_t.to(torch.bfloat16)
+    w.v_xmin_ext[TB] = vx_t.to(torch.bfloat16)
+
+    # 6a) STAGED leg: boundary block lives only in this seq's staging.
+    st = _FakeState(BS, H, D)
+    st.k_stage[:TAIL] = k_tail_true[:TAIL]
+    st.k_stage_block_id = TB
+    st.k_stage_count = TAIL
+    k_c, v_c = gather_context_kv(kv_cache, w, bt_tail, ctx_t,
+                                 torch.bfloat16, state=st, allow_tail=True)
+    check("tail: shapes (2*BS+tail)", k_c.shape == (ctx_t, H, D)
+          and v_c.shape == (ctx_t, H, D))
+    check("tail: staged K rows EXACT (bf16 bit-equal)",
+          bool((k_c[2 * BS:] == k_tail_true[:TAIL]).all()))
+    check("tail: full blocks unchanged by tail path",
+          bool((k_c[:2 * BS] == k_dq[:2 * BS]).all()))
+    v_err_t = (v_c[2 * BS:].float() - v_tail_true[:TAIL].float()).abs() \
+        .view(TAIL, H, D // G, G)
+    v_tol_t = vs_t[:TAIL].unsqueeze(-1) * 0.5 \
+        + 0.05 * v_tail_true[:TAIL].float().abs().view(TAIL, H, D // G, G) \
+        + 1e-2
+    check("tail: V rows within per-token quant tolerance",
+          bool((v_err_t <= v_tol_t).all()))
+
+    # 6b) pure-tail context (ctx_len < BS — a tiny chunk budget).
+    st_small = _FakeState(BS, H, D)
+    st_small.k_stage[:7] = k_tail_true[:7]
+    st_small.k_stage_block_id = TB
+    st_small.k_stage_count = 7
+    k_c7, v_c7 = gather_context_kv(
+        kv_cache, w, torch.tensor([TB, 0, 0, 0], dtype=torch.int32), 7,
+        torch.bfloat16, state=st_small, allow_tail=True)
+    check("tail: pure-tail ctx (< BS) exact",
+          k_c7.shape == (7, H, D)
+          and bool((k_c7 == k_tail_true[:7]).all()))
+
+    # 6c) FINALIZED leg: this step's write completed the boundary block —
+    #     staging moved on (count reset / other block); cache is valid.
+    pk_t, ks_t, kx_t, kp_t = _ref_quant_k_block(
+        k_tail_true, w.protected_d_per_head)
+    kv_cache[0, TB, :, :, :D // 2] = pk_t
+    w.k_scale_ext[TB] = ks_t.to(torch.bfloat16)
+    w.k_xmin_ext[TB] = kx_t.to(torch.bfloat16)
+    w.k_protect_ext[TB] = kp_t
+    st_done = _FakeState(BS, H, D)
+    st_done.k_stage_block_id = TB
+    st_done.k_stage_count = 0            # finalize resets the count
+    k_cf, _ = gather_context_kv(kv_cache, w, bt_tail, ctx_t,
+                                torch.bfloat16, state=st_done,
+                                allow_tail=True)
+    expect_tail = dequant_k_blocks(
+        kv_cache[0, TB:TB + 1, :, :, :D // 2],
+        w.k_scale_ext[TB:TB + 1], w.k_xmin_ext[TB:TB + 1],
+        w.k_protect_ext[TB:TB + 1], w.protected_d_per_head,
+    )[0, :TAIL].to(torch.bfloat16)
+    check("tail: finalized-block leg == block dequant (bit-exact)",
+          bool((k_cf[2 * BS:] == expect_tail).all()))
+    tol_t = (0.5 * ks_t + 1e-3).unsqueeze(0) \
+        + 0.01 * k_tail_true[:TAIL].float().abs() + 1e-2
+    err_t = (k_cf[2 * BS:].float() - k_tail_true[:TAIL].float()).abs()
+    check("tail: finalized leg within quant tolerance of true",
+          bool((err_t <= tol_t).all()))
+    # state=None (e.g. APC+chunked seq whose stage moved on) also lands
+    # on the finalized leg — same result.
+    k_cn, _ = gather_context_kv(kv_cache, w, bt_tail, ctx_t,
+                                torch.bfloat16, state=None, allow_tail=True)
+    check("tail: finalized leg with state=None identical",
+          bool((k_cn[2 * BS:] == expect_tail).all()))
+
+    # 6d) NEITHER staged nor finalized -> loud refusal (broken identity).
+    NEVER = 7                              # block never written/finalized
+    bt_never = torch.tensor([2, 5, NEVER, 0], dtype=torch.int32)
+    try:
+        gather_context_kv(kv_cache, w, bt_never, ctx_t, torch.bfloat16,
+                          state=None, allow_tail=True)
+        check("tail: unfinalized+unstaged refused", False)
+    except RuntimeError as e:
+        check("tail: unfinalized+unstaged refused",
+              "never finalized" in str(e))
+
+    # 6e) default callers (allow_tail omitted) keep the 6K.16 rail even
+    #     with a staged state present.
+    try:
+        gather_context_kv(kv_cache, w, bt_tail, ctx_t, torch.bfloat16,
+                          state=st)
+        check("tail: refused without allow_tail (APC rail verbatim)", False)
+    except RuntimeError:
+        check("tail: refused without allow_tail (APC rail verbatim)", True)
+
+    # 6f) prot-int8 (6N) interaction: finalized boundary block under
+    #     uint8 protect codes — the tail dequant routes through
+    #     _protect_view_bf16 like full blocks (no raw codes leak).
+    pk8, ks8, kx8, kp8 = _ref_quant_k_block(
+        k_tail_true, w8.protected_d_per_head)
+    kv_cache[0, TB, :, :, :D // 2] = pk8
+    w8.k_scale_ext[TB] = ks8.to(torch.bfloat16)
+    w8.k_xmin_ext[TB] = kx8.to(torch.bfloat16)
+    w8.k_protect_ext[TB] = w8._protect_store(kp8)
+    kv_cache[1, TB, :, :, :D // 2] = pv_t
+    w8.v_scale_ext[TB] = vs_t.to(torch.bfloat16)
+    w8.v_xmin_ext[TB] = vx_t.to(torch.bfloat16)
+    k_c8, _ = gather_context_kv(kv_cache, w8, bt_tail, ctx_t,
+                                torch.bfloat16, state=None, allow_tail=True)
+    codes_t = w8.k_protect_ext[TB:TB + 1]
+    expect_p8 = w8._protect_view_bf16(codes_t)[0, :TAIL]
+    got_p8 = torch.gather(
+        k_c8[2 * BS:].view(TAIL, H, D), -1,
+        w8.protected_d_per_head.view(1, H, n_p).expand(TAIL, -1, -1))
+    check("tail: prot-int8 protect == dequant(stored codes) bit-exact",
+          bool((got_p8 == expect_p8).all()))
 
     print(f"\n{'ALL PASS' if not fails else f'{len(fails)} FAIL: ' + ', '.join(fails)}")
     return 0 if not fails else 1

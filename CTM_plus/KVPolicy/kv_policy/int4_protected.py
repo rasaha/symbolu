@@ -252,16 +252,17 @@ def _resolve_prefix_caching(requested: Optional[bool]) -> bool:
     return True
 
 
-# Phase 6K.17 — chunked-prefill guard (factory side). vLLM 0.7.3 V0
-# AUTO-ENABLES chunked prefill when max_model_len > 32768 (late default in
-# config.py). Chunk 2+ of a chunked prompt is scheduled as prefill WITH
-# computed context (non-empty prefill block_tables) and lands on the same
-# prefix-aware-prefill branch as APC — which the backend refuses unless
-# factory-armed, and whose math is validated ONLY for APC-shaped,
-# block-aligned shared prefixes. Hit live (A100-80G, mml=36096: the
-# auto-default flipped a 32K-context bench into chunked prefill -> backend
-# refusal mid-warmup). The factory must pin the value EXPLICITLY — leaving
-# it None means "auto" to vLLM, not "off".
+# Phase 6K.17 guard -> Phase 6K.18 supported opt-in (chunked prefill).
+# vLLM 0.7.3 V0 AUTO-ENABLES chunked prefill when max_model_len > 32768
+# (late default in config.py), so the factory must pin the value
+# EXPLICITLY — leaving it None means "auto" to vLLM, not "off". Chunk 2+
+# of a chunked prompt is scheduled as prefill WITH computed context and
+# lands on the prefix-aware read branch; 6K.18 (D1) taught that branch
+# the non-block-aligned boundary: full blocks via the existing dequant,
+# the trailing ctx_len % 32 K rows spliced from that sequence's staging
+# buffer (exact bf16) or the finalized boundary block. Identity across
+# chunks is the 6K.16c rid stash — armed by THIS factory (D2), which is
+# why explicit True is supported only through here.
 _ALLOW_CHUNKED_ENV = "INT4_PROTECTED_ALLOW_CHUNKED_PREFILL"
 
 
@@ -273,33 +274,38 @@ def _allow_chunked_override() -> bool:
 def _resolve_chunked_prefill(requested) -> bool:
     """Resolve the effective ``enable_chunked_prefill`` for int4_protected.
 
+    Phase 6K.18 (D3): explicit True is a SUPPORTED configuration — the
+    factory arms the same identity machinery as APC (6B.2 rid-stash hook
+    + chunked_active flag + eager-only coupling) and the prefix-aware
+    read path handles chunk boundaries via the staged-K-tail splice.
+
     Priority order:
       1. None / False (caller didn't opt in): False — EXPLICIT, because
          vLLM treats None as "auto" and auto-enables at mml > 32768.
-      2. True: REFUSED (RuntimeError) unless INT4_PROTECTED_ALLOW_CHUNKED_
-         PREFILL is set, in which case honored with a loud warning (chunk
-         2+ then runs the prefix-prefill read path on non-APC metadata —
-         unvalidated math).
+         The DEFAULT is unchanged: existing deploys see no new behavior.
+      2. True: honored. INT4_PROTECTED_ALLOW_CHUNKED_PREFILL is no
+         longer required here; it remains the raw dev bypass for
+         non-factory construction (backend-side check), where identity
+         is UNPROVEN.
+
+    GATE STATUS: machinery built + CPU-gated (selftest §6, unit tests).
+    Pod gates G1-G6 of PHASE6K18_CHUNKED_PREFILL_DESIGN.md NOT yet run —
+    the construction-time warning below stays until they are green.
     """
     if not requested:
         return False
-    if _allow_chunked_override():
-        logger.warning(
-            "int4_protected: enable_chunked_prefill=True allowed by %s=1 — "
-            "chunk 2+ of every long prompt runs the prefix-prefill path on "
-            "NON-APC metadata, which is unvalidated. Dev only.",
-            _ALLOW_CHUNKED_ENV,
-        )
-        return True
-    raise RuntimeError(
-        "int4_protected does not support chunked prefill: chunk 2+ of a "
-        "chunked prompt is a prefill-with-context and lands on the "
-        "prefix-aware read path, validated only for factory-armed APC "
-        "(block-aligned shared prefixes). Note vLLM V0 AUTO-enables "
-        "chunked prefill at max_model_len > 32768 — the factory pins it "
-        "off; pass enable_chunked_prefill=False/nothing, or set "
-        + _ALLOW_CHUNKED_ENV + "=1 to bypass (dev only)."
+    # 6K.18 BUILT (eager-only opt-in, default unchanged). The warning is
+    # deliberate friction: it is downgraded to info ONLY when the pod
+    # gates (S1-chunked byte-gate, greedy A/B, needle-at-util-0.85,
+    # mixed-batch TTFT, APC+chunked, prot-int8 cell) are green.
+    logger.warning(
+        "int4_protected: chunked prefill ENABLED (eager-only opt-in; "
+        "identity armed via the 6B.2 rid-stash hook). POD GATES PENDING "
+        "(PHASE6K18_CHUNKED_PREFILL_DESIGN.md G1-G6) — machinery is "
+        "CPU-gated only; do not deploy this configuration on quality-"
+        "critical traffic until the design-doc status says gates GREEN."
     )
+    return True
 
 
 def Int4ProtectedLLM(
@@ -349,6 +355,14 @@ def Int4ProtectedLLM(
             INT4_PROTECTED_ALLOW_PREFIX_CACHING=1 (the prefix-prefill
             branch would read the packed cache as bf16). Plan:
             PHASE6K16_PREFIX_CACHING_PLAN.md.
+        enable_chunked_prefill (via **kwargs): Phase 6K.18 — DEFAULT
+            pinned False (vLLM V0 would auto-enable at max_model_len >
+            32768; existing deploys are unaffected). Explicit True is a
+            supported eager-only opt-in: the factory arms the 6B.2
+            rid-stash hook + the chunked_active contract (chunk 2+
+            context rebuild splices the staged K tail; identity refusals
+            mirror APC's C-ID). POD GATES PENDING — see
+            PHASE6K18_CHUNKED_PREFILL_DESIGN.md status before deploying.
         **kwargs: anything else accepted by `vllm.LLM`.
 
     Raises:
@@ -428,14 +442,41 @@ def Int4ProtectedLLM(
     elif _requested_apc is not None:
         kwargs["enable_prefix_caching"] = _requested_apc
 
-    # Phase 6K.17 — chunked-prefill guard, same gating shape as 6K.15/16.
-    # Needed even when the caller passes NOTHING: vLLM V0 auto-enables
-    # chunked prefill at max_model_len > 32768, and the backend refuses
-    # chunk 2+ mid-prefill (prefix-aware branch). Pin explicitly.
+    # Phase 6K.17 pin -> 6K.18 supported opt-in, same gating shape as
+    # 6K.15/16. The pin is needed even when the caller passes NOTHING:
+    # vLLM V0 auto-enables chunked prefill at max_model_len > 32768; the
+    # factory keeps the DEFAULT explicitly False (opt-in only).
     _requested_chunked = kwargs.pop("enable_chunked_prefill", None)
+    _chunked_resolved = False
     if kv_cache_dtype == "int4_protected":
-        kwargs["enable_chunked_prefill"] = _resolve_chunked_prefill(
-            _requested_chunked)
+        _chunked_resolved = _resolve_chunked_prefill(_requested_chunked)
+        kwargs["enable_chunked_prefill"] = _chunked_resolved
+        # Phase 6K.18 (D2/D4): chunked prefill is EAGER-COUPLED exactly
+        # like APC — the prefix-aware prefill path is eager-only and the
+        # graphs interaction is ungated (the APC graphs+replay defect is
+        # an attention-kernel issue at B>1; chunked decode-after-prefill
+        # has the same staged-tail shape). Refuse an EXPLICIT graphs
+        # request; force eager otherwise. Dev override:
+        # INT4_PROTECTED_CHUNKED_ALLOW_GRAPHS=1.
+        if _chunked_resolved:
+            _allow_graphs_ck = os.environ.get(
+                "INT4_PROTECTED_CHUNKED_ALLOW_GRAPHS", "").strip() in (
+                "1", "true", "yes")
+            if not effective_enforce_eager and not _allow_graphs_ck:
+                if enforce_eager is False:
+                    raise RuntimeError(
+                        "int4_protected chunked prefill is EAGER-ONLY "
+                        "(coupled like APC: the prefix-aware prefill path "
+                        "is eager and graphs+chunked is ungated). Pass "
+                        "enforce_eager=True (or omit enforce_eager), or "
+                        "set INT4_PROTECTED_CHUNKED_ALLOW_GRAPHS=1 for "
+                        "development."
+                    )
+                logger.warning(
+                    "int4_protected: chunked prefill enabled -> forcing "
+                    "enforce_eager=True (eager-only coupling, as APC)."
+                )
+                effective_enforce_eager = True
     elif _requested_chunked is not None:
         kwargs["enable_chunked_prefill"] = _requested_chunked
 
@@ -477,15 +518,18 @@ def Int4ProtectedLLM(
     # Eager normally doesn't need it (write_decode_batched syncs inline) ->
     # skip. EXCEPTION (Phase 6K.16c): with prefix caching ON, the hook is
     # what stashes the stable real seq ids the eager write/read paths use,
-    # so it must be installed in eager mode too.
+    # so it must be installed in eager mode too. Phase 6K.18: same for
+    # chunked prefill — the rid stash is the ONLY identity chunk 2+ may
+    # use (contract C-ID extended), so the hook is mandatory there too.
     # Best-effort: never fail the factory on a hook-install error. A/B
     # toggle: PHASE6K10_AUTO_HOOK=0.
     _auto_hook = os.environ.get(
         "PHASE6K10_AUTO_HOOK", "1"
     ).strip().lower() not in ("0", "false", "no")
     _apc_on = bool(kwargs.get("enable_prefix_caching"))
+    _chunked_on = bool(kwargs.get("enable_chunked_prefill"))
     if (kv_cache_dtype == "int4_protected"
-            and (not effective_enforce_eager or _apc_on)
+            and (not effective_enforce_eager or _apc_on or _chunked_on)
             and _auto_hook):
         try:
             from kv_policy.phase6b2_precapture_hook import (
@@ -526,6 +570,17 @@ def Int4ProtectedLLM(
         set_apc_active(True)
         logger.info("Int4ProtectedLLM: APC contract refusal armed "
                     "(post-init; capture warm-ups exempt by construction).")
+
+    # Phase 6K.18 — same arming shape for chunked prefill: from here on,
+    # a live step without the rid stash raises (contract C-ID extended by
+    # D2), the write path applies the chunked reset rule (ctx==0 segments
+    # only), and mid-chunked-prefill SeqStates are GC-exempt.
+    if _chunked_resolved:
+        from kv_policy.phase5b_4c_paged_writer import set_chunked_active
+        set_chunked_active(True)
+        logger.info("Int4ProtectedLLM: chunked-prefill contract refusal "
+                    "armed (post-init; capture warm-ups exempt by "
+                    "construction).")
 
     return llm
 
