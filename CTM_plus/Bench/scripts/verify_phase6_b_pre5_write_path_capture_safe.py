@@ -257,18 +257,26 @@ def check_runtime() -> tuple[bool, dict]:
     # We assert that ALL writer-frame host syncs are accounted for by
     # the exempt pattern.
     B = 2
+    # Phase 6C made backing-skip the DEFAULT: the bf16-backing overflow
+    # guard (B `.item()`s per step) is inside `if not _bf16_backing_
+    # skipped:` and never fires in skip mode. The expectation tracks the
+    # mode the workload writer actually allocated in, so the verifier
+    # stays meaningful in both (set PHASE6C_BF16_BACKING_SKIP=0 for the
+    # legacy-pool count).
+    overflow_guard_items = 0 if getattr(w, "_bf16_backing_skipped", True) else B
     expected_per_step = {
         # .cpu(): 1 pre-capture + 3 post-capture (slot_idx + 3 pool dumps)
         "cpu":    1 + 3,
         # .tolist(): same 1 + 3
         "tolist": 1 + 3,
-        # .item(): B from overflow guard + B from the Phase 6B.2
-        # sentinel-gate inside _sync_pool_counters_from_states (checks
+        # .item(): B from the overflow guard (legacy backing mode only)
+        # + B from the Phase 6B.2 sentinel-gate inside
+        # _sync_pool_counters_from_states (checks
         # `_k_stage_block_id_pool[slot]` per slot to decide whether
         # the prefill->decode transition sync should fire). Both are
         # PRE-CAPTURE host syncs; the AST verifier's CAPTURED-REGION
         # span sees zero forbidden calls.
-        "item":   2 * B,
+        "item":   overflow_guard_items + B,
     }
     n_steps = 4
     expected_total = {k: v * n_steps for k, v in expected_per_step.items()}
