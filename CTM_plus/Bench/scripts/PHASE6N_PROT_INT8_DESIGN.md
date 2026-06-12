@@ -63,4 +63,17 @@ problem the streaming K/V quantizers solve). Two variants:
 5. Sidecar measurement (savings probe) confirms ~-1 GiB; density line moves
    1.75x -> ~1.78x in the demo report.
 
+## Probe verdict (in progress, 2026-06-12)
+
+First static run (SYMMETRIC absmax/127 scales): noprot 0.0611 /
+cur_bf16 95.0% / prot_int8(dynamic) 95.3% / prot_int8_static 96.3% —
+static retains ~74% of protect's mean-error benefit vs dynamic's ~94%
+(score-noise delta ~2% of total; SNR ~30 -> ~29.4). Outside the 0.5pp
+auto-lock threshold -> added the ASYMMETRIC static policy (min/max per
+channel, ~10 KB constants, still zero streaming changes; one-sided
+channels recover up to 2x resolution). Final variant call after the
+prot_int8_static_asym run. If asym-static ~= dynamic -> Variant A with
+asymmetric static scales; else judgment call between A (simplicity,
+~74-85% of an 11%-share benefit) and B (fidelity, streaming machinery).
+
 Effort: Variant A ~1-2 days dev + ~1 day gates. Variant B ~3-4 days dev.
