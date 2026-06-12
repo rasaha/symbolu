@@ -55,7 +55,7 @@ problem the streaming K/V quantizers solve). Two variants:
 
 ## Gate checklist (build session, pod)
 
-1. probe `prot_int8_static` policy ~= dynamic int8 (pre-build decision).
+1. ~~probe static ~= dynamic~~ DONE (verdict above: asym-static, 95.9%).
 2. Selftests + guard tests still green.
 3. Needle 16K/32K (savings probe) + 6-prompt greedy bit-exactness vs the
    bf16-protect build (expect: same identical-count, overlap within noise).
@@ -63,17 +63,33 @@ problem the streaming K/V quantizers solve). Two variants:
 5. Sidecar measurement (savings probe) confirms ~-1 GiB; density line moves
    1.75x -> ~1.78x in the demo report.
 
-## Probe verdict (in progress, 2026-06-12)
+## Probe verdict — FINAL (2026-06-12, three runs, 26,629 tokens x 32 layers)
 
-First static run (SYMMETRIC absmax/127 scales): noprot 0.0611 /
-cur_bf16 95.0% / prot_int8(dynamic) 95.3% / prot_int8_static 96.3% —
-static retains ~74% of protect's mean-error benefit vs dynamic's ~94%
-(score-noise delta ~2% of total; SNR ~30 -> ~29.4). Outside the 0.5pp
-auto-lock threshold -> added the ASYMMETRIC static policy (min/max per
-channel, ~10 KB constants, still zero streaming changes; one-sided
-channels recover up to 2x resolution). Final variant call after the
-prot_int8_static_asym run. If asym-static ~= dynamic -> Variant A with
-asymmetric static scales; else judgment call between A (simplicity,
-~74-85% of an 11%-share benefit) and B (fidelity, streaming machinery).
+| policy | mean|err| | % of no-protect | protect benefit retained |
+|---|---|---|---|
+| noprot | 0.06110 | 100.0% | — |
+| cur_bf16 (deployed) | 0.05804 | 95.0% | 100% |
+| prot_int8 dynamic (per-block) | 0.05822 | 95.3% | 94% |
+| prot_int8 static SYM (absmax/127) | 0.05885 | 96.3% | 74% |
+| **prot_int8 static ASYM (min/max)** | **0.05858** | **95.9%** | **82%** |
 
-Effort: Variant A ~1-2 days dev + ~1 day gates. Variant B ~3-4 days dev.
+**DECISION: Variant A with ASYMMETRIC static scales.** The honest
+arithmetic behind choosing simplicity over the last fraction:
+
+- The asym-static vs dynamic gap is 12% of protect's benefit = 12% x the
+  11.2% score-noise share ≈ **1.3% of total score noise** (SNR ~30 ->
+  ~29.8). No end-to-end gate we run resolves that.
+- Variant B is STRICTLY WORSE on memory, not just effort: per-block
+  scale/offset sidecars cost ~160 B/block on top of the int8 values
+  (1440 vs A's ~1280 B/block + 10 KB constants) — B buys 12% more of an
+  11% effect while saving less memory and adding streaming-finalize
+  code to the validated write hot path.
+- Same-corpus caveat: real calibration adds a range margin (~1.1x each
+  side); expect asym-static to land ~96.0-96.1% in deployment. Same
+  argument holds. The build-time gate checklist (needle / greedy /
+  byte-gate / hard-needle) is the final arbiter.
+
+Calibration emits per protected channel: x_min, x_max (fp16, widened by
+the margin factor) alongside the mask -> artifact version bump.
+
+Effort: Variant A ~1-2 days dev + ~1 day gates. (Variant B retired.)

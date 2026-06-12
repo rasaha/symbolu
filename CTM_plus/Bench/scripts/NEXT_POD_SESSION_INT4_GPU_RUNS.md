@@ -301,3 +301,11 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   (~5 min) — if static ~= dynamic int8, Variant A (no streaming changes,
   1-2 days + gates) proceeds; build belongs in a pod session, flag
   INT4_PROTECTED_PROT_INT8 default OFF until gated.
+- PHASE 6N VARIANT LOCKED (3rd probe run): asym-static int8 protect =
+  95.9% of no-protect (82% of protect benefit retained) vs dynamic 95.3%
+  (94%) vs deployed bf16 95.0%. Variant A (asymmetric static min/max
+  scales, ~10 KB constants, zero streaming changes) WINS — the residual
+  gap is ~1.3% of total score noise (below gate resolution), and Variant
+  B is strictly worse on memory (per-block scale sidecars) while adding
+  hot-path code. Design doc finalized: PHASE6N_PROT_INT8_DESIGN.md.
+  Build = 1-2 days + gates in a pod session; flag default OFF.
