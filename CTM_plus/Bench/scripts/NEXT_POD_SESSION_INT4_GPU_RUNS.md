@@ -155,6 +155,19 @@ Docs updated post-gates: PHASE6N_PROT_INT8_DESIGN.md (status GATED +
 checklist results), deploy/INT4_PROTECTED_DESIGN.md §6 (density row +
 customer statement carry 1.78x-with-flag). Reproduction commands below.
 
+SCHEDULING-PARAMS SWEEP MEASURED 2026-06-12 (decision: polish, not a
+lever — do not re-litigate without new evidence): int4 backend, eager,
+util 0.60, mml 4096, 32x ~500-tok prompts gen=64 + B=1 gen=128 control.
+B=1 decode FLAT across max_num_seqs 4/16/64 (12.85/13.05/12.50 tok/s,
++/-2% = noise: the scheduler cannot move the kernel-bound path). Agg
+throughput 40.7 -> 113.2 -> 165.7 tok/s, scaling efficiency FALLING
+(2.8x for 4x seqs, then ~73% of the remaining 2x) — saturating toward
+the kernel ceiling (= 6F territory). max_num_batched_tokens < mml is
+REFUSED by vLLM V0 without chunked prefill (verified verbatim) — the
+one TTFT-shaping scheduler knob is locked behind 6K.18. Cross-check:
+B=1 ~12.5-13 vs bf16 ~35 tok/s same pod/short ctx = 0.36x, inside the
+disclosed 0.13-0.67x range.
+
 ```bash
 # 0) preamble as above ($M, PROTECT_MASK_PATH, import check).
 
