@@ -66,6 +66,18 @@ ceiling ~0.27-0.30x unchanged until built.
 | 44000 |    62.72 |    11.96 (0.19x) |  14.39 (0.23x) |  83.3 | 1.00/1.00/1.00 |
 | 52000 |    60.13 |    10.85 (0.18x) |  13.71 (0.23x) |  85.6 | 1.00/1.00/1.00 |
 | 60000 |    57.74 |     9.65 (0.17x) |  13.10 (0.23x) |  87.7 | 1.00/1.00/1.00 |
+| 80000 |    53.40 |     7.51 (0.14x) |  11.45 (0.21x) |  90.6 | 1.00/1.00/1.00 |
+| 100000 |   49.26 |     6.28 (0.13x) |  10.34 (0.21x) |  93.3 | 1.00/1.00/1.00 |
+
+EXTENDED 2026-06-12 to 80K/100K (seeds 1,2,3 x depths 0.1/0.5, repeats 2):
+**QUALITY CEILING RAISED 60K -> 100K** — needle 1.00 for bf16/int4/rs at
+both lengths, including retention at **93.3% skip** (retained ~6,280 of
+~93,675: the bounded-set mechanism measured end-to-end; relative win
+grows +8%@32K -> +65%@100K). Still NO bf16 crossover; quant-alone floor
+slides 0.17 -> **0.13x @100K** -> cost range re-widened to 0.13-0.67x in
+brief/DESIGN/demo/QUICKSTART (second self-correction). rs holds ~0.21x
+flat at 80-100K. The 100K-document (prefill/SSD-tier) claims are now
+GATED, not extrapolated.
 
 (B=1, gen=128, eager; bf16 cells at util 0.85, AB cells at 0.55 — B=1
 decode tok/s is pool-independent.) NO bf16 crossover up to 60K: rs flat

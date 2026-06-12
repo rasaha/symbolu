@@ -36,8 +36,8 @@
 >   from ≤32K on 8-KV-head models (+8%→+36% across 32→60K at 77–88% skip,
 >   June 2026; +25%→+72% at the ~95%-skip config — keep-set dependent),
 >   quality 1.0/1.0 throughout. Absolute disclosure (bf16-ref, same harness):
->   even with read-skip, decode is **~0.23× bf16, flat across 32–60K** — it
->   does NOT cross bf16 at these lengths. Realized value today is **density + flat decode-scaling that
+>   even with read-skip, decode is **~0.21–0.24× bf16, flat across 32–100K**
+>   — it does NOT cross bf16 at these lengths (quality 1.0/1.0 to 100K). Realized value today is **density + flat decode-scaling that
 >   compounds on int4** — store ~2× the context per GB (1.83× net of the sidecar tax) and hold per-token decode
 >   ~flat as context grows, not a sub-32K speed win. Software-capturable, not a
 >   hardware mandate.
@@ -332,7 +332,7 @@ A100, reproduced on independent hardware):**
 | gen=512 | 576.3 | 184.4 | 0.32× | 0.16× (~6.3× slower) | 1.83× |
 | gen=512, deep saturation (locked 6L) | 597.3 | 130.4 | **0.22×** | 0.11× (~9× slower) | 1.83× |
 
-**The throughput tax ranges 0.17×–0.54× depending on workload** (floor 0.17×: B=1 eager 60K-ctx Llama, June 2026). The widely-quoted
+**The throughput tax ranges 0.13×–0.54× depending on workload** (floor 0.13×: B=1 eager 100K-ctx Llama, June 2026). The widely-quoted
 "0.22× / ~9× slower" is the **worst case** (deep saturation + long generation), NOT
 the typical case. **Density is invariant at ~1.81–1.83× across the entire curve** —
 the compression win does not depend on the operating point.
@@ -536,7 +536,7 @@ recompile, not a methodology change.
 | Sidecar diet (fp8 sidecars, option C) | ~3 days kernel work | Reduces sidecar overhead by ~1.7 GB (partial toward HBM parity) |
 | Pre-calibrated mask zoo | 1 day | Ship 10-20 popular models pre-calibrated; remove user-side calibration step |
 | Cold-tier (per-session safetensors snapshot/restore) | 4-6 weeks | Optional 3-tier KV storage (hot GPU / warm CPU swap / cold disk). Warm-tier foundation verified bit-clean (TIER5A measured GREEN — see Page 6). |
-| **Read-skip vs bf16 long-context crossover — ANSWERED (June 2026): NO** | done | Measured on 128K-native Llama-3.1-8B, no YaRN (B=1, gen=128, eager, 32–60K): int4+read-skip = **0.23–0.24× bf16, flat** (16.1→13.1 tok/s vs bf16 66.2→57.7); quant-alone slopes 0.23→0.17×; read-skip claws back +8%→+36% at skip 77→88%, quality 1.00/1.00/1.00 in every cell. **No bf16 crossover ≤60K** — the parity thesis is unsupported at these lengths; the headline stays density + quality + APC, with read-skip as the long-context decode-tax mitigator (vs full-int4), not a bf16-beater. `phase10_crossover_sweep.py`, /tmp/x10. |
+| **Read-skip vs bf16 long-context crossover — ANSWERED (June 2026): NO** | done | Measured on 128K-native Llama-3.1-8B, no YaRN (B=1, gen=128, eager, 32–100K): int4+read-skip = **0.21–0.24× bf16, flat** (16.1→10.3 tok/s vs bf16 66.2→49.3); quant-alone slopes 0.23→0.13×; read-skip claws back +8%→+65% at skip 77→93%, quality 1.00/1.00/1.00 in every cell **including 100K at 93.3% skip**. **No bf16 crossover ≤100K** — the parity thesis is unsupported at these lengths; the headline stays density + quality + APC, with read-skip as the long-context decode-tax mitigator (vs full-int4), not a bf16-beater. `phase10_crossover_sweep.py`, /tmp/x10. |
 
 **Tier 3 — research extensions**
 
@@ -629,7 +629,7 @@ every cell × mml.
 
 | Item | Status |
 |---|---|
-| **Decode throughput negative — WORKLOAD-DEPENDENT, range 0.17×–0.54×** | Real cost, but a curve not a number (Phase 6M.6, reproduced on fresh A100): **0.54× at short gen (gen=128), 0.32× at gen=512, 0.22× worst-case (deep sat + long gen)**; **0.17× measured at B=1 eager 60K ctx on Llama (June 2026)** — density invariant ~1.83× throughout. The "0.22× / 9× slower" is the worst case; short-output workloads pay only ~2×. Attribution (6M.4): GPU-work-bound (paged gather ~25% + attention ~21%, host syncs <1%) → recoverable headroom **bounded ~0.27–0.30×, not parity**; the closing lever (read-path fusion, 6F) now has a **measured GO at B=1** (gather-headroom profile, June 2026: fuseable 60% of the read path @8K ctx / 42% @32K; the gather is GPU-time-bound, cpu/gpu 0.2–0.7×, so CUDA fusion — not Python vectorization — is the fix). Realized < headroom; ceiling unchanged ~0.27–0.30×; still **lower priority than deploying at short generation.** |
+| **Decode throughput negative — WORKLOAD-DEPENDENT, range 0.13×–0.54×** | Real cost, but a curve not a number (Phase 6M.6, reproduced on fresh A100): **0.54× at short gen (gen=128), 0.32× at gen=512, 0.22× worst-case (deep sat + long gen)**; **quant-alone declines with context at B=1 eager: 0.23×@32K → 0.17×@60K → 0.13×@100K (Llama, June 2026); read-skip holds ~0.21× at 80–100K** — density invariant ~1.83× throughout. The "0.22× / 9× slower" is the worst case; short-output workloads pay only ~2×. Attribution (6M.4): GPU-work-bound (paged gather ~25% + attention ~21%, host syncs <1%) → recoverable headroom **bounded ~0.27–0.30×, not parity**; the closing lever (read-path fusion, 6F) now has a **measured GO at B=1** (gather-headroom profile, June 2026: fuseable 60% of the read path @8K ctx / 42% @32K; the gather is GPU-time-bound, cpu/gpu 0.2–0.7×, so CUDA fusion — not Python vectorization — is the fix). Realized < headroom; ceiling unchanged ~0.27–0.30×; still **lower priority than deploying at short generation.** |
 | **~+4.4 GB total HBM vs bf16 (4.38 GB sidecars)** | Structural (sidecar overhead); diet options can reduce by ~2.5 GB but cannot reach HBM parity without option D or a different KV layout |
 | **Capacity now DEMONSTRATED (Phase 6L) — residual: single-mml** | Was a block-budget estimate; Phase 6L confirmed it under sustained `--resident-pressure` load at mml=8K B=128 (1.83× seq/GB net, 2.02× raw live). Residual: only mml=8K tested; 16K/32K robustness pending |
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
@@ -650,7 +650,7 @@ every cell × mml.
 | Sidecar diet option C (~1.7 GB savings) + option F preserves token-agreement gain | Medium — no quality re-bench yet after diet |
 | Methodology extends to Phi (D=96) | Medium — calibration math is architecture-agnostic; kernel constraint is the only barrier |
 | Methodology extends to mixture-of-experts (Mixtral, DeepSeek) | Untested — MoE adds routing complexity orthogonal to attention |
-| **Read-skip decode throughput-positive at long context — GRADUATED: projected → MEASURED** | ✅ **MEASURED** (`Llama-3.1-8B-Instruct`, 128K-native, int4 read-skip, no rope hacking): retention vs full-int4 decode = **+25.0 % @32K, +46.4 % @44K, +58.8 % @52K, +72.2 % @60K**, needle **1.0/1.0** at every ctx (monotonic — grows with length). `off` slopes down (linear KV read), retention stays flat (bounded ~1.9K retained, ~95 % skip) → gap **grows** with length. **Replicated on a second standard-rope model:** Mistral-7B-v0.3 crosses **+25.6 % @30K** (8 KV heads) — within noise of Llama's +25.0 %, confirming the crossover tracks **KV-head count**, not a single model. Crossover lands **≤32K on KV-heavy GQA** (8-KV-head Llama/Mistral); ~42K on 4-KV-head Qwen. **Caveat 1 (int4-KV quality):** int4-KV long-context *quality* is **model-dependent** — held 1.0/1.0 on Llama & Mistral (standard rope) out to 30–60K, broke on Qwen2.5-7B-1M (extreme `rope_theta`: passes at 8K, `off` itself collapses to 0.667/0.0 by 32K). **Caveat 2 (retention quality):** the read-skip *retention policy* is also model-dependent at a fixed keep-set — Llama held needle 1.0/1.0, but Mistral dropped depth-0.5 to **0.667** (1 of 3 mid-context needles lost); the keep-set must be validated/widened per model. The **throughput** win reproduces cleanly; the **quality** of skipping does not, automatically. **Caveat 3 (absolute scale — June 2026 bf16-ref, same harness):** the relative win does NOT cross bf16 — int4+read-skip is **~0.23× bf16, flat across 32–60K** (B=1, gen=128, eager), and the relative delta is keep-set-dependent (+8→+36% at 77–88% skip in that run). Read-skip mitigates the long-context decode tax; it does not buy bf16 parity. |
+| **Read-skip decode throughput-positive at long context — GRADUATED: projected → MEASURED** | ✅ **MEASURED** (`Llama-3.1-8B-Instruct`, 128K-native, int4 read-skip, no rope hacking): retention vs full-int4 decode = **+25.0 % @32K, +46.4 % @44K, +58.8 % @52K, +72.2 % @60K**, needle **1.0/1.0** at every ctx (monotonic — grows with length). `off` slopes down (linear KV read), retention stays flat (bounded ~1.9K retained, ~95 % skip) → gap **grows** with length. **Replicated on a second standard-rope model:** Mistral-7B-v0.3 crosses **+25.6 % @30K** (8 KV heads) — within noise of Llama's +25.0 %, confirming the crossover tracks **KV-head count**, not a single model. Crossover lands **≤32K on KV-heavy GQA** (8-KV-head Llama/Mistral); ~42K on 4-KV-head Qwen. **Caveat 1 (int4-KV quality):** int4-KV long-context *quality* is **model-dependent** — held 1.0/1.0 on Llama & Mistral (standard rope) out to 30–60K — and on Llama now measured to **100K** (June 2026, incl. retention at 93.3% skip), broke on Qwen2.5-7B-1M (extreme `rope_theta`: passes at 8K, `off` itself collapses to 0.667/0.0 by 32K). **Caveat 2 (retention quality):** the read-skip *retention policy* is also model-dependent at a fixed keep-set — Llama held needle 1.0/1.0, but Mistral dropped depth-0.5 to **0.667** (1 of 3 mid-context needles lost); the keep-set must be validated/widened per model. The **throughput** win reproduces cleanly; the **quality** of skipping does not, automatically. **Caveat 3 (absolute scale — June 2026 bf16-ref, same harness):** the relative win does NOT cross bf16 — int4+read-skip is **~0.21–0.24× bf16, flat across 32–100K** (B=1, gen=128, eager), and the relative delta grows with length (+8%@32K → +65%@100K at 77→93% skip). Read-skip mitigates the long-context decode tax; it does not buy bf16 parity. |
 | **Read-skip general fidelity under skip** — token-agreement beyond needle, + the observe-refresh quality/speed knob | Untested — needle 1.0/1.0 validated at 94% skip, but broader generation fidelity and the refresh-cadence trade-off on *shifting*-attention workloads (the static needle is favorable) are not yet benched |
 
 ---
@@ -756,7 +756,7 @@ capacity cost — in a movement-bound world the sidecars are *extra bytes to mov
 scattered* (poorer coalescing than the contiguous int4 read), so the net transport
 reduction is the **~1.8×** density figure, not 4×. The same tax, on a new axis. And on
 the single-GPU decode path the int4 quant remains throughput-negative today
-(**0.17–0.67× bf16**) — the per-position byte saving is real but unrealized as
+(**0.13–0.67× bf16**) — the per-position byte saving is real but unrealized as
 wall-clock until read-path kernel fusion.
 
 **Net positioning:** the move to data movement *promotes* read-skip (measured, on the
@@ -816,7 +816,7 @@ constraint and the KV fits, bf16. They complement, not compete.**
 | Long context (16K+) | **KVPro** | 2× context per GPU at near-bf16 quality (needle 1.0 to 60K) |
 | Agentic, many turns | **KVPro** | sessions grow; APC cuts re-prefill **−53→−86% per hit** |
 | RAG over shared documents | **KVPro** | document prefix cached once (APC): **1.19–1.85×** batch throughput at 94% hit rate |
-| Latency-critical single-stream long-gen | bf16 | KVPro's disclosed worst regime (0.17× at 60K, B=1) |
+| Latency-critical single-stream long-gen | bf16 | KVPro's disclosed worst regime (0.13× at 100K, B=1) |
 
 **What about an 8-bit middle tier?** Gated on this stack (June 2026,
 `bench_8bit_kv_gate.py`): vLLM has **no int8 KV** (fp8 only, verified from
