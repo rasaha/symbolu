@@ -105,10 +105,16 @@ print("=" * 78)
 
 # DENSITY
 bs_slots, i4_slots = bf.get("total_token_slots"), i4.get("total_token_slots")
+net = None
 if isinstance(bs_slots, (int, float)) and isinstance(i4_slots, (int, float)) and bs_slots:
     ratio = i4_slots / bs_slots
     print(f"DENSITY :  bf16 {bs_slots:,} token-slots  ->  int4 {i4_slots:,}  =  "
-          f"{ratio:.2f}x  more concurrent/longer-context users per GPU  [the $ win]")
+          f"{ratio:.2f}x  raw pool density  [the $ win]")
+    sc, bud = i4.get("sidecar_bytes"), i4.get("vllm_budget_bytes")
+    if isinstance(sc, (int, float)) and isinstance(bud, (int, float)) and bud > 0:
+        net = ratio * (1.0 - min(1.0, sc / bud))
+        print(f"           sidecars {sc / 2**30:.1f} GiB held OUTSIDE the pool (measured) "
+              f"->  ~{net:.2f}x net at equal total VRAM")
 else:
     print("DENSITY :  n/a (capacity probe did not complete)")
 
@@ -137,7 +143,9 @@ print("           recoverable ceiling ~0.27-0.30x, NOT parity. Best for throughp
 print("           insensitive density-bound + shared-prefix/short-output workloads.")
 print("-" * 78)
 if isinstance(i4_slots, (int, float)) and isinstance(bs_slots, (int, float)) and bs_slots:
-    print(f"NET     :  ~{i4_slots/bs_slots:.1f}x the users/context per GPU at near-bf16 quality,")
+    eff = net if isinstance(net, (int, float)) else i4_slots / bs_slots
+    tag = "net of sidecars" if isinstance(net, (int, float)) else "raw pool"
+    print(f"NET     :  ~{eff:.1f}x the users/context per GPU ({tag}) at near-bf16 quality,")
 else:
     print("NET     :  density NOT measured this run (probe incomplete) — prior-measured")
     print("           reference is ~2x (1.83x net of sidecars); re-run the density step,")

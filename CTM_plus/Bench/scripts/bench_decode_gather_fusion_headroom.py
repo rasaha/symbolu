@@ -203,8 +203,15 @@ def main(argv=None):
 
     mml = args.max_model_len or (args.context_tokens + 4096)
     print(f"Loading {args.model} (max_model_len={mml}) ...", flush=True)
+    # EAGER is required, not a preference: under CUDA-graph replay the python
+    # read path (where the profiler regions live) executes only at capture
+    # time, so a graphs run records ~nothing per decode step. Eager also
+    # avoids capture-time staging/workspace on top of the out-of-pool
+    # sidecars (OOM at gpu_util 0.85 on A100-80G otherwise).
     llm = Int4ProtectedLLM(model=args.model, max_model_len=mml,
-                           gpu_memory_utilization=args.gpu_util)
+                           gpu_memory_utilization=args.gpu_util,
+                           enforce_eager=True,
+                           max_num_seqs=max(2, args.batch))
     tok = llm.get_tokenizer()
     model = _find_inner_model(llm)
     prompt = _build_filler(tok, args.context_tokens) + "\n\nWrite a brief summary:"

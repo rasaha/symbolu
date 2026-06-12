@@ -101,3 +101,18 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   all present in `phase5b_backend_install.py`; `reset_sequence("all")` supported.
 - Demo hardened: `python`->`python3` fallback; the no-data NET line now says
   "density NOT measured this run" instead of quoting ~2x as if live.
+- GPU memory accounting gotcha (hit live 2026-06-12, A100-80G, util 0.85):
+  the int4 sidecars (~16-20% of pool bytes) AND the per-slot staging that
+  CUDA-graph capture inflates to max_num_seqs (V0 default 256 -> ~6 GiB)
+  live OUTSIDE gpu_memory_utilization -> engine init OOMs at high util.
+  Fixes shipped: savings probe runs EAGER with max_num_seqs=16 (B=1 probe;
+  pool size/density unaffected) and now MEASURES the sidecar bytes -> the
+  report prints raw pool ratio AND net-of-sidecars at equal total VRAM;
+  apc_payoff_sweep caps max_num_seqs at the batch size (noapc cell keeps
+  graphs, as shipped). First live numbers: bf16 399,792 slots vs int4
+  24,987x32 = 799,584 -> 2.00x raw pool (vLLM's own log: max concurrency
+  12.20x vs 24.40x).
+- bench_decode_gather_fusion_headroom now forces enforce_eager=True — under
+  graph replay the python read path (where the profiler regions live) never
+  executes per step, so a graphs run would record nothing. The headroom it
+  measures is the EAGER read path (the path the fusion would fix).
