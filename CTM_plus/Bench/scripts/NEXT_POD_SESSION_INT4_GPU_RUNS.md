@@ -243,3 +243,12 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   (c) fp8-e4m3 = max-density option (2.00x, no sidecars) at 0.33x with
   lite-grade quality; KVPro keeps hard-gated quality + APC-measured.
   Escalation if ever needed: run 6k12 hard-needle on fp8_e4m3.
+- probe_block_quant_error.py added (dynamic-protect decision data): stock
+  bf16 engine + per-layer hooks capture post-RoPE K/V/q on a mixed corpus;
+  replays the EXACT validated quantizer (int4_per_channel_kv, group=32,
+  asym, bits=4) under policies {noprot, cur_bf16-protect, protect@int8,
+  fresh-mask 1-8% sweep, sensitivity-mask@4%}; per-block max-err CDF ->
+  %blocks tagged + int8-fallback GiB/100K-session at each threshold;
+  score-space SNR per layer (|q.dk| vs std(q.K), GQA-mapped). Artifacts:
+  summary.json + blocks.npz + channels.npz — sized so NO re-runs are
+  needed for later threshold/mask questions. Selftest needs torch (pod).
