@@ -15,7 +15,24 @@
   graphs) — the speedup is NET of the eager tax.
 - Full report + artifacts: /tmp/savings_demo on the pod.
 
-Tasks 2-4 below still to run; docs update (task 5) after 2+3.
+## TASK 3 (main sweep) ✅ MEASURED 2026-06-12 (N=16, groups=1, hit 94%, gen=32, util 0.60)
+
+| prefix | TTFT miss | TTFT hit | saved | tput off | tput apc | speedup | quality |
+|-------:|----------:|---------:|------:|---------:|---------:|--------:|---------|
+|   1000 |  142.2 ms |  66.4 ms |  53%  |      109 |      130 |  1.19x  | 1.00/1.00 |
+|   2000 |  215.2 ms |  94.5 ms |  56%  |       76 |       98 |  1.29x  | 1.00/1.00 |
+|   4000 |  362.8 ms |  81.3 ms |  78%  |       48 |       78 |  1.64x  | 1.00/1.00 |
+|   8000 |  704.5 ms |  98.3 ms |  86%  |       28 |       52 |  1.85x  | 1.00/1.00 |
+
+Headline: APC saves up to **86% of TTFT per cache hit** (prefix=8000) and
+**1.85x throughput** at 94% hit rate, quality clean (1.00 == no-APC) — net
+of the eager tax (APC cell eager, no-APC cell graphs, as shipped).
+Mechanism signature visible in the data: miss-TTFT linear in prefix,
+hit-TTFT ~flat (~66-98 ms). 78%@4000 replicates the quick run's 79% at a
+different gpu_util -> util change measurement-neutral, as claimed.
+
+Still to run: task 3 mixed (groups=4), task 2 headroom verdicts, task 4
+(optional); docs update (task 5) after 2+3.
 
 
 Status: every script below is **CPU-validated only** (selftests ALL PASS, dry-runs
