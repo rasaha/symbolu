@@ -825,6 +825,43 @@ an SSD simulator — modeled, load-dependent — consistent with the GPU-measure
   churn exceeds QLC's ~1k-P/E budget (≈ *months* of life at ~10 DWPD, modeled) — so the flash
   tier is for **warm/reused** KV, not per-request hot churn.
 
+### How int4_protected shifts the HBM↔NAND balance
+
+> *Strategic framing. The per-token transfer reduction and "warm-NAND viability" are projections
+> built on two **measured** anchors — 1.8× density; read-skip ~95%-fewer positions at 32K
+> (GPU-measured) — plus **modeled** storage economics (P0–P1).*
+
+The hierarchy's roles don't change — **HBM stays the active-compute tier; NAND stays the
+cold/warm capacity tier.** What int4_protected (+ read-skip) changes is the **cost of keeping KV
+far from compute**, which moves the boundary between them:
+
+- **1.8× fewer bytes** (logical density, measured) **× read-skip fetching only the retained
+  positions** (~95% fewer at 32K, GPU-measured) ⇒ per-token HBM↔NAND transfer shrinks **~20–35×**
+  (modeled). Lower bring-back cost ⇒ KV can profitably live *further* from compute.
+
+Three balance shifts follow:
+1. **HBM spills later** — denser resident KV + a lighter feed keep more concurrency/context in HBM
+   before any offload (work pushed *up* the stack).
+2. **The crossover becomes worth paying for** — at bf16 the HBM↔NAND round-trip is too expensive
+   to tier warm KV; at ~20–35× less transfer it pays off, turning NAND from "archive you avoid
+   touching" into a **usable warm tier**.
+3. **NAND widens from cold → warm/reused** — shared prefixes, multi-turn sessions, and persisted
+   long context become economical to park on flash and stream back on demand.
+
+Mapped to NAND's roles: **scalability** (~2× parked context/sessions per GB), **long-context
+persistence** (smaller payload + restore only the attended positions), **edge** (context that
+won't fit in bf16 HBM fits in int4_protected, or persists on local flash and streams slices).
+
+**It moves boundaries, not tiers (guardrails):** NAND stays warm/cold — int4_protected does
+nothing for NAND array-read latency (`t_R` ~50–100 µs vs HBM ns); attention still needs the
+active KV in HBM. The density is medium-agnostic (it aids HBM *identically* — not a NAND-specific
+boost). QLC endurance keeps the flash tier to **warm/reused**, not per-request churn. read-skip
+selection is approximate (quality-equivalent on tested workloads, not bit-exact).
+
+**One line:** *int4_protected + read-skip don't add or speed up a tier — they lower the cost of
+distance from compute, so the hot/warm line moves: HBM holds more before spilling, and the spill
+target becomes a viable warm, reusable NAND tier instead of cold archive — at quality parity.*
+
 ### Target customer profile
 
 The shippable product fits any of:
