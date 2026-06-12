@@ -269,11 +269,13 @@ if [[ -n "${FA_VENDORED}" && -d "${FA_VENDORED}" && ! -d "${BACKUP_DIR}" ]]; the
     cp -r "${FA_VENDORED}" "${BACKUP_DIR}"
 fi
 
-# Build the wheel (--no-deps: do NOT let pip touch torch/other deps).
+# Build the wheel (--no-deps: do NOT let pip touch torch/other deps; -v so the
+# cmake/nvcc lines STREAM into the log — default pip buffers them until the
+# build ends, which makes tail -f useless mid-build).
 FA_BUILD_LOG="${LOG_DIR}/fa_wheel_build_$(date +%Y%m%d_%H%M%S).log"
-echo "      full build log: ${FA_BUILD_LOG}"
+echo "      full build log: ${FA_BUILD_LOG}   (tail -f it for live nvcc progress)"
 if ! (cd "${VLLM_FA_DIR}" && rm -rf dist && \
-        pip wheel --no-build-isolation --no-deps -w dist . >"${FA_BUILD_LOG}" 2>&1); then
+        pip wheel -v --no-build-isolation --no-deps -w dist . >"${FA_BUILD_LOG}" 2>&1); then
     echo "FAIL: vllm-flash-attn wheel build failed. Last 40 log lines:"
     tail -40 "${FA_BUILD_LOG}"
     if grep -qiE "(internal compiler error: )?Killed( signal)?" "${FA_BUILD_LOG}" \
