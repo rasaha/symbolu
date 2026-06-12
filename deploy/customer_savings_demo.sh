@@ -9,7 +9,7 @@
 #   DENSITY  — token-slots per GPU, int4_protected vs bf16 (same budget)  [the $ win]
 #   QUALITY  — needle retrieval == bf16                                   [no quality cost]
 #   APC      — TTFT saved per cache hit + throughput on shared prefixes   [prefill saving]
-#   COST     — decode throughput ~0.22-0.67x bf16                         [disclosed]
+#   COST     — decode throughput ~0.13-0.67x bf16                         [disclosed]
 #
 # Prereqs (see deploy/INT4_PROTECTED_DESIGN.md §8): a deployed pod, venv-vllm
 # active, the kernel built, and PROTECT_MASK_PATH exported.
@@ -55,7 +55,10 @@ warn() { echo "  [warn] $*"; }
 
 # ---- preconditions ----
 say "Preconditions"
-[[ -n "${VIRTUAL_ENV:-}" ]] && ok "venv: ${VIRTUAL_ENV}" || warn "no venv active — run 'source /workspace/venv-vllm/bin/activate'"
+# No venv is FINE on pods where the pinned stack lives in system python —
+# what matters is that THIS interpreter sees the kernel ([ok] line below).
+[[ -n "${VIRTUAL_ENV:-}" ]] && ok "venv: ${VIRTUAL_ENV}" \
+    || ok "no venv — using ${PY} ($("${PY}" -V 2>&1))"
 [[ -n "${PROTECT_MASK_PATH:-}" && -f "${PROTECT_MASK_PATH}" ]] && ok "mask: ${PROTECT_MASK_PATH}" \
     || warn "PROTECT_MASK_PATH unset/missing — int4 cells will fail (calibrate first; see DESIGN §8)"
 "${PY}" -c "from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache" 2>/dev/null \
@@ -80,8 +83,12 @@ fi
 if [[ "${SKIP_APC}" == "0" ]]; then
     say "2/3  APC PREFILL SAVING — TTFT + throughput, APC on vs off, swept by prefix length"
     if [[ "${QUICK}" == "1" ]]; then PREFIXES="2000,4000"; NREQ=8; AGEN=16; else PREFIXES="1000,2000,4000,8000"; NREQ=16; AGEN=32; fi
+    # NB: deliberately NOT forwarding --gpu-util: the sweep's own default
+    # (0.60) applies. High util is for the DENSITY showcase; for the APC
+    # cells it just inflates the pool -> inflates out-of-pool sidecars ->
+    # knife-edge OOM on the graphs cell. TTFT/speedup are pool-independent.
     "${PY}" "${BENCH}/apc_payoff_sweep.py" --model "${MODEL}" --prefixes "${PREFIXES}" \
-        --num-requests "${NREQ}" --num-groups 1 --gen "${AGEN}" --gpu-util "${GPU_UTIL}" \
+        --num-requests "${NREQ}" --num-groups 1 --gen "${AGEN}" \
         --out-dir "${OUT_DIR}/apc" || warn "apc payoff sweep failed"
 else
     say "2/3  APC — SKIPPED (--skip-apc)"
@@ -105,10 +112,16 @@ print("=" * 78)
 
 # DENSITY
 bs_slots, i4_slots = bf.get("total_token_slots"), i4.get("total_token_slots")
+net = None
 if isinstance(bs_slots, (int, float)) and isinstance(i4_slots, (int, float)) and bs_slots:
     ratio = i4_slots / bs_slots
     print(f"DENSITY :  bf16 {bs_slots:,} token-slots  ->  int4 {i4_slots:,}  =  "
-          f"{ratio:.2f}x  more concurrent/longer-context users per GPU  [the $ win]")
+          f"{ratio:.2f}x  raw pool density  [the $ win]")
+    sc, bud = i4.get("sidecar_bytes"), i4.get("vllm_budget_bytes")
+    if isinstance(sc, (int, float)) and isinstance(bud, (int, float)) and bud > 0:
+        net = ratio * (1.0 - min(1.0, sc / bud))
+        print(f"           sidecars {sc / 2**30:.1f} GiB held OUTSIDE the pool (measured) "
+              f"->  ~{net:.2f}x net at equal total VRAM")
 else:
     print("DENSITY :  n/a (capacity probe did not complete)")
 
@@ -132,12 +145,14 @@ else:
     print("APC     :  n/a (sweep did not complete or quality gate not clean)")
 
 print("-" * 78)
-print("COST    :  decode throughput ~0.22-0.67x bf16 (DISCLOSED) — int4 is kernel-bound;")
+print("COST    :  decode throughput ~0.13-0.67x bf16 (DISCLOSED) — int4 is kernel-bound;")
 print("           recoverable ceiling ~0.27-0.30x, NOT parity. Best for throughput-")
 print("           insensitive density-bound + shared-prefix/short-output workloads.")
 print("-" * 78)
 if isinstance(i4_slots, (int, float)) and isinstance(bs_slots, (int, float)) and bs_slots:
-    print(f"NET     :  ~{i4_slots/bs_slots:.1f}x the users/context per GPU at near-bf16 quality,")
+    eff = net if isinstance(net, (int, float)) else i4_slots / bs_slots
+    tag = "net of sidecars" if isinstance(net, (int, float)) else "raw pool"
+    print(f"NET     :  ~{eff:.1f}x the users/context per GPU ({tag}) at near-bf16 quality,")
 else:
     print("NET     :  density NOT measured this run (probe incomplete) — prior-measured")
     print("           reference is ~2x (1.83x net of sidecars); re-run the density step,")

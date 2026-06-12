@@ -1,7 +1,7 @@
 # int4_protected — VC Brief
 
 **Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16)*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026*
 
 ---
 
@@ -32,10 +32,12 @@
 >   read-skip measures **−10.6% vs full-int4 at 32K** (recovered from ~−30% as the
 >   controller moved on-GPU — tensor index + cached block-ids + tuned observe
 >   cadence). But the retained set is **bounded** while full attention grows
->   **linearly**: the measured A/B gap **halves from 16K→32K** and the curves
->   **extrapolate to cross near ~50K**, where read-skip turns throughput-positive
->   (a YaRN-extended run to convert that extrapolation into a measured number is
->   the next gate). Realized value today is **density + flat decode-scaling that
+>   **linearly**: read-skip now MEASURES throughput-positive **vs full-int4**
+>   from ≤32K on 8-KV-head models (+8%→+36% across 32→60K at 77–88% skip,
+>   June 2026; +25%→+72% at the ~95%-skip config — keep-set dependent),
+>   quality 1.0/1.0 throughout. Absolute disclosure (bf16-ref, same harness):
+>   even with read-skip, decode is **~0.21–0.24× bf16, flat across 32–100K**
+>   — it does NOT cross bf16 at these lengths (quality 1.0/1.0 to 100K). Realized value today is **density + flat decode-scaling that
 >   compounds on int4** — store ~2× the context per GB (1.83× net of the sidecar tax) and hold per-token decode
 >   ~flat as context grows, not a sub-32K speed win. Software-capturable, not a
 >   hardware mandate.
@@ -62,7 +64,7 @@ The industry has tried four mitigations:
 | Approach | Memory savings | Quality | Status |
 |---|---:|---|---|
 | **bf16** (baseline) | 1.0× | perfect | the reference |
-| **fp8** (half-precision) | 0.5× KV | **poor** — needle 1/15 (6.7%) on Qwen-7B (200-fillers 1/5, 600-fillers 0/5, 1200-fillers 0/5, direct measurement); 0/6 bit-identical greedy decode; 12% common-prefix overlap vs bf16 | shipped, widely deployed; quality degradation accepted |
+| **fp8** (half-precision) | 0.5× KV | **poor-to-mixed, MODEL-DEPENDENT** — Qwen-7B: needle 1/15 (6.7%), 0/6 bit-identical greedy, 12% prefix overlap (direct measurement). Llama-3.1-8B gate (June 2026): lite needles PASS (3/3@8K, 5/5@32K) but greedy divergence persists — e5m2 1/6 identical / 41% overlap, e4m3+calculated-scales 2/6 / 84% — and **both measured SLOWER than bf16 on vLLM 0.7.3** (0.76× / 0.33× @32K B=1): no speed win to offset the quality risk | shipped, widely deployed; quality degradation accepted |
 | **naive int4** (unprotected 4-bit) | 0.5× KV | degraded — token-agreement vs bf16 collapses to 0.533 (53%); easy needle deceptively OK (≈0.96–1.0) but general generation fidelity is substantially degraded; hard multi-needle retrieval 0.915 (vs bf16 1.000) | research-grade only; not shippable for quality-sensitive workloads |
 | **int4 with protected channels** *(our approach)* | **0.5× KV** | **near-bf16 fidelity: token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16 (saturated); hard-needle retrieval 0.964 (vs naive 0.915, bf16 1.000); 4-model portfolio 15/15 needle replicated 2-of-2 seeds on Mistral-7B, Llama-3.1-8B, Qwen-14B** | **shipped via vLLM, 4 models measured this quarter** |
 
@@ -330,7 +332,7 @@ A100, reproduced on independent hardware):**
 | gen=512 | 576.3 | 184.4 | 0.32× | 0.16× (~6.3× slower) | 1.83× |
 | gen=512, deep saturation (locked 6L) | 597.3 | 130.4 | **0.22×** | 0.11× (~9× slower) | 1.83× |
 
-**The throughput tax ranges 0.22×–0.54× depending on workload.** The widely-quoted
+**The throughput tax ranges 0.13×–0.54× depending on workload** (floor 0.13×: B=1 eager 100K-ctx Llama, June 2026). The widely-quoted
 "0.22× / ~9× slower" is the **worst case** (deep saturation + long generation), NOT
 the typical case. **Density is invariant at ~1.81–1.83× across the entire curve** —
 the compression win does not depend on the operating point.
@@ -378,7 +380,7 @@ tax is already smallest for free.
 | Approach | Memory | Quality | Notes |
 |---|---:|---|---|
 | **bf16** (vLLM default) | 1.0× | perfect | the reference |
-| **fp8** (vLLM-supported) | 0.5× KV | poor — needle 1/15 (6.7%) on Qwen-7B; 0/6 bit-identical greedy; 12% common-prefix overlap | half-precision; ships, accepted as a quality compromise |
+| **fp8** (vLLM-supported) | 0.5× KV | poor-to-mixed, model-dependent — Qwen-7B needle 1/15; Llama-3.1-8B (June 2026): lite needles pass, greedy still diverges (e5m2 1/6 / 41%; e4m3+scales 2/6 / 84%), and both decode SLOWER than bf16 on vLLM 0.7.3 (0.76× / 0.33×) | half-precision; ships, accepted as a quality compromise |
 | **AWQ / GPTQ** (weight-only quantization) | weights only, not KV | high | does NOT compress KV-cache; orthogonal solution |
 | **naive int4 (KIVI-style)** | 0.5× KV | degraded — token-agreement vs bf16: 0.533 (53%); easy needle deceptively OK but general fidelity substantially reduced | research-grade; our measurements confirm fidelity degradation |
 | **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 *(competitor's reported figure)* | W4A4 not KV; complementary, not competitive |
@@ -506,8 +508,11 @@ recompile, not a methodology change.
 - **Prefix caching (APC), eager-only** (Phase 6K.16): shipped +
   validated bit-exact (S1 byte-gate 13/13 cached blocks byte-identical
   to a fresh prefill; hard-needle with APC 0.955 = bf16; zero degenerate
-  outputs). The first throughput-tax reducer — cache hits skip prefill,
-  compounding with density. graphs+APC gated off (int4 kernel not
+  outputs). The first throughput-tax reducer — measured (Llama-3.1-8B,
+  A100-80G, June 2026): **TTFT −53/56/78/86% per cache hit** at
+  1K/2K/4K/8K shared prefixes, **1.85× batch throughput** at 94% hit
+  rate (1.54× at 75%), quality 1.00 == APC-off in every cell — net of
+  the eager tax. graphs+APC gated off (int4 kernel not
   graph-safe at B>1 — see Page 6).
 
 ### What v2 unlocks (in priority order)
@@ -517,7 +522,7 @@ recompile, not a methodology change.
 | Item | Status | Impact |
 |---|---|---|
 | **Capacity demonstration** (sustained high-B saturation) | ✅ DONE (Phase 6L: `--resident-pressure`, mml=8K B=128, both cells 100% KV-block util) | Validated the density claim under real load: **1.83× seq/GB** net of tax (2.02× raw live). Caveat: aggregate throughput **0.22× bf16** at saturation (unoptimized decode path) |
-| **Decode-throughput recovery** (the 0.22× closer) | **Attributed (Phase 6M.4): GPU-work-bound at saturation** — decode-attention kernel ~29% + paged gather/copy ~19.5%; host syncs <1%. **CUDA graphs ruled OUT** (6M.3: neutral at saturation, eager ≈ captured). Next gate = **Test 1 roofline (6M.5)** to split compute- vs bandwidth-bound. **⚠ Test 1 BLOCKED on RunPod A100 (`ERR_NVGPUCTRPERM`, perf counters locked) — needs a profiling-enabled experiment server; tooling is committed and ready.** | Bounds the recoverable headroom. Honest ceiling: **~0.22× → ~0.27–0.30×, NOT bf16 parity** (int4 fundamentally reads packed KV + sidecars and dequants/token). Kernel fusion (6F) is gated on the Test 1 verdict + a funding decision |
+| **Decode-throughput recovery** (the 0.22× closer) | **Attributed (Phase 6M.4): GPU-work-bound at saturation** — decode-attention kernel ~29% + paged gather/copy ~19.5%; host syncs <1%. **CUDA graphs ruled OUT** (6M.3: neutral at saturation, eager ≈ captured). Next gate = **Test 1 roofline (6M.5)** to split compute- vs bandwidth-bound. **⚠ Test 1 BLOCKED on RunPod A100 (`ERR_NVGPUCTRPERM`, perf counters locked) — needs a profiling-enabled experiment server; tooling is committed and ready.** | Bounds the recoverable headroom. Honest ceiling: **~0.22× → ~0.27–0.30×, NOT bf16 parity** (int4 fundamentally reads packed KV + sidecars and dequants/token). Kernel fusion (6F): **headroom now measured directly** (June 2026, CUDA-event GPU split at B=1 — no perf counters needed): fuseable pre-kernel gather+splice+prep = **60% of the int4 read path at 8K ctx, 42% at 32K** → **GO**, realized < headroom (in-register gather remains). Test 1 roofline still wanted for the saturation regime; the funding decision now has a measured upside bound |
 | **Tensor parallelism** (TP) for 70B-class models | Not yet validated | Unlocks 70B Llama / Qwen-72B where memory savings move the dollar economics |
 | **Broader quality bench** (MMLU, HumanEval, LongBench) beyond needle | **MMLU DONE (Phase 6N.2): 0.0 pt + 100% per-question agreement at 1,000 Q.** HumanEval/LongBench tooling committed (generate-only; sandbox to score pass@1) | De-risks customer adoption — MMLU closed at scale with fidelity diagnostic; remaining benches are runner-ready |
 
@@ -531,7 +536,7 @@ recompile, not a methodology change.
 | Sidecar diet (fp8 sidecars, option C) | ~3 days kernel work | Reduces sidecar overhead by ~1.7 GB (partial toward HBM parity) |
 | Pre-calibrated mask zoo | 1 day | Ship 10-20 popular models pre-calibrated; remove user-side calibration step |
 | Cold-tier (per-session safetensors snapshot/restore) | 4-6 weeks | Optional 3-tier KV storage (hot GPU / warm CPU swap / cold disk). Warm-tier foundation verified bit-clean (TIER5A measured GREEN — see Page 6). |
-| **Read-skip long-context crossover (YaRN-extended 48–64K)** | 2–3 days | Convert the **~50K crossover extrapolation into a measured throughput-positive number** — the read-skip headline. Rope-scaling decouples the speed win from Qwen-7B's 32K native cap; validate needle quality holds at extended context first. Tooling (`phase9_p3_fused_needle.py --ab`) is committed; gated only on the YaRN config + GPU time. |
+| **Read-skip vs bf16 long-context crossover — ANSWERED (June 2026): NO** | done | Measured on 128K-native Llama-3.1-8B, no YaRN (B=1, gen=128, eager, 32–100K): int4+read-skip = **0.21–0.24× bf16, flat** (16.1→10.3 tok/s vs bf16 66.2→49.3); quant-alone slopes 0.23→0.13×; read-skip claws back +8%→+65% at skip 77→93%, quality 1.00/1.00/1.00 in every cell **including 100K at 93.3% skip**. **No bf16 crossover ≤100K** — the parity thesis is unsupported at these lengths; the headline stays density + quality + APC, with read-skip as the long-context decode-tax mitigator (vs full-int4), not a bf16-beater. `phase10_crossover_sweep.py`, /tmp/x10. |
 
 **Tier 3 — research extensions**
 
@@ -624,12 +629,12 @@ every cell × mml.
 
 | Item | Status |
 |---|---|
-| **Decode throughput negative — WORKLOAD-DEPENDENT, range 0.22×–0.54×** | Real cost, but a curve not a number (Phase 6M.6, reproduced on fresh A100): **0.54× at short gen (gen=128), 0.32× at gen=512, 0.22× worst-case (deep sat + long gen)** — density invariant ~1.83× throughout. The "0.22× / 9× slower" is the worst case; short-output workloads pay only ~2×. Attribution (6M.4): GPU-work-bound (paged gather ~25% + attention ~21%, host syncs <1%) → recoverable headroom **bounded ~0.27–0.30×, not parity**; the closing lever (read-path fusion, 6F) is gated on Test 1 (6M.5, blocked on counter-locked pods) and is **lower priority than deploying at short generation.** |
+| **Decode throughput negative — WORKLOAD-DEPENDENT, range 0.13×–0.54×** | Real cost, but a curve not a number (Phase 6M.6, reproduced on fresh A100): **0.54× at short gen (gen=128), 0.32× at gen=512, 0.22× worst-case (deep sat + long gen)**; **quant-alone declines with context at B=1 eager: 0.23×@32K → 0.17×@60K → 0.13×@100K (Llama, June 2026); read-skip holds ~0.21× at 80–100K** — density invariant ~1.83× throughout. The "0.22× / 9× slower" is the worst case; short-output workloads pay only ~2×. Attribution (6M.4): GPU-work-bound (paged gather ~25% + attention ~21%, host syncs <1%) → recoverable headroom **bounded ~0.27–0.30×, not parity**; the closing lever (read-path fusion, 6F) now has a **measured GO at B=1** (gather-headroom profile, June 2026: fuseable 60% of the read path @8K ctx / 42% @32K; the gather is GPU-time-bound, cpu/gpu 0.2–0.7×, so CUDA fusion — not Python vectorization — is the fix). Realized < headroom; ceiling unchanged ~0.27–0.30×; still **lower priority than deploying at short generation.** |
 | **~+4.4 GB total HBM vs bf16 (4.38 GB sidecars)** | Structural (sidecar overhead); diet options can reduce by ~2.5 GB but cannot reach HBM parity without option D or a different KV layout |
 | **Capacity now DEMONSTRATED (Phase 6L) — residual: single-mml** | Was a block-budget estimate; Phase 6L confirmed it under sustained `--resident-pressure` load at mml=8K B=128 (1.83× seq/GB net, 2.02× raw live). Residual: only mml=8K tested; 16K/32K robustness pending |
 | **Tensor parallelism not validated** | Code expected to generalize; unverified — requires multi-GPU pod (Tier 1 v2) |
 | **Swap-to-CPU preemption unsupported — now GUARDED (Phase 6K.15)** | The quantization sidecars (scales/xmin/protect/staging) live outside vLLM's paged KV tensor and are **not migrated** by `swap_out/swap_in`; a swapped sequence would resume with silently corrupted KV. vLLM V0's *default* policy picks SWAP for multi-seq groups (parallel sampling / beam), so this was a correctness landmine behind a config default. Fixed: the factory now forces `preemption_mode="recompute"` and refuses `"swap"` at init (loud error; `INT4_PROTECTED_ALLOW_SWAP=1` dev escape hatch). Residual: recompute + parallel sampling under preemption pressure hits vLLM's single-seq recompute assert — a loud failure, not corruption. True sidecar migration = future work, only needed if swap-preemption serving is a requirement. |
-| **Slot-pool staging memory scales with `max_num_seqs`** | Multi-batch decode is implemented + proven (slot pool, Phase 6K.14 auto-bump/GC; measured at B=128 / 117 live seqs in Phase 6L), but each slot carries ~24 MB staging state — `max_num_seqs=256` adds ~6 GB on top of the 4.38 GB sidecar tax. The auto-bump makes this implicit; deployments should pin `PHASE6_MAX_ACTIVE_SLOTS` to actual concurrency. **Prefix caching (APC) now SHIPS eager-only** (Phase 6K.16) — validated bit-exact: S1 byte-gate **13/13 cached prefix blocks byte-identical** to a fresh no-APC prefill (packed K + packed V + all five sidecars), hard-needle with APC **0.955 = bf16**, zero degenerate outputs. The storage layer was APC-compatible *by construction* (block-local quant groups = block size; sidecars keyed by block_id travel with shared blocks), so the eager ship was the Tier-1 (days) item it was scoped as. This is **the first lever that reduces the throughput tax**: prefix-cache hits *skip prefill compute*, and density compounds it (2× blocks ⇒ ~2× cacheable prefix), so high-fan-out shared-prefix workloads (agentic / RAG — the target segment) pay the int4 tax on fewer tokens. **graphs+APC is gated off** (factory forces `enforce_eager=True` under APC): root-caused this quarter to the **int4 FA kernel not being CUDA-graph-safe at B>1** (see the negative-results table) — low-ROI to chase since int4 is kernel-bound (graphs neutral at saturation, 6M.3). Chunked prefill remains off. |
+| **Slot-pool staging memory scales with `max_num_seqs`** | Multi-batch decode is implemented + proven (slot pool, Phase 6K.14 auto-bump/GC; measured at B=128 / 117 live seqs in Phase 6L), but each slot carries ~24 MB staging state — `max_num_seqs=256` adds ~6 GB on top of the sidecar tax — which scales with the KV pool (~16–17%): 4.38 GB at a mid-size pool, **8.3 GiB measured at a max-util 48.8 GiB pool** (June 2026). The auto-bump makes this implicit; deployments should pin `PHASE6_MAX_ACTIVE_SLOTS` to actual concurrency. **Prefix caching (APC) now SHIPS eager-only** (Phase 6K.16) — validated bit-exact: S1 byte-gate **13/13 cached prefix blocks byte-identical** to a fresh no-APC prefill (packed K + packed V + all five sidecars), hard-needle with APC **0.955 = bf16**, zero degenerate outputs. The storage layer was APC-compatible *by construction* (block-local quant groups = block size; sidecars keyed by block_id travel with shared blocks), so the eager ship was the Tier-1 (days) item it was scoped as. This is **the first lever that reduces the throughput tax — now measured** (Llama-3.1-8B, A100-80G, June 2026): TTFT −53→−86% per cache hit as shared prefixes grow 1K→8K, batch throughput 1.19–1.85× at 94% hit rate (1.28–1.54× at 75%), quality 1.00 == APC-off in every cell, net of the eager tax; density compounds it (2× blocks ⇒ ~2× cacheable prefix), so high-fan-out shared-prefix workloads (agentic / RAG — the target segment) pay the int4 tax on fewer tokens. **graphs+APC is gated off** (factory forces `enforce_eager=True` under APC): root-caused this quarter to the **int4 FA kernel not being CUDA-graph-safe at B>1** (see the negative-results table) — low-ROI to chase since int4 is kernel-bound (graphs neutral at saturation, 6M.3). Chunked prefill remains off. |
 | **vLLM 0.7.3 V0 fork vendored at SHA `720c948`** | Upstream vLLM has moved to V1; forward-port is 1-2 weeks of maintenance (Tier 2 v2) |
 | **Only D=128 head dim supported** | Kernel constraint; Phi-3.5 (D=96) and similar need a kernel recompile (Tier 2 v2) |
 | **Quality bench: needle + token-agreement + hard-needle + MMLU (1K)** | **MMLU 0.0 pt + 100% per-question agreement at 1,000 Q (Phase 6N.2)** — the agreement diagnostic rules out compensating flips that aggregate parity could hide. Residual: 100% agreement on 4-way MC proves argmax unchanged, not bitwise-identical logits; HumanEval pass@1 (sandboxed) + LongBench F1 are runner-ready but not yet executed |
@@ -639,13 +644,13 @@ every cell × mml.
 | Item | Confidence |
 |---|---|
 | ~~Write-path CUDA graph capture unlocks 2× aggregate throughput~~ **WITHDRAWN (Phase 6M.3)** | **Overturned.** At saturation, eager ≈ captured (125.5 ≈ 130.4 tok/s) — graphs are **neutral**, not a 2× lever; launch overhead is NOT the saturation bottleneck (6M.4: GPU-work-bound). The real (bounded) lever is read-path kernel fusion, gated on Test 1 |
-| Decode-throughput recovery to ~0.27–0.30× (read-path fusion, 6F) | Medium, and **bounded** — Phase 6M.4 localized the tax to genuine int4 reconstruction (decode-attention + paged gather); fusion can trim the ~19.5% gather pass but int4 cannot reach bf16 parity. Contingent on the Test 1 roofline verdict (currently blocked on a counter-unlocked pod) |
+| Decode-throughput recovery to ~0.27–0.30× (read-path fusion, 6F) | Medium, and **bounded** — Phase 6M.4 localized the tax to genuine int4 reconstruction (decode-attention + paged gather); fusion can trim the gather pass (~19.5% at saturation, 6M.4; **measured 42–60% of the B=1 read path** incl. splice/prep, June 2026 → GO) but int4 cannot reach bf16 parity. Test 1 roofline (saturation regime) remains blocked on counter-locked pods; the B=1 headroom is CUDA-event-measured and needs no counters |
 | ~2× net capacity under sustained high-concurrency load | ✅ **CONFIRMED (Phase 6L)** — the block-budget estimate (~1.8× seq/GB) was confirmed by direct `--resident-pressure` observation: 1.83× net seq/GB, 2.02× raw live at saturation |
 | TP enables 70B-class serving | Medium — code structure looks TP-compatible; risk is in vLLM-side plumbing |
 | Sidecar diet option C (~1.7 GB savings) + option F preserves token-agreement gain | Medium — no quality re-bench yet after diet |
 | Methodology extends to Phi (D=96) | Medium — calibration math is architecture-agnostic; kernel constraint is the only barrier |
 | Methodology extends to mixture-of-experts (Mixtral, DeepSeek) | Untested — MoE adds routing complexity orthogonal to attention |
-| **Read-skip decode throughput-positive at long context — GRADUATED: projected → MEASURED** | ✅ **MEASURED** (`Llama-3.1-8B-Instruct`, 128K-native, int4 read-skip, no rope hacking): retention vs full-int4 decode = **+25.0 % @32K, +46.4 % @44K, +58.8 % @52K, +72.2 % @60K**, needle **1.0/1.0** at every ctx (monotonic — grows with length). `off` slopes down (linear KV read), retention stays flat (bounded ~1.9K retained, ~95 % skip) → gap **grows** with length. **Replicated on a second standard-rope model:** Mistral-7B-v0.3 crosses **+25.6 % @30K** (8 KV heads) — within noise of Llama's +25.0 %, confirming the crossover tracks **KV-head count**, not a single model. Crossover lands **≤32K on KV-heavy GQA** (8-KV-head Llama/Mistral); ~42K on 4-KV-head Qwen. **Caveat 1 (int4-KV quality):** int4-KV long-context *quality* is **model-dependent** — held 1.0/1.0 on Llama & Mistral (standard rope) out to 30–60K, broke on Qwen2.5-7B-1M (extreme `rope_theta`: passes at 8K, `off` itself collapses to 0.667/0.0 by 32K). **Caveat 2 (retention quality):** the read-skip *retention policy* is also model-dependent at a fixed keep-set — Llama held needle 1.0/1.0, but Mistral dropped depth-0.5 to **0.667** (1 of 3 mid-context needles lost); the keep-set must be validated/widened per model. The **throughput** win reproduces cleanly; the **quality** of skipping does not, automatically. |
+| **Read-skip decode throughput-positive at long context — GRADUATED: projected → MEASURED** | ✅ **MEASURED** (`Llama-3.1-8B-Instruct`, 128K-native, int4 read-skip, no rope hacking): retention vs full-int4 decode = **+25.0 % @32K, +46.4 % @44K, +58.8 % @52K, +72.2 % @60K**, needle **1.0/1.0** at every ctx (monotonic — grows with length). `off` slopes down (linear KV read), retention stays flat (bounded ~1.9K retained, ~95 % skip) → gap **grows** with length. **Replicated on a second standard-rope model:** Mistral-7B-v0.3 crosses **+25.6 % @30K** (8 KV heads) — within noise of Llama's +25.0 %, confirming the crossover tracks **KV-head count**, not a single model. Crossover lands **≤32K on KV-heavy GQA** (8-KV-head Llama/Mistral); ~42K on 4-KV-head Qwen. **Caveat 1 (int4-KV quality):** int4-KV long-context *quality* is **model-dependent** — held 1.0/1.0 on Llama & Mistral (standard rope) out to 30–60K — and on Llama now measured to **100K** (June 2026, incl. retention at 93.3% skip), broke on Qwen2.5-7B-1M (extreme `rope_theta`: passes at 8K, `off` itself collapses to 0.667/0.0 by 32K). **Caveat 2 (retention quality):** the read-skip *retention policy* is also model-dependent at a fixed keep-set — Llama held needle 1.0/1.0, but Mistral dropped depth-0.5 to **0.667** (1 of 3 mid-context needles lost); the keep-set must be validated/widened per model. The **throughput** win reproduces cleanly; the **quality** of skipping does not, automatically. **Caveat 3 (absolute scale — June 2026 bf16-ref, same harness):** the relative win does NOT cross bf16 — int4+read-skip is **~0.21–0.24× bf16, flat across 32–100K** (B=1, gen=128, eager), and the relative delta grows with length (+8%@32K → +65%@100K at 77→93% skip). Read-skip mitigates the long-context decode tax; it does not buy bf16 parity. |
 | **Read-skip general fidelity under skip** — token-agreement beyond needle, + the observe-refresh quality/speed knob | Untested — needle 1.0/1.0 validated at 94% skip, but broader generation fidelity and the refresh-cadence trade-off on *shifting*-attention workloads (the static needle is favorable) are not yet benched |
 
 ---
@@ -751,7 +756,7 @@ capacity cost — in a movement-bound world the sidecars are *extra bytes to mov
 scattered* (poorer coalescing than the contiguous int4 read), so the net transport
 reduction is the **~1.8×** density figure, not 4×. The same tax, on a new axis. And on
 the single-GPU decode path the int4 quant remains throughput-negative today
-(**0.22–0.67× bf16**) — the per-position byte saving is real but unrealized as
+(**0.13–0.67× bf16**) — the per-position byte saving is real but unrealized as
 wall-clock until read-path kernel fusion.
 
 **Net positioning:** the move to data movement *promotes* read-skip (measured, on the
@@ -793,6 +798,64 @@ The shippable product fits any of:
 | Enterprise self-hosters | Quality-sensitive deployments (legal, healthcare, finance) that need near-bf16 output fidelity but can't justify bf16's concurrency limit. |
 | Open-model hubs deploying Llama / Mistral / Qwen at scale | The 3 model families validated this quarter cover ~80% of open-weights serving traffic by category. |
 | Edge / low-HBM hardware (H100 PCIe 80GB, L40S 48GB) | Lower-tier GPUs that can't hold 32K concurrent context in bf16 can hold it in int4_protected at near-bf16 fidelity. |
+
+### Real-world economics — the bf16 + KVPro playbook (measured numbers)
+
+int4_protected (productized name: **KVPro**) is **not a bf16 replacement** —
+the crossover sweep settled that (decode 0.17–0.67× bf16, no parity ≤60K).
+It is a **memory-density tool**: bf16 buys speed, KVPro buys capacity, and a
+deployment that routes between them beats either alone.
+
+**The core principle: if memory is the constraint, KVPro; if speed is the
+constraint and the KV fits, bf16. They complement, not compete.**
+
+| Workload | Route to | Why (measured) |
+|---|---|---|
+| Short chat (<4K), low concurrency | bf16 | speed matters; the KV fits anyway |
+| Short/mid chat, high concurrency | **KVPro** | the KV pool is the binding constraint → 2.00× slots |
+| Long context (16K+) | **KVPro** | 2× context per GPU at near-bf16 quality (needle 1.0 to 60K) |
+| Agentic, many turns | **KVPro** | sessions grow; APC cuts re-prefill **−53→−86% per hit** |
+| RAG over shared documents | **KVPro** | document prefix cached once (APC): **1.19–1.85×** batch throughput at 94% hit rate |
+| Latency-critical single-stream long-gen | bf16 | KVPro's disclosed worst regime (0.13× at 100K, B=1) |
+
+**What about an 8-bit middle tier?** Gated on this stack (June 2026,
+`bench_8bit_kv_gate.py`): vLLM has **no int8 KV** (fp8 only, verified from
+source), and **neither fp8 variant is a speed tier** — e5m2 decodes at 0.76×
+bf16 with corrupted greedy output (1/6 identical, 41% overlap), e4m3 with
+calculated scales at **0.33× bf16** with lite-gate quality only (needles pass
+on Llama, 2/6 identical / 84% overlap; the hard gates KVPro passed — depth-
+stressed hard-needle, 60K retention, byte-exact APC — have not been run on
+it). fp8-e4m3 is the honest **max-density** option (2.00× in-pool, no sidecar
+tax, vs KVPro's 1.75× net) for quality-tolerant traffic; it does not replace
+bf16 for speed or KVPro for hard-gated quality. The bf16/KVPro split stands.
+
+**The economics on one A100-80G (measured, Llama-3.1-8B, util 0.85, mml 32K):**
+
+| Metric | bf16 | KVPro | Ratio |
+|---|---|---|---|
+| KV tokens per GiB of pool | ~8,200 | ~16,400 raw / ~14,000 net of sidecars | **2.00× / 1.75×** |
+| Resident 32K sequences | 12 | 24 | **2.00×** (vLLM's own max-concurrency line) |
+| Per-sequence decode @32K, B=1 | 66 tok/s | 15–16 tok/s | 0.23× |
+| Total throughput at saturation | — | — | **0.22–0.54×, workload-dependent** (6M.6; B=1 × N extrapolation is invalid) |
+
+**GPU-count example (measured density):** 100 concurrent 32K agent sessions
+need ~9 bf16 GPUs (12 resident sequences each) vs **~5 KVPro GPUs** (24 each)
+— **~44% fewer GPUs** for memory-resident concurrency, paid for with slower
+per-session decode. Right for latency-tolerant agentic / batch / async traffic;
+wrong for interactive single-stream.
+
+**Hybrid deployment = ROUTING, not swapping.** Run two engine pools (bf16 for
+speed-critical, KVPro for memory-bound / shared-prefix) and route per request —
+the controller logic already named in the memory-stack table. Do **not** plan
+on migrating live sequences between pools: cache dtype is per-engine, and swap
+preemption is hard-refused inside KVPro (6K.15 — the sidecars are not migrated;
+the guard exists because the failure mode is silent KV corruption).
+
+**One sentence for the budget owner:** *KVPro gives 2.00× the KV slots per GPU
+(1.75× net of sidecars, measured live) at 0.17–0.67× decode speed — route
+memory-bound, long-context, shared-prefix, and high-concurrency traffic to it,
+keep latency-critical traffic on bf16, and the measured 32K-concurrency example
+runs on ~44% fewer GPUs at near-bf16 quality.*
 
 ### The ask
 
@@ -917,10 +980,14 @@ regardless of which request produced it; (b) the sidecars are **keyed by global
 **Validated bit-exact**: S1 byte-gate — 13/13 cached blocks byte-identical to a
 fresh no-APC prefill.
 
-- **Payoff**: a prefix-cache hit *skips prefill compute* — **the first lever
-  that reduces the throughput tax** — and density compounds it (2× blocks ⇒
-  ~2× cacheable prefix). Most valuable on the **target segment** (high-fan-out
-  shared-prefix agentic/RAG traffic).
+- **Payoff — measured** (Llama-3.1-8B, A100-80G, N=16, gen=32, June 2026):
+  a cache hit skips the prefix's prefill — **TTFT −53/−56/−78/−86%** at
+  1K/2K/4K/8K shared prefixes (miss-TTFT grows linearly 142→704 ms while
+  hit-TTFT stays ~66–98 ms: the mechanism is visible in the raw data), and
+  **1.19–1.85× batch throughput** at 94% hit rate (1.28–1.54× at 75%),
+  quality 1.00 == APC-off in every cell, net of the eager tax. Density
+  compounds it (2× blocks ⇒ ~2× cacheable prefix). Most valuable on the
+  **target segment** (high-fan-out shared-prefix agentic/RAG traffic).
 - **Shipped eager-only** (Phase 6K.16). **graphs+APC is gated off**: this
   quarter root-caused the corruption to the **int4 attention kernel not being
   CUDA-graph-safe at B>1** — identical K/V inputs produce ~1.8× divergent

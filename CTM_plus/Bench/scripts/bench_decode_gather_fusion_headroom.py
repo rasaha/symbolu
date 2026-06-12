@@ -182,7 +182,10 @@ def main(argv=None):
                     help="0 -> context_tokens + 4096 headroom")
     ap.add_argument("--gen", type=int, default=64, help="decode tokens to profile over")
     ap.add_argument("--batch", type=int, default=1, help="B (read-skip regime is 1)")
-    ap.add_argument("--gpu-util", type=float, default=0.85)
+    # 0.70 (not 0.85): pool size doesn't affect the timing split, but the
+    # out-of-pool sidecars scale with the pool — 0.85 leaves ~3 GiB margin
+    # at 32K ctx (knife-edge), 0.70 leaves ~20 GiB.
+    ap.add_argument("--gpu-util", type=float, default=0.70)
     ap.add_argument("--n-runs", type=int, default=2)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
@@ -203,8 +206,15 @@ def main(argv=None):
 
     mml = args.max_model_len or (args.context_tokens + 4096)
     print(f"Loading {args.model} (max_model_len={mml}) ...", flush=True)
+    # EAGER is required, not a preference: under CUDA-graph replay the python
+    # read path (where the profiler regions live) executes only at capture
+    # time, so a graphs run records ~nothing per decode step. Eager also
+    # avoids capture-time staging/workspace on top of the out-of-pool
+    # sidecars (OOM at gpu_util 0.85 on A100-80G otherwise).
     llm = Int4ProtectedLLM(model=args.model, max_model_len=mml,
-                           gpu_memory_utilization=args.gpu_util)
+                           gpu_memory_utilization=args.gpu_util,
+                           enforce_eager=True,
+                           max_num_seqs=max(2, args.batch))
     tok = llm.get_tokenizer()
     model = _find_inner_model(llm)
     prompt = _build_filler(tok, args.context_tokens) + "\n\nWrite a brief summary:"

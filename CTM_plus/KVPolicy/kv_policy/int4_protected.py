@@ -252,6 +252,56 @@ def _resolve_prefix_caching(requested: Optional[bool]) -> bool:
     return True
 
 
+# Phase 6K.17 — chunked-prefill guard (factory side). vLLM 0.7.3 V0
+# AUTO-ENABLES chunked prefill when max_model_len > 32768 (late default in
+# config.py). Chunk 2+ of a chunked prompt is scheduled as prefill WITH
+# computed context (non-empty prefill block_tables) and lands on the same
+# prefix-aware-prefill branch as APC — which the backend refuses unless
+# factory-armed, and whose math is validated ONLY for APC-shaped,
+# block-aligned shared prefixes. Hit live (A100-80G, mml=36096: the
+# auto-default flipped a 32K-context bench into chunked prefill -> backend
+# refusal mid-warmup). The factory must pin the value EXPLICITLY — leaving
+# it None means "auto" to vLLM, not "off".
+_ALLOW_CHUNKED_ENV = "INT4_PROTECTED_ALLOW_CHUNKED_PREFILL"
+
+
+def _allow_chunked_override() -> bool:
+    raw = os.environ.get(_ALLOW_CHUNKED_ENV, "").strip()
+    return raw in ("1", "true", "True", "yes", "Yes")
+
+
+def _resolve_chunked_prefill(requested) -> bool:
+    """Resolve the effective ``enable_chunked_prefill`` for int4_protected.
+
+    Priority order:
+      1. None / False (caller didn't opt in): False — EXPLICIT, because
+         vLLM treats None as "auto" and auto-enables at mml > 32768.
+      2. True: REFUSED (RuntimeError) unless INT4_PROTECTED_ALLOW_CHUNKED_
+         PREFILL is set, in which case honored with a loud warning (chunk
+         2+ then runs the prefix-prefill read path on non-APC metadata —
+         unvalidated math).
+    """
+    if not requested:
+        return False
+    if _allow_chunked_override():
+        logger.warning(
+            "int4_protected: enable_chunked_prefill=True allowed by %s=1 — "
+            "chunk 2+ of every long prompt runs the prefix-prefill path on "
+            "NON-APC metadata, which is unvalidated. Dev only.",
+            _ALLOW_CHUNKED_ENV,
+        )
+        return True
+    raise RuntimeError(
+        "int4_protected does not support chunked prefill: chunk 2+ of a "
+        "chunked prompt is a prefill-with-context and lands on the "
+        "prefix-aware read path, validated only for factory-armed APC "
+        "(block-aligned shared prefixes). Note vLLM V0 AUTO-enables "
+        "chunked prefill at max_model_len > 32768 — the factory pins it "
+        "off; pass enable_chunked_prefill=False/nothing, or set "
+        + _ALLOW_CHUNKED_ENV + "=1 to bypass (dev only)."
+    )
+
+
 def Int4ProtectedLLM(
     model: str,
     *,
@@ -377,6 +427,17 @@ def Int4ProtectedLLM(
                 effective_enforce_eager = True
     elif _requested_apc is not None:
         kwargs["enable_prefix_caching"] = _requested_apc
+
+    # Phase 6K.17 — chunked-prefill guard, same gating shape as 6K.15/16.
+    # Needed even when the caller passes NOTHING: vLLM V0 auto-enables
+    # chunked prefill at max_model_len > 32768, and the backend refuses
+    # chunk 2+ mid-prefill (prefix-aware branch). Pin explicitly.
+    _requested_chunked = kwargs.pop("enable_chunked_prefill", None)
+    if kv_cache_dtype == "int4_protected":
+        kwargs["enable_chunked_prefill"] = _resolve_chunked_prefill(
+            _requested_chunked)
+    elif _requested_chunked is not None:
+        kwargs["enable_chunked_prefill"] = _requested_chunked
 
     # Lazy import so the kv_policy package remains importable in
     # environments without vLLM (eg. CPU-only dev).
