@@ -1,7 +1,7 @@
 # int4_protected — VC Brief
 
 **Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured)*
 
 ---
 
@@ -787,6 +787,43 @@ It's a **capacity-and-bandwidth play, not a raw-speed one** (it spends some
 Layer-1 compute on dequant — the disclosed tax). In the stack's own terms: *it
 doesn't make the fuel line faster — it makes the engine sip instead of guzzle,
 and packs 2× the fuel in the tank, without losing octane (quality).*
+
+### Logical vs physical density — and the honest NAND-tier limit
+
+> *Distinction + numbers from a June 2026 storage-extension study (NDOL). The storage figures
+> in this subsection are **analytical-model / SSD-simulator outputs (NDOL model + MQSim),
+> validation phase P0–P1 — NOT silicon-measured**, and are kept separate from the GPU-measured
+> KV results elsewhere in this brief.*
+
+There are **two different "densities,"** and only one of them is int4_protected's:
+
+- **Logical (quantization) density — the asset.** int4_protected stores **~1.8× fewer *bytes***
+  per KV token at preserved quality. This is **medium-agnostic** — the *same* 1.8× applies in
+  HBM, DRAM, or NAND. It is fundamentally an **HBM capacity + bandwidth play** (Layer ②); a NAND
+  tier simply inherits the identical 1.8×. **It is not a NAND innovation — it is the same
+  compression on a cheaper shelf.**
+- **Physical (cell) density — NOT ours, and capped.** Packing more bits per NAND cell
+  (SLC→TLC→QLC) is a NAND-only lever HBM does not have. A conservative ECC/RBER + endurance model
+  shows protect-mask-driven cross-tier placement yields only **~1.14× over a fair iso-reliability
+  baseline** (~2.0× vs bf16 once compounded with the logical 1.8×, modeled) — a **hardware
+  ceiling** (denser cells have higher raw error rates; ECC parity eats most of the gain), **not
+  patent-worthy, and a known technique** (unequal error protection). We do **not** claim a NAND
+  density innovation.
+
+**So the NAND angle's value is cost-tiering, not a new density mechanism.** int4_protected being
+~1.8× smaller *and* quality-stable is what makes it practical to park **warm / reused KV**
+(shared prefixes, multi-turn sessions) on cheap, high-capacity flash instead of HBM — HBM for
+hot KV, NAND for warm. The win is **$/GB of warm KV + reuse**, unlocked *by* the compression,
+not a flash-specific density claim. (Read-skip's traffic reduction was separately reproduced in
+an SSD simulator — modeled, load-dependent — consistent with the GPU-measured ~95%-fewer-reads.)
+
+**Honest limits of the NAND tier (modeled):**
+- Density on NAND = the same **1.8× logical**; the extra cell-tiering lever is **~1.14× and capped**.
+- NAND helps capacity and bus-transfer but does **nothing** for NAND array-read latency
+  (`t_R` ~50–100 µs) — a bottleneck HBM does not have.
+- **Endurance gates hot KV off QLC:** write-once-read-many keeps wear low, but per-request KV
+  churn exceeds QLC's ~1k-P/E budget (≈ *months* of life at ~10 DWPD, modeled) — so the flash
+  tier is for **warm/reused** KV, not per-request hot churn.
 
 ### Target customer profile
 
