@@ -55,7 +55,10 @@ warn() { echo "  [warn] $*"; }
 
 # ---- preconditions ----
 say "Preconditions"
-[[ -n "${VIRTUAL_ENV:-}" ]] && ok "venv: ${VIRTUAL_ENV}" || warn "no venv active — run 'source /workspace/venv-vllm/bin/activate'"
+# No venv is FINE on pods where the pinned stack lives in system python —
+# what matters is that THIS interpreter sees the kernel ([ok] line below).
+[[ -n "${VIRTUAL_ENV:-}" ]] && ok "venv: ${VIRTUAL_ENV}" \
+    || ok "no venv — using ${PY} ($("${PY}" -V 2>&1))"
 [[ -n "${PROTECT_MASK_PATH:-}" && -f "${PROTECT_MASK_PATH}" ]] && ok "mask: ${PROTECT_MASK_PATH}" \
     || warn "PROTECT_MASK_PATH unset/missing — int4 cells will fail (calibrate first; see DESIGN §8)"
 "${PY}" -c "from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache" 2>/dev/null \
