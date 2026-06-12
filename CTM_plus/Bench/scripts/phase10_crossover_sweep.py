@@ -124,7 +124,12 @@ def main(argv=None):
     ap.add_argument("--seeds", default="1,2,3")
     ap.add_argument("--repeats", type=int, default=3)
     ap.add_argument("--warmup", type=int, default=2)
-    ap.add_argument("--gpu-util", type=float, default=0.85)
+    # 0.55, deliberately NOT 0.85: this is a B=1 decode-timing sweep — tok/s
+    # is pool-size-independent; the pool only needs ONE ctx+gen sequence
+    # (~7-9 GiB at 52-68K). The route-A int4 store + eager long-prefill
+    # activations allocate OUTSIDE the vLLM budget: at 0.85 the 44K AB cell
+    # measured 76.3 GiB committed before the first prefill and OOMed.
+    ap.add_argument("--gpu-util", type=float, default=0.55)
     ap.add_argument("--mml-headroom", type=int, default=8192,
                     help="max_model_len = context + headroom (per cell)")
     ap.add_argument("--harness", default=HARNESS_DEFAULT)

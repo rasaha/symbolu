@@ -194,3 +194,8 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   pool-independent), headroom bench default 0.70, demo no longer forwards
   its density-util into the APC stage. High util remains ONLY where it is
   the point (the density probe).
+- Task 4 note: crossover driver default --gpu-util now 0.55 (route-A's own
+  int4 store + eager 44K-prefill activations live outside the vLLM budget;
+  at 0.85 the ab_ctx44000 cell hit 76.3 GiB committed pre-prefill -> OOM).
+  bf16 cells measured at 0.85 stay valid (B=1 decode tok/s is
+  pool-independent); resume with --reuse on the same out-dir.
