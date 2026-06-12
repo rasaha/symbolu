@@ -134,3 +134,10 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   graph replay the python read path (where the profiler regions live) never
   executes per step, so a graphs run would record nothing. The headroom it
   measures is the EAGER read path (the path the fusion would fix).
+- Phase 6K.17 (hit live on the 32K headroom cell): vLLM V0 AUTO-ENABLES
+  chunked prefill at max_model_len > 32768; chunk 2+ arrives as a
+  prefill-with-context and the backend refuses it on the prefix-aware
+  branch. The factory now pins enable_chunked_prefill=False explicitly
+  (True refused; INT4_PROTECTED_ALLOW_CHUNKED_PREFILL=1 dev override) —
+  guard-tested in tests/test_phase6k17_chunked_guard.py. phase9's
+  _engine_kwargs pins False too (bf16 ref + route-A comparability at >32K).

@@ -142,8 +142,13 @@ def _engine_kwargs(args):
     ``rope_scaling`` (YaRN) so a 32K-native model (Qwen2.5-7B) can run the 48-64K
     read-skip CROSSOVER experiment past its native window. Empty -> stock defaults
     (byte-for-byte the prior behavior)."""
+    # enable_chunked_prefill pinned False: vLLM V0 AUTO-enables it at
+    # max_model_len > 32768 (every >32K crossover cell). Route-A's prefill
+    # write hooks are not chunk-validated, and the bf16 reference must use
+    # the same single-shot prefill for comparability.
     kw = dict(enforce_eager=True, max_model_len=args.max_model_len,
-              gpu_memory_utilization=args.gpu_util)
+              gpu_memory_utilization=args.gpu_util,
+              enable_chunked_prefill=False)
     raw = (getattr(args, "hf_overrides", "") or "").strip()
     if raw:
         import json
