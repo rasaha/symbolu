@@ -190,12 +190,25 @@ def run_worker(mml, items_per_mode):
     # needles don't share prefixes across items, so hits come only from
     # vLLM's own block-hash reuse; quality must match the non-APC cell.
     apc = os.environ.get("NEEDLE_APC", "").strip() in ("1", "true", "yes")
+    # 6K.18: NEEDLE_CHUNKED=1 enables chunked prefill (eager-only by
+    # factory coupling) — gates G4/G6. NEEDLE_GPU_UTIL overrides the
+    # 0.5 default (the G4 prize cell runs util 0.85). NEEDLE_MAX_BATCHED
+    # sets max_num_batched_tokens (the chunk budget). All three apply to
+    # the bf16 baseline cell too, so A/B columns stay comparable.
+    chunked = os.environ.get("NEEDLE_CHUNKED", "").strip() in ("1", "true", "yes")
+    gpu_util = float(os.environ.get("NEEDLE_GPU_UTIL", "0.5"))
+    _budget = os.environ.get("NEEDLE_MAX_BATCHED", "").strip()
     from vllm import SamplingParams
     if cell == "bf16":
         from vllm import LLM
+        _bkw = {}
+        if chunked:
+            _bkw["enable_chunked_prefill"] = True
+            if _budget:
+                _bkw["max_num_batched_tokens"] = int(_budget)
         llm = LLM(model=model, max_model_len=mml,
-                  gpu_memory_utilization=0.5, dtype="bfloat16",
-                  max_num_seqs=8, enforce_eager=eager)
+                  gpu_memory_utilization=gpu_util, dtype="bfloat16",
+                  max_num_seqs=8, enforce_eager=eager, **_bkw)
     else:
         from kv_policy.int4_protected import Int4ProtectedLLM
         _kw = {}
@@ -204,8 +217,15 @@ def run_worker(mml, items_per_mode):
             _kw["enable_prefix_caching"] = True
             print(f"[6k12 {cell}] APC cell: enable_prefix_caching=True "
                   f"(eager-only by factory coupling)", flush=True)
+        if chunked:
+            _kw["enable_chunked_prefill"] = True
+            if _budget:
+                _kw["max_num_batched_tokens"] = int(_budget)
+            print(f"[6k12 {cell}] CHUNKED cell: enable_chunked_prefill="
+                  f"True budget={_budget or 'vLLM default'} "
+                  f"util={gpu_util} (6K.18 G4/G6)", flush=True)
         llm = Int4ProtectedLLM(model=model, max_model_len=mml,
-                               gpu_memory_utilization=0.5, max_num_seqs=8,
+                               gpu_memory_utilization=gpu_util, max_num_seqs=8,
                                enforce_eager=eager, **_kw)
 
     sp = SamplingParams(temperature=0.0, max_tokens=16)

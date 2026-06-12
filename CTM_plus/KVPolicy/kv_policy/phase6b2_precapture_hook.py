@@ -128,7 +128,11 @@ def clear_stash(attn_metadata: Any) -> None:
 # ordered list on attn_metadata; the write/read paths consult it (with a
 # count-check fallback to block-local). vLLM 0.7.3 V0 default has no
 # chunked prefill, so a step is all-prefill OR all-decode — one ordered
-# list per step is sufficient.
+# list per step is sufficient THERE. Phase 6K.18: with chunked prefill
+# armed, ONE step can carry prefill-chunk segments AND decode rows; the
+# flattened ids arrive prefills-first (the V0 batch-order invariant the
+# attention backend slices the query by), so the stash is SPLIT at
+# num_prefills — see stash_real_seq_ids_split.
 #
 # Source preference (defensive — the consumer count-checks, so a wrong
 # guess degrades to block-local, never corrupts):
@@ -173,6 +177,37 @@ def extract_real_seq_ids(model_input: Any) -> Optional[List[int]]:
 # phase5b_backend_install, but checks the step-level shape instead
 # of per-impl call shape).
 # ---------------------------------------------------------------------- #
+
+
+def stash_real_seq_ids_split(attn_metadata: Any,
+                             real_ids: Optional[List[int]],
+                             is_dec: bool) -> None:
+    """Stash extracted rids on attn_metadata for the write/read paths.
+
+    Pure decode -> the decode attr; pure prefill -> the prefill attr
+    (pre-6K.18 behavior, unchanged). Phase 6K.18 MIXED step (prefill-
+    chunk segments + decode rows in one batch — only the V0 chunked-
+    prefill scheduler builds these): ids arrive in batch order with
+    prefills FIRST (the invariant the attention backend itself relies on
+    to slice query at num_prefill_tokens), so split at
+    attn_metadata.num_prefills — each consumer's count-check then sees
+    exactly its own rows (un-split, BOTH count-checks would fail and the
+    armed contract would refuse every mixed step).
+    """
+    if attn_metadata is None or real_ids is None:
+        return
+    from kv_policy.phase5b_4c_paged_writer import (
+        _REAL_SEQ_IDS_ATTR, _REAL_SEQ_IDS_PREFILL_ATTR,
+    )
+    if is_dec:
+        setattr(attn_metadata, _REAL_SEQ_IDS_ATTR, real_ids)
+        return
+    n_pre = int(getattr(attn_metadata, "num_prefills", 0) or 0)
+    if 0 < n_pre < len(real_ids):
+        setattr(attn_metadata, _REAL_SEQ_IDS_PREFILL_ATTR, real_ids[:n_pre])
+        setattr(attn_metadata, _REAL_SEQ_IDS_ATTR, real_ids[n_pre:])
+        return
+    setattr(attn_metadata, _REAL_SEQ_IDS_PREFILL_ATTR, real_ids)
 
 
 def _is_pure_decode_step(attn_metadata: Any) -> bool:
@@ -614,28 +649,25 @@ def install_int4_protected_precapture_hook(
         # Phase 6K.16c: stash real seq ids in attention-row order on EVERY
         # step (prefill OR decode), so the write/read paths can use stable
         # identity under prefix caching. Decode -> _int4_real_seq_ids;
-        # prefill -> _int4_real_seq_ids_prefill (one per prompt segment).
-        # Best-effort; the consumers count-check and fall back to
-        # block-local. Skipped silently when extraction yields nothing.
+        # prefill -> _int4_real_seq_ids_prefill (one per prompt segment);
+        # 6K.18 MIXED chunked steps -> SPLIT at num_prefills (see
+        # stash_real_seq_ids_split). Best-effort; the consumers count-
+        # check (and, when un-armed, fall back to block-local). Skipped
+        # silently when extraction yields nothing.
         if attn_metadata is not None:
             try:
-                from kv_policy.phase5b_4c_paged_writer import (
-                    _REAL_SEQ_IDS_ATTR, _REAL_SEQ_IDS_PREFILL_ATTR,
-                )
                 real_ids = extract_real_seq_ids(model_input)
                 is_dec = _is_pure_decode_step(attn_metadata)
-                if real_ids is not None:
-                    setattr(attn_metadata,
-                            _REAL_SEQ_IDS_ATTR if is_dec
-                            else _REAL_SEQ_IDS_PREFILL_ATTR,
-                            real_ids)
+                stash_real_seq_ids_split(attn_metadata, real_ids, is_dec)
                 if os.environ.get("INT4_PROTECTED_PREFIX_DEBUG", "").strip() \
                         in ("1", "true", "yes"):
                     n = None if real_ids is None else len(real_ids)
                     head = None if real_ids is None else real_ids[:6]
+                    _n_pre = getattr(attn_metadata, "num_prefills", 0)
                     logger.warning("[6K.16c-dbg] %s step: extract -> count=%s "
-                                   "head=%s", "decode" if is_dec else "prefill",
-                                   n, head)
+                                   "head=%s num_prefills=%s",
+                                   "decode" if is_dec else "prefill",
+                                   n, head, _n_pre)
             except Exception as _e:  # never break the forward over this
                 logger.warning("6K.16c seq-id stash skipped: %s", _e)
         if _is_pure_decode_step(attn_metadata):

@@ -125,6 +125,115 @@ python -c "import vllm; from vllm.vllm_flash_attn import flash_attn_with_int4_kv
 #     int4C_build_*.log — read those on failure, the console only tails.
 ```
 
+## TASK 6K.18 (chunked prefill) — BUILT 2026-06-12, ⛔ NOT GATED — RUN THIS FIRST
+
+Code is on the branch (D1 tail splice, D2 rid contract, D3 factory
+opt-in; CPU suites green incl. the storage byte-gate across chunk
+boundaries). **NO pod numbers exist. The factory default stays False and
+the init warning stays until every gate below is green.** Design + gate
+contract: PHASE6K18_CHUNKED_PREFILL_DESIGN.md. Order is binding:
+P2 first (the STOP rule), then G1->G6; G2 red = build wrong, full stop.
+
+Pod realities that bite here: preamble + import check as below;
+PROTECT_MASK_PATH per-model (recalibrate if absent — cheap,
+deterministic); 6k12 needs --model AND --protect-mask; sidecars live
+OUTSIDE gpu_memory_utilization (the chunked prize is about the
+ACTIVATION spike, so judge cells by nvml peak + did-it-OOM, not by the
+paged-pool number); chunked cells are eager-forced by the factory.
+
+```bash
+# 0) preamble ($M, PROTECT_MASK_PATH, import check) — see Preamble below.
+M=NousResearch/Meta-Llama-3.1-8B-Instruct
+G=CTM_plus/Bench/scripts/phase6k18_chunked_gates.py
+
+# P1 — gap trace (~10 min). As SCOPED it documents the OLD failure: run
+#   it from main (pre-merge) and capture the ctx%32-rail / arming-check
+#   stack trace. On THIS branch the same probe must instead die at the
+#   C-ID stash refusal (raw bypass has no hook -> identity unprovable):
+#   both traces together document gap -> guard. Raw-bypass repro:
+INT4_PROTECTED_ALLOW_CHUNKED_PREFILL=1 python - <<'EOF'
+import os, kv_policy.int4_protected  # registers backend
+from vllm import LLM, SamplingParams
+llm = LLM(model=os.environ["M"], kv_cache_dtype="int4_protected",
+          block_size=32, max_model_len=8192, enforce_eager=True,
+          enable_chunked_prefill=True, max_num_batched_tokens=472,
+          gpu_memory_utilization=0.5)
+llm.generate(["word " * 1500], SamplingParams(max_tokens=2))  # expect loud refusal, stack trace = P1 evidence
+EOF
+
+# P2 — PRIZE BOUND on STOCK bf16 (~20 min). 44K and 100K, chunked
+#   on/off, util 0.85. THE STOP RULE: if the 100K chunked-on cell cannot
+#   run at util 0.85 (OOM) or shows no peak-memory headroom vs off,
+#   the prize is smaller than claimed -> re-scope the story before G4.
+python $G --probe p2 --chunked off --p2-tokens 44000  --gpu-util 0.85 --model $M --out /tmp/p2_44k_off.json   # expect: OOM or huge spike (the banked 76.3 GiB shape)
+python $G --probe p2 --chunked on  --p2-tokens 44000  --gpu-util 0.85 --model $M --out /tmp/p2_44k_on.json
+python $G --probe p2 --chunked off --p2-tokens 100000 --gpu-util 0.85 --model $M --out /tmp/p2_100k_off.json
+python $G --probe p2 --chunked on  --p2-tokens 100000 --gpu-util 0.85 --model $M --out /tmp/p2_100k_on.json
+# record: nvml_peak_used_gib, prefill_wall_s, ttft_s, short_ttfts_s, ran-at-all.
+
+# G1 — selftests + guard tests (every suite, incl. the new 6K.18 one):
+python CTM_plus/KVPolicy/kv_policy/phase6k16_prefix_prefill.py          # incl. tail-splice §6
+python CTM_plus/KVPolicy/tests/test_phase6k18_chunked_prefill.py
+python CTM_plus/KVPolicy/tests/test_phase6n_prot_int8.py
+for t in CTM_plus/KVPolicy/tests/test_*.py; do python $t || break; done
+python $G --selftest
+
+# G2 — S1-chunked byte-gate (THE machinery gate; red = full stop).
+#   Aligns dump events BY BLOCK ID (chunked finalize order differs).
+python $G --mode mono    --dump /tmp/s1_mono.pt    --model $M
+python $G --mode chunked --dump /tmp/s1_chunked.pt --model $M
+python $G --compare /tmp/s1_mono.pt /tmp/s1_chunked.pt
+
+# G3 — greedy chunked vs monolithic (6 prompts + one >2-chunk prompt).
+#   EXPECT near-bar, NOT bit-exact (context-quant residual: chunk k sees
+#   QUANTIZED full blocks where monolithic saw exact bf16). Divergences
+#   must be coherent near-ties; any degenerate text = machinery FAIL.
+python $G --greedy mono    --out /tmp/g3_mono.json    --model $M
+python $G --greedy chunked --out /tmp/g3_chunked.json --model $M
+python $G --compare-greedy /tmp/g3_mono.json /tmp/g3_chunked.json
+
+# G4 — needle 32K + 100K WITH chunking at util 0.85 (THE prize cell).
+#   Baseline = the unchunked util-0.55 numbers. Record retrieval + peak
+#   memory + TTFT. (6k12 trap: --model AND --protect-mask, always.)
+NEEDLE_CHUNKED=1 NEEDLE_GPU_UTIL=0.85 NEEDLE_MAX_BATCHED=2048 \
+  python CTM_plus/Bench/scripts/phase6k12_hard_needle.py \
+  --mml 32768 --items 4 --cells bf16,protected --model $M --protect-mask $PROTECT_MASK_PATH
+NEEDLE_CHUNKED=1 NEEDLE_GPU_UTIL=0.85 NEEDLE_MAX_BATCHED=2048 \
+  python CTM_plus/Bench/scripts/phase6k12_hard_needle.py \
+  --mml 102400 --items 2 --cells protected --model $M --protect-mask $PROTECT_MASK_PATH
+# unchunked util-0.55 baseline (only if not already banked this pod):
+NEEDLE_GPU_UTIL=0.55 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py \
+  --mml 32768 --items 4 --cells protected --model $M --protect-mask $PROTECT_MASK_PATH
+
+# G5 — mixed-batch TTFT on the int4 engine (decode stall), chunked A/B:
+python $G --probe p2 --engine int4 --chunked off --p2-tokens 32000 --gpu-util 0.55 --model $M --out /tmp/g5_off.json
+python $G --probe p2 --engine int4 --chunked on  --p2-tokens 32000 --gpu-util 0.55 --model $M --out /tmp/g5_on.json
+# compare short_ttfts_s: chunked-on shorts must not stall behind the long prefill.
+
+# G6 — interaction cells (D4 decision happens HERE, by measurement):
+#   (a) APC+chunked: pass => supported combo; fail => wire the loud
+#       refusal for the combination (factory) and ship chunked w/o APC.
+python $G --mode chunked --apc --dump /tmp/s1_apc_chunked.pt --model $M
+python $G --compare /tmp/s1_mono.pt /tmp/s1_apc_chunked.pt
+python $G --greedy chunked --apc --out /tmp/g6_apc.json --model $M
+python $G --compare-greedy /tmp/g3_mono.json /tmp/g6_apc.json
+NEEDLE_APC=1 NEEDLE_CHUNKED=1 python CTM_plus/Bench/scripts/phase6k12_hard_needle.py \
+  --mml 8192 --items 4 --cells protected --model $M --protect-mask $PROTECT_MASK_PATH
+#   (b) prot-int8 (6N) + chunked (set the flag in BOTH compared cells):
+INT4_PROTECTED_PROT_INT8=1 python $G --mode mono    --dump /tmp/s1_mono8.pt    --model $M
+INT4_PROTECTED_PROT_INT8=1 python $G --mode chunked --dump /tmp/s1_chunked8.pt --model $M
+python $G --compare /tmp/s1_mono8.pt /tmp/s1_chunked8.pt
+
+# AFTER all green (and only then, with the measured numbers):
+#  - design doc status -> GATED + checklist results (P2/G4 peak-mem +
+#    util numbers are the headline; G5 TTFT secondary),
+#  - downgrade the factory's POD-GATES-PENDING warning to logger.info,
+#  - this ledger entry -> ✅ with the numbers,
+#  - deploy/INT4_PROTECTED_DESIGN.md + VC-brief long-context paragraphs.
+# If ANY gate is red: fix or revert — never ship red; a win on corrupted
+# output never counts.
+```
+
 ## TASK 6N ✅ ALL GATES GREEN 2026-06-12 (A100-SXM4-80G, same pod)
 
 Phase 6N (asym-static int8 protected channels) behind
