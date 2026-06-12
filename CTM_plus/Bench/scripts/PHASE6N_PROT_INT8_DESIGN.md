@@ -17,14 +17,24 @@ states; recalibration reproduced the deployed mask byte-identically
 Storage note: codes are uint8 0..255 with the xmin offset (the probe's
 exact math and the int4 path's existing asym convention) — "int8" in this
 doc means 8-bit integer storage; the byte count is identical.
-MODEL SCOPE (honest): every 6N number above — probe residual AND gates —
-is **Llama-3.1-8B only**. The mechanism is per-model by construction
-(each model's own v2 calibration supplies its min/max), but the protect
-score-noise share (11.2% here) is model-specific; before enabling the
-flag on Qwen/Mistral run the per-model short check: recalibrate v2
-(mask-unchanged assert) -> probe_block_quant_error (read the
-prot_int8_static_asym % for THAT model) -> phase6n_prot_int8_gate greedy
-A/B -> savings-probe needle A/B.
+MODEL SCOPE: the full gate set above is **Llama-3.1-8B**. The mechanism
+is per-model by construction (each model's own v2 calibration supplies
+its min/max); protect's weight is model-specific, so each model gets the
+short check before the flag is enabled there: recalibrate v2 ->
+probe_block_quant_error (prot_int8_static_asym for THAT model) ->
+phase6n_prot_int8_gate greedy A/B -> savings-probe needle A/B.
+
+| model (short check 2026-06-12, same pod) | probe: cur_bf16 / asym-static (benefit retained) | greedy A/B | needle A/B | sidecar delta |
+|---|---|---|---|---|
+| Llama-3.1-8B (full gates) | 95.0% / 95.9% (**82%**) | 6/6 identical, 32/32 active | OK both | **-0.953 GiB** @24,987 blk (byte-exact) |
+| Qwen2.5-7B | 93.9% / 94.7% (**87%**) | 6/6 identical, 28/28 active | OK both | **-0.991 GiB** @59,388 blk (byte-exact) |
+| Mistral-7B-v0.3 | NOT RUN | — | — | — |
+
+Qwen lineage note: this pod had no prior Qwen artifact — its mask is
+freshly calibrated (v2), so the A/B is internally consistent but not
+comparable against historical Qwen-pod numbers. Mistral pending; its
+margins are thinner on unrelated gates (keep-set depth-0.5) — judge it
+on its own probe line.
 
 ## Evidence (probe_block_quant_error, 2026-06-12, 26,629 tokens x 32 layers)
 
