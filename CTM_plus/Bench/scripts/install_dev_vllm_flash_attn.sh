@@ -28,7 +28,21 @@ if [ -z "$WHEEL_PATH" ] || [ ! -f "$WHEEL_PATH" ]; then
     exit 1
 fi
 
-FA_VENDORED=/workspace/venv-vllm/lib/python3.12/site-packages/vllm/vllm_flash_attn
+# Locate the vendored slot from whichever python actually has vllm — venv OR
+# system install (fresh pods may have no /workspace/venv-vllm at all). Override
+# with FA_VENDORED=... if needed.
+if [ -z "${FA_VENDORED:-}" ]; then
+    for PYBIN in python3 python; do
+        FA_VENDORED=$(command -v "$PYBIN" >/dev/null 2>&1 && "$PYBIN" -c \
+            'import vllm, os; print(os.path.join(os.path.dirname(vllm.__file__), "vllm_flash_attn"))' \
+            2>/dev/null) && [ -n "$FA_VENDORED" ] && break
+    done
+fi
+if [ -z "${FA_VENDORED:-}" ] || [ ! -d "$FA_VENDORED" ]; then
+    echo "ERROR: cannot locate the vendored vllm_flash_attn dir (is vllm importable" >&2
+    echo "       from python3/python?). Set FA_VENDORED=... explicitly." >&2
+    exit 1
+fi
 BACKUP_DIR=/workspace/dev/build-logs/vllm_flash_attn_vendored_backup
 if [ ! -d "$BACKUP_DIR" ]; then
     echo "ERROR: backup dir $BACKUP_DIR missing — refuse to install without backup" >&2
