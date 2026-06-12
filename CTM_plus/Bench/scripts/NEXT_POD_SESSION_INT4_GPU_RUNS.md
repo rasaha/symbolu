@@ -278,3 +278,19 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   score-space (|k_d| x |q_d| weighting), not element-space; the per-layer
   score SNR + sensitivity-mask overlap live in /tmp/qerr/summary.json
   (offline analysis; no GPU rerun needed by design).
+- SCORE-NOISE ATTRIBUTION (offline from channels.npz): deployed 4% mask
+  carries 11.2% of score-noise weight (5.8-15.0% by layer) = 2.8x its
+  budget share; sensitivity-ranked ceiling at same budget = 16.0%.
+  READ: protect is a real but SECONDARY contributor — ~89% of the
+  measured near-bf16 quality is carried by block-local per-channel int4
+  itself; protect's clearest job is tail-trimming (block p99 -24%).
+  DECISIONS: (a) mask re-ranking SHELVED — +4.8pp score-noise removal is
+  below gate sensitivity on a model already at needle 1.0; it becomes
+  the FIRST lever for models that fail gates (Mistral keep-set depth-0.5,
+  Qwen-1M rope). (b) rotation-v2 thesis STRENGTHENED: deleting all
+  protect machinery (sidecar + splice, ~half the fuseable decode
+  overhead) risks only ~11% score-noise increase — pending its own
+  end-to-end gates. (c) int8-protect even safer (demotes an 11%-share
+  population from exact to ~16x-finer-than-int4). OPTIONAL closer: a
+  no-protect end-to-end ablation (needle 32-60K + 6-prompt greedy,
+  ~10 min) would convert the 89% proxy into a measured claim.
