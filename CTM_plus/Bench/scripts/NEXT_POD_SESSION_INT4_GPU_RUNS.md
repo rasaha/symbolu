@@ -1,5 +1,23 @@
 # NEXT POD SESSION — int4_protected GPU runs (deploy verify + headroom + APC payoff)
 
+## TASK 1 ✅ MEASURED 2026-06-12 (A100-SXM4-80G, util 0.85, mml 32768, --quick)
+
+- DENSITY: bf16 399,792 slots -> int4 799,584 = **2.00x raw pool**;
+  sidecars **8.3 GiB measured outside the pool** -> **~1.75x net** at equal
+  total VRAM. (Historical 1.83x was at a smaller pool — the sidecar
+  fraction scales with pool size, so net is util-dependent: quote 1.75x
+  at max-util, not 1.83x, for this config.)
+- QUALITY: needle RETRIEVED at ctx=16384 (also gates the cu128-toolchain
+  rebuild: eager B=1 int4 read path coherent).
+- APC (quick: N=8, gen=16, hit 88%): TTFT saved 62% @prefix=2000 ->
+  **79% @4000** (grows with prefix ✓), tput **1.37x -> 1.78x**, quality
+  1.00/1.00 both rows. As-shipped comparison (APC cell eager vs no-APC
+  graphs) — the speedup is NET of the eager tax.
+- Full report + artifacts: /tmp/savings_demo on the pod.
+
+Tasks 2-4 below still to run; docs update (task 5) after 2+3.
+
+
 Status: every script below is **CPU-validated only** (selftests ALL PASS, dry-runs
 emit correct per-cell commands, the savings-report renderer verified against
 fixture JSONs on 2026-06-12 — cross-file JSON contracts checked field-by-field).
