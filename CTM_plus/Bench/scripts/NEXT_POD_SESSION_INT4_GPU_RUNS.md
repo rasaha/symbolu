@@ -141,3 +141,11 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   (True refused; INT4_PROTECTED_ALLOW_CHUNKED_PREFILL=1 dev override) —
   guard-tested in tests/test_phase6k17_chunked_guard.py. phase9's
   _engine_kwargs pins False too (bf16 ref + route-A comparability at >32K).
+- Second OOM shape (hit live, noapc p2000 cell): SMALL mml -> vLLM profiles
+  tiny activations -> BIGGER pool (51.5 GiB at mml=6096) -> bigger sidecars
+  (~16% of pool) -> graphs capture allocates them all ("capture took 11.82
+  GiB") -> 79.06/79.14 used -> first prefill OOMs. Fix: apc_payoff_sweep
+  default --gpu-util 0.60 (sweep needs ~2 GiB of cache; TTFT/tput are
+  pool-independent), headroom bench default 0.70, demo no longer forwards
+  its density-util into the APC stage. High util remains ONLY where it is
+  the point (the density probe).

@@ -83,8 +83,12 @@ fi
 if [[ "${SKIP_APC}" == "0" ]]; then
     say "2/3  APC PREFILL SAVING — TTFT + throughput, APC on vs off, swept by prefix length"
     if [[ "${QUICK}" == "1" ]]; then PREFIXES="2000,4000"; NREQ=8; AGEN=16; else PREFIXES="1000,2000,4000,8000"; NREQ=16; AGEN=32; fi
+    # NB: deliberately NOT forwarding --gpu-util: the sweep's own default
+    # (0.60) applies. High util is for the DENSITY showcase; for the APC
+    # cells it just inflates the pool -> inflates out-of-pool sidecars ->
+    # knife-edge OOM on the graphs cell. TTFT/speedup are pool-independent.
     "${PY}" "${BENCH}/apc_payoff_sweep.py" --model "${MODEL}" --prefixes "${PREFIXES}" \
-        --num-requests "${NREQ}" --num-groups 1 --gen "${AGEN}" --gpu-util "${GPU_UTIL}" \
+        --num-requests "${NREQ}" --num-groups 1 --gen "${AGEN}" \
         --out-dir "${OUT_DIR}/apc" || warn "apc payoff sweep failed"
 else
     say "2/3  APC — SKIPPED (--skip-apc)"

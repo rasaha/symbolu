@@ -182,7 +182,10 @@ def main(argv=None):
                     help="0 -> context_tokens + 4096 headroom")
     ap.add_argument("--gen", type=int, default=64, help="decode tokens to profile over")
     ap.add_argument("--batch", type=int, default=1, help="B (read-skip regime is 1)")
-    ap.add_argument("--gpu-util", type=float, default=0.85)
+    # 0.70 (not 0.85): pool size doesn't affect the timing split, but the
+    # out-of-pool sidecars scale with the pool — 0.85 leaves ~3 GiB margin
+    # at 32K ctx (knife-edge), 0.70 leaves ~20 GiB.
+    ap.add_argument("--gpu-util", type=float, default=0.70)
     ap.add_argument("--n-runs", type=int, default=2)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)

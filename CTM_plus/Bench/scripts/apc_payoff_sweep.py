@@ -280,7 +280,12 @@ def main(argv=None):
                     help="distinct prefixes among the requests; hit_rate=(N-G)/N")
     ap.add_argument("--gen", type=int, default=32)
     ap.add_argument("--ttft-reps", type=int, default=5)
-    ap.add_argument("--gpu-util", type=float, default=0.85)
+    # 0.60, deliberately NOT 0.85: the sweep needs ~2 GiB of KV cache, and a
+    # bigger pool means BIGGER out-of-pool sidecars (~16% of pool) — at 0.85
+    # the noapc (graphs) cell allocates weights+pool+sidecars+capture to
+    # 79.06/79.14 GiB and the first real prefill OOMs (measured: capture
+    # "took 11.82 GiB" at mml=6096). TTFT/throughput are pool-independent.
+    ap.add_argument("--gpu-util", type=float, default=0.60)
     ap.add_argument("--out-dir", default="/tmp/apc_payoff")
     ap.add_argument("--python", default=sys.executable)
     ap.add_argument("--reuse", action="store_true")
