@@ -64,7 +64,7 @@ The industry has tried four mitigations:
 | Approach | Memory savings | Quality | Status |
 |---|---:|---|---|
 | **bf16** (baseline) | 1.0× | perfect | the reference |
-| **fp8** (half-precision) | 0.5× KV | **poor** — needle 1/15 (6.7%) on Qwen-7B (200-fillers 1/5, 600-fillers 0/5, 1200-fillers 0/5, direct measurement); 0/6 bit-identical greedy decode; 12% common-prefix overlap vs bf16 | shipped, widely deployed; quality degradation accepted |
+| **fp8** (half-precision) | 0.5× KV | **poor-to-mixed, MODEL-DEPENDENT** — Qwen-7B: needle 1/15 (6.7%), 0/6 bit-identical greedy, 12% prefix overlap (direct measurement). Llama-3.1-8B gate (June 2026): lite needles PASS (3/3@8K, 5/5@32K) but greedy divergence persists — e5m2 1/6 identical / 41% overlap, e4m3+calculated-scales 2/6 / 84% — and **both measured SLOWER than bf16 on vLLM 0.7.3** (0.76× / 0.33× @32K B=1): no speed win to offset the quality risk | shipped, widely deployed; quality degradation accepted |
 | **naive int4** (unprotected 4-bit) | 0.5× KV | degraded — token-agreement vs bf16 collapses to 0.533 (53%); easy needle deceptively OK (≈0.96–1.0) but general generation fidelity is substantially degraded; hard multi-needle retrieval 0.915 (vs bf16 1.000) | research-grade only; not shippable for quality-sensitive workloads |
 | **int4 with protected channels** *(our approach)* | **0.5× KV** | **near-bf16 fidelity: token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16 (saturated); hard-needle retrieval 0.964 (vs naive 0.915, bf16 1.000); 4-model portfolio 15/15 needle replicated 2-of-2 seeds on Mistral-7B, Llama-3.1-8B, Qwen-14B** | **shipped via vLLM, 4 models measured this quarter** |
 
@@ -380,7 +380,7 @@ tax is already smallest for free.
 | Approach | Memory | Quality | Notes |
 |---|---:|---|---|
 | **bf16** (vLLM default) | 1.0× | perfect | the reference |
-| **fp8** (vLLM-supported) | 0.5× KV | poor — needle 1/15 (6.7%) on Qwen-7B; 0/6 bit-identical greedy; 12% common-prefix overlap | half-precision; ships, accepted as a quality compromise |
+| **fp8** (vLLM-supported) | 0.5× KV | poor-to-mixed, model-dependent — Qwen-7B needle 1/15; Llama-3.1-8B (June 2026): lite needles pass, greedy still diverges (e5m2 1/6 / 41%; e4m3+scales 2/6 / 84%), and both decode SLOWER than bf16 on vLLM 0.7.3 (0.76× / 0.33×) | half-precision; ships, accepted as a quality compromise |
 | **AWQ / GPTQ** (weight-only quantization) | weights only, not KV | high | does NOT compress KV-cache; orthogonal solution |
 | **naive int4 (KIVI-style)** | 0.5× KV | degraded — token-agreement vs bf16: 0.533 (53%); easy needle deceptively OK but general fidelity substantially reduced | research-grade; our measurements confirm fidelity degradation |
 | **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 *(competitor's reported figure)* | W4A4 not KV; complementary, not competitive |
@@ -817,6 +817,17 @@ constraint and the KV fits, bf16. They complement, not compete.**
 | Agentic, many turns | **KVPro** | sessions grow; APC cuts re-prefill **−53→−86% per hit** |
 | RAG over shared documents | **KVPro** | document prefix cached once (APC): **1.19–1.85×** batch throughput at 94% hit rate |
 | Latency-critical single-stream long-gen | bf16 | KVPro's disclosed worst regime (0.17× at 60K, B=1) |
+
+**What about an 8-bit middle tier?** Gated on this stack (June 2026,
+`bench_8bit_kv_gate.py`): vLLM has **no int8 KV** (fp8 only, verified from
+source), and **neither fp8 variant is a speed tier** — e5m2 decodes at 0.76×
+bf16 with corrupted greedy output (1/6 identical, 41% overlap), e4m3 with
+calculated scales at **0.33× bf16** with lite-gate quality only (needles pass
+on Llama, 2/6 identical / 84% overlap; the hard gates KVPro passed — depth-
+stressed hard-needle, 60K retention, byte-exact APC — have not been run on
+it). fp8-e4m3 is the honest **max-density** option (2.00× in-pool, no sidecar
+tax, vs KVPro's 1.75× net) for quality-tolerant traffic; it does not replace
+bf16 for speed or KVPro for hard-gated quality. The bf16/KVPro split stands.
 
 **The economics on one A100-80G (measured, Llama-3.1-8B, util 0.85, mml 32K):**
 

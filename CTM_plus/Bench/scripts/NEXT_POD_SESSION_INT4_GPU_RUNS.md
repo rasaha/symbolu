@@ -229,3 +229,17 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   density/needles/6-prompt bit-exactness/decode tok/s for fp8_e4m3
   (+calculated scales if supported) and fp8_e5m2 vs bf16. LMDeploy/TRT
   int8 explicitly out of scope.
+- 8-BIT KV GATE MEASURED 2026-06-12 (bench_8bit_kv_gate.py, graphs ON,
+  B=1, mml 36096, util 0.55): vLLM 0.7.3 accepts auto/fp8/fp8_e4m3/
+  fp8_e5m2 — NO int8 (verified from CacheConfig source);
+  calculate_kv_scales supported. bf16 202,480 slots / 66.9 tok/s.
+  fp8_e4m3+calc-scales: 2.00x slots, needles 3/3+5/5, greedy 2/6
+  identical / 84% overlap, 21.9 tok/s = 0.33x. fp8_e5m2: 2.00x slots,
+  needles pass, greedy 1/6 / 41% (FAIL), 50.8 tok/s = 0.76x.
+  CONCLUSIONS: (a) the fp8 needle catastrophe (Qwen 1/15) is
+  MODEL-DEPENDENT — brief updated to rest the quality wedge on greedy
+  divergence + hard gates, not needles-always-fail; (b) NO fast 8-bit
+  tier exists on vLLM 0.7.3 — both fp8 variants slower than bf16;
+  (c) fp8-e4m3 = max-density option (2.00x, no sidecars) at 0.33x with
+  lite-grade quality; KVPro keeps hard-gated quality + APC-measured.
+  Escalation if ever needed: run 6k12 hard-needle on fp8_e4m3.
