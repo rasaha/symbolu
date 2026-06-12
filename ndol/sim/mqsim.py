@@ -126,8 +126,12 @@ def run_mqsim(
             f"MQSim binary not found at {binary}. Build it: "
             f"git clone https://github.com/CMU-SAFARI/MQSim && cd MQSim && make -j"
         )
-    ssdconfig = ssdconfig or os.path.join(mqsim_dir, "ssdconfig.xml")
     out_dir = out_dir or os.path.dirname(os.path.abspath(trace_path))
+    if ssdconfig is None:
+        # Default to a shrunk device so MQSim's startup allocation fits a
+        # memory-capped container (the full ssdconfig models ~512 GB → OOM).
+        ssdconfig = os.path.join(out_dir, "ssd_small.xml")
+        _configure(ET.parse(os.path.join(mqsim_dir, "ssdconfig.xml"))).write(ssdconfig)
 
     workload = os.path.join(out_dir, os.path.basename(trace_path) + ".workload.xml")
     write_workload_xml(workload, trace_path)
@@ -155,16 +159,37 @@ def _retained_set(step: int, n_blocks: int, retained: int) -> list[int]:
     return list(range(hot)) + list(range(hot + start, hot + start + window))
 
 
+def _configure(
+    tree: "ET.ElementTree",
+    *,
+    t_r_us: float | None = None,
+    blocks_per_plane: int = 16,
+    pages_per_block: int = 64,
+) -> "ET.ElementTree":
+    """Shrink the simulated device and (optionally) set its tier read latency.
+
+    The default ssdconfig models a ~512 GB device whose page-level FTL map +
+    startup pre-conditioning allocate multiple GB — enough to be SIGKILL'd by a
+    container memory cgroup. Our KV traces touch only a few MB of LBA space, so
+    we shrink Block_No_Per_Plane / Page_No_Per_Block to a ~1 GB device. The
+    channel/chip/die/plane parallelism (which drives the timing model) is
+    untouched, so latencies stay representative; only the address space shrinks.
+    """
+    for el in tree.getroot().iter():
+        if t_r_us is not None and el.tag.startswith("Page_Read_Latency"):
+            el.text = str(int(t_r_us * 1000))
+        elif el.tag == "Block_No_Per_Plane":
+            el.text = str(blocks_per_plane)
+        elif el.tag == "Page_No_Per_Block":
+            el.text = str(pages_per_block)
+    return tree
+
+
 def make_tier_config(base_ssdconfig: str, out_path: str, t_r_us: float) -> str:
     """Write an ssdconfig variant whose every Page_Read_Latency_* equals `t_r_us`
-    (µs → ns). Models an SLC/TLC/QLC tier by its array read time t_R — the term
-    §2 says dominates a read. Everything else (geometry, program/erase) is held
-    fixed so t_R is the only variable."""
-    tree = ET.parse(base_ssdconfig)
-    ns = int(t_r_us * 1000)
-    for el in tree.getroot().iter():
-        if el.tag.startswith("Page_Read_Latency"):
-            el.text = str(ns)
+    (µs → ns), on a shrunk device. Models an SLC/TLC/QLC tier by its array read
+    time t_R — the term §2 says dominates a read."""
+    tree = _configure(ET.parse(base_ssdconfig), t_r_us=t_r_us)
     tree.write(out_path)
     return out_path
 
