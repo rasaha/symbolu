@@ -58,9 +58,28 @@ Measured headroom 60%@8K -> 42%@32K, GO at both ends (threshold 35%);
 biggest relative win at short-mid context; realized < headroom; decode
 ceiling ~0.27-0.30x unchanged until built.
 
-Task 4 (crossover >32K) optional, not yet run. Docs (task 5) DONE for
-density + APC + headroom (brief + DESIGN section 6 updated with measured
-numbers).
+## TASK 4 (read-skip crossover >32K) ✅ MEASURED 2026-06-12 — ANSWER: NO CROSSOVER
+
+| ctx   | bf16 tps | int4 tps (/bf16) | rs tps (/bf16) | skip% | quality bf/int4/rs |
+|------:|---------:|-----------------:|---------------:|------:|--------------------|
+| 32000 |    66.19 |    14.91 (0.23x) |  16.14 (0.24x) |  77.1 | 1.00/1.00/1.00 |
+| 44000 |    62.72 |    11.96 (0.19x) |  14.39 (0.23x) |  83.3 | 1.00/1.00/1.00 |
+| 52000 |    60.13 |    10.85 (0.18x) |  13.71 (0.23x) |  85.6 | 1.00/1.00/1.00 |
+| 60000 |    57.74 |     9.65 (0.17x) |  13.10 (0.23x) |  87.7 | 1.00/1.00/1.00 |
+
+(B=1, gen=128, eager; bf16 cells at util 0.85, AB cells at 0.55 — B=1
+decode tok/s is pool-independent.) NO bf16 crossover up to 60K: rs flat
+~0.23x while quant-alone slopes 0.23->0.17x; read-skip claws back
++8%->+36% over quant-alone as skip grows 77->88%, quality 1.00 everywhere
+(notable at 87.7% skip). The parity thesis is unsupported at these
+lengths — story stays density + quality + APC. NOTE: 0.17x is BELOW the
+previously disclosed 0.22x floor -> cost range updated to 0.17-0.67x in
+brief/DESIGN/demo/QUICKSTART. The relative read-skip delta is
+keep-set-dependent (prior ~95%-skip config measured +25->+72%).
+
+Docs (task 5) DONE for density + APC + headroom + crossover (brief, DESIGN
+§6, demo, QUICKSTART all carry measured numbers; page-1 stale ~50K
+extrapolation replaced with the measured answer).
 
 
 Status: every script below is **CPU-validated only** (selftests ALL PASS, dry-runs

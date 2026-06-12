@@ -79,7 +79,7 @@ DENSITY :  bf16 N1 token-slots  ->  int4 N2  =  ~2.0x  more users/context per GP
 QUALITY :  int4 needle RETRIEVED — near-bf16, no quality cost                       [differentiator]
 APC     :  TTFT -XX% per cache hit (prefix=P), Y.Yx throughput at hit-rate H        [prefill saving]
 ------------------------------------------------------------------------------
-COST    :  decode throughput ~0.22-0.67x bf16 (DISCLOSED) — int4 is kernel-bound ...
+COST    :  decode throughput ~0.17-0.67x bf16 (DISCLOSED) — int4 is kernel-bound ...
 ------------------------------------------------------------------------------
 NET     :  ~2x the users/context per GPU at near-bf16 quality, plus prefill savings
            on shared-prefix traffic, at a disclosed decode cost.

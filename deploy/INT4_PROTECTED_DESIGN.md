@@ -14,7 +14,7 @@ loses quality and naive int4 loses fidelity.
 
 > **The honest sentence, up front:** the win is **density + preserved quality**
 > (and, for shared-prefix workloads, an **APC prefill saving**) — **not raw decode
-> throughput.** int4_protected is **decode-throughput-negative** (~0.22–0.67× bf16;
+> throughput.** int4_protected is **decode-throughput-negative** (~0.17–0.67× bf16;
 > it is kernel-bound). It serves **~2× more concurrent / longer-context users per
 > GPU at near-bf16 quality** for **throughput-insensitive, density-bound** and
 > **shared-prefix / short-output** workloads. A customer "experiences the savings"
@@ -130,7 +130,7 @@ A deployment realizes value on three axes; one cost is disclosed.
 | **Density** (the $ saving) | **2.00× raw pool measured live** (399,792 → 799,584 token-slots, A100-80G, util 0.85, mml 32K); **~1.75× net** of the measured **8.3 GiB** out-of-pool sidecar tax at equal total VRAM. Net is util-dependent (tax ~16% of pool): 1.83× at smaller pools | LIVE-MEASURED (savings demo, June 2026) |
 | **Quality** (the differentiator) | near-bf16: needle == bf16 (live: RETRIEVED at ctx=16K); MMLU 0.0 pt; hard-needle 0.964 | MEASURED, 4 models |
 | **APC prefill** (shared-prefix) | **Measured** (Llama-3.1-8B, N=16, gen=32): TTFT **−53/−56/−78/−86%** per cache hit at 1K/2K/4K/8K prefixes; batch throughput **1.19–1.85×** at 94% hit rate, 1.28–1.54× at 75%; quality 1.00 == APC-off in every cell; net of the eager tax. Compounds with density | MEASURED (apc_payoff_sweep, June 2026) |
-| **Decode throughput** (the cost) | **0.22–0.67× bf16** — kernel-bound; recoverable ceiling ~0.27–0.30×, NOT parity. Fusion headroom measured June 2026: pre-kernel gather+splice = **60% / 42%** of the B=1 read path at 8K / 32K ctx → the 6F in-kernel gather is **GO** (realized < headroom) | DISCLOSED |
+| **Decode throughput** (the cost) | **0.17–0.67× bf16** (floor: B=1 eager 60K ctx, June 2026) — kernel-bound; recoverable ceiling ~0.27–0.30×, NOT parity. Fusion headroom measured June 2026: pre-kernel gather+splice = **60% / 42%** of the B=1 read path at 8K / 32K ctx → the 6F in-kernel gather is **GO** (realized < headroom) | DISCLOSED |
 
 **Where it wins:** throughput-insensitive density-bound serving (many concurrent
 long-context users; batch/offline) **and** shared-prefix / short-output workloads
@@ -229,7 +229,7 @@ It runs (each guarded, honest framing):
 
 | Limit | Detail / mitigation |
 |---|---|
-| **Decode throughput-negative (0.22–0.67×)** | kernel-bound (gather + dequant); recoverable ceiling ~0.27–0.30×, **not parity**. Size the gather-fusion win first: `bench_decode_gather_fusion_headroom.py`. |
+| **Decode throughput-negative (0.17–0.67×)** | kernel-bound (gather + dequant); recoverable ceiling ~0.27–0.30×, **not parity**. Size the gather-fusion win first: `bench_decode_gather_fusion_headroom.py`. |
 | **+4.4 GB sidecar tax** | structural (scales with KV block pool, **flat with context length**); diet (fp8 sidecars / coarser V) saves ~2.5 GB but not to parity. |
 | **graphs + APC gated OFF** | root-caused to the **int4 attention kernel not being CUDA-graph-safe at B>1** (identical inputs → ~1.8× divergent output; our Python state machine measured clean). APC **ships eager-only**; low-ROI to fix since int4 is kernel-bound (graphs buy little). See `PHASE6K16_APC_CONTRACT.md`. *Open: non-APC graphs at B>1 shares the kernel — a revalidation item.* |
 | **D=128 head dim only** | Phi (D=96) etc. need a kernel recompile, not a methodology change. |

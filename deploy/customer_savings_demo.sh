@@ -9,7 +9,7 @@
 #   DENSITY  — token-slots per GPU, int4_protected vs bf16 (same budget)  [the $ win]
 #   QUALITY  — needle retrieval == bf16                                   [no quality cost]
 #   APC      — TTFT saved per cache hit + throughput on shared prefixes   [prefill saving]
-#   COST     — decode throughput ~0.22-0.67x bf16                         [disclosed]
+#   COST     — decode throughput ~0.17-0.67x bf16                         [disclosed]
 #
 # Prereqs (see deploy/INT4_PROTECTED_DESIGN.md §8): a deployed pod, venv-vllm
 # active, the kernel built, and PROTECT_MASK_PATH exported.
@@ -145,7 +145,7 @@ else:
     print("APC     :  n/a (sweep did not complete or quality gate not clean)")
 
 print("-" * 78)
-print("COST    :  decode throughput ~0.22-0.67x bf16 (DISCLOSED) — int4 is kernel-bound;")
+print("COST    :  decode throughput ~0.17-0.67x bf16 (DISCLOSED) — int4 is kernel-bound;")
 print("           recoverable ceiling ~0.27-0.30x, NOT parity. Best for throughput-")
 print("           insensitive density-bound + shared-prefix/short-output workloads.")
 print("-" * 78)
