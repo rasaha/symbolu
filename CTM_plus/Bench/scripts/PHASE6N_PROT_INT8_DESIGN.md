@@ -28,13 +28,17 @@ phase6n_prot_int8_gate greedy A/B -> savings-probe needle A/B.
 |---|---|---|---|---|
 | Llama-3.1-8B (full gates) | 95.0% / 95.9% (**82%**) | 6/6 identical, 32/32 active | OK both | **-0.953 GiB** @24,987 blk (byte-exact) |
 | Qwen2.5-7B | 93.9% / 94.7% (**87%**) | 6/6 identical, 28/28 active | OK both | **-0.991 GiB** @59,388 blk (byte-exact) |
-| Mistral-7B-v0.3 | NOT RUN | — | — | — |
+| Mistral-7B-v0.3 | 93.7% / 94.6% (**86%**) | 6/6 identical, 32/32 active | OK both | **-1.015 GiB** @26,609 blk (byte-exact) |
 
-Qwen lineage note: this pod had no prior Qwen artifact — its mask is
-freshly calibrated (v2), so the A/B is internally consistent but not
-comparable against historical Qwen-pod numbers. Mistral pending; its
-margins are thinner on unrelated gates (keep-set depth-0.5) — judge it
-on its own probe line.
+THREE-MODEL READ: benefit retained 82-87% everywhere; greedy 18/18
+prompts bit-identical across the three ON/OFF pairs; needles clean; all
+three sidecar deltas match the byte arithmetic EXACTLY (the saving is
+~1 GiB/model at util-0.85 pools despite different shapes — Qwen's
+half-size per-block saving is offset by its 2.4x bigger pool). Mistral's
+thin margins on unrelated gates did NOT materialize for prot-int8.
+Lineage note: the Qwen and Mistral masks were freshly calibrated on this
+pod (no prior artifacts existed here) — their A/Bs are internally
+consistent but not comparable against historical pods' numbers.
 
 ## Evidence (probe_block_quant_error, 2026-06-12, 26,629 tokens x 32 layers)
 
