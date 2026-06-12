@@ -799,6 +799,53 @@ The shippable product fits any of:
 | Open-model hubs deploying Llama / Mistral / Qwen at scale | The 3 model families validated this quarter cover ~80% of open-weights serving traffic by category. |
 | Edge / low-HBM hardware (H100 PCIe 80GB, L40S 48GB) | Lower-tier GPUs that can't hold 32K concurrent context in bf16 can hold it in int4_protected at near-bf16 fidelity. |
 
+### Real-world economics — the bf16 + KVPro playbook (measured numbers)
+
+int4_protected (productized name: **KVPro**) is **not a bf16 replacement** —
+the crossover sweep settled that (decode 0.17–0.67× bf16, no parity ≤60K).
+It is a **memory-density tool**: bf16 buys speed, KVPro buys capacity, and a
+deployment that routes between them beats either alone.
+
+**The core principle: if memory is the constraint, KVPro; if speed is the
+constraint and the KV fits, bf16. They complement, not compete.**
+
+| Workload | Route to | Why (measured) |
+|---|---|---|
+| Short chat (<4K), low concurrency | bf16 | speed matters; the KV fits anyway |
+| Short/mid chat, high concurrency | **KVPro** | the KV pool is the binding constraint → 2.00× slots |
+| Long context (16K+) | **KVPro** | 2× context per GPU at near-bf16 quality (needle 1.0 to 60K) |
+| Agentic, many turns | **KVPro** | sessions grow; APC cuts re-prefill **−53→−86% per hit** |
+| RAG over shared documents | **KVPro** | document prefix cached once (APC): **1.19–1.85×** batch throughput at 94% hit rate |
+| Latency-critical single-stream long-gen | bf16 | KVPro's disclosed worst regime (0.17× at 60K, B=1) |
+
+**The economics on one A100-80G (measured, Llama-3.1-8B, util 0.85, mml 32K):**
+
+| Metric | bf16 | KVPro | Ratio |
+|---|---|---|---|
+| KV tokens per GiB of pool | ~8,200 | ~16,400 raw / ~14,000 net of sidecars | **2.00× / 1.75×** |
+| Resident 32K sequences | 12 | 24 | **2.00×** (vLLM's own max-concurrency line) |
+| Per-sequence decode @32K, B=1 | 66 tok/s | 15–16 tok/s | 0.23× |
+| Total throughput at saturation | — | — | **0.22–0.54×, workload-dependent** (6M.6; B=1 × N extrapolation is invalid) |
+
+**GPU-count example (measured density):** 100 concurrent 32K agent sessions
+need ~9 bf16 GPUs (12 resident sequences each) vs **~5 KVPro GPUs** (24 each)
+— **~44% fewer GPUs** for memory-resident concurrency, paid for with slower
+per-session decode. Right for latency-tolerant agentic / batch / async traffic;
+wrong for interactive single-stream.
+
+**Hybrid deployment = ROUTING, not swapping.** Run two engine pools (bf16 for
+speed-critical, KVPro for memory-bound / shared-prefix) and route per request —
+the controller logic already named in the memory-stack table. Do **not** plan
+on migrating live sequences between pools: cache dtype is per-engine, and swap
+preemption is hard-refused inside KVPro (6K.15 — the sidecars are not migrated;
+the guard exists because the failure mode is silent KV corruption).
+
+**One sentence for the budget owner:** *KVPro gives 2.00× the KV slots per GPU
+(1.75× net of sidecars, measured live) at 0.17–0.67× decode speed — route
+memory-bound, long-context, shared-prefix, and high-concurrency traffic to it,
+keep latency-critical traffic on bf16, and the measured 32K-concurrency example
+runs on ~44% fewer GPUs at near-bf16 quality.*
+
 ### The ask
 
 Validate the production deployment story with a partner
