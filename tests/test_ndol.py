@@ -13,6 +13,7 @@ from ndol import (
     BenefitFunction,
     Compressor,
     FileStore,
+    KVAwareController,
     NANDModel,
     NDOLController,
     PhaseScheduler,
@@ -242,3 +243,49 @@ def test_bench_incs_boundary_is_monotone_and_flips():
     # Low ops/byte pushes down; high ops/byte refuses (corrected §3.5).
     assert rows[0][1] is True
     assert rows[-1][1] is False
+
+
+# ------------------------- KVAwareController (int4_protected) -------------- #
+def _make_kv(n_blocks: int = 100, protected_every: int = 10):
+    c = KVAwareController()
+    for bid in range(n_blocks):
+        c.write_block(bid, f"kvblock-{bid}".encode().ljust(1280, b"\0"),
+                      protected=(bid % protected_every == 0))
+    c.metrics.__init__()
+    return c
+
+
+def test_kv_gather_is_byte_identical_to_full_read():
+    # gather == full-read: the EQSPEC invariant, by construction.
+    c = _make_kv()
+    retained = [3, 17, 42, 99]
+    out = c.step(retained)
+    for bid, blob in zip(retained, out):
+        assert blob == c.comp.decompress(c.store.read(bid))
+
+
+def test_kv_protect_mask_drives_tiering():
+    c = _make_kv(protected_every=10)
+    assert c._tier_of(0) is Tier.SLC    # protected -> fast tier
+    assert c._tier_of(10) is Tier.SLC
+    assert c._tier_of(3) is Tier.QLC    # 4-bit bulk -> dense tier
+
+
+def test_kv_read_skip_yields_bandwidth_amplification_and_speedup():
+    c = _make_kv(n_blocks=100)
+    retained = list(range(8))  # read-skip keeps ~8% of blocks
+    for _ in range(20):        # stable attention across steps
+        c.step(retained)
+    r = c.kv_report()
+    # ~100/8 full-attention reduction, compounded by VSP on the stable set.
+    assert r["bandwidth_amplification"] > 10.0
+    assert r["speedup_vs_baseline"] > 5.0
+    assert r["vsp_hit_rate"] > 0.5      # stable retained set hits the prefetch buffer
+
+
+def test_kv_baseline_is_full_attention():
+    c = _make_kv(n_blocks=50)
+    c.step([1, 2, 3])
+    # One step's baseline accounts a full read of all 50 blocks.
+    assert c.metrics.blocks_skipped == 47
+    assert c.metrics.blocks_gathered == 3

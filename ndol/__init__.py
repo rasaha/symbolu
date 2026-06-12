@@ -24,9 +24,11 @@ from .primitives import (
     NearDataCompute,
 )
 from .controller import NDOLController
+from .kv_aware import KVAwareController
 
 __all__ = [
     "NDOLController",
+    "KVAwareController",
     "NANDModel",
     "Tier",
     "Regime",

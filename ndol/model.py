@@ -116,6 +116,10 @@ class Metrics:
     pe_cycles: int = 0
     scans: int = 0
     scans_pushed_down: int = 0
+    # KV-aware (int4_protected / read-skip) accounting
+    kv_steps: int = 0
+    blocks_gathered: int = 0
+    blocks_skipped: int = 0
 
     def speedup(self) -> float:
         if self.modeled_latency_us <= 0:
@@ -125,6 +129,12 @@ class Metrics:
     def vsp_hit_rate(self) -> float:
         total = self.vsp_hits + self.vsp_misses
         return self.vsp_hits / total if total else 0.0
+
+    def bandwidth_amplification(self) -> float:
+        """A_BW: full-attention blocks / blocks actually gathered (read-skip)."""
+        if self.blocks_gathered <= 0:
+            return 1.0
+        return (self.blocks_gathered + self.blocks_skipped) / self.blocks_gathered
 
     def spec_wasted(self) -> int:
         # Prefetches that were never served. Approximate, but bounded.

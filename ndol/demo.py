@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 
-from ndol import NDOLController
+from ndol import KVAwareController, NDOLController
 
 
 def _fresh(**kw) -> NDOLController:
@@ -49,6 +49,19 @@ def demo() -> None:
     c.scan(list(range(256)), predicate=lambda p: True, ops_per_byte=20.0)
     print(f"INCS (expensive-op scan, refused): {c.report()['speedup_vs_baseline']:>5}x  "
           f"pushed_down={c.last_scan_pushdown}")
+
+    # KV-aware (int4_protected / read-skip): bounded retained set + protect tiering.
+    kv = KVAwareController()
+    for bid in range(1024):
+        kv.write_block(bid, (b"k" * 1280), protected=(bid % 16 == 0))
+    kv.metrics.__init__()
+    retained = list(range(64))  # read-skip keeps ~6% (≈94% skip, as at 32K)
+    for _ in range(32):
+        kv.step(retained)
+    r = kv.kv_report()
+    print(f"\nKV   (int4_protected read-skip)  : {r['speedup_vs_baseline']:>5}x  "
+          f"A_BW={r['bandwidth_amplification']}x  vsp_hit={r['vsp_hit_rate']:.2f}  "
+          f"protected={r['protected_blocks']}/{r['total_blocks']}")
 
 
 if __name__ == "__main__":
