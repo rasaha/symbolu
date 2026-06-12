@@ -2,8 +2,12 @@
 
 **Working Title:** NAND-Decode Optimization Layer (NDOL)
 **Author:** Rakesh Mohan, Cognade Labs
-**Status:** Draft v0.2 (engineering design, pre-prototype) — corrected formulas, regime model, USE integration
+**Status:** Draft v0.3 (engineering design, pre-prototype) — re-anchored on int4_protected / prot-int8
 **Scope:** Apply five LLM decoding-acceleration techniques (PAT, EQSPEC/EXSPEC speculative decoding, KVzip/FastKV, LycheeDecode, EVA) as NAND-flash storage primitives. This is a **design document**, not a patent draft — claims here are engineering hypotheses with explicit assumptions and falsifiable success criteria.
+
+> **Changelog v0.2 → v0.3**
+> - **§9 re-anchored** from the deprecated CTM+/PCAM tier-hint framing onto the shipped **int4_protected / prot-int8** KV stack. Adds the primitive→signal mapping (read-skip retained block-ids drive VSP/INCS; the protect mask drives LMTP; int4_protected blocks are the QACC payload), the write-once-read-many NAND fit, and an honest novelty position vs. InfiniGen / Quest / ShadowKV / Mooncake / LMCache.
+> - **§8 novelty bullet rewritten** to point at the int4_protected intersection (exact, output-equivalent KV offload to an endurance-aware NAND tier, tiered by quantization-protection) rather than the generic ports.
 
 > **Changelog v0.1 → v0.2**
 > - **§3.1 MDPC corrected.** The original `t_R + N·t_xfer` same-die formula assumed one array-sense could serve N distinct pages. It cannot. MDPC is now split into three physically-distinct mechanisms (page-dedup, multi-plane, cross-die interleave) with separate, correct formulas. The headline 4.9× now applies only to page-dedup, which is a workload property, not a free win.
@@ -367,28 +371,55 @@ VSP's speculative reads compete with MDPC's coalescing window for die-time. **Re
 ## 8. What This Does Not Claim
 
 - Not that combining all five achieves the product of individual speedups. Composition is sublinear, regime-exclusive (§2.1), and conflict-bound (§6.5).
-- Not novelty over the ISP category itself. The novelty (if pursued for IP) lives in the **specific algorithmic ports** — LycheeDecode-style learnable tier placement and EVA-style codebook-reuse-with-amortization are the strongest individually novel angles. The USE→splay scheduler is novel cross-portfolio reuse, not a novel scheduler per se (repulsive Kuramoto / splay states are known in coupled-oscillator literature).
+- Not novelty over the ISP category itself, nor over the generic primitives. MDPC/VSP/QACC as *generic* storage techniques are prior art (FTL scheduling, ML-prefetch, ScaleFlux inline compression). The defensible novelty (if pursued for IP) is the **int4_protected intersection** in §9.3 — *exact, output-equivalent KV offload to an endurance-aware NAND tier, tiered by quantization-protection structure* — and even that must clear InfiniGen / Quest / ShadowKV / Mooncake / LMCache via a prior-art search. The USE→splay scheduler is novel cross-portfolio reuse, not a novel scheduler per se (repulsive Kuramoto / desynchronization splay states are known — cf. DESYNC, IPSN'07).
 - Not any specific NAND vendor controller. Assumes a programmable-controller class (NVMe Computational Storage compliant) with 1–10 MB SRAM and 1–10 GOPS compute fabric.
 - Not a market commitment. Best-fit: vector search, RAG retrieval, columnar analytics scan, encrypted search — not transactional OLTP, not bulk media.
 - **Best-fit workloads carry an important asymmetry**: they are random-access (VSP-hostile) *and* shared-index (MDPC-dedup-friendly). Design accordingly.
 
 -----
 
-## 9. Connection to Cognade Symbol-U Portfolio
+## 9. Connection to Cognade Symbol-U Portfolio — anchored on int4_protected / prot-int8
 
-This is a **storage-layer extension** of the existing portfolio:
+This is a **storage-layer extension anchored on the shipped int4_protected KV-cache stack.** The earlier CTM+/PCAM tier-hint framing is deprecated and explicitly *not* the anchor here.
 
 - **Compute:** USE (synchronization), SCC (coherence), BCVF (control)
-- **Cache:** int4_protected (KV-cache compression), CTM+/PCAM (KV eviction with tier hints)
+- **Cache:** **int4_protected / prot-int8** — quality-preserving KV quantization (1.78–1.83× density, bf16-parity, greedy bit-identical across Llama-3.1-8B / Qwen2.5-7B / Mistral-7B-v0.3) **+ attention-guided read-skip** (bounded retained block-set; `gather == full-read`, output-identical, GPU-verified)
 - **Storage:** *gap — this document fills it*
 
-Two concrete integration threads, both now load-bearing rather than rhetorical:
+**Why int4_protected is the right anchor.** It already supplies the two signals a NAND tier needs and that a generic block device cannot derive from LBA traces:
 
-1. **Tier-hint vocabulary (CTM+/PCAM → LMTP).** CTM+/PCAM already emits HOT/WARM/COLD tier hints that route between HBM and DRAM. NDOL extends the *same* hints down to NAND tiers (SLC/TLC/QLC via §3.4), closing the vertical stack from L1 cache to NAND in one coherent policy framework.
-2. **USE → die scheduler (§6.5).** The same peer-to-peer phase-synchronization engine used for compute-channel coherence is reused, in its repulsive/splay form, as the decentralized cross-die bus arbiter. This is the first time a USE primitive reaches the storage tier — concrete evidence that the portfolio's core formalisms compose vertically, not just a slide-deck claim.
+1. **A model-internal access signal** — read-skip's attention-guided **retained block-ids**: which KV blocks decode will actually gather next.
+2. **A correctness invariant** — `gather == full-read`, **bit-identical**. This is the true EQSPEC port: verified speculation backed by a *proven output-equivalence guarantee*, not best-effort prefetch with a comparator.
 
-The architectural value beyond per-technique speedups: **it makes the Cognade tier-hint vocabulary and the USE phase formalism the unifying primitives across the entire memory hierarchy — L1 cache down to NAND.**
+It also has a media-friendly physical shape: KV is laid out in **fixed blocks (≈1280 B) with a per-block dequant sidecar, ×32 layers**, tens of thousands of blocks — already page-like.
+
+### 9.1 Primitive → int4_protected signal mapping
+
+| NDOL primitive | int4_protected / prot-int8 signal that drives it | Notes |
+|---|---|---|
+| **QACC** (§3.3) | Store the **int4_protected blocks themselves** on NAND; the per-block dequant sidecar is the indirection metadata | Not generic zlib — quality-preserving KV quant at 1.78× with bf16-parity. Compression *with a correctness guarantee*. |
+| **LMTP** (§3.4) | **Protected channels → fast tier (SLC); 4-bit/8-bit bulk → dense tier (QLC)**, keyed on the per-model calibration mask | The protect mask *is* the learned tier signal; replaces the deprecated HOT/WARM/COLD hint source. |
+| **VSP** (§3.2) | **read-skip retained block-ids → prefetch exactly those blocks** | α is attention-driven, not stride-driven; inherits `gather == full-read` → *verified* speculative storage. |
+| **INCS-CR** (§3.5) | Push the **read-skip gather into the storage layer** — emit only retained blocks across the bus | The retained-index is the EVA "codebook." A_BW ≈ full-attention / retained-set (≈16× at 32K, ~94% skip). |
+| **MDPC** (§3.1) | Batch per-layer / per-head block reads | Mechanical; no novelty. |
+
+### 9.2 Why KV-on-NAND is a good media fit
+
+KV-cache is **write-once at prefill, read-many at decode** — no random writes, low write-amplification, low P/E wear. NAND's worst property (write endurance) is precisely the one this workload does not stress, which is why a flash KV tier is more defensible here than for general storage. (Contrast: the DRAM/CPU-offload literature ignores flash physics entirely.)
+
+### 9.3 Honest novelty position (read before any IP filing)
+
+Long-context KV offload is a **crowded** arena. Adjacent prior art to clear: **InfiniGen** (OSDI'24, attention-guided speculative KV prefetch from CPU), **Quest** (ICML'24, query-aware top-k KV page selection), **ShadowKV**, **Mooncake** / **LMCache** / **FlexGen** (KV offload to SSD/DRAM/disk).
+
+- **Do NOT claim** "attention-driven KV prefetch" (InfiniGen) or "KV-on-SSD" (Mooncake) as such.
+- **The defensible intersection** is narrower: *exact, output-equivalent (`gather == full-read`) KV offload to an **endurance-aware NAND tier**, tiered by **quantization-protection structure** (the int4_protected/prot-int8 mask).* The exactness (vs the approximate selection in InfiniGen/Quest/H2O), the flash co-design, and the protect-mask-driven tiering are the three angles that are plausibly not anticipated — **pending a prior-art search.**
+
+### 9.4 USE → die scheduler (unchanged)
+
+The peer-to-peer USE phase-synchronization engine is reused, in its repulsive/splay form, as the decentralized cross-die bus arbiter (§6.5) — the first time a USE primitive reaches the storage tier.
+
+**Architectural value beyond per-technique speedups:** NDOL turns the **int4_protected block + read-skip retained-set + protect mask** into the unifying access vocabulary across the memory hierarchy, with the USE phase formalism as the shared scheduler — extending a *shipped, quality-preserving* KV stack down to NAND rather than re-deriving generic SSD techniques.
 
 -----
 
-*End of design document v0.2. Next iteration after P0 analytical sweep.*
+*End of design document v0.3. Next iteration after P0 analytical sweep.*
