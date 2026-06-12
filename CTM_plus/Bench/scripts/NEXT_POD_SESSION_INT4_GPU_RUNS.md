@@ -218,3 +218,14 @@ If no crossover: say so and bound the story — density/niche framing, not parit
   at 0.85 the ab_ctx44000 cell hit 76.3 GiB committed pre-prefill -> OOM).
   bf16 cells measured at 0.85 stay valid (B=1 decode tok/s is
   pool-independent); resume with --reuse on the same out-dir.
+- bf16 graphs-vs-eager MEASURED (32K B=1, two-pass): eager 66.6 vs graphs
+  67.2 tok/s -> +0.9%, NEUTRAL. Validates the crossover's eager bf16
+  baseline (no handicap asterisk needed on the 0.23x ratio) and kills
+  graphs/multi-step as B=1 long-ctx bf16 levers — the remaining real
+  levers are speculative decoding, TP, or hardware.
+- bench_8bit_kv_gate.py added: 3-cell (~12 min) gate for the "8-bit KV is
+  the better fast tier" claim ON OUR STACK — runtime-introspects what
+  kv dtypes this vLLM actually accepts (int8 expected ABSENT), measures
+  density/needles/6-prompt bit-exactness/decode tok/s for fp8_e4m3
+  (+calculated scales if supported) and fp8_e5m2 vs bf16. LMDeploy/TRT
+  int8 explicitly out of scope.
