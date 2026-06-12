@@ -96,6 +96,15 @@ def fresh_mask(stat, pct):
     return m
 
 
+def _p99(t):
+    """p99 that survives torch.quantile's ~2^24-element input limit by
+    strided subsampling (error fields are ~stationary across positions)."""
+    f = t.flatten()
+    if f.numel() > 8_000_000:
+        f = f[:: (f.numel() // 8_000_000) + 1]
+    return float(f.quantile(0.99))
+
+
 def block_max_err(err):
     """(S,H,D) -> per (block, head) max err: (S//GROUP, H)."""
     S = (err.shape[0] // GROUP) * GROUP
@@ -225,7 +234,7 @@ def run_gpu(args):
         row = {}
         kstd = float(k.std())
         for nm, e in errs.items():
-            row[nm] = {"mean": float(e.mean()), "p99": float(e.flatten().quantile(0.99)),
+            row[nm] = {"mean": float(e.mean()), "p99": _p99(e),
                        "max": float(e.max()), "mean_over_kstd": float(e.mean()) / kstd}
         # mask-size sweep + sensitivity mask (bf16-protect variants of noprot)
         for pct in PCT_SWEEP:
@@ -258,7 +267,7 @@ def run_gpu(args):
         row["score"] = {"std_true": float(strue.std()), "std_noise": float(snoise.std()),
                         "snr": float(strue.std() / max(1e-9, snoise.std())),
                         "p99_noise_over_std_true":
-                        float(snoise.abs().flatten().quantile(0.99)) / float(strue.std())}
+                        _p99(snoise.abs()) / float(strue.std())}
 
         be_cur = block_max_err(errs["cur_bf16"])          # (B,H)
         be_nop = block_max_err(errs["noprot"])
