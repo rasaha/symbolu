@@ -172,25 +172,24 @@ def kvpro_apc_backend(*, base_url: str, model: str, disk_dir: Optional[str] = No
 
 
 def kvpro_snapshot_backend(*, snapshot_dir: Optional[str] = None, **kw) -> dict:
-    """KVPro NVMe-snapshot warm tier — THE Phase-0 engineering item.
+    """KVPro NVMe-snapshot warm tier.
 
-    The SERIALIZE half EXISTS: `kv_policy.phase5b_4c_paged_writer._maybe_dump_block`
-    torch.saves per-block {packed_k, packed_v, k_scale, k_xmin, k_protect(+format),
-    v_scale, v_xmin} when INT4_PROTECTED_DUMP_BLOCKS is set (capped at 16 blocks;
-    byte-compared by Bench/scripts/phase6k16_byte_gate.py --compare).
+    The serialize/restore PRIMITIVE now exists:
+    `kv_policy.tier5b_snapshot` provides `save_prefix_snapshot` / `load_prefix_snapshot`
+    / `restore_prefix` (the missing reload half — re-injects packed K/V + 5 sidecars into
+    a fresh paged allocation, re-encoding protect via the writer's _protect_store) and a
+    built-in `verify_roundtrip` byte-gate. RUN `verify_roundtrip` ON THE POD FIRST — it is
+    the protocol's Phase-0 gate (snapshot → zero → restore → byte-compare); the primitive
+    is HARDWARE-UNTESTED until it passes.
 
-    To build this backend:
-      1. prefill_store  — generalize the dump (lift the 16-block cap, key by prefix)
-         to write ALL of a prefix's blocks + 5 sidecars to {snapshot_dir}/{prefix_id};
-         record the dir-size delta as bytes_stored (disk_dir_bytes).
-      2. reload_query   — the MISSING half: re-inject a saved block set into a fresh
-         paged allocation (write packed nibbles into kv_cache[0/1, b, :, :, :half_D]
-         and restore writer.k_scale_ext[b]/k_xmin_ext[b]/k_protect_ext[b]/v_scale_ext[b]/
-         v_xmin_ext[b] from the dump), then attend. No reload primitive exists yet.
-      3. roundtrip gate — reuse the byte-gate to prove reload == resident, extending
-         the TIER5A byte-clean CPU-swap result to NVMe (this is roundtrip_clean's job).
-
-    Until step 2 lands, run KVPro via kvpro_apc_backend (HOT reuse) for the quality +
-    TTFT columns; the NVMe bytes/transfer columns need this snapshot path.
+    The REMAINING gap is only the live-engine wiring this backend needs:
+      - prefill_store: get the prefix's writer + kv_cache + its block_ids from the running
+        vLLM engine, call save_prefix_snapshot(writer, kv_cache, block_ids, {snapshot_dir}/{id}),
+        evict; record dir-size delta as bytes_stored (disk_dir_bytes).
+      - reload_query: allocate fresh blocks for the prefix, load_prefix_snapshot + restore_prefix
+        into them, then serve the query attending over the restored KV.
+    Both need handles into the engine's block manager / writer registry, which is the
+    integration this raises on. Until wired, use kvpro_apc_backend for the quality + TTFT
+    columns (HOT reuse); this snapshot path adds the true NVMe bytes/transfer columns.
     """
     raise NotImplementedError(kvpro_snapshot_backend.__doc__)
