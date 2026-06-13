@@ -216,6 +216,42 @@ _DEFAULT_TEXT = (
 )
 
 
+def _cache_layer_values(pkv, layer: int):
+    """Per-layer value tensor [batch, kv_heads, seq, head_dim] from whatever
+    transformers Cache layout this version uses. The API has churned a lot."""
+    # 1. newest layered API (transformers ≳4.54): pkv.layers[i].values / .value_states
+    layers = getattr(pkv, "layers", None)
+    if layers is not None:
+        lyr = layers[layer]
+        for attr in ("values", "value_states", "value"):
+            v = getattr(lyr, attr, None)
+            if v is not None and not callable(v):
+                return v
+    # 2. 4.36–4.53: parallel lists
+    vc = getattr(pkv, "value_cache", None)
+    if vc is not None:
+        return vc[layer]
+    # 3. legacy-cache conversion
+    if hasattr(pkv, "to_legacy_cache"):
+        leg = pkv.to_legacy_cache()
+        if leg:
+            return leg[layer][1]
+    # 4. iterable of (key, value) per layer
+    try:
+        return list(pkv)[layer][1]
+    except Exception:
+        pass
+    # 5. legacy tuple-of-tuples
+    try:
+        return pkv[layer][1]
+    except Exception:
+        pass
+    attrs = sorted(a for a in dir(pkv) if not a.startswith("__"))
+    raise RuntimeError(
+        f"could not extract value cache from {type(pkv).__name__}; attributes = {attrs}"
+    )
+
+
 def run_real(
     model: str,
     *,
@@ -274,14 +310,7 @@ def run_real(
     attention = [float(last_attn[lo:hi].sum()) for lo, hi in blocks]
 
     # coherence score: mean value-vector per block, cosine to context centroid.
-    # transformers >= 4.36 returns a Cache object, not the legacy tuple — handle both.
-    pkv = out.past_key_values
-    if hasattr(pkv, "to_legacy_cache"):
-        val = pkv.to_legacy_cache()[layer][1][0]        # [kv_heads, seq, head_dim]
-    elif hasattr(pkv, "value_cache"):
-        val = pkv.value_cache[layer][0]
-    else:
-        val = pkv[layer][1][0]
+    val = _cache_layer_values(out.past_key_values, layer)[0]   # [kv_heads, seq, head_dim]
     block_mat = torch.stack([val[:, lo:hi, :].mean(dim=1).reshape(-1) for lo, hi in blocks])
     coherence = score_torch(block_mat.float(), mode="cos_value").tolist()
 
