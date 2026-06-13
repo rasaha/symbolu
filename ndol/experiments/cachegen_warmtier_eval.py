@@ -237,18 +237,20 @@ def make_mock_backend(*, bytes_per_token: float = 8.9, hard_quality: float = 1.0
 
 
 def build_backend(name: str, **opts) -> dict:
-    """Factory. `mock` is in-process (CPU). `kvpro` / `cachegen` / `bf16` are the pod
-    integration points — see docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.md §Wiring."""
+    """Factory. `mock` is in-process (CPU). `cachegen` / `bf16` / `kvpro` delegate to
+    the pod adapters in `warmtier_backends` (need a live server; see the protocol
+    §Wiring). `kvpro` defaults to the NVMe-snapshot path (the Phase-0 item, not yet
+    built → raises); pass `mode=apc` for HOT prefix-reuse quality/TTFT today."""
     if name == "mock":
         return make_mock_backend(**opts)
-    if name in ("kvpro", "cachegen", "bf16"):
-        raise NotImplementedError(
-            f"backend '{name}' is a pod integration point. Wire it per "
-            "docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.md §Wiring:\n"
-            "  kvpro    -> snapshot packed-KV + 5 sidecars to disk (TIER5A→NVMe), reload, continue;\n"
-            "  cachegen -> LMCache connector with CacheGen enabled (sweep level to iso-bytes);\n"
-            "  bf16     -> vLLM baseline, no reuse (cold) for the TTFT speedup denominator.\n"
-            "Each must return the four callables {prefill_store, reload_query, resident_query, cold_query}.")
+    if name in ("cachegen", "bf16", "kvpro"):
+        from ndol.experiments import warmtier_backends as wb
+        if name == "cachegen":
+            return wb.cachegen_backend(**opts)
+        if name == "bf16":
+            return wb.bf16_cold_backend(**opts)
+        mode = opts.pop("mode", "snapshot")
+        return wb.kvpro_apc_backend(**opts) if mode == "apc" else wb.kvpro_snapshot_backend(**opts)
     raise ValueError(f"unknown backend: {name}")
 
 
@@ -261,10 +263,29 @@ def _add_workload_args(p):
     p.add_argument("--seed", type=int, default=0)
 
 
-def _mock_opts(args) -> dict:
-    return {k: v for k, v in (("bytes_per_token", getattr(args, "bytes_per_token", None)),
+def _coerce(v: str):
+    for cast in (int, float):
+        try:
+            return cast(v)
+        except ValueError:
+            pass
+    if v.lower() in ("true", "false"):
+        return v.lower() == "true"
+    return v
+
+
+def _backend_opts(args) -> dict:
+    """Mock-tuning flags + generic --opt KEY=VAL passthrough (for the pod backends:
+    base_url=..., model=..., disk_dir=..., cold_base_url=..., mode=apc, ...)."""
+    opts = {k: v for k, v in (("bytes_per_token", getattr(args, "bytes_per_token", None)),
                               ("hard_quality", getattr(args, "hard_quality", None)),
                               ("corrupt_reload", getattr(args, "corrupt_reload", None))) if v is not None}
+    for kv in getattr(args, "opt", None) or []:
+        if "=" not in kv:
+            raise SystemExit(f"--opt expects KEY=VAL, got {kv!r}")
+        k, v = kv.split("=", 1)
+        opts[k] = _coerce(v)
+    return opts
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -275,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     rt.add_argument("--backend", default="mock")
     rt.add_argument("--bytes-per-token", type=float)
     rt.add_argument("--corrupt-reload", action="store_true")
+    rt.add_argument("--opt", action="append", help="backend KEY=VAL (e.g. base_url=..., model=...)")
     _add_workload_args(rt)
 
     r = sub.add_parser("run", help="run the reuse workload through one backend; write its summary")
@@ -284,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--bytes-per-token", type=float)
     r.add_argument("--hard-quality", type=float)
     r.add_argument("--no-cold", action="store_true")
+    r.add_argument("--opt", action="append", help="backend KEY=VAL (e.g. base_url=..., model=..., mode=apc)")
     _add_workload_args(r)
 
     c = sub.add_parser("compare", help="compare arm summaries; print table + iso-bytes verdict")
@@ -295,17 +318,14 @@ def main(argv: list[str] | None = None) -> int:
                                      args.ctx_sentences, args.n_hard, args.seed)
 
     if args.cmd == "roundtrip":
-        be = build_backend(args.backend, **_mock_opts(args))
+        be = build_backend(args.backend, **_backend_opts(args))
         res = roundtrip_clean(wl(), backend=be)
         print(f"[roundtrip:{args.backend}] clean={res['clean']} "
               f"({res['n_identical']}/{res['n']} identical)")
         return 0 if res["clean"] else 1
 
     if args.cmd == "run":
-        opts = _mock_opts(args)
-        if getattr(args, "hard_quality", None) is not None:
-            opts["hard_quality"] = args.hard_quality
-        be = build_backend(args.backend, **opts)
+        be = build_backend(args.backend, **_backend_opts(args))
         arm_out = run_warmtier_arm(wl(), arm=args.arm, backend=be, with_cold=not args.no_cold)
         s = summarize_arm(arm_out, label=args.arm)
         with open(args.out, "w") as fh:

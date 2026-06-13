@@ -113,10 +113,23 @@ def test_iso_bytes_picks_closest_cachegen_arm():
 
 
 # ------------------------------ backend factory ---------------------------- #
-def test_build_backend_mock_and_unimplemented():
+def test_build_backend_mock_and_integration_points():
     assert isinstance(build_backend("mock"), dict)
-    for name in ("kvpro", "cachegen", "bf16"):
-        with pytest.raises(NotImplementedError):
+    # kvpro defaults to the NVMe-snapshot path = the Phase-0 item, not yet built
+    with pytest.raises(NotImplementedError):
+        build_backend("kvpro")
+    # cachegen / bf16 are real pod adapters needing a live server (base_url/model)
+    for name in ("cachegen", "bf16"):
+        with pytest.raises(TypeError):                 # missing required base_url/model
             build_backend(name)
     with pytest.raises(ValueError):
         build_backend("nope")
+
+
+def test_disk_dir_bytes_probe_measures_delta(tmp_path):
+    from ndol.experiments.warmtier_backends import disk_dir_bytes, disk_dir_bytes_probe
+    probe = disk_dir_bytes_probe(str(tmp_path))
+    assert probe() == 0
+    (tmp_path / "chunk0.bin").write_bytes(b"x" * 1024)
+    (tmp_path / "chunk1.bin").write_bytes(b"y" * 512)
+    assert disk_dir_bytes(str(tmp_path)) == 1536       # the measured stored-bytes delta
