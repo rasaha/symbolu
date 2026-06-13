@@ -20,7 +20,13 @@ import sys
 import numpy as np
 
 FEATURES = ["attn_mean", "attn_max", "attn_last", "coherence", "value_norm", "recency", "idx_frac"]
-ATTN_BASELINE_FEATURE = "attn_mean"   # the free signal the probe must beat
+# Serving-SAFE subset: computable in one normal decode pass. Excludes attn_mean/max
+# (multi-LAYER attention — NOT free; fused/flash kernels don't expose all-layer attn).
+# attn_last = single-layer read-skip score; coherence/value_norm = one-layer value
+# geometry; recency/idx_frac = free. The verdict is gated on THIS set (gate 2).
+SERVING_SAFE = ["attn_last", "coherence", "value_norm", "recency", "idx_frac"]
+ATTN_BASELINE_FEATURE = "attn_last"   # the free single-layer attention signal to beat
+GO_BAR = 0.10                          # gate 1: held-out margin must clear +0.10 to matter
 
 
 # ------------------------------ data ---------------------------------------- #
@@ -29,8 +35,8 @@ def load_dump(path: str) -> list[dict]:
         return [json.loads(line) for line in fh if line.strip()]
 
 
-def _design(records: list[dict]):
-    X = np.array([[r["features"][f] for f in FEATURES] for r in records], dtype=float)
+def _design(records: list[dict], feats: list[str] = FEATURES):
+    X = np.array([[r["features"][f] for f in feats] for r in records], dtype=float)
     y = np.array([r["label"] for r in records], dtype=float)
     groups = [(r["model"], r["seed"]) for r in records]
     return X, y, groups
@@ -84,26 +90,43 @@ class LogisticRanker:
     def score(self, X: np.ndarray) -> np.ndarray:
         return ((X - self.mu) / self.sd) @ self.w + self.b
 
-    def weights(self) -> dict:
-        return {f: float(wi) for f, wi in zip(FEATURES, self.w)}
+    def weights_named(self, feats: list[str]) -> dict:
+        return {f: round(float(wi), 2) for f, wi in zip(feats, self.w)}
 
 
 # ------------------------------ evaluation ---------------------------------- #
-def evaluate(train: list[dict], test: list[dict], frac: float = 0.15) -> dict:
-    Xtr, ytr, gtr = _design(train)
-    Xte, yte, gte = _design(test)
+def _probe_recall(train, test, feats, frac):
+    Xtr, ytr, gtr = _design(train, feats)
+    Xte, yte, gte = _design(test, feats)
     ranker = LogisticRanker().fit(Xtr, _topk_binary(ytr, gtr, frac))
-    probe_recall = recall_at_budget(ranker.score(Xte), yte, gte, frac)
-    attn_recall = recall_at_budget(Xte[:, FEATURES.index(ATTN_BASELINE_FEATURE)], yte, gte, frac)
-    margin = probe_recall - attn_recall
-    if margin > 0.05:
-        verdict = f"PROMISING — probe beats attention on the held-out model by Δrecall {margin:+.3f}"
-    elif margin < -0.02:
-        verdict = f"WORSE than attention on held-out (Δ {margin:+.3f}) — overfit / no transfer"
+    return recall_at_budget(ranker.score(Xte), yte, gte, frac), ranker.weights_named(feats)
+
+
+def evaluate(train: list[dict], test: list[dict], frac: float = 0.15) -> dict:
+    """Train on `train` models, evaluate on the held-out `test` model. Reports BOTH
+    a serving-safe probe (gate 2) and a full-feature probe, vs free attention. The
+    verdict is gated on the SERVING-SAFE probe clearing +GO_BAR (gate 1)."""
+    _, _, gte = _design(test, SERVING_SAFE)
+    Xte_all, yte, _ = _design(test, FEATURES)
+    attn_recall = recall_at_budget(Xte_all[:, FEATURES.index(ATTN_BASELINE_FEATURE)], yte, gte, frac)
+    cheap_recall, cheap_w = _probe_recall(train, test, SERVING_SAFE, frac)
+    full_recall, full_w = _probe_recall(train, test, FEATURES, frac)
+    cheap_margin = cheap_recall - attn_recall
+    full_margin = full_recall - attn_recall
+
+    if cheap_margin >= GO_BAR:
+        verdict = (f"GO — serving-safe probe beats attention by Δ{cheap_margin:+.3f} (≥{GO_BAR}) on the "
+                   f"held-out model. NECESSARY-not-sufficient: now gate on Exp-B (decode quality + "
+                   f"p99 latency) before adopting.")
+    elif full_margin >= GO_BAR > cheap_margin:
+        verdict = (f"RESEARCH-ONLY — only the EXPENSIVE-feature probe clears the bar "
+                   f"(cheap Δ{cheap_margin:+.3f}, full Δ{full_margin:+.3f}); not serving-viable → don't ship.")
     else:
-        verdict = f"NO GAIN — probe ≈ attention on held-out (Δ {margin:+.3f}); attention suffices"
-    return {"probe_recall": probe_recall, "attn_recall": attn_recall, "margin": margin,
-            "verdict": verdict, "weights": ranker.weights()}
+        verdict = (f"STOP — no probe clears +{GO_BAR} on held-out (cheap Δ{cheap_margin:+.3f}, "
+                   f"full Δ{full_margin:+.3f}); attention is the selector.")
+    return {"attn_recall": attn_recall, "cheap_recall": cheap_recall, "full_recall": full_recall,
+            "cheap_margin": cheap_margin, "full_margin": full_margin, "margin": cheap_margin,
+            "verdict": verdict, "cheap_weights": cheap_w, "full_weights": full_w}
 
 
 # ------------------------------ synthetic ----------------------------------- #
@@ -125,23 +148,24 @@ def synthetic_records(model: str, weights: dict, n_seeds: int = 3, n_blocks: int
 
 
 def _synthetic_demo() -> None:
-    # importance driven by attention + a value-geometry feature (coherence)
-    W_shared = {"attn_mean": 1.0, "coherence": 0.8}
-    # a model where the value-geometry term FLIPS sign (the Qwen↔Phi non-replication)
-    W_flipped = {"attn_mean": 1.0, "coherence": -0.8}
+    # importance driven by serving-safe features (single-layer attn + value geometry)
+    W_shared = {"attn_last": 1.0, "coherence": 0.8}
+    W_flipped = {"attn_last": 1.0, "coherence": -0.8}   # value-geometry term FLIPS (Qwen↔Phi)
     A = synthetic_records("A", W_shared, seed=0)
     B_same = synthetic_records("B", W_shared, seed=1)
     B_flip = synthetic_records("B", W_flipped, seed=2)
 
     print("Learned-probe pipeline — synthetic (CPU). go/no-go = held-out-model recall vs attention.\n")
     r1 = evaluate(A, B_same)
-    print("  [transfers]   train A, test B (SAME importance law):")
-    print(f"    probe {r1['probe_recall']:.3f} vs attn {r1['attn_recall']:.3f}  → {r1['verdict']}")
+    print(f"  [transfers]   train A, test B (SAME law):  attn {r1['attn_recall']:.2f}  "
+          f"cheap {r1['cheap_recall']:.2f}  full {r1['full_recall']:.2f}")
+    print(f"    → {r1['verdict']}\n")
     r2 = evaluate(A, B_flip)
-    print("  [no transfer] train A, test B (FLIPPED value-geometry law):")
-    print(f"    probe {r2['probe_recall']:.3f} vs attn {r2['attn_recall']:.3f}  → {r2['verdict']}")
-    print("\n  Reading: a probe only helps if the importance law TRANSFERS across models. The")
-    print("  observed Qwen↔Phi flip is the 'no transfer' case — which is why the prior is poor.")
+    print(f"  [no transfer] train A, test B (FLIPPED law): attn {r2['attn_recall']:.2f}  "
+          f"cheap {r2['cheap_recall']:.2f}  full {r2['full_recall']:.2f}")
+    print(f"    → {r2['verdict']}")
+    print("\n  Reading: a probe helps only if the importance law TRANSFERS across models AND the")
+    print("  win comes from SERVING-SAFE features. The Qwen↔Phi flip is the 'no transfer' case.")
 
 
 # ----------------------------------- CLI ------------------------------------ #
@@ -168,12 +192,13 @@ def main(argv: list[str] | None = None) -> int:
         ap.error(f"need ≥2 models; have {models}, holding out {test_model!r}")
     res = evaluate(train, test, frac=args.frac)
     print(f"Learned probe — train {sorted(set(r['model'] for r in train))}, TEST held-out '{test_model}'\n")
-    print(f"  probe recall (held-out model) = {res['probe_recall']:.3f}")
-    print(f"  attention-only recall         = {res['attn_recall']:.3f}")
-    print(f"  margin                        = {res['margin']:+.3f}")
-    print(f"  learned weights               = { {k: round(v,2) for k,v in res['weights'].items()} }")
-    print(f"\n  GO/NO-GO: {res['verdict']}")
-    print("\n  Decisive test is the HELD-OUT model. If no gain there, attention suffices — stop.")
+    print(f"  attention-only recall (held-out)   = {res['attn_recall']:.3f}")
+    print(f"  serving-safe probe recall          = {res['cheap_recall']:.3f}   (Δ {res['cheap_margin']:+.3f})")
+    print(f"  full-feature probe recall          = {res['full_recall']:.3f}   (Δ {res['full_margin']:+.3f})")
+    print(f"  serving-safe weights               = {res['cheap_weights']}")
+    print(f"\n  GO/NO-GO (gate1 ≥+{GO_BAR}, gate2 serving-safe-only): {res['verdict']}")
+    print("\n  Gate 3 (not tested here): even on GO, confirm Exp-B — read-skip decode quality"
+          "\n  (needle/greedy agreement) AND tokens/sec + p99 — before adopting. Recall ≠ product.")
     return 0
 
 

@@ -25,30 +25,31 @@ def test_recall_perfect_and_chanceish():
 
 
 def test_probe_beats_attention_when_law_transfers():
-    W = {"attn_mean": 1.0, "coherence": 0.8}                            # importance uses both
+    W = {"attn_last": 1.0, "coherence": 0.8}                            # serving-safe law, uses both
     A = synthetic_records("A", W, seed=0)
     B = synthetic_records("B", W, seed=1)                              # SAME law on held-out
     r = evaluate(A, B)
-    assert r["margin"] > 0.05                                          # probe adds over attention
+    assert r["cheap_margin"] > 0.05                                    # serving-safe probe adds over attn
 
 
 def test_probe_fails_when_law_flips_across_models():
-    A = synthetic_records("A", {"attn_mean": 1.0, "coherence": 0.8}, seed=0)
-    B = synthetic_records("B", {"attn_mean": 1.0, "coherence": -0.8}, seed=2)   # FLIPPED law
+    A = synthetic_records("A", {"attn_last": 1.0, "coherence": 0.8}, seed=0)
+    B = synthetic_records("B", {"attn_last": 1.0, "coherence": -0.8}, seed=2)   # FLIPPED law
     r = evaluate(A, B)
-    assert r["margin"] <= 0.05                                         # no reliable held-out gain
+    assert r["cheap_margin"] <= 0.05                                   # no reliable held-out gain
 
 
 def test_pure_attention_law_gives_no_gain():
-    W = {"attn_mean": 1.5}                                             # importance = attention only
+    W = {"attn_last": 1.5}                                             # importance = attention only
     A = synthetic_records("A", W, seed=0)
     B = synthetic_records("B", W, seed=1)
     r = evaluate(A, B)
-    assert r["margin"] < 0.1                                           # probe ≈ attention
+    assert r["cheap_margin"] < 0.1                                     # probe ≈ attention
 
 
-def test_weights_present_and_named():
-    A = synthetic_records("A", {"attn_mean": 1.0}, seed=0)
-    B = synthetic_records("B", {"attn_mean": 1.0}, seed=1)
+def test_reports_both_cheap_and_full():
+    A = synthetic_records("A", {"attn_last": 1.0, "coherence": 0.8}, seed=0)
+    B = synthetic_records("B", {"attn_last": 1.0, "coherence": 0.8}, seed=1)
     r = evaluate(A, B)
-    assert "attn_mean" in r["weights"] and "coherence" in r["weights"]
+    assert "cheap_margin" in r and "full_margin" in r
+    assert "coherence" in r["cheap_weights"]
