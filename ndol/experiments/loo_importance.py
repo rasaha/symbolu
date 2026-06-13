@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import math
 import random
+import statistics
 import sys
 from dataclasses import dataclass
 
@@ -75,6 +76,71 @@ def _softmax(logits: list[float]) -> list[float]:
 
 def _kl(p: list[float], q: list[float]) -> float:
     return sum(pi * math.log(pi / qi) for pi, qi in zip(p, q) if pi > 0 and qi > 0)
+
+
+def _bootstrap_partial(x: list[float], y: list[float], z: list[float],
+                       n: int = 500, seed: int = 0) -> tuple[float, float]:
+    """95% bootstrap CI for partial_spearman(x, y | z) — so the >0.1 call carries
+    uncertainty instead of resting on a single point estimate."""
+    rng = random.Random(seed)
+    m = len(x)
+    if m < 8:
+        return (float("nan"), float("nan"))
+    vals = []
+    for _ in range(n):
+        idx = [rng.randrange(m) for _ in range(m)]
+        vals.append(partial_spearman([x[i] for i in idx], [y[i] for i in idx], [z[i] for i in idx]))
+    vals.sort()
+    return vals[int(0.025 * n)], vals[int(0.975 * n)]
+
+
+# --------------------------------------------------------------------------- #
+# analyze() — turns (attention, coherence, true-importance) into stats +
+# DIAGNOSTICS + a validity gate, so a degenerate run cannot yield a verdict.
+# --------------------------------------------------------------------------- #
+def analyze(attention: list[float], coherence: list[float], true: list[float],
+            needle_budget_frac: float = 0.10) -> dict:
+    n = len(true)
+    rho_attn = spearman(attention, true)
+    rho_coh = spearman(coherence, true)
+    rho_partial = partial_spearman(coherence, true, attention)
+    ci_lo, ci_hi = _bootstrap_partial(coherence, true, attention)
+    rho_ac = spearman(attention, coherence)               # signal collinearity
+    imp_sorted = sorted(true)
+    imp_med = imp_sorted[n // 2] if n else 0.0
+    imp_max = max(true) if n else 0.0
+    frac_tiny = (sum(1 for t in true if t < 1e-4) / n) if n else 1.0
+    attn_std = statistics.pstdev(attention) if n > 1 else 0.0
+    coh_std = statistics.pstdev(coherence) if n > 1 else 0.0
+
+    hi = imp_sorted[int(0.85 * n)] if n else 0.0
+    lo_attn = sorted(attention)[int(0.50 * n)] if n else 0.0
+    needles = [k for k in range(n) if true[k] >= hi and attention[k] <= lo_attn]
+    budget = max(1, int(needle_budget_frac * n))
+
+    def recall(scores):
+        top = set(sorted(range(n), key=lambda k: scores[k], reverse=True)[:budget])
+        return (sum(1 for k in needles if k in top) / len(needles)) if needles else float("nan")
+
+    # validity gate — model-agnostic (does NOT assume attention predicts importance)
+    reasons = []
+    if imp_max < 1e-3:
+        reasons.append("LOO importance ≈0 for every block — masking not applied, or context fully redundant")
+    if frac_tiny > 0.95:
+        reasons.append(f"{frac_tiny:.0%} of blocks have ~zero importance — degenerate ground truth")
+    if abs(rho_ac) > 0.9:
+        reasons.append(f"attention & coherence are collinear (ρ={rho_ac:+.2f}) — partial correlation unstable")
+    if attn_std < 1e-9 or coh_std < 1e-9:
+        reasons.append("a signal has ~no variance — cannot rank")
+
+    return {
+        "rho_attn": rho_attn, "rho_coh": rho_coh, "rho_partial_coh_given_attn": rho_partial,
+        "rho_partial_ci": (ci_lo, ci_hi), "rho_attn_coh": rho_ac,
+        "imp_med": imp_med, "imp_max": imp_max, "imp_frac_tiny": frac_tiny,
+        "attn_std": attn_std, "coh_std": coh_std,
+        "needle_recall_attn": recall(attention), "needle_recall_coh": recall(coherence),
+        "n_needles": len(needles), "valid": len(reasons) == 0, "invalid_reasons": reasons,
+    }
 
 
 # ------------------------------ synthetic model ---------------------------- #
@@ -136,34 +202,8 @@ def _synthetic_world(cfg: SyntheticConfig):
 
 def run_synthetic(cfg: SyntheticConfig) -> dict:
     attention, coherence, loo = _synthetic_world(cfg)
-    n = cfg.n_blocks
-    true = [loo(b) for b in range(n)]   # full LOO (cheap in synthetic; sampled on real models)
-
-    rho_attn = spearman(attention, true)
-    rho_coh = spearman(coherence, true)
-    rho_partial = partial_spearman(coherence, true, attention)   # the decisive 'w_sem' proxy
-
-    # needle recall: high-importance, low-attention blocks
-    hi = sorted(true)[int(0.85 * n)]
-    lo_attn = sorted(attention)[int(0.50 * n)]
-    needles = [i for i in range(n) if true[i] >= hi and attention[i] <= lo_attn]
-    budget = int(0.10 * n)
-
-    def top(scores):
-        return set(sorted(range(n), key=lambda i: scores[i], reverse=True)[:budget])
-
-    def recall(scores):
-        S = top(scores)
-        return (sum(1 for i in needles if i in S) / len(needles)) if needles else float("nan")
-
-    return {
-        "rho_attn": rho_attn,
-        "rho_coh": rho_coh,
-        "rho_partial_coh_given_attn": rho_partial,
-        "needle_recall_attn": recall(attention),
-        "needle_recall_coh": recall(coherence),
-        "n_needles": len(needles),
-    }
+    true = [loo(b) for b in range(cfg.n_blocks)]   # full LOO (cheap synthetically; sampled on real models)
+    return analyze(attention, coherence, true)
 
 
 # ------------------------------ real-model path ---------------------------- #
@@ -260,41 +300,40 @@ def run_real(
 
     a_s = [attention[b] for b in idx]
     c_s = [coherence[b] for b in idx]
-    rho_attn = spearman(a_s, true)
-    rho_coh = spearman(c_s, true)
-    rho_partial = partial_spearman(c_s, true, a_s)
-
-    hi_thr = sorted(true)[int(0.85 * len(true))]
-    lo_attn_thr = sorted(a_s)[int(0.50 * len(a_s))]
-    needles = [k for k in range(len(idx)) if true[k] >= hi_thr and a_s[k] <= lo_attn_thr]
-    budget = max(1, int(0.10 * len(idx)))
-
-    def recall(scores):
-        top = set(sorted(range(len(idx)), key=lambda k: scores[k], reverse=True)[:budget])
-        return (sum(1 for k in needles if k in top) / len(needles)) if needles else float("nan")
-
-    return {
-        "model": model, "seq_len": L, "n_blocks": nb, "n_loo": len(idx), "layer": layer,
-        "rho_attn": rho_attn, "rho_coh": rho_coh, "rho_partial_coh_given_attn": rho_partial,
-        "needle_recall_attn": recall(a_s), "needle_recall_coh": recall(c_s),
-        "n_needles": len(needles),
-    }
+    return {"model": model, "seq_len": L, "n_blocks": nb, "n_loo": len(idx), "layer": layer,
+            **analyze(a_s, c_s, true)}
 
 
 # ----------------------------------- CLI ----------------------------------- #
-def _decision(rho_partial: float, nr_coh: float, nr_attn: float) -> str:
-    if rho_partial > 0.1 and nr_coh > nr_attn + 0.05:
-        return "USEFUL (coherence adds incremental predictive power) — proceed to Exp B"
-    return "NOT USEFUL here (w_sem≈0; attention suffices) — drop unless Exp B disagrees"
+def _decision(d: dict) -> str:
+    """Validity-gated, CI-based 3-way determination (Decision Rule A)."""
+    if not d.get("valid", True):
+        return "INCONCLUSIVE — RUN INVALID: " + "; ".join(d["invalid_reasons"])
+    lo, hi = d.get("rho_partial_ci", (float("nan"), float("nan")))
+    edge = d["needle_recall_coh"] > d["needle_recall_attn"] + 0.05
+    if not math.isnan(lo) and lo > 0.1 and edge:
+        return f"USEFUL — partial-corr CI [{lo:+.2f},{hi:+.2f}] > 0.1 and coherence catches the needles → proceed to Exp B"
+    if not math.isnan(hi) and hi < 0.1:
+        return f"NOT USEFUL — partial-corr CI [{lo:+.2f},{hi:+.2f}] < 0.1; attention suffices → drop"
+    return f"INCONCLUSIVE — partial-corr CI [{lo:+.2f},{hi:+.2f}] straddles 0.1 → more prompts/samples or check signals"
 
 
-def _print_expA(avg: dict, header: str, footer: str) -> None:
+def _print_expA(d: dict, header: str, footer: str) -> None:
+    lo, hi = d.get("rho_partial_ci", (float("nan"), float("nan")))
     print(header + "\n")
-    print(f"  Spearman(attention, importance)            = {avg['rho_attn']:+.3f}")
-    print(f"  Spearman(coherence, importance)            = {avg['rho_coh']:+.3f}")
-    print(f"  PARTIAL  (coherence, importance | attn)    = {avg['rho_partial_coh_given_attn']:+.3f}  <- decisive")
-    print(f"  needle recall  attention / coherence       = {avg['needle_recall_attn']:.3f} / {avg['needle_recall_coh']:.3f}")
-    print(f"\n  decision: {_decision(avg['rho_partial_coh_given_attn'], avg['needle_recall_coh'], avg['needle_recall_attn'])}")
+    print(f"  Spearman(attention, importance)            = {d['rho_attn']:+.3f}")
+    print(f"  Spearman(coherence, importance)            = {d['rho_coh']:+.3f}")
+    print(f"  PARTIAL (coherence, importance | attn)     = {d['rho_partial_coh_given_attn']:+.3f}  CI[{lo:+.2f},{hi:+.2f}]  <- decisive")
+    print(f"  needle recall  attention / coherence       = {d['needle_recall_attn']:.3f} / {d['needle_recall_coh']:.3f}"
+          f"  ({d['n_needles']} needles)")
+    print("  --- diagnostics (validity gate) ---")
+    print(f"  attention–coherence collinearity ρ         = {d['rho_attn_coh']:+.3f}   (|ρ|>0.9 ⇒ partial unstable)")
+    print(f"  LOO importance  median / max               = {d['imp_med']:.2e} / {d['imp_max']:.2e}"
+          f"   ({d['imp_frac_tiny']:.0%} ~zero)")
+    print(f"  signal variance  attn / coh                = {d['attn_std']:.3e} / {d['coh_std']:.3e}")
+    print(f"  run valid?                                 = {d['valid']}"
+          + ("" if d["valid"] else f"  ({'; '.join(d['invalid_reasons'])})"))
+    print(f"\n  decision: {_decision(d)}")
     print(footer)
 
 
@@ -303,7 +342,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--synthetic", action="store_true", help="run the CPU synthetic model")
     ap.add_argument("--w-sem", type=float, default=0.5, help="(synthetic) semantic importance share")
     ap.add_argument("--n-blocks", type=int, default=400, help="(synthetic) number of blocks")
-    ap.add_argument("--seeds", type=int, default=5, help="(synthetic) seeds to average")
+    ap.add_argument("--seed", type=int, default=0, help="(synthetic) RNG seed")
     # real-model (GPU) args
     ap.add_argument("--model", default=None, help="HF model id — real GPU path")
     ap.add_argument("--text-file", default=None, help="long-context prompt file (default: built-in)")
@@ -330,19 +369,12 @@ def main(argv: list[str] | None = None) -> int:
     if not args.synthetic:
         ap.error("pass --synthetic (CPU) or --model <id> (GPU)")
 
-    keys = ["rho_attn", "rho_coh", "rho_partial_coh_given_attn",
-            "needle_recall_attn", "needle_recall_coh"]
-    acc = {k: 0.0 for k in keys}
-    for sd in range(args.seeds):
-        rr = run_synthetic(SyntheticConfig(n_blocks=args.n_blocks, w_sem=args.w_sem, seed=sd))
-        for k in keys:
-            acc[k] += rr[k]
-    avg = {k: v / args.seeds for k, v in acc.items()}
+    d = run_synthetic(SyntheticConfig(n_blocks=args.n_blocks, w_sem=args.w_sem, seed=args.seed))
     _print_expA(
-        avg,
-        f"Exp-A (synthetic, w_sem={args.w_sem}, n_blocks={args.n_blocks}, seeds={args.seeds})",
-        "\n  NOTE: synthetic — proves the harness + decision rule. Real w_sem is unknown;"
-        "\n  run --model <id> on a GPU pod to measure it on a real model.",
+        d,
+        f"Exp-A (synthetic, w_sem={args.w_sem}, n_blocks={args.n_blocks}, seed={args.seed})",
+        "\n  NOTE: synthetic — proves the harness + diagnostics + decision rule. Real w_sem is"
+        "\n  unknown; run --model <id> on a GPU pod to measure it on a real model.",
     )
     return 0
 

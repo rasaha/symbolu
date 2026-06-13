@@ -101,3 +101,38 @@ def test_decision_flips_with_w_sem():
 def test_coherence_catches_needles_attention_misses():
     r = run_synthetic(SyntheticConfig(w_sem=0.7, seed=0))
     assert r["needle_recall_coh"] > r["needle_recall_attn"]
+
+
+# ------------------------------ validity gate ------------------------------ #
+from ndol.experiments.loo_importance import analyze, _decision   # noqa: E402
+
+
+def test_gate_flags_broken_masking_zero_importance():
+    d = analyze(attention=[0.1 * i for i in range(50)],
+                coherence=[0.05 * i for i in range(50)],
+                true=[1e-9] * 50)                       # masking did nothing
+    assert d["valid"] is False
+    assert any("importance" in r for r in d["invalid_reasons"])
+    assert "INVALID" in _decision(d)
+
+
+def test_gate_flags_collinear_signals():
+    d = analyze(attention=[0.1 * i for i in range(50)],
+                coherence=[0.1 * i + 1e-6 for i in range(50)],   # ≈ identical ranking
+                true=[(i % 7) * 0.3 for i in range(50)])
+    assert d["valid"] is False
+    assert any("collinear" in r for r in d["invalid_reasons"])
+
+
+def test_valid_run_passes_gate_and_emits_verdict():
+    d = run_synthetic(SyntheticConfig(w_sem=0.7, seed=0))
+    assert d["valid"] is True
+    assert "INVALID" not in _decision(d)
+    lo, hi = d["rho_partial_ci"]
+    assert lo <= d["rho_partial_coh_given_attn"] <= hi   # point estimate inside its CI
+
+
+def test_ci_present_and_ordered():
+    d = run_synthetic(SyntheticConfig(w_sem=0.5, seed=1))
+    lo, hi = d["rho_partial_ci"]
+    assert lo <= hi
