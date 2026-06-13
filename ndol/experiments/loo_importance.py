@@ -314,14 +314,17 @@ def run_real(
     block_mat = torch.stack([val[:, lo:hi, :].mean(dim=1).reshape(-1) for lo, hi in blocks])
     coherence = score_torch(block_mat.float(), mode="cos_value").tolist()
 
-    # stratified block sample for the (expensive) LOO forwards
+    # stratified block sample for the (expensive) LOO forwards: half from the
+    # blocks where attention and coherence most DISAGREE (where the signals'
+    # predictive power separates), half a random spread. Robust for any n_sample.
     idx = list(range(nb))
     if nb > n_sample:
-        by_attn = sorted(idx, key=lambda i: attention[i])
-        disagree = sorted(idx, key=lambda i: abs(_ranks(attention)[i] - _ranks(coherence)[i]),
-                          reverse=True)
-        keep = set(by_attn[:16] + by_attn[-16:] + disagree[:48])
-        keep.update(rng.sample(idx, min(n_sample - len(keep), nb)))
+        ranks_a, ranks_c = _ranks(attention), _ranks(coherence)
+        disagree = sorted(idx, key=lambda i: abs(ranks_a[i] - ranks_c[i]), reverse=True)
+        keep = set(disagree[: max(1, n_sample // 2)])
+        rest = [i for i in idx if i not in keep]
+        rng.shuffle(rest)
+        keep.update(rest[: max(0, n_sample - len(keep))])
         idx = sorted(keep)
 
     true = []
