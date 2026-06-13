@@ -1,7 +1,8 @@
 # Semantic KV-Tiering — Negative Result (Exp-A)
 
 **Status: CLOSED — hypothesis REJECTED** across the full pre-registered protocol
-(2 models × 3 layers × 3 prompts = **18 valid configs**), 2026-06-13.
+(2 models × 3 layers × 3 prompts = **18 valid configs**) **and a learned-probe cross-model
+test**, 2026-06-13.
 **Harness:** `ndol/experiments/loo_importance.py`. **Protocol:** `docs/SEMANTIC_TIERING_GPU_PROTOCOL.md`.
 
 > A durable negative, in the spirit of `CTM_plus/TURBOQUANT_RETIREMENT.md`: written so the
@@ -77,9 +78,38 @@ no robust, general semantic lever to exploit. A real signal would replicate; it 
   **no new moat emerged.** The bankable KV asset remains **int4_protected quantization**
   (~1.8× density, measured, quality-preserving) + attention read-skip.
 
+## Learned probe — the strongest test (also fails)
+
+Hand-crafted signals could miss a combination a *trained* model would find, so we ran the
+principled version: a ranker (`ndol/experiments/probe.py`) over serving-safe features
+(`attn_last`, `coherence`, `value_norm`, `recency`, `idx_frac`) + a full-feature variant,
+trained on **Qwen** and evaluated on the **held-out Phi** model (the decisive transfer test),
+against three pre-registered gates (≥+0.10 held-out margin; serving-safe-only; recall is
+necessary-not-sufficient pending Exp-B).
+
+| signal (held-out Phi) | recall | Δ vs attention |
+|---|---|---|
+| attention-only (`attn_last`) | **0.421** | — |
+| serving-safe probe | 0.316 | **−0.105** |
+| full-feature probe | 0.386 | **−0.035** |
+
+**Both probes are WORSE than free attention on the held-out model.** Learned serving-safe
+weights: `attn_last +2.55`, `coherence −0.57`, `value_norm −0.26`, recency/idx ≈ 0 — i.e. the
+probe correctly learned (on Qwen) that attention dominates and coherence is anti-predictive,
+but that learned combination **does not transfer** to Phi, so it underperforms raw attention.
+**GO/NO-GO: STOP.** This is the overfit / no-transfer outcome the synthetic harness predicted.
+
+Strongest-method-last summary: single config → grid (18 configs) → learned probe (cross-model)
+— **attention wins or ties at every stage; nothing beats it.**
+
 ## Caveats / what was NOT tested
 - Only the `cos_value` coherence signal (centroid cosine). `value_norm` and `cos_key` modes, and a
   *learned* probe over richer features, were not swept — but the prior is now strongly negative.
 - Needle-haystack workload at 4096 ctx; longer contexts blocked by `output_attentions` memory.
-- A trained selector could in principle find a signal these hand-crafted ones miss; that is a
-  larger effort and is not justified given a model-dependent (non-replicating) effect here.
+- A trained selector was the obvious "could a learned model find what hand-crafted ones miss?"
+  rebuttal — so we ran it (above). It **also fails cross-model** (worse than attention on
+  held-out Phi). Only `cos_value` coherence + the listed serving-safe features were used;
+  expensive propagation features (attention-rollout, gradient saliency) were deliberately NOT
+  built — they are not serving-viable, and the prior after the learned-probe failure does not
+  justify the effort. A future revisit would need a fundamentally cheaper-yet-transferable
+  signal, which nothing here suggests exists.
