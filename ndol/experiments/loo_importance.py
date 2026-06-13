@@ -166,26 +166,119 @@ def run_synthetic(cfg: SyntheticConfig) -> dict:
     }
 
 
-# ------------------------------ real-model hook ---------------------------- #
-def run_real(model: str, task: str = "needle", **kw):
-    """GPU path — NOT YET IMPLEMENTED (documented scaffold).
+# ------------------------------ real-model path ---------------------------- #
+_DEFAULT_TEXT = (
+    "The history of computing spans mechanical calculators, vacuum tubes, transistors, "
+    "and integrated circuits. Memory hierarchies trade capacity against latency. "
+    "Long-context language models keep a key-value cache whose size grows with the "
+    "sequence. Quantization reduces the bytes per element while protecting sensitive "
+    "channels. Flash storage offers cheap capacity but limited write endurance. "
+)
 
-    To implement (see docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §2–§3):
-      HOOK 1 — capture per-block KV (mean value/key vectors) + attention block
-               scores from the model's decode step (reuse ReadSkipController's
-               block_score for attention; coherence via experiments.coherence.score_torch).
-      HOOK 2 — for a stratified sample of blocks, mask the block in the KV and
-               re-run the forward; true_importance(b) = KL(full ‖ masked) on the
-               next-token distribution.
-    Then feed (attention, coherence, true) into spearman/partial_spearman/needle
-    recall above and apply pre-registered Decision Rule A.
+
+def run_real(
+    model: str,
+    *,
+    text_file: str | None = None,
+    prompt_len: int = 2048,
+    block_size: int = 64,
+    layer: int = -1,
+    n_sample: int = 128,
+    device: str = "cuda",
+    seed: int = 0,
+) -> dict:
+    """GPU path: measure LOO KV-importance on a real model and compute Exp-A stats.
+
+    ⚠️ WRITTEN TO THE HUGGINGFACE API BUT NOT EXECUTED HERE (no GPU in the dev box).
+    Expect to adapt small details per model / attention backend on first run.
+
+    Method (docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §2–3):
+      prefill the prompt (eager attn so attentions are returned) → per-block
+      attention score (last query's attention mass over the block) and coherence
+      score (mean value-vector cosine to the context centroid). For a sample of
+      blocks, re-run the forward with that block masked in the attention mask and
+      measure KL(full ‖ masked) as ground-truth importance. Then partial-correlate.
     """
-    raise NotImplementedError(
-        "Real-model LOO needs torch + transformers + GPU. This is a marked scaffold — "
-        "fill HOOK 1 (capture per-block KV + attention/coherence scores) and HOOK 2 "
-        "(masked re-forward → KL) per docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §2–§3, then "
-        "reuse the stats in this module. Run --synthetic to exercise the pipeline on CPU."
-    )
+    import torch  # noqa: F401
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    from .coherence import score_torch
+
+    rng = random.Random(seed)
+    tok = AutoTokenizer.from_pretrained(model)
+    # eager attention is required for output_attentions on most HF models
+    lm = AutoModelForCausalLM.from_pretrained(
+        model, torch_dtype="auto", attn_implementation="eager"
+    ).to(device).eval()
+
+    text = open(text_file).read() if text_file else _DEFAULT_TEXT
+    ids = tok(text, return_tensors="pt").input_ids[0]
+    while ids.numel() < prompt_len:  # repeat to reach target length
+        ids = torch.cat([ids, ids], dim=0)
+    ids = ids[:prompt_len].unsqueeze(0).to(device)
+    L = ids.shape[1]
+    pos = torch.arange(L, device=device).unsqueeze(0)
+
+    with torch.no_grad():
+        out = lm(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos,
+                 output_attentions=True, use_cache=True)
+    full_logits = out.logits[0, -1].float()
+    p_full = torch.softmax(full_logits, dim=-1)
+
+    blocks = [(lo, min(lo + block_size, L)) for lo in range(0, L, block_size)]
+    nb = len(blocks)
+
+    # attention score: last query's attention mass over each block (mean over heads)
+    att = out.attentions[layer][0]                      # [heads, q_len, k_len]
+    last_attn = att[:, -1, :].mean(0).float()           # [k_len]
+    attention = [float(last_attn[lo:hi].sum()) for lo, hi in blocks]
+
+    # coherence score: mean value-vector per block, cosine to context centroid
+    val = out.past_key_values[layer][1][0]              # [kv_heads, seq, head_dim]
+    block_mat = torch.stack([val[:, lo:hi, :].mean(dim=1).reshape(-1) for lo, hi in blocks])
+    coherence = score_torch(block_mat.float(), mode="cos_value").tolist()
+
+    # stratified block sample for the (expensive) LOO forwards
+    idx = list(range(nb))
+    if nb > n_sample:
+        by_attn = sorted(idx, key=lambda i: attention[i])
+        disagree = sorted(idx, key=lambda i: abs(_ranks(attention)[i] - _ranks(coherence)[i]),
+                          reverse=True)
+        keep = set(by_attn[:16] + by_attn[-16:] + disagree[:48])
+        keep.update(rng.sample(idx, min(n_sample - len(keep), nb)))
+        idx = sorted(keep)
+
+    true = []
+    with torch.no_grad():
+        for b in idx:
+            lo, hi = blocks[b]
+            mask = torch.ones(L, device=device, dtype=torch.long)
+            mask[lo:hi] = 0
+            ob = lm(input_ids=ids, attention_mask=mask.unsqueeze(0), position_ids=pos)
+            pb = torch.softmax(ob.logits[0, -1].float(), dim=-1)
+            true.append(float((p_full * (p_full.clamp_min(1e-12) / pb.clamp_min(1e-12)).log()).sum()))
+
+    a_s = [attention[b] for b in idx]
+    c_s = [coherence[b] for b in idx]
+    rho_attn = spearman(a_s, true)
+    rho_coh = spearman(c_s, true)
+    rho_partial = partial_spearman(c_s, true, a_s)
+
+    hi_thr = sorted(true)[int(0.85 * len(true))]
+    lo_attn_thr = sorted(a_s)[int(0.50 * len(a_s))]
+    needles = [k for k in range(len(idx)) if true[k] >= hi_thr and a_s[k] <= lo_attn_thr]
+    budget = max(1, int(0.10 * len(idx)))
+
+    def recall(scores):
+        top = set(sorted(range(len(idx)), key=lambda k: scores[k], reverse=True)[:budget])
+        return (sum(1 for k in needles if k in top) / len(needles)) if needles else float("nan")
+
+    return {
+        "model": model, "seq_len": L, "n_blocks": nb, "n_loo": len(idx), "layer": layer,
+        "rho_attn": rho_attn, "rho_coh": rho_coh, "rho_partial_coh_given_attn": rho_partial,
+        "needle_recall_attn": recall(a_s), "needle_recall_coh": recall(c_s),
+        "n_needles": len(needles),
+    }
 
 
 # ----------------------------------- CLI ----------------------------------- #
@@ -195,42 +288,65 @@ def _decision(rho_partial: float, nr_coh: float, nr_attn: float) -> str:
     return "NOT USEFUL here (w_sem≈0; attention suffices) — drop unless Exp B disagrees"
 
 
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Exp-A: LOO KV-importance signal predictivity")
-    ap.add_argument("--synthetic", action="store_true", help="run the CPU synthetic model")
-    ap.add_argument("--w-sem", type=float, default=0.5, help="(synthetic) semantic importance share")
-    ap.add_argument("--n-blocks", type=int, default=400)
-    ap.add_argument("--seeds", type=int, default=5)
-    ap.add_argument("--model", default=None, help="(GPU) HF model id — real path, not yet implemented")
-    args = ap.parse_args(argv)
-
-    if args.model and not args.synthetic:
-        run_real(args.model)   # raises with guidance
-        return 0
-
-    if not args.synthetic:
-        ap.error("pass --synthetic (CPU) or --model <id> (GPU scaffold)")
-
-    # average over seeds for stability
-    keys = ["rho_attn", "rho_coh", "rho_partial_coh_given_attn",
-            "needle_recall_attn", "needle_recall_coh"]
-    acc = {k: 0.0 for k in keys}
-    for sd in range(args.seeds):
-        r = run_synthetic(SyntheticConfig(n_blocks=args.n_blocks, w_sem=args.w_sem, seed=sd))
-        for k in keys:
-            acc[k] += r[k]
-    avg = {k: v / args.seeds for k, v in acc.items()}
-
-    print(f"Exp-A (synthetic, w_sem={args.w_sem}, n_blocks={args.n_blocks}, seeds={args.seeds})\n")
+def _print_expA(avg: dict, header: str, footer: str) -> None:
+    print(header + "\n")
     print(f"  Spearman(attention, importance)            = {avg['rho_attn']:+.3f}")
     print(f"  Spearman(coherence, importance)            = {avg['rho_coh']:+.3f}")
     print(f"  PARTIAL  (coherence, importance | attn)    = {avg['rho_partial_coh_given_attn']:+.3f}  <- decisive")
     print(f"  needle recall  attention / coherence       = {avg['needle_recall_attn']:.3f} / {avg['needle_recall_coh']:.3f}")
     print(f"\n  decision: {_decision(avg['rho_partial_coh_given_attn'], avg['needle_recall_coh'], avg['needle_recall_attn'])}")
-    print("\n  NOTE: synthetic — proves the harness + decision rule. Real w_sem is unknown;"
-          "\n  run the --model path on a GPU pod to measure it on a real model.")
+    print(footer)
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Exp-A: LOO KV-importance signal predictivity")
+    ap.add_argument("--synthetic", action="store_true", help="run the CPU synthetic model")
+    ap.add_argument("--w-sem", type=float, default=0.5, help="(synthetic) semantic importance share")
+    ap.add_argument("--n-blocks", type=int, default=400, help="(synthetic) number of blocks")
+    ap.add_argument("--seeds", type=int, default=5, help="(synthetic) seeds to average")
+    # real-model (GPU) args
+    ap.add_argument("--model", default=None, help="HF model id — real GPU path")
+    ap.add_argument("--text-file", default=None, help="long-context prompt file (default: built-in)")
+    ap.add_argument("--prompt-len", type=int, default=2048)
+    ap.add_argument("--block-size", type=int, default=64)
+    ap.add_argument("--layer", type=int, default=-1, help="layer index for attn/coherence scores")
+    ap.add_argument("--n-sample", type=int, default=128, help="blocks to LOO-mask")
+    ap.add_argument("--device", default="cuda")
+    args = ap.parse_args(argv)
+
+    if args.model:
+        r = run_real(args.model, text_file=args.text_file, prompt_len=args.prompt_len,
+                     block_size=args.block_size, layer=args.layer, n_sample=args.n_sample,
+                     device=args.device)
+        _print_expA(
+            r,
+            f"Exp-A (REAL: {r['model']}, seq_len={r['seq_len']}, layer={r['layer']}, "
+            f"LOO {r['n_loo']}/{r['n_blocks']} blocks, {r['n_needles']} needles)",
+            "\n  Measured on a real model. Repeat across ≥2 models + layers + prompts and apply "
+            "Decision Rule A\n  (docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §3) before any claim.",
+        )
+        return 0
+
+    if not args.synthetic:
+        ap.error("pass --synthetic (CPU) or --model <id> (GPU)")
+
+    keys = ["rho_attn", "rho_coh", "rho_partial_coh_given_attn",
+            "needle_recall_attn", "needle_recall_coh"]
+    acc = {k: 0.0 for k in keys}
+    for sd in range(args.seeds):
+        rr = run_synthetic(SyntheticConfig(n_blocks=args.n_blocks, w_sem=args.w_sem, seed=sd))
+        for k in keys:
+            acc[k] += rr[k]
+    avg = {k: v / args.seeds for k, v in acc.items()}
+    _print_expA(
+        avg,
+        f"Exp-A (synthetic, w_sem={args.w_sem}, n_blocks={args.n_blocks}, seeds={args.seeds})",
+        "\n  NOTE: synthetic — proves the harness + decision rule. Real w_sem is unknown;"
+        "\n  run --model <id> on a GPU pod to measure it on a real model.",
+    )
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
