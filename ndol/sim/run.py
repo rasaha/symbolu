@@ -31,9 +31,9 @@ def main() -> int:
           f"({t['baseline_requests'] / max(1, t['ndol_requests']):.1f}x fewer)\n")
 
     try:
-        print("Running MQSim on baseline ...")
+        print("Running MQSim on baseline (~20–60s) ...", flush=True)
         base = run_mqsim(t["baseline_trace"], mqsim_dir=args.mqsim)
-        print("Running MQSim on ndol ...")
+        print("Running MQSim on ndol (~20–60s) ...", flush=True)
         ndol = run_mqsim(t["ndol_trace"], mqsim_dir=args.mqsim)
     except FileNotFoundError as e:
         print(f"\n[skip] {e}", file=sys.stderr)
