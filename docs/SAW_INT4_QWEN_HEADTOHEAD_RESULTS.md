@@ -1,6 +1,6 @@
 # SAW-INT4 vs int4_protected — Qwen Head-to-Head (RESULTS)
 
-**Status: NOT YET RUN — template to fill on the GPU pod.** Applies
+**Status: BUILD + SMOKE PASS (2026-06-13) — comparison eval pending.** Applies
 `docs/KV_COMPRESSION_HEADTOHEAD_PROTOCOL.md`. No positioning language until measured.
 
 ## Provenance (verified from the repo, 2026-06-13)
@@ -8,7 +8,17 @@
 - **Commit:** `e51bfa7291d52cd14b86e4c6ded6c002d0444ff0`
 - **BDR submodule:** `third_party/sglang-fast-rotation` → `github.com/jindajia/sglang-fork.git` branch `colm_rotation_fast` (pins in `SUBMODULE_VERSIONS.md`)
 - **Method:** block-diagonal Hadamard rotation (BDR) on K + token-wise INT4, fused into SGLang.
-- **Hardware (fill):** ______  • **GPU (fill):** ______  • **Date (fill):** ______
+- **GPU:** 1× NVIDIA A100-SXM4-80GB • **Driver:** 550.127.05 • **CUDA:** 12.4 • **Date:** 2026-06-13
+
+## Build + smoke (DONE)
+- Build: `pip install -e ".[all]"` + fast-hadamard-transform — **OK**.
+- BDR server launched on `Qwen/Qwen3-4B-Thinking-2507` (`HADAMARD=1 HADAMARD_ORDER=128`,
+  `--kv-cache-dtype int4`, prefill fa3 / decode triton). KV pool: **51.5 GB** (K 25.78 + V 25.78,
+  1.50M tokens) → INT4 KV ≈ 34 KB/token across all layers.
+- `scripts/bdr_smoke_test.py`: **PASS** — coherent CoT, correct GPQA answer **A** (vs plain INT4's
+  known collapse → confirms BDR active, not naive INT4). CUDA/kernel path **works**.
+- **Note:** server reserves ~72/82 GB (SGLang KV pool) at 0% util when idle — by design; must
+  stop it before launching int4_protected on the same GPU (run methods sequentially).
 
 ## ⚠️ Integration reality (decides the comparison shape)
 - SAW-INT4 = **SGLang server** (`--kv-cache-dtype int4` + `HADAMARD=1`); accuracy via **GPQA / simple-evals**, throughput via **genai-bench**. Requirements: **MHA models only** (not MLA), prefill `fa3`, decode `triton`.
