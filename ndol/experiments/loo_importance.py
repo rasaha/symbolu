@@ -326,6 +326,7 @@ def run_real(
     coh_mode: str = "cos_value",
     device: str = "cuda",
     seeds=(0,),
+    dump_features: str | None = None,
 ) -> dict:
     """GPU path: measure LOO KV-importance across a layers × seeds grid + aggregate.
 
@@ -390,15 +391,37 @@ def run_real(
                 true.append(float(kl.sum()))
 
         # per layer: cheap re-scoring from the SAME prefill against the shared importance
+        layer_attn, layer_coh = {}, {}
         for layer in layers:
             att = out.attentions[layer][0]
             attn_rows = att[:, eval_pos, :].mean(0).float()
             attention = [float(attn_rows[:, lo:hi].sum(dim=1).mean()) for lo, hi in blocks]
             coherence = score_torch(_block_value_mat(out, layer, blocks).float(), mode=coh_mode).tolist()
+            layer_attn[layer], layer_coh[layer] = attention, coherence
             a_s = [attention[b] for b in idx]
             c_s = [coherence[b] for b in idx]
             configs.append({"seed": seed, "layer": layer, "seq_len": L, "n_blocks": nb,
                             "n_loo": len(idx), **analyze(a_s, c_s, true)})
+
+        # optional: dump per-block (features, LOO label) for the learned probe
+        if dump_features:
+            import json as _json
+            vnorm = _block_value_mat(out, layers[-1], blocks).norm(dim=-1).tolist()
+            true_map = dict(zip(idx, true))
+            with open(dump_features, "a") as fh:
+                for b in idx:
+                    attns = [layer_attn[L_][b] for L_ in layers]
+                    feats = {
+                        "attn_mean": sum(attns) / len(attns),
+                        "attn_max": max(attns),
+                        "attn_last": layer_attn[layers[-1]][b],
+                        "coherence": layer_coh[layers[-1]][b],
+                        "value_norm": vnorm[b],
+                        "recency": blocks[b][1] / L,
+                        "idx_frac": b / max(1, nb),
+                    }
+                    fh.write(_json.dumps({"model": model, "seed": seed, "block": b,
+                                          "label": true_map[b], "features": feats}) + "\n")
 
         del out
         if str(device).startswith("cuda"):
@@ -516,6 +539,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--coh-mode", default="cos_value", choices=["cos_value", "value_norm"],
                     help="coherence signal: cos_value (centroid cosine) or value_norm")
     ap.add_argument("--n-sample", type=int, default=128, help="blocks to LOO-mask per seed")
+    ap.add_argument("--dump-features", default=None,
+                    help="append per-block (features,label) JSONL here for the learned probe")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args(argv)
 
@@ -524,7 +549,8 @@ def main(argv: list[str] | None = None) -> int:
         seeds = [int(x) for x in str(args.seeds).split(",")]
         res = run_real(args.model, task=args.task, text_file=args.text_file, prompt_len=args.prompt_len,
                        block_size=args.block_size, layers=layers, n_sample=args.n_sample,
-                       coh_mode=args.coh_mode, device=args.device, seeds=seeds)
+                       coh_mode=args.coh_mode, device=args.device, seeds=seeds,
+                       dump_features=args.dump_features)
         _print_grid(res)
         return 0
 
