@@ -343,16 +343,22 @@ def run_real(
     with torch.no_grad():
         out = lm(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos,
                  output_attentions=True, use_cache=True)
-    full_logits = out.logits[0, -1].float()
-    p_full = torch.softmax(full_logits, dim=-1)
+
+    # MULTI-POSITION importance: aggregate over the last n_eval prediction targets,
+    # not one. A single next-token concentrates importance in 1–2 blocks (heavy
+    # tail, unrankable); summing each block's LOO effect over many query positions
+    # spreads importance across many blocks → gradated, rankable ground truth.
+    n_eval = max(8, min(64, L // 4))
+    eval_pos = list(range(L - n_eval, L))
+    p_full = torch.softmax(out.logits[0, eval_pos].float(), dim=-1)   # [n_eval, V]
 
     blocks = [(lo, min(lo + block_size, L)) for lo in range(0, L, block_size)]
     nb = len(blocks)
 
-    # attention score: last query's attention mass over each block (mean over heads)
-    att = out.attentions[layer][0]                      # [heads, q_len, k_len]
-    last_attn = att[:, -1, :].mean(0).float()           # [k_len]
-    attention = [float(last_attn[lo:hi].sum()) for lo, hi in blocks]
+    # attention score: mean over eval positions of attention mass to each block
+    att = out.attentions[layer][0]                          # [heads, q_len, k_len]
+    attn_rows = att[:, eval_pos, :].mean(0).float()         # [n_eval, k_len], mean over heads
+    attention = [float(attn_rows[:, lo:hi].sum(dim=1).mean()) for lo, hi in blocks]
 
     # coherence score: mean value-vector per block, cosine to context centroid.
     val = _cache_layer_values(out.past_key_values, layer)[0]   # [kv_heads, seq, head_dim]
@@ -372,6 +378,7 @@ def run_real(
         keep.update(rest[: max(0, n_sample - len(keep))])
         idx = sorted(keep)
 
+    eval_t = torch.tensor(eval_pos, device=device)
     true = []
     with torch.no_grad():
         for b in idx:
@@ -379,8 +386,11 @@ def run_real(
             mask = torch.ones(L, device=device, dtype=torch.long)
             mask[lo:hi] = 0
             ob = lm(input_ids=ids, attention_mask=mask.unsqueeze(0), position_ids=pos)
-            pb = torch.softmax(ob.logits[0, -1].float(), dim=-1)
-            true.append(float((p_full * (p_full.clamp_min(1e-12) / pb.clamp_min(1e-12)).log()).sum()))
+            pb = torch.softmax(ob.logits[0, eval_pos].float(), dim=-1)        # [n_eval, V]
+            kl = (p_full * (p_full.clamp_min(1e-12) / pb.clamp_min(1e-12)).log()).sum(dim=-1)  # [n_eval]
+            # only eval positions that can causally attend to block b (p >= hi-1)
+            kl = kl * (eval_t >= (hi - 1)).float()
+            true.append(float(kl.sum()))
 
     a_s = [attention[b] for b in idx]
     c_s = [coherence[b] for b in idx]
