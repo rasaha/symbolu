@@ -55,7 +55,7 @@ _QUALITY = {
     "int4 (naive)": "degraded (the problem)",
     "int4_protected": "near-bf16 (MEASURED: needle 15/15, greedy bit-identical)",
     "GEAR": "near-lossless (CLAIMED 2403.05527)",
-    "SAW-INT4": "near-lossless (CLAIMED 2604.19157)",
+    "SAW-INT4": "near-lossless on Qwen3 (CLAIMED) BUT MEASURED 0% needle on Qwen2.5-7B-Instruct — does not generalize (see SAW_INT4_QWEN_HEADTOHEAD_RESULTS.md)",
 }
 
 

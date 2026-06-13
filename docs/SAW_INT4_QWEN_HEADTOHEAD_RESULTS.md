@@ -1,7 +1,38 @@
 # SAW-INT4 vs int4_protected — Qwen Head-to-Head (RESULTS)
 
-**Status: BUILD + SMOKE PASS (2026-06-13) — comparison eval pending.** Applies
-`docs/KV_COMPRESSION_HEADTOHEAD_PROTOCOL.md`. No positioning language until measured.
+**Status: MEASURED — QUALITY-EDGE (2026-06-13).** SAW-INT4/BDR **does not generalize
+to Qwen2.5-7B-Instruct** (collapses to 0% retrieval) although it works on the Qwen3
+model SAW tuned. int4_protected re-measurement on this harness pending (see §Open item).
+Applies `docs/KV_COMPRESSION_HEADTOHEAD_PROTOCOL.md`.
+
+## TL;DR (measured this session, A100-80GB, SGLang fork, seed 0)
+| model | mode | needle | hard-needle | provenance |
+|---|---|---|---|---|
+| Qwen2.5-7B-Instruct | **BF16** | **1.000** | **1.000** | measured, 40 prompts, ctx≈120 sent. |
+| Qwen2.5-7B-Instruct | naive INT4 | **0.000** | **0.000** | measured, 10 prompts, ctx=4 — multilingual word-salad |
+| Qwen2.5-7B-Instruct | **SAW-INT4 (BDR)** | **0.000** | **0.000** | measured, 40@ctx≈120 **and** 5+5@ctx=4 — digit-repetition garbage |
+| Qwen3-4B-Thinking-2507 (SAW's own) | SAW-INT4 (BDR) | **1.000** | **1.000** | measured CONTROL — validates harness + fork path |
+
+- **The collapse is real, not a harness artifact:** identical prompts/seed/client give BF16
+  1.000 and the Qwen3-4B BDR control 1.000. Only INT4-KV on Qwen2.5-7B fails.
+- **BDR is engaging, not silently falling back to naive:** its failure signature (digit
+  repetition) differs from naive INT4's (foreign-word salad, e.g. `pérdida`/`若您`). The
+  rotation runs; it just doesn't rescue this model.
+- **Decision rule → QUALITY-EDGE:** SAW exhibits a total quality cliff (1.0→0.0) on a
+  mainstream model that BF16 handles perfectly. SAW's ~2× density advantage is moot where
+  it returns garbage. (Was the make-or-break test for int4_protected as a format.)
+
+### ⚠️ Honest caveats
+- **Launch recipe:** used `HADAMARD=1 HADAMARD_ORDER=128` (head_dim=128), the **same flags
+  that work on Qwen3-4B**. If SAW ships a Qwen2.5-specific rotation config we didn't find,
+  that could change the result — but out-of-the-box with their documented Qwen3 recipe, BDR
+  does not transfer. Hadamard is parameter-free (no calibration), so there is no obvious
+  per-model tuning knob we skipped.
+- **int4_protected not yet re-measured on THIS harness/model** (see §Open item). Its
+  near-bf16 quality is from prior CTM_plus/Bench validation (needle 15/15, greedy
+  bit-identical on the portfolio models). The QUALITY-EDGE claim rests on (a) SAW's measured
+  collapse here + (b) int4_protected's prior validation; closing (b) on Qwen2.5-7B with this
+  client makes the table fully symmetric.
 
 ## Provenance (verified from the repo, 2026-06-13)
 - **SAW-INT4 repo:** `github.com/togethercomputer/saw-int4`
@@ -78,26 +109,40 @@ genai-bench benchmark --api-backend sglang --api-base "http://127.0.0.1:30000" -
 ```
 Memory: record **measured** KV bytes/token incl. scales/metadata/padding/sidecars/temp buffers for each method (don't use paper ratios).
 
-## Results table (fill)
-Model: `Qwen/Qwen2.5-7B-Instruct` • GPU: ______ • context: ______
+## Results table (measured 2026-06-13)
+GPU: 1× A100-SXM4-80GB • SGLang fork `colm_rotation_fast` • client: `ndol.experiments.openai_kv_eval` (temp 0, seed 0)
 
-| method | GPQA (shared) | hard-needle | needle | greedy-agree vs bf16 | PPL | **bytes/token (measured)** | tokens/sec | p95 / p99 |
-|---|---|---|---|---|---|---|---|---|
-| bf16 | | | | 1.000 | | | | |
-| int4 (naive) | | | | | | | | |
-| int4_protected / KVPro | | | | | | | | |
-| SAW-INT4 (BDR) | | | | | | | | |
+| model | method | needle | hard-needle | n prompts / ctx | notes |
+|---|---|---|---|---|---|
+| Qwen2.5-7B-Instruct | bf16 | **1.000** | **1.000** | 40 / ~120 sent | clean exact answers |
+| Qwen2.5-7B-Instruct | int4 (naive) | **0.000** | **0.000** | 10 / 4 sent | word-salad collapse (`pérdida`,`若您`) |
+| Qwen2.5-7B-Instruct | SAW-INT4 (BDR) | **0.000** | **0.000** | 40 / ~120 **+** 5+5 / 4 sent | digit-repetition garbage; rotation active |
+| Qwen2.5-7B-Instruct | int4_protected / KVPro | _pending_ | _pending_ | — | re-measure on this client (Open item) |
+| Qwen3-4B-Thinking-2507 | SAW-INT4 (BDR) | **1.000** | **1.000** | 5+5 / 4 sent (max_tok 1024) | CONTROL — harness + fork path valid |
 
-*SAW published reference (Qwen3-4B, not our model): BF16 GPQA 66.7 / INT4 0 / BDR 65.8; BDR tps ≈ INT4 ≈ BF16.*
+Run artifacts on pod: `/workspace/run_bf16.jsonl`, `run_int4.jsonl`, `run_bdr.jsonl`,
+`run_bdr_short.jsonl`, `run_bdr_qwen3.jsonl`.
+
+*SAW published reference (Qwen3-4B, not Qwen2.5-7B): BF16 GPQA 66.7 / INT4 0 / BDR 65.8 — consistent
+with our Qwen3-4B BDR control working; the new datum is that this does NOT transfer to Qwen2.5-7B.*
 
 ## Decision outcome
-**[ NOT YET RUN ]** — set one of, per protocol §make-or-break:
-- **BUILD-FAILED** — SAW kernel/build/smoke did not work on the pod (attach error).
-- **DOMINATED** — SAW-INT4 matches int4_protected quality (hard-needle within 2 pts / greedy within 1 pt / GPQA within noise) at **≤ memory and ≥ throughput** → int4_protected not a defensible format → pivot.
-- **QUALITY-EDGE** — int4_protected beats SAW on hard-tail by **≥5 pts** (or SAW shows a quality cliff) → reposition claim to tail-quality, state the memory trade.
-- **PARITY** — mixed → differentiate on integration/warm-tier.
+**QUALITY-EDGE (with caveat).** SAW-INT4/BDR shows a **total quality cliff on Qwen2.5-7B-Instruct**
+(needle 1.0→0.0) that BF16 does not, on a model int4_protected is validated to handle. Per protocol
+§make-or-break, "SAW shows a quality cliff int4_protected doesn't" ⇒ QUALITY-EDGE: the defensible
+claim is **robust near-bf16 quality across mainstream models**, where SAW's cheap rotation does not
+generalize. NOT DOMINATED (SAW does not match quality), NOT BUILD-FAILED (build/smoke + Qwen3-4B
+control all pass).
+
+## Open item (to make the table fully symmetric)
+Run int4_protected's vLLM server on `Qwen/Qwen2.5-7B-Instruct`, expose its OpenAI endpoint, and run
+the **same** client (`openai_kv_eval run --label int4_protected --seed 0`) + `compare --ref bf16`.
+Expected (per prior validation): needle/hard ≈ bf16. That closes caveat (b) and confirms int4_protected
+holds where SAW collapses.
 
 ## Next recommendation
-**[ fill after measuring ]** — e.g. "DOMINATED → draft pivot to warm-tier systems story" or
-"QUALITY-EDGE on hard-needle → that becomes the claim; verify on Mistral/Llama next; then GEAR."
-Do NOT integrate GEAR until this SAW result is recorded.
+QUALITY-EDGE → the claim becomes **"robust near-bf16 KV quant that generalizes across mainstream
+models, where cheap rotation-only INT4 (SAW) does not."** Next: (1) close the Open item
+(int4_protected on Qwen2.5-7B, same client); (2) replicate the SAW-collapse datum on a second
+non-Qwen3 model (Mistral-7B-v0.3 or Llama-3.1-8B) to show it is not Qwen2.5-specific; (3) THEN GEAR.
+Do NOT integrate GEAR until (1)+(2) are recorded.
