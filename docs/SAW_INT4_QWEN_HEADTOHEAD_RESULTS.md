@@ -18,9 +18,11 @@ Applies `docs/KV_COMPRESSION_HEADTOHEAD_PROTOCOL.md`.
 - **BDR is engaging, not silently falling back to naive:** its failure signature (digit
   repetition) differs from naive INT4's (foreign-word salad, e.g. `pérdida`/`若您`). The
   rotation runs; it just doesn't rescue this model.
-- **Decision rule → QUALITY-EDGE:** SAW exhibits a total quality cliff (1.0→0.0) on a
-  mainstream model that BF16 handles perfectly. SAW's ~2× density advantage is moot where
-  it returns garbage. (Was the make-or-break test for int4_protected as a format.)
+- **Decision rule → QUALITY-EDGE (scoped to Qwen2.5-7B):** SAW exhibits a total quality
+  cliff (1.0→0.0) on this model that BF16 handles perfectly. SAW's ~2× density advantage is
+  moot where it returns garbage. This proves **model-transfer fragility**, NOT broad
+  superiority — the edge is "wins where cheap rotation fails," and the breadth of that set is
+  **unproven** (n=1). (Was the make-or-break test for int4_protected as a format.)
 
 ### ⚠️ Honest caveats
 - **Launch recipe:** used `HADAMARD=1 HADAMARD_ORDER=128` (head_dim=128), the **same flags
@@ -129,10 +131,15 @@ with our Qwen3-4B BDR control working; the new datum is that this does NOT trans
 ## Decision outcome
 **QUALITY-EDGE (with caveat).** SAW-INT4/BDR shows a **total quality cliff on Qwen2.5-7B-Instruct**
 (needle 1.0→0.0) that BF16 does not, on a model int4_protected is validated to handle. Per protocol
-§make-or-break, "SAW shows a quality cliff int4_protected doesn't" ⇒ QUALITY-EDGE: the defensible
-claim is **robust near-bf16 quality across mainstream models**, where SAW's cheap rotation does not
-generalize. NOT DOMINATED (SAW does not match quality), NOT BUILD-FAILED (build/smoke + Qwen3-4B
-control all pass).
+§make-or-break, "SAW shows a quality cliff int4_protected doesn't" ⇒ QUALITY-EDGE. NOT DOMINATED
+(SAW does not match quality on this model), NOT BUILD-FAILED (build/smoke + Qwen3-4B control all pass).
+
+**Defensible claim (scoped to what is measured):** *int4_protected delivers a quality-safe 1.8× KV
+reduction that survived a hard failure case for cheap rotation-only INT4 — Qwen2.5-7B hard-needle
+retrieval collapsed to 0% under SAW-BDR while BF16 and (per prior validation) int4_protected retained
+retrieval.* Do **not** claim "across mainstream models" until the Mistral/Llama replication runs —
+this is n=1. Do **not** claim "SAW can't enter vLLM/LMCache"; correct wording is "SAW is
+SGLang-oriented; LMCache/vLLM warm-tier compatibility is unproven for it."
 
 ## Open item (to make the table fully symmetric)
 Run int4_protected's vLLM server on `Qwen/Qwen2.5-7B-Instruct`, expose its OpenAI endpoint, and run
@@ -140,9 +147,28 @@ the **same** client (`openai_kv_eval run --label int4_protected --seed 0`) + `co
 Expected (per prior validation): needle/hard ≈ bf16. That closes caveat (b) and confirms int4_protected
 holds where SAW collapses.
 
-## Next recommendation
-QUALITY-EDGE → the claim becomes **"robust near-bf16 KV quant that generalizes across mainstream
-models, where cheap rotation-only INT4 (SAW) does not."** Next: (1) close the Open item
-(int4_protected on Qwen2.5-7B, same client); (2) replicate the SAW-collapse datum on a second
-non-Qwen3 model (Mistral-7B-v0.3 or Llama-3.1-8B) to show it is not Qwen2.5-specific; (3) THEN GEAR.
-Do NOT integrate GEAR until (1)+(2) are recorded.
+## Next recommendation — reordered (the next risk is no longer "SAW beat us")
+With QUALITY-EDGE banked on Qwen2.5-7B, the live risks to the thesis are: (a) is the SAW failure
+**broad or Qwen2.5-specific?** (b) does **CacheGen** already own the warm-tier niche? (c) does
+int4_protected hold **throughput/p99** in paged serving? Priority stack:
+
+1. **Breadth test — SAW on one non-Qwen3 mainstream model** (Mistral-7B-Instruct or
+   Llama-3.1-8B-Instruct), same hard/normal-needle harness. Broad collapse ⇒ "cheap rotation-only
+   INT4 has broad transfer cliffs" (strong). Works there ⇒ moat is Qwen2.5-style-specific (narrow).
+   Both outcomes are decision-useful. Cheap, highest information — do FIRST.
+2. **int4_protected vs CacheGen inside LMCache/vLLM** — the REAL warm-tier incumbent (LMCache's own
+   KV→bitstream codec for offload/reuse), not SAW. Long-prefix reuse workload; measure bytes stored,
+   TTFT-with-reuse, NVMe/PCIe transfer volume, p95/p99 under concurrency, cost/repeated-query;
+   quality only as a sanity check. This is the comparison that decides whether the warm-tier claim
+   is real.
+3. **int4_protected decode throughput/p99 in a paged/fused stack** (bf16 vs naive int4 vs
+   int4_protected) — the unmeasured axis it could still lose on; SAW is paged+fused-native.
+4. **Close the symmetry gap** — int4_protected vLLM on Qwen2.5-7B via the same client (`--label
+   int4_protected --seed 0`) + `compare --ref bf16`.
+5. **THEN GEAR.** Do NOT integrate GEAR until 1–2 are recorded.
+
+**Reframe Test B (warm-tier reuse) as a SYSTEMS benchmark, not a quality re-test:** for a fixed codec,
+store→NVMe→reload is byte round-tripping — quality after reload ≈ quality without it (already covered
+by the needle test, since the needle lives in the reused prefix). The real metrics are bytes /
+transfer / TTFT / p99 / cost; quality is a sanity check guarding against dtype/chunking/partial-load
+bugs in the storage path.
