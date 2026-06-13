@@ -273,8 +273,15 @@ def run_real(
     last_attn = att[:, -1, :].mean(0).float()           # [k_len]
     attention = [float(last_attn[lo:hi].sum()) for lo, hi in blocks]
 
-    # coherence score: mean value-vector per block, cosine to context centroid
-    val = out.past_key_values[layer][1][0]              # [kv_heads, seq, head_dim]
+    # coherence score: mean value-vector per block, cosine to context centroid.
+    # transformers >= 4.36 returns a Cache object, not the legacy tuple — handle both.
+    pkv = out.past_key_values
+    if hasattr(pkv, "to_legacy_cache"):
+        val = pkv.to_legacy_cache()[layer][1][0]        # [kv_heads, seq, head_dim]
+    elif hasattr(pkv, "value_cache"):
+        val = pkv.value_cache[layer][0]
+    else:
+        val = pkv[layer][1][0]
     block_mat = torch.stack([val[:, lo:hi, :].mean(dim=1).reshape(-1) for lo, hi in blocks])
     coherence = score_torch(block_mat.float(), mode="cos_value").tolist()
 
