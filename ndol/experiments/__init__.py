@@ -11,6 +11,8 @@ run on plain Python lists so they are unit-testable without torch/GPU.
 """
 from .coherence import context_centroid, coherence_scores, MODES
 from .selector import select_by_policy, select_blocks, blend, POLICIES
+# NB: .probe needs numpy — import it directly (ndol.experiments.probe), not here,
+# so the pure-stdlib package (and the GPU feature-dump path) stays import-light.
 
 __all__ = [
     "context_centroid",

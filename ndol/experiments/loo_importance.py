@@ -99,7 +99,7 @@ def _bootstrap_partial(x: list[float], y: list[float], z: list[float],
 # DIAGNOSTICS + a validity gate, so a degenerate run cannot yield a verdict.
 # --------------------------------------------------------------------------- #
 def analyze(attention: list[float], coherence: list[float], true: list[float],
-            needle_budget_frac: float = 0.10) -> dict:
+            topk_frac: float = 0.15, budget_frac: float = 0.15) -> dict:
     n = len(true)
     rho_attn = spearman(attention, true)
     rho_coh = spearman(coherence, true)
@@ -113,21 +113,36 @@ def analyze(attention: list[float], coherence: list[float], true: list[float],
     attn_std = statistics.pstdev(attention) if n > 1 else 0.0
     coh_std = statistics.pstdev(coherence) if n > 1 else 0.0
 
-    hi = imp_sorted[int(0.85 * n)] if n else 0.0
-    lo_attn = sorted(attention)[int(0.50 * n)] if n else 0.0
-    needles = [k for k in range(n) if true[k] >= hi and attention[k] <= lo_attn]
-    budget = max(1, int(needle_budget_frac * n))
+    # PRIMARY metric (heavy-tail robust): recall of the truly-important block set.
+    # KV importance for a single next-token is heavy-tailed (few blocks matter),
+    # so Spearman over a sea of ~zeros is weak; "does the signal's top-budget
+    # contain the truly-important blocks?" is the decision-relevant question.
+    K = max(3, int(round(topk_frac * n)))
+    important = set(sorted(range(n), key=lambda i: true[i], reverse=True)[:K])
+    budget = max(3, int(round(budget_frac * n)))
+    # blend on RANKS (attention & coherence are on different scales)
+    ra, rc = _ranks(attention), _ranks(coherence)
+    scc = [0.5 * ra[i] + 0.5 * rc[i] for i in range(n)]
+    # INVERSE hypothesis: distinctiveness = low centroid similarity = -coherence
+    distinct = [-c for c in coherence]
+    scc_d = [0.5 * ra[i] + 0.5 * ((n - 1) - rc[i]) for i in range(n)]   # attn + distinctiveness ranks
 
     def recall(scores):
-        top = set(sorted(range(n), key=lambda k: scores[k], reverse=True)[:budget])
-        return (sum(1 for k in needles if k in top) / len(needles)) if needles else float("nan")
+        top = set(sorted(range(n), key=lambda i: scores[i], reverse=True)[:budget])
+        return len(top & important) / len(important) if important else float("nan")
 
-    # validity gate — model-agnostic (does NOT assume attention predicts importance)
+    # how many blocks carry meaningful (>5% of max) importance — too few ⇒ not rankable
+    n_meaningful = sum(1 for t in true if t > 0.05 * imp_max) if imp_max > 0 else 0
+
+    # validity gate — recalibrated: heavy-tailed importance is NORMAL (it's why
+    # read-skip works), NOT degenerate. Invalid only if masking did nothing, a
+    # signal is flat, signals are collinear, or there are too few positives to rank.
     reasons = []
     if imp_max < 1e-3:
         reasons.append("LOO importance ≈0 for every block — masking not applied, or context fully redundant")
-    if frac_tiny > 0.95:
-        reasons.append(f"{frac_tiny:.0%} of blocks have ~zero importance — degenerate ground truth")
+    if n_meaningful < 3:
+        reasons.append(f"only {n_meaningful} block(s) carry meaningful importance — too few positives to rank "
+                       "(use a needle/retrieval prompt or aggregate over more decode positions)")
     if abs(rho_ac) > 0.9:
         reasons.append(f"attention & coherence are collinear (ρ={rho_ac:+.2f}) — partial correlation unstable")
     if attn_std < 1e-9 or coh_std < 1e-9:
@@ -137,10 +152,30 @@ def analyze(attention: list[float], coherence: list[float], true: list[float],
         "rho_attn": rho_attn, "rho_coh": rho_coh, "rho_partial_coh_given_attn": rho_partial,
         "rho_partial_ci": (ci_lo, ci_hi), "rho_attn_coh": rho_ac,
         "imp_med": imp_med, "imp_max": imp_max, "imp_frac_tiny": frac_tiny,
+        "n_meaningful": n_meaningful, "heavy_tailed": frac_tiny > 0.9,
+        "important_k": K, "budget": budget,
         "attn_std": attn_std, "coh_std": coh_std,
+        "recall_attn": recall(attention), "recall_coh": recall(coherence), "recall_scc": recall(scc),
+        "recall_distinct": recall(distinct), "recall_scc_distinct": recall(scc_d),
+        # back-compat aliases (now = recall of important set)
         "needle_recall_attn": recall(attention), "needle_recall_coh": recall(coherence),
-        "n_needles": len(needles), "valid": len(reasons) == 0, "invalid_reasons": reasons,
+        "n_needles": len(important),
+        "valid": len(reasons) == 0, "invalid_reasons": reasons,
     }
+
+
+# alternative signals to attention, by name → recall key (for the determination)
+_ALT_RECALLS = {
+    "coherence": "recall_coh",
+    "distinctiveness(-coh)": "recall_distinct",
+    "scc(attn+coh)": "recall_scc",
+    "scc(attn+distinct)": "recall_scc_distinct",
+}
+
+
+def best_alternative(d: dict) -> tuple[str, float]:
+    """Best non-attention signal (coherence / distinctiveness / either blend) by recall."""
+    return max(((name, d[key]) for name, key in _ALT_RECALLS.items()), key=lambda kv: kv[1])
 
 
 # ------------------------------ synthetic model ---------------------------- #
@@ -207,134 +242,281 @@ def run_synthetic(cfg: SyntheticConfig) -> dict:
 
 
 # ------------------------------ real-model path ---------------------------- #
-_DEFAULT_TEXT = (
-    "The history of computing spans mechanical calculators, vacuum tubes, transistors, "
-    "and integrated circuits. Memory hierarchies trade capacity against latency. "
-    "Long-context language models keep a key-value cache whose size grows with the "
-    "sequence. Quantization reduces the bytes per element while protecting sensitive "
-    "channels. Flash storage offers cheap capacity but limited write endurance. "
-)
+def _diverse_filler(rng, n_sentences: int) -> str:
+    """Non-repeating filler — each sentence carries unique tokens, so masking a
+    block removes information not recoverable from elsewhere (unlike repeated
+    text, which makes every block redundant → zero LOO importance)."""
+    S = ["The committee", "A sensor array", "The field archive", "Our control model",
+         "The cooling unit", "A courier drone", "The audit ledger", "The orbital probe"]
+    V = ["recorded", "transmitted", "recalibrated", "rejected", "amplified", "buffered",
+         "encrypted", "down-sampled"]
+    O = ["a fragment", "the residual", "an anomaly", "the manifest", "a checksum",
+         "the payload", "an estimate", "the gradient"]
+    out = []
+    for i in range(n_sentences):
+        out.append(f"{rng.choice(S)} {rng.choice(V)} {rng.choice(O)} #{rng.randint(100, 999)} at stage {i}.")
+    return " ".join(out)
+
+
+def _build_prompt_ids(tok, task: str, prompt_len: int, seed: int = 0) -> list[int]:
+    """Token ids for the real-model prompt. task='needle' (default) plants one
+    unique fact early and ends with a query that REQUIRES it, so the needle block
+    has high LOO importance and most filler blocks have low — giving the variance
+    Exp-A needs (and a built-in test that masking actually changes the output)."""
+    rng = random.Random(seed)
+    if task != "needle":
+        ids = tok(_diverse_filler(rng, max(1, prompt_len // 8))).input_ids
+        while len(ids) < prompt_len:
+            ids += tok(_diverse_filler(rng, 200)).input_ids
+        return ids[:prompt_len]
+    code = rng.randint(10000, 99999)
+    n_ids = tok(f" Important fact to remember: the secret access code is {code}. ").input_ids
+    q_ids = tok(" Question: what is the secret access code? Answer: the secret access code is").input_ids
+    budget = max(0, prompt_len - len(n_ids) - len(q_ids))
+    pre = tok(_diverse_filler(rng, max(1, budget // 8))).input_ids[: budget // 5]
+    post = tok(_diverse_filler(rng, max(1, budget // 2))).input_ids[: budget - len(pre)]
+    return pre + n_ids + post + q_ids   # query stays at the very end
+
+
+def _cache_layer_values(pkv, layer: int):
+    """Per-layer value tensor [batch, kv_heads, seq, head_dim] from whatever
+    transformers Cache layout this version uses. The API has churned a lot."""
+    # 1. newest layered API (transformers ≳4.54): pkv.layers[i].values / .value_states
+    layers = getattr(pkv, "layers", None)
+    if layers is not None:
+        lyr = layers[layer]
+        for attr in ("values", "value_states", "value"):
+            v = getattr(lyr, attr, None)
+            if v is not None and not callable(v):
+                return v
+    # 2. 4.36–4.53: parallel lists
+    vc = getattr(pkv, "value_cache", None)
+    if vc is not None:
+        return vc[layer]
+    # 3. legacy-cache conversion
+    if hasattr(pkv, "to_legacy_cache"):
+        leg = pkv.to_legacy_cache()
+        if leg:
+            return leg[layer][1]
+    # 4. iterable of (key, value) per layer
+    try:
+        return list(pkv)[layer][1]
+    except Exception:
+        pass
+    # 5. legacy tuple-of-tuples
+    try:
+        return pkv[layer][1]
+    except Exception:
+        pass
+    attrs = sorted(a for a in dir(pkv) if not a.startswith("__"))
+    raise RuntimeError(
+        f"could not extract value cache from {type(pkv).__name__}; attributes = {attrs}"
+    )
 
 
 def run_real(
     model: str,
     *,
+    task: str = "needle",
     text_file: str | None = None,
     prompt_len: int = 2048,
     block_size: int = 64,
-    layer: int = -1,
+    layers=(-1,),
     n_sample: int = 128,
+    coh_mode: str = "cos_value",
     device: str = "cuda",
-    seed: int = 0,
+    seeds=(0,),
+    dump_features: str | None = None,
 ) -> dict:
-    """GPU path: measure LOO KV-importance on a real model and compute Exp-A stats.
+    """GPU path: measure LOO KV-importance across a layers × seeds grid + aggregate.
 
-    ⚠️ WRITTEN TO THE HUGGINGFACE API BUT NOT EXECUTED HERE (no GPU in the dev box).
-    Expect to adapt small details per model / attention backend on first run.
-
-    Method (docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §2–3):
-      prefill the prompt (eager attn so attentions are returned) → per-block
-      attention score (last query's attention mass over the block) and coherence
-      score (mean value-vector cosine to the context centroid). For a sample of
-      blocks, re-run the forward with that block masked in the attention mask and
-      measure KL(full ‖ masked) as ground-truth importance. Then partial-correlate.
+    Per seed (prompt): prefill (eager attn) → MULTI-POSITION LOO importance
+    (layer-agnostic, computed ONCE — the expensive part) → for each layer, cheaply
+    re-score attention, coherence, and the inverse 'distinctiveness' against that
+    importance. Aggregate across the grid. Run per --model for ≥2 models before a
+    final close. (Written to the HF API; adapt small details per attention backend.)
     """
-    import torch  # noqa: F401
+    import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     from .coherence import score_torch
 
-    rng = random.Random(seed)
     tok = AutoTokenizer.from_pretrained(model)
-    # eager attention is required for output_attentions on most HF models
     lm = AutoModelForCausalLM.from_pretrained(
         model, torch_dtype="auto", attn_implementation="eager"
     ).to(device).eval()
 
-    text = open(text_file).read() if text_file else _DEFAULT_TEXT
-    ids = tok(text, return_tensors="pt").input_ids[0]
-    while ids.numel() < prompt_len:  # repeat to reach target length
-        ids = torch.cat([ids, ids], dim=0)
-    ids = ids[:prompt_len].unsqueeze(0).to(device)
-    L = ids.shape[1]
-    pos = torch.arange(L, device=device).unsqueeze(0)
+    def _block_value_mat(out, layer, blocks):
+        val = _cache_layer_values(out.past_key_values, layer)[0]   # [kv_heads, seq, head_dim]
+        return torch.stack([val[:, lo:hi, :].mean(dim=1).reshape(-1) for lo, hi in blocks])
 
-    with torch.no_grad():
-        out = lm(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos,
-                 output_attentions=True, use_cache=True)
-    full_logits = out.logits[0, -1].float()
-    p_full = torch.softmax(full_logits, dim=-1)
+    configs = []
+    for seed in seeds:
+        rng = random.Random(seed)
+        if text_file:
+            prompt_ids = tok(open(text_file).read()).input_ids[:prompt_len]
+        else:
+            prompt_ids = _build_prompt_ids(tok, task, prompt_len, seed)
+        ids = torch.tensor(prompt_ids, dtype=torch.long, device=device).unsqueeze(0)
+        L = ids.shape[1]
+        pos = torch.arange(L, device=device).unsqueeze(0)
 
-    blocks = [(lo, min(lo + block_size, L)) for lo in range(0, L, block_size)]
-    nb = len(blocks)
+        with torch.no_grad():
+            out = lm(input_ids=ids, attention_mask=torch.ones_like(ids), position_ids=pos,
+                     output_attentions=True, use_cache=True)
 
-    # attention score: last query's attention mass over each block (mean over heads)
-    att = out.attentions[layer][0]                      # [heads, q_len, k_len]
-    last_attn = att[:, -1, :].mean(0).float()           # [k_len]
-    attention = [float(last_attn[lo:hi].sum()) for lo, hi in blocks]
+        n_eval = max(8, min(64, L // 4))
+        eval_pos = list(range(L - n_eval, L))
+        eval_t = torch.tensor(eval_pos, device=device)
+        p_full = torch.softmax(out.logits[0, eval_pos].float(), dim=-1)
+        blocks = [(lo, min(lo + block_size, L)) for lo in range(0, L, block_size)]
+        nb = len(blocks)
 
-    # coherence score: mean value-vector per block, cosine to context centroid
-    val = out.past_key_values[layer][1][0]              # [kv_heads, seq, head_dim]
-    block_mat = torch.stack([val[:, lo:hi, :].mean(dim=1).reshape(-1) for lo, hi in blocks])
-    coherence = score_torch(block_mat.float(), mode="cos_value").tolist()
+        idx = list(range(nb))
+        if nb > n_sample:
+            rng.shuffle(idx)
+            idx = sorted(idx[:n_sample])
 
-    # stratified block sample for the (expensive) LOO forwards
-    idx = list(range(nb))
-    if nb > n_sample:
-        by_attn = sorted(idx, key=lambda i: attention[i])
-        disagree = sorted(idx, key=lambda i: abs(_ranks(attention)[i] - _ranks(coherence)[i]),
-                          reverse=True)
-        keep = set(by_attn[:16] + by_attn[-16:] + disagree[:48])
-        keep.update(rng.sample(idx, min(n_sample - len(keep), nb)))
-        idx = sorted(keep)
+        # LOO importance — layer-agnostic, computed ONCE per seed (the expensive part)
+        true = []
+        with torch.no_grad():
+            for b in idx:
+                lo, hi = blocks[b]
+                mask = torch.ones(L, device=device, dtype=torch.long)
+                mask[lo:hi] = 0
+                ob = lm(input_ids=ids, attention_mask=mask.unsqueeze(0), position_ids=pos)
+                pb = torch.softmax(ob.logits[0, eval_pos].float(), dim=-1)
+                kl = (p_full * (p_full.clamp_min(1e-12) / pb.clamp_min(1e-12)).log()).sum(dim=-1)
+                kl = kl * (eval_t >= (hi - 1)).float()   # causal: only positions that attend to b
+                true.append(float(kl.sum()))
 
-    true = []
-    with torch.no_grad():
-        for b in idx:
-            lo, hi = blocks[b]
-            mask = torch.ones(L, device=device, dtype=torch.long)
-            mask[lo:hi] = 0
-            ob = lm(input_ids=ids, attention_mask=mask.unsqueeze(0), position_ids=pos)
-            pb = torch.softmax(ob.logits[0, -1].float(), dim=-1)
-            true.append(float((p_full * (p_full.clamp_min(1e-12) / pb.clamp_min(1e-12)).log()).sum()))
+        # per layer: cheap re-scoring from the SAME prefill against the shared importance
+        layer_attn, layer_coh = {}, {}
+        for layer in layers:
+            att = out.attentions[layer][0]
+            attn_rows = att[:, eval_pos, :].mean(0).float()
+            attention = [float(attn_rows[:, lo:hi].sum(dim=1).mean()) for lo, hi in blocks]
+            coherence = score_torch(_block_value_mat(out, layer, blocks).float(), mode=coh_mode).tolist()
+            layer_attn[layer], layer_coh[layer] = attention, coherence
+            a_s = [attention[b] for b in idx]
+            c_s = [coherence[b] for b in idx]
+            configs.append({"seed": seed, "layer": layer, "seq_len": L, "n_blocks": nb,
+                            "n_loo": len(idx), **analyze(a_s, c_s, true)})
 
-    a_s = [attention[b] for b in idx]
-    c_s = [coherence[b] for b in idx]
-    return {"model": model, "seq_len": L, "n_blocks": nb, "n_loo": len(idx), "layer": layer,
-            **analyze(a_s, c_s, true)}
+        # optional: dump per-block (features, LOO label) for the learned probe
+        if dump_features:
+            import json as _json
+            vnorm = _block_value_mat(out, layers[-1], blocks).norm(dim=-1).tolist()
+            true_map = dict(zip(idx, true))
+            with open(dump_features, "a") as fh:
+                for b in idx:
+                    attns = [layer_attn[L_][b] for L_ in layers]
+                    feats = {
+                        "attn_mean": sum(attns) / len(attns),
+                        "attn_max": max(attns),
+                        "attn_last": layer_attn[layers[-1]][b],
+                        "coherence": layer_coh[layers[-1]][b],
+                        "value_norm": vnorm[b],
+                        "recency": blocks[b][1] / L,
+                        "idx_frac": b / max(1, nb),
+                    }
+                    fh.write(_json.dumps({"model": model, "seed": seed, "block": b,
+                                          "label": true_map[b], "features": feats}) + "\n")
+
+        del out
+        if str(device).startswith("cuda"):
+            torch.cuda.empty_cache()
+
+    return {"model": model, "coh_mode": coh_mode, "configs": configs,
+            "aggregate": _aggregate(configs)}
+
+
+def _aggregate(configs: list[dict]) -> dict:
+    import statistics as st
+    from collections import Counter
+    valid = [c for c in configs if c["valid"]]
+    out = {"n_valid": len(valid), "n_total": len(configs)}
+    if not valid:
+        out["determination"] = "INCONCLUSIVE — no valid configs (see per-config reasons)"
+        return out
+    best = [best_alternative(c) for c in valid]
+    deltas = [b[1] - c["recall_attn"] for b, c in zip(best, valid)]
+    out["mean_recall_attn"] = st.mean(c["recall_attn"] for c in valid)
+    out["mean_recall_best_alt"] = st.mean(b[1] for b in best)
+    out["mean_delta"] = st.mean(deltas)
+    out["best_alt_winner"] = Counter(b[0] for b in best).most_common(1)[0][0]
+    n_useful = sum(1 for d in deltas if d > 0.10)
+    n_notuseful = sum(1 for d in deltas if d < -0.05)
+    out["n_useful"], out["n_notuseful"] = n_useful, n_notuseful
+    if out["mean_delta"] > 0.10 and n_useful >= 0.6 * len(valid):
+        out["determination"] = (f"USEFUL — best alt '{out['best_alt_winner']}' beats attention by "
+                                 f"Δrecall {out['mean_delta']:+.2f} in {n_useful}/{len(valid)} valid configs → proceed to Exp B")
+    elif out["mean_delta"] < 0 and n_notuseful >= 0.6 * len(valid):
+        out["determination"] = (f"NOT USEFUL — attention ≥ every alternative (recall "
+                                 f"{out['mean_recall_attn']:.2f} vs best-alt {out['mean_recall_best_alt']:.2f}) "
+                                 f"in {n_notuseful}/{len(valid)} valid configs → DROP")
+    else:
+        out["determination"] = (f"INCONCLUSIVE — mixed across configs (mean Δrecall {out['mean_delta']:+.2f}); "
+                                 "need more seeds/layers/models")
+    return out
 
 
 # ----------------------------------- CLI ----------------------------------- #
 def _decision(d: dict) -> str:
-    """Validity-gated, CI-based 3-way determination (Decision Rule A)."""
+    """Validity-gated determination (Decision Rule A). Primary signal = recall of
+    the truly-important block set (heavy-tail robust); partial correlation secondary."""
     if not d.get("valid", True):
         return "INCONCLUSIVE — RUN INVALID: " + "; ".join(d["invalid_reasons"])
+    ra = d["recall_attn"]
+    name, best_alt = best_alternative(d)
     lo, hi = d.get("rho_partial_ci", (float("nan"), float("nan")))
-    edge = d["needle_recall_coh"] > d["needle_recall_attn"] + 0.05
-    if not math.isnan(lo) and lo > 0.1 and edge:
-        return f"USEFUL — partial-corr CI [{lo:+.2f},{hi:+.2f}] > 0.1 and coherence catches the needles → proceed to Exp B"
-    if not math.isnan(hi) and hi < 0.1:
-        return f"NOT USEFUL — partial-corr CI [{lo:+.2f},{hi:+.2f}] < 0.1; attention suffices → drop"
-    return f"INCONCLUSIVE — partial-corr CI [{lo:+.2f},{hi:+.2f}] straddles 0.1 → more prompts/samples or check signals"
+    if best_alt > ra + 0.10:
+        return (f"USEFUL — '{name}' retains MORE important blocks "
+                f"(recall {best_alt:.2f} vs attention {ra:.2f}) → proceed to Exp B")
+    if best_alt < ra - 0.05:
+        return (f"NOT USEFUL — attention retains more important blocks "
+                f"(recall {ra:.2f} vs best-alt '{name}' {best_alt:.2f}) → attention suffices, drop")
+    return (f"INCONCLUSIVE — attn {ra:.2f} vs best-alt '{name}' {best_alt:.2f}, "
+            f"partial CI[{lo:+.2f},{hi:+.2f}] → need more positives/configs")
 
 
 def _print_expA(d: dict, header: str, footer: str) -> None:
     lo, hi = d.get("rho_partial_ci", (float("nan"), float("nan")))
     print(header + "\n")
-    print(f"  Spearman(attention, importance)            = {d['rho_attn']:+.3f}")
-    print(f"  Spearman(coherence, importance)            = {d['rho_coh']:+.3f}")
-    print(f"  PARTIAL (coherence, importance | attn)     = {d['rho_partial_coh_given_attn']:+.3f}  CI[{lo:+.2f},{hi:+.2f}]  <- decisive")
-    print(f"  needle recall  attention / coherence       = {d['needle_recall_attn']:.3f} / {d['needle_recall_coh']:.3f}"
-          f"  ({d['n_needles']} needles)")
+    print(f"  recall of important blocks (top-{d['important_k']}, budget {d['budget']})  <- PRIMARY")
+    print(f"    attention            = {d['recall_attn']:.3f}")
+    print(f"    coherence            = {d['recall_coh']:.3f}")
+    print(f"    distinctiveness(-coh)= {d['recall_distinct']:.3f}   <- inverse hypothesis")
+    print(f"    scc(attn+coh)        = {d['recall_scc']:.3f}")
+    print(f"    scc(attn+distinct)   = {d['recall_scc_distinct']:.3f}")
+    print(f"  Spearman attn / coh                        = {d['rho_attn']:+.3f} / {d['rho_coh']:+.3f}")
+    print(f"  PARTIAL (coherence | attn)                 = {d['rho_partial_coh_given_attn']:+.3f}  CI[{lo:+.2f},{hi:+.2f}]")
     print("  --- diagnostics (validity gate) ---")
     print(f"  attention–coherence collinearity ρ         = {d['rho_attn_coh']:+.3f}   (|ρ|>0.9 ⇒ partial unstable)")
     print(f"  LOO importance  median / max               = {d['imp_med']:.2e} / {d['imp_max']:.2e}"
-          f"   ({d['imp_frac_tiny']:.0%} ~zero)")
-    print(f"  signal variance  attn / coh                = {d['attn_std']:.3e} / {d['coh_std']:.3e}")
+          f"   ({d['imp_frac_tiny']:.0%} ~zero, {d['n_meaningful']} meaningful, heavy_tailed={d['heavy_tailed']})")
     print(f"  run valid?                                 = {d['valid']}"
           + ("" if d["valid"] else f"  ({'; '.join(d['invalid_reasons'])})"))
     print(f"\n  decision: {_decision(d)}")
     print(footer)
+
+
+def _print_grid(res: dict) -> None:
+    print(f"Exp-A GRID — {res['model']}  (coh_mode={res['coh_mode']})\n")
+    print(f"  {'seed':>4}{'layer':>6}{'ok':>3}{'attn':>7}{'coh':>7}{'dist':>7}{'sccD':>7}{'partial':>9}  note")
+    for c in res["configs"]:
+        note = "" if c["valid"] else "INVALID: " + c["invalid_reasons"][0][:40]
+        print(f"  {c['seed']:>4}{c['layer']:>6}{('Y' if c['valid'] else '-'):>3}"
+              f"{c['recall_attn']:>7.2f}{c['recall_coh']:>7.2f}{c['recall_distinct']:>7.2f}"
+              f"{c['recall_scc_distinct']:>7.2f}{c['rho_partial_coh_given_attn']:>9.2f}  {note}")
+    a = res["aggregate"]
+    print(f"\n  valid configs: {a['n_valid']}/{a['n_total']}")
+    if a["n_valid"]:
+        print(f"  mean recall  attention={a['mean_recall_attn']:.3f}  best-alt={a['mean_recall_best_alt']:.3f}"
+              f" ({a['best_alt_winner']})  meanΔ={a['mean_delta']:+.3f}")
+    print(f"\n  DETERMINATION: {a['determination']}")
+    print("\n  This is ONE model. Re-run per --model for ≥2 models, and check consistency,"
+          "\n  before the final close (docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §3).")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -345,25 +527,31 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=0, help="(synthetic) RNG seed")
     # real-model (GPU) args
     ap.add_argument("--model", default=None, help="HF model id — real GPU path")
-    ap.add_argument("--text-file", default=None, help="long-context prompt file (default: built-in)")
-    ap.add_argument("--prompt-len", type=int, default=2048)
+    ap.add_argument("--task", default="needle", choices=["needle", "text"],
+                    help="needle = plant a fact + query that needs it (gives importance variance); "
+                         "text = diverse filler")
+    ap.add_argument("--text-file", default=None, help="real long-doc prompt (overrides --task)")
+    ap.add_argument("--prompt-len", type=int, default=2048,
+                    help="keep ≤~4096: output_attentions stores all-layer attn (O(L²)·layers); 8192 OOMs 80GB")
     ap.add_argument("--block-size", type=int, default=64)
-    ap.add_argument("--layer", type=int, default=-1, help="layer index for attn/coherence scores")
-    ap.add_argument("--n-sample", type=int, default=128, help="blocks to LOO-mask")
+    ap.add_argument("--layers", default="-1", help="comma list of layer indices, e.g. '0,15,-1'")
+    ap.add_argument("--seeds", default="0", help="comma list of prompt seeds, e.g. '0,1,2' (≥2 prompts)")
+    ap.add_argument("--coh-mode", default="cos_value", choices=["cos_value", "value_norm"],
+                    help="coherence signal: cos_value (centroid cosine) or value_norm")
+    ap.add_argument("--n-sample", type=int, default=128, help="blocks to LOO-mask per seed")
+    ap.add_argument("--dump-features", default=None,
+                    help="append per-block (features,label) JSONL here for the learned probe")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args(argv)
 
     if args.model:
-        r = run_real(args.model, text_file=args.text_file, prompt_len=args.prompt_len,
-                     block_size=args.block_size, layer=args.layer, n_sample=args.n_sample,
-                     device=args.device)
-        _print_expA(
-            r,
-            f"Exp-A (REAL: {r['model']}, seq_len={r['seq_len']}, layer={r['layer']}, "
-            f"LOO {r['n_loo']}/{r['n_blocks']} blocks, {r['n_needles']} needles)",
-            "\n  Measured on a real model. Repeat across ≥2 models + layers + prompts and apply "
-            "Decision Rule A\n  (docs/SEMANTIC_TIERING_GPU_PROTOCOL.md §3) before any claim.",
-        )
+        layers = [int(x) for x in str(args.layers).split(",")]
+        seeds = [int(x) for x in str(args.seeds).split(",")]
+        res = run_real(args.model, task=args.task, text_file=args.text_file, prompt_len=args.prompt_len,
+                       block_size=args.block_size, layers=layers, n_sample=args.n_sample,
+                       coh_mode=args.coh_mode, device=args.device, seeds=seeds,
+                       dump_features=args.dump_features)
+        _print_grid(res)
         return 0
 
     if not args.synthetic:
