@@ -141,3 +141,15 @@ def test_cells_per_token_bf16_matches_geometry():
     g = KVGeometry("t", layers=32, kv_heads=8, head_dim=128)
     expected = g.elements_per_token() * 16 / BITS_PER_CELL["TLC"]
     assert cells_per_token(g, ProtectScheme(), "bf16_tlc") == expected
+
+
+# ------------------------- KV-method memory comparison --------------------- #
+def test_kv_method_memory_saw_denser_than_protected():
+    from ndol.sim.kv_method_memory import Params
+    p = Params()
+    assert abs(p.bits_per_elem("int4_protected") - 16 / 1.80) < 1e-6   # measured anchor
+    assert p.bits_per_elem("SAW-INT4") < p.bits_per_elem("int4_protected")   # SAW denser (rotation free)
+    assert p.bits_per_elem("GEAR") < p.bits_per_elem("int4_protected")
+    saw = 16 / p.bits_per_elem("SAW-INT4")
+    prot = 16 / p.bits_per_elem("int4_protected")
+    assert 1.8 < saw / prot < 2.2                                      # ~2× denser
