@@ -114,7 +114,51 @@ bound (it improves, but does not reach full-precision parity — stated honestly
 
 ---
 
-## 5 · Why it's defensible
+## 5 · Conservative cost analysis
+
+The dollar case rests on **one measured fact** — KVPro holds **~2× the resident long-context sequences
+per GPU** — applied *only* where the binding constraint is KV memory (long-context, high-concurrency
+serving). We model it conservatively and state exactly where it does **not** apply.
+
+**Unit economics — per 100 concurrent 32K-context sessions (measured density):**
+
+| | full precision | KVPro |
+|---|---|---|
+| Resident 32K sessions / GPU (measured) | ~12 | ~24 |
+| GPUs for 100 concurrent sessions | ~9 | ~5 |
+| Cost / month, 24×7 @ $1.50/GPU-hr\* | ~$9,900 | ~$5,500 |
+| **GPU savings** | — | **~$4,400/mo (~44%)** |
+
+\*Illustrative blended cloud A100-80GB rate — substitute your real GPU cost. The **~44% GPU-count
+reduction is the measured, rate-independent result**; only the dollar figure moves with the rate.
+
+**Scaling (linear in concurrency, same assumptions):**
+
+| Concurrent 32K sessions | GPUs removed | Annual GPU savings @ $1.50/hr |
+|---|---|---|
+| 100 | ~4 | ~$53K |
+| 1,000 | ~40 | ~$530K |
+| 10,000 | ~400 | ~$5.3M |
+
+**Where we deliberately under-promise:**
+- Savings apply to **memory/capacity-bound** serving only. KVPro is **throughput-negative** (§4), so for
+  **throughput-bound or latency-critical** traffic it is *not* routed and is credited **zero** — that
+  traffic is excluded entirely from the table.
+- If only **half** of a deployment's long-context traffic is capacity-bound (a conservative split),
+  **halve every figure** — KVPro still removes **~20%** of the GPU bill for that workload.
+- The table **excludes the second lever**: prefix / KV **reuse** (KVPro WarmTier). For shared-document
+  RAG and multi-turn / agent sessions, reusing cached KV avoids recomputing prefill — measured
+  **50–86% lower time-to-first-token per cache hit** and **1.2–1.85× batch throughput** at high hit
+  rates. That is additional, compounding upside we do **not** count here.
+
+**Bottom line:** on the **target segment alone, conservatively scoped**, KVPro removes on the order of
+**20–44% of the GPU bill at near-full-precision quality**, and the warm-tier reuse lever stacks on top.
+The unit — GPUs per concurrent long-context session — is measured; the dollar figure simply scales with
+the buyer's GPU rate and traffic mix.
+
+---
+
+## 6 · Why it's defensible
 
 - **Patent-pending method.** The channel-protection approach is novel and proprietary; a fast
   per-model setup makes it practical at deployment time.
@@ -130,7 +174,7 @@ bound (it improves, but does not reach full-precision parity — stated honestly
 
 ---
 
-## 6 · KVPro WarmTier — the expansion
+## 7 · KVPro WarmTier — the expansion
 
 Serving is moving from single-tier GPU memory to **hierarchical KV memory** (GPU HBM → CPU DRAM →
 NVMe/flash), where expensive prefill work is stored and **reused** across requests and sessions
@@ -145,20 +189,20 @@ near-term results are scoped.)*
 
 ---
 
-## 7 · Traction
+## 8 · Traction
 
 [TRACTION — pilots / design partners / LOIs / usage / inbound. If pre-traction, state the
 proof-of-technology milestones reached this quarter and the named partners in conversation.]
 
 ---
 
-## 8 · Team
+## 9 · Team
 
 [TEAM — founders + key technical hires; relevant background in ML systems / inference / kernels.]
 
 ---
 
-## 9 · The ask
+## 10 · The ask
 
 [RAISE — amount, stage, instrument, and use of funds. Suggested framing: fund v2 productionization
 (decode-throughput recovery, tensor parallelism for 70B-class, KVPro WarmTier serving) + 1–2 design-
