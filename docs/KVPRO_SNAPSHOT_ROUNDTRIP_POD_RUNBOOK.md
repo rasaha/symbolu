@@ -1,5 +1,15 @@
 # KVPro Snapshot Round-Trip — Pod Runbook (Phase-0 gate)
 
+> **✅ PASSED — MEASURED 2026-06-14.** On `Qwen/Qwen2.5-7B-Instruct`, int4_protected, A100-80GB
+> (vLLM 0.7.3 V0). Layer-0 writer `NB=27950 BS=32 H=4 D=128 n_protect=5 prot_int8=False`; 8 blocks
+> @ **21,760 B/block**. Both **DISK** (`save_prefix_snapshot → zero → load → restore_prefix`) and the
+> in-memory **`verify_roundtrip`** byte-gate returned clean across all 7 tensors
+> (`packed_k, packed_v, k_scale, k_xmin, k_protect, v_scale, v_xmin` all `True`). The snapshot/restore
+> primitive (`kv_policy/tier5b_snapshot.py`) is byte-faithful on hardware. Run on commit `1a5f2fe`.
+> Prefill-only (`--max-tokens 1`); the int4 *decode* FA fork was absent and is **not needed** for this
+> gate (only for the later CacheGen comparison arms). *Open follow-up: re-run with
+> `INT4_PROTECTED_PROT_INT8=1` to also exercise the uint8 protect format.*
+
 Proves `kv_policy.tier5b_snapshot` (snapshot/restore of int4_protected KV) is **byte-faithful on
 real hardware**, on KV produced by `Qwen/Qwen2.5-7B-Instruct`. This is the gate the warm-tier
 protocol (`docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.md` §Phase 0) requires **before** any CacheGen
