@@ -1,7 +1,54 @@
-# int4_protected — VC Brief
+# KVPro — VC Brief
 
-**Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026 · KVPro warm-tier: byte-faithful disk snapshot/restore (Phase-0, MEASURED) + KVPro-vs-CacheGen codec fidelity (MEASURED, end-to-end open) added June 2026*
+**Cognade Labs | Quality-Safe KV-Cache Compression for Long-Context LLM Serving**
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026 · KVPro WarmTier: byte-faithful disk snapshot/restore (Phase-0, MEASURED) + KVPro-vs-CacheGen codec fidelity (MEASURED, end-to-end open) added June 2026 · renamed to KVPro + 1-page exec summary added June 2026*
+
+> **Naming key.** **KVPro** = the product / module. **int4_protected** = its first shipped codec
+> implementation (the vLLM backend measured throughout this brief; the registered `kv_cache_dtype`
+> string stays `int4_protected`). **Protected channels** = the core mechanism (keep the ~4%
+> highest-attention K channels at bf16, quantize the rest to int4). **KVPro WarmTier** = the
+> storage/reuse product direction (snapshot KV to CPU/NVMe and reuse it across sessions).
+
+---
+
+## Executive Summary (one page)
+
+**The problem.** At long context (32K+), the **KV-cache — not model weights — dominates LLM serving
+cost and caps concurrency.** The obvious fix, 4-bit KV, hasn't shipped *at quality*: fp8 and naive int4
+buy density by spending accuracy (fp8: needle 1/15; naive int4: token-agreement vs bf16 collapses to
+0.53). The gap between "4-bit density" and "maintained quality" is the market.
+
+**The product.** **KVPro** is a quality-safe KV-cache compressor. Its first codec, **int4_protected**,
+uses the **protected-channels** mechanism — keep the ~4% highest-attention K channels at bf16, quantize
+the rest to int4 — to restore **near-bf16 fidelity at ~2× KV density**. It ships through vLLM as a
+one-line backend: no retraining, no quantization-aware fine-tuning.
+
+**What's measured (this quarter, real H100/A100):**
+- **Quality:** 4 models (Qwen / Mistral / Llama, 7–14B) hit **15/15 needle == bf16** (2-of-2 seeds);
+  MMLU / ARC / TruthfulQA **0.0-pt delta + 100% per-question agreement**; **+20.4 pt** token-agreement
+  over naive int4; hard-needle 0.964 vs naive 0.915.
+- **Density:** **2.0× raw KV slots, ~1.8× net** of the sidecar tax (1.83× Qwen util 0.5 / 1.75× Llama
+  util 0.85), demonstrated under sustained saturation.
+- **Honest cost:** decode is **throughput-negative — 0.13–0.67× bf16** (0.22× worst case; 0.54× at
+  short generation). KVPro is a **capacity + quality** tool, not a bf16 *speed* replacement: route
+  memory-bound, long-context, high-concurrency, and shared-prefix traffic to it; keep latency-critical
+  single-stream on bf16.
+
+**The competitive edge (measured).** Against every *denser* competitor, KVPro's protected channels
+**hold the hard tail where they collapse**: **SAW-INT4** → 0% needle on Qwen2.5-7B (KVPro/bf16 100%);
+**KVarN** → hard-needle 0.25→0.06; and vs LMCache's **CacheGen** codec, KVPro has **zero error on the
+high-attention K channels vs CacheGen's 0.0145** (measured on real KV). The trade is honest: KVPro is
+**less dense, quality-safe.**
+
+**KVPro WarmTier (the direction).** As serving moves to **GPU→CPU→NVMe KV hierarchies**, the bottleneck
+becomes quality-safe KV *movement*. KVPro's snapshot/restore is **byte-faithful** (Phase-0 proven on
+Qwen2.5-7B, both protect formats) — so reused KV loses **zero** quality, a guarantee lossy codecs can't
+make. This positions KVPro as the **reliability layer** on top of LMCache's offload plumbing. *(Serving
+integration and the end-to-end CacheGen needle comparison are scoped-but-open.)*
+
+**The ask.** A production partner (~10–100 GPUs of long-context traffic) to convert "shipped through
+vLLM at near-bf16 fidelity" into "deployed with measured $/quality/latency," and to fund v2 Tier-1
+(decode-kernel throughput recovery, tensor parallelism, KVPro WarmTier serving).
 
 ---
 
@@ -14,8 +61,7 @@
 > > "most token value per watt per user" (CNBC, interview with Elaine Yu, June 2026)
 >
 > Inference economics reduce to that ratio: **useful tokens delivered per joule,
-> per concurrent user.** int4_protected (product name: **KVPro** — the two names refer
-> to the same backend throughout this brief) is built to move it on the very axes
+> per concurrent user.** KVPro is built to move it on the very axes
 > Srinivas names — and, decisively, without spending the **accuracy** term that
 > competitors trade away:
 >
@@ -105,7 +151,7 @@ near-bf16 fidelity over naive int4 — **+20.4 points token-agreement,
 hard-needle retrieval 0.964 vs naive 0.915** — at the same 4-bit KV
 density.
 
-**The honest trade-off**: int4_protected costs ~+4.4 GB total HBM
+**The honest trade-off**: KVPro costs ~+4.4 GB total HBM
 vs bf16 (protection sidecars; Phase 6L live-measured the tax at
 **4.38 GB** at mml=8K) and is **decode-throughput-negative**: ~1.5–1.9×
 slower per-seq at low load, and at saturation Phase 6L measured **0.22×
@@ -115,7 +161,7 @@ long generation); the workload curve is 0.13×–0.54×, and short-output
 serving pays only ~0.54× (see the throughput section)*. The win is
 **fidelity-at-density**, not raw memory savings or throughput vs bf16.
 
-This brief documents the int4_protected backend: the calibration
+This brief documents the KVPro backend: the calibration
 methodology, the validated 4-model portfolio, the integration
 through vLLM, and the honest trade-offs.
 
@@ -123,7 +169,7 @@ through vLLM, and the honest trade-offs.
 
 ## Page 2 — The Architecture
 
-### int4_protected — one backend, one calibration script, one user-facing API
+### KVPro — one backend, one calibration script, one user-facing API
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
@@ -184,8 +230,8 @@ bf16 attention at the per-(layer, head) level.
 ### One-line user API
 
 ```python
-import kv_policy.int4_protected           # registers the backend
-from kv_policy.int4_protected import Int4ProtectedLLM
+import kv_policy.KVPro           # registers the backend
+from kv_policy.KVPro import Int4ProtectedLLM
 from vllm import SamplingParams
 
 llm = Int4ProtectedLLM(model="Qwen/Qwen2.5-7B-Instruct")
@@ -232,7 +278,7 @@ asks the model to recall it. 15 trials = 5 unique codes × 3
 context-length buckets (~200, ~600, ~1200 filler tokens, needle
 always in the middle).
 
-| Length bucket | bf16 stock | int4_protected |
+| Length bucket | bf16 stock | KVPro |
 |---|:-:|:-:|
 | 200 filler tokens | 5/5 | 5/5 |
 | 600 filler tokens | 5/5 | 5/5 |
@@ -263,12 +309,12 @@ superseded.
 | 32,768 | 35.9 GB | 40.5 GB | **+4.7 GB** | 12.0 | 23.9 | **1.99×** |
 
 **What these numbers mean:**
-- **Total HBM is +4.7 GB higher** for int4_protected at equal
+- **Total HBM is +4.7 GB higher** for KVPro at equal
   `gpu_memory_utilization` (this long-context bench's total-HBM figure;
   Phase 6L's saturated run measured the delta at **+4.39 GB**, of which
   **4.38 GB is sidecars** — the bench's larger figure also includes the
   CUDA-graph private pools). This is the sidecar overhead (protection
-  tensors for scale, xmin, and protected channels) — int4_protected does
+  tensors for scale, xmin, and protected channels) — KVPro does
   **not** shrink the absolute HBM footprint; it costs more.
 - **max_concurrency is 2×** because int4's 4-bit nibbles are 4× denser
   than bf16 *at the element level*, but the per-block scale/xmin sidecars
@@ -283,7 +329,7 @@ superseded.
   bf16 58** (2.02× raw), which net of the measured HBM tax is
   protected **2.498 seq/GB vs bf16 1.367 seq/GB = 1.83× per GB** of
   total HBM. This is the real high-load story: at saturation,
-  int4_protected serves ~1.83× more concurrent users per GPU than
+  KVPro serves ~1.83× more concurrent users per GPU than
   bf16, even after paying the 4.38 GB sidecar tax.
 
 > ✅ **DEMONSTRATED (Phase 6L, mml=8K, B=128):** the 2× concurrency is
@@ -324,7 +370,7 @@ Understanding §3.**
 
 ### Throughput (Qwen-7B, A100-80GB) — a WORKLOAD CURVE, not one number
 
-int4_protected's decode throughput is below bf16 at every operating point, but
+KVPro's decode throughput is below bf16 at every operating point, but
 **the size of the gap is workload-dependent — and that is the actionable finding.**
 The int4 tax is dominated by a per-decode-step paged-gather; it amortizes over
 **fewer steps at short generation**, so short-output workloads pay far less.
@@ -356,7 +402,7 @@ the compression win does not depend on the operating point.
   not "replace bf16 everywhere."
 
 **Deployment is a routing decision customers already make:** send short-output
-fan-out traffic to int4_protected (2× the users/GPU, quality-preserved), keep
+fan-out traffic to KVPro (2× the users/GPU, quality-preserved), keep
 long-form chat on bf16. The density savings beat the latency cost on $/request for
 KV-bound short-output traffic. See `PHASE_6M_HEADROOM_NO_NCU.md` (deployment
 guidance) for the routing rubric.
@@ -374,14 +420,14 @@ tax is already smallest for free.
 
 | Backend | Bit-identical | Non-identical prompts share |
 |---|---|---|
-| **int4_protected** | **3 of 6 IDENTICAL** | the other 3 share 33%, 76%, and 82% prefix with bf16 |
+| **KVPro** | **3 of 6 IDENTICAL** | the other 3 share 33%, 76%, and 82% prefix with bf16 |
 | **fp8** | **0 of 6 IDENTICAL** | diverges within 6–16 chars on every prompt (5.9–16.2% prefix overlap) |
 
 ---
 
 ## Page 4 — Competitive Landscape
 
-### Where int4_protected sits in the KV-compression space
+### Where KVPro sits in the KV-compression space
 
 | Approach | Memory | Quality | Notes |
 |---|---:|---|---|
@@ -393,20 +439,20 @@ tax is already smallest for free.
 | **KVarN k4v2** (Huawei, vLLM-0.22) | 2.67× KV (−9.5 GB tail pool); Llama-family only | easy free-gen 0.982 vs bf16; **hard-needle COLLAPSE: 0.25 (8K) → 0.06 (32K), K-bound**; crashes on Qwen2.5-7B (GQA-7) | only competitor run **head-to-head on our hardware** — wins easy metric + throughput, loses the hard tail |
 | **SAW-INT4 (BDR)** (Together, 2026) | ~3.56× KV (token-wise int4 + parameter-free Hadamard rotation → ~0 metadata) | near-lossless on **Qwen3** (their eval) BUT **MEASURED 0% needle AND 0% hard-needle on Qwen2.5-7B-Instruct** (our A100; BF16=100% on identical prompts; rotation confirmed active) — **model-transfer fragility, n=1** | SGLang-native; head-to-head June 2026 — densest competitor on paper, collapses on a mainstream model KVPro handles. `docs/SAW_INT4_QWEN_HEADTOHEAD_RESULTS.md` |
 | **CacheGen** (LMCache; warm-tier offload codec) | per-layer bins-quant (~4–5 bit) + arithmetic coding; denser, no sidecar | **MEASURED codec fidelity** (real Qwen2.5-7B KV): better *average* fidelity than KVPro, but **0.0145 error on top-attention K channels vs KVPro's 0.0000**; lossy (no lossless reuse) | the real warm-tier incumbent; KVPro edge = top-channel fidelity + lossless reuse; **end-to-end needle at iso-bytes still open**. `docs/KVPRO_VS_CACHEGEN_VERDICT.md` |
-| **int4_protected** *(this work)* | **0.5× KV + ~4.4 GB sidecar overhead (4.38 GB live)** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed; warm-tier snapshot/restore byte-faithful (Phase-0)** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
+| **KVPro** *(this work)* | **0.5× KV + ~4.4 GB sidecar overhead (4.38 GB live)** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed; warm-tier snapshot/restore byte-faithful (Phase-0)** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
 
 ### The relevant comparison
 
 There are two distinct comparisons:
 
-**int4_protected vs naive int4** (the quality story):
+**KVPro vs naive int4** (the quality story):
 - Same 4-bit KV density. Same total HBM footprint (roughly).
-- int4_protected wins on every quality metric: +20.4 pt
+- KVPro wins on every quality metric: +20.4 pt
   token-agreement, +0.049 hard-needle retrieval, K-bound misses
   eliminated. Protect is near-free *over naive*, so there is no
   reason to ship naive int4 over protected.
 
-**int4_protected vs bf16** (the capacity story):
+**KVPro vs bf16** (the capacity story):
 - int4 packs 2× the sequences in the same KV block budget (Phase 6L:
   117 vs 58 live at saturation = 2.02× raw).
 - int4 costs **4.38 GB** sidecar tax (Phase 6L live-measured; ~+4.4 GB HBM).
@@ -418,36 +464,36 @@ There are two distinct comparisons:
   per GPU at near-bf16 quality. For workloads with slack KV headroom or
   latency sensitivity, bf16 is simpler and faster per-seq.
 
-**int4_protected vs KVarN** (the head-to-head we actually ran — same model, same needles):
+**KVPro vs KVarN** (the head-to-head we actually ran — same model, same needles):
 - KVarN (Huawei, vLLM-0.22 fork; Hadamard + iterative variance-normalization; 4-bit K / 2-bit V;
   **no protect**) is the strongest external KV method we tested: near-lossless easy free-gen
   (0.982 token-agreement vs bf16), 2.67× density, throughput ≥ bf16 on a modern (V1) engine.
 - Run head-to-head on **identical** Llama-3.1-8B hard needles (same builder / classifier / seed
-  as our own validation), int4_protected matches **full precision** exactly where KVarN
+  as our own validation), KVPro matches **full precision** exactly where KVarN
   **collapses K-bound**:
 
-  | hard-needle retrieval | bf16 | int4_protected | KVarN |
+  | hard-needle retrieval | bf16 | KVPro | KVarN |
   |---|---:|---:|---:|
   | 8K | 0.955 | **0.955** | 0.250 |
   | 32K | 1.000 | **1.000** | 0.062 |
 
 - The failure is precisely what protect defends: KVarN drops the protected channels, so its 4-bit
-  K loses long-range retrieval (`MISS_K`-heavy, **worsening with context length**). int4_protected
+  K loses long-range retrieval (`MISS_K`-heavy, **worsening with context length**). KVPro
   was confirmed genuinely active (2.0× token capacity, `kv_cache_dtype=int4_protected` — not a
   bf16 fallback). **A credible competitor — near-lossless on the easy metrics — was beaten on the
-  regime the product targets (selective long-context retrieval), while int4_protected held
+  regime the product targets (selective long-context retrieval), while KVPro held
   full-precision quality at 2× density.**
 - **Fair to KVarN (the honest moat boundary):** KVarN wins density (2.67× vs 2.0×), throughput
   (≥bf16 vs 0.3–0.5×), and easy/short-context quality, on a newer engine. For short-context or
-  throughput-bound serving it is the better choice. int4_protected's defensible moat is the
+  throughput-bound serving it is the better choice. KVPro's defensible moat is the
   **hard tail** (long-context selective retrieval) **and Qwen2.5-7B / GQA-7 models where KVarN
   crashes** — not throughput. (Full data: `CTM_plus/Bench/scripts/KVARN_EVAL_FINDINGS.md`.)
 
-**int4_protected vs fp8** (the quality-at-density story):
+**KVPro vs fp8** (the quality-at-density story):
 - Both deliver ~2× KV concurrency density vs bf16.
-- fp8 costs less total HBM (no sidecars); int4_protected costs ~4.4 GB
+- fp8 costs less total HBM (no sidecars); KVPro costs ~4.4 GB
   more than bf16 (Phase 6L: 4.38 GB sidecars) while fp8 costs less.
-- int4_protected wins decisively on quality: 0.737 token-agreement
+- KVPro wins decisively on quality: 0.737 token-agreement
   vs fp8's degraded output (0/6 bit-identical, 12% prefix overlap,
   1/15 needle). For quality-sensitive workloads, fp8 is not a viable
   alternative.
@@ -457,9 +503,9 @@ There are two distinct comparisons:
 | Alternative | Why it doesn't substitute |
 |---|---|
 | Faster fp8 kernels | fp8's quality limit isn't a kernel issue — it's a representation issue. 8 bits per element cannot preserve the per-channel dynamic range of K at the precision that long-context attention requires. |
-| AWQ + AWQ-Marlin | These quantize *weights*, not KV-cache — orthogonal budgets, **complementary** to int4_protected. **Composition status (Phase 6O, measured + fixed):** the stack initially crashed on a dtype mismatch (AWQ fp16 activations vs int4 bf16-dequant K); a one-commit dtype bridge (e06dd26) fixed it, and **byte-equivalence on the bf16 path stayed GREEN (15/15)** — the fix is non-invasive. **AWQ weights + int4_protected KV now load and run together with quality preserved — MMLU 56% (stacked) vs 55% (each alone), within noise.** The *integration and quality* compose, validated. **Memory composition also MEASURED (live introspection, Phase 6O): AWQ shrinks weights 14.25 → 5.57 GB (2.6×, −8.7 GB), and the saving is IDENTICAL with bf16 KV and int4 KV (5.571 = 5.571) — proving the two are orthogonal and additive.** So int4_protected compresses the KV-cache (its moat, which AWQ/GPTQ cannot touch) AND stacks with AWQ weight-quant: both memory budgets shrink together, quality preserved. |
+| AWQ + AWQ-Marlin | These quantize *weights*, not KV-cache — orthogonal budgets, **complementary** to KVPro. **Composition status (Phase 6O, measured + fixed):** the stack initially crashed on a dtype mismatch (AWQ fp16 activations vs int4 bf16-dequant K); a one-commit dtype bridge (e06dd26) fixed it, and **byte-equivalence on the bf16 path stayed GREEN (15/15)** — the fix is non-invasive. **AWQ weights + KVPro KV now load and run together with quality preserved — MMLU 56% (stacked) vs 55% (each alone), within noise.** The *integration and quality* compose, validated. **Memory composition also MEASURED (live introspection, Phase 6O): AWQ shrinks weights 14.25 → 5.57 GB (2.6×, −8.7 GB), and the saving is IDENTICAL with bf16 KV and int4 KV (5.571 = 5.571) — proving the two are orthogonal and additive.** So KVPro compresses the KV-cache (its moat, which AWQ/GPTQ cannot touch) AND stacks with AWQ weight-quant: both memory budgets shrink together, quality preserved. |
 | Speculative decoding | Reduces decode FLOPs, doesn't reduce KV memory. Orthogonal to KV compression. |
-| Paged attention (vLLM) | Already deployed everywhere. Paged attention manages KV memory; it doesn't compress KV. int4_protected uses vLLM's paged cache as its substrate. |
+| Paged attention (vLLM) | Already deployed everywhere. Paged attention manages KV memory; it doesn't compress KV. KVPro uses vLLM's paged cache as its substrate. |
 
 ### Why the methodology generalizes
 
@@ -493,7 +539,7 @@ recompile, not a methodology change.
 - **Quality**: 4 models, 3 families, 2 scales, all 15/15 needle
   replicated 2-of-2 seeds on Mistral / Llama-3.1-8B / Qwen-14B;
   token-agreement +20.4 pt over naive (0.737 vs 0.533, post-fix).
-  **Academic benchmarks (Qwen-7B, Phase 6N/6N.2): int4_protected = bf16 with
+  **Academic benchmarks (Qwen-7B, Phase 6N/6N.2): KVPro = bf16 with
   0.0 pt delta AND 100% per-question agreement on THREE benchmarks —
   MMLU (63.5%=63.5% @200Q; 73.9%=73.9% @1,000Q), ARC-Challenge (91.5%=91.5%),
   TruthfulQA (71.5%=71.5%).** Across all of them int4 chose the IDENTICAL answer
@@ -564,7 +610,7 @@ A focused 6-8 week effort can land Tier 1 cleanly:
 - Weeks 5-6: Hard-needle at 16K/32K + sidecar diet option C
 - Weeks 6-8: Broader hardening + pre-calibrated mask zoo + buffer for findings
 
-End state: int4_protected shipping on 4+ model families with
+End state: KVPro shipping on 4+ model families with
 demonstrated sustained capacity, a comprehensive quality bar (not
 just needle), and a production deployment story.
 
@@ -579,7 +625,7 @@ should be able to tell which is which.
 
 Three independent decode bugs were found and fixed after the initial
 Phase 5 ship. All prior quality and throughput benchmarks on
-int4_protected were measured on broken code; the corrected results
+KVPro were measured on broken code; the corrected results
 below supersede them.
 
 | Bug | Symptom | Fix |
@@ -603,18 +649,18 @@ every cell × mml.
 | **Token-agreement vs bf16 (post-fix, Qwen-7B, 8K-32K mml):** naive int4 = 0.533, protected int4 = **0.737 (+20.4 pt)** | `phase6j_quality_comparison.py` on clean post-fix data (6K.7/6K.9/6K.10); 295/553 naive vs 420/570 protected |
 | **Easy needle saturated (post-fix):** naive int4 ≈ bf16 (0.96–1.00 at 8K–32K mml) — this gate no longer discriminates protect | `phase6k11_needle_failuremode.py`; COLLAPSE=0 confirmed |
 | **Hard-needle retrieval (post-fix, mml=8192, 60 items):** bf16 1.000, protected **0.964**, naive 0.915 (+0.049); genuine misses 5→2 (K-bound miss eliminated by protect, V-bound halved) | `phase6k12_hard_needle.py`; adjudicated FORMAT items; `retrieved_or_present` metric |
-| **Memory (A100-80GB, gpu_util=0.5):** int4_protected uses ~+4.4 GB HBM vs bf16; Phase 6L live-measured the sidecar tax at **4.38 GB** (mml=8K, B=128) = ~99.8% of the +4.39 GB delta | `bench_phase6_long_context_gpu.py`; Phase 6L `report.json`; `MEMORY_STORY.md` Table 1 |
+| **Memory (A100-80GB, gpu_util=0.5):** KVPro uses ~+4.4 GB HBM vs bf16; Phase 6L live-measured the sidecar tax at **4.38 GB** (mml=8K, B=128) = ~99.8% of the +4.39 GB delta | `bench_phase6_long_context_gpu.py`; Phase 6L `report.json`; `MEMORY_STORY.md` Table 1 |
 | **vLLM max_concurrency 2× bf16** at all tested mml; **DEMONSTRATED under load (Phase 6L):** 117 vs 58 live at saturation = 2.02× raw | Long-context bench + Phase 6L `--resident-pressure` |
 | **Concurrency density (DEMONSTRATED, Phase 6L):** protected **2.498 seq/GB** vs bf16 **1.367 seq/GB** = **1.83× net** of the 4.38 GB sidecar tax | Phase 6L live: peak_live / hbm_gb at saturation; `PHASE_6L_CAPACITY_DEMO_RESULT.md` |
 | **Throughput (post-fix), mml=8K B=8 short-gen:** int4 0.56× bf16 agg_tps; mml=16K 0.65×; mml=32K 0.67× | `bench_phase6_long_context_gpu.py` post-fix; `MEMORY_STORY.md` Table 2 |
 | **Throughput at saturation (DEMONSTRATED, Phase 6L):** int4 **0.22× bf16** agg tok/s (130.4 vs 597.3) at mml=8K B=128 gen=512 — ~9× slower per user; unoptimized decode path | Phase 6L `report.json`; `PHASE_6L_CAPACITY_DEMO_RESULT.md` §3 |
 | **Slot lifecycle fix (6K.14):** auto-bump to `max_num_seqs` + evict-on-completion; protected ran B=48–128 with `slots=B`, zero slot-exhaustion / OOM / preempt | GPU Run 1; `PHASE_6K14_SLOT_LIFECYCLE_FINDINGS.md` |
-| 2.01× total-slot ratio at same memory budget (Qwen-7B, gpu_util=0.5, max_model_len=4096): bf16 27,934 / int4_protected 28,060 cuda blocks at block_size=16 and block_size=32 respectively | Tier A `bench_phase5c_v1.py` three-way bench; `PHASE5C_USAGE.md` |
+| 2.01× total-slot ratio at same memory budget (Qwen-7B, gpu_util=0.5, max_model_len=4096): bf16 27,934 / KVPro 28,060 cuda blocks at block_size=16 and block_size=32 respectively | Tier A `bench_phase5c_v1.py` three-way bench; `PHASE5C_USAGE.md` |
 | 219× max concurrency vs stock 109× (Qwen-7B at max_model_len=4096) | Tier A three-way bench; vLLM engine-init log |
 | 0 fallbacks across packed decode + write paths on Qwen-7B Tier A R7-latency run (9,240 decode + 9,408 write = 18,648 calls) | `Int4ProtectedAttentionImpl.get_call_stats()` snapshot |
 | 3/6 diverse prompts produce bit-identical greedy output vs stock; remaining 3 share 33% / 76% / 82% prefix; fp8 diverges within 6-16 chars on every prompt | `bench_phase5c_v1.py` (Qwen-7B, max_model_len=4096, Tier A) |
 | Multi-batch determinism (run1 == run2 byte-identical at B=2..8) | `verify_phase5b_6_batch.py` ALL 7 gates GREEN |
-| Warm-tier swap-restore is byte-clean for int4_protected on vLLM 0.7.3 (Qwen-7B + A100 + `preemption_mode='swap'`): under matched concurrent pressure, swap-mode and recompute-mode baselines produced bit-identical 64-token output. All six TIER5A acceptance gates GREEN. | TIER5A bench: `Bench/scripts/PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md` |
+| Warm-tier swap-restore is byte-clean for KVPro on vLLM 0.7.3 (Qwen-7B + A100 + `preemption_mode='swap'`): under matched concurrent pressure, swap-mode and recompute-mode baselines produced bit-identical 64-token output. All six TIER5A acceptance gates GREEN. | TIER5A bench: `Bench/scripts/PHASE_TIER5A_SWAP_RESTORE_FINDINGS.md` |
 | Read-path preflight for CUDA Graphs (B-pre-1..4) COMPLETE; graph mode verified correct end-to-end (6K.10) | `Bench/scripts/OPTION_B_PREFLIGHT.md`; `PHASE_6K7_INT4_DISPATCH_FIX_FINDINGS.md` |
 | CPU regression: slot lifecycle (5/5 PASS, including wave-leak repro + fix) | `Bench/tests/test_phase6k14_slot_gc.py` |
 | **Read-skip (Phase 10, Qwen-7B, A100):** at 32K context **94% of per-token KV positions skipped** with **needle 1.0/1.0** (depths 0.1/0.5); the retained-index path is GPU-gated **output-identical to full-read** (`gather == compacted == full`). Decode **−10.6% vs full-int4 at 32K** (weight-bound regime; recovered from ~−30% via on-GPU tensor index + block-id cache + tuned observe cadence). A/B gap **halves 16K→32K** (5.05→2.67 tok/s), extrapolating to a ~50K crossover | `phase9_p3_fused_needle.py --ab` (sweep 8K/16K/32K); `test_gather_decode_gpu.py`; `Bench/scripts/PHASE10_FINAL_VERDICT.md` |
@@ -623,7 +669,7 @@ every cell × mml.
 
 | Item | Result |
 |---|---|
-| **int4_protected total HBM vs bf16** | CAPACITY-NEGATIVE at equal `gpu_memory_utilization`: ~+4.4 GB more (Phase 6L live-measured 4.38 GB sidecar tax). The net capacity density is **1.83× seq/GB (DEMONSTRATED, Phase 6L)**, which requires running **at the KV block limit** to realize (not a savings at low B). |
+| **KVPro total HBM vs bf16** | CAPACITY-NEGATIVE at equal `gpu_memory_utilization`: ~+4.4 GB more (Phase 6L live-measured 4.38 GB sidecar tax). The net capacity density is **1.83× seq/GB (DEMONSTRATED, Phase 6L)**, which requires running **at the KV block limit** to realize (not a savings at low B). |
 | **Decode throughput** | Per-seq ~1.5–1.9× slower than bf16 at low load; **at saturation Phase 6L measured 0.22× bf16 aggregate tok/s (~9× slower per user)** on the unoptimized int4 decode path. Density-positive, throughput-negative at saturation — fine for batch/offline, needs decode-kernel optimization for interactive serving. |
 | **Sidecar diet ceiling** | A+F+C stack (fp8 sidecars + fewer protect channels + coarser V groups) saves ~2.5 GB realistically — leaving int4 still ~2.5 GB above bf16. Diet alone likely can't reach HBM parity; option D (inline protect into KV layout) is an additional lever. |
 | **Deleting the tax via rotation (KurTail / SpinQuant-style)** | The ~3.4 GB per-channel-scale + protect tax is **structural, not removable by rotation** — measured on **2 models**. A learned (kurtosis-optimized) rotation that should let *per-tensor* int4 replace per-channel scales **FAILS the hard-tail free-gen gate on both**: learned-rotation+per-tensor agreement vs bf16 = **Qwen 0.040 / Llama 0.385**, below per-channel+protect (**0.266 / 0.510**) and below even **naive per-channel int4** (0.236 / 0.471) — i.e. rotating to drop the scales makes K *worse* than keeping them. Llama is the more rotatable model and still loses. Negative across **6 independent lines** (light KV-QAT FT, Hadamard & learned rotation, scale-drop 7.1×, head-wise allocation, TurboQuant package `sym4`=0.037 with `sym8`=0.70 proving a genuine low-bit-K wall, and KVLinC's published design keeping per-channel K). **Conclusion: per-channel + protect is *necessary*, not a tunable — the tax is the price of K quality, and the hybrid scheduler (never worse than bf16) is the operational answer.** |
@@ -692,7 +738,7 @@ decisions earned through this quarter's measurement work.
 ### Where the business value sits
 
 The serving economics for long-context workloads are governed by
-**concurrent users per GPU**. int4_protected delivers:
+**concurrent users per GPU**. KVPro delivers:
 
 - **1.83× concurrent max-len sequences per GB of HBM** (DEMONSTRATED,
   Phase 6L) at near-bf16 quality (0.737 token-agreement vs naive's
@@ -714,13 +760,13 @@ fit **throughput-insensitive, density-bound workloads** (offline eval,
 bulk summarization, agentic batch); interactive serving is gated on
 decode-kernel optimization.
 
-**The quality story is the differentiator.** int4_protected is the
+**The quality story is the differentiator.** KVPro is the
 only 4-bit KV scheme with a published validated quality story: +20.4
 pt token-agreement over naive int4, replicated across 4 model
 families, at a cost structure fully disclosed above. fp8 achieves
 similar density with dramatically lower quality (0/6 bit-identical).
 Naive int4 achieves the same density with degraded fidelity.
-int4_protected closes the quality gap while maintaining the density
+KVPro closes the quality gap while maintaining the density
 advantage.
 
 ### Forward thesis — the bottleneck is shifting from memory capacity to data movement
@@ -741,7 +787,7 @@ direct reduction in the dominant data-movement term of decode, **captured in sof
 on today's GPUs** — no new hardware mandate. As the narrative moves capacity→movement,
 this is the asset that moves to center stage.
 
-**int4_protected (the quant) is a quality-preserving KV shrink — most valuable exactly
+**KVPro (the quant) is a quality-preserving KV shrink — most valuable exactly
 where KV becomes *transported* data.** The emerging movement-bound architectures —
 disaggregated prefill/decode, cross-request prefix caches, HBM→CPU/NVMe KV offload —
 all ship and store the KV cache as their primary payload. A 4-bit KV that *holds
@@ -758,7 +804,7 @@ of three already measured:
 | decode HBM-traffic term | lever | status |
 |---|---|---|
 | weight movement (short-ctx bottleneck) | AWQ weight-quant — **composes**, orthogonal budget (weights 14.25→5.57 GB, identical under bf16 and int4 KV) | MEASURED stack |
-| KV bytes per position | int4_protected — ~1.8× net (sidecar-inclusive) | density MEASURED; bandwidth unrealized as wall-clock |
+| KV bytes per position | KVPro — ~1.8× net (sidecar-inclusive) | density MEASURED; bandwidth unrealized as wall-clock |
 | KV positions read per step | read-skip — ~95% fewer | MEASURED (+72% @60K, quality 1.0/1.0) |
 
 **The honest drag carries to this axis too.** The ~3.4 GB sidecar tax isn't only a
@@ -774,10 +820,10 @@ dominant bottleneck) and gives the quality-preserving KV shrink a second use
 (transported/cached KV) — provided the multi-GPU and disaggregated legs stay labeled
 **projected** until built.
 
-### Where int4_protected sits in the memory stack
+### Where KVPro sits in the memory stack
 
 The serving bottleneck *is* the memory hierarchy — **"AI is only as fast as the
-memory feeding it."** int4_protected has a clear primary home in that stack, a
+memory feeding it."** KVPro has a clear primary home in that stack, a
 strong secondary lever, and honest zones of no influence. Mapped to the five
 layers (it doesn't make any layer intrinsically *faster* — it **reduces the
 demand** on the ones that bind):
@@ -788,9 +834,9 @@ demand** on the ones that bind):
 | **② HBM / DRAM** — the fuel line | **PRIMARY — maximum influence** | The KV-cache lives here and **exceeds weight memory past ~32K**. **Capacity:** 2× KV density (1.83× net) → ~2× more concurrent users / longer context in the same HBM. **Bandwidth:** decode is HBM-bound — 4-bit KV moves **~1.8× fewer bytes/token** to compute (the literal "lighter feed"). |
 | **③④ NAND/SSD + HDD** — active + archive | **Indirect — cheaper at every tier below HBM** | A 4-bit, quality-preserving KV is ~1.8× smaller to spill or archive; warm-tier CPU swap-restore is **byte-clean** (TIER5A). When the hot tier overflows, the offload payload shrinks and restore is faster — the right payload to *move and cache* as KV becomes transported data. |
 | **⑤ Controllers** — traffic system | **Strong secondary — via read-skip** | read-skip *is* a memory-traffic controller: it moves only the KV positions worth reading (**95% fewer at 32K, needle 1.0/1.0**) — "optimizes flow, prevents bottlenecks," layered *on* the Layer-2 compression. Deployment routing (short-output→int4, long-form→bf16) is controller logic too. |
-| **Model weights** | **Not its lever** | Weight footprint is AWQ's domain; int4_protected composes with it but owns only the *KV* term. |
+| **Model weights** | **Not its lever** | Weight footprint is AWQ's domain; KVPro composes with it but owns only the *KV* term. |
 
-**One line:** int4_protected's say is at **Layer 2** — it makes the KV-cache (the
+**One line:** KVPro's say is at **Layer 2** — it makes the KV-cache (the
 dominant thing the fuel line carries at long context) **~2× denser and ~1.8×
 lighter to move**, with read-skip (Layer 5) cutting *positions* moved by ~95%.
 It's a **capacity-and-bandwidth play, not a raw-speed one** (it spends some
@@ -798,7 +844,7 @@ Layer-1 compute on dequant — the disclosed tax). In the stack's own terms: *it
 doesn't make the fuel line faster — it makes the engine sip instead of guzzle,
 and packs 2× the fuel in the tank, without losing octane (quality).*
 
-### The warm tier — where compression unlocks cheaper KV reuse (LMCache *and* NAND)
+### KVPro WarmTier — where compression unlocks cheaper KV reuse (LMCache *and* NAND)
 
 > *Strategic framing (June 2026). The market shift is **EXTERNAL and real** (vLLM/LMCache ship
 > hierarchical KV today). KVPro's fit is anchored on **MEASURED** results (quality on 4 models; the
@@ -937,16 +983,16 @@ offload plumbing LMCache already provides.*
 
 The shippable product fits any of:
 
-| Customer | Why int4_protected fits |
+| Customer | Why KVPro fits |
 |---|---|
 | Inference API providers (OpenRouter-like, Replicate-like) | High-concurrency, long-context workloads where KV block limit is the binding constraint. Density advantage converts to per-token margin; quality advantage is the differentiator vs fp8 alternatives. |
 | Enterprise self-hosters | Quality-sensitive deployments (legal, healthcare, finance) that need near-bf16 output fidelity but can't justify bf16's concurrency limit. |
 | Open-model hubs deploying Llama / Mistral / Qwen at scale | The 3 model families validated this quarter cover ~80% of open-weights serving traffic by category. |
-| Edge / low-HBM hardware (H100 PCIe 80GB, L40S 48GB) | Lower-tier GPUs that can't hold 32K concurrent context in bf16 can hold it in int4_protected at near-bf16 fidelity. |
+| Edge / low-HBM hardware (H100 PCIe 80GB, L40S 48GB) | Lower-tier GPUs that can't hold 32K concurrent context in bf16 can hold it in KVPro at near-bf16 fidelity. |
 
 ### Real-world economics — the bf16 + KVPro playbook (measured numbers)
 
-int4_protected (productized name: **KVPro**) is **not a bf16 replacement** —
+KVPro is **not a bf16 replacement** —
 the crossover sweep settled that (decode 0.17–0.67× bf16, no parity ≤60K).
 It is a **memory-density tool**: bf16 buys speed, KVPro buys capacity, and a
 deployment that routes between them beats either alone.
@@ -1040,7 +1086,7 @@ attention score `Q·K` is dominated by a small set of high-magnitude K
 channels per `(layer, head)`; the rest carry diffuse, low-magnitude signal.
 Uniform int4 quantizes all `D` channels onto one 4-bit grid under a single
 per-block scale, so the few high-dynamic-range channels — the ones the inner
-product actually depends on — are the first to be crushed. int4_protected
+product actually depends on — are the first to be crushed. KVPro
 keeps the **top `N = round(D × 4%)` (= 5 at D=128) highest-magnitude channels
 per `(layer, h_kv)` at bf16** and quantizes the rest to int4: the protected
 channels carry the inner-product signal at full precision, the int4 bulk
@@ -1070,10 +1116,10 @@ Two distinct quantities, routinely conflated:
 They relate by `density ≈ compression × (KV's share of the memory being
 compressed)`, because total HBM = weights (fixed) + KV + sidecars and
 compression shrinks only the KV term. **They converge only when KV dominates
-memory** — precisely int4_protected's regime (long context 32K+, where KV
+memory** — precisely KVPro's regime (long context 32K+, where KV
 exceeds weight memory).
 
-For int4_protected both land near 2× for two *stacked* reasons: (1) the 4-bit
+For KVPro both land near 2× for two *stacked* reasons: (1) the 4-bit
 nibbles are **4× denser at the element level, but the protect/scale/xmin
 sidecars are themselves stored bytes**, so the realized KV *compression* is
 ~2×, not 4×; (2) that ~2× compression carries through to **~2× concurrency**
@@ -1082,7 +1128,7 @@ brief reports both on purpose: **2.0× = KV-block density** (sidecar-excluded)
 vs **1.83× = net seq/GB** (sidecar-included). **That 2.0 → 1.83 (~8%) gap *is*
 "compression minus density"** — the 4.38 GB sidecar tax is fixed overhead that
 does not scale with concurrency. At short context (weights-dominant) the gap
-blows open; int4_protected is deployed long-context specifically so the
+blows open; KVPro is deployed long-context specifically so the
 compression carries through. **The defensible headline is 2× density (1.83×
 net) — never 4×.**
 
@@ -1120,7 +1166,7 @@ to context length, the axis competitors degrade on.**
 ### 4. APC-compatible by construction — and the graph-safety boundary
 
 vLLM's prefix caching shares full immutable KV blocks across requests by
-content hash. int4_protected is APC-compatible **by construction**: (a) quant
+content hash. KVPro is APC-compatible **by construction**: (a) quant
 groups are **block-local** (`group_size = block_size = 32`), so a block's
 nibbles + per-block scale/xmin depend only on that block's tokens — *identical*
 regardless of which request produced it; (b) the sidecars are **keyed by global
@@ -1162,19 +1208,19 @@ backend covers ~80% of open-weights serving traffic by category.**
 
 ### 6. Orthogonality — why it composes with weight-quant and read-skip
 
-int4_protected attacks one of the three HBM-traffic terms of decode and
+KVPro attacks one of the three HBM-traffic terms of decode and
 **composes additively** with levers on the other two (two of three already
 measured):
 
 | Decode HBM-traffic term | Lever | Why orthogonal |
 |---|---|---|
 | weight movement | AWQ weight-quant | disjoint budget — weights, not KV (measured: AWQ 14.25 → 5.57 GB *identical* under bf16 and int4 KV) |
-| KV bytes per position | **int4_protected** | the KV-cache itself — AWQ / GPTQ cannot touch this |
+| KV bytes per position | **KVPro** | the KV-cache itself — AWQ / GPTQ cannot touch this |
 | KV positions read per step | read-skip | bounded retained set vs linear-growing attention → throughput-positive at long context (measured +25% @32K → +72% @60K, needle 1.0/1.0) |
 
 Because the three target disjoint terms, the savings **add** — AWQ shrinks
-weights *and* int4_protected shrinks KV in the same run with quality preserved
-(MMLU 56% stacked vs 55% each alone). **Exclusivity: int4_protected owns the KV
+weights *and* KVPro shrinks KV in the same run with quality preserved
+(MMLU 56% stacked vs 55% each alone). **Exclusivity: KVPro owns the KV
 term — the one budget weight-quant and spec-decode cannot address — and stacks
 cleanly on top of them.**
 
