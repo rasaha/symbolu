@@ -33,7 +33,17 @@ for the warm-tier job at all. **Decision: [ YES / NO ] — record before Phase 0
 ## Phase 0 — FEASIBILITY GATE (new vs the SAW protocol; run FIRST)
 KVPro's reconstruction sidecars (`k_scale/xmin`, `v_scale/xmin`, `k_protect`, staging) live **outside**
 vLLM's paged KV tensor — which is precisely why swap-preemption is hard-refused (6K.15: a migrated KV
-without its sidecars is silently corrupt). So before any measurement:
+without its sidecars is silently corrupt).
+
+> **The serialize/restore primitive is now implemented:** `kv_policy/tier5b_snapshot.py`
+> (`save_prefix_snapshot` / `load_prefix_snapshot` / `restore_prefix` + a built-in
+> `verify_roundtrip` byte-gate). It re-injects packed K/V + all 5 sidecars into a fresh paged
+> allocation and re-encodes protect via the writer's `_protect_store` (byte-clean under prot-int8:
+> quantize∘dequant is identity on the code lattice). It is HARDWARE-UNTESTED until `verify_roundtrip`
+> passes on the pod — which IS the Phase-0 gate below. The remaining work is only the live-engine
+> wiring (getting a prefix's writer + kv_cache + block_ids, and a fresh allocation to restore into).
+
+So before any measurement:
 
 1. **Can KVPro state be serialized + faithfully reloaded through an offload path?** TIER5A already proved
    byte-clean **CPU swap-restore** (matched-pressure swap vs recompute → bit-identical 64-token output).
