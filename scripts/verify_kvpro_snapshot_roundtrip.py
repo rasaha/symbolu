@@ -164,9 +164,19 @@ def main(argv=None) -> int:
         llm = Int4ProtectedLLM(model=args.model, max_model_len=args.max_model_len,
                                gpu_memory_utilization=args.gpu_mem_util, enforce_eager=True)
     except Exception as e:  # noqa: BLE001
-        _die(f"Int4ProtectedLLM construction failed ({type(e).__name__}: {e}). Common cause: the "
-             "calibrated protect mask is missing — set $PROTECT_MASK_PATH (default "
-             "/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt) or run Phase 5B.0 calibration.")
+        msg = str(e)
+        if "config" in msg.lower() or "couldn't connect" in msg.lower() or "Can't load" in msg:
+            _die(f"model config could not be loaded ({type(e).__name__}: {e}).\n"
+                 f"  The model '{args.model}' is not cached on this pod and/or HF is unreachable.\n"
+                 "  Fix: download it, set HF creds, or pass a LOCAL path to --model. E.g.:\n"
+                 "    export HF_HUB_ENABLE_HF_TRANSFER=0   # if hf_transfer isn't installed\n"
+                 "    huggingface-cli download Qwen/Qwen2.5-7B-Instruct\n"
+                 "  then re-run, or: --model /path/to/local/Qwen2.5-7B-Instruct")
+        if "mask" in msg.lower() or "protect" in msg.lower() or os.environ.get("PROTECT_MASK_PATH", "") in msg:
+            _die(f"protect mask problem ({type(e).__name__}: {e}).\n"
+                 "  Set $PROTECT_MASK_PATH to the calibrated mask "
+                 "(default /workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt) or run Phase 5B.0.")
+        _die(f"Int4ProtectedLLM construction failed ({type(e).__name__}: {e}).")
 
     print(f"[2/6] short prefill+decode (max_tokens={args.max_tokens}) to populate KV ...")
     out = llm.generate([args.prompt], SamplingParams(temperature=0.0, max_tokens=args.max_tokens))
