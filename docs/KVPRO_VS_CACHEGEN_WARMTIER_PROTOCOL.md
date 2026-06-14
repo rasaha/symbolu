@@ -1,5 +1,12 @@
 # KVPro vs CacheGen — Warm-Tier KV Reuse Head-to-Head (Pre-Registered Protocol)
 
+> **DIRECTIONAL VERDICT recorded (2026-06-14): see `docs/KVPRO_VS_CACHEGEN_VERDICT.md`.** CacheGen's
+> shipped config = dense, **unprotected** ~4–5-bit quant + arithmetic coding → same class as naive-int4
+> / SAW / KVarN, all MEASURED to lose the hard tail. KVPro wins tail-safe-at-iso-bytes (its design
+> target) + lossless reuse (proven); CacheGen wins raw density. End-to-end CacheGen run blocked on this
+> pod (lmcache 0.4.7 → vLLM 0.23.0 → torch cu130 needs driver ≥13.0; pod is 12.8) — confirm on a
+> newer-driver pod (Option A).
+
 **Status:** experiment design (pre-registration). **Prereq:** GPU pod + LMCache + vLLM + KVPro backend.
 **Companion:** `docs/SAW_INT4_QWEN_HEADTOHEAD_RESULTS.md` (the hot-tier head-to-head), `INT4_PROTECTED_VC_BRIEF.md`
 §"Why hierarchical KV memory is the market" (the PROJECTED warm-tier pillar this protocol validates or kills).
@@ -35,13 +42,15 @@ KVPro's reconstruction sidecars (`k_scale/xmin`, `v_scale/xmin`, `k_protect`, st
 vLLM's paged KV tensor — which is precisely why swap-preemption is hard-refused (6K.15: a migrated KV
 without its sidecars is silently corrupt).
 
-> **The serialize/restore primitive is now implemented:** `kv_policy/tier5b_snapshot.py`
-> (`save_prefix_snapshot` / `load_prefix_snapshot` / `restore_prefix` + a built-in
-> `verify_roundtrip` byte-gate). It re-injects packed K/V + all 5 sidecars into a fresh paged
-> allocation and re-encodes protect via the writer's `_protect_store` (byte-clean under prot-int8:
-> quantize∘dequant is identity on the code lattice). It is HARDWARE-UNTESTED until `verify_roundtrip`
-> passes on the pod — which IS the Phase-0 gate below. The remaining work is only the live-engine
-> wiring (getting a prefix's writer + kv_cache + block_ids, and a fresh allocation to restore into).
+> **The serialize/restore primitive is implemented AND hardware-verified:** `kv_policy/tier5b_snapshot.py`
+> (`save_prefix_snapshot` / `load_prefix_snapshot` / `restore_prefix` + a built-in `verify_roundtrip`
+> byte-gate). It re-injects packed K/V + all 5 sidecars into a fresh paged allocation and re-encodes
+> protect via the writer's `_protect_store` (byte-clean under prot-int8: quantize∘dequant is identity
+> on the code lattice).
+> **✅ Phase-0 PASSED (MEASURED 2026-06-14, Qwen2.5-7B-Instruct, A100-80GB):** DISK + in-memory
+> round-trips byte-clean across all 7 tensors (8 blocks @ 21,760 B/block) — see
+> `docs/KVPRO_SNAPSHOT_ROUNDTRIP_POD_RUNBOOK.md`. The remaining work is only the live-engine wiring
+> (getting a prefix's writer + kv_cache + block_ids, and a fresh allocation to restore into).
 
 So before any measurement:
 

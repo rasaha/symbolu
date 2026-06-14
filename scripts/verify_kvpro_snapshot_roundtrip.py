@@ -132,7 +132,10 @@ def main(argv=None) -> int:
     ap.add_argument("--max-model-len", type=int, default=1024)
     ap.add_argument("--gpu-mem-util", type=float, default=0.5)
     ap.add_argument("--prompt", default="The secret access code is 60494. " * 40)
-    ap.add_argument("--max-tokens", type=int, default=8)
+    ap.add_argument("--max-tokens", type=int, default=1,
+                    help="1 = prefill-only (populates KV via the WRITE path, no decode). "
+                         ">1 triggers the int4 decode read kernel (needs the vllm-flash-attn "
+                         "int4 fork). Phase-0 only needs prefill writes, so default 1.")
     ap.add_argument("--n-blocks", type=int, default=8, help="how many written blocks to round-trip")
     ap.add_argument("--snapshot-path", default="/tmp/kvpro_prefix_snapshot.pt")
     args = ap.parse_args(argv)
@@ -164,13 +167,34 @@ def main(argv=None) -> int:
         llm = Int4ProtectedLLM(model=args.model, max_model_len=args.max_model_len,
                                gpu_memory_utilization=args.gpu_mem_util, enforce_eager=True)
     except Exception as e:  # noqa: BLE001
-        _die(f"Int4ProtectedLLM construction failed ({type(e).__name__}: {e}). Common cause: the "
-             "calibrated protect mask is missing — set $PROTECT_MASK_PATH (default "
-             "/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt) or run Phase 5B.0 calibration.")
+        msg = str(e)
+        if "config" in msg.lower() or "couldn't connect" in msg.lower() or "Can't load" in msg:
+            _die(f"model config could not be loaded ({type(e).__name__}: {e}).\n"
+                 f"  The model '{args.model}' is not cached on this pod and/or HF is unreachable.\n"
+                 "  Fix: download it, set HF creds, or pass a LOCAL path to --model. E.g.:\n"
+                 "    export HF_HUB_ENABLE_HF_TRANSFER=0   # if hf_transfer isn't installed\n"
+                 "    huggingface-cli download Qwen/Qwen2.5-7B-Instruct\n"
+                 "  then re-run, or: --model /path/to/local/Qwen2.5-7B-Instruct")
+        if "mask" in msg.lower() or "protect" in msg.lower() or os.environ.get("PROTECT_MASK_PATH", "") in msg:
+            _die(f"protect mask problem ({type(e).__name__}: {e}).\n"
+                 "  Set $PROTECT_MASK_PATH to the calibrated mask "
+                 "(default /workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt) or run Phase 5B.0.")
+        _die(f"Int4ProtectedLLM construction failed ({type(e).__name__}: {e}).")
 
-    print(f"[2/6] short prefill+decode (max_tokens={args.max_tokens}) to populate KV ...")
-    out = llm.generate([args.prompt], SamplingParams(temperature=0.0, max_tokens=args.max_tokens))
-    print(f"      generated: {out[0].outputs[0].text[:60]!r}")
+    print(f"[2/6] prefill (max_tokens={args.max_tokens}) to populate KV via the write path ...")
+    try:
+        out = llm.generate([args.prompt], SamplingParams(temperature=0.0, max_tokens=args.max_tokens))
+        print(f"      generated: {out[0].outputs[0].text[:60]!r}")
+    except Exception as e:  # noqa: BLE001
+        if "flash_attn_with_int4_kvcache" in str(e) or "_read_decode" in str(e):
+            # PREFILL writes the KV before the DECODE read runs, so the cache is already
+            # populated when the (missing) int4 decode kernel raises. Phase-0 only needs the
+            # written KV, so warn and PROCEED rather than die.
+            print(f"[warn] int4 DECODE kernel missing ({type(e).__name__}) — but prefill already "
+                  "wrote the KV; proceeding on the written blocks. (The decode/serving kernel is "
+                  "only needed later for the CacheGen comparison arms, not for this byte-clean gate.)")
+        else:
+            _die(f"prefill failed ({type(e).__name__}: {e}).")
     if os.path.exists(native_dump):
         print(f"[ok] native writer dump produced at {native_dump} (write path confirmed firing)")
     else:
@@ -186,20 +210,27 @@ def main(argv=None) -> int:
 
     keys = t5b._TENSOR_KEYS
 
+    # The writer's KV tensors are vLLM inference-mode tensors; in-place mutation
+    # (zero/restore) is only allowed inside InferenceMode — the same context the real
+    # engine restore runs in. Snapshots (read+clone) are fine either way.
+    import torch
+
     print(f"[4/6] DISK round-trip: save -> zero -> load -> restore_prefix ({args.snapshot_path}) ...")
     reference = [t5b.snapshot_block(writer, kv, b) for b in block_ids]
     saved = t5b.save_prefix_snapshot(writer, kv, block_ids, args.snapshot_path)
     print(f"      saved {saved['n_blocks']} blocks, {saved['approx_bytes']} bytes "
           f"({saved['approx_bytes'] / max(1, len(block_ids)):.0f} B/block)")
-    t5b._zero_blocks(writer, kv, block_ids)
-    snap = t5b.load_prefix_snapshot(args.snapshot_path)
-    t5b.restore_prefix(writer, kv, snap, block_ids)
-    after = [t5b.snapshot_block(writer, kv, b) for b in block_ids]
+    with torch.inference_mode():
+        t5b._zero_blocks(writer, kv, block_ids)
+        snap = t5b.load_prefix_snapshot(args.snapshot_path)
+        t5b.restore_prefix(writer, kv, snap, block_ids)
+        after = [t5b.snapshot_block(writer, kv, b) for b in block_ids]
     disk_mism = _compare(reference, after, keys)
     disk_clean = not disk_mism
 
     print("[5/6] in-memory verify_roundtrip (built-in byte-gate) ...")
-    res = t5b.verify_roundtrip(writer, kv, block_ids)
+    with torch.inference_mode():
+        res = t5b.verify_roundtrip(writer, kv, block_ids)
 
     print("\n================ RESULT ================")
     print(f"DISK   save/load/restore_prefix : {'PASS' if disk_clean else 'FAIL'}")
