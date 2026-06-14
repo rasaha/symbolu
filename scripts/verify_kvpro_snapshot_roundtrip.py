@@ -187,13 +187,14 @@ def main(argv=None) -> int:
         print(f"      generated: {out[0].outputs[0].text[:60]!r}")
     except Exception as e:  # noqa: BLE001
         if "flash_attn_with_int4_kvcache" in str(e) or "_read_decode" in str(e):
-            _die(f"int4 DECODE kernel missing ({type(e).__name__}: {e}).\n"
-                 "  This pod has stock vllm.vllm_flash_attn, not the int4 fork that provides "
-                 "flash_attn_with_int4_kvcache.\n"
-                 "  Phase-0 does NOT need decode — re-run with --max-tokens 1 (prefill-only) to "
-                 "populate KV via the WRITE path and skip this kernel. (The decode/serving kernel "
-                 "is only needed later for the CacheGen comparison arms, not for the byte-clean gate.)")
-        _die(f"prefill failed ({type(e).__name__}: {e}).")
+            # PREFILL writes the KV before the DECODE read runs, so the cache is already
+            # populated when the (missing) int4 decode kernel raises. Phase-0 only needs the
+            # written KV, so warn and PROCEED rather than die.
+            print(f"[warn] int4 DECODE kernel missing ({type(e).__name__}) — but prefill already "
+                  "wrote the KV; proceeding on the written blocks. (The decode/serving kernel is "
+                  "only needed later for the CacheGen comparison arms, not for this byte-clean gate.)")
+        else:
+            _die(f"prefill failed ({type(e).__name__}: {e}).")
     if os.path.exists(native_dump):
         print(f"[ok] native writer dump produced at {native_dump} (write path confirmed firing)")
     else:
