@@ -210,20 +210,27 @@ def main(argv=None) -> int:
 
     keys = t5b._TENSOR_KEYS
 
+    # The writer's KV tensors are vLLM inference-mode tensors; in-place mutation
+    # (zero/restore) is only allowed inside InferenceMode — the same context the real
+    # engine restore runs in. Snapshots (read+clone) are fine either way.
+    import torch
+
     print(f"[4/6] DISK round-trip: save -> zero -> load -> restore_prefix ({args.snapshot_path}) ...")
     reference = [t5b.snapshot_block(writer, kv, b) for b in block_ids]
     saved = t5b.save_prefix_snapshot(writer, kv, block_ids, args.snapshot_path)
     print(f"      saved {saved['n_blocks']} blocks, {saved['approx_bytes']} bytes "
           f"({saved['approx_bytes'] / max(1, len(block_ids)):.0f} B/block)")
-    t5b._zero_blocks(writer, kv, block_ids)
-    snap = t5b.load_prefix_snapshot(args.snapshot_path)
-    t5b.restore_prefix(writer, kv, snap, block_ids)
-    after = [t5b.snapshot_block(writer, kv, b) for b in block_ids]
+    with torch.inference_mode():
+        t5b._zero_blocks(writer, kv, block_ids)
+        snap = t5b.load_prefix_snapshot(args.snapshot_path)
+        t5b.restore_prefix(writer, kv, snap, block_ids)
+        after = [t5b.snapshot_block(writer, kv, b) for b in block_ids]
     disk_mism = _compare(reference, after, keys)
     disk_clean = not disk_mism
 
     print("[5/6] in-memory verify_roundtrip (built-in byte-gate) ...")
-    res = t5b.verify_roundtrip(writer, kv, block_ids)
+    with torch.inference_mode():
+        res = t5b.verify_roundtrip(writer, kv, block_ids)
 
     print("\n================ RESULT ================")
     print(f"DISK   save/load/restore_prefix : {'PASS' if disk_clean else 'FAIL'}")
