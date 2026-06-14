@@ -33,8 +33,9 @@ wedge in a market where a cheap **wrong** token has no value.
 **quality-safe KV movement**. **KVPro WarmTier** extends the product to store and reuse compressed KV
 across sessions with a **byte-faithful** guarantee — proven — so reused context loses **zero** quality.
 
-**The ask.** [RAISE — amount / stage / use of funds] and a production design partner to convert "shipped
-at near-full-precision fidelity" into "deployed with measured cost/quality/latency."
+**The ask.** Funding for **v2 productionization** (throughput recovery, tensor parallelism, KVPro
+WarmTier serving) and a **production design partner** to convert "shipped at near-full-precision
+fidelity" into "deployed with measured cost/quality/latency." *(Round sized to milestones — §10.)*
 
 ---
 
@@ -204,9 +205,15 @@ proof-of-technology milestones reached this quarter and the named partners in co
 
 ## 10 · The ask
 
-[RAISE — amount, stage, instrument, and use of funds. Suggested framing: fund v2 productionization
-(decode-throughput recovery, tensor parallelism for 70B-class, KVPro WarmTier serving) + 1–2 design-
-partner deployments to produce a measured cost/quality/latency case study.]
+We are raising to fund **v2 productionization** and the **first design-partner deployments**. Use of
+funds:
+- **Decode-throughput recovery** — the kernel work that lifts the 0.13–0.67× toward its bounded ceiling.
+- **Tensor parallelism** for 70B-class models, where the memory economics are largest.
+- **KVPro WarmTier serving** — turn the proven byte-faithful snapshot/restore into a deployed warm tier.
+- **1–2 design-partner deployments** → a third-party-verifiable cost/quality/latency case study at
+  production scale.
+
+*(Round size and instrument are being set with lead investors; we'll size to the milestones above.)*
 
 **What we want from a partner:** a production-scale, long-context serving deployment to convert
 "shipped at near-full-precision fidelity" into "deployed with measured savings."
