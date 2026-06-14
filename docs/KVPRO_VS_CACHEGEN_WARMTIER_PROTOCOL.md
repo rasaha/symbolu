@@ -1,5 +1,12 @@
 # KVPro vs CacheGen — Warm-Tier KV Reuse Head-to-Head (Pre-Registered Protocol)
 
+> **DIRECTIONAL VERDICT recorded (2026-06-14): see `docs/KVPRO_VS_CACHEGEN_VERDICT.md`.** CacheGen's
+> shipped config = dense, **unprotected** ~4–5-bit quant + arithmetic coding → same class as naive-int4
+> / SAW / KVarN, all MEASURED to lose the hard tail. KVPro wins tail-safe-at-iso-bytes (its design
+> target) + lossless reuse (proven); CacheGen wins raw density. End-to-end CacheGen run blocked on this
+> pod (lmcache 0.4.7 → vLLM 0.23.0 → torch cu130 needs driver ≥13.0; pod is 12.8) — confirm on a
+> newer-driver pod (Option A).
+
 **Status:** experiment design (pre-registration). **Prereq:** GPU pod + LMCache + vLLM + KVPro backend.
 **Companion:** `docs/SAW_INT4_QWEN_HEADTOHEAD_RESULTS.md` (the hot-tier head-to-head), `INT4_PROTECTED_VC_BRIEF.md`
 §"Why hierarchical KV memory is the market" (the PROJECTED warm-tier pillar this protocol validates or kills).
