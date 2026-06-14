@@ -27,6 +27,33 @@ import math
 import sys
 
 
+def _extract_layers(pkv):
+    """Return [(K, V), ...] with K/V shaped [B, H, S, D], across transformers cache APIs."""
+    # DynamicCache with parallel key_cache / value_cache lists (most common)
+    kc, vc = getattr(pkv, "key_cache", None), getattr(pkv, "value_cache", None)
+    if kc is not None and vc is not None and len(kc) > 0:
+        return list(zip(kc, vc))
+    # newer transformers: .layers, each with .keys/.values (or key_cache/value_cache)
+    lys = getattr(pkv, "layers", None)
+    if lys is not None and len(lys) > 0:
+        out = []
+        for L in lys:
+            k = getattr(L, "keys", None)
+            if k is None:
+                k = getattr(L, "key_cache", None)
+            v = getattr(L, "values", None)
+            if v is None:
+                v = getattr(L, "value_cache", None)
+            out.append((k, v))
+        return out
+    # legacy: tuple/list of per-layer (K, V, ...) — take first two
+    if isinstance(pkv, (tuple, list)):
+        return [(t[0], t[1]) for t in pkv]
+    if hasattr(pkv, "to_legacy_cache"):
+        return [(t[0], t[1]) for t in pkv.to_legacy_cache()]
+    raise TypeError(f"unrecognized past_key_values type: {type(pkv)}")
+
+
 def _entropy_bits(codes, bins):
     import torch
     hist = torch.bincount(codes.flatten().to(torch.int64), minlength=bins).float()
@@ -88,8 +115,7 @@ def main(argv=None) -> int:
     print(f"[2/3] forward (use_cache) — prompt tokens: {ids.input_ids.shape[1]}")
     with torch.inference_mode():
         out = model(**ids, use_cache=True)
-    pkv = out.past_key_values
-    layers = list(pkv) if not hasattr(pkv, "to_legacy_cache") else list(pkv.to_legacy_cache())
+    layers = _extract_layers(out.past_key_values)
     n_layers = len(layers)
     if args.max_layers:
         layers = layers[: args.max_layers]
