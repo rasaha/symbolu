@@ -1,7 +1,7 @@
 # int4_protected — VC Brief
 
 **Cognade Labs | KV-Cache Quantization that Preserves Quality**
-*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026*
+*Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026 · KVPro warm-tier: byte-faithful disk snapshot/restore (Phase-0, MEASURED) + KVPro-vs-CacheGen codec fidelity (MEASURED, end-to-end open) added June 2026*
 
 ---
 
@@ -386,7 +386,8 @@ tax is already smallest for free.
 | **TurboQuant W4A4** (Google) | weights + activations | <1% MMLU loss on Llama-2 *(competitor's reported figure)* | W4A4 not KV; complementary, not competitive |
 | **KVarN k4v2** (Huawei, vLLM-0.22) | 2.67× KV (−9.5 GB tail pool); Llama-family only | easy free-gen 0.982 vs bf16; **hard-needle COLLAPSE: 0.25 (8K) → 0.06 (32K), K-bound**; crashes on Qwen2.5-7B (GQA-7) | only competitor run **head-to-head on our hardware** — wins easy metric + throughput, loses the hard tail |
 | **SAW-INT4 (BDR)** (Together, 2026) | ~3.56× KV (token-wise int4 + parameter-free Hadamard rotation → ~0 metadata) | near-lossless on **Qwen3** (their eval) BUT **MEASURED 0% needle AND 0% hard-needle on Qwen2.5-7B-Instruct** (our A100; BF16=100% on identical prompts; rotation confirmed active) — **model-transfer fragility, n=1** | SGLang-native; head-to-head June 2026 — densest competitor on paper, collapses on a mainstream model KVPro handles. `docs/SAW_INT4_QWEN_HEADTOHEAD_RESULTS.md` |
-| **int4_protected** *(this work)* | **0.5× KV + ~4.4 GB sidecar overhead (4.38 GB live)** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
+| **CacheGen** (LMCache; warm-tier offload codec) | per-layer bins-quant (~4–5 bit) + arithmetic coding; denser, no sidecar | **MEASURED codec fidelity** (real Qwen2.5-7B KV): better *average* fidelity than KVPro, but **0.0145 error on top-attention K channels vs KVPro's 0.0000**; lossy (no lossless reuse) | the real warm-tier incumbent; KVPro edge = top-channel fidelity + lossless reuse; **end-to-end needle at iso-bytes still open**. `docs/KVPRO_VS_CACHEGEN_VERDICT.md` |
+| **int4_protected** *(this work)* | **0.5× KV + ~4.4 GB sidecar overhead (4.38 GB live)** | **token-agreement 0.737 (+20.4 pt over naive); easy needle ≈ bf16; hard-needle retrieval 0.964 vs naive 0.915; 4-model portfolio 15/15 needle 2-of-2 seed; warm-tier snapshot/restore byte-faithful (Phase-0)** | **best fidelity at 4-bit KV density; sidecar cost is the trade-off** |
 
 ### The relevant comparison
 
@@ -922,11 +923,25 @@ In both, higher nominal density bought a hard-tail cliff. KVPro spends bits to p
 K structure and **holds the tail** — exactly the property a hierarchy that *reuses* compressed KV
 depends on.
 
-**The real warm-tier incumbent is CacheGen, not SAW.** LMCache already ships **CacheGen** — KV →
-compact-bitstream encoding purpose-built for offload/reuse with low decode overhead. So the
-comparison that actually gates the warm-tier claim is **KVPro vs CacheGen inside LMCache/vLLM**
-(quality-after-reuse at equal bytes + the systems metrics below), **not** KVPro vs SAW. **This
-benchmark is NOT YET RUN** — it is the top open item for this section.
+**The real warm-tier incumbent is CacheGen, not SAW.** LMCache ships **CacheGen** — per-layer
+bins-quantization (~4–5 bit) + arithmetic coding, purpose-built for offload/reuse. We read its shipped
+config and ran a **MEASURED KV-codec fidelity test on real Qwen2.5-7B KV** (28 layers,
+`scripts/compare_kvpro_vs_cachegen_fidelity.py`, June 2026):
+
+| codec | K bits/elem | K rel-err | **K rel-err @ top-attention channels** | V rel-err |
+|---|---|---|---|---|
+| CacheGen (bins=16) | 3.68 | 0.056 | 0.030 | 0.102 |
+| CacheGen (bins=32) | 4.72 | 0.027 | **0.0145** | 0.049 |
+| KVPro (int4+protect) | 4.48 | 0.052 | **0.0000** | 0.102 |
+
+**The honest read:** KVPro uniquely delivers **zero error on the high-attention K channels** (its
+protected-channel design, confirmed on real KV) at competitive bits — the exact failure mode that
+collapsed naive int4 / SAW / KVarN end-to-end. **But CacheGen is a capable codec, not a pushover:** at
+bins=32 it has *better average* fidelity than KVPro (it spends bits evenly) and only ~half the
+critical-channel error of naive int4. So KVPro's edge is **real but narrow** (the protected channels +,
+separately, lossless reuse), and a *measured end-to-end* win over CacheGen is **not yet proven** — the
+remaining open item is whether CacheGen's small (0.0145) critical-channel error breaks hard-tail
+retrieval in a live needle run (needs the LMCache server; see `docs/KVPRO_VS_CACHEGEN_VERDICT.md`).
 
 **Integration posture (stated carefully).** KVPro *is* a vLLM backend — its entire implementation is
 a vLLM-FA fork + impl swap — so it sits in the **same ecosystem as LMCache** (vLLM-native). SAW is
@@ -942,9 +957,10 @@ it, and KVPro starts in-stack. This is a practical edge, not a codec claim.
 | KVPro near-bf16 quality at ~1.8× density | **MEASURED** (this brief, 4 models) |
 | SAW-INT4 collapse on Qwen2.5-7B (the quality-edge proof) | **MEASURED, n=1** |
 | Byte-clean warm-tier CPU swap-restore | **MEASURED** (TIER5A) |
-| KVPro inside the LMCache offload path | **PROJECTED — not built** |
-| KVPro vs CacheGen (the warm-tier decider) | **NOT RUN — top open item** |
-| Warm-tier *systems* metrics (bytes stored / TTFT-with-reuse / NVMe+PCIe volume / p95-p99 / $/query) | **NOT MEASURED in a real offload stack** |
+| KVPro disk snapshot/restore byte-faithful (NVMe warm tier) | **MEASURED** (Phase-0, Qwen2.5-7B, 8 prefixes, both protect formats — `KVPRO_SNAPSHOT_ROUNDTRIP_POD_RUNBOOK.md`) |
+| KVPro vs CacheGen — **codec fidelity** (zero error on top-K channels vs CacheGen 0.0145) | **MEASURED** (real KV, June 2026) |
+| KVPro vs CacheGen — **end-to-end needle / TTFT at iso-bytes** | **OPEN — needs LMCache server (newer-driver pod)** |
+| KVPro inside the LMCache offload serving path | **PROJECTED — not built** (needs the int4 decode FA fork + scheduler injection) |
 
 > *Note on the warm-tier test design:* for a **fixed** codec, store→NVMe→reload is byte
 > round-tripping — quality after reload ≈ quality without it, and is already covered by the needle
@@ -954,10 +970,13 @@ it, and KVPro starts in-stack. This is a practical edge, not a codec claim.
 
 **What NOT to claim** ✗ "we invented hierarchical KV / cold storage" ✗ "KVPro extends the true
 context window" ✗ "KVPro is the densest codec" ✗ "KVPro owns full lifecycle management" ✗ "SAW
-can't enter vLLM/LMCache." **Claim instead:** *hierarchical KV memory is emerging as the long-context
-serving architecture; KVPro is a quality-safe compressed KV layer for it — reducing bytes moved per
-reused context while preserving hard-tail retrieval, measured to survive (Qwen2.5-7B) where cheap
-rotation-only INT4 collapsed.*
+can't enter vLLM/LMCache" ✗ "KVPro beats CacheGen end-to-end" (codec-fidelity favors KVPro on the tail,
+but the end-to-end needle win is **not yet measured** — CacheGen is denser and better on average).
+**Claim instead:** *hierarchical KV memory is emerging as the long-context serving architecture; KVPro
+is a quality-safe compressed KV layer for it, with two measured guarantees the incumbent lossy codecs
+lack — **(1) zero error on the high-attention K channels** (vs CacheGen's 0.0145, naive/SAW's collapse)
+and **(2) byte-faithful snapshot/restore for warm-tier reuse** (Phase-0, both protect formats). It
+trades raw density for those guarantees.*
 
 **One line for the deck:** *As long-context serving moves to GPU/CPU/NVMe KV hierarchies, the
 bottleneck becomes quality-safe KV movement. KVPro reduces the bytes moved per reused context while
