@@ -14,12 +14,16 @@
 > > "most token value per watt per user" (CNBC, interview with Elaine Yu, June 2026)
 >
 > Inference economics reduce to that ratio: **useful tokens delivered per joule,
-> per concurrent user.** int4_protected is built to move it on the very axes
+> per concurrent user.** int4_protected (product name: **KVPro** — the two names refer
+> to the same backend throughout this brief) is built to move it on the very axes
 > Srinivas names — and, decisively, without spending the **accuracy** term that
 > competitors trade away:
 >
-> - **per user / cost (shipped):** 1.83× denser KV-cache → more concurrent
->   long-context users on the same GPU.
+> - **per user / cost (shipped):** **~1.8× denser KV-cache (net)** → more concurrent
+>   long-context users on the same GPU. *Canonical density figure used throughout:*
+>   **2.0× raw KV slots, ~1.8× net of the sidecar tax** — measured 1.83× on Qwen
+>   (util 0.5, mml 8K, Phase 6L) and 1.75× on Llama-3.1-8B (util 0.85, mml 32K); both
+>   appear below tagged to their config.
 > - **token *value* / accuracy (shipped):** quality held at bf16 parity (MMLU/ARC
 >   0.0 pt; needle preserved). A cheap *wrong* token has no value — this is the
 >   wedge: fp8 and naive int4 buy density by spending accuracy; we don't.
@@ -106,7 +110,9 @@ vs bf16 (protection sidecars; Phase 6L live-measured the tax at
 **4.38 GB** at mml=8K) and is **decode-throughput-negative**: ~1.5–1.9×
 slower per-seq at low load, and at saturation Phase 6L measured **0.22×
 bf16 aggregate tok/s** (~9× slower per user) on the as-yet-unoptimized
-int4 decode path (see the capacity section). The win is
+int4 decode path — *this 0.22× is the **worst case** (deep saturation +
+long generation); the workload curve is 0.13×–0.54×, and short-output
+serving pays only ~0.54× (see the throughput section)*. The win is
 **fidelity-at-density**, not raw memory savings or throughput vs bf16.
 
 This brief documents the int4_protected backend: the calibration
@@ -694,14 +700,16 @@ The serving economics for long-context workloads are governed by
   of the 4.38 GB sidecar tax.
 - **But throughput-negative at saturation**: the same Phase 6L run
   measured int4 at **0.22× bf16 aggregate tok/s (~9× slower per user)**
-  on the unoptimized decode path. The density win is real; it currently
+  on the unoptimized decode path — the **worst case** (deep saturation +
+  long generation); short-output serving pays only ~0.54× (curve:
+  0.13×–0.54×, throughput section). The density win is real; it currently
   costs per-user latency at the saturated operating point.
 
 Translated to operator economics: a serving deployment at the KV
 block limit (the common case for production serving at peak load)
 can serve **~1.83× more concurrent long-context users per GPU** at
-near-bf16 output quality — but at ~0.22× the aggregate token rate until
-the int4 decode kernel is optimized. That makes the current demonstrated
+near-bf16 output quality — but at ~0.22×–0.54× the aggregate token rate
+(workload-dependent) until the int4 decode kernel is optimized. That makes the current demonstrated
 fit **throughput-insensitive, density-bound workloads** (offline eval,
 bulk summarization, agentic batch); interactive serving is gated on
 decode-kernel optimization.
@@ -790,93 +798,22 @@ Layer-1 compute on dequant — the disclosed tax). In the stack's own terms: *it
 doesn't make the fuel line faster — it makes the engine sip instead of guzzle,
 and packs 2× the fuel in the tank, without losing octane (quality).*
 
-### Logical vs physical density — and the honest NAND-tier limit
-
-> *Distinction + numbers from a June 2026 storage-extension study (NDOL). The storage figures
-> in this subsection are **analytical-model / SSD-simulator outputs (NDOL model + MQSim),
-> validation phase P0–P1 — NOT silicon-measured**, and are kept separate from the GPU-measured
-> KV results elsewhere in this brief.*
-
-There are **two different "densities,"** and only one of them is int4_protected's:
-
-- **Logical (quantization) density — the asset.** int4_protected stores **~1.8× fewer *bytes***
-  per KV token at preserved quality. This is **medium-agnostic** — the *same* 1.8× applies in
-  HBM, DRAM, or NAND. It is fundamentally an **HBM capacity + bandwidth play** (Layer ②); a NAND
-  tier simply inherits the identical 1.8×. **It is not a NAND innovation — it is the same
-  compression on a cheaper shelf.**
-- **Physical (cell) density — NOT ours, and capped.** Packing more bits per NAND cell
-  (SLC→TLC→QLC) is a NAND-only lever HBM does not have. A conservative ECC/RBER + endurance model
-  shows protect-mask-driven cross-tier placement yields only **~1.14× over a fair iso-reliability
-  baseline** (~2.0× vs bf16 once compounded with the logical 1.8×, modeled) — a **hardware
-  ceiling** (denser cells have higher raw error rates; ECC parity eats most of the gain), **not
-  patent-worthy, and a known technique** (unequal error protection). We do **not** claim a NAND
-  density innovation.
-
-**So the NAND angle's value is cost-tiering, not a new density mechanism.** int4_protected being
-~1.8× smaller *and* quality-stable is what makes it practical to park **warm / reused KV**
-(shared prefixes, multi-turn sessions) on cheap, high-capacity flash instead of HBM — HBM for
-hot KV, NAND for warm. The win is **$/GB of warm KV + reuse**, unlocked *by* the compression,
-not a flash-specific density claim. (Read-skip's traffic reduction was separately reproduced in
-an SSD simulator — modeled, load-dependent — consistent with the GPU-measured ~95%-fewer-reads.)
-
-**Honest limits of the NAND tier (modeled):**
-- Density on NAND = the same **1.8× logical**; the extra cell-tiering lever is **~1.14× and capped**.
-- NAND helps capacity and bus-transfer but does **nothing** for NAND array-read latency
-  (`t_R` ~50–100 µs) — a bottleneck HBM does not have.
-- **Endurance gates hot KV off QLC:** write-once-read-many keeps wear low, but per-request KV
-  churn exceeds QLC's ~1k-P/E budget (≈ *months* of life at ~10 DWPD, modeled) — so the flash
-  tier is for **warm/reused** KV, not per-request hot churn.
-
-### How int4_protected shifts the HBM↔NAND balance
-
-> *Strategic framing. The per-token transfer reduction and "warm-NAND viability" are projections
-> built on two **measured** anchors — 1.8× density; read-skip ~95%-fewer positions at 32K
-> (GPU-measured) — plus **modeled** storage economics (P0–P1).*
-
-The hierarchy's roles don't change — **HBM stays the active-compute tier; NAND stays the
-cold/warm capacity tier.** What int4_protected (+ read-skip) changes is the **cost of keeping KV
-far from compute**, which moves the boundary between them:
-
-- **1.8× fewer bytes** (logical density, measured) **× read-skip fetching only the retained
-  positions** (~95% fewer at 32K, GPU-measured) ⇒ per-token HBM↔NAND transfer shrinks **~20–35×**
-  (modeled). Lower bring-back cost ⇒ KV can profitably live *further* from compute.
-
-Three balance shifts follow:
-1. **HBM spills later** — denser resident KV + a lighter feed keep more concurrency/context in HBM
-   before any offload (work pushed *up* the stack).
-2. **The crossover becomes worth paying for** — at bf16 the HBM↔NAND round-trip is too expensive
-   to tier warm KV; at ~20–35× less transfer it pays off, turning NAND from "archive you avoid
-   touching" into a **usable warm tier**.
-3. **NAND widens from cold → warm/reused** — shared prefixes, multi-turn sessions, and persisted
-   long context become economical to park on flash and stream back on demand.
-
-Mapped to NAND's roles: **scalability** (~2× parked context/sessions per GB), **long-context
-persistence** (smaller payload + restore only the attended positions), **edge** (context that
-won't fit in bf16 HBM fits in int4_protected, or persists on local flash and streams slices).
-
-**It moves boundaries, not tiers (guardrails):** NAND stays warm/cold — int4_protected does
-nothing for NAND array-read latency (`t_R` ~50–100 µs vs HBM ns); attention still needs the
-active KV in HBM. The density is medium-agnostic (it aids HBM *identically* — not a NAND-specific
-boost). QLC endurance keeps the flash tier to **warm/reused**, not per-request churn. read-skip
-selection is approximate (quality-equivalent on tested workloads, not bit-exact).
-
-**One line:** *int4_protected + read-skip don't add or speed up a tier — they lower the cost of
-distance from compute, so the hot/warm line moves: HBM holds more before spilling, and the spill
-target becomes a viable warm, reusable NAND tier instead of cold archive — at quality parity.*
-
-### Why hierarchical KV memory is the market — and KVPro is its reliability layer
+### The warm tier — where compression unlocks cheaper KV reuse (LMCache *and* NAND)
 
 > *Strategic framing (June 2026). The market shift is **EXTERNAL and real** (vLLM/LMCache ship
-> hierarchical KV today). KVPro's fit is anchored on **MEASURED** quality (this brief, 4 models) +
-> the **MEASURED** SAW-INT4 head-to-head (n=1, Qwen2.5-7B). KVPro-inside-LMCache integration and
-> warm-tier economics are **PROJECTED, not built** — labeled in the scope table below.*
+> hierarchical KV today). KVPro's fit is anchored on **MEASURED** results (quality on 4 models; the
+> SAW-INT4 head-to-head n=1; KVPro-vs-CacheGen codec fidelity; byte-faithful snapshot). KVPro-inside-
+> LMCache **serving** and the **NAND** economics are **PROJECTED / modeled** — labeled below. The NAND
+> figures are **analytical-model / SSD-simulator (NDOL + MQSim, P0–P1), NOT silicon-measured.***
 
 **The shift: long-context serving is becoming a KV-cache *lifecycle* problem, not a GPU-memory
 problem.** Production stacks (vLLM + LMCache) now treat the KV cache as a managed object that moves
 across tiers — **GPU HBM (hot) → CPU DRAM (warm) → NVMe / local / remote (cold/reused)** — to reuse
 expensive prefill, keep long sessions alive, and serve repeated document/agent contexts without
-recomputing the prefix. This is becoming **infrastructure**; we do **not** claim to have invented KV
-offload.
+recomputing the prefix. A **physical NAND/flash tier** is just the same idea one shelf lower. Both are
+instances of one thesis: *compression that stays quality-safe makes keeping KV far from compute cheap
+enough to be worth it.* This is becoming **infrastructure**; we do **not** claim to have invented KV
+offload — the differentiator is the **quality-safe payload**, not the plumbing.
 
 ```
    User / Agent / RAG workload
@@ -948,6 +885,19 @@ a vLLM-FA fork + impl swap — so it sits in the **same ecosystem as LMCache** (
 **SGLang-oriented**; its LMCache/vLLM warm-tier compatibility is **unproven for it**. We do **not**
 claim "SAW can't enter" (almost anything is adaptable with engineering) — only that the burden is on
 it, and KVPro starts in-stack. This is a practical edge, not a codec claim.
+
+**On the NAND/flash tier specifically (modeled, NDOL+MQSim P0–P1 — not silicon).** The same warm-tier
+logic extends one shelf lower, with two honest caveats:
+- **It's logical density, medium-agnostic — not a NAND innovation.** The ~1.8× byte reduction applies
+  identically in HBM/DRAM/NAND; a flash tier just inherits it on a cheaper shelf. The *physical* cell
+  lever (SLC→TLC→QLC, protect-mask placement) adds only **~1.14× over a fair iso-reliability baseline**
+  (≈2.0× vs bf16 compounded) — a hardware ceiling (ECC parity eats the gain), a **known technique**, not
+  patent-worthy. We claim cost-tiering, not a flash density mechanism.
+- **Flash is warm-only.** It does nothing for NAND array-read latency (`t_R` ~50–100 µs vs HBM ns), and
+  QLC endurance (~1k P/E ≈ months at ~10 DWPD) gates per-request hot churn off it. The payoff: 1.8× fewer
+  bytes × read-skip's ~95%-fewer positions ⇒ **~20–35× less HBM↔NAND transfer per token (modeled)**,
+  which is what turns flash from "cold archive" into a viable warm/reused tier — boundaries move, tiers
+  don't.
 
 **Honest scope — what is and isn't built:**
 
@@ -1025,6 +975,9 @@ tax, vs KVPro's 1.75× net) for quality-tolerant traffic; it does not replace
 bf16 for speed or KVPro for hard-gated quality. The bf16/KVPro split stands.
 
 **The economics on one A100-80G (measured, Llama-3.1-8B, util 0.85, mml 32K):**
+*(Net density here is **1.75×** for this specific config — Llama, util 0.85, mml 32K;
+the canonical headline is ~1.8× net / 2.0× raw, which lands at 1.83× for the Qwen util-0.5
+config. Both are measured; the spread is the sidecar tax's share of different pool sizes.)*
 
 | Metric | bf16 | KVPro | Ratio |
 |---|---|---|---|
