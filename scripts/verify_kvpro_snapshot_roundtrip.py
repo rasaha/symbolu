@@ -132,7 +132,10 @@ def main(argv=None) -> int:
     ap.add_argument("--max-model-len", type=int, default=1024)
     ap.add_argument("--gpu-mem-util", type=float, default=0.5)
     ap.add_argument("--prompt", default="The secret access code is 60494. " * 40)
-    ap.add_argument("--max-tokens", type=int, default=8)
+    ap.add_argument("--max-tokens", type=int, default=1,
+                    help="1 = prefill-only (populates KV via the WRITE path, no decode). "
+                         ">1 triggers the int4 decode read kernel (needs the vllm-flash-attn "
+                         "int4 fork). Phase-0 only needs prefill writes, so default 1.")
     ap.add_argument("--n-blocks", type=int, default=8, help="how many written blocks to round-trip")
     ap.add_argument("--snapshot-path", default="/tmp/kvpro_prefix_snapshot.pt")
     args = ap.parse_args(argv)
@@ -178,9 +181,19 @@ def main(argv=None) -> int:
                  "(default /workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt) or run Phase 5B.0.")
         _die(f"Int4ProtectedLLM construction failed ({type(e).__name__}: {e}).")
 
-    print(f"[2/6] short prefill+decode (max_tokens={args.max_tokens}) to populate KV ...")
-    out = llm.generate([args.prompt], SamplingParams(temperature=0.0, max_tokens=args.max_tokens))
-    print(f"      generated: {out[0].outputs[0].text[:60]!r}")
+    print(f"[2/6] prefill (max_tokens={args.max_tokens}) to populate KV via the write path ...")
+    try:
+        out = llm.generate([args.prompt], SamplingParams(temperature=0.0, max_tokens=args.max_tokens))
+        print(f"      generated: {out[0].outputs[0].text[:60]!r}")
+    except Exception as e:  # noqa: BLE001
+        if "flash_attn_with_int4_kvcache" in str(e) or "_read_decode" in str(e):
+            _die(f"int4 DECODE kernel missing ({type(e).__name__}: {e}).\n"
+                 "  This pod has stock vllm.vllm_flash_attn, not the int4 fork that provides "
+                 "flash_attn_with_int4_kvcache.\n"
+                 "  Phase-0 does NOT need decode — re-run with --max-tokens 1 (prefill-only) to "
+                 "populate KV via the WRITE path and skip this kernel. (The decode/serving kernel "
+                 "is only needed later for the CacheGen comparison arms, not for the byte-clean gate.)")
+        _die(f"prefill failed ({type(e).__name__}: {e}).")
     if os.path.exists(native_dump):
         print(f"[ok] native writer dump produced at {native_dump} (write path confirmed firing)")
     else:
