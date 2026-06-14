@@ -17,6 +17,33 @@ real hardware**, on KV produced by `Qwen/Qwen2.5-7B-Instruct`. This is the gate 
 protocol (`docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.md` §Phase 0) requires **before** any CacheGen
 comparison and before wiring `cachegen_warmtier_eval roundtrip --backend kvpro`.
 
+## SYSTEMS measurement (storage path) — MEASURED 2026-06-14
+`scripts/measure_kvpro_warmtier_snapshot.py`, Qwen2.5-7B-Instruct, A100-80GB, 8 prefixes ×
+16 blocks (layer 0), `--reps 60`:
+
+| metric | value |
+|---|---|
+| all byte-clean (8 prefixes) | **True** |
+| bytes/token *(single layer)* | 215.86 B |
+| bytes/block | 23,704 B |
+| encode throughput | 47.5 MB/s |
+| reload throughput | 53.4 MB/s |
+| reload s / 1k tokens *(single layer)* | 0.0040 s |
+| reload p50 / p95 (per 16-block prefix) | 6.9 / 7.2 ms |
+
+**Two caveats that MUST travel with these numbers:**
+1. **Single-layer.** The script snapshots ONE layer's writer+kv_cache (layer 0). A real warm-tier
+   snapshot is **all layers** → multiply the footprint by `num_layers` (≈28 for Qwen2.5-7B):
+   full-model snapshot ≈ **~6.0 KB/token**. (bf16 full KV ≈ 56 KB/token; the snapshot stores the
+   packed int4 nibbles + 5 sidecars.)
+2. **`torch.save`/`load`-bound, NOT NVMe bandwidth.** 47–53 MB/s reflects Python pickle serialization
+   + the restore tensor copies, not raw flash bandwidth (NVMe is GB/s). Treat these as a **conservative
+   floor**; a production path (safetensors / raw tensor write / pinned-memory DMA) would be much faster.
+
+So this establishes: the primitive is **byte-clean at scale (8 prefixes, both protect formats)** and
+gives a **footprint** number + a **serialization-bound throughput floor** — not yet a tuned-storage or
+full-model figure, and not the serving TTFT/quality (those need the decode FA fork + scheduler injection).
+
 Script: `scripts/verify_kvpro_snapshot_roundtrip.py` (fails loudly if the live writer / kv_cache /
 written blocks can't be obtained — it never fakes tensors).
 
