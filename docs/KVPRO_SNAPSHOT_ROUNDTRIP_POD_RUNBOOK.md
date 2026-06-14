@@ -7,8 +7,10 @@
 > (`packed_k, packed_v, k_scale, k_xmin, k_protect, v_scale, v_xmin` all `True`). The snapshot/restore
 > primitive (`kv_policy/tier5b_snapshot.py`) is byte-faithful on hardware. Run on commit `1a5f2fe`.
 > Prefill-only (`--max-tokens 1`); the int4 *decode* FA fork was absent and is **not needed** for this
-> gate (only for the later CacheGen comparison arms). *Open follow-up: re-run with
-> `INT4_PROTECTED_PROT_INT8=1` to also exercise the uint8 protect format.*
+> gate (only for the later CacheGen comparison arms).
+> **Both protect formats verified:** `prot_int8=False` (bf16) AND `prot_int8=True` (uint8, via
+> `INT4_PROTECTED_PROT_INT8=1`) both PASS clean across all 7 tensors — confirms the byte-clean restore
+> holds under the uint8 protect format (quantize∘dequant is identity on the code lattice).
 
 Proves `kv_policy.tier5b_snapshot` (snapshot/restore of int4_protected KV) is **byte-faithful on
 real hardware**, on KV produced by `Qwen/Qwen2.5-7B-Instruct`. This is the gate the warm-tier

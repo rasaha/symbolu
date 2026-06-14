@@ -190,6 +190,10 @@ def kvpro_snapshot_backend(*, snapshot_dir: Optional[str] = None, **kw) -> dict:
         into them, then serve the query attending over the restored KV.
     Both need handles into the engine's block manager / writer registry, which is the
     integration this raises on. Until wired, use kvpro_apc_backend for the quality + TTFT
-    columns (HOT reuse); this snapshot path adds the true NVMe bytes/transfer columns.
+    columns (HOT reuse).
+
+    The SYSTEMS columns of this path (bytes/token, encode/reload throughput, transfer) ARE
+    measurable today WITHOUT the decode kernel or scheduler injection — run
+    `scripts/measure_kvpro_warmtier_snapshot.py` (Phase-0 PASSED 2026-06-14; see the runbook).
     """
     raise NotImplementedError(kvpro_snapshot_backend.__doc__)
