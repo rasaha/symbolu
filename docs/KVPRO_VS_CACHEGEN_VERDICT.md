@@ -1,10 +1,31 @@
-# KVPro vs CacheGen — Verdict (DIRECTIONAL, mechanism-grounded)
+# KVPro vs CacheGen — Verdict (DIRECTIONAL, mechanism + codec-fidelity measured)
 
-**Status: DIRECTIONAL VERDICT (2026-06-14).** Grounded in (a) CacheGen's *actual* mechanism read from
-its shipped config, (b) three prior MEASURED head-to-heads against structurally-identical codecs, and
-(c) KVPro's MEASURED lossless warm-reuse + footprint. **Not yet an end-to-end CacheGen run** — that is
-blocked on this pod by an environment wall (below) and needs Option A. Companion:
-`docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.md`, `docs/KVPRO_SNAPSHOT_ROUNDTRIP_POD_RUNBOOK.md`.
+**Status: DIRECTIONAL VERDICT (2026-06-14), now refined by a MEASURED codec-fidelity test.** Grounded in
+(a) CacheGen's *actual* mechanism (shipped config), (b) MEASURED KV-codec fidelity on real Qwen2.5-7B KV
+(`scripts/compare_kvpro_vs_cachegen_fidelity.py`), (c) KVPro's MEASURED lossless warm-reuse + footprint,
+and (d) three prior MEASURED head-to-heads. **Not yet an end-to-end needle run** (blocked on this pod —
+env wall below; needs Option A). Companion: `docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.md`.
+
+## MEASURED codec fidelity (real Qwen2.5-7B KV, 28 layers, 2026-06-14)
+| method | K bits/elem | K rel-err | **K rel-err@TOP** | V rel-err |
+|---|---|---|---|---|
+| CacheGen(bins=16) | 3.68 | 0.0557 | 0.0299 | 0.1020 |
+| CacheGen(bins=32) | 4.72 | 0.0270 | **0.0145** | 0.0493 |
+| naive_int4 | 4.00 | 0.0557 | 0.0299 | 0.1020 |
+| **KVPro(int4+protect)** | 4.48 | 0.0521 | **0.0000** | 0.1020 |
+
+**Refined read (this corrects the earlier "CacheGen will collapse like naive/SAW" framing — too strong):**
+1. **KVPro uniquely delivers zero error on the high-attention K channels** (`@TOP = 0.0000`) at
+   competitive bits (4.48). That is its protected-channel design, confirmed on real KV.
+2. **But CacheGen@32 is MORE faithful on average** (K 0.027 vs KVPro 0.052; V 0.049 vs 0.102) — KVPro
+   leaves its non-protected 96% at naive-int4 quality, while CacheGen spends bits more evenly.
+3. **CacheGen is a stronger codec than naive/SAW:** its critical-channel error (0.0145 @bins32) is HALF
+   of naive int4's (0.0299) — so it is NOT obviously in the hard-tail-collapse bucket the way naive int4
+   and SAW were.
+4. So the question narrows to: **does KVPro's zero-error-on-top-K beat CacheGen's lower-average-error-
+   but-small-nonzero-on-top-K?** For retrieval (dominated by high-magnitude K channels) the mechanism
+   favors KVPro — but the margin is far SOFTER than vs naive/SAW, and only the end-to-end needle run
+   settles whether 0.0145 top-channel error is benign or breaks the tail.
 
 ## What CacheGen actually is (verified from lmcache 0.4.7 on the pod)
 `lmcache/v1/storage_backend/naive_serde/cachegen_{encoder,decoder,basics}.py`. `CacheGenConfig` =
@@ -62,8 +83,19 @@ Until these run, the verdict is directional, not a measured DOMINATED/QUALITY-ED
   driver). There the LMCache+CacheGen server + the arms in `ndol/experiments/cachegen_warmtier_eval.py`
   run directly — real bytes + hard-needle + TTFT, no internal-API guessing. Then map to the decision rule.
 
-## Bottom line
-On the evidence we have, **KVPro is the quality-safe choice and CacheGen the denser-but-lossy one**, and
-the decider (does CacheGen's loss break the hard tail at iso-bytes?) points — by mechanism and by three
-measured analogues — to **KVPro holding the tail where CacheGen would not.** A newer-driver pod converts
-this directional verdict into a measured one.
+## Bottom line (refined by the fidelity measurement)
+**KVPro has a real, unique, measured advantage: guaranteed zero error on the attention-critical K
+channels at competitive bits.** CacheGen does not eliminate that error — but it is a capable codec
+(better *average* fidelity, only ~0.0145 critical-channel error at bins=32), **not** the obvious-collapse
+case naive int4 / SAW were. So:
+- If hard-tail retrieval is dominated by exact preservation of the top-K channels (which the three prior
+  collapses suggest), **KVPro is better for the tail** — its 0.0 vs CacheGen's 0.0145.
+- But CacheGen's critical-channel error is small and its average fidelity is higher, so a **measured
+  end-to-end win is NOT guaranteed** and would be by a smaller margin than vs SAW. It is genuinely open.
+- KVPro also uniquely offers **lossless warm reuse** (proven) — orthogonal to raw fidelity, a real
+  systems guarantee CacheGen's lossy codec cannot make.
+
+**Honest one-liner:** KVPro concentrates fidelity exactly where attention is most sensitive (zero error
+on top-K channels) and guarantees lossless reuse; CacheGen spends bits more evenly and is denser, with
+small-but-nonzero error on those critical channels. Whether KVPro's concentration wins end-to-end is the
+open question — settle it with the needle run on a newer-driver pod (Option A).
