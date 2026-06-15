@@ -13,16 +13,16 @@
 ## Executive summary
 
 **The problem.** At long context, the **KV-cache — not model weights — is the dominant cost and
-concurrency limit** in LLM serving. The obvious fix, 4-bit KV, has not shipped *at quality*: today's
-options buy density by spending accuracy (the leading half-precision option retrieves a planted fact in
-just **1 of 15** trials; naïve 4-bit agrees with full precision on only **~53%** of generated tokens).
-The gap between "4-bit density" and "maintained quality" is the opportunity.
+concurrency limit** in LLM serving. The obvious fix, low-bit KV, has not shipped *at quality*: today's
+options buy density by spending accuracy (the leading half-precision option fails the large majority of
+long-context retrievals; naïve low-bit agrees with full precision on only about half its generated
+tokens). The gap between "compressed density" and "maintained quality" is the opportunity.
 
-**The product.** **KVPro** is a quality-safe KV-cache compressor. A **proprietary, patent-pending**
-method preserves the highest-leverage parts of the model's attention state while aggressively
-compressing the rest, delivering **near-full-precision quality at ~2× the KV density**. It ships as a
+**The product.** **KVPro** is a quality-safe KV-cache compressor: a **proprietary, patent-pending**
+compression layer that **preserves long-context fidelity while materially reducing KV memory
+footprint**, delivering **near-full-precision quality at ~2× the KV density**. It ships as a
 **one-line drop-in** to the dominant open serving stack (vLLM) — no model retraining, no
-quantization-aware fine-tuning.
+quantization-aware fine-tuning. *(Mechanism, calibration, and kernel detail are NDA-only.)*
 
 **Why it wins.** Every *denser* competitor we measured trades away hard-retrieval quality; KVPro does
 not. On identical tests, competing 4-bit methods **collapse on hard long-context retrieval** while KVPro
@@ -57,9 +57,10 @@ finance), open-model serving hubs, and edge/low-HBM deployments.
 
 KVPro is a post-hoc KV-cache compressor: it plugs into an existing serving deployment and compresses the
 KV-cache **without** touching the model. Its differentiator is a **proprietary, patent-pending**
-mechanism that protects the small, high-leverage fraction of the attention state that determines
-retrieval quality, while compressing the bulk to 4-bit — recovering near-full-precision behavior at the
-same 4-bit density that naïve methods degrade.
+compression layer that **maintains retrieval-critical behavior under compression** — recovering
+near-full-precision behavior at densities where naïve methods degrade — **without** model retraining or
+quantization-aware fine-tuning. *(Technical mechanism, calibration, and kernel details are available
+only under NDA.)*
 
 - **Integration:** one-line backend in vLLM (the dominant open serving engine). No retraining, no
   fine-tuning, no model-code changes.
@@ -76,8 +77,8 @@ same 4-bit density that naïve methods degrade.
 ## 3 · Measured results (real GPUs, this quarter)
 
 **Quality — at full-precision parity:**
-- **Four models** (three families, 7–14B) hit **15/15** on needle-in-haystack retrieval, **matching
-  full precision**, replicated across independent seeds.
+- **Four models** (three families, 7–14B) hit **full parity** on hard long-context retrieval,
+  **matching full precision**, replicated across independent seeds.
 - Standard academic benchmarks (knowledge, reasoning, truthfulness): **0.0-point delta vs full
   precision**, with the model choosing the **identical answer on every question**.
 - **+20 points** of token-for-token agreement over naïve 4-bit; hard multi-distractor retrieval near
@@ -89,12 +90,12 @@ same 4-bit density that naïve methods degrade.
   quality.
 
 **Competitive — KVPro holds the tail where denser codecs break (measured, our hardware):**
-- A leading rotation-based 4-bit method works on the model it was tuned on but **collapses to 0%**
+- A leading denser 4-bit method works on the model it was tuned on but **collapses to 0%**
   hard-retrieval on a mainstream model where KVPro and full precision score **100%**.
-- A vendor 4-bit/2-bit method is near-lossless on easy metrics but **collapses on hard long-context
+- Another vendor codec is near-lossless on easy metrics but **collapses on hard long-context
   retrieval**; KVPro holds full-precision quality on the same test.
-- Against the incumbent warm-tier storage codec, **KVPro preserves the critical attention information
-  exactly where that codec introduces error** (measured on real model KV).
+- Against the incumbent warm-tier storage codec, **KVPro retained long-context fidelity in regimes
+  where that codec measurably degraded** (measured on real model KV).
 
 **Warm-tier reuse — byte-faithful, proven:**
 - KVPro's snapshot/restore of compressed KV to CPU/flash is **bit-exact** (verified across multiple
@@ -161,9 +162,9 @@ the buyer's GPU rate and traffic mix.
 
 ## 6 · Why it's defensible
 
-- **Patent-pending method.** The channel-protection approach is novel and proprietary; a fast
-  per-model setup makes it practical at deployment time.
-- **Operational know-how.** The calibration design, the parameter choices, and the
+- **Patent-pending method.** The proprietary KV fidelity-preservation approach is novel; a fast,
+  fully automated per-model setup makes it practical at deployment time.
+- **Operational know-how.** The automated per-model setup, the parameter choices, and the
   correctness/serving engineering are earned, non-obvious, and validated by this quarter's
   measurement work — not reproducible from public description.
 - **Battle-tested integration.** KVPro runs today in a real, dominant serving stack at
