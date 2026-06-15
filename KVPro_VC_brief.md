@@ -14,14 +14,14 @@
 
 **The problem.** At long context, the **KV-cache — not model weights — is the dominant cost and
 concurrency limit** in LLM serving. The obvious fix, low-bit KV, has not shipped *at quality*: today's
-options buy density by spending accuracy (the leading half-precision option fails the large majority of
-long-context retrievals; naïve low-bit agrees with full precision on only about half its generated
+options buy density by spending accuracy (a leading compressed-KV method fails the large majority of
+hard long-context retrievals; naïve low-bit agrees with full precision on only about half its generated
 tokens). The gap between "compressed density" and "maintained quality" is the opportunity.
 
 **The product.** **KVPro** is a quality-safe KV-cache compressor: a **proprietary, patent-pending**
 compression layer that **preserves long-context fidelity while materially reducing KV memory
 footprint**, delivering **near-full-precision quality at ~2× the KV density**. It ships as a
-**one-line drop-in** to the dominant open serving stack (vLLM) — no model retraining, no
+**drop-in backend path** for the dominant open serving stack (vLLM) — no model retraining, no
 quantization-aware fine-tuning. *(Mechanism, calibration, and kernel detail are NDA-only.)*
 
 **Why it wins.** Every *denser* competitor we measured trades away hard-retrieval quality; KVPro does
@@ -30,8 +30,9 @@ holds full-precision-level accuracy. That reliability — *quality you can trust
 wedge in a market where a cheap **wrong** token has no value.
 
 **The expansion.** As serving moves to tiered KV memory (GPU → CPU → flash), the bottleneck becomes
-**quality-safe KV movement**. **KVPro WarmTier** extends the product to store and reuse compressed KV
-across sessions with a **byte-faithful** guarantee — proven — so reused context loses **zero** quality.
+**quality-safe KV movement**. **KVPro WarmTier** stores and reuses compressed KV across sessions with
+**byte-faithful snapshot/restore** (proven), so **CPU/flash movement introduces no additional quality
+loss beyond KVPro's already-measured in-GPU path**.
 
 **The ask.** Funding for **v2 productionization** (throughput recovery, tensor parallelism, KVPro
 WarmTier serving) and a **production design partner** to convert "shipped at near-full-precision
@@ -62,7 +63,7 @@ near-full-precision behavior at densities where naïve methods degrade — **wit
 quantization-aware fine-tuning. *(Technical mechanism, calibration, and kernel details are available
 only under NDA.)*
 
-- **Integration:** one-line backend in vLLM (the dominant open serving engine). No retraining, no
+- **Integration:** drop-in backend path for vLLM (the dominant open serving engine). No retraining, no
   fine-tuning, no model-code changes.
 - **Generality:** a fast, fully automated per-model setup; validated across three model families and
   two scales with no per-family tuning.
@@ -99,20 +100,21 @@ only under NDA.)*
 
 **Warm-tier reuse — byte-faithful, proven:**
 - KVPro's snapshot/restore of compressed KV to CPU/flash is **bit-exact** (verified across multiple
-  prefixes and configurations), so **reused context loses zero quality** — a guarantee lossy
-  compressors cannot make.
+  prefixes and configurations), so **CPU/flash movement introduces no additional quality loss beyond
+  KVPro's already-measured in-GPU path** — something lossy compressors cannot offer.
 
 ---
 
 ## 4 · The honest trade-off
 
-We disclose the cost plainly: on the current (unoptimized) decode path, KVPro is
-**throughput-negative — roughly 0.13–0.67× full-precision tokens/sec depending on workload**
-(worst case at long generation under deep saturation; best at short-output, high-concurrency traffic).
-KVPro buys **capacity and quality**, not raw per-stream speed. The economics still win on **$/request**
-for the large and growing class of memory-bound, long-context, high-fan-out workloads — which is the
-target segment, served by routing. Decode-throughput recovery is a funded v2 item with a measured upside
-bound (it improves, but does not reach full-precision parity — stated honestly).
+KVPro is designed for **routing**: memory-bound, long-context traffic goes to KVPro; latency-critical
+single-stream traffic stays on full precision. In the current (unoptimized) decode path, KVPro is
+**below full-precision throughput — roughly 0.13–0.67× depending on workload** (best at short-output,
+high-concurrency traffic; worst at long generation under deep saturation) — while delivering **~1.8× net
+resident capacity**. The v1 product therefore targets workloads where **HBM residency, not raw decode
+speed, is the binding constraint**, and wins on **$/request** there. Decode-throughput recovery is a
+funded v2 item with a measured (bounded) upside — it improves but does not reach full-precision parity;
+stated honestly.
 
 ---
 
@@ -143,9 +145,9 @@ reduction is the measured, rate-independent result**; only the dollar figure mov
 | 10,000 | ~400 | ~$5.3M |
 
 **Where we deliberately under-promise:**
-- Savings apply to **memory/capacity-bound** serving only. KVPro is **throughput-negative** (§4), so for
-  **throughput-bound or latency-critical** traffic it is *not* routed and is credited **zero** — that
-  traffic is excluded entirely from the table.
+- Savings apply to **memory/capacity-bound** serving only. KVPro is **below full-precision throughput**
+  on the current path (§4), so **throughput-bound or latency-critical** traffic is *not* routed to it and
+  is credited **zero** — that traffic is excluded entirely from the table.
 - If only **half** of a deployment's long-context traffic is capacity-bound (a conservative split),
   **halve every figure** — KVPro still removes **~20%** of the GPU bill for that workload.
 - The table **excludes the second lever**: prefix / KV **reuse** (KVPro WarmTier). For shared-document
@@ -164,7 +166,7 @@ the buyer's GPU rate and traffic mix.
 
 - **Patent-pending method.** The proprietary KV fidelity-preservation approach is novel; a fast,
   fully automated per-model setup makes it practical at deployment time.
-- **Operational know-how.** The automated per-model setup, the parameter choices, and the
+- **Operational know-how.** The automated per-model setup, the deployment configuration, and the
   correctness/serving engineering are earned, non-obvious, and validated by this quarter's
   measurement work — not reproducible from public description.
 - **Battle-tested integration.** KVPro runs today in a real, dominant serving stack at
@@ -184,23 +186,34 @@ NVMe/flash), where expensive prefill work is stored and **reused** across reques
 movement**, and the winning component is the one that compresses, stores, reloads, and reuses KV
 **without breaking quality**.
 
-KVPro WarmTier is built for exactly this: a quality-safe compressed KV format with a **byte-faithful
-reuse guarantee** (proven), positioned as the **reliability layer** on top of the KV-offload plumbing
+KVPro WarmTier is built for exactly this: a quality-safe compressed KV format whose **snapshot/restore
+is byte-faithful** (proven) — CPU/flash movement adds no quality loss beyond KVPro's in-GPU path, positioned as the **reliability layer** on top of the KV-offload plumbing
 the ecosystem already provides. *(Full end-to-end warm-tier serving integration is in progress;
 near-term results are scoped.)*
 
 ---
 
-## 8 · Traction
+## 8 · Traction & technical milestones
 
-[TRACTION — pilots / design partners / LOIs / usage / inbound. If pre-traction, state the
-proof-of-technology milestones reached this quarter and the named partners in conversation.]
+Pre-revenue; this quarter's progress is **proof-of-technology**, on real GPUs:
+- KVPro integrated into the vLLM serving path and running at near-full-precision long-context quality.
+- **Four models across three families (7–14B)** validated at full-precision long-context retrieval parity.
+- **~2× raw / ~1.8× net** resident KV capacity measured on real H100/A100 GPUs, under sustained saturation.
+- **Head-to-head comparisons completed** against leading compressed-KV alternatives (they break on the
+  hard tail where KVPro holds).
+- **KVPro WarmTier** snapshot/restore verified **byte-faithful** across multiple configurations.
+- **v2 scope defined:** decode-throughput recovery, tensor parallelism, 70B-class support, WarmTier
+  serving, and design-partner deployment.
+
+*[Commercial traction — design partners / pilots / LOIs / inbound — to be added as it lands.]*
 
 ---
 
 ## 9 · Team
 
-[TEAM — founders + key technical hires; relevant background in ML systems / inference / kernels.]
+*[To be completed by the founder — founders + key technical hires, with relevant background in ML
+systems / inference / GPU kernels. A short, honest version beats a placeholder; this is the one section
+that must reflect the real team.]*
 
 ---
 
