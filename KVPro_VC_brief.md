@@ -145,9 +145,9 @@ reduction is the measured, rate-independent result**; only the dollar figure mov
 | 10,000 | ~400 | ~$5.3M |
 
 **Where we deliberately under-promise:**
-- Savings apply to **memory/capacity-bound** serving only. KVPro is **throughput-negative** (§4), so for
-  **throughput-bound or latency-critical** traffic it is *not* routed and is credited **zero** — that
-  traffic is excluded entirely from the table.
+- Savings apply to **memory/capacity-bound** serving only. KVPro is **below full-precision throughput**
+  on the current path (§4), so **throughput-bound or latency-critical** traffic is *not* routed to it and
+  is credited **zero** — that traffic is excluded entirely from the table.
 - If only **half** of a deployment's long-context traffic is capacity-bound (a conservative split),
   **halve every figure** — KVPro still removes **~20%** of the GPU bill for that workload.
 - The table **excludes the second lever**: prefix / KV **reuse** (KVPro WarmTier). For shared-document
