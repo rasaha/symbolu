@@ -19,7 +19,8 @@ produced**; the four labels are never conflated._
 |---|---|---|---|
 | 1. Simulation (19 scenarios) | `simulated` | ✅ **Done** | 0 catastrophic/severe/SLO regressions; guard blocked 87/649 scale-outs (13.4%). `cloud_controller/observability/edge_cases.py` |
 | 2. Real production-trace replay (offline) | `real-trace-replay` | ✅ **Done (self-run)** | Azure LLM/LMM inference traces; multimodal 1M requests/7 days: 80/2,537 blocked, +0.01pp SLO, 0.74% replica-cycles saved. `artifacts/cloud_controller_real_validation/track_b_trace_replay.md` |
-| 3. Live shadow on a real cluster under fault injection (self-run) | `live-shadow-self-run` | 🟡 **Harness built; wiring proven; execution pending a Docker host** | `deploy/local-shadow/` + `tests/cloud_controller/test_shadow_integration.py` (real-HTTP stub) |
+| 2.5 Estimator/guard calibration vs **real system dynamics** (non-k8s) | `real-dynamics-calibration` | ✅ **Done (self-run)** | Real concurrent service; tail latency emerges from real queuing. 0 harmful FP / 0 SLO regressions; guard caught real futility only at *severe* over-provisioning. `artifacts/cloud_controller_real_validation/realdyn_calibration.md` |
+| 3. Live shadow on a real cluster under fault injection (self-run) | `live-shadow-self-run` | 🔴 **NOT done — impossible in this sandbox.** Harness built + wiring proven only | `deploy/local-shadow/` + `tests/cloud_controller/test_shadow_integration.py` (real-HTTP stub); container registries are egress-blocked, so no cluster can be created here |
 | 4. Independent third-party telemetry | `third-party` | ❌ **PENDING** | none — requires an external design partner |
 
 ## What is now real (was synthetic before this work)
@@ -35,12 +36,34 @@ produced**; the four labels are never conflated._
   kube-prometheus-stack + Online Boutique + real HPA + Chaos Mesh) with a 1:1
   mapping from the 19 synthetic scenarios to real faults.
 
+## Rung 2.5 — calibration against real system dynamics (new)
+
+Rung 2 left the *system dynamics* modelled. Rung 2.5 closes that gap **without a
+cluster**: the estimator + guard were run against a real concurrent service whose
+tail latency *emerges* from real queuing (capacity-bound → scaling really helps;
+serialized bottleneck → throughput hard-capped at ~63 rps from 8→40 workers, so
+scaling really cannot help; plus a noisy case). It is **not** `live-shadow-self-run`
+(no k8s, no real HPA). Findings (`realdyn_calibration.md`):
+
+- **Safety strengthened on real dynamics:** where scaling truly helped, the
+  estimator never mislabeled a helpful scale-out as futile (wrong-on-help = 0) and
+  the guard stayed dormant — **0 harmful false positives, 0 SLO regressions** in
+  all four scenarios.
+- **Futility-catching is conservative live:** the guard caught real futility only
+  at *severe* over-provisioning (deep bottleneck: 19/19 blocks correct, 0 harmful);
+  at *moderate* over-provisioning it stayed dormant. The simulation's 13.4% block
+  rate does **not** reproduce on these real dynamics.
+- **Estimator recalibration flag:** NOT_HELPING is driven mainly by utilization
+  collapse; the estimator does not act on "latency flat despite scaling" alone.
+  Tuning the tentative-window thresholds is the recommended next step before any
+  claim of live futility-catching value.
+
 ## What is still synthetic / modelled (be honest about it)
 
 - **The demand→metric transfer function** in rung 2 is still the model the
   synthetic suite uses (latency bound by demand, not replica count). Only the
   *workload distribution* feeding it is real. So rung 2 closes the *distribution*
-  gap, not the *system-dynamics* gap.
+  gap; rung 2.5 (above) is what closes the *system-dynamics* gap — but off-cluster.
 - **The HPA baseline** in rung 2 is the standard threshold model, not real HPA
   telemetry.
 - **Rung 3 has not been executed** in this environment. We confirmed precisely
