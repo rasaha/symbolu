@@ -1,0 +1,5 @@
+config,auroc,auroc_ci_lo,auroc_ci_hi,auprc,n,n_positive,human_burden_to_catch_0.90,over_block_at_0.10,catch@0.05,catch@0.10,catch@0.20
+C1_approval_only,0.8056,0.5831,1.0000,0.6619,15,6,0.8667,0.1111,0.1667,0.1667,0.3333
+C2_approval_risk,0.8519,0.6400,1.0000,0.6885,15,6,0.5333,0.1111,0.1667,0.1667,0.3333
+C3_approval_risk_confidence,0.8333,0.5714,1.0000,0.7329,15,6,0.5333,0.1111,0.1667,0.1667,0.3333
+C4_plus_internal_signals,0.8519,0.6071,1.0000,0.7579,15,6,0.5333,0.1111,0.1667,0.1667,0.3333

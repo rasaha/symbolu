@@ -40,7 +40,9 @@ from experiments.signal_gov.dataset import (
     Scenario, category_balance, load_dataset, load_external,
 )
 from experiments.signal_gov.delong import delong_roc_test
-from experiments.signal_gov.features import FeatureVector, build_extractor
+from experiments.signal_gov.features import (
+    FeatureVector, build_extractor, write_features_jsonl,
+)
 from experiments.signal_gov.metrics import (
     BUDGETS_DEFAULT,
     bootstrap_ci,
@@ -87,7 +89,8 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         features_path: str | None = None, n_boot: int = 2000,
         make_plots: bool = True, checkpoint: str | None = None,
         real_cg_stub: bool = False, strict_signals: bool = False,
-        tier: str = "consumer", external_path: str | None = None) -> ExperimentResult:
+        tier: str = "consumer", external_path: str | None = None,
+        hf_model: str | None = None, hf_mock: bool = False) -> ExperimentResult:
     if dataset in ("agentdojo", "injecagent") and external_path:
         scenarios = load_external(dataset, external_path)
     else:
@@ -103,8 +106,15 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
 
     extractor = build_extractor(mode, seed=seed, features_path=features_path,
                                 checkpoint=checkpoint, use_stub=real_cg_stub,
-                                strict_signals=strict_signals, tier=tier)
+                                strict_signals=strict_signals, tier=tier,
+                                hf_model=hf_model, use_mock_hf=hf_mock)
     features = extractor.extract_all(scenarios)
+
+    # real_checkpoint_cached: persist the scenario-varying feature cache so C1-C4
+    # can be re-evaluated offline with `--mode cached --features <out>/features.jsonl`.
+    if mode == "real_checkpoint_cached":
+        out_dir.mkdir(parents=True, exist_ok=True)
+        write_features_jsonl(features, out_dir / "features.jsonl")
 
     scores_by_config = score_configs(scenarios, features)
     tiebreak = np.arange(len(scenarios), dtype=float)  # deterministic tie-break
@@ -233,21 +243,35 @@ def _write_report(results: Dict, path: Path) -> None:
                  f"({ds['positive_rate']*100:.0f}%)  ·  **Category balance:** {ds['category_balance']}")
     lines.append("")
     prov = str(meta.get("feature_provenance") or "")
-    if meta["mode"] != "real_cg":
-        lines.append("> ⚠️ **Not a result.** This run uses "
-                     f"`{meta['mode']}` features. The `mock` mode is SYNTHETIC and validates "
-                     "the harness only. Scientific conclusions require `real_cg` features, the "
-                     "full balanced benchmark, and a held-out split.")
-        lines.append("")
-    elif "stub" in prov:
-        lines.append("> ⚠️ **Plumbing validation, not evidence.** This `real_cg` run uses a "
-                     "deterministic STUB 32-D state (`StubCGLLMAdapter`), not live model "
-                     "inference. The internal-signal extraction path (sovereign_bridge → "
-                     "entropy/vritti adapters → JEPA) executes end-to-end, but the state is a "
-                     "FIXED fixture, so internal signals are constant across scenarios and "
-                     "carry NO discriminative claim. AUROC(C4)==AUROC(C3) is expected here. "
-                     "Evidence requires a real CG checkpoint + the full balanced benchmark + a "
-                     "held-out split.")
+    mode = meta["mode"]
+    disclaimer = None
+    if mode == "mock":
+        disclaimer = ("> ⚠️ **Not a result.** This run uses `mock` SYNTHETIC features and "
+                      "validates the harness only. Scientific conclusions require real "
+                      "features, the full balanced benchmark, and a held-out split.")
+    elif mode == "real_cg" and "stub" in prov:
+        disclaimer = ("> ⚠️ **Plumbing validation, not evidence.** This `real_cg` run uses a "
+                      "deterministic STUB 32-D state (`StubCGLLMAdapter`), not live inference. "
+                      "The extraction path (sovereign_bridge → entropy/vritti adapters → JEPA) "
+                      "executes end-to-end, but the state is a FIXED fixture, so internal "
+                      "signals are constant across scenarios and carry NO discriminative claim "
+                      "(AUROC(C4)==AUROC(C3) is expected). Evidence requires a real CG "
+                      "checkpoint + the full balanced benchmark + a held-out split.")
+    elif mode == "real_checkpoint_cached" or "real_checkpoint_cached" in prov or "PROXY" in prov:
+        is_mock = "mock-hf" in prov
+        disclaimer = ("> ⚠️ **" + ("Plumbing validation (mock backend), not evidence."
+                      if is_mock else "Pilot, not a full result.") + "** "
+                      "`real_checkpoint_cached`: `entropy` is REAL predictive entropy from the "
+                      "model logits, but `coherence`/`vritti`/`jepa` come from a hidden-state → "
+                      "32-D **PROXY** projection (unvalidated placeholder, NOT the CG path). "
+                      + ("The mock backend is deterministic and label-blind. " if is_mock else
+                         "Intended as a 30-50 scenario pilot before any 400-600 full run. ")
+                      + "No benchmark success claim.")
+    elif mode == "cached" and "stub" in prov:
+        disclaimer = ("> ⚠️ **Plumbing validation, not evidence.** Cached features were "
+                      "produced from a deterministic STUB CG state (no discriminative claim).")
+    if disclaimer:
+        lines.append(disclaimer)
         lines.append("")
     lines.append("## Ablation metrics")
     lines.append("")
@@ -297,7 +321,9 @@ def _write_report(results: Dict, path: Path) -> None:
 
 def _parse_args(argv=None):
     p = argparse.ArgumentParser(description="Signal-governance experiment harness")
-    p.add_argument("--mode", choices=["mock", "cached", "real_cg"], default="mock")
+    p.add_argument("--mode",
+                   choices=["mock", "cached", "real_cg", "real_checkpoint_cached"],
+                   default="mock")
     p.add_argument("--dataset", default="smoke",
                    help="handbuilt | smoke | agentdojo_fixture | injecagent_fixture | "
                         "external_fixtures | agentdojo | injecagent")
@@ -313,6 +339,10 @@ def _parse_args(argv=None):
     p.add_argument("--strict-signals", action="store_true",
                    help="real_cg: raise instead of fail-closed when a signal is missing")
     p.add_argument("--tier", default="consumer", help="governance tier for real_cg")
+    p.add_argument("--hf-model", default=None,
+                   help="stock HF model for --mode real_checkpoint_cached (Qwen/Llama/Mistral)")
+    p.add_argument("--hf-mock", action="store_true",
+                   help="real_checkpoint_cached via a deterministic mock backend (no torch)")
     p.add_argument("--n-boot", type=int, default=2000)
     p.add_argument("--no-plots", action="store_true")
     return p.parse_args(argv)
@@ -325,7 +355,8 @@ def main(argv=None) -> int:
               features_path=args.features, n_boot=args.n_boot,
               make_plots=not args.no_plots, checkpoint=args.checkpoint,
               real_cg_stub=args.real_cg_stub, strict_signals=args.strict_signals,
-              tier=args.tier, external_path=args.external_path)
+              tier=args.tier, external_path=args.external_path,
+              hf_model=args.hf_model, hf_mock=args.hf_mock)
     r = res.results
     print(f"[signal_gov] mode={args.mode} dataset={args.dataset} "
           f"N={r['dataset']['n_total']} unsafe={r['dataset']['n_positive']}")

@@ -403,7 +403,10 @@ def load_dataset(name: str) -> List[Scenario]:
     external data, call ``load_external(source, path=...)`` (or use
     ``run_experiment --dataset agentdojo --external-path ...``).
     """
-    if name == "handbuilt":
+    if name in ("handbuilt", "pilot"):
+        # "pilot" is the offline 15-scenario balanced stand-in. The real 30-50
+        # scenario pilot adds AgentDojo/InjecAgent exports (see EXTERNAL_BENCHMARKS.md)
+        # for the injection third plus more destructive/ambiguous scenarios.
         return load_handbuilt()
     if name == "smoke":
         return load_smoke()

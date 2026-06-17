@@ -24,6 +24,7 @@ make signal-gov-deps           # numpy, matplotlib, pytest
 make signal-gov-smoke          # deterministic CI smoke test (10 scenarios, mock features)
 make signal-gov-realcg-smoke   # LIVE internal-signal path via StubCGLLMAdapter (no torch/GPU)
 make signal-gov-external-smoke # AgentDojo/InjecAgent ingestion on offline fixtures
+make signal-gov-checkpoint-smoke # stock-model (Qwen/Llama/Mistral) path via mock backend
 make signal-gov-run            # full hand-built mini-set (mock) -> out/mock_handbuilt/
 make signal-gov-data           # (re)write the on-disk benchmark JSONL
 ```
@@ -71,6 +72,14 @@ zero-tuning variant (see the design doc).
 | `cached` | precomputed `features.parquet` / `.jsonl` | numpy (+pandas/pyarrow for parquet) |
 | `real_cg` (`--real-cg-stub`) | **LIVE** path: `StubCGLLMAdapter` fixed 32-D state → `sovereign_bridge` → entropy/vritti adapters → JEPA | numpy + in-repo agentic pkg (**no torch**) |
 | `real_cg` (live) | `MistralCGAdapter` forward pass → same bridge → signal adapters → JEPA | torch + CG checkpoint + agentic framework |
+| `real_checkpoint_cached` (`--hf-mock`) | stock-model path via deterministic mock backend (CI) | numpy + in-repo agentic pkg (**no torch**) |
+| `real_checkpoint_cached` (live) | Qwen/Llama/Mistral: REAL logit `entropy` + **PROXY** hidden-state vritti/JEPA; caches features for offline C1–C4 | torch + transformers + weights |
+
+The `real_checkpoint_cached` mode runs a stock model once and caches scenario-varying
+features for offline evaluation — the path to the **30–50 scenario pilot**. On a stock
+model only `entropy`/`text_confidence` are genuinely real; vritti/JEPA come from an
+unvalidated hidden-state→state **proxy**. See
+[`REAL_CHECKPOINT_CACHED.md`](REAL_CHECKPOINT_CACHED.md).
 
 The `real_cg` path is **wired and tested with deterministic stub state** — see
 [`REAL_CG_WIRING.md`](REAL_CG_WIRING.md) for the exact repo functions, what is real vs
@@ -189,7 +198,9 @@ experiments/signal_gov/
   data/handbuilt_miniset.jsonl   on-disk benchmark (generated from dataset.py)
   data/fixtures/{agentdojo,injecagent}_mini.json   tiny offline ingestion fixtures
   EXTERNAL_BENCHMARKS.md         ingestion format + source/category/oracle mapping
+  REAL_CHECKPOINT_CACHED.md      stock-model (Qwen/Llama/Mistral) cache workflow + pilot guide
   tests/test_external_loaders.py external ingestion tests
+  tests/test_real_checkpoint_cached.py  stock-checkpoint extraction tests (mock backend)
   sample_output/mock_smoke/      committed reference run (mock)
   sample_output/real_cg_stub_smoke/  committed reference run (real_cg via stub)
   tests/test_smoke.py            mock-mode CI smoke test

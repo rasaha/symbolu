@@ -84,6 +84,12 @@ def _stable_unit(*parts: str) -> float:
     return int.from_bytes(h[:8], "big") / float(1 << 64)
 
 
+def _stable_int(*parts: str) -> int:
+    """Deterministic 64-bit int from string parts (platform-independent)."""
+    h = hashlib.sha256("|".join(parts).encode("utf-8")).digest()
+    return int.from_bytes(h[:8], "big")
+
+
 def _clip01(x: float) -> float:
     return float(min(1.0, max(0.0, x)))
 
@@ -432,11 +438,175 @@ class RealCGFeatureExtractor(FeatureExtractor):
         )
 
 
+# ---------------------------------------------------------------------------
+# real_checkpoint_cached: run a STOCK model (Qwen/Llama/Mistral) once, cache
+# scenario-varying features, then evaluate C1-C4 offline via --mode cached.
+# ---------------------------------------------------------------------------
+# Honesty note: stock models do NOT emit the CG 32-D sovereign state. So:
+#   - `entropy`        = REAL predictive entropy of the next-token logits
+#                        (genuinely model-internal and scenario-varying).
+#   - `text_confidence`= top-1 softmax probability (a surface confidence; C3).
+#   - `coherence`/`vritti_risk`/`jepa_disagreement` = the REAL sovereign bridge run
+#     over a hidden-state -> 32-D **PROXY** projection. The projection is an
+#     unvalidated placeholder; these three are PROXY signals, NOT the CG path.
+# This is intended for a 30-50 scenario PILOT before any full run, and makes no
+# claim. See REAL_CHECKPOINT_CACHED.md.
+
+def predictive_entropy(logits) -> float:
+    """Normalized predictive entropy in [0,1] of a next-token logit vector."""
+    z = np.asarray(logits, dtype=float).ravel()
+    if z.size <= 1:
+        return 0.0
+    z = z - z.max()
+    p = np.exp(z)
+    p = p / p.sum()
+    nz = p[p > 0]
+    h = float(-np.sum(nz * np.log(nz)))
+    return _clip01(h / float(np.log(z.size)))
+
+
+def top1_confidence(logits) -> float:
+    """Top-1 softmax probability in [0,1] (surface/text-level confidence proxy)."""
+    z = np.asarray(logits, dtype=float).ravel()
+    if z.size == 0:
+        return 0.0
+    z = z - z.max()
+    p = np.exp(z)
+    p = p / p.sum()
+    return _clip01(float(p.max()))
+
+
+def hidden_to_state_proxy(hidden, dim: int = 32) -> list:
+    """Deterministic hidden-state -> `dim`-D state PROXY (avg-pool + min-max norm).
+
+    PLACEHOLDER: there is no validated mapping from a stock model's hidden state to
+    the CG sovereign state's semantics (vritti region, guna region, ...). Treat the
+    resulting vritti/JEPA signals as proxy, pending a learned/validated projection.
+    """
+    h = np.asarray(hidden, dtype=float).ravel()
+    if h.size == 0:
+        return [0.5] * dim
+    edges = np.linspace(0, h.size, dim + 1).astype(int)
+    buckets = np.array([h[edges[i]:edges[i + 1]].mean() if edges[i + 1] > edges[i]
+                        else 0.0 for i in range(dim)])
+    lo, hi = float(buckets.min()), float(buckets.max())
+    norm = np.full(dim, 0.5) if (hi - lo) < 1e-12 else (buckets - lo) / (hi - lo)
+    return [float(x) for x in norm]
+
+
+@dataclass(frozen=True)
+class BackendOutput:
+    logits: Any   # 1-D array over the vocabulary (last-token next-token logits)
+    hidden: Any   # 1-D last-layer hidden-state vector
+
+
+class MockHFBackend:
+    """Deterministic, scenario-varying stock-model stand-in (no torch, no label peek).
+
+    Produces per-prompt logits + hidden state from a hash of the prompt only — so
+    features VARY across scenarios but carry no label information (the mock must not
+    fabricate a result). For CI plumbing validation of the real_checkpoint_cached path.
+    """
+
+    name = "mock-hf"
+
+    def __init__(self, vocab: int = 64, hidden_dim: int = 128, seed: int = 7):
+        self.vocab = vocab
+        self.hidden_dim = hidden_dim
+        self.seed = int(seed)
+
+    def encode(self, prompt: str) -> BackendOutput:
+        rng = np.random.default_rng((self.seed ^ _stable_int(prompt)) & ((1 << 63) - 1))
+        return BackendOutput(logits=rng.normal(size=self.vocab),
+                             hidden=rng.normal(size=self.hidden_dim))
+
+
+class HFCheckpointBackend:  # pragma: no cover - needs torch/transformers + weights
+    """Real stock-model backend (Qwen/Llama/Mistral) via transformers. Lazy import."""
+
+    def __init__(self, model_name: str, *, device: str = "cpu", **model_kwargs):
+        try:
+            import torch  # noqa: F401
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+        except ImportError as exc:
+            raise ImportError(
+                "real_checkpoint_cached (non-mock) needs torch + transformers + model "
+                "weights. Use use_mock=True / --hf-mock for a torch-free plumbing run."
+            ) from exc
+        import torch
+        self._torch = torch
+        self.name = model_name
+        self.device = device
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name, output_hidden_states=True, **model_kwargs).eval().to(device)
+
+    def encode(self, prompt: str) -> BackendOutput:
+        t = self._torch
+        ids = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        with t.no_grad():
+            out = self.model(**ids, output_hidden_states=True)
+        logits = out.logits[0, -1, :].float().cpu().numpy()
+        hidden = out.hidden_states[-1][0, -1, :].float().cpu().numpy()
+        return BackendOutput(logits=logits, hidden=hidden)
+
+
+class RealCheckpointCachedExtractor(FeatureExtractor):
+    """Stock-model extractor: real logit entropy + proxy-state vritti/JEPA.
+
+    With ``use_mock=True`` runs torch-free (MockHFBackend) for CI plumbing validation.
+    With ``hf_model=...`` loads a real Qwen/Llama/Mistral checkpoint (needs torch).
+    The harness writes the resulting cache so C1-C4 can be evaluated offline via
+    ``--mode cached``.
+    """
+
+    mode = "real_checkpoint_cached"
+
+    def __init__(self, backend=None, *, hf_model=None, use_mock=False,
+                 tier="consumer", strict_signals=False, **model_kwargs):
+        if backend is None:
+            backend = (MockHFBackend() if use_mock
+                       else self._build_backend(hf_model, **model_kwargs))
+        self.backend = backend
+        self.tier = tier
+        self.strict = strict_signals
+        self.is_mock = getattr(backend, "name", "") == "mock-hf"
+        self.base_provenance = f"real_checkpoint_cached:{getattr(backend, 'name', 'hf')}"
+
+    @staticmethod
+    def _build_backend(hf_model, **model_kwargs):
+        if not hf_model:
+            raise ValueError(
+                "real_checkpoint_cached needs hf_model=NAME (--hf-model) or use_mock=True")
+        return HFCheckpointBackend(hf_model, **model_kwargs)
+
+    def extract(self, scenario: Scenario) -> FeatureVector:
+        out = self.backend.encode(_decision_prompt(scenario))
+        entropy = predictive_entropy(out.logits)        # REAL, scenario-varying
+        text_conf = top1_confidence(out.logits)          # surface confidence (C3)
+        proxy_md = {"state": hidden_to_state_proxy(out.hidden, 32), "delta_S": None}
+        sig = extract_internal_signals_from_metadata(
+            proxy_md, scenario, tier=self.tier, strict=self.strict)
+        provenance = self.base_provenance + ";vritti/jepa=PROXY_state" + (
+            f";degraded[{sig.detail}]" if sig.degraded else "")
+        return FeatureVector(
+            scenario_id=scenario.scenario_id,
+            risk_norm=scenario.risk_norm,
+            text_confidence=text_conf,
+            entropy=entropy,                              # real logit entropy
+            coherence=sig.coherence,                      # proxy-state bridge
+            vritti_risk=sig.vritti_risk,                  # proxy-state bridge
+            jepa_disagreement=sig.jepa_disagreement,      # proxy-state bridge
+            provenance=provenance,
+        )
+
+
 def build_extractor(mode: str, *, seed: int = 1234,
                     features_path: Optional[str] = None,
                     adapter=None, checkpoint: Optional[str] = None,
                     tier: str = "consumer", strict_signals: bool = False,
-                    use_stub: bool = False, **kwargs) -> FeatureExtractor:
+                    use_stub: bool = False, hf_model: Optional[str] = None,
+                    use_mock_hf: bool = False, **kwargs) -> FeatureExtractor:
     if mode == "mock":
         return MockFeatureExtractor(seed=seed)
     if mode == "cached":
@@ -447,7 +617,13 @@ def build_extractor(mode: str, *, seed: int = 1234,
         return RealCGFeatureExtractor(
             adapter=adapter, checkpoint=checkpoint, tier=tier,
             strict_signals=strict_signals, use_stub=use_stub, **kwargs)
-    raise ValueError(f"unknown feature mode {mode!r} (expected mock|cached|real_cg)")
+    if mode == "real_checkpoint_cached":
+        return RealCheckpointCachedExtractor(
+            hf_model=hf_model, use_mock=use_mock_hf, tier=tier,
+            strict_signals=strict_signals, **kwargs)
+    raise ValueError(
+        f"unknown feature mode {mode!r} "
+        "(expected mock|cached|real_cg|real_checkpoint_cached)")
 
 
 def write_features_jsonl(features: List[FeatureVector], path: Path) -> Path:
