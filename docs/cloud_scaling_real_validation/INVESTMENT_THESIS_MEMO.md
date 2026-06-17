@@ -201,8 +201,9 @@ never happens, cannot sustain venture-scale ARR.
 ## 13. The investor version (one paragraph)
 There is a missing layer in the autoscaling stack — *scaling decision quality* —
 that no observability, FinOps, or autoscaler answers, because the built-ins are
-intent engines and the actuators are structurally disinclined to question their own
-actions. We fill it with a read-only causal verdict for every scale-out, shipped as
+intent engines and the actuators optimize a different objective — making actions
+cheaper, faster, or more autonomous — rather than verifying their outcomes. We fill
+it with a read-only causal verdict for every scale-out, shipped as
 a zero-risk safety interlock. We have already de-risked the hard technical
 property — across simulation, real production-trace replay, and a real-dynamics
 calibration the engine is **safe and selective: 0 harmful false positives, 0 SLO
