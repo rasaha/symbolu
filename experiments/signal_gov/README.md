@@ -20,10 +20,11 @@ unsafe tool calls* and reports standard, deck-ready metrics.
 ## Quick start
 
 ```bash
-make signal-gov-deps     # numpy, matplotlib, pytest
-make signal-gov-smoke    # deterministic CI smoke test (10 scenarios, mock features)
-make signal-gov-run      # full hand-built mini-set (mock) -> artifacts in out/mock_handbuilt/
-make signal-gov-data     # (re)write the on-disk benchmark JSONL
+make signal-gov-deps           # numpy, matplotlib, pytest
+make signal-gov-smoke          # deterministic CI smoke test (10 scenarios, mock features)
+make signal-gov-realcg-smoke   # LIVE internal-signal path via StubCGLLMAdapter (no torch/GPU)
+make signal-gov-run            # full hand-built mini-set (mock) -> out/mock_handbuilt/
+make signal-gov-data           # (re)write the on-disk benchmark JSONL
 ```
 
 Or directly:
@@ -67,7 +68,14 @@ zero-tuning variant (see the design doc).
 |---|---|---|
 | `mock` | deterministic synthetic (seeded by scenario_id; internals constructed to be informative) | numpy |
 | `cached` | precomputed `features.parquet` / `.jsonl` | numpy (+pandas/pyarrow for parquet) |
-| `real_cg` | `MistralCGAdapter` forward pass → entropy/vritti/JEPA via signal adapters | torch + CG checkpoint + agentic framework |
+| `real_cg` (`--real-cg-stub`) | **LIVE** path: `StubCGLLMAdapter` fixed 32-D state → `sovereign_bridge` → entropy/vritti adapters → JEPA | numpy + in-repo agentic pkg (**no torch**) |
+| `real_cg` (live) | `MistralCGAdapter` forward pass → same bridge → signal adapters → JEPA | torch + CG checkpoint + agentic framework |
+
+The `real_cg` path is **wired and tested with deterministic stub state** — see
+[`REAL_CG_WIRING.md`](REAL_CG_WIRING.md) for the exact repo functions, what is real vs
+stubbed, and what remains before running against a real checkpoint. Missing internal
+signals **fail closed** (conservative high value + provenance flag), never silent zeros;
+`--strict-signals` makes them hard errors.
 
 `risk_norm` is real metadata (from `tool_risk_level`) in **every** mode; only confidence and
 the internal signals are "extracted".
@@ -141,16 +149,19 @@ result flips across seeds/checkpoints; C3 already saturates (>0.92).
 
 ---
 
-## Wiring the `real_cg` mode (integration task)
+## Going live with `real_cg` (from stub → real checkpoint)
 
-1. Implement `RealCGFeatureExtractor.extract` (`features.py`): build the decision-point prompt
-   from the scenario, run one `MistralCGAdapter` forward pass to get `last_cg_metadata` (32-D
-   state), then map it via `sovereign_bridge` + `signal_adapters` (entropy/vritti) + JEPA to a
-   `FeatureVector`. Cache to `features.parquet`.
-2. Re-run analysis with `--mode cached --features features.parquet` for fast, deterministic
-   iteration.
-3. Wire `dataset.load_external` for AgentDojo / InjecAgent to fill the injection third.
-4. Add a held-out split + weight fitting for C3/C4 (and keep the zero-tuning variant).
+`RealCGFeatureExtractor` is already wired (see [`REAL_CG_WIRING.md`](REAL_CG_WIRING.md)).
+To move from the torch-free stub to a real model:
+
+1. Swap the adapter: `--mode real_cg --checkpoint <path>` (drop `--real-cg-stub`). Requires
+   torch + weights + the `symbolu_training` wrapper. Everything downstream is unchanged.
+2. Cache real forward passes (`features.write_features_jsonl` / parquet) and iterate with
+   `--mode cached --features <path>`.
+3. Replace the `text_confidence` placeholder with a real model-elicited self-report.
+4. Wire `dataset.load_external` for AgentDojo / InjecAgent (the injection third).
+5. Add a held-out split + C3/C4 weight fitting (keep the zero-tuning variant), then judge
+   against the pre-registered success/failure criteria in the design doc.
 
 ---
 
@@ -167,7 +178,10 @@ experiments/signal_gov/
   plots.py         ROC overlay + catch@budget bars (matplotlib Agg)
   run_experiment.py end-to-end pipeline + artifact writers + CLI
   data/handbuilt_miniset.jsonl   on-disk benchmark (generated from dataset.py)
-  sample_output/mock_smoke/      committed reference run
-  tests/test_smoke.py            CI smoke test
+  sample_output/mock_smoke/      committed reference run (mock)
+  sample_output/real_cg_stub_smoke/  committed reference run (real_cg via stub)
+  tests/test_smoke.py            mock-mode CI smoke test
+  tests/test_realcg_smoke.py     real_cg plumbing validation (live path via stub)
+  REAL_CG_WIRING.md              exact repo functions, real vs stubbed, going-live steps
   requirements.txt · README.md
 ```

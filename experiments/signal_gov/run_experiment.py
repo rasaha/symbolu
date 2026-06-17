@@ -83,7 +83,9 @@ def _oriented_feature_columns(features: List[FeatureVector]) -> Dict[str, List[f
 
 def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         features_path: str | None = None, n_boot: int = 2000,
-        make_plots: bool = True, checkpoint: str | None = None) -> ExperimentResult:
+        make_plots: bool = True, checkpoint: str | None = None,
+        real_cg_stub: bool = False, strict_signals: bool = False,
+        tier: str = "consumer") -> ExperimentResult:
     scenarios = load_dataset(dataset)
 
     # Label integrity: authored labels must match the rule-based oracle.
@@ -95,7 +97,8 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
     labels = _labels_from_oracle(scenarios)
 
     extractor = build_extractor(mode, seed=seed, features_path=features_path,
-                                checkpoint=checkpoint)
+                                checkpoint=checkpoint, use_stub=real_cg_stub,
+                                strict_signals=strict_signals, tier=tier)
     features = extractor.extract_all(scenarios)
 
     scores_by_config = score_configs(scenarios, features)
@@ -224,11 +227,22 @@ def _write_report(results: Dict, path: Path) -> None:
     lines.append(f"- **N:** {ds['n_total']}  ·  **Unsafe:** {ds['n_positive']} "
                  f"({ds['positive_rate']*100:.0f}%)  ·  **Category balance:** {ds['category_balance']}")
     lines.append("")
+    prov = str(meta.get("feature_provenance") or "")
     if meta["mode"] != "real_cg":
         lines.append("> ⚠️ **Not a result.** This run uses "
                      f"`{meta['mode']}` features. The `mock` mode is SYNTHETIC and validates "
                      "the harness only. Scientific conclusions require `real_cg` features, the "
                      "full balanced benchmark, and a held-out split.")
+        lines.append("")
+    elif "stub" in prov:
+        lines.append("> ⚠️ **Plumbing validation, not evidence.** This `real_cg` run uses a "
+                     "deterministic STUB 32-D state (`StubCGLLMAdapter`), not live model "
+                     "inference. The internal-signal extraction path (sovereign_bridge → "
+                     "entropy/vritti adapters → JEPA) executes end-to-end, but the state is a "
+                     "FIXED fixture, so internal signals are constant across scenarios and "
+                     "carry NO discriminative claim. AUROC(C4)==AUROC(C3) is expected here. "
+                     "Evidence requires a real CG checkpoint + the full balanced benchmark + a "
+                     "held-out split.")
         lines.append("")
     lines.append("## Ablation metrics")
     lines.append("")
@@ -285,6 +299,11 @@ def _parse_args(argv=None):
     p.add_argument("--seed", type=int, default=1234)
     p.add_argument("--features", default=None, help="path to cached features (.jsonl/.parquet)")
     p.add_argument("--checkpoint", default=None, help="CG checkpoint for real_cg mode")
+    p.add_argument("--real-cg-stub", action="store_true",
+                   help="real_cg via StubCGLLMAdapter (torch-free plumbing validation)")
+    p.add_argument("--strict-signals", action="store_true",
+                   help="real_cg: raise instead of fail-closed when a signal is missing")
+    p.add_argument("--tier", default="consumer", help="governance tier for real_cg")
     p.add_argument("--n-boot", type=int, default=2000)
     p.add_argument("--no-plots", action="store_true")
     return p.parse_args(argv)
@@ -295,7 +314,9 @@ def main(argv=None) -> int:
     out_dir = Path(args.out) if args.out else DEFAULT_OUT_ROOT / f"{args.mode}_{args.dataset}"
     res = run(args.mode, args.dataset, out_dir, seed=args.seed,
               features_path=args.features, n_boot=args.n_boot,
-              make_plots=not args.no_plots, checkpoint=args.checkpoint)
+              make_plots=not args.no_plots, checkpoint=args.checkpoint,
+              real_cg_stub=args.real_cg_stub, strict_signals=args.strict_signals,
+              tier=args.tier)
     r = res.results
     print(f"[signal_gov] mode={args.mode} dataset={args.dataset} "
           f"N={r['dataset']['n_total']} unsafe={r['dataset']['n_positive']}")

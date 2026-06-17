@@ -191,52 +191,252 @@ class CachedFeatureExtractor(FeatureExtractor):
         return self._by_id[scenario.scenario_id]
 
 
+# ---------------------------------------------------------------------------
+# real_cg: the LIVE internal-signal path
+# ---------------------------------------------------------------------------
+# Pipeline (all torch-free; the engines under agentic/entropy and
+# agentic/chitta_vritti import no torch):
+#
+#   adapter.call(prompt)                      -> last_cg_metadata {state(32-D), delta_S, ...}
+#   sovereign_bridge.governance_inputs_from_cg_metadata(md)
+#                                              -> {entropy_result, vritti_result}
+#   entropy_adapter.resolve_entropy_signal     -> EntropyResolution
+#   vritti_adapter.resolve_vritti_signal       -> VrittiResolution (REAL when result present)
+#   jepa_governance.safe_jepa_governance_check -> JEPAGovernanceAssessment (regime, conf_adj)
+#   map_resolutions_to_signals(...)            -> InternalSignals  (fail-closed)
+#
+# See REAL_CG_WIRING.md for the exact repo functions and what is real vs stubbed.
+
+# Fail-closed default: when a REQUIRED internal risk signal is unavailable we do
+# NOT emit 0.0 (which reads as "no risk" and silently passes). We emit a
+# conservative HIGH value so the call is escalated, and flag degradation in
+# provenance. strict_signals=True turns this into a hard error instead.
+MISSING_SIGNAL_RISK = 1.0
+
+# The stub adapter cannot self-report a text-level confidence; real models elicit
+# this from their text output. For the stub plumbing path we use a neutral
+# placeholder and record the provenance. This keeps the INTERNAL signals honest
+# (truly engine-derived) without fabricating a text-level confidence.
+REAL_CG_TEXT_CONFIDENCE_PLACEHOLDER = 0.5
+
+# Regime -> disagreement severity (anomalous/unknown regimes fail closed high).
+_REGIME_SEVERITY = {
+    "normal": 0.0,
+    "process_drift": 0.5,
+    "semantic_shift": 0.5,
+    "dual_anomaly": 1.0,
+    "unknown": 1.0,
+}
+
+
+class RealCGSignalError(RuntimeError):
+    """Raised in strict mode when a required internal signal is unavailable."""
+
+
+@dataclass(frozen=True)
+class InternalSignals:
+    entropy: float
+    coherence: float
+    vritti_risk: float
+    jepa_disagreement: float
+    degraded: bool
+    detail: str
+
+
+def _vritti_risk_from_distribution(dist) -> float:
+    """Non-grounded vritti mass = viparyaya + vikalpa + nidra (higher = riskier).
+
+    The 5 vrittis sum to ~1; pramana (valid cognition) + smrti (memory) are the
+    grounded modes, so their complement is the risk mass.
+    """
+    risk = (float(dist.get("viparyaya", 0.0))
+            + float(dist.get("vikalpa", 0.0))
+            + float(dist.get("nidra", 0.0)))
+    return _clip01(risk)
+
+
+def _jepa_disagreement_from_assessment(assessment) -> float:
+    """JEPA disagreement in [0,1] from regime severity and confidence adjustment."""
+    regime = getattr(getattr(assessment, "regime", None), "value", "unknown")
+    severity = _REGIME_SEVERITY.get(str(regime), 1.0)  # unknown -> fail-closed high
+    adj = float(getattr(assessment, "confidence_adjustment", 0.0) or 0.0)  # in [-0.5, 0]
+    adj_mag = _clip01(-adj / 0.5)
+    return _clip01(max(severity, adj_mag))
+
+
+def map_resolutions_to_signals(entropy_resolution, vritti_resolution, assessment,
+                               *, strict: bool = False) -> InternalSignals:
+    """Pure mapping: resolution objects -> InternalSignals, fail-closed.
+
+    Duck-typed (getattr) so it is importable + testable WITHOUT the engines:
+    pass crafted resolution objects (e.g. SimpleNamespace) to exercise edge cases.
+    """
+    notes = []
+    degraded = False
+
+    # entropy (higher = riskier). Missing -> fail closed (NOT 0.0).
+    available = bool(getattr(entropy_resolution, "available", False))
+    ce = getattr(entropy_resolution, "combined_entropy", None)
+    if available and ce is not None:
+        entropy = _clip01(float(ce))
+    else:
+        if strict:
+            raise RealCGSignalError("entropy signal unavailable (strict_signals=True)")
+        entropy = MISSING_SIGNAL_RISK
+        degraded = True
+        notes.append("entropy_unavailable->fail_closed")
+
+    coherence = _clip01(float(getattr(vritti_resolution, "coherence", 0.0)))
+    vritti_risk = _vritti_risk_from_distribution(
+        getattr(vritti_resolution, "distribution", {}) or {})
+    if getattr(vritti_resolution, "degraded", False):
+        degraded = True
+        src = getattr(getattr(vritti_resolution, "source", None), "value", "?")
+        notes.append(f"vritti_degraded({src})")
+
+    jepa_disagreement = _jepa_disagreement_from_assessment(assessment)
+    regime = str(getattr(getattr(assessment, "regime", None), "value", "unknown"))
+    if regime == "unknown":
+        degraded = True
+        notes.append("jepa_regime_unknown->fail_closed")
+
+    return InternalSignals(
+        entropy=entropy,
+        coherence=coherence,
+        vritti_risk=vritti_risk,
+        jepa_disagreement=jepa_disagreement,
+        degraded=degraded,
+        detail=";".join(notes) if notes else "ok",
+    )
+
+
+def _decision_prompt(scenario: Scenario) -> str:
+    """Decision-point text fed to the CG adapter forward pass."""
+    return (
+        f"User request: {scenario.user_prompt}\n"
+        f"Proposed tool: {scenario.proposed_tool} "
+        f"(risk={scenario.tool_risk_level}) args={scenario.tool_args}"
+    )
+
+
+def extract_internal_signals_from_metadata(cg_metadata, scenario, *,
+                                           tier: str = "consumer",
+                                           strict: bool = False) -> InternalSignals:
+    """Run the LIVE bridge: cg_metadata -> entropy/vritti/JEPA -> InternalSignals.
+
+    Lazily imports the agentic framework so mock/cached modes never need it. The
+    REAL vritti_result drives resolve_vritti_signal (q/c/layer_weights only feed the
+    unused approximation fallback + JEPA's ontology prior), so we pass neutral
+    text-level inputs and let the 32-D state drive the internal signals.
+    """
+    from agentic.agentic_framework.sovereign_bridge import (
+        governance_inputs_from_cg_metadata,
+    )
+    from agentic.agentic_framework.signal_adapters.entropy_adapter import (
+        resolve_entropy_signal,
+    )
+    from agentic.agentic_framework.signal_adapters.vritti_adapter import (
+        resolve_vritti_signal,
+    )
+    from agentic.agentic_framework.jepa_governance import (
+        approximate_layer_weights,
+        safe_jepa_governance_check,
+    )
+
+    gov = governance_inputs_from_cg_metadata(cg_metadata, tier=tier)
+    entropy_resolution = resolve_entropy_signal(entropy_result=gov.get("entropy_result"))
+    layer_weights = approximate_layer_weights()  # neutral (0.5) text-level inputs
+    vritti_resolution = resolve_vritti_signal(
+        vritti_result=gov.get("vritti_result"),
+        layer_weights=layer_weights,
+    )
+    assessment = safe_jepa_governance_check(
+        layer_weights=layer_weights,
+        vritti_distribution=vritti_resolution.distribution,
+        coherence=vritti_resolution.coherence,
+        score=vritti_resolution.score,
+        action_type="call_tool",
+        tool_name=scenario.proposed_tool,
+        risk_level=scenario.tool_risk_level,
+        confidence_score=0.5,
+        agency_level="FULL",
+        execution_mode="autonomous",
+        escalation_level="none",
+        session_id=scenario.scenario_id,
+        actor_id="",
+        capabilities=[],
+    )
+    return map_resolutions_to_signals(
+        entropy_resolution, vritti_resolution, assessment, strict=strict)
+
+
 class RealCGFeatureExtractor(FeatureExtractor):
-    """Run the real CG path: MistralCGAdapter forward pass -> signal adapters.
+    """Live internal-signal extractor (StubCGLLMAdapter or MistralCGAdapter).
 
-    INTEGRATION POINT — requires torch + a CG checkpoint and the agentic framework
-    package. Not exercised by the smoke test. The body below is the wiring contract;
-    verify each call against the live module signatures before a real run:
-
-      - agentic.agentic_framework.llm_adapters.MistralCGAdapter -> last_cg_metadata
-      - agentic.agentic_framework.sovereign_bridge.governance_inputs_from_cg_metadata
-      - agentic.agentic_framework.signal_adapters.entropy_adapter.resolve_entropy_signal
-      - agentic.agentic_framework.signal_adapters.vritti_adapter.resolve_vritti_signal
-      - agentic.agentic_framework.jepa_governance (regime -> disagreement scalar)
+    With ``use_stub=True`` (or any adapter exposing ``IS_STUB``) this runs the full
+    extraction path WITHOUT torch/GPU using a deterministic 32-D state fixture — a
+    *plumbing validation*, not evidence. With a real ``MistralCGAdapter`` + checkpoint
+    it runs live inference (requires torch).
     """
 
     mode = "real_cg"
 
-    def __init__(self, adapter=None, checkpoint: Optional[str] = None, **kwargs) -> None:
-        self.adapter = adapter
-        self.checkpoint = checkpoint
-        self.kwargs = kwargs
+    def __init__(self, adapter=None, *, checkpoint=None, tier="consumer",
+                 strict_signals=False, use_stub=False, **kwargs):
+        self.tier = tier
+        self.strict = strict_signals
         if adapter is None:
-            self.adapter = self._build_adapter(checkpoint, **kwargs)
+            adapter = self._build_adapter(checkpoint=checkpoint, use_stub=use_stub, **kwargs)
+        self.adapter = adapter
+        self.is_stub = bool(getattr(adapter, "IS_STUB", False))
+        prov = getattr(adapter, "STATE_PROVENANCE", None)
+        self.base_provenance = f"real_cg:{prov or ('stub' if self.is_stub else 'live')}"
 
     @staticmethod
-    def _build_adapter(checkpoint, **kwargs):  # pragma: no cover - needs torch/ckpt
-        try:
+    def _build_adapter(*, checkpoint=None, use_stub=False, **kwargs):
+        if use_stub:
+            from agentic.agentic_framework.llm_adapters import StubCGLLMAdapter
+            return StubCGLLMAdapter(default_response="stub-cg-response")
+        try:  # pragma: no cover - needs torch/checkpoint
             from agentic.agentic_framework.llm_adapters import MistralCGAdapter
         except ImportError as exc:
             raise ImportError(
-                "real_cg mode requires the agentic framework + torch. "
-                "Install torch and run from the repo root, or use --mode mock/cached."
+                "real_cg without use_stub requires the agentic framework + torch + a "
+                "CG checkpoint. Pass use_stub=True for a torch-free plumbing run."
             ) from exc
-        return MistralCGAdapter(model_name=checkpoint, **kwargs) if checkpoint else MistralCGAdapter(**kwargs)
+        return (MistralCGAdapter(model_name=checkpoint, **kwargs)
+                if checkpoint else MistralCGAdapter(**kwargs))
 
-    def extract(self, scenario: Scenario) -> FeatureVector:  # pragma: no cover
-        raise NotImplementedError(
-            "real_cg extraction is the integration task: build the decision-point "
-            "prompt from the scenario, run one adapter forward pass to obtain the 32-D "
-            "state (last_cg_metadata), then map it to entropy/coherence/vritti/JEPA via "
-            "the signal adapters listed in this class's docstring. Cache results to "
-            "features.parquet and re-run in --mode cached for analysis."
+    def extract(self, scenario: Scenario) -> FeatureVector:
+        self.adapter.call(_decision_prompt(scenario))
+        md = getattr(self.adapter, "last_cg_metadata", None)
+        if not md:
+            getter = getattr(self.adapter, "get_cg_metadata", None)
+            md = getter() if callable(getter) else None
+        if not md:
+            raise RealCGSignalError(
+                f"adapter produced no cg_metadata for {scenario.scenario_id}")
+        sig = extract_internal_signals_from_metadata(
+            md, scenario, tier=self.tier, strict=self.strict)
+        provenance = self.base_provenance + (
+            f";degraded[{sig.detail}]" if sig.degraded else "")
+        return FeatureVector(
+            scenario_id=scenario.scenario_id,
+            risk_norm=scenario.risk_norm,
+            text_confidence=REAL_CG_TEXT_CONFIDENCE_PLACEHOLDER,
+            entropy=sig.entropy,
+            coherence=sig.coherence,
+            vritti_risk=sig.vritti_risk,
+            jepa_disagreement=sig.jepa_disagreement,
+            provenance=provenance,
         )
 
 
 def build_extractor(mode: str, *, seed: int = 1234,
-                    features_path: Optional[str] = None, **kwargs) -> FeatureExtractor:
+                    features_path: Optional[str] = None,
+                    adapter=None, checkpoint: Optional[str] = None,
+                    tier: str = "consumer", strict_signals: bool = False,
+                    use_stub: bool = False, **kwargs) -> FeatureExtractor:
     if mode == "mock":
         return MockFeatureExtractor(seed=seed)
     if mode == "cached":
@@ -244,7 +444,9 @@ def build_extractor(mode: str, *, seed: int = 1234,
             raise ValueError("cached mode requires --features PATH")
         return CachedFeatureExtractor(features_path)
     if mode == "real_cg":
-        return RealCGFeatureExtractor(**kwargs)
+        return RealCGFeatureExtractor(
+            adapter=adapter, checkpoint=checkpoint, tier=tier,
+            strict_signals=strict_signals, use_stub=use_stub, **kwargs)
     raise ValueError(f"unknown feature mode {mode!r} (expected mock|cached|real_cg)")
 
 
