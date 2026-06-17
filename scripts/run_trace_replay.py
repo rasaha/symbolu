@@ -131,11 +131,16 @@ def main():
 
     md = report_mod.build_markdown(results, synthetic)
     js = report_mod.build_json(results, synthetic)
-    with open(os.path.join(OUT, "track_b_trace_replay.md"), "w") as f:
+    # Fixture-sample runs write to a distinct name so they never clobber the
+    # real full-trace artifact.
+    stem = "track_b_trace_replay.SAMPLE" if args.fixtures else "track_b_trace_replay"
+    md_path = os.path.join(OUT, stem + ".md")
+    js_path = os.path.join(OUT, stem + ".json")
+    with open(md_path, "w") as f:
         f.write(md)
-    with open(os.path.join(OUT, "track_b_trace_replay.json"), "w") as f:
+    with open(js_path, "w") as f:
         json.dump(js, f, indent=2)
-    print(f"\nWrote:\n  {os.path.join(OUT, 'track_b_trace_replay.md')}\n  {os.path.join(OUT, 'track_b_trace_replay.json')}")
+    print(f"\nWrote:\n  {md_path}\n  {js_path}")
 
 
 if __name__ == "__main__":
