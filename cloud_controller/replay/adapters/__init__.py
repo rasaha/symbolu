@@ -11,6 +11,9 @@ from cloud_controller.replay.adapters.alibaba_microservices import (
     AlibabaMicroservicesAdapter,
 )
 from cloud_controller.replay.adapters.google_borg import GoogleBorgAdapter
+from cloud_controller.replay.adapters.partner_prometheus import (
+    PartnerPrometheusAdapter,
+)
 
 __all__ = [
     "AdapterStatus",
@@ -20,4 +23,5 @@ __all__ = [
     "AzureVMNoiseAdapter",
     "AlibabaMicroservicesAdapter",
     "GoogleBorgAdapter",
+    "PartnerPrometheusAdapter",
 ]
