@@ -1,0 +1,14 @@
+# signal_gov experiment harness — dependencies
+#
+# Required (smoke test + mock/cached modes):
+numpy>=1.23
+matplotlib>=3.6
+pytest>=7.4
+
+# Optional:
+#   scikit-learn  -> cross-check AUROC/AP in tests (harness implements its own in numpy)
+#   pandas,pyarrow -> read/write features.parquet for the `cached` mode
+#   torch + a CG checkpoint + the agentic framework -> the `real_cg` feature mode
+# scikit-learn>=1.2
+# pandas>=1.5
+# pyarrow>=12
