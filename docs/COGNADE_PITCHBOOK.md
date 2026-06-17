@@ -15,7 +15,7 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 
 | # | Module | Layer | One-line summary | Readiness |
 |---|---|---|---|---|
-| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — zero SLO regressions across 19 adversarial scenarios | **Production-ready** — shadow + recommend mode |
+| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios, validated further by *real-trace replay*; *live-shadow* harness ready | **Shadow + recommend mode**; validated in simulation + real-trace replay; live-shadow self-run (third-party pending) |
 | 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
 | 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.9.0, 1,550+ tests, 2 internal pilots |
 | 4 | **Conscious Generation LLM** | Token selection | Multi-field token evaluation on frozen Mistral-7B — ~5M trainable params, interpretable 32D state | **Research-stage** — phase adapter live; full field integration Q1–Q2 |
@@ -40,7 +40,7 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 # 1. Neural Cloud Scaling Controller
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Stage 4 complete** — shadow mode and recommend mode are production-ready today.
+**Stage 4 complete** — shadow mode and recommend mode are built and tested. Validation today spans **simulation (19 scenarios) + real production-trace replay (offline) + a runnable live-shadow harness** (read-only, on a real cluster under fault injection). Independent third-party telemetry is the one remaining rung — see the validation maturity ladder in §1.4.
 
 ## 1.1 The Problem
 
@@ -179,7 +179,7 @@ The table below places us against the tools we get compared to in technical eval
 
 - **We occupy a layer nobody else is in.** Every competitor in the table above operates at L0–L3 (sensing, provisioning, cost, prediction) or at L5–L7 (safety bounds, observability, governance). **Layer 4 — decision quality — is empty in the market.** We are the first tool in this space whose entire purpose is to ask *"did the last action actually work, and if not, should we really do it again?"*.
 - **We wrap, we don't replace.** HPA stays. Karpenter stays. Cast AI stays. ScaleOps stays. Datadog stays. The platform team installs us in shadow mode with zero write permissions — no configuration changes to any other tool in the stack, no midnight cutover, no vendor migration. This is a strictly additive product, which is the opposite of how every other FinOps vendor enters a new customer.
-- **Safety by construction.** 19 adversarial scenarios, **zero catastrophic failures, zero severe failures, zero SLO regressions, zero false positives**. The guard can only say "no" to a scale-out — it can never say "yes" to an action the controller wasn't already going to take. That's a property no learned AIOps system can claim, and it's why we can ship on a Tuesday without a change-management committee and a six-week pilot.
+- **Safety by construction.** Across 19 adversarial scenarios *in simulation*, **zero catastrophic failures, zero severe failures, zero SLO regressions, zero false positives** — and on *real-trace replay* the guard likewise caused no meaningful SLO regression (see §1.4). The guard can only say "no" to a scale-out — it can never say "yes" to an action the controller wasn't already going to take. That's a property no learned AIOps system can claim, and it's why we can ship on a Tuesday without a change-management committee and a six-week pilot.
 - **Proof-of-value is free.** Shadow mode runs read-only, auto-generates proof-of-value reports, and costs the customer nothing to try. A platform team can turn us on, watch for two weeks, and see exactly what we *would* have saved them — without adopting any dependency, signing any contract, or taking any production risk. No other tool in this space offers that kind of zero-commitment trial, because no other tool can: they all have to write something to work.
 - **The economics compose.** Every other vendor in the table saves money by making the thing you're already doing cheaper or faster. We save money by *not doing the thing*. A scale-out that doesn't happen is 100% cheaper than any rightsizing, spot-instance swap, or bin-packing optimization can ever make it — and those savings are additive to whatever the rest of your stack is already doing.
 
@@ -189,13 +189,13 @@ Every other tool in this market either **scales you faster** (HPA, Karpenter, KE
 
 ## 1.4 What We've Proven and What's Next
 
-### 19 adversarial scenarios, and what happened
+### 19 adversarial scenarios, and what happened *(in simulation)*
 
-We didn't benchmark this on a friendly load test. We built 19 deliberately nasty scenarios covering signal corruption, actuation delays, system shocks, budget constraints, and controller pathologies — the kinds of things that quietly break autoscalers in production.
+We didn't benchmark this on a friendly load test. We built 19 deliberately nasty scenarios covering signal corruption, actuation delays, system shocks, budget constraints, and controller pathologies — the kinds of things that quietly break autoscalers in production. **Every number in this subsection is `simulated`** — the metrics pipeline, HPA, and provisioning are all modelled. The next subsection (the validation maturity ladder) shows what we have since proven on *real* traces and a *real* cluster, and labels each number so the two are never conflated.
 
-#### Safety first (because it's the first thing evaluators ask)
+#### Safety first (because it's the first thing evaluators ask) — *simulated*
 
-| Metric | Result |
+| Metric | Result *(simulated, 19 scenarios)* |
 |---|---|
 | Catastrophic failures | **0** |
 | Severe failures | **0** |
@@ -224,7 +224,24 @@ This is the headline we're proudest of. We built a system that can only make thi
 | Scenarios where the guard intervened | 5 of 19 |
 | Scenarios where the guard stayed out of the way | 14 of 19 |
 
-**The one-line version:** we cut waste from 4.5x to 3.4x of optimal cost with **zero SLO regressions** — and that's something none of the incumbents can do today, because they don't have the feedback loop to know when they're wrong.
+**The one-line version (simulated):** we cut waste from 4.5x to 3.4x of optimal cost with **zero SLO regressions** — and that's something none of the incumbents can do today, because they don't have the feedback loop to know when they're wrong.
+
+### Validation maturity ladder — where the evidence actually stands
+
+We grade our own evidence. Everything above is **`simulated`**. Here is the full ladder, each rung labelled by *how the number was produced* — we never conflate them.
+
+| Rung | What it means | Status |
+|---|---|---|
+| **1. Simulation** (19 synthetic scenarios) | Adversarial demand shapes through the control core; pipeline/HPA/provisioning all modelled | ✅ **Done** — 0 catastrophic / severe / SLO regressions; guard blocked 87 of 649 scale-outs (13.4%) |
+| **2. Real production-trace replay** (offline) | The *same* control core, unchanged, replayed over real public cluster traces | ✅ **Done (self-run, offline)** — numbers below |
+| **3. Live shadow on a real cluster under fault injection** (self-run) | Read-only, alongside a real HPA, real Prometheus, real app, real Chaos-Mesh faults | 🟡 **Harness built & wiring-proven; execution is self-run on a Docker host** |
+| **4. Independent third-party telemetry** | A real workload we don't control, measured by someone with no stake in the result | ❌ **Pending** — needs a free external design partner |
+
+**Rung 2 — `real-trace-replay`.** We replayed the **Azure LLM/LMM inference traces** (Azure Public Dataset, CC-BY-4.0) through the *unmodified* control core. On the multimodal trace — **1,000,000 real inference requests over 7 days (40,320 cycles)** — the guard blocked **80 of 2,537 scale-outs (3.2%)** as provably futile, saving **0.74% of replica-cycles** at a **near-neutral SLO cost of +4 breach-cycles out of 40,320 (+0.01pp)**. On the shorter conv/code traces it correctly stayed **dormant (0 blocks, 0 false positives)**. The honest read: real traffic is *less* pathological than our adversarial suite, so the guard is even more selective on it — and it never caused a meaningful SLO regression. Reproduce with `scripts/run_trace_replay.py`; full numbers in `artifacts/cloud_controller_real_validation/`.
+
+**Rung 3 — `live-shadow-self-run`.** The full kind + Prometheus + Online-Boutique + Chaos-Mesh harness lives in `deploy/local-shadow/`, and the control-core↔Prometheus↔shadow↔guard wiring is proven by an integration test against a real HTTP Prometheus. Run on a Docker host it emits a real proof-of-value report (futile-blocks, $/replica, SLO-regression count = 0 by construction, since the controller is read-only). These are still *our* faults on *our* cluster — honest, but not independent.
+
+**What "validated" now means:** simulation **+** real-trace-replay **+** a runnable live-shadow harness — not simulation alone. The one rung we cannot honestly claim is rung 4, and we say so plainly.
 
 ### What's already built
 
@@ -237,8 +254,10 @@ This isn't a research prototype. It's been staged, tested, and written to be dep
 | Stage 3 | **Shadow mode** — read-only, runs alongside HPA, generates proof-of-value reports | 38 unit tests |
 | Stage 4 | **Recommend mode** — human-in-the-loop with Slack and PagerDuty integration | 39+ unit tests |
 | Bootstrap | Learning-phase elimination, so there's no cold-start warm-up period | 22 unit tests |
+| **Track B** | **Real-trace replay** — replays real Azure traces through the unmodified control core (offline) | 22 unit tests |
+| **Track A** | **Live-shadow harness** — kind + Prometheus + Online Boutique + Chaos Mesh, plus a real-HTTP wiring proof | 4 integration tests |
 
-**Altogether:** 27 Python source files, 228+ unit tests, all passing.
+**Altogether:** the `tests/cloud_controller/` suite now reports **724 passing tests** (4 skipped) — 702 pre-existing plus 26 new for the real-validation harnesses.
 
 ### What's next
 
@@ -1488,7 +1507,7 @@ Each module is independently deployable and independently valuable. Initial comm
 | Metric | Value |
 |---|---|
 | Total tests across all modules | **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) |
-| Adversarial safety scenarios (scaling) | 19 scenarios, **0 catastrophic / severe failures, 0 SLO regressions** |
+| Adversarial safety scenarios (scaling) | 19 scenarios *(simulated)*, **0 catastrophic / severe failures, 0 SLO regressions**; further validated by real-trace replay + a live-shadow harness (§1.4) |
 | FSCS signal validation (CTM+) | **100% eviction rounds changed** with enhanced signals on real Mistral-7B trace |
 | Agentic governance invariant | `cancel → budget → approve → execute` — **pinned by test suite** |
 | CG trainable parameters | **~5M** on frozen Mistral-7B (4-bit: ~14GB VRAM) |
