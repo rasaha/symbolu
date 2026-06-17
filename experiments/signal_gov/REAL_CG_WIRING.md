@@ -73,9 +73,11 @@ coherence=0.5, vritti_risk=1.0 (nidra-dominant fixture), jepa_disagreement=0.5
 2. **Per-scenario forward passes.** With a real model the state varies per decision point,
    so the internal signals become discriminative. Confirm `extract` builds a sensible
    decision-point prompt (`features._decision_prompt`) for your model's chat format.
-3. **Cache + analyze.** Real forward passes are expensive; persist features
-   (`features.write_features_jsonl` / parquet) and re-run analysis with
-   `--mode cached --features <path>` for fast, deterministic iteration.
+3. **Cache + analyze.** Real forward passes are expensive. `--mode real_cg` **auto-writes a
+   reusable `features.jsonl`** into `--out` (disable with `--no-cache-write`); the schema is
+   identical to `--mode cached`, so re-run analysis offline with
+   `--mode cached --features <out>/features.jsonl` for fast, deterministic, metric-identical
+   iteration (provenance `real_cg:<…>` is carried into the replay).
 4. **Real text-level confidence.** Replace the `0.5` placeholder by eliciting a
    self-reported safety confidence from the model's text output (so C3 is a fair
    text-level baseline).

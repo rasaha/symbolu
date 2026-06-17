@@ -127,48 +127,38 @@ python -m experiments.signal_gov.run_experiment \
 What happens: for each scenario the harness builds a short decision-point prompt, runs **one**
 `MistralCGAdapter` forward pass to get `last_cg_metadata` (the 32-D state), and derives
 entropy/coherence/vritti/JEPA via the real `sovereign_bridge` → entropy/vritti adapters →
-JEPA path (see `REAL_CG_WIRING.md`). C1–C4 are scored and metrics computed.
+JEPA path (see `REAL_CG_WIRING.md`). C1–C4 are scored and metrics computed. It also writes a
+reusable **`features.jsonl`** cache into `--out` by default (disable with `--no-cache-write`).
 
 ---
 
 ## 6. Cache features, then re-run offline (cheap iteration)
 
-GPU passes are the expensive part. **Cache once, analyze many times** with no GPU:
+GPU passes are the expensive part. `--mode real_cg` **writes `features.jsonl` into `--out` by
+default**, so you do one GPU pass and then iterate on the analysis with **no GPU**. The cache
+schema is identical to `--mode cached`, and offline replay is **metric-identical** (the CG
+forward pass is the only thing skipped).
 
 ```bash
-# A) one GPU pass that also writes a feature cache
+# A) one GPU pass — extracts CG features AND writes runs/cg_pilot/features.jsonl
 python -m experiments.signal_gov.run_experiment \
-    --mode real_cg --checkpoint "$CG_CHECKPOINT" --cg-quantize 4bit \
-    --scenarios experiments/signal_gov/data/pilot_30_50.jsonl \
+    --dataset pilot_30_50 --mode real_cg \
+    --checkpoint "$CG_CHECKPOINT" --cg-quantize 4bit \
     --out runs/cg_pilot
-# copy the per-scenario features out of the run for reuse:
-python - <<'PY'
-import json, pathlib
-res = json.loads(pathlib.Path("runs/cg_pilot/results.json").read_text())
-print("provenance:", res["meta"]["feature_provenance"])   # real_cg:<...>
-PY
-```
 
-> Note: `--mode real_cg` does not auto-write `features.jsonl` (only
-> `real_checkpoint_cached` does). To cache CG features for offline replay, extract once and
-> persist them yourself, e.g.:
-
-```python
-from pathlib import Path
-from experiments.signal_gov.dataset import load_scenarios_jsonl
-from experiments.signal_gov.features import RealCGFeatureExtractor, write_features_jsonl
-sc = load_scenarios_jsonl("experiments/signal_gov/data/pilot_30_50.jsonl")
-fx = RealCGFeatureExtractor(checkpoint="<CG_CHECKPOINT>", quantize="4bit")  # GPU
-write_features_jsonl(fx.extract_all(sc), Path("runs/cg_pilot/features.jsonl"))
-```
-
-```bash
 # B) re-evaluate C1-C4 offline from the cache (no GPU; deterministic, fast)
 python -m experiments.signal_gov.run_experiment \
-    --mode cached --features runs/cg_pilot/features.jsonl \
-    --scenarios experiments/signal_gov/data/pilot_30_50.jsonl \
-    --out runs/cg_pilot_offline
+    --dataset pilot_30_50 --mode cached \
+    --features runs/cg_pilot/features.jsonl \
+    --out runs/cg_pilot_replay
 ```
+
+- `--dataset pilot_30_50` loads the committed 30-scenario set. For a custom assembled file
+  (e.g. `pilot_45.jsonl`), use `--scenarios <path>` in **both** commands instead so labels and
+  the cache align.
+- The replay's `meta.feature_provenance` is carried from the cache (`real_cg:<…>`), so a
+  replayed run is clearly traceable to the original CG extraction.
+- Pass `--no-cache-write` to skip writing the cache (e.g. a throwaway run).
 
 ---
 

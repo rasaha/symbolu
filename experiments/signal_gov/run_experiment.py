@@ -92,7 +92,8 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         tier: str = "consumer", external_path: str | None = None,
         hf_model: str | None = None, hf_mock: bool = False,
         scenarios_path: str | None = None,
-        cg_quantize: str | None = None, cg_device: str = "auto") -> ExperimentResult:
+        cg_quantize: str | None = None, cg_device: str = "auto",
+        write_cache: bool = True) -> ExperimentResult:
     if scenarios_path:
         scenarios = load_scenarios_jsonl(scenarios_path)
     elif dataset in ("agentdojo", "injecagent") and external_path:
@@ -117,11 +118,16 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
                                 hf_model=hf_model, use_mock_hf=hf_mock, **extra)
     features = extractor.extract_all(scenarios)
 
-    # real_checkpoint_cached: persist the scenario-varying feature cache so C1-C4
+    # Persist a reusable feature cache for the extraction modes (real_cg,
+    # real_checkpoint_cached) so the expensive forward passes are done once and C1-C4
     # can be re-evaluated offline with `--mode cached --features <out>/features.jsonl`.
-    if mode == "real_checkpoint_cached":
+    # The cache schema is identical to the `cached` reader (all FEATURE_FIELDS, incl.
+    # provenance). Enabled by default; disable with --no-cache-write.
+    cache_path = None
+    if write_cache and mode in ("real_cg", "real_checkpoint_cached"):
         out_dir.mkdir(parents=True, exist_ok=True)
-        write_features_jsonl(features, out_dir / "features.jsonl")
+        cache_path = out_dir / "features.jsonl"
+        write_features_jsonl(features, cache_path)
 
     scores_by_config = score_configs(scenarios, features)
     tiebreak = np.arange(len(scenarios), dtype=float)  # deterministic tie-break
@@ -172,6 +178,7 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
             "python": platform.python_version(),
             "numpy": np.__version__,
             "feature_provenance": features[0].provenance if features else None,
+            "feature_cache": str(cache_path) if cache_path else None,
             "disclaimer": (
                 "mock mode uses SYNTHETIC features and validates the harness only; "
                 "scientific conclusions require real_cg features + the full balanced "
@@ -380,6 +387,9 @@ def _parse_args(argv=None):
                    help="MistralCGAdapter quantization for --mode real_cg (needs bitsandbytes)")
     p.add_argument("--cg-device", default="auto",
                    help="MistralCGAdapter device_map for --mode real_cg")
+    p.add_argument("--no-cache-write", action="store_true",
+                   help="do not write features.jsonl (real_cg / real_checkpoint_cached "
+                        "write a reusable cache by default)")
     p.add_argument("--n-boot", type=int, default=2000)
     p.add_argument("--no-plots", action="store_true")
     return p.parse_args(argv)
@@ -395,7 +405,7 @@ def main(argv=None) -> int:
               tier=args.tier, external_path=args.external_path,
               hf_model=args.hf_model, hf_mock=args.hf_mock,
               scenarios_path=args.scenarios, cg_quantize=args.cg_quantize,
-              cg_device=args.cg_device)
+              cg_device=args.cg_device, write_cache=not args.no_cache_write)
     r = res.results
     print(f"[signal_gov] mode={args.mode} dataset={args.dataset} "
           f"N={r['dataset']['n_total']} unsafe={r['dataset']['n_positive']}")
@@ -404,6 +414,9 @@ def main(argv=None) -> int:
         print(f"  {name:32s} AUROC={m['auroc']:.3f}  catch@10%={m['catch_at_budget']['0.10']:.3f}")
     print(f"  ordering C4>=C3>=C2>=C1: {'PASS' if r['ordering_ok'] else 'FAIL'}")
     print(f"  artifacts -> {res.out_dir}")
+    if r["meta"].get("feature_cache"):
+        print(f"  feature cache -> {r['meta']['feature_cache']}  "
+              "(offline replay: --mode cached --features <path>)")
     return 0
 
 

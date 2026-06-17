@@ -32,7 +32,8 @@ signal-gov-pilot-assemble:
 # GPU + CG CHECKPOINT REQUIRED — NOT runnable in CI. The first true pilot result.
 # See experiments/signal_gov/CG_PILOT_RUNBOOK.md. Requires torch + transformers +
 # symbolu_training + a CG-trained checkpoint. Set CG_CHECKPOINT; optional
-# CG_QUANTIZE (4bit|8bit), CG_DEVICE (auto), CG_PILOT_OUT.
+# CG_QUANTIZE (4bit|8bit), CG_DEVICE (auto), CG_PILOT_OUT. Writes
+# <out>/features.jsonl by default for offline `--mode cached` replay.
 signal-gov-cg-pilot:
 	@test -n "$$CG_CHECKPOINT" || { \
 	  echo "ERROR: set CG_CHECKPOINT=<HF id or local path> (see experiments/signal_gov/CG_PILOT_RUNBOOK.md)"; \

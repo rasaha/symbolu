@@ -14,11 +14,12 @@ internal signals are constant across scenarios and carry no discriminative claim
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
 
-from experiments.signal_gov.configs import CONFIGS
+from experiments.signal_gov.configs import CONFIGS, CONFIG_ORDER
 from experiments.signal_gov.dataset import load_handbuilt, load_smoke
 from experiments.signal_gov.features import (
     FEATURE_FIELDS,
@@ -189,6 +190,55 @@ def test_realcg_determinism():
     a = [fv.to_dict() for fv in RealCGFeatureExtractor(use_stub=True).extract_all(s)]
     b = [fv.to_dict() for fv in RealCGFeatureExtractor(use_stub=True).extract_all(s)]
     assert a == b
+
+
+@agentic_required
+def test_realcg_writes_feature_cache(tmp_path):
+    res = run("real_cg", "handbuilt", tmp_path, real_cg_stub=True, n_boot=50,
+              make_plots=False)
+    cache = tmp_path / "features.jsonl"
+    assert cache.exists() and cache.stat().st_size > 0
+    assert res.results["meta"]["feature_cache"] == str(cache)
+    rows = [json.loads(ln) for ln in cache.read_text().splitlines() if ln.strip()]
+    assert len(rows) == res.results["dataset"]["n_total"]
+    for r in rows:                                   # cache schema == FEATURE_FIELDS
+        assert set(r.keys()) == set(FEATURE_FIELDS)
+        assert r["provenance"].startswith("real_cg:")
+
+
+@agentic_required
+def test_realcg_cache_replay_bit_identical(tmp_path):
+    gpu = run("real_cg", "handbuilt", tmp_path / "extract", real_cg_stub=True,
+              n_boot=50, make_plots=False)
+    cache = tmp_path / "extract" / "features.jsonl"
+    replay = run("cached", "handbuilt", tmp_path / "replay",
+                 features_path=str(cache), n_boot=50, make_plots=False)
+    for name in CONFIG_ORDER:                        # metrics identical offline
+        g, r = gpu.results["configs"][name], replay.results["configs"][name]
+        assert r["auroc"] == pytest.approx(g["auroc"], abs=1e-12)
+        assert r["auprc"] == pytest.approx(g["auprc"], abs=1e-12)
+        assert r["catch_at_budget"] == g["catch_at_budget"]
+
+
+@agentic_required
+def test_realcg_cache_provenance_preserved(tmp_path):
+    gpu = run("real_cg", "smoke", tmp_path / "extract", real_cg_stub=True,
+              n_boot=50, make_plots=False)
+    cache = tmp_path / "extract" / "features.jsonl"
+    replay = run("cached", "smoke", tmp_path / "replay",
+                 features_path=str(cache), n_boot=50, make_plots=False)
+    # provenance is carried through the cache into the replay's metadata.
+    assert replay.results["meta"]["feature_provenance"] == \
+        gpu.results["meta"]["feature_provenance"]
+    assert "real_cg" in replay.results["meta"]["feature_provenance"]
+
+
+@agentic_required
+def test_realcg_no_cache_write_disables(tmp_path):
+    res = run("real_cg", "smoke", tmp_path, real_cg_stub=True, n_boot=50,
+              make_plots=False, write_cache=False)
+    assert not (tmp_path / "features.jsonl").exists()
+    assert res.results["meta"]["feature_cache"] is None
 
 
 @agentic_required

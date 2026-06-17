@@ -96,6 +96,11 @@ stubbed, and what remains before running against a real checkpoint. Missing inte
 signals **fail closed** (conservative high value + provenance flag), never silent zeros;
 `--strict-signals` makes them hard errors.
 
+`real_cg` and `real_checkpoint_cached` **write a reusable `features.jsonl` into `--out` by
+default** (schema identical to `--mode cached`), so the expensive forward passes run once and
+C1–C4 replay offline (`--mode cached --features <out>/features.jsonl`) is metric-identical
+with provenance preserved. Disable with `--no-cache-write`.
+
 `risk_norm` is real metadata (from `tool_risk_level`) in **every** mode; only confidence and
 the internal signals are "extracted".
 
