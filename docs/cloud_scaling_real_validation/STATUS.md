@@ -43,9 +43,14 @@ produced**; the four labels are never conflated._
   gap, not the *system-dynamics* gap.
 - **The HPA baseline** in rung 2 is the standard threshold model, not real HPA
   telemetry.
-- **Rung 3 has not been executed** in this environment (no Docker daemon). The
-  harness + wiring are proven; the live numbers are produced when someone runs it
-  on a Docker host. We ship no fabricated live numbers.
+- **Rung 3 has not been executed** in this environment. We confirmed precisely
+  why: the Docker daemon *can* be started here, but **container-registry blob
+  egress is blocked** — `docker pull` gets `403 Forbidden` from
+  `production.cloudfront.docker.com` (the network policy is GitHub-only), so kind/
+  k3s cannot pull a node image and the apps cannot pull from gcr.io. A real
+  cluster is therefore impossible in this sandbox. The harness + wiring are proven;
+  the live numbers are produced when someone runs it on a host with normal
+  registry access. We ship no fabricated live numbers.
 - **Alibaba & Google traces** were not replayed — their data lives behind
   egress-blocked hosts here. The adapters exist and are fixture-tested
   (`PENDING_DATA`), but produced no reported number.

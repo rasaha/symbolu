@@ -8,8 +8,11 @@ would have blocked, a $/replica savings estimate, and the SLO-regression count.
 
 > **Status / honesty label.** Everything in this directory is **runnable on a
 > Docker host** and produces numbers labelled **`live-shadow-self-run`**. It was
-> **NOT executed in the build environment**, which has no Docker daemon (no
-> kind/k3s/kubectl). So this repo ships the *harness*, not live numbers — the
+> **NOT executed in the build environment**: the Docker daemon can be started
+> there, but the network policy is GitHub-only, so `docker pull` gets `403
+> Forbidden` on image blobs (`production.cloudfront.docker.com`) — kind/k3s cannot
+> pull a node image and the apps cannot pull from gcr.io, so no cluster can come
+> up. This repo therefore ships the *harness*, not live numbers — the
 > `artifacts/.../track_a_live_shadow.*` files are produced when you run it. The
 > control-core↔Prometheus↔shadow↔guard **wiring is proven here** by
 > `tests/cloud_controller/test_shadow_integration.py`, which runs the whole chain

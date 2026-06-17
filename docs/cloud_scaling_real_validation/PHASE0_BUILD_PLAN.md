@@ -219,7 +219,7 @@ Probed this sandbox directly:
 
 | capability | result | consequence |
 |---|---|---|
-| Docker daemon | **DOWN** (no `/var/run/docker.sock`); no kind/k3s/kubectl/helm/k6/Locust | **A live cluster cannot run here.** Track A is delivered as a fully reproducible harness; its live numbers are **PENDING** execution on a Docker/k8s host. We will **not** fabricate them. |
+| Docker daemon | Initially down; **can be started** (dockerd 29.3.1), but `docker pull` then hits **403 Forbidden on image blobs** (`production.cloudfront.docker.com`) — the GitHub-only egress policy blocks container registries. No kind/k3s/kubectl/helm/k6/Locust either. | **A live cluster cannot run here** (no node/app images can be pulled). Track A is delivered as a fully reproducible harness; its live numbers are **PENDING** execution on a host with normal registry access. We will **not** fabricate them. |
 | PyPI | **reachable** (installed pytest 9.1, numpy 2.4) | existing 702 tests + new harness tests run here |
 | Egress | **GitHub-only**: `github.com` + `raw.githubusercontent.com` = 200; Azure blob, GCS, TU-Delft, HuggingFace, `api.github.com` = 403 | Real traces must come from files **committed in-git** on GitHub. |
 | Alibaba / Google traces | **blocked** (live on Alibaba blob / GCS) | adapters built + unit-tested on fixtures, but **not executed here**; labeled PENDING-DATA. |
