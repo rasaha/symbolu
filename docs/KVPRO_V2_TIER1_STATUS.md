@@ -20,15 +20,27 @@ pod with the int4 flash-attention fork built**, and therefore **cannot be produc
 here**. Per the task's hard constraint, **no GPU result has been simulated or labeled measured.**
 
 What **was** delivered, and is green on CPU:
+- **Phase-1 pod-ready code** (`kv_policy/phase6f_read_fusion.py`): the int4 read-path
+  gather+splice+dequant-prep as a pure-PyTorch **reference** + a single-pass **fused** variant
+  proven **byte-equal** on CPU — the numerical oracle the GPU kernel must match. **HARDWARE-UNTESTED
+  on GPU; no throughput number claimed.**
+- **Phase-3 pod-ready code** (`kv_policy/tier5c_warmtier_serving.py`): the WarmTier **serving**
+  orchestration (prefix keying, snapshot store + manifest, reuse-plan + computed-token accounting,
+  eviction policy) on top of the proven tier5b primitive. Host logic CPU-tested incl. an end-to-end
+  snapshot→store→plan→restore byte-clean round-trip; the vLLM/GPU serving steps are isolated and
+  **HARDWARE-UNTESTED** (fail loudly, never silently fake).
 - A **CPU regression test suite for the WarmTier snapshot/restore primitive** (`tier5b_snapshot.py`)
   — the Phase-3 "gate on `verify_roundtrip` byte-clean first" requirement, validated at the
   **logic/plumbing level** (both protect formats), plus its guard behavior. **MEASURED (CPU,
   logic-level), this session.**
-- Confirmation that the **existing CPU-runnable test suite stays green** (164 tests pass; only
-  genuine CUDA-only paths skip).
+- Confirmation that the **existing CPU-runnable test suite stays green** (196 tests pass: 45 new +
+  151 existing CPU-runnable; only genuine CUDA-only paths skip).
 - This honest STATUS doc + a prior-measured baseline table (clearly labeled, **not** reproduced here).
 
-The remaining work is **blocked on hardware/toolchain prerequisites**, enumerated precisely below.
+> **Per-session direction:** after the Phase-0 stop-and-report, the user chose
+> *"write untested pod-ready code"* — so Phase-1 and Phase-3 are now implemented as
+> HARDWARE-UNTESTED, CPU-logic-tested code for later pod execution (above). The remaining
+> **measurements** are still **blocked on hardware/toolchain prerequisites**, enumerated below.
 
 ---
 
@@ -99,11 +111,16 @@ to beat**, **not** re-measured in this container. Do not read this table as a cu
 Cannot build the int4 FA fork, calibrate masks, or run vLLM. Baseline table above is prior-measured.
 **STOP-and-report point reached as the task instructs.**
 
-### Phase 1 — Decode-throughput recovery (read-path fusion) → **BLOCKED (no GPU/CUDA)**
-The lever (fuse the pre-kernel gather+splice+dequant-prep of the int4 read path; ~42–60% of the B=1
-read path) needs a built int4 kernel + GPU to measure. No roofline (no perf-counter pod) and no
-CUDA-event B=1 headroom run is possible without a GPU. **Honest ceiling remains ~0.27–0.30×, NOT
-parity** — unchanged, and unverified this session. No fusion kernel was written blind-and-untestable.
+### Phase 1 — Decode-throughput recovery (read-path fusion) → **CODE DELIVERED; GPU measurement BLOCKED**
+- **Delivered (pod-ready, CPU-validated):** `kv_policy/phase6f_read_fusion.py` implements the lever —
+  the pre-kernel gather+splice+dequant-prep (~42–60% of the B=1 read path) — as a pure-PyTorch
+  reference + a single-pass fused variant, **byte-equal on CPU** (`test_phase6f_read_fusion_cpu.py`,
+  11 tests). It matches the production pack/quant convention exactly, so it is the **numerical oracle**
+  for the GPU kernel and a drop-in host-fused prep for `_read_decode_packed_batched`.
+- **Still BLOCKED (needs GPU):** building/wiring the kernel, the CUDA-event B=1 headroom run, the
+  perf-counter roofline (no `ERR_NVGPUCTRPERM`-cleared pod), and the throughput curve.
+- **Honest ceiling remains ~0.27–0.30×, NOT full-precision parity** — unchanged, and **not measured
+  this session**. No throughput number is claimed.
 
 ### Phase 2 — Tensor parallelism → **BLOCKED (no multi-GPU; no single GPU)**
 Nothing validated. Still **single-GPU-only** as a claim; TP correctness/sharding/density are open.
@@ -112,14 +129,20 @@ Nothing validated. Still **single-GPU-only** as a claim; TP correctness/sharding
 - The **storage** half (snapshot a prefix's blocks+sidecars to NVMe, reload into fresh blocks) is
   implemented: `kv_policy/tier5b_snapshot.py`, `scripts/measure_kvpro_warmtier_snapshot.py`,
   `scripts/verify_kvpro_snapshot_roundtrip.py`. The systems-metrics script is pod-only.
-- The **serving** half (allocate fresh blocks → restore → **generate tokens over restored KV** with
-  scheduler "already-computed prefix" injection) needs the **int4 decode kernel + vLLM scheduler
-  changes** → **BLOCKED here**. Not written blind.
-- **Delivered:** the Phase-3 gate ("byte-clean first") is now covered by a **CPU logic test**
-  (`tests/test_tier5b_snapshot_cpu.py`): both protect formats round-trip byte-clean, disk
-  round-trip byte-clean, and the count-/geometry-mismatch guards refuse before touching tensors.
-  **MEASURED (CPU, logic-level), this session.** This does not replace the pod byte-gate on the live
-  vLLM writer; it guards the serialize/restore code against logic regressions without a GPU.
+- **Serving orchestration DELIVERED (pod-ready, host logic CPU-tested):**
+  `kv_policy/tier5c_warmtier_serving.py` adds prefix keying (block-aligned chained hash),
+  a snapshot store + JSON manifest with collision-guarded longest-prefix match, the eviction
+  snapshot policy (threshold + dedup), the reuse plan + **computed-token accounting**
+  (`num_computed_tokens = n_blocks·block_size`), and writer-backed snapshot/restore that inherits
+  tier5b's byte-faithful guarantee. `test_tier5c_warmtier_serving_cpu.py` (21 tests) covers all of
+  it incl. an **end-to-end snapshot→store→plan→restore byte-clean round-trip** on a mock writer.
+- **Still BLOCKED (needs GPU/vLLM):** `mark_prefix_computed` (scheduler "already-computed" signal)
+  and `serve_with_warmtier_reuse` (generate over restored KV with the int4 decode kernel) are
+  isolated and **raise loudly off-pod** — never a silent fake. The reuse economics (TTFT-vs-cold,
+  bytes/token, p95/p99) are **MEASURED on a pod**, not here.
+- **Phase-3 gate** ("byte-clean first") is also covered by `tests/test_tier5b_snapshot_cpu.py`
+  (both protect formats, disk round-trip, guards). **MEASURED (CPU, logic-level), this session.**
+  This does not replace the pod byte-gate on the live vLLM writer.
 
 ### Phase 4 — Broader quality bench → **BLOCKED (no GPU)**
 HumanEval pass@1 (sandboxed) and LongBench F1 vs full precision both need GPU inference. Runner-ready
@@ -134,13 +157,21 @@ codec-fidelity-directional, e2e OPEN (`docs/KVPRO_VS_CACHEGEN_WARMTIER_PROTOCOL.
 ## What is now MEASURED (this session) vs still PROJECTED / OPEN
 
 **Newly MEASURED (CPU, logic-level only):**
+- **Phase-1 read-fusion numerics:** the fused dequant-prep is **byte-equal** to the staged reference
+  for K, V, and the whole-view prep; pack/unpack round-trips and the protect overlay are exact;
+  4-bit reconstruction error is bounded by one step. 11/11 tests pass. (No throughput measured.)
+- **Phase-3 WarmTier host logic:** prefix keying, store + manifest round-trip, longest-prefix match
+  (collision-guarded), reuse-plan accounting, eviction policy, and an **end-to-end
+  snapshot→store→plan→restore byte-clean round-trip** on a mock writer. 21/21 tests pass.
 - WarmTier snapshot/restore round-trip is byte-clean at the logic level for **both** protect formats
   (bf16-passthrough strictly byte-equal; prot-int8 code-lattice identity), and the restore guards
   (1:1 count, geometry) refuse bad input before any tensor write. 13/13 tests pass.
-- Existing CPU-runnable test suite is green (164 tests pass; CUDA-only paths skip).
+- Existing CPU-runnable test suite is green (**196 tests pass: 45 new + 151 existing**; CUDA-only
+  paths skip).
 
 **Still PROJECTED / OPEN (need a GPU pod — unchanged from prior status):**
-- Decode-throughput recovery to the **~0.27–0.30× bounded ceiling** (PROJECTED; never parity).
+- Decode-throughput recovery to the **~0.27–0.30× bounded ceiling** (PROJECTED; never parity) — the
+  Phase-1 fusion code is ready; the kernel build + throughput curve are the open GPU work.
 - TP correctness/density at 2-rank and 70B-class (OPEN).
 - WarmTier **serving** TTFT-vs-cold, bytes/token on a real reuse workload, p95/p99 under concurrency
   (OPEN; storage-half script ready).
@@ -170,15 +201,32 @@ this gate — prefill writes the KV before the decode read runs). It must print
 
 ---
 
+## Pod-ready code delivered this session (Phase 1 + Phase 3)
+
+| File | What | CPU-validated | Pod-only (HARDWARE-UNTESTED) |
+|---|---|---|---|
+| `kv_policy/phase6f_read_fusion.py` | int4 read-path dequant-prep: reference + fused | nibble codec, quant round-trip, protect overlay, **fused≡reference byte-eq** (K/V/prep) | the inline CUDA/Triton kernel + throughput curve |
+| `kv_policy/tier5c_warmtier_serving.py` | WarmTier serving orchestration | prefix keying, store/manifest, reuse-plan + computed-token accounting, eviction policy, **e2e snapshot→store→plan→restore byte-clean** | `mark_prefix_computed` (scheduler signal), `serve_with_warmtier_reuse` (decode over restored KV) |
+
+**Integration points for the pod engineer** (in code comments too):
+- Phase 1: drop `fused_read_dequant_prep` into `phase5b_backend_install._read_decode_packed_batched`
+  (B=1: `_read_decode_packed_one`); the CUDA path is the existing
+  `int4_fused_attention_kernel.fused_protected_k_decode_attention`. `PHASE6F_FUSED_READ=0` forces the
+  reference for a byte-eq gate (mirrors `PHASE6E_FUSED_WRITER`).
+- Phase 3: compose `plan_reuse → restore_prefix_into_blocks → mark_prefix_computed → generate`;
+  gate on `scripts/verify_kvpro_snapshot_roundtrip.py` first, then measure TTFT-vs-cold / p95 / p99.
+
 ## How to run the delivered CPU subset
 
 ```bash
-# WarmTier snapshot/restore logic + guards (this session's new tests)
-python3 -m unittest CTM_plus.KVPolicy.tests.test_tier5b_snapshot_cpu -v
+# This session's new pod-ready code + its CPU logic tests (45 tests)
+python3 -m unittest CTM_plus.KVPolicy.tests.test_tier5b_snapshot_cpu \
+                    CTM_plus.KVPolicy.tests.test_phase6f_read_fusion_cpu \
+                    CTM_plus.KVPolicy.tests.test_tier5c_warmtier_serving_cpu -v
 
 # Existing CPU-runnable guard suites (must stay green)
 python3 -m unittest CTM_plus.KVPolicy.tests.test_phase6k15_swap_guard \
                     CTM_plus.KVPolicy.tests.test_phase6k16_prefix_guard \
                     CTM_plus.KVPolicy.tests.test_phase6k17_chunked_guard
 ```
-(`torch` CPU build is sufficient for the round-trip tests; the pure-helper tests need no deps.)
+(`torch` CPU build is sufficient for the round-trip/byte-eq tests; the pure-helper tests need no deps.)
