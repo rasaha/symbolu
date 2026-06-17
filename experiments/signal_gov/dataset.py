@@ -395,21 +395,37 @@ def load_external(source: str, path: Optional[str] = None, *,
     return _load_external(source, path, pairing=pairing, limit=limit)
 
 
+def load_scenarios_jsonl(path) -> List[Scenario]:
+    """Load Scenario records from a JSONL file (one scenario per line)."""
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(
+            f"scenario file not found: {p} (assemble it with "
+            "`python -m experiments.signal_gov.pilot --out <path>`)")
+    out: List[Scenario] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            out.append(Scenario.from_dict(json.loads(line)))
+    return out
+
+
 def load_dataset(name: str) -> List[Scenario]:
     """Dispatch a dataset by name.
 
-    Recognised names: 'handbuilt', 'smoke', 'agentdojo_fixture',
-    'injecagent_fixture', 'external_fixtures' (both fixtures combined). For real
-    external data, call ``load_external(source, path=...)`` (or use
-    ``run_experiment --dataset agentdojo --external-path ...``).
+    Recognised names: 'handbuilt', 'smoke', 'pilot' (offline 15-scenario stand-in),
+    'pilot_30_50' (the assembled balanced pilot, if present), 'agentdojo_fixture',
+    'injecagent_fixture', 'external_fixtures'. For real external data, call
+    ``load_external(source, path=...)`` or ``run_experiment --scenarios <jsonl>``.
     """
     if name in ("handbuilt", "pilot"):
         # "pilot" is the offline 15-scenario balanced stand-in. The real 30-50
-        # scenario pilot adds AgentDojo/InjecAgent exports (see EXTERNAL_BENCHMARKS.md)
-        # for the injection third plus more destructive/ambiguous scenarios.
+        # scenario pilot is assembled by pilot.py into data/pilot_30_50.jsonl
+        # (load it via name 'pilot_30_50' or --scenarios <path>).
         return load_handbuilt()
     if name == "smoke":
         return load_smoke()
+    if name in ("pilot_30_50", "pilot_assembled"):
+        return load_scenarios_jsonl(DATA_DIR / "pilot_30_50.jsonl")
     if name in ("agentdojo_fixture", "injecagent_fixture"):
         from experiments.signal_gov.external import load_fixture
         return load_fixture(name.replace("_fixture", ""))

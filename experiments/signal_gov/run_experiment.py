@@ -37,7 +37,7 @@ import numpy as np
 from experiments.signal_gov import __doc__ as _pkg_doc  # noqa: F401
 from experiments.signal_gov.configs import CONFIG_ORDER, CONFIGS, score_configs
 from experiments.signal_gov.dataset import (
-    Scenario, category_balance, load_dataset, load_external,
+    Scenario, category_balance, load_dataset, load_external, load_scenarios_jsonl,
 )
 from experiments.signal_gov.delong import delong_roc_test
 from experiments.signal_gov.features import (
@@ -90,8 +90,12 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         make_plots: bool = True, checkpoint: str | None = None,
         real_cg_stub: bool = False, strict_signals: bool = False,
         tier: str = "consumer", external_path: str | None = None,
-        hf_model: str | None = None, hf_mock: bool = False) -> ExperimentResult:
-    if dataset in ("agentdojo", "injecagent") and external_path:
+        hf_model: str | None = None, hf_mock: bool = False,
+        scenarios_path: str | None = None,
+        cg_quantize: str | None = None, cg_device: str = "auto") -> ExperimentResult:
+    if scenarios_path:
+        scenarios = load_scenarios_jsonl(scenarios_path)
+    elif dataset in ("agentdojo", "injecagent") and external_path:
         scenarios = load_external(dataset, external_path)
     else:
         scenarios = load_dataset(dataset)
@@ -104,10 +108,13 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
 
     labels = _labels_from_oracle(scenarios)
 
+    # CG adapter knobs only apply to real_cg (live MistralCGAdapter).
+    extra = ({"quantize": cg_quantize, "device_map": cg_device}
+             if mode == "real_cg" and not real_cg_stub else {})
     extractor = build_extractor(mode, seed=seed, features_path=features_path,
                                 checkpoint=checkpoint, use_stub=real_cg_stub,
                                 strict_signals=strict_signals, tier=tier,
-                                hf_model=hf_model, use_mock_hf=hf_mock)
+                                hf_model=hf_model, use_mock_hf=hf_mock, **extra)
     features = extractor.extract_all(scenarios)
 
     # real_checkpoint_cached: persist the scenario-varying feature cache so C1-C4
@@ -297,6 +304,30 @@ def _write_report(results: Dict, path: Path) -> None:
     pv = d["p_value"]
     lines.append(f"- DeLong p-value = {'nan (too few samples per class)' if np.isnan(pv) else f'{pv:.4f}'}")
     lines.append("")
+
+    # Power / significance disclaimer (auto, for small-N pilots).
+    n = ds["n_total"]
+    npos = ds["n_positive"]
+    nneg = n - npos
+    underpowered = n < 100 or min(npos, nneg) < 20
+    power_notes = []
+    if underpowered:
+        power_notes.append(
+            f"**N={n} (pos={npos}, neg={nneg}) is small.** Bootstrap CIs are wide and the "
+            "DeLong test is UNDERPOWERED — a non-significant or borderline p-value at this N "
+            "is NOT evidence of no effect, and a significant one needs replication. Treat a "
+            "30-50 scenario run as a directional pilot, not a confirmatory result.")
+    if np.isnan(pv):
+        power_notes.append("DeLong p-value is undefined (need ≥2 samples per class).")
+    elif pv > 0.05:
+        power_notes.append(f"C4 vs C3 is NOT significant at p<0.05 (p={pv:.3f}).")
+    if power_notes:
+        lines.append("## Power & significance")
+        lines.append("")
+        for nt in power_notes:
+            lines.append(f"- {nt}")
+        lines.append("")
+
     lines.append("## Standalone signal importance (AUROC, oriented higher=riskier)")
     lines.append("")
     lines.append("| Feature | Standalone AUROC |")
@@ -343,6 +374,12 @@ def _parse_args(argv=None):
                    help="stock HF model for --mode real_checkpoint_cached (Qwen/Llama/Mistral)")
     p.add_argument("--hf-mock", action="store_true",
                    help="real_checkpoint_cached via a deterministic mock backend (no torch)")
+    p.add_argument("--scenarios", default=None,
+                   help="load Scenario records directly from a JSONL (e.g. the assembled pilot)")
+    p.add_argument("--cg-quantize", default=None, choices=[None, "4bit", "8bit"],
+                   help="MistralCGAdapter quantization for --mode real_cg (needs bitsandbytes)")
+    p.add_argument("--cg-device", default="auto",
+                   help="MistralCGAdapter device_map for --mode real_cg")
     p.add_argument("--n-boot", type=int, default=2000)
     p.add_argument("--no-plots", action="store_true")
     return p.parse_args(argv)
@@ -356,7 +393,9 @@ def main(argv=None) -> int:
               make_plots=not args.no_plots, checkpoint=args.checkpoint,
               real_cg_stub=args.real_cg_stub, strict_signals=args.strict_signals,
               tier=args.tier, external_path=args.external_path,
-              hf_model=args.hf_model, hf_mock=args.hf_mock)
+              hf_model=args.hf_model, hf_mock=args.hf_mock,
+              scenarios_path=args.scenarios, cg_quantize=args.cg_quantize,
+              cg_device=args.cg_device)
     r = res.results
     print(f"[signal_gov] mode={args.mode} dataset={args.dataset} "
           f"N={r['dataset']['n_total']} unsafe={r['dataset']['n_positive']}")

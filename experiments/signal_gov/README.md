@@ -25,9 +25,18 @@ make signal-gov-smoke          # deterministic CI smoke test (10 scenarios, mock
 make signal-gov-realcg-smoke   # LIVE internal-signal path via StubCGLLMAdapter (no torch/GPU)
 make signal-gov-external-smoke # AgentDojo/InjecAgent ingestion on offline fixtures
 make signal-gov-checkpoint-smoke # stock-model (Qwen/Llama/Mistral) path via mock backend
+make signal-gov-pilot-assemble # assemble the balanced 30-50 scenario pilot set (CPU)
+make signal-gov-cg-pilot       # GPU + CG checkpoint: first true pilot (see CG_PILOT_RUNBOOK.md)
 make signal-gov-run            # full hand-built mini-set (mock) -> out/mock_handbuilt/
 make signal-gov-data           # (re)write the on-disk benchmark JSONL
 ```
+
+**First true pilot (GPU):** to produce the first real 30–50 scenario result on the actual
+CG checkpoint path (`--mode real_cg` with `MistralCGAdapter`), follow
+[`CG_PILOT_RUNBOOK.md`](CG_PILOT_RUNBOOK.md). Assemble the balanced set with
+`make signal-gov-pilot-assemble` (CPU → `data/pilot_30_50.jsonl`), then run on a GPU box.
+Reports auto-include a **Power & significance** disclaimer (a 30–50 pilot is underpowered —
+directional, not confirmatory). Fill [`PILOT_REPORT_TEMPLATE.md`](PILOT_REPORT_TEMPLATE.md).
 
 Or directly:
 
@@ -194,13 +203,18 @@ experiments/signal_gov/
   delong.py        paired AUROC significance test
   plots.py         ROC overlay + catch@budget bars (matplotlib Agg)
   external.py      AgentDojo / InjecAgent -> Scenario loaders (offline, deterministic)
+  pilot.py         balanced 30-50 pilot assembler + enterprise scenario pool
   run_experiment.py end-to-end pipeline + artifact writers + CLI
   data/handbuilt_miniset.jsonl   on-disk benchmark (generated from dataset.py)
   data/fixtures/{agentdojo,injecagent}_mini.json   tiny offline ingestion fixtures
+  data/pilot_30_50.jsonl         committed balanced 30-scenario pilot (assembled)
   EXTERNAL_BENCHMARKS.md         ingestion format + source/category/oracle mapping
   REAL_CHECKPOINT_CACHED.md      stock-model (Qwen/Llama/Mistral) cache workflow + pilot guide
+  CG_PILOT_RUNBOOK.md            GPU runbook for the first true CG-checkpoint pilot
+  PILOT_REPORT_TEMPLATE.md       report template for the true pilot
   tests/test_external_loaders.py external ingestion tests
   tests/test_real_checkpoint_cached.py  stock-checkpoint extraction tests (mock backend)
+  tests/test_pilot_assembly.py   balanced-pilot assembly tests (CPU)
   sample_output/mock_smoke/      committed reference run (mock)
   sample_output/real_cg_stub_smoke/  committed reference run (real_cg via stub)
   tests/test_smoke.py            mock-mode CI smoke test
