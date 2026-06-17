@@ -772,3 +772,43 @@ class TestPipelineBootstrap:
         stats = pipeline.normalizer.get_window_stats("cpu")
         assert stats is not None
         assert stats["count"] > 10
+
+
+class TestK8sStateQueryConstruction:
+    """The kube-state-metrics queries must use modern names with a legacy
+    fallback, label the HPA series by `horizontalpodautoscaler` (not
+    `deployment`), and splice selectors so the PromQL is always well-formed."""
+
+    def _capture(self, namespace=None, deployment=None):
+        client = PrometheusClient(PrometheusConfig(url="http://fake:9090"))
+        seen = []
+        with patch.object(client, "instant_query",
+                          side_effect=lambda q: (seen.append(q), 1.0)[1]):
+            client.query_k8s_state(namespace=namespace, deployment=deployment)
+        return seen
+
+    def test_modern_name_with_legacy_fallback(self):
+        joined = " ".join(self._capture())
+        assert "kube_horizontalpodautoscaler_status_current_replicas" in joined
+        assert "kube_horizontalpodautoscaler_status_desired_replicas" in joined
+        assert "kube_hpa_status_current_replicas" in joined   # legacy fallback kept
+        assert " or " in joined
+
+    def test_hpa_filtered_by_horizontalpodautoscaler_label(self):
+        qs = self._capture(namespace="boutique", deployment="frontend")
+        hpa_q = next(q for q in qs if "horizontalpodautoscaler_status_current" in q)
+        assert 'namespace="boutique"' in hpa_q
+        assert 'horizontalpodautoscaler="frontend"' in hpa_q
+        assert 'deployment="frontend"' not in hpa_q   # HPA series is not labelled by deployment
+
+    def test_pod_restarts_selector_inside_metric(self):
+        pr = next(q for q in self._capture(namespace="boutique") if "restarts_total" in q)
+        assert 'kube_pod_container_status_restarts_total{namespace="boutique"}[10m]' in pr
+        assert "[10m]{" not in pr   # no malformed selector-after-range
+
+    def test_no_filters_yields_valid_promql(self):
+        qs = self._capture()
+        for q in qs:
+            assert "__NSSEL__" not in q and "__HPASEL__" not in q
+        pr = next(q for q in qs if "restarts_total" in q)
+        assert "restarts_total[10m]" in pr

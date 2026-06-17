@@ -61,22 +61,32 @@ DEFAULT_QUERIES: List[Tuple[str, str, str]] = [
     ),
 ]
 
-# Kubernetes-specific queries for system state
+# Kubernetes-specific queries for system state.
+#
+# Label selectors are injected at the `__NSSEL__` / `__HPASEL__` tokens by
+# query_k8s_state (NOT by naive brace-splicing). HPA replica counts use the
+# modern kube-state-metrics names (kube_horizontalpodautoscaler_status_*) with an
+# `or` fallback to the legacy names (kube_hpa_status_*) so the same query works
+# across kube-state-metrics versions. Note the HPA series is labelled by
+# `horizontalpodautoscaler` (the HPA's name), not `deployment`; the `deployment`
+# argument is matched against that label (HPA name == target name by convention).
 K8S_QUERIES: List[Tuple[str, str, str]] = [
     (
         "pod_restarts",
-        "sum(rate(kube_pod_container_status_restarts_total[10m]))",
+        "sum(rate(kube_pod_container_status_restarts_total__NSSEL__[10m]))",
         "Pod restart rate over last 10 minutes",
     ),
     (
         "current_replicas",
-        "kube_hpa_status_current_replicas",
-        "Current replica count from HPA",
+        "kube_horizontalpodautoscaler_status_current_replicas__HPASEL__ "
+        "or kube_hpa_status_current_replicas__HPASEL__",
+        "Current replica count from HPA (modern name, legacy fallback)",
     ),
     (
         "desired_replicas",
-        "kube_hpa_status_desired_replicas",
-        "Desired replica count from HPA",
+        "kube_horizontalpodautoscaler_status_desired_replicas__HPASEL__ "
+        "or kube_hpa_status_desired_replicas__HPASEL__",
+        "Desired replica count from HPA (modern name, legacy fallback)",
     ),
 ]
 
@@ -187,8 +197,9 @@ class PrometheusClient:
         """Query Kubernetes-specific state metrics.
 
         Args:
-            namespace: Filter by K8s namespace (appended to queries).
-            deployment: Filter by deployment name.
+            namespace: Filter by K8s namespace.
+            deployment: Filter by scaling target name (matched against the HPA's
+                `horizontalpodautoscaler` label; HPA name == target by convention).
 
         Returns:
             Dict of state_name → value.
@@ -201,25 +212,21 @@ class PrometheusClient:
             logger.warning("Invalid deployment label rejected: %s", deployment)
             deployment = None
 
+        # Build label selectors and splice them in at the explicit tokens. This
+        # is correct for aggregations (sum/rate) and `or` expressions, unlike
+        # naive first-brace replacement.
+        ns_sel = f'{{namespace="{namespace}"}}' if namespace else ""
+        hpa_parts = []
+        if namespace:
+            hpa_parts.append(f'namespace="{namespace}"')
+        if deployment:
+            hpa_parts.append(f'horizontalpodautoscaler="{deployment}"')
+        hpa_sel = "{" + ",".join(hpa_parts) + "}" if hpa_parts else ""
+
         results: Dict[str, Optional[float]] = {}
         for name, promql, _ in K8S_QUERIES:
-            # Append label filters if specified
-            if namespace or deployment:
-                filters = []
-                if namespace:
-                    filters.append(f'namespace="{namespace}"')
-                if deployment:
-                    filters.append(f'deployment="{deployment}"')
-                filter_str = ",".join(filters)
-                # Insert filter into the query — simple approach for common patterns
-                if "{" in promql:
-                    promql = promql.replace("{", "{" + filter_str + ",", 1)
-                else:
-                    promql = promql.replace(")", "{" + filter_str + "})", 1)
-                    if "{" not in promql:
-                        promql = promql + "{" + filter_str + "}"
-
-            results[name] = self.instant_query(promql)
+            q = promql.replace("__NSSEL__", ns_sel).replace("__HPASEL__", hpa_sel)
+            results[name] = self.instant_query(q)
 
         return results
 
