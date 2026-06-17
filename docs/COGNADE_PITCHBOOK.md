@@ -15,7 +15,7 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 
 | # | Module | Layer | One-line summary | Readiness |
 |---|---|---|---|---|
-| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios, validated further by *real-trace replay*; *live-shadow* harness ready | **Shadow + recommend mode**; validated in simulation + real-trace replay; live-shadow self-run (third-party pending) |
+| 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios; further checked on *real workload traces* (simulated system dynamics) | **Shadow + recommend mode** (built/tested); validated in simulation + real-workload-trace replay; live-shadow harness built but **not yet run on a cluster**; third-party pending |
 | 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
 | 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.9.0, 1,550+ tests, 2 internal pilots |
 | 4 | **Conscious Generation LLM** | Token selection | Multi-field token evaluation on frozen Mistral-7B — ~5M trainable params, interpretable 32D state | **Research-stage** — phase adapter live; full field integration Q1–Q2 |
@@ -40,7 +40,7 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 # 1. Neural Cloud Scaling Controller
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Stage 4 complete** — shadow mode and recommend mode are built and tested. Validation today spans **simulation (19 scenarios) + real production-trace replay (offline) + a runnable live-shadow harness** (read-only, on a real cluster under fault injection). Independent third-party telemetry is the one remaining rung — see the validation maturity ladder in §1.4.
+**Current validation state:** the Cloud Scaling Controller is validated in **simulation** (19 synthetic adversarial scenarios — synthetic workload and simulated system dynamics) and by **offline replay of real workload traces** (Azure Public Dataset LLM/LMM inference traces), in which the request timing and distribution are real but the demand→metrics mapping, replica-optimum estimation, efficiency scoring, and SLO calculation remain modeled (**simulated system dynamics**); the **live-shadow-self-run** harness is built, integration-tested, and wiring-proven against a real Prometheus API but **has not yet been executed on a real Kubernetes cluster**, and **independent third-party telemetry has not started**. Shadow mode and recommend mode are built and tested. See the validation maturity ladder in §1.4.
 
 ## 1.1 The Problem
 
@@ -215,6 +215,8 @@ This is the headline we're proudest of. We built a system that can only make thi
 | hidden_demand | 2.41x optimal | **2.21x optimal** | −0.20x |
 | coherence_oscillation | 3.77x optimal | **3.67x optimal** | −0.10x |
 
+> **Caveat — simulated system dynamics.** Every figure in this subsection is `simulated`: the workload is synthetic *and* the demand→metrics mapping, replica-optimum, efficiency scoring, and SLO accounting are modeled. These are not measured production savings.
+
 #### How often did it actually step in?
 
 | Metric | Value |
@@ -228,20 +230,22 @@ This is the headline we're proudest of. We built a system that can only make thi
 
 ### Validation maturity ladder — where the evidence actually stands
 
-We grade our own evidence. Everything above is **`simulated`**. Here is the full ladder, each rung labelled by *how the number was produced* — we never conflate them.
+We grade our own evidence on two independent axes — is the **workload** real, and are the **system dynamics** (metrics, optimum, efficiency, SLO) real or modeled — so no reader can mistake one rung for another.
 
-| Rung | What it means | Status |
-|---|---|---|
-| **1. Simulation** (19 synthetic scenarios) | Adversarial demand shapes through the control core; pipeline/HPA/provisioning all modelled | ✅ **Done** — 0 catastrophic / severe / SLO regressions; guard blocked 87 of 649 scale-outs (13.4%) |
-| **2. Real production-trace replay** (offline) | The *same* control core, unchanged, replayed over real public cluster traces | ✅ **Done (self-run, offline)** — numbers below |
-| **3. Live shadow on a real cluster under fault injection** (self-run) | Read-only, alongside a real HPA, real Prometheus, real app, real Chaos-Mesh faults | 🟡 **Harness built & wiring-proven; execution is self-run on a Docker host** |
-| **4. Independent third-party telemetry** | A real workload we don't control, measured by someone with no stake in the result | ❌ **Pending** — needs a free external design partner |
+| Rung | Workload | System dynamics | Status |
+|---|---|---|---|
+| **1. Synthetic scenarios** | synthetic (19 adversarial shapes) | simulated | ✅ **Complete** — 0 catastrophic / severe / SLO regressions; guard blocked 87 of 649 scale-outs (13.4%) |
+| **2. Real workload trace replay** (offline) | **real** (Azure Public Dataset inference traces) | **still simulated** (demand→metrics, optimum, efficiency, SLO all modeled) | ✅ **Complete** — numbers below |
+| **3. Live-shadow-self-run** (real cluster, our faults) | real | **live** (real Prometheus / HPA / app; our injected faults) | 🟡 **Harness built, integration-tested, wiring-proven — NOT yet run on a real cluster** |
+| **4. Independent third-party telemetry** | real, not ours | live | ❌ **Not started** — needs a free external design partner |
 
-**Rung 2 — `real-trace-replay`.** We replayed the **Azure LLM/LMM inference traces** (Azure Public Dataset, CC-BY-4.0) through the *unmodified* control core. On the multimodal trace — **1,000,000 real inference requests over 7 days (40,320 cycles)** — the guard blocked **80 of 2,537 scale-outs (3.2%)** as provably futile, saving **0.74% of replica-cycles** at a **near-neutral SLO cost of +4 breach-cycles out of 40,320 (+0.01pp)**. On the shorter conv/code traces it correctly stayed **dormant (0 blocks, 0 false positives)**. The honest read: real traffic is *less* pathological than our adversarial suite, so the guard is even more selective on it — and it never caused a meaningful SLO regression. Reproduce with `scripts/run_trace_replay.py`; full numbers in `artifacts/cloud_controller_real_validation/`.
+**Rung 2 — real workload trace replay (simulated system dynamics).** We replayed the **Azure LLM/LMM inference traces** (Azure Public Dataset, CC-BY-4.0) through the *unmodified* control core. On the multimodal trace — **1,000,000 real inference requests over 7 days (40,320 cycles)** — the guard blocked **80 of 2,537 scale-outs (≈3.2%)** and stayed **dormant (0 blocks, 0 false positives)** on the shorter conv/code traces; against the modeled SLO proxy the change was a near-neutral **+4 breach-cycles out of 40,320 (+0.01pp)**.
 
-**Rung 3 — `live-shadow-self-run`.** The full kind + Prometheus + Online-Boutique + Chaos-Mesh harness lives in `deploy/local-shadow/`, and the control-core↔Prometheus↔shadow↔guard wiring is proven by an integration test against a real HTTP Prometheus. Run on a Docker host it emits a real proof-of-value report (futile-blocks, $/replica, SLO-regression count = 0 by construction, since the controller is read-only). These are still *our* faults on *our* cluster — honest, but not independent.
+> **Caveat — read with every Rung-2 number.** Only the **workload** is real here (real request timing and distribution). The demand→metrics mapping, replica-optimum, efficiency scoring, and SLO calculation are the **same models used in the synthetic suite** — i.e. **simulated system dynamics**. So Rung 2 demonstrates the guard's *selectivity and SLO-neutrality on a real workload distribution*; it is **not** a measurement of savings under live actuation. Reproduce with `scripts/run_trace_replay.py`; numbers in `artifacts/cloud_controller_real_validation/`.
 
-**What "validated" now means:** simulation **+** real-trace-replay **+** a runnable live-shadow harness — not simulation alone. The one rung we cannot honestly claim is rung 4, and we say so plainly.
+**Rung 3 — live-shadow-self-run (built, not yet run).** The full kind + Prometheus + Online-Boutique + Chaos-Mesh harness lives in `deploy/local-shadow/`, and the control-core↔Prometheus↔shadow↔guard wiring is proven by an integration test against a real HTTP Prometheus API. **No real-cluster run has been executed yet**; when run on a cluster it emits a proof-of-value report (futile-blocks, $/replica, SLO-regression count = 0 by construction, since the controller is read-only). Even then the faults are *ours* — it is not independent.
+
+**What "validated" means today:** simulation **+** real-workload-trace replay (with simulated system dynamics) **+** a built-but-not-yet-run live-shadow harness — not a real-cluster or customer result. Rungs 3 (execution) and 4 (independence) are explicitly open.
 
 ### What's already built
 
@@ -1518,7 +1522,7 @@ Each module is independently deployable and independently valuable. Initial comm
 
 | Module | Readiness | Near-term commercial path |
 |---|---|---|
-| **Cloud Scaling Controller** | Production-ready (shadow + recommend mode) | First design-partner deployments; Stage 5 active mode |
+| **Cloud Scaling Controller** | Shadow + recommend mode built and tested; validated in simulation + real-workload-trace replay (simulated system dynamics); live-shadow harness built but not yet run on a cluster; third-party pending | First design-partner deployments (the live-shadow + third-party rungs); Stage 5 active mode |
 | **CTM+/PCAM** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
 | **Agentic Framework** | Pilot-ready (v1.9.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
 | **Conscious Generation LLM** | Research-stage (phase adapter live) | Benchmark validation; adapter maturation for Agentic Framework |

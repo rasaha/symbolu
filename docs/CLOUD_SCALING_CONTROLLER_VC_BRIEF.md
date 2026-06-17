@@ -1,7 +1,7 @@
 # Neural Cloud Scaling Controller — VC Brief
 
 **A four-page introduction for investors**
-**Where we are:** Stage 4 built and tested (shadow + recommend mode). Validation spans **simulation (19 scenarios) + real production-trace replay (offline) + a runnable live-shadow harness** on a real cluster under fault injection. Independent third-party telemetry is the one remaining rung — see the validation maturity ladder on Page 4.
+**Where we are:** validated in **simulation** (19 synthetic adversarial scenarios) and by **offline replay of real workload traces** (Azure Public Dataset inference traces) — where the workload timing and distribution are real but the demand→metrics mapping, replica-optimum, efficiency scoring, and SLO proxy remain modeled (**simulated system dynamics**) — while the **live-shadow-self-run** harness is built, integration-tested, and wiring-proven but **not yet run on a real cluster**, and **independent third-party telemetry is pending**. (Shadow + recommend mode are built and tested.) See the validation maturity ladder on Page 4.
 
 ---
 
@@ -184,6 +184,8 @@ This is the headline we're proudest of. We built a system that can only make thi
 | hidden_demand | 2.41x optimal | **2.21x optimal** | −0.20x |
 | coherence_oscillation | 3.77x optimal | **3.67x optimal** | −0.10x |
 
+> **Caveat — simulated system dynamics.** Every figure in this subsection is `simulated`: synthetic workload *and* modeled demand→metrics, replica-optimum, efficiency scoring, and SLO accounting. These are not measured production savings.
+
 #### How often did it actually step in?
 
 | Metric | Value |
@@ -197,18 +199,20 @@ This is the headline we're proudest of. We built a system that can only make thi
 
 ### Validation maturity ladder — where the evidence actually stands
 
-We grade our own evidence. Everything above is **`simulated`**. The full ladder, each rung labelled by *how the number was produced*:
+We grade our own evidence on two independent axes — is the **workload** real, and are the **system dynamics** (metrics, optimum, efficiency, SLO) real or modeled — so no rung can be mistaken for another.
 
-| Rung | What it means | Status |
-|---|---|---|
-| **1. Simulation** (19 synthetic scenarios) | Adversarial demand shapes; pipeline/HPA/provisioning modelled | ✅ **Done** — 0 catastrophic / severe / SLO regressions; 87 of 649 scale-outs blocked (13.4%) |
-| **2. Real production-trace replay** (offline) | The *same* control core, unchanged, over real public cluster traces | ✅ **Done (self-run, offline)** |
-| **3. Live shadow on a real cluster under fault injection** (self-run) | Read-only, real HPA / Prometheus / app / Chaos-Mesh faults | 🟡 **Harness built & wiring-proven; self-run on a Docker host** |
-| **4. Independent third-party telemetry** | A real workload we don't control, measured by a disinterested party | ❌ **Pending** — needs a free external design partner |
+| Rung | Workload | System dynamics | Status |
+|---|---|---|---|
+| **1. Synthetic scenarios** | synthetic (19 adversarial shapes) | simulated | ✅ **Complete** — 0 catastrophic / severe / SLO regressions; 87 of 649 scale-outs blocked (13.4%) |
+| **2. Real workload trace replay** (offline) | **real** (Azure Public Dataset inference traces) | **still simulated** (demand→metrics, optimum, efficiency, SLO all modeled) | ✅ **Complete** |
+| **3. Live-shadow-self-run** (real cluster, our faults) | real | **live** (real Prometheus / HPA / app; our injected faults) | 🟡 **Harness built, integration-tested, wiring-proven — NOT yet run on a cluster** |
+| **4. Independent third-party telemetry** | real, not ours | live | ❌ **Not started** — needs a free external design partner |
 
-**Rung 2 — `real-trace-replay`.** We replayed the **Azure LLM/LMM inference traces** (Azure Public Dataset, CC-BY-4.0) through the *unmodified* control core. On the multimodal trace — **1,000,000 real requests over 7 days (40,320 cycles)** — the guard blocked **80 of 2,537 scale-outs (3.2%)**, saving **0.74% of replica-cycles** at a near-neutral SLO cost of **+4 breach-cycles of 40,320 (+0.01pp)**; on the shorter conv/code traces it stayed **dormant (0 blocks, 0 false positives)**. Real traffic is *less* pathological than our adversarial suite, so the guard is even more selective — and caused no meaningful SLO regression. (`scripts/run_trace_replay.py`; numbers in `artifacts/cloud_controller_real_validation/`.)
+**Rung 2 — real workload trace replay (simulated system dynamics).** We replayed the **Azure LLM/LMM inference traces** (Azure Public Dataset, CC-BY-4.0) through the *unmodified* control core. On the multimodal trace — **1,000,000 real requests over 7 days (40,320 cycles)** — the guard blocked **80 of 2,537 scale-outs (≈3.2%)** and stayed **dormant (0 blocks, 0 false positives)** on the shorter conv/code traces; against the modeled SLO proxy the change was a near-neutral **+4 breach-cycles of 40,320 (+0.01pp)**.
 
-**Rung 3 — `live-shadow-self-run`.** The full kind + Prometheus + Online-Boutique + Chaos-Mesh harness is in `deploy/local-shadow/`; the control-core↔Prometheus↔shadow↔guard wiring is proven by an integration test against a real HTTP Prometheus. Run on a Docker host it emits a real proof-of-value report. Still *our* faults on *our* cluster — not independent.
+> **Caveat — read with every Rung-2 number.** Only the **workload** is real (real request timing and distribution). The demand→metrics mapping, replica-optimum, efficiency scoring, and SLO calculation are the **same models used in the synthetic suite** — **simulated system dynamics**. Rung 2 shows the guard's *selectivity and SLO-neutrality on a real workload distribution*; it is **not** measured savings under live actuation. (`scripts/run_trace_replay.py`; numbers in `artifacts/cloud_controller_real_validation/`.)
+
+**Rung 3 — live-shadow-self-run (built, not yet run).** The full kind + Prometheus + Online-Boutique + Chaos-Mesh harness is in `deploy/local-shadow/`; the control-core↔Prometheus↔shadow↔guard wiring is proven by an integration test against a real HTTP Prometheus API. **No real-cluster run has been executed yet.** When run, the faults are still *ours* — not independent.
 
 ### What's already built
 
