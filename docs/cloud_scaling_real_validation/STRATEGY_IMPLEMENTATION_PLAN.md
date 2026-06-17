@@ -100,6 +100,14 @@ frequency estimate.
   cluster — **not** third-party, and **no** savings claim.
 
 ## 8. Pull measurement (Track C)
+- **Differentiation signal (measure early — before payment or actuation):** does the
+  SRE/platform team say the verdict told them **something their existing tooling did
+  not** — specifically *"scaling was not helping"*? Datadog/Grafana show the
+  incident, Kubecost/CloudZero show the cost, CAST AI/Karpenter show the scaling
+  actions; only our verdict claims to surface **non-causal scaling**. A credible
+  "yes, this told me something new" is a **leading indicator of pull** that precedes
+  LOIs and actuation trust, and the cleanest early test of whether we are
+  differentiated rather than redundant.
 - **Counts as real demand:** signed **paid pilot / LOI**; **unprompted cluster
   expansion**; **≥50% of partners "very disappointed if removed"** (Sean-Ellis);
   explicit request to enable **recommend mode**; a credible **"we'd let it act
@@ -111,10 +119,14 @@ frequency estimate.
 ## 9. Go / no-go decision after 90 days
 | Outcome | Gate 1 — APCY | Gate 2 — Trust | Gate 3 — Pull | Action |
 |---|---|---|---|---|
-| **Company** | ≥ **3–5× price** | ≤5% FP, ≥40–50 adjudicated flags, **0 harmful FP on helpful cases** | paid LOI + expansion + "very disappointed" | Build the read-only interlock; sequence toward recommend → bounded actuation; prepare investor appendix. |
-| **Premium feature / acquisition primitive** | ~ **1–2× price** | green | weak ("expect it free," no LOI) | License/embed the verdict into a platform; pursue acquisition into CAST AI / Datadog. |
+| **Company** | ≥ **3–5× price** | ≤5% FP, ≥40–50 adjudicated flags, **0 harmful FP on helpful cases** | paid LOI + expansion + "very disappointed" + **verdict surfaced what Datadog/Kubecost/CAST AI did not** | Build the read-only interlock; sequence toward recommend → bounded actuation; prepare investor appendix. |
+| **Premium feature / acquisition primitive** | ~ **1–2× price** | green | weak ("expect it free," no LOI) — and **verdict mostly duplicated existing tooling** | License/embed the verdict into a platform; pursue acquisition into CAST AI / Datadog. |
 | **Research / kill** | < **1× price**, or **<5 Tier-A / ≥150 cluster-months** | OR unachievable on real metrics | red | Stop productizing; keep as research or shelve. |
 Price anchor (~$1–2k/cluster/yr) is illustrative — calibrate on first partner data.
+**Supporting pull evidence:** "did the verdict tell us something our existing
+tooling did not (that scaling was not helping)?" is a **leading, pre-payment**
+differentiation indicator — a consistent "yes" reinforces the Company case; a
+consistent "no, we'd have seen it anyway" pushes toward feature/acquisition.
 
 ## 10. What NOT to do during these 90 days
 - **No threshold tuning** unless **pre-registered** before seeing partner data (a
@@ -130,6 +142,10 @@ Price anchor (~$1–2k/cluster/yr) is illustrative — calibrate on first partne
 1. **Run one real Track-A `live-shadow-self-run`** on a host with registry egress
    (removes the "no real cluster" objection; tests precision on real metrics).
 2. **Begin outreach to 3–6 design partners** matching §4 (critical path for Track B).
+   In the **first interviews**, explicitly ask the differentiation question: *did our
+   verdict tell you something your existing tooling (Datadog/Grafana, Kubecost/
+   CloudZero, CAST AI/Karpenter) did not — namely that scaling was not helping?* This
+   measures differentiation **before** any payment or actuation discussion.
 3. **Prepare the data-ingestion checklist + replay pipeline** (§5–§6) so partner
    history converts to a directional APCY within ~30 days of first export.
 
