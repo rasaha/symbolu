@@ -382,26 +382,38 @@ def load_smoke() -> List[Scenario]:
     return [by_id[i] for i in SMOKE_IDS]
 
 
-def load_external(source: str) -> List[Scenario]:
-    """Loader for external benchmarks (AgentDojo / InjecAgent).
+def load_external(source: str, path: Optional[str] = None, *,
+                  pairing: str = "both", limit: Optional[int] = None) -> List[Scenario]:
+    """Load an external benchmark (AgentDojo / InjecAgent) into Scenario records.
 
-    Intentionally a stub: the scaffold must run with no external dependency.
-    Wiring these is the first task of the *real* experiment — map each external
-    task/attack into the pre-registered Scenario schema with its native oracle.
+    Reads a LOCAL exported file (no network). Pass ``path`` to your export, or use
+    the committed fixtures via ``load_dataset("agentdojo_fixture")``. See
+    ``external.py`` + ``EXTERNAL_BENCHMARKS.md`` for the ingestion format.
     """
-    raise NotImplementedError(
-        f"External source {source!r} is not wired in the scaffold. "
-        "Implement a loader that maps AgentDojo/InjecAgent tasks into Scenario "
-        "records (one per proposed tool call) with deterministic labels."
-    )
+    # Lazy import to avoid a dataset <- external <- oracle <- dataset import cycle.
+    from experiments.signal_gov.external import load_external as _load_external
+    return _load_external(source, path, pairing=pairing, limit=limit)
 
 
 def load_dataset(name: str) -> List[Scenario]:
-    """Dispatch a dataset by name: 'handbuilt', 'smoke', or an external source."""
+    """Dispatch a dataset by name.
+
+    Recognised names: 'handbuilt', 'smoke', 'agentdojo_fixture',
+    'injecagent_fixture', 'external_fixtures' (both fixtures combined). For real
+    external data, call ``load_external(source, path=...)`` (or use
+    ``run_experiment --dataset agentdojo --external-path ...``).
+    """
     if name == "handbuilt":
         return load_handbuilt()
     if name == "smoke":
         return load_smoke()
+    if name in ("agentdojo_fixture", "injecagent_fixture"):
+        from experiments.signal_gov.external import load_fixture
+        return load_fixture(name.replace("_fixture", ""))
+    if name == "external_fixtures":
+        from experiments.signal_gov.external import load_fixture
+        return load_fixture("agentdojo") + load_fixture("injecagent")
+    # Bare external source name without a path -> raise a helpful error.
     return load_external(name)
 
 

@@ -23,6 +23,7 @@ unsafe tool calls* and reports standard, deck-ready metrics.
 make signal-gov-deps           # numpy, matplotlib, pytest
 make signal-gov-smoke          # deterministic CI smoke test (10 scenarios, mock features)
 make signal-gov-realcg-smoke   # LIVE internal-signal path via StubCGLLMAdapter (no torch/GPU)
+make signal-gov-external-smoke # AgentDojo/InjecAgent ingestion on offline fixtures
 make signal-gov-run            # full hand-built mini-set (mock) -> out/mock_handbuilt/
 make signal-gov-data           # (re)write the on-disk benchmark JSONL
 ```
@@ -110,6 +111,13 @@ Every scenario has exactly these fields:
 scenario's declared inputs; the smoke test asserts the oracle reproduces all authored labels
 (no human judgement in the labelling path).
 
+**External benchmarks (AgentDojo / InjecAgent)** plug into the injection third via
+`dataset.load_external(source, path=...)` (or the offline fixtures `load_dataset(
+"agentdojo_fixture" | "injecagent_fixture" | "external_fixtures")`). Both map to
+`category="prompt_injection"` and reuse the injection oracle. No network — loaders read a
+local export. See [`EXTERNAL_BENCHMARKS.md`](EXTERNAL_BENCHMARKS.md) for the ingestion
+format, the source/category/oracle mapping, and how to export the real benchmarks.
+
 ---
 
 ## Metrics (pure numpy — see `metrics.py`)
@@ -176,8 +184,12 @@ experiments/signal_gov/
   metrics.py       AUROC / AUPRC / catch@budget / bootstrap (pure numpy)
   delong.py        paired AUROC significance test
   plots.py         ROC overlay + catch@budget bars (matplotlib Agg)
+  external.py      AgentDojo / InjecAgent -> Scenario loaders (offline, deterministic)
   run_experiment.py end-to-end pipeline + artifact writers + CLI
   data/handbuilt_miniset.jsonl   on-disk benchmark (generated from dataset.py)
+  data/fixtures/{agentdojo,injecagent}_mini.json   tiny offline ingestion fixtures
+  EXTERNAL_BENCHMARKS.md         ingestion format + source/category/oracle mapping
+  tests/test_external_loaders.py external ingestion tests
   sample_output/mock_smoke/      committed reference run (mock)
   sample_output/real_cg_stub_smoke/  committed reference run (real_cg via stub)
   tests/test_smoke.py            mock-mode CI smoke test

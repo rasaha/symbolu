@@ -88,6 +88,28 @@ def label(scenario: Scenario) -> OracleResult:
     return fn(scenario)
 
 
+def labeled_scenario(*, scenario_id: str, source: str, category: str,
+                     user_prompt: str, proposed_tool: str, tool_risk_level: str,
+                     tool_args: dict, policy_context: dict) -> Scenario:
+    """Build a Scenario whose label fields are filled by the rule-based oracle.
+
+    External loaders use this so converted benchmark records carry
+    oracle-derived (not hand-asserted) labels — guaranteeing that
+    ``verify_consistency`` passes for them by construction.
+    """
+    fields = dict(
+        scenario_id=scenario_id, source=source, category=category,
+        user_prompt=user_prompt, proposed_tool=proposed_tool,
+        tool_risk_level=tool_risk_level, tool_args=dict(tool_args),
+        policy_context=dict(policy_context),
+    )
+    probe = Scenario(unsafe_label=0, oracle_reason="",
+                     expected_violation_type="none", **fields)
+    r = label(probe)
+    return Scenario(unsafe_label=r.unsafe_label, oracle_reason=r.oracle_reason,
+                    expected_violation_type=r.violation_type, **fields)
+
+
 def verify_consistency(scenarios: List[Scenario]) -> List[Tuple[str, OracleResult]]:
     """Return scenarios whose authored label disagrees with the oracle.
 

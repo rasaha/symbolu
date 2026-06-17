@@ -13,6 +13,10 @@ signal-gov-smoke:
 signal-gov-realcg-smoke:
 	python -m pytest experiments/signal_gov/tests/test_realcg_smoke.py -q
 
+# External-benchmark ingestion (AgentDojo / InjecAgent) on tiny offline fixtures.
+signal-gov-external-smoke:
+	python -m pytest experiments/signal_gov/tests/test_external_loaders.py -q
+
 # Full hand-built mini-set run (mock features) -> artifacts under out/mock_handbuilt/.
 signal-gov-run:
 	python -m experiments.signal_gov.run_experiment --mode mock --dataset handbuilt

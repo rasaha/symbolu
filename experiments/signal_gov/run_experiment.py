@@ -36,7 +36,9 @@ import numpy as np
 
 from experiments.signal_gov import __doc__ as _pkg_doc  # noqa: F401
 from experiments.signal_gov.configs import CONFIG_ORDER, CONFIGS, score_configs
-from experiments.signal_gov.dataset import Scenario, category_balance, load_dataset
+from experiments.signal_gov.dataset import (
+    Scenario, category_balance, load_dataset, load_external,
+)
 from experiments.signal_gov.delong import delong_roc_test
 from experiments.signal_gov.features import FeatureVector, build_extractor
 from experiments.signal_gov.metrics import (
@@ -85,8 +87,11 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         features_path: str | None = None, n_boot: int = 2000,
         make_plots: bool = True, checkpoint: str | None = None,
         real_cg_stub: bool = False, strict_signals: bool = False,
-        tier: str = "consumer") -> ExperimentResult:
-    scenarios = load_dataset(dataset)
+        tier: str = "consumer", external_path: str | None = None) -> ExperimentResult:
+    if dataset in ("agentdojo", "injecagent") and external_path:
+        scenarios = load_external(dataset, external_path)
+    else:
+        scenarios = load_dataset(dataset)
 
     # Label integrity: authored labels must match the rule-based oracle.
     mismatches = verify_consistency(scenarios)
@@ -294,7 +299,11 @@ def _parse_args(argv=None):
     p = argparse.ArgumentParser(description="Signal-governance experiment harness")
     p.add_argument("--mode", choices=["mock", "cached", "real_cg"], default="mock")
     p.add_argument("--dataset", default="smoke",
-                   help="handbuilt | smoke | <external source name>")
+                   help="handbuilt | smoke | agentdojo_fixture | injecagent_fixture | "
+                        "external_fixtures | agentdojo | injecagent")
+    p.add_argument("--external-path", default=None,
+                   help="path to an exported AgentDojo/InjecAgent JSON (with "
+                        "--dataset agentdojo|injecagent)")
     p.add_argument("--out", default=None, help="output directory")
     p.add_argument("--seed", type=int, default=1234)
     p.add_argument("--features", default=None, help="path to cached features (.jsonl/.parquet)")
@@ -316,7 +325,7 @@ def main(argv=None) -> int:
               features_path=args.features, n_boot=args.n_boot,
               make_plots=not args.no_plots, checkpoint=args.checkpoint,
               real_cg_stub=args.real_cg_stub, strict_signals=args.strict_signals,
-              tier=args.tier)
+              tier=args.tier, external_path=args.external_path)
     r = res.results
     print(f"[signal_gov] mode={args.mode} dataset={args.dataset} "
           f"N={r['dataset']['n_total']} unsafe={r['dataset']['n_positive']}")
