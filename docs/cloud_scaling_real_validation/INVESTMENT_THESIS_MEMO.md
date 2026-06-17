@@ -57,11 +57,12 @@ scaling causality, read-only, and (eventually) gates the actuation in L3.
   scale-out but have no notion of its counterfactual. They could add a "scaling
   effectiveness" panel — which is exactly the **feature-absorption risk** — but a
   panel is not a trusted control-path position.
-- **CAST AI/StormForge/Sedai/ScaleOps/Spot** are *actuators*; their incentive is to
-  make their own action cheaper/faster, not to question whether it should happen.
-  A vendor whose product is "we scale for you" is structurally disinclined to ship
-  "your scaling didn't help." This is the classic incumbent blind spot — and our
-  opening.
+- **CAST AI/StormForge/Sedai/ScaleOps/Spot** are *actuators* with a different
+  primary objective: making scaling/provisioning/resource actions cheaper, faster,
+  or more autonomous. Our focus is narrower and complementary — verifying whether a
+  specific scale-out actually improved service health — which is not what they are
+  built to optimize. That difference in objective, not any bad faith on their part,
+  is our opening.
 - None of them is **read-only-first**; they all want write access, which is a trust
   and procurement barrier we don't have.
 
@@ -126,6 +127,36 @@ a definable ICP (large, spiky, dependency-heavy clusters) — then:
   TAM-expansion story.
 The bet is not "we beat CAST AI on savings" (we don't); it's "we own the missing
 decision-quality layer, earn trust read-only, and expand into the control plane."
+
+## 8A. Why now?
+If scaling decision quality is an empty layer, the fair challenge is: why is it
+investable *now* rather than five years ago? The timing rests on a shift in how
+scaling is *used*, not on any claim that the market is already proven.
+- **Autoscaling has crossed from helper to control loop.** Kubernetes, HPA, and
+  Karpenter are now mature and widely trusted to scale production automatically — and
+  a control loop that runs without a human in it needs **outcome verification**,
+  which is precisely the loop nobody closes today.
+- **More autonomy raises the cost of being wrong.** The more scaling is automated and
+  trusted, the more it matters to verify whether a given action actually worked,
+  because no human is reviewing each decision.
+- **Systems are more dependency-heavy.** Microservices, queues, databases, caches,
+  third-party APIs, and AI inference backends create far more **non-capacity
+  bottlenecks** — exactly the regime where adding replicas does not help and where a
+  causal verdict has signal.
+- **AI and bursty workloads make scaling more active and harder to reason about
+  manually.** Inference traffic is spiky and dependency-bound; autoscalers fire more
+  often and less legibly, so manual "did that help?" review does not scale.
+- **Platform teams are squeezed on both incidents and cloud waste**, yet today's
+  tooling splits observability (L1), cost (L2), and actuation (L3) without closing the
+  loop on **decision quality (L4)** — the gap is structural, not merely unbuilt.
+- **Read-only-first is newly practical and newly attractive.** Teams can adopt a
+  decision-quality layer in shadow without granting a new vendor write access to
+  production — lowering the adoption bar at exactly the moment automated scaling makes
+  the need acute.
+
+Honest bound: "why now" explains the **timing and the tailwind**, not the size. It
+makes the empty layer plausibly *ready* to be filled — but **APCY and Tier-A
+frequency still decide whether filling it is a company or a feature.**
 
 ## 9. Why this may only be a feature or acquisition primitive *if the thesis is weak*
 If APCY is low / Tier-A is rare, then the verdict is a genuinely useful **primitive**
@@ -204,4 +235,5 @@ measurement, not the story, and be willing to conclude "feature" or "research."
   retrospective replay across ≥6 design-partner orgs, plus a **real Track-A
   live-shadow-self-run** for precision on real metrics. The **market thesis is
   unproven until those land** — and they are the cheapest, fastest way to learn
-  whether this is a company, a feature, or research.
+  whether this is a company, a feature, or research. **The next step is not more
+  positioning; it is measuring APCY, Tier-A frequency, and design-partner pull.**
