@@ -1,0 +1,21 @@
+# Synthetic scenarios #3 conflicting_signals and #7 cascading_failure →
+# real upstream latency injected on a downstream dependency (productcatalog).
+# CPU on the frontend stays low while latency/errors climb — the exact "scaling
+# won't help, it's an external bottleneck" trap the futility guard exists for.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: upstream-latency
+  namespace: boutique
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [boutique]
+    labelSelectors:
+      app: productcatalogservice
+  delay:
+    latency: "300ms"
+    jitter: "100ms"
+    correlation: "50"
+  duration: "4m"

@@ -1,0 +1,27 @@
+{
+  "label": "live-shadow-self-run",
+  "period_label": "STUB wiring demo (NOT a cluster)",
+  "cycles": 60,
+  "divergence": {
+    "total_decisions": 60,
+    "total_agreements": 24,
+    "total_divergences": 36,
+    "controller_correct": 0,
+    "hpa_correct": 0,
+    "estimated_cost_saved_usd": 0.0
+  },
+  "guard": {
+    "scale_outs_observed": 0,
+    "futile_scale_outs_guard_would_block": 0,
+    "activation_reason": ""
+  },
+  "slo": {
+    "regressions_caused_by_guard": 0,
+    "observed_breach_cycles": 0
+  },
+  "notes": [
+    "Controller ran read-only in shadow; the guard's blocks are a counterfactual, never applied to the cluster.",
+    "Cost/divergence verdicts are correlation, not causation (see DivergenceTracker docstring)."
+  ],
+  "_disclaimer": "STUB wiring demo, NOT a cluster run; numbers from an HTTP stub Prometheus"
+}

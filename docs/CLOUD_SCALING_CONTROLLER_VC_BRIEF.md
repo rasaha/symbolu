@@ -1,7 +1,7 @@
 # Neural Cloud Scaling Controller — VC Brief
 
 **A four-page introduction for investors**
-**Where we are:** Stage 4 complete — shadow mode and recommend mode are production-ready today.
+**Where we are:** validated in **simulation** (19 synthetic adversarial scenarios) and by **offline replay of real workload traces** (Azure Public Dataset inference traces) — where the workload timing and distribution are real but the demand→metrics mapping, replica-optimum, efficiency scoring, and SLO proxy remain modeled (**simulated system dynamics**) — while the **live-shadow-self-run** harness is built, integration-tested, and wiring-proven but **not yet run on a real cluster**, and **independent third-party telemetry is pending**. (Shadow + recommend mode are built and tested.) See the validation maturity ladder on Page 4.
 
 ---
 
@@ -146,7 +146,7 @@ The table below places us against the tools we get compared to in investor conve
 
 - **We occupy a layer nobody else is in.** Every competitor in the table above operates at L0–L3 (sensing, provisioning, cost, prediction) or at L5–L7 (safety bounds, observability, governance). **Layer 4 — decision quality — is empty in the market.** We are the first tool in this space whose entire purpose is to ask *"did the last action actually work, and if not, should we really do it again?"*.
 - **We wrap, we don't replace.** HPA stays. Karpenter stays. Cast AI stays. ScaleOps stays. Datadog stays. The platform team installs us in shadow mode with zero write permissions — no configuration changes to any other tool in the stack, no midnight cutover, no vendor migration. This is a strictly additive product, which is the opposite of how every other FinOps vendor enters a new customer.
-- **Safety by construction.** 19 adversarial scenarios, **zero catastrophic failures, zero severe failures, zero SLO regressions, zero false positives**. The guard can only say "no" to a scale-out — it can never say "yes" to an action the controller wasn't already going to take. That's a property no learned AIOps system can claim, and it's why we can ship on a Tuesday without a change-management committee and a six-week pilot.
+- **Safety by construction.** Across 19 adversarial scenarios *in simulation*, **zero catastrophic failures, zero severe failures, zero SLO regressions, zero false positives** — and on *real-trace replay* the guard caused no meaningful SLO regression (Page 4). The guard can only say "no" to a scale-out — it can never say "yes" to an action the controller wasn't already going to take. That's a property no learned AIOps system can claim, and it's why we can ship on a Tuesday without a change-management committee and a six-week pilot.
 - **Proof-of-value is free.** Shadow mode runs read-only, auto-generates proof-of-value reports, and costs the customer nothing to try. A platform team can turn us on, watch for two weeks, and see exactly what we *would* have saved them — without adopting any dependency, signing any contract, or taking any production risk. No other tool in this space offers that kind of zero-commitment trial, because no other tool can: they all have to write something to work.
 - **The economics compose.** Every other vendor in the table saves money by making the thing you're already doing cheaper or faster. We save money by *not doing the thing*. A scale-out that doesn't happen is 100% cheaper than any rightsizing, spot-instance swap, or bin-packing optimization can ever make it — and those savings are additive to whatever the rest of your stack is already doing.
 
@@ -158,13 +158,13 @@ Every other tool in this market either **scales you faster** (HPA, Karpenter, KE
 
 ## Page 4 — What We've Proven and What's Next
 
-### 19 adversarial scenarios, and what happened
+### 19 adversarial scenarios, and what happened *(in simulation)*
 
-We didn't benchmark this on a friendly load test. We built 19 deliberately nasty scenarios covering signal corruption, actuation delays, system shocks, budget constraints, and controller pathologies — the kinds of things that quietly break autoscalers in production.
+We didn't benchmark this on a friendly load test. We built 19 deliberately nasty scenarios covering signal corruption, actuation delays, system shocks, budget constraints, and controller pathologies — the kinds of things that quietly break autoscalers in production. **Every number in this subsection is `simulated`** (modelled pipeline/HPA/provisioning). The maturity ladder that follows shows what we have since proven on *real* traces and a *real* cluster, each number labelled so the two are never conflated.
 
-#### Safety first (because it's the first thing investors ask)
+#### Safety first (because it's the first thing investors ask) — *simulated*
 
-| Metric | Result |
+| Metric | Result *(simulated, 19 scenarios)* |
 |---|---|
 | Catastrophic failures | **0** |
 | Severe failures | **0** |
@@ -184,6 +184,8 @@ This is the headline we're proudest of. We built a system that can only make thi
 | hidden_demand | 2.41x optimal | **2.21x optimal** | −0.20x |
 | coherence_oscillation | 3.77x optimal | **3.67x optimal** | −0.10x |
 
+> **Caveat — simulated system dynamics.** Every figure in this subsection is `simulated`: synthetic workload *and* modeled demand→metrics, replica-optimum, efficiency scoring, and SLO accounting. These are not measured production savings.
+
 #### How often did it actually step in?
 
 | Metric | Value |
@@ -193,7 +195,24 @@ This is the headline we're proudest of. We built a system that can only make thi
 | Scenarios where the guard intervened | 5 of 19 |
 | Scenarios where the guard stayed out of the way | 14 of 19 |
 
-**The one-line version:** we cut waste from 4.5x to 3.4x of optimal cost with **zero SLO regressions** — and that's something none of the incumbents can do today, because they don't have the feedback loop to know when they're wrong.
+**The one-line version (simulated):** we cut waste from 4.5x to 3.4x of optimal cost with **zero SLO regressions** — and that's something none of the incumbents can do today, because they don't have the feedback loop to know when they're wrong.
+
+### Validation maturity ladder — where the evidence actually stands
+
+We grade our own evidence on two independent axes — is the **workload** real, and are the **system dynamics** (metrics, optimum, efficiency, SLO) real or modeled — so no rung can be mistaken for another.
+
+| Rung | Workload | System dynamics | Status |
+|---|---|---|---|
+| **1. Synthetic scenarios** | synthetic (19 adversarial shapes) | simulated | ✅ **Complete** — 0 catastrophic / severe / SLO regressions; 87 of 649 scale-outs blocked (13.4%) |
+| **2. Real workload trace replay** (offline) | **real** (Azure Public Dataset inference traces) | **still simulated** (demand→metrics, optimum, efficiency, SLO all modeled) | ✅ **Complete** |
+| **3. Live-shadow-self-run** (real cluster, our faults) | real | **live** (real Prometheus / HPA / app; our injected faults) | 🟡 **Harness built, integration-tested, wiring-proven — NOT yet run on a cluster** |
+| **4. Independent third-party telemetry** | real, not ours | live | ❌ **Not started** — needs a free external design partner |
+
+**Rung 2 — real workload trace replay (simulated system dynamics).** We replayed the **Azure LLM/LMM inference traces** (Azure Public Dataset, CC-BY-4.0) through the *unmodified* control core. On the multimodal trace — **1,000,000 real requests over 7 days (40,320 cycles)** — the guard blocked **80 of 2,537 scale-outs (≈3.2%)** and stayed **dormant (0 blocks, 0 false positives)** on the shorter conv/code traces; against the modeled SLO proxy the change was a near-neutral **+4 breach-cycles of 40,320 (+0.01pp)**.
+
+> **Caveat — read with every Rung-2 number.** Only the **workload** is real (real request timing and distribution). The demand→metrics mapping, replica-optimum, efficiency scoring, and SLO calculation are the **same models used in the synthetic suite** — **simulated system dynamics**. Rung 2 shows the guard's *selectivity and SLO-neutrality on a real workload distribution*; it is **not** measured savings under live actuation. (`scripts/run_trace_replay.py`; numbers in `artifacts/cloud_controller_real_validation/`.)
+
+**Rung 3 — live-shadow-self-run (built, not yet run).** The full kind + Prometheus + Online-Boutique + Chaos-Mesh harness is in `deploy/local-shadow/`; the control-core↔Prometheus↔shadow↔guard wiring is proven by an integration test against a real HTTP Prometheus API. **No real-cluster run has been executed yet.** When run, the faults are still *ours* — not independent.
 
 ### What's already built
 
@@ -206,8 +225,10 @@ This isn't a research prototype. It's been staged, tested, and written to be dep
 | Stage 3 | **Shadow mode** — read-only, runs alongside HPA, generates proof-of-value reports | 38 unit tests |
 | Stage 4 | **Recommend mode** — human-in-the-loop with Slack and PagerDuty integration | 39+ unit tests |
 | Bootstrap | Learning-phase elimination, so there's no cold-start warm-up period | 22 unit tests |
+| **Track B** | **Real-trace replay** — real Azure traces through the unmodified control core (offline) | 22 unit tests |
+| **Track A** | **Live-shadow harness** — kind + Prometheus + Online Boutique + Chaos Mesh + real-HTTP wiring proof | 4 integration tests |
 
-**Altogether:** 27 Python source files, 228+ unit tests, all passing.
+**Altogether:** the `tests/cloud_controller/` suite reports **724 passing tests** (4 skipped) — 702 pre-existing plus 26 for the new real-validation harnesses.
 
 ### What's next
 

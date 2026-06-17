@@ -1,0 +1,21 @@
+# Synthetic scenario #16 feedback_delay_loop → real actuation/readiness lag.
+# Network delay on the frontend slows readiness probes and request handling, so
+# capacity added by HPA takes longer to "land" — the over-issue-while-waiting
+# trap. Pair with a long readinessProbe initialDelay (see README) for the full
+# 8-cycle lag.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: feedback-delay
+  namespace: boutique
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces: [boutique]
+    labelSelectors:
+      app: frontend
+  delay:
+    latency: "150ms"
+    jitter: "50ms"
+  duration: "5m"
