@@ -46,11 +46,20 @@ class TraceSeries:
     demand: List[float]
     metrics: Optional[List[Dict[str, float]]] = None
     meta: Dict[str, object] = field(default_factory=dict)
+    # Real per-cycle replica history (current_replicas), aligned 1:1 with `demand`.
+    # Supplied by exports that carry real fleet sizes (e.g. a partner Prometheus/HPA
+    # export); left None for traces that only carry a workload distribution (e.g. the
+    # Azure arrival traces, where the replica trajectory is simulated by the harness).
+    # When present, the Tier-A detector reads the partner's REAL replicas rather than a
+    # modeled trajectory.
+    replicas: Optional[List[float]] = None
 
     def __post_init__(self) -> None:
         # Clamp demand defensively — a real trace must never push the controller
         # outside its documented [0,1] input contract.
         self.demand = [max(0.0, min(1.0, float(d))) for d in self.demand]
+        if self.replicas is not None:
+            self.replicas = [max(0.0, float(r)) for r in self.replicas]
 
     @property
     def n_cycles(self) -> int:
@@ -67,6 +76,29 @@ class TraceSeries:
         # Imported lazily to avoid a hard import cycle at module load.
         from cloud_controller.observability.benchmark import _demand_to_metrics
         return [_demand_to_metrics(d) for d in self.demand]
+
+
+@dataclass
+class IncidentWindow:
+    """A partner incident, expressed in trace-cycle indices.
+
+    Adapters that ingest an incident timeline (e.g. the partner Prometheus/HPA
+    export) convert each incident's start/end timestamp to cycle indices on the
+    trace grid and attach a list of these to `TraceSeries.meta["incidents"]`. The
+    Tier-A detector reads them to decide whether a futile episode *overlapped a real
+    incident* (the Tier-A requirement). Defined here, in the data-contract module, so
+    adapters never need to import the detector.
+    """
+    incident_id: str
+    start_cycle: int
+    end_cycle: int
+    severity: str = ""
+
+    def overlaps(self, a: int, b: int) -> int:
+        """Number of overlapped cycles with the closed span [a, b]."""
+        lo = max(self.start_cycle, a)
+        hi = min(self.end_cycle, b)
+        return max(0, hi - lo + 1)
 
 
 class TraceAdapter(abc.ABC):

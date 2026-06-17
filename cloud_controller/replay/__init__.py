@@ -23,6 +23,20 @@ from cloud_controller.replay.harness import (
     TraceReplayHarness,
 )
 from cloud_controller.replay.replay_source import ReplayPrometheusClient
+from cloud_controller.replay.tier_a import (
+    DEFAULT_TIER_A_SPEC,
+    APCYEstimate,
+    ClusterTierAResult,
+    IncidentWindow,
+    TierAEpisode,
+    TierASpec,
+    TierBEvent,
+    compute_apcy,
+    detect_tier_a,
+    emit_worksheet,
+    emit_worksheets,
+    observe_trace,
+)
 
 __all__ = [
     "AdapterStatus",
@@ -34,4 +48,17 @@ __all__ = [
     "ReplayRun",
     "TraceReplayHarness",
     "ReplayPrometheusClient",
+    # Tier-A detector + APCY (pre-registered; see TIER_A_DETECTOR_SPEC.md)
+    "DEFAULT_TIER_A_SPEC",
+    "TierASpec",
+    "IncidentWindow",
+    "TierAEpisode",
+    "TierBEvent",
+    "ClusterTierAResult",
+    "APCYEstimate",
+    "observe_trace",
+    "detect_tier_a",
+    "compute_apcy",
+    "emit_worksheet",
+    "emit_worksheets",
 ]

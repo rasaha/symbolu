@@ -1,0 +1,85 @@
+{
+  "label": "real-trace-replay (estimate pending live adjudication)",
+  "is_tooling_self_test": true,
+  "spec_doc": "docs/cloud_scaling_real_validation/TIER_A_DETECTOR_SPEC.md",
+  "clusters": [
+    {
+      "cluster": "fixture-cluster",
+      "org": "fixture-org",
+      "label": "real-trace-replay (estimate pending live adjudication)",
+      "data_status": "pending_data",
+      "n_cycles": 55,
+      "cycle_seconds": 60.0,
+      "cluster_months": 0.0013,
+      "cluster_years": 0.0001,
+      "incidents_provided": true,
+      "verdict_mix": {
+        "cycles_helping": 10,
+        "cycles_neutral": 16,
+        "cycles_not_helping": 29
+      },
+      "tier_a_candidate_count": 1,
+      "tier_b_event_count": 0,
+      "tier_a_candidates": [
+        {
+          "episode_id": "fixture-cluster-ep1",
+          "classification": "tier_a_candidate",
+          "start_cycle": 26,
+          "end_cycle": 46,
+          "length_cycles": 21,
+          "floor_replicas": 24,
+          "min_replicas": 24,
+          "peak_replicas": 34,
+          "mean_confidence": 0.51,
+          "overlaps_incident": true,
+          "incident_ids": [
+            "INC-101"
+          ],
+          "incident_overlap_minutes": 17.0,
+          "slo_breach_cycles": 19,
+          "excess_replica_hours": 2.767,
+          "excess_compute_cost_usd": 0.28,
+          "incident_cost_usd": 85.0,
+          "episode_cost_usd": 85.28,
+          "metric_snapshot": {
+            "peak_latency_p99": 0.96,
+            "peak_error_rate": 0.22,
+            "mean_cpu": 0.439
+          }
+        }
+      ],
+      "tier_b_events": [],
+      "meta": {
+        "transfer": "real measured metrics (no demand\u2192metric model)",
+        "normalization": {
+          "latency_slo_seconds": 1.0,
+          "latency_units": "seconds",
+          "queue_capacity": 0.93,
+          "cpu_memory_error": "percent if series max>1 else fraction; clamped [0,1]"
+        },
+        "dollars_per_replica_hour": 0.1,
+        "dollars_per_incident_minute": 5.0,
+        "spec": {
+          "k_consecutive_not_helping": 5,
+          "m_replicas": 20,
+          "eval_window": 5
+        }
+      }
+    }
+  ],
+  "apcy": {
+    "label": "real-trace-replay (estimate pending live adjudication)",
+    "n_orgs": 1,
+    "n_clusters": 1,
+    "total_cluster_months": 0.001,
+    "total_cluster_years": 0.0001,
+    "total_tier_a_candidates": 1,
+    "total_tier_b_events": 0,
+    "median_episode_cost_usd": 85.28,
+    "tier_a_per_cluster_year": 9562.9091,
+    "apcy_usd_per_cluster_year": 815493.01,
+    "reportable": false,
+    "market_red": false,
+    "reason": "NOT reportable as market evidence \u2014 insufficient coverage (0.0 < 150 cluster-months); too few orgs (1 < 6; single-workload bias risk); too few Tier-A (1 < 5)"
+  }
+}
