@@ -1,0 +1,18 @@
+# Synthetic scenario #8 spot_interruption → real random pod kills, standing in
+# for spot/preemptible eviction mid-load. The controller (read-only) must not
+# overreact to the transient replica loss.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: spot-interruption
+  namespace: boutique
+spec:
+  action: pod-kill
+  mode: fixed
+  value: "1"
+  selector:
+    namespaces: [boutique]
+    labelSelectors:
+      app: frontend
+  duration: "10s"
+  # Wrap in a Schedule (every ~1m) to approximate the 5%/cycle eviction rate.
