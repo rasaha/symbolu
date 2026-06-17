@@ -245,4 +245,6 @@ We are the **decision-quality layer** for cloud autoscaling — the missing piec
 
 We're raising to fund Stage 5 (active mode), land our first design-partner deployments, and build out the learning loop that turns every customer into a self-improving control surface. If that sounds like the kind of problem you want to help solve, we'd love to keep talking.
 
+> **Internal pointer:** the read-only design-partner evidence program — exactly what we ask partners for, and how Tracks A/B/C gather it — is specified in `docs/cloud_scaling_real_validation/PARTNER_DATA_REQUIREMENTS_PLAN.md` (with the supporting docs under `docs/cloud_scaling_real_validation/`).
+
 > *"Scale because it works, not because the metrics say so."*
