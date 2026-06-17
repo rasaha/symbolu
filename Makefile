@@ -31,16 +31,20 @@ signal-gov-pilot-assemble:
 
 # GPU + CG CHECKPOINT REQUIRED — NOT runnable in CI. The first true pilot result.
 # See experiments/signal_gov/CG_PILOT_RUNBOOK.md. Requires torch + transformers +
-# symbolu_training + a CG-trained checkpoint. Set CG_CHECKPOINT; optional
-# CG_QUANTIZE (4bit|8bit), CG_DEVICE (auto), CG_PILOT_OUT. Writes
-# <out>/features.jsonl by default for offline `--mode cached` replay.
+# symbolu_training + a TRAINED CG state-dict. Set CG_STATE_DICT (trained *_model.pt);
+# optional CG_BASE_MODEL (default mistral), CG_QUANTIZE (4bit|8bit), CG_DEVICE (auto),
+# CG_PILOT_OUT, CG_ALLOW_UNTRAINED=1 (override the fail-closed check; plumbing only).
+# Fails closed if the state-dict looks vanilla/untrained. Writes <out>/features.jsonl
+# by default for offline `--mode cached` replay.
 signal-gov-cg-pilot:
-	@test -n "$$CG_CHECKPOINT" || { \
-	  echo "ERROR: set CG_CHECKPOINT=<HF id or local path> (see experiments/signal_gov/CG_PILOT_RUNBOOK.md)"; \
+	@test -n "$$CG_STATE_DICT" || { \
+	  echo "ERROR: set CG_STATE_DICT=<trained *_model.pt> (+ optional CG_BASE_MODEL). See experiments/signal_gov/CG_PILOT_RUNBOOK.md"; \
 	  exit 1; }
 	python -m experiments.signal_gov.run_experiment --mode real_cg \
-	  --checkpoint "$$CG_CHECKPOINT" \
+	  --checkpoint "$${CG_BASE_MODEL:-mistralai/Mistral-7B-v0.3}" \
+	  --cg-state-dict "$$CG_STATE_DICT" \
 	  --cg-quantize "$${CG_QUANTIZE:-4bit}" --cg-device "$${CG_DEVICE:-auto}" \
+	  $${CG_ALLOW_UNTRAINED:+--allow-untrained-cg-head} \
 	  --scenarios experiments/signal_gov/data/pilot_30_50.jsonl \
 	  --out "$${CG_PILOT_OUT:-runs/cg_pilot}"
 

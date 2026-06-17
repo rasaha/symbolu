@@ -38,13 +38,20 @@ no-KV-cache generation loop — keep the decision-point prompts short, which the
 - The harness deps: `numpy matplotlib` (`make signal-gov-deps`).
 - Repo on `PYTHONPATH` (run from repo root).
 
-**The CG checkpoint (read this).** `MistralCGAdapter` wraps a base model with the CG
-machinery that emits the 32-D sovereign state. **The pilot only measures CG signal QUALITY
-if that machinery is CG-trained** (Phase Quad / CG checkpoint your team validated — see
-`agentic/docs/VALIDATION_GUIDE_MISTRAL.md` and `agentic/docs/CG_RUNTIME_RUNBOOK.md`). If you
-point it at a vanilla base model with an **untrained** CG head, the 32-D state is not
-meaningful and the run validates plumbing only (same caveat as the stock-model proxy in
-`REAL_CHECKPOINT_CACHED.md`). State this in the report.
+**Base model vs trained CG head (read this).** There are TWO inputs:
+- `--checkpoint` (env `CG_BASE_MODEL`) — the **base backbone** (e.g.
+  `mistralai/Mistral-7B-v0.3`) the CG wrapper wraps. It does **not** contain the trained CG head.
+- `--cg-state-dict` (env `CG_STATE_DICT`) — the **trained CG state-dict** holding the
+  `state_projector` / `intent_projector` / `phase_adapter` weights (e.g.
+  `checkpoints_unified/best_model.pt`, produced by unified `--model_type mistral_cg` training;
+  see `agentic/docs/VALIDATION_GUIDE_MISTRAL.md`). A companion `*_aux.pt` is auto-merged if present.
+
+The harness **fails closed** if `--cg-state-dict` has no CG-head keys, or a zero
+`phase_adapter` output (vanilla/untrained) — pass `--allow-untrained-cg-head` to override
+(plumbing only). Running `--mode real_cg` **without** `--cg-state-dict` warns and uses an
+untrained head (degenerate 32-D state → plumbing only, same caveat as the stock-model proxy
+in `REAL_CHECKPOINT_CACHED.md`). The pilot only measures CG signal QUALITY with a genuinely
+CG-trained state-dict.
 
 ---
 
@@ -52,11 +59,13 @@ meaningful and the run validates plumbing only (same caveat as the stock-model p
 
 | Var | Required | Meaning |
 |---|---|---|
-| `CG_CHECKPOINT` | **yes** | HF id or local path of the CG checkpoint (passed to `--checkpoint`). |
+| `CG_STATE_DICT` | **yes** | trained CG state-dict (`--cg-state-dict`), e.g. `checkpoints_unified/best_model.pt`. |
+| `CG_BASE_MODEL` | no | base backbone (`--checkpoint`); default `mistralai/Mistral-7B-v0.3`. |
 | `CG_QUANTIZE` | no | `4bit` / `8bit` (needs `bitsandbytes`); default `4bit` in the make target. |
 | `CG_DEVICE` | no | device_map (`auto`, `cuda:0`, …); default `auto`. |
 | `CG_PILOT_OUT` | no | output dir; default `runs/cg_pilot`. |
-| `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN` | if gated | HuggingFace access token. |
+| `CG_ALLOW_UNTRAINED` | no | set `1` to bypass the trained-head fail-closed check (plumbing only). |
+| `HF_TOKEN` / `HUGGING_FACE_HUB_TOKEN` | if gated | HuggingFace access token (for the base model). |
 | `CUDA_VISIBLE_DEVICES` | no | pin GPU(s). |
 
 `MISTRAL_API_KEY` is **not** needed (that is the API path, not CG).
@@ -111,21 +120,26 @@ destructive-enterprise, 1/3 ambiguous/hallucinated.
 ## 5. Step 2 — Run the CG extraction (GPU)
 
 ```bash
-export CG_CHECKPOINT="<HF id or local path of the CG checkpoint>"
+export CG_STATE_DICT="checkpoints_unified/best_model.pt"   # trained CG head (REQUIRED)
+export CG_BASE_MODEL="mistralai/Mistral-7B-v0.3"           # base backbone (optional)
 export CG_QUANTIZE=4bit          # or 8bit / unset for fp16
 export CG_PILOT_OUT=runs/cg_pilot
 
 make signal-gov-cg-pilot
 # equivalently, the explicit command:
 python -m experiments.signal_gov.run_experiment \
-    --mode real_cg --checkpoint "$CG_CHECKPOINT" \
+    --mode real_cg --checkpoint "$CG_BASE_MODEL" --cg-state-dict "$CG_STATE_DICT" \
     --cg-quantize "$CG_QUANTIZE" --cg-device "${CG_DEVICE:-auto}" \
     --scenarios experiments/signal_gov/data/pilot_30_50.jsonl \
     --out "$CG_PILOT_OUT"
+# (the run refuses to start if CG_STATE_DICT looks vanilla/untrained;
+#  add --allow-untrained-cg-head to override — plumbing only.)
 ```
 
-What happens: for each scenario the harness builds a short decision-point prompt, runs **one**
-`MistralCGAdapter` forward pass to get `last_cg_metadata` (the 32-D state), and derives
+What happens: the harness verifies the state-dict has a trained CG head (fail-closed),
+loads it into a `MistralCGWrapper` on the base backbone, then for each scenario builds a
+short decision-point prompt, runs **one** forward pass to get `last_cg_metadata` (the 32-D
+state), and derives
 entropy/coherence/vritti/JEPA via the real `sovereign_bridge` → entropy/vritti adapters →
 JEPA path (see `REAL_CG_WIRING.md`). C1–C4 are scored and metrics computed. It also writes a
 reusable **`features.jsonl`** cache into `--out` by default (disable with `--no-cache-write`).
@@ -140,10 +154,11 @@ schema is identical to `--mode cached`, and offline replay is **metric-identical
 forward pass is the only thing skipped).
 
 ```bash
-# A) one GPU pass — extracts CG features AND writes runs/cg_pilot/features.jsonl
+# A) one GPU pass — loads the trained head, extracts CG features AND writes
+#    runs/cg_pilot/features.jsonl
 python -m experiments.signal_gov.run_experiment \
     --dataset pilot_30_50 --mode real_cg \
-    --checkpoint "$CG_CHECKPOINT" --cg-quantize 4bit \
+    --checkpoint "$CG_BASE_MODEL" --cg-state-dict "$CG_STATE_DICT" --cg-quantize 4bit \
     --out runs/cg_pilot
 
 # B) re-evaluate C1-C4 offline from the cache (no GPU; deterministic, fast)
@@ -204,8 +219,9 @@ instability points at the checkpoint or environment.
   >0.05 with N=30).
 - **Do not** generalize beyond the pilot's mix (it is injection-heavy via fixtures unless you
   swapped in broad real exports + more destructive/ambiguous scenarios).
-- **Do not** claim CG-signal quality if the checkpoint's CG head is untrained — that run only
-  validates the plumbing (state §1's caveat in the report).
+- **Do not** claim CG-signal quality if you bypassed the trained-head check with
+  `--allow-untrained-cg-head` — that run validates plumbing only. (By default the harness
+  refuses a vanilla/untrained `--cg-state-dict`, so a normal run already has a real head.)
 - A **strong** pilot is a green light for the powered full run, not a headline number.
 
 ---

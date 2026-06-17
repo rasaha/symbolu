@@ -80,7 +80,7 @@ zero-tuning variant (see the design doc).
 | `mock` | deterministic synthetic (seeded by scenario_id; internals constructed to be informative) | numpy |
 | `cached` | precomputed `features.parquet` / `.jsonl` | numpy (+pandas/pyarrow for parquet) |
 | `real_cg` (`--real-cg-stub`) | **LIVE** path: `StubCGLLMAdapter` fixed 32-D state → `sovereign_bridge` → entropy/vritti adapters → JEPA | numpy + in-repo agentic pkg (**no torch**) |
-| `real_cg` (live) | `MistralCGAdapter` forward pass → same bridge → signal adapters → JEPA | torch + CG checkpoint + agentic framework |
+| `real_cg` (live) | `MistralCGAdapter` (base `--checkpoint` + trained `--cg-state-dict`) → bridge → signal adapters → JEPA | torch + base model + trained CG state-dict |
 | `real_checkpoint_cached` (`--hf-mock`) | stock-model path via deterministic mock backend (CI) | numpy + in-repo agentic pkg (**no torch**) |
 | `real_checkpoint_cached` (live) | Qwen/Llama/Mistral: REAL logit `entropy` + **PROXY** hidden-state vritti/JEPA; caches features for offline C1–C4 | torch + transformers + weights |
 
@@ -95,6 +95,13 @@ The `real_cg` path is **wired and tested with deterministic stub state** — see
 stubbed, and what remains before running against a real checkpoint. Missing internal
 signals **fail closed** (conservative high value + provenance flag), never silent zeros;
 `--strict-signals` makes them hard errors.
+
+For a **trained** CG head, pass `--checkpoint <BASE_MODEL> --cg-state-dict <trained
+*_model.pt>` (e.g. `checkpoints_unified/best_model.pt`). The harness loads the trained
+`state_projector`/`intent_projector`/`phase_adapter` (`cg_checkpoint.py`) and **fails closed**
+if the state-dict is vanilla or untrained (zero `phase_adapter` output) — override with
+`--allow-untrained-cg-head` (plumbing only). `--checkpoint` alone uses an untrained head and
+warns. See [`CG_PILOT_RUNBOOK.md`](CG_PILOT_RUNBOOK.md).
 
 `real_cg` and `real_checkpoint_cached` **write a reusable `features.jsonl` into `--out` by
 default** (schema identical to `--mode cached`), so the expensive forward passes run once and
@@ -208,6 +215,7 @@ experiments/signal_gov/
   delong.py        paired AUROC significance test
   plots.py         ROC overlay + catch@budget bars (matplotlib Agg)
   external.py      AgentDojo / InjecAgent -> Scenario loaders (offline, deterministic)
+  cg_checkpoint.py --cg-state-dict load + trained-CG-head verification (fail-closed)
   pilot.py         balanced 30-50 pilot assembler + enterprise scenario pool
   run_experiment.py end-to-end pipeline + artifact writers + CLI
   data/handbuilt_miniset.jsonl   on-disk benchmark (generated from dataset.py)
@@ -220,6 +228,7 @@ experiments/signal_gov/
   tests/test_external_loaders.py external ingestion tests
   tests/test_real_checkpoint_cached.py  stock-checkpoint extraction tests (mock backend)
   tests/test_pilot_assembly.py   balanced-pilot assembly tests (CPU)
+  tests/test_cg_checkpoint.py    --cg-state-dict load/verify tests (torch-free)
   sample_output/mock_smoke/      committed reference run (mock)
   sample_output/real_cg_stub_smoke/  committed reference run (real_cg via stub)
   tests/test_smoke.py            mock-mode CI smoke test

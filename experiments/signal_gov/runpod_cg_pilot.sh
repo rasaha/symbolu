@@ -55,19 +55,25 @@ fi
 
 # ----- 5. Required environment variables --------------------------------------
 echo "== 5. env vars =="
-# REQUIRED: the CG-trained checkpoint (HF id or local path). EDIT THIS.
-export CG_CHECKPOINT="${CG_CHECKPOINT:-EDIT_ME/path-or-hf-id}"
+# Base backbone (HF id or local HF dir) that the CG wrapper wraps:
+export CG_BASE_MODEL="${CG_BASE_MODEL:-mistralai/Mistral-7B-v0.3}"
+# REQUIRED: the TRAINED CG state-dict (e.g. checkpoints_unified/best_model.pt). EDIT THIS.
+# NOTE: CG_BASE_MODEL alone does NOT contain the trained CG head.
+export CG_STATE_DICT="${CG_STATE_DICT:-EDIT_ME/path/to/best_model.pt}"
 # Optional:
 export CG_QUANTIZE="${CG_QUANTIZE:-4bit}"          # 4bit | 8bit | "" (fp16, ~15GB)
 export CG_DEVICE="${CG_DEVICE:-auto}"              # auto | cuda:0 | ...
 export CG_PILOT_OUT="${CG_PILOT_OUT:-runs/cg_pilot}"
-# HuggingFace token (only if the checkpoint is gated):
+export CG_ALLOW_UNTRAINED="${CG_ALLOW_UNTRAINED:-}"  # set to 1 to bypass the trained-head check (plumbing only)
+# HuggingFace token (only if the base model is gated):
 export HF_TOKEN="${HF_TOKEN:-}"
 export HUGGING_FACE_HUB_TOKEN="${HUGGING_FACE_HUB_TOKEN:-$HF_TOKEN}"
 # export CUDA_VISIBLE_DEVICES=0                     # pin a GPU if multi-GPU
 
-if [ "$CG_CHECKPOINT" = "EDIT_ME/path-or-hf-id" ] || [ -z "$CG_CHECKPOINT" ]; then
-  echo "ERROR: set CG_CHECKPOINT to your CG checkpoint (HF id or local path)."; exit 1
+if [ "$CG_STATE_DICT" = "EDIT_ME/path/to/best_model.pt" ] || [ -z "$CG_STATE_DICT" ]; then
+  echo "ERROR: set CG_STATE_DICT to your TRAINED CG state-dict (e.g. checkpoints_unified/best_model.pt)."
+  echo "       CG_BASE_MODEL is only the base backbone; it does NOT contain the trained CG head."
+  exit 1
 fi
 
 # ----- 6. Smoke tests (no GPU needed; validates harness + CG signal plumbing) -
@@ -77,43 +83,50 @@ python -m pytest experiments/signal_gov/tests/test_smoke.py \
                  experiments/signal_gov/tests/test_pilot_assembly.py -q
 # (equivalent make targets: make signal-gov-smoke / signal-gov-realcg-smoke)
 
-# ----- 7. CG checkpoint + import-stack validation -----------------------------
+# ----- 7. State-dict + import-stack validation (verifies a TRAINED CG head) ----
 echo "== 7. checkpoint + import validation =="
-if [ -e "$CG_CHECKPOINT" ]; then echo "checkpoint: local path exists ($CG_CHECKPOINT)";
-else echo "checkpoint: treating '$CG_CHECKPOINT' as an HF id (will download; needs HF_TOKEN if gated)"; fi
+[ -e "$CG_STATE_DICT" ] || { echo "ERROR: CG_STATE_DICT not found: $CG_STATE_DICT"; exit 1; }
+if [ -e "$CG_BASE_MODEL" ]; then echo "base model: local path ($CG_BASE_MODEL)";
+else echo "base model: HF id '$CG_BASE_MODEL' (downloads; needs HF_TOKEN if gated)"; fi
 python - <<'PY'
-import importlib, importlib.util, sys
+import importlib, importlib.util, os, sys
 ok = True
 for m in ("torch", "transformers", "numpy"):
     if importlib.util.find_spec(m) is None:
         print(f"MISSING: {m}"); ok = False
-try:
-    import torch
-    print("torch", torch.__version__, "| cuda available:", torch.cuda.is_available())
-except Exception as e:
-    print("torch import FAILED:", e); ok = False
+import torch
+print("torch", torch.__version__, "| cuda available:", torch.cuda.is_available())
 try:
     importlib.import_module("symbolu_training.training.unified.mistral_wrapper")
     print("MistralCGWrapper: importable")
 except Exception as e:
     print("MistralCGWrapper import FAILED:", e); ok = False
-# Confirm the pilot set is present + balanced (no model load here).
+# Verify the state-dict has a TRAINED CG head (loads only the dict; no model build).
+from experiments.signal_gov.cg_checkpoint import unwrap_state_dict, verify_cg_state_dict
+sd = unwrap_state_dict(torch.load(os.environ["CG_STATE_DICT"], map_location="cpu", weights_only=False))
+v = verify_cg_state_dict(sd)
+print("CG state-dict:", v.summary)
+if not (v.has_cg_keys and v.is_trained) and not os.environ.get("CG_ALLOW_UNTRAINED"):
+    print("ERROR: state-dict looks vanilla/untrained. Set CG_ALLOW_UNTRAINED=1 to override (plumbing only).")
+    ok = False
 from experiments.signal_gov.dataset import load_dataset
-sc = load_dataset("pilot_30_50")
 from collections import Counter
-print("pilot_30_50:", len(sc), dict(Counter(s.category for s in sc)),
-      "unsafe=", sum(s.unsafe_label for s in sc))
+scn = load_dataset("pilot_30_50")
+print("pilot_30_50:", len(scn), dict(Counter(s.category for s in scn)),
+      "unsafe=", sum(s.unsafe_label for s in scn))
 sys.exit(0 if ok else 1)
 PY
 
-# ----- 8. Pilot command (GPU; extracts CG features AND writes features.jsonl) -
+# ----- 8. Pilot command (GPU; loads TRAINED CG head, writes features.jsonl) ----
 echo "== 8. CG pilot run =="
 python -m experiments.signal_gov.run_experiment \
   --dataset pilot_30_50 \
   --mode real_cg \
-  --checkpoint "$CG_CHECKPOINT" \
+  --checkpoint "$CG_BASE_MODEL" \
+  --cg-state-dict "$CG_STATE_DICT" \
   --cg-quantize "$CG_QUANTIZE" \
   --cg-device "$CG_DEVICE" \
+  ${CG_ALLOW_UNTRAINED:+--allow-untrained-cg-head} \
   --out "$CG_PILOT_OUT"
 
 # ----- 9. Offline replay (no GPU; metric-identical from the cache) ------------
@@ -146,12 +159,15 @@ echo "DONE. This is an underpowered pilot — do not claim a result; see CG_PILO
 #   export HF_TOKEN=hf_xxx ; export HUGGING_FACE_HUB_TOKEN=$HF_TOKEN
 #   huggingface-cli login   # interactive alternative
 #
-# Missing / wrong checkpoint ("Repository Not Found", "does not appear to have ...",
-# or a local path that doesn't exist):
-#   ls -la "$CG_CHECKPOINT"            # local path must exist
-#   # or verify the HF id is correct and accessible with your token.
-#   # NOTE: a vanilla base model with an UNTRAINED CG head yields a non-meaningful
-#   # 32-D state -> the run validates plumbing only (state this in the report).
+# Missing base model / state-dict:
+#   ls -la "$CG_STATE_DICT"           # trained state-dict must exist (local .pt)
+#   # CG_BASE_MODEL is an HF id or local dir; verify access + HF_TOKEN if gated.
+#
+# Untrained / vanilla CG head (run refuses to start: "looks vanilla/untrained"):
+#   # Section 7 AND the run fail closed when the state-dict has no CG-head keys or a
+#   # zero phase_adapter output. Point CG_STATE_DICT at a TRAINED *_model.pt
+#   # (e.g. checkpoints_unified/best_model.pt). To run anyway (PLUMBING ONLY):
+#   export CG_ALLOW_UNTRAINED=1
 #
 # bitsandbytes failure ("CUDA Setup failed", "libbitsandbytes... not found",
 # wrong CUDA version):

@@ -66,10 +66,14 @@ coherence=0.5, vritti_risk=1.0 (nidra-dominant fixture), jepa_disagreement=0.5
 
 ## What remains before running against a real checkpoint
 
-1. **Provide a real CG adapter.** Swap `StubCGLLMAdapter` for `MistralCGAdapter` with a
-   checkpoint: `--mode real_cg --checkpoint <path>` (no `--real-cg-stub`). Requires
-   `torch` + the model weights + the `symbolu_training` wrapper. Everything downstream of
-   the adapter is unchanged.
+1. **Provide the trained CG head.** `--mode real_cg --checkpoint <BASE_MODEL>
+   --cg-state-dict <trained *_model.pt>` loads the trained
+   `state_projector`/`intent_projector`/`phase_adapter` into a `MistralCGWrapper`
+   (`cg_checkpoint.load_cg_adapter`) and **fails closed** if the state-dict is
+   vanilla/untrained (override: `--allow-untrained-cg-head`). A companion `*_aux.pt` is
+   auto-merged if present. Requires `torch` + the weights + the `symbolu_training` wrapper.
+   `--checkpoint` alone (no `--cg-state-dict`) wraps the base backbone with an UNTRAINED
+   head → plumbing only (the run warns).
 2. **Per-scenario forward passes.** With a real model the state varies per decision point,
    so the internal signals become discriminative. Confirm `extract` builds a sensible
    decision-point prompt (`features._decision_prompt`) for your model's chat format.

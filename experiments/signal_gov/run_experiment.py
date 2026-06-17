@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 import platform
 import sys
 from dataclasses import dataclass
@@ -53,6 +54,8 @@ from experiments.signal_gov.metrics import (
 from experiments.signal_gov.oracle import label as oracle_label
 from experiments.signal_gov.oracle import verify_consistency
 from experiments.signal_gov.plots import catch_at_budget_bar, roc_overlay
+
+logger = logging.getLogger(__name__)
 
 PKG_DIR = Path(__file__).resolve().parent
 DEFAULT_OUT_ROOT = PKG_DIR / "out"
@@ -93,7 +96,8 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         hf_model: str | None = None, hf_mock: bool = False,
         scenarios_path: str | None = None,
         cg_quantize: str | None = None, cg_device: str = "auto",
-        write_cache: bool = True) -> ExperimentResult:
+        write_cache: bool = True, cg_state_dict: str | None = None,
+        allow_untrained_cg_head: bool = False) -> ExperimentResult:
     if scenarios_path:
         scenarios = load_scenarios_jsonl(scenarios_path)
     elif dataset in ("agentdojo", "injecagent") and external_path:
@@ -109,9 +113,23 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
 
     labels = _labels_from_oracle(scenarios)
 
-    # CG adapter knobs only apply to real_cg (live MistralCGAdapter).
-    extra = ({"quantize": cg_quantize, "device_map": cg_device}
-             if mode == "real_cg" and not real_cg_stub else {})
+    # CG adapter wiring for live (non-stub) real_cg.
+    extra: dict = {}
+    if mode == "real_cg" and not real_cg_stub:
+        if cg_state_dict:
+            # Load the TRAINED CG head into a wrapper -> adapter. Fail-closed inside
+            # load_cg_adapter if the checkpoint is vanilla/untrained (unless allowed).
+            from experiments.signal_gov.cg_checkpoint import load_cg_adapter
+            extra = {"adapter": load_cg_adapter(
+                base_model=checkpoint, state_dict_path=cg_state_dict,
+                quantize=cg_quantize, device_map=cg_device,
+                allow_untrained=allow_untrained_cg_head)}
+        else:
+            logger.warning(
+                "real_cg without --cg-state-dict: CG head is UNTRAINED (base backbone "
+                "'%s' only) -> degenerate 32-D state, PLUMBING ONLY. Pass --cg-state-dict "
+                "<trained *_model.pt> for a real-signal run.", checkpoint)
+            extra = {"quantize": cg_quantize, "device_map": cg_device}
     extractor = build_extractor(mode, seed=seed, features_path=features_path,
                                 checkpoint=checkpoint, use_stub=real_cg_stub,
                                 strict_signals=strict_signals, tier=tier,
@@ -387,6 +405,13 @@ def _parse_args(argv=None):
                    help="MistralCGAdapter quantization for --mode real_cg (needs bitsandbytes)")
     p.add_argument("--cg-device", default="auto",
                    help="MistralCGAdapter device_map for --mode real_cg")
+    p.add_argument("--cg-state-dict", default=None,
+                   help="trained CG wrapper state-dict for --mode real_cg "
+                        "(e.g. checkpoints_unified/best_model.pt); --checkpoint stays the "
+                        "BASE backbone id. Fails closed if the checkpoint looks "
+                        "vanilla/untrained.")
+    p.add_argument("--allow-untrained-cg-head", action="store_true",
+                   help="proceed even if --cg-state-dict looks vanilla/untrained (plumbing only)")
     p.add_argument("--no-cache-write", action="store_true",
                    help="do not write features.jsonl (real_cg / real_checkpoint_cached "
                         "write a reusable cache by default)")
@@ -405,7 +430,9 @@ def main(argv=None) -> int:
               tier=args.tier, external_path=args.external_path,
               hf_model=args.hf_model, hf_mock=args.hf_mock,
               scenarios_path=args.scenarios, cg_quantize=args.cg_quantize,
-              cg_device=args.cg_device, write_cache=not args.no_cache_write)
+              cg_device=args.cg_device, write_cache=not args.no_cache_write,
+              cg_state_dict=args.cg_state_dict,
+              allow_untrained_cg_head=args.allow_untrained_cg_head)
     r = res.results
     print(f"[signal_gov] mode={args.mode} dataset={args.dataset} "
           f"N={r['dataset']['n_total']} unsafe={r['dataset']['n_positive']}")
