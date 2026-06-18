@@ -322,6 +322,7 @@ class AuditEntry:
     confidence_risk_gap_escalate: Optional[bool] = None
     confidence_risk_gap_value: Optional[float] = None
     confidence_risk_gap_reason: Optional[str] = None
+    confidence_risk_gap_verbalized_safety: Optional[float] = None
 
     # Phase 3: Session enrichment provenance
     session_identity_type: Optional[str] = None
@@ -1061,6 +1062,9 @@ class SafeMCPGateway:
             confidence_risk_gap_reason=(
                 confidence_risk_gap.reason if confidence_risk_gap else None
             ),
+            confidence_risk_gap_verbalized_safety=(
+                confidence_risk_gap.verbalized_safety if confidence_risk_gap else None
+            ),
             # Phase 3: Session enrichment provenance
             session_identity_type=(
                 session_enrichment.identity_type if session_enrichment else None
@@ -1326,7 +1330,7 @@ class SafeMCPGateway:
                     self._audit(tool_call, tool_def, result, gate_decision,
                                 jepa_assessment, jepa_overrode=True,
                                 domain_result=domain_result,
-                                domain_overrode=domain_overrode)
+                                domain_overrode=domain_overrode, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                     return result
                 else:
                     # Read-only during drift/shift → escalate (match DEFER)
@@ -1349,7 +1353,7 @@ class SafeMCPGateway:
                     self._audit(tool_call, tool_def, result, gate_decision,
                                 jepa_assessment, jepa_overrode=True,
                                 domain_result=domain_result,
-                                domain_overrode=domain_overrode)
+                                domain_overrode=domain_overrode, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                     return result
 
         # JEPA NORMAL — log success and proceed
@@ -1746,6 +1750,9 @@ class SafeMCPGateway:
         *,
         cg_metadata: Optional[Dict[str, Any]] = None,
         tier: str = "consumer",
+        raw_entropy: Optional[float] = None,
+        raw_logprobs: Optional[Any] = None,
+        verbalized_safety_confidence: Optional[float] = None,
     ) -> MCPToolResult:
         """
         Simplified tool call with minimal parameters.
@@ -1774,6 +1781,9 @@ class SafeMCPGateway:
             parameters=parameters,
             quality_score=quality_score,
             coherence_score=coherence_score,
+            raw_entropy=raw_entropy,
+            raw_logprobs=raw_logprobs,
+            verbalized_safety_confidence=verbalized_safety_confidence,
         )
         # Request-boundary enrichment seam (Phase 2): a single helper
         # standardizes the "CG metadata → governance kwargs" translation

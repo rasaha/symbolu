@@ -17,9 +17,14 @@ from agentic.agentic_framework.signal_config import SignalConfig
 
 
 def run_async(coro):
-    # asyncio.run manages the loop lifecycle cleanly (no global-loop pollution that
-    # would break other async test modules when the full suite runs together).
-    return asyncio.run(coro)
+    # Use a private loop (created + closed, never set as the global current loop) so we
+    # neither leak loops nor disturb the global event loop other async test modules read
+    # via asyncio.get_event_loop() when the full suite runs together.
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 def _gateway(*, deny: bool = True, signal_config=None):

@@ -64,6 +64,16 @@ class SignalConfig:
     # Escalation level raised when the gap fires ("notify" | "confirm" | "halt").
     gap_escalation_level: str = "confirm"
 
+    # --- verbalized safety self-assessment SEAM (default OFF) -----------------
+    # The confidence-risk gap needs a verbalized safety score. We never invent one:
+    # an adapter/agent may set `last_safety_confidence` from an existing signal, OR a
+    # future self-assessment step may elicit it. That elicitation is a SECOND model
+    # call (expensive), so it is gated here and OFF by default. When False, if no
+    # safety score is supplied the gap simply does not fire (governance degrades to
+    # verbalized confidence + risk taxonomy). Turning this on is the explicit opt-in
+    # to pay for safety self-assessment; the elicitation itself is left to the caller.
+    enable_safety_self_assessment: bool = False
+
     def risk_meets_gap_minimum(self, tool_risk_level: str) -> bool:
         """True if `tool_risk_level` is at/above the gap's minimum-risk gate."""
         return (RISK_RANK.get(str(tool_risk_level).lower(), 0)
