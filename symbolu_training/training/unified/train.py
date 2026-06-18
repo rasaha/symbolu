@@ -1886,7 +1886,7 @@ def train(config: UnifiedTrainingConfig):
             print(f"    ⚠️  Could not restore SRK state: {e}")
 
     # Mixed precision
-    scaler = torch.amp.GradScaler('cuda') if config.mixed_precision != "none" else None
+    scaler = torch.amp.GradScaler('cuda') if config.mixed_precision == "fp16" else None
     autocast_dtype = torch.bfloat16 if config.mixed_precision == "bf16" else torch.float16
 
     # Set autocast dtype on probe hooks (created earlier, before autocast_dtype was available)
