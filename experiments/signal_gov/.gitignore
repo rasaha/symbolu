@@ -1,0 +1,6 @@
+# Generated run outputs (regenerate with run_experiment.py).
+out/
+__pycache__/
+*.pyc
+.pytest_cache/
+# sample_output/ is intentionally committed as a reference run.
