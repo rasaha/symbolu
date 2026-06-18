@@ -1,7 +1,7 @@
 # Repo-level convenience targets.
 #
 # signal_gov — model-internal-signal governance experiment harness.
-.PHONY: signal-gov-smoke signal-gov-realcg-smoke signal-gov-external-smoke signal-gov-checkpoint-smoke signal-gov-pilot-assemble signal-gov-cg-pilot signal-gov-run signal-gov-data signal-gov-deps
+.PHONY: signal-gov-smoke signal-gov-realcg-smoke signal-gov-external-smoke signal-gov-checkpoint-smoke signal-gov-pilot-assemble signal-gov-cg-pilot signal-gov-run signal-gov-data signal-gov-deps signal-gov-falsify-test signal-gov-falsify
 
 # CI smoke test: deterministic, mock features, validates harness + ablation ordering.
 signal-gov-smoke:
@@ -16,6 +16,10 @@ signal-gov-realcg-smoke:
 # External-benchmark ingestion (AgentDojo / InjecAgent) on tiny offline fixtures.
 signal-gov-external-smoke:
 	python -m pytest experiments/signal_gov/tests/test_external_loaders.py -q
+
+# Fastest-falsification: fabrication scenarios + conditional decision rule (torch-free).
+signal-gov-falsify-test:
+	python -m pytest experiments/signal_gov/tests/test_falsification.py -q
 
 # Stock-checkpoint extraction (real_checkpoint_cached) via a torch-free mock backend:
 # real logit-entropy + proxy-state vritti/JEPA, cache round-trip, offline C1-C4.
@@ -47,6 +51,19 @@ signal-gov-cg-pilot:
 	  $${CG_ALLOW_UNTRAINED:+--allow-untrained-cg-head} \
 	  --scenarios experiments/signal_gov/data/pilot_30_50.jsonl \
 	  --out "$${CG_PILOT_OUT:-runs/cg_pilot}"
+
+# GPU + CG CHECKPOINT REQUIRED — the fastest-falsification run. bf16 (no quantize) by
+# default to match training precision. Emits a SCALE or KILL/DEPRIORITIZE verdict.
+signal-gov-falsify:
+	@test -n "$$CG_STATE_DICT" || { \
+	  echo "ERROR: set CG_STATE_DICT=<trained *_model.pt> (+ optional CG_BASE_MODEL)."; \
+	  exit 1; }
+	python -m experiments.signal_gov.falsification.run \
+	  --checkpoint "$${CG_BASE_MODEL:-mistralai/Mistral-7B-v0.3}" \
+	  --cg-state-dict "$$CG_STATE_DICT" --cg-device "$${CG_DEVICE:-auto}" \
+	  $${CG_QUANTIZE:+--cg-quantize $$CG_QUANTIZE} \
+	  $${CG_ALLOW_UNTRAINED:+--allow-untrained-cg-head} \
+	  --out "$${FALSIFY_OUT:-runs/falsify}"
 
 # Full hand-built mini-set run (mock features) -> artifacts under out/mock_handbuilt/.
 signal-gov-run:
