@@ -234,7 +234,8 @@ experiments/signal_gov/
   tests/test_smoke.py            mock-mode CI smoke test
   tests/test_realcg_smoke.py     real_cg plumbing validation (live path via stub)
   tests/test_d1_ladder.py        Diagnostic D1 probe honesty + verdict branches + mock cache
-  diagnostics/                   read-only fix-or-falsify probe studies (D1 ladder; D2-D6 later)
+  tests/test_d4_d5.py            Diagnostics D4 (collapse) + D5 (entropy-def correlation)
+  diagnostics/                   read-only fix-or-falsify probe studies (D1 ladder + D4/D5 offline; D2/D3/D6 later)
   REAL_CG_WIRING.md              exact repo functions, real vs stubbed, going-live steps
   requirements.txt · README.md
 ```
@@ -246,6 +247,8 @@ CG is demoted to research-only (`enable_cg_state_signals=False`) and off the pro
 [`diagnostics/`](diagnostics/) holds the **read-only** probe studies that localize where
 the predictive-uncertainty signal dies. **D1 — the signal-survival ladder** is implemented
 (`make signal-gov-d1`, GPU); it retrains nothing, touches no product path, and emits a
-*projection-vs-entropy-definition* localization verdict that selects R1/R2. See
+*projection-vs-entropy-definition* localization verdict that selects R1/R2. **D4**
+(component collapse) and **D5** (entropy-definition correlation) run **offline** off the
+same `d1_cache.npz` (no second GPU pass). See
 [`diagnostics/README.md`](diagnostics/README.md) and
 [`diagnostics/D1_FINDINGS.md`](diagnostics/D1_FINDINGS.md).

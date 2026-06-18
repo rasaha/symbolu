@@ -73,6 +73,28 @@ python -m experiments.signal_gov.diagnostics.run --from-cache runs/d1/d1_cache.n
 
 `d1_cache.npz` is reusable for D2–D6 (it already stores every layer's last-token hidden).
 
+## Offline follow-ups on the D1 cache (no GPU, no torch, no model)
+
+These consume `runs/d1/d1_cache.npz` and add **no** forward pass — they re-read what D1
+already cached. Run them after `make signal-gov-d1` (set `D1_CACHE` if the npz is
+elsewhere):
+
+| Diagnostic | What it reads | What it adds over D1 | Command |
+|---|---|---|---|
+| **D4 — vritti / component collapse** (`d4_vritti.py`) | cached 32-D `state32` | per-component distribution entropy (Bhava one-hot vs Vritti uniform), twin separation vs spread, best single-dim AUROC | `make signal-gov-d4` |
+| **D5 — entropy-definition correlation** (`d5_entropy_def.py`) | cached `raw_entropy`, `cg_entropy` | Pearson/Spearman of predictive entropy vs `entropy_from_sovereign_state` → corroborates D1's (c)→(d) rung (near-zero ⇒ wrong object, not undertrained) | `make signal-gov-d5` |
+
+```bash
+make signal-gov-d1                      # GPU: produces runs/d1/d1_cache.npz
+make signal-gov-d4                      # CPU offline -> runs/d4/d4_report.md
+make signal-gov-d5                      # CPU offline -> runs/d5/d5_report.md
+make signal-gov-diag-test               # torch-free tests for D1 + D4 + D5
+```
+
+D4 explains *why* a D1 rung-(e) read-out is dead (collapsed vs diluted vs twin-blind);
+D5 sharpens *whether* a low CG-entropy AUROC is the metric (different object) or upstream
+(projection). Neither retrains anything or ranks CG against a baseline.
+
 ## Isolation
 
 This subpackage **imports** `Scenario`, `oracle`, `features`, `metrics`,
