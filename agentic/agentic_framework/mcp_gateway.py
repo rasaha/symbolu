@@ -81,6 +81,16 @@ from agentic.agentic_framework.signal_adapters.entropy_adapter import (
     resolve_entropy_signal,
     EntropyResolution,
 )
+from agentic.agentic_framework.signal_adapters.raw_entropy_adapter import (
+    resolve_raw_entropy_signal,
+)
+from agentic.agentic_framework.signal_adapters.confidence_risk_gap import (
+    assess_confidence_risk_gap,
+)
+from agentic.agentic_framework.signal_config import (
+    DEFAULT_SIGNAL_CONFIG,
+    SignalConfig,
+)
 from agentic.agentic_framework.domain_policy import (
     DomainActionMode,
     DomainPolicyResult,
@@ -202,7 +212,19 @@ class MCPToolCall:
     # Duck-typed: must expose .combined_entropy, .guna_entropy, .kosha_entropy,
     # .cross_domain_entropy, .gate. Absent entropy does not weaken governance
     # posture (fail-closed). Consumed by _jepa_check() via entropy_adapter.
+    # NOTE: this is the CG 32-D sovereign-state entropy — EXPERIMENTAL since the
+    # 2026-06 falsification (off by default; see SignalConfig.enable_cg_state_signals).
     entropy_result: Optional[Any] = field(default=None)
+
+    # Raw next-token uncertainty (FIRST-CLASS, provider-agnostic). Supply ONE of:
+    #   raw_entropy: precomputed normalized predictive entropy in [0, 1], or
+    #   raw_logprobs: a (possibly top-k) logprobs list to compute it from.
+    # All optional — absence degrades to verbalized confidence + risk taxonomy.
+    raw_entropy: Optional[float] = field(default=None)
+    raw_logprobs: Optional[Any] = field(default=None)
+    # The model's self-reported "is this action safe?" confidence in [0, 1]
+    # (higher = safer). Pairs with raw_entropy to drive the confidence-risk gap.
+    verbalized_safety_confidence: Optional[float] = field(default=None)
 
     # Request metadata
     request_id: str = field(default_factory=lambda: f"mcp-{int(time.time() * 1000)}")
@@ -293,6 +315,13 @@ class AuditEntry:
     entropy_confidence_penalty: Optional[float] = None
     entropy_gate: Optional[str] = None
     entropy_detail: Optional[str] = None
+    # 2026-06 pivot: raw next-token entropy (first-class signal) + confidence-risk gap.
+    raw_entropy_available: Optional[bool] = None
+    raw_entropy: Optional[float] = None
+    raw_entropy_source: Optional[str] = None
+    confidence_risk_gap_escalate: Optional[bool] = None
+    confidence_risk_gap_value: Optional[float] = None
+    confidence_risk_gap_reason: Optional[str] = None
 
     # Phase 3: Session enrichment provenance
     session_identity_type: Optional[str] = None
@@ -682,6 +711,7 @@ class SafeMCPGateway:
         domain_registry: Optional[DomainRegistry] = None,
         domain_id: Optional[str] = None,
         shadow_registry: Optional[ShadowRegistry] = None,
+        signal_config: Optional[SignalConfig] = None,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -721,6 +751,12 @@ class SafeMCPGateway:
 
         # Shadow AI Control Layer
         self._shadow_registry: Optional[ShadowRegistry] = shadow_registry
+
+        # Model-uncertainty signal configuration. Default: raw next-token entropy is
+        # the first-class signal; the CG 32-D sovereign-state signals are demoted to
+        # experimental (off). The confidence-risk gap (confident-but-uncertain ->
+        # escalate) is on. See signal_config.py / the 2026-06 falsification result.
+        self._signal_config: SignalConfig = signal_config or DEFAULT_SIGNAL_CONFIG
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -927,6 +963,8 @@ class SafeMCPGateway:
         shadow_overrode: bool = False,
         vritti_resolution: Optional[VrittiResolution] = None,
         entropy_resolution: Optional[EntropyResolution] = None,
+        raw_entropy_resolution: Optional[Any] = None,
+        confidence_risk_gap: Optional[Any] = None,
         session_enrichment: Optional[Any] = None,
     ) -> None:
         """Log audit entry to in-memory cache and durable store."""
@@ -1004,6 +1042,24 @@ class SafeMCPGateway:
             ),
             entropy_detail=(
                 entropy_resolution.source_detail if entropy_resolution else None
+            ),
+            raw_entropy_available=(
+                raw_entropy_resolution.available if raw_entropy_resolution else None
+            ),
+            raw_entropy=(
+                raw_entropy_resolution.raw_entropy if raw_entropy_resolution else None
+            ),
+            raw_entropy_source=(
+                raw_entropy_resolution.source if raw_entropy_resolution else None
+            ),
+            confidence_risk_gap_escalate=(
+                confidence_risk_gap.escalate if confidence_risk_gap else None
+            ),
+            confidence_risk_gap_value=(
+                confidence_risk_gap.gap if confidence_risk_gap else None
+            ),
+            confidence_risk_gap_reason=(
+                confidence_risk_gap.reason if confidence_risk_gap else None
             ),
             # Phase 3: Session enrichment provenance
             session_identity_type=(
@@ -1127,23 +1183,59 @@ class SafeMCPGateway:
         )
         regime = jepa_assessment.regime
 
+        # ---- Model-uncertainty signals (raw entropy is first-class) --------
+        # Raw next-token entropy is the DEFAULT uncertainty signal. The CG 32-D
+        # sovereign-state entropy (entropy_resolution) is EXPERIMENTAL and only
+        # penalizes confidence when explicitly enabled (default off). See the
+        # 2026-06 falsification result / signal_config.py.
+        raw_entropy_resolution = resolve_raw_entropy_signal(
+            raw_entropy=getattr(tool_call, "raw_entropy", None),
+            logprobs=getattr(tool_call, "raw_logprobs", None),
+            enabled=self._signal_config.enable_raw_entropy_signal,
+        )
+        cg_entropy_penalty = (
+            entropy_resolution.confidence_penalty
+            if self._signal_config.enable_cg_state_signals else 0.0
+        )
+
         # Compute JEPA-adjusted confidence and escalation (stricter-only).
         # These are used in all MCPToolResult construction below so that
         # MCP results reflect JEPA overrides, matching GovernanceService.
-        # Phase 1: Also apply bounded entropy confidence penalty.
         effective_confidence = max(
             0.0,
             gate_decision.confidence.overall
             + jepa_assessment.confidence_adjustment
-            - entropy_resolution.confidence_penalty,
+            - raw_entropy_resolution.confidence_penalty
+            - cg_entropy_penalty,
         )
         effective_escalation = gate_decision.escalation.level
+        _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
         if jepa_assessment.escalation_override is not None:
             jepa_esc = jepa_assessment.escalation_override.lower()
             gate_esc = gate_decision.escalation.level.value
-            _ESC_SEVERITY = {"none": 0, "notify": 1, "confirm": 2, "halt": 3}
             if _ESC_SEVERITY.get(jepa_esc, 0) > _ESC_SEVERITY.get(gate_esc, 0):
                 effective_escalation = EscalationLevel(jepa_esc)
+
+        # ---- Confidence-risk gap: confident-but-uncertain -> escalate ------
+        # The falsification finding operationalized: if the model SAYS the action
+        # is safe but its raw next-token entropy is high, escalate (stricter-only).
+        gap_result = assess_confidence_risk_gap(
+            verbalized_safety_confidence=getattr(
+                tool_call, "verbalized_safety_confidence", None),
+            raw_entropy_resolution=raw_entropy_resolution,
+            tool_risk_level=tool_def.risk_level.value,
+            config=self._signal_config,
+        )
+        if gap_result.escalate:
+            if (_ESC_SEVERITY.get(gap_result.level, 0)
+                    > _ESC_SEVERITY.get(effective_escalation.value, 0)):
+                effective_escalation = EscalationLevel(gap_result.level)
+            logger.info(
+                "confidence-risk gap escalation [%s]: %s",
+                tool_call.tool_name, gap_result.reason,
+            )
+        # Whether the gap demands a human even if the gate would otherwise allow.
+        gap_requires_human = gap_result.escalate and gap_result.level in ("confirm", "halt")
 
         # Domain Semantic Policy Layer check.
         # Computed BEFORE JEPA regime handling so that domain policy
@@ -1206,7 +1298,7 @@ class SafeMCPGateway:
                             domain_result=domain_result,
                             domain_overrode=domain_overrode,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
 
             if merged_decision == "DEFER":
@@ -1289,7 +1381,7 @@ class SafeMCPGateway:
                             jepa_assessment, jepa_overrode=False,
                             domain_result=domain_result, domain_overrode=True,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
             elif domain_result.mode in (
                 DomainActionMode.CONFIRM_REQUIRED,
@@ -1319,7 +1411,7 @@ class SafeMCPGateway:
                             jepa_assessment, jepa_overrode=False,
                             domain_result=domain_result, domain_overrode=True,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
             elif domain_result.mode in (
                 DomainActionMode.READ_ONLY,
@@ -1352,7 +1444,7 @@ class SafeMCPGateway:
                                 domain_result=domain_result,
                                 domain_overrode=True,
                                 vritti_resolution=vritti_resolution,
-                                entropy_resolution=entropy_resolution)
+                                entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                     return result
 
         # Shadow AI Control Layer check
@@ -1428,7 +1520,7 @@ class SafeMCPGateway:
                             shadow_assessment=shadow_assessment,
                             shadow_overrode=True,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
             elif shadow_gov == "DEFER":
                 shadow_overrode = True
@@ -1456,7 +1548,7 @@ class SafeMCPGateway:
                             shadow_assessment=shadow_assessment,
                             shadow_overrode=True,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
 
         # Check minimum confidence for risk level (use JEPA-adjusted)
@@ -1481,13 +1573,17 @@ class SafeMCPGateway:
                         shadow_assessment=shadow_assessment,
                         shadow_overrode=shadow_overrode,
                         vritti_resolution=vritti_resolution,
-                        entropy_resolution=entropy_resolution)
+                        entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
             return result
 
-        # Check execution permission
-        if not gate_decision.execution.can_execute:
+        # Check execution permission. The confidence-risk gap can require a human
+        # even when the gate would allow execution (the gate keys off verbalized
+        # confidence alone; the gap adds raw model-uncertainty).
+        if not gate_decision.execution.can_execute or gap_requires_human:
             # Check if we need escalation
-            if gate_decision.escalation.requires_human or tool_def.requires_confirmation:
+            if (gate_decision.escalation.requires_human
+                    or tool_def.requires_confirmation
+                    or gap_requires_human):
                 # Request human confirmation
                 confirmed = await self.escalation.request_confirmation(
                     tool_call, tool_def, gate_decision
@@ -1512,7 +1608,7 @@ class SafeMCPGateway:
                                 shadow_assessment=shadow_assessment,
                                 shadow_overrode=shadow_overrode,
                                 vritti_resolution=vritti_resolution,
-                                entropy_resolution=entropy_resolution)
+                                entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                     return result
             else:
                 result = MCPToolResult(
@@ -1532,7 +1628,7 @@ class SafeMCPGateway:
                             shadow_assessment=shadow_assessment,
                             shadow_overrode=shadow_overrode,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
 
         # Handle notification escalation
@@ -1564,7 +1660,7 @@ class SafeMCPGateway:
                             shadow_assessment=shadow_assessment,
                             shadow_overrode=shadow_overrode,
                             vritti_resolution=vritti_resolution,
-                            entropy_resolution=entropy_resolution)
+                            entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                 return result
             human_confirmed = True
 
@@ -1594,7 +1690,7 @@ class SafeMCPGateway:
                         shadow_assessment=shadow_assessment,
                         shadow_overrode=shadow_overrode,
                         vritti_resolution=vritti_resolution,
-                        entropy_resolution=entropy_resolution)
+                        entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
             return result
 
         except asyncio.TimeoutError:
@@ -1616,7 +1712,7 @@ class SafeMCPGateway:
                         shadow_assessment=shadow_assessment,
                         shadow_overrode=shadow_overrode,
                         vritti_resolution=vritti_resolution,
-                        entropy_resolution=entropy_resolution)
+                        entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
             return result
 
         except Exception as e:
@@ -1638,7 +1734,7 @@ class SafeMCPGateway:
                         shadow_assessment=shadow_assessment,
                         shadow_overrode=shadow_overrode,
                         vritti_resolution=vritti_resolution,
-                        entropy_resolution=entropy_resolution)
+                        entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
             return result
 
     async def call_tool_simple(
