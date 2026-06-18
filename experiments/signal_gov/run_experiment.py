@@ -36,7 +36,10 @@ from typing import Dict, List
 import numpy as np
 
 from experiments.signal_gov import __doc__ as _pkg_doc  # noqa: F401
-from experiments.signal_gov.configs import CONFIG_ORDER, CONFIGS, score_configs
+from experiments.signal_gov.configs import (
+    CONFIG_ORDER, CONFIGS, VARIANT_CONFIG_ORDER, VARIANT_CONFIGS,
+    score_configs, score_variant_configs,
+)
 from experiments.signal_gov.dataset import (
     Scenario, category_balance, load_dataset, load_external, load_scenarios_jsonl,
 )
@@ -81,6 +84,7 @@ def _oriented_feature_columns(features: List[FeatureVector]) -> Dict[str, List[f
     return {
         "risk_norm": [f.risk_norm for f in features],
         "inv_text_confidence": [1.0 - f.text_confidence for f in features],
+        "inv_text_confidence_top1": [1.0 - f.text_confidence_top1 for f in features],
         "entropy": [f.entropy for f in features],
         "inv_coherence": [1.0 - f.coherence for f in features],
         "vritti_risk": [f.vritti_risk for f in features],
@@ -167,6 +171,21 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         aurocs[name] = m["auroc"]
         catch_by_config[name] = m["catch_at_budget"]
 
+    # Variant baselines (e.g. C3b top-1 confidence): scored + reported alongside,
+    # but kept OUT of the nested ordering check so the C1..C4 story stays clean.
+    from experiments.signal_gov.metrics import catch_at_budget as _catch_var
+    variant_scores = score_variant_configs(scenarios, features)
+    variant_metrics: Dict[str, Dict] = {}
+    for name in VARIANT_CONFIG_ORDER:
+        scores = variant_scores[name]
+        m = per_config_metrics(labels, scores, BUDGETS_DEFAULT)
+        m["catch_at_budget"] = {
+            f"{b:.2f}": _catch_var(labels, scores, b, tiebreak) for b in BUDGETS_DEFAULT
+        }
+        _, lo, hi = bootstrap_ci(labels, scores, roc_auc, n_boot=n_boot, seed=seed)
+        m["auroc_ci95"] = [lo, hi]
+        variant_metrics[name] = m
+
     # Ablation ordering on AUROC (NaN-safe).
     ordered_aucs = [aurocs[n] for n in CONFIG_ORDER]
     ordering_ok = all(
@@ -175,7 +194,7 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         if not (np.isnan(a) or np.isnan(b))
     )
 
-    # DeLong: C4 vs C3 (the decisive comparison).
+    # DeLong: C4 vs C3 (verbalized-confidence baseline — the primary comparison).
     c3, c4 = CONFIG_ORDER[2], CONFIG_ORDER[3]
     auc_c3, auc_c4, p_val = delong_roc_test(labels, scores_by_config[c3], scores_by_config[c4])
     delong_block = {
@@ -183,6 +202,18 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
         "auc_c4": auc_c4, "auc_c3": auc_c3,
         "delta_auroc": auc_c4 - auc_c3, "p_value": p_val,
     }
+
+    # DeLong: C4 vs C3b (top-1-confidence baseline — baseline-sensitivity check).
+    delong_c3b_block = None
+    if VARIANT_CONFIG_ORDER:
+        c3b = VARIANT_CONFIG_ORDER[0]
+        auc_c3b, auc_c4b, p_c3b = delong_roc_test(
+            labels, variant_scores[c3b], scores_by_config[c4])
+        delong_c3b_block = {
+            "config_a": c4, "config_b": c3b,
+            "auc_c4": auc_c4b, "auc_c3b": auc_c3b,
+            "delta_auroc": auc_c4b - auc_c3b, "p_value": p_c3b,
+        }
 
     sig_imp = signal_importance(labels, _oriented_feature_columns(features))
 
@@ -211,7 +242,9 @@ def run(mode: str, dataset: str, out_dir: Path, *, seed: int = 1234,
             "scenario_ids": [s.scenario_id for s in scenarios],
         },
         "configs": config_metrics,
+        "variant_configs": variant_metrics,
         "delong_c4_vs_c3": delong_block,
+        "delong_c4_vs_c3b": delong_c3b_block,
         "ordering_ok": bool(ordering_ok),
         "signal_importance": sig_imp,
     }
@@ -330,6 +363,39 @@ def _write_report(results: Dict, path: Path) -> None:
     lines.append(f"- DeLong p-value = {'nan (too few samples per class)' if np.isnan(pv) else f'{pv:.4f}'}")
     lines.append("")
 
+    # Baseline-sensitivity: C3 (verbalized) vs C3b (top-1) confidence vs C4.
+    vc = results.get("variant_configs") or {}
+    db = results.get("delong_c4_vs_c3b")
+    if vc:
+        c3m = results["configs"][CONFIG_ORDER[2]]
+        c4m = results["configs"][CONFIG_ORDER[3]]
+        lines.append("## Baseline sensitivity: verbalized (C3) vs top-1 (C3b) confidence")
+        lines.append("")
+        lines.append("C3 uses a VERBALIZED safety score elicited from the model; C3b is the same "
+                     "config with TOP-1 next-token confidence instead (a parallel baseline, NOT "
+                     "part of the nested C1..C4 ordering). This shows whether C4's edge survives a "
+                     "different — possibly stronger — confidence baseline.")
+        lines.append("")
+        lines.append("| Config | Confidence source | AUROC | AUROC 95% CI | AUPRC | catch@10% |")
+        lines.append("|---|---|---|---|---|---|")
+
+        def _row(label, src, m):
+            ci = m.get("auroc_ci95", [float("nan"), float("nan")])
+            return (f"| {label} | {src} | {m['auroc']:.3f} | [{ci[0]:.3f}, {ci[1]:.3f}] | "
+                    f"{m['auprc']:.3f} | {m['catch_at_budget']['0.10']:.3f} |")
+
+        lines.append(_row("C3", "verbalized", c3m))
+        for name in VARIANT_CONFIG_ORDER:
+            lines.append(_row(name, "top-1 token", vc[name]))
+        lines.append(_row("C4", "+ internal signals", c4m))
+        lines.append("")
+        if db:
+            pvb = db["p_value"]
+            lines.append(f"- **C4 vs C3b (DeLong):** AUROC(C4) = {db['auc_c4']:.3f}, "
+                         f"AUROC(C3b) = {db['auc_c3b']:.3f}, Δ = {db['delta_auroc']:+.3f}, "
+                         f"p = {'nan (too few per class)' if np.isnan(pvb) else f'{pvb:.4f}'}")
+            lines.append("")
+
     # Power / significance disclaimer (auto, for small-N pilots).
     n = ds["n_total"]
     npos = ds["n_positive"]
@@ -439,7 +505,17 @@ def main(argv=None) -> int:
     for name in CONFIG_ORDER:
         m = r["configs"][name]
         print(f"  {name:32s} AUROC={m['auroc']:.3f}  catch@10%={m['catch_at_budget']['0.10']:.3f}")
+    for name in VARIANT_CONFIG_ORDER:
+        m = r.get("variant_configs", {}).get(name)
+        if m:
+            print(f"  {name:32s} AUROC={m['auroc']:.3f}  "
+                  f"catch@10%={m['catch_at_budget']['0.10']:.3f}  (variant baseline)")
     print(f"  ordering C4>=C3>=C2>=C1: {'PASS' if r['ordering_ok'] else 'FAIL'}")
+    db = r.get("delong_c4_vs_c3b")
+    if db:
+        pvb = db["p_value"]
+        print(f"  C4 vs C3b (top-1 baseline): dAUROC={db['delta_auroc']:+.3f}  "
+              f"p={'nan' if np.isnan(pvb) else f'{pvb:.4f}'}")
     print(f"  artifacts -> {res.out_dir}")
     if r["meta"].get("feature_cache"):
         print(f"  feature cache -> {r['meta']['feature_cache']}  "

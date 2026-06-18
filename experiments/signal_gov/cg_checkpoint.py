@@ -155,14 +155,30 @@ def _default_wrapper_factory(base_model: str, quantize: Optional[str], device_ma
 
 def _default_adapter_factory(wrapper: Any) -> Any:  # pragma: no cover
     from agentic.agentic_framework.llm_adapters import MistralCGAdapter
-    return MistralCGAdapter(pretrained_model=wrapper)
+    # The harness consumes ONLY adapter.last_cg_metadata (the 32-D state captured by
+    # the single metadata forward pass, llm_adapters.py:534). The autoregressive
+    # generation that follows is discarded — features.py uses a text_confidence
+    # PLACEHOLDER, not the generated text. Generating the default 512 tokens per
+    # scenario through a no-KV-cache O(n^2) loop costs ~30-50s/scenario of pure
+    # waste (hours across a 400-600 benchmark). Cap at 1 token; the metadata (and
+    # therefore every signal) is captured before the loop and is unaffected.
+    return MistralCGAdapter(pretrained_model=wrapper, max_new_tokens=1)
 
 
 def _load_into_wrapper(wrapper: Any, sd: Dict[str, Any]) -> None:
+    # Load ONLY the trained CG head (non-backbone params). The backbone is loaded fresh
+    # from the base model and frozen — bit-identical to what training used — so copying
+    # backbone.* weights from the checkpoint is both unnecessary and BROKEN under
+    # quantization: a 4-bit/8-bit backbone has bitsandbytes-packed param shapes (e.g.
+    # [8388608, 1]) that don't match the checkpoint's full-precision [4096, 4096], which
+    # raises a load_state_dict size mismatch. Filtering to the head (state_projector /
+    # intent_projector / phase_adapter / adapter_gate / adapter_output_norm) avoids that
+    # entirely and works for any quantization setting. The head is never quantized.
+    head_sd = {k: v for k, v in sd.items() if not k.startswith("backbone.")}
     try:
-        wrapper.load_state_dict(sd, strict=False)
+        wrapper.load_state_dict(head_sd, strict=False)
     except TypeError:  # wrappers without a strict kwarg
-        wrapper.load_state_dict(sd)
+        wrapper.load_state_dict(head_sd)
 
 
 def load_cg_adapter(*, base_model: str, state_dict_path: str | Path,
