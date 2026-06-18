@@ -455,6 +455,15 @@ class MistralCGAdapter(BaseLLMAdapter):
         self.last_cg_metadata: Dict[str, Any] = {}
         self.call_history: List[str] = []
 
+        # Model-uncertainty signals from the most recent call (consumed at the
+        # governance request boundary via request_enrichment). raw_entropy is the
+        # FIRST-CLASS signal and is computed cheaply from the decision-point forward
+        # this adapter already runs. last_safety_confidence is the verbalized-safety
+        # seam: it stays None unless a (flag-gated) self-assessment populates it —
+        # we never invent a safety score from a forward pass alone.
+        self.last_raw_entropy: Optional[float] = None
+        self.last_safety_confidence: Optional[float] = None
+
         # Import and build model
         try:
             import torch  # noqa: F811
@@ -507,6 +516,25 @@ class MistralCGAdapter(BaseLLMAdapter):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+    def _decision_raw_entropy(self, logits) -> Optional[float]:
+        """Normalized next-token predictive entropy in [0, 1] from the decision-point
+        forward's logits ([B, T, V]); None if unavailable. Vectorized in torch (cheap);
+        never raises (returns None on any failure so governance degrades gracefully)."""
+        if logits is None:
+            return None
+        try:
+            import math
+            torch = self._torch
+            nt = logits[0, -1, :].float()
+            v = int(nt.shape[-1])
+            if v <= 1:
+                return 0.0
+            probs = torch.softmax(nt, dim=-1)
+            ent = float(-(probs * torch.log(probs + 1e-12)).sum().item())
+            return float(min(1.0, max(0.0, ent / math.log(v))))
+        except Exception:
+            return None
+
     def call(self, prompt: str) -> str:
         """
         Generate text from prompt using MistralCGWrapper.
@@ -548,6 +576,12 @@ class MistralCGAdapter(BaseLLMAdapter):
             'vritti_gate_events': [],
             'guna_gate_events': [],
         }
+
+        # FIRST-CLASS uncertainty signal: raw next-token predictive entropy at the
+        # decision point, from the logits this forward already produced (no extra
+        # forward). Consumed at the governance boundary; falls back to None on any
+        # failure (governance degrades to verbalized confidence + risk taxonomy).
+        self.last_raw_entropy = self._decision_raw_entropy(cg_outputs.get('logits'))
 
         # Autoregressive generation
         generated_ids = input_ids.clone()
@@ -842,6 +876,13 @@ class StubCGLLMAdapter(MockLLMAdapter):
         + [0.0] * 4
     )
 
+    #: Deterministic model-uncertainty fixtures so the full governance path
+    #: (raw entropy + confidence-risk gap) is exercisable without a real model.
+    #: Chosen to represent the confident-but-uncertain signature (high verbalized
+    #: safety + high raw entropy) so the gap fires on non-trivial tools in tests.
+    STUB_RAW_ENTROPY: float = 0.85
+    STUB_SAFETY_CONFIDENCE: float = 0.95
+
     def call(self, prompt: str) -> str:
         """Call mock LLM and refresh ``last_cg_metadata`` with the
         deterministic stub fixture. Marked DEV/TEST ONLY at the
@@ -853,6 +894,10 @@ class StubCGLLMAdapter(MockLLMAdapter):
             "delta_bhava": None,
             "intent_phase": None,
         }
+        # Deterministic uncertainty signals (DEV/TEST ONLY) so the raw-entropy +
+        # confidence-risk-gap path can be exercised end-to-end without a real model.
+        self.last_raw_entropy: float = self.STUB_RAW_ENTROPY
+        self.last_safety_confidence: float = self.STUB_SAFETY_CONFIDENCE
         return response
 
 

@@ -1,7 +1,7 @@
 # Agentic Framework — VC Brief
 
 **Cognade Labs | Governed Runtime for Autonomous AI Agents**
-*Version 1.9.0 — Prepared April 2026*
+*Version 1.10.0 — Updated June 2026 (external / evidence-based)*
 
 ---
 
@@ -119,23 +119,36 @@ enforces these at call time; the LLM cannot route around them. Turn-level
 and per-call governance are complementary — one protects the turn, the
 other protects the specific action.
 
-### Signal-enriched governance (our differentiation)
+### Signal-enriched governance (model-uncertainty signals in the execution path)
 
-When the agent is backed by a **CG-capable adapter** (our
-`MistralCGAdapter`, or the Phase Quad LLM from our broader stack),
-governance decisions can be enriched with *model-internal runtime
-signals* — entropy and vritti (coherence-fluctuation) values derived
-from the model's internal state after inference. These are
-state-derived uncertainty and coherence signals, not prompt-level
-self-reported confidence scores, and they are not available to
-frameworks that only see the text output of a closed API. Our approach
-is differentiated here because we control both the adapter interface
-and, in the CG path, the model internals.
+The governance runtime can ingest **model-internal uncertainty signals** at the
+decision point — not just a prompt-level, self-reported confidence score. The
+first-class signal is **raw next-token predictive entropy**: it is provider-agnostic
+(computed from any model that exposes logits or logprobs) and the gateway combines it
+with the risk taxonomy, approval workflows, budget enforcement, and the audit trail in
+a single execution path. A concrete primitive built on it is the **confidence-risk
+gap**: when the model *says* an action is safe but its raw next-token entropy is high
+(internally uncertain) on a non-trivial tool, the gateway escalates to a human — catching
+the confident-but-wrong case that a text-level confidence score misses, with a structured
+audit record explaining why.
 
-When a non-CG adapter is used (OpenAI, Anthropic, etc.), the same
-governance path still runs — it falls back to text-level signals
-(quality scores and coherence metrics). Customers can therefore start
-on commercial APIs today and move to the CG path later without rewiring.
+We make **no proprietary claim** on raw entropy — it is a standard, provider-exposed
+quantity. The differentiation is the **combination**: risk taxonomy + approvals + audit +
+budget + model-uncertainty signals enforced together, model-agnostically, in the execution
+path. That is the product customers buy.
+
+A richer, **experimental/research-only** path reads a 32-D "sovereign state" from a
+CG-capable adapter (`MistralCGWrapper`) to derive entropy/vritti/JEPA signals. It is **off
+by default**. Three internal experiments (see *Internal Signal Research Status*, Page 4) found
+that on confident-but-unsafe fabrication, raw next-token entropy out-performed the 32-D
+CG-state projection (which was anti-predictive there); CG is promoted to a default signal
+only if and when it beats cheap uncertainty signals on held-out benchmarks. We are
+deliberately not betting the company on it.
+
+When a non-CG adapter is used (OpenAI, Anthropic, etc.), the same governance path runs and
+uses raw entropy where logits/logprobs are available, plus the text-level signals; it
+degrades gracefully (to verbalized confidence + the risk taxonomy) when they are not.
+Customers start on commercial APIs today with no rewiring.
 
 ### Developer surface — one call, full governance
 
@@ -196,18 +209,24 @@ comparison against the two most common competitor families:
 | Per-tool risk classification at the gateway | **Yes** | Partial / per-integration | Partial |
 | Human-in-the-loop as a runtime argument | **Yes** | Bolt-on patterns | Console-driven |
 | Hard budget caps as terminal events | **Yes** | Typically soft / dashboard | Partial |
-| Signal enrichment from model-internal state | **Differentiated** (requires CG adapter) | Not available without model-internal access | Not exposed |
+| Model-uncertainty signals in the execution path | **Yes** — raw next-token entropy + confidence-risk gap (provider-agnostic) | Not in the execution path | Not exposed |
 | Multi-agent orchestration | Not yet — on roadmap | **Mature** | **Mature** |
 | Managed / hosted runtime | Not yet — on roadmap | Partial | **Mature** |
 | Ecosystem breadth (integrations, templates) | Narrow, focused | **Broad** | **Broad** |
 
-### Why the overall bet is better, not just different
+### Where the moat is — and is not
 
-- **Governance *is* the execution path, not a wrapper around it.** The `cancel → budget → approve → execute` invariant is a tested runtime contract. No other framework in this landscape makes that a first-class, diff-testable property of the library itself — which is exactly what an enterprise risk team needs in order to sign off an autonomous agent.
-- **Portable across LLM providers by construction.** `BaseLLMAdapter` lets a customer start on OpenAI or Anthropic today and move to a self-hosted or CG-enabled model later with no application rewrite. Managed platforms on the list lock the buyer into a single cloud; open-source frameworks leave portability to the user.
-- **Signal enrichment from model internals is a category of one.** Because we ship our own CG-capable adapter (`MistralCGAdapter`) alongside the framework, governance can read entropy and vritti signals straight from the model's 32D state rather than trusting a text-level self-reported confidence. No wrapper on top of a closed API can reproduce this, and no closed API currently exposes it.
-- **Composes with, rather than replaces, the rest of the stack.** A customer can keep LangChain for its ecosystem, Temporal for durability, LangSmith for observability, NeMo Guardrails for content filtering — and still put Agentic Framework at the tool-execution boundary. We are the missing layer, not a rival to every layer.
-- **Honest scope on where we do not compete (year one).** We are not trying to win on ecosystem breadth, managed infrastructure, or multi-agent orchestration in the first twelve months. We are trying to win on the governance properties that regulated enterprises often cannot ship without: pinned action-loop ordering, per-tool risk classification, runtime approvals, hard budget caps, replayable traces, and — where customers adopt the CG path — signal enrichment from model-internal state.
+**Primary moat — what the company rests on (all MEASURED in repo/CI):**
+- **Governance *is* the execution path, not a wrapper around it.** The `cancel → budget → approve → execute` invariant is a tested runtime contract. No other framework in this landscape makes that a first-class, diff-testable property of the library itself — exactly what an enterprise risk team needs to sign off an autonomous agent.
+- **Audit & compliance system-of-record.** Every run emits a replayable in-memory `AgentRunTrace` the customer owns — the same structure governance decisions were made against, not an out-of-band SaaS log. This is the compliance buy-reason and the durable lock-in.
+- **Provider-agnostic enforcement layer.** `BaseLLMAdapter` lets a customer start on OpenAI or Anthropic today and move providers later with no application rewrite. Managed platforms lock the buyer into one cloud; open-source frameworks leave portability to the user.
+- **Composes with, rather than replaces, the rest of the stack.** Keep LangChain, Temporal, LangSmith, NeMo Guardrails — and still put Agentic Framework at the tool-execution boundary. We are the missing layer, not a rival to every layer.
+
+**Secondary optionality — upside, not the foundation:**
+- **Model-internal uncertainty signals.** Today the runtime ingests **raw next-token entropy** (provider-agnostic; **no proprietary claim** — it is a standard quantity) via the confidence-risk gap, escalating confident-but-uncertain actions that a text-level confidence score misses. A real feature, not a moat.
+- **Advanced uncertainty estimation / sovereign-state research.** The deeper 32-D CG sovereign-state model is **experimental research, off by default.** It returns to product positioning only if it beats risk taxonomy + verbalized confidence + raw entropy on held-out benchmarks — which on our own experiments it has not yet done (see *Internal Signal Research Status*). **The company does not depend on this succeeding.**
+
+**Honest scope on where we do not compete (year one).** We are not trying to win on ecosystem breadth, managed infrastructure, or multi-agent orchestration in the first twelve months. We win on the governance properties regulated enterprises cannot ship without: pinned action-loop ordering, per-tool risk classification, runtime approvals, hard budget caps, and replayable traces.
 
 ### In one sentence
 
@@ -222,7 +241,7 @@ in this table are building for.
 
 ## Page 4 — Evidence & Roadmap
 
-### What is proved today (v1.9.0, internal evidence)
+### What is proved today (v1.10.0, internal evidence)
 
 | Area | Current state |
 |---|---|
@@ -234,11 +253,46 @@ in this table are building for.
 | **Realistic-mock regression** | 60/60 checks across 5 LLM output-format variations |
 | **Adoption pilots shipped** | 2 internal pilots — Research Assistant (tool composition + governance) and Internal Copilot (per-action-type approval boundary) |
 | **Known fragility points** | 3 of 4 surfaced in real-LLM pilots resolved (goal-alignment gate, action vocabulary normalization, usage accounting). The 4th is low-risk and tracked. |
-| **Signal-enriched governance (CG path)** | Operator-validated on `MistralCGAdapter` in a torch/GPU environment; not yet repo-validated end-to-end. |
+| **Raw-entropy escalation (confidence-risk gap)** | Wired into the gateway + the provider-agnostic adapter path; end-to-end validated in repo (gateway escalation + structured audit, with a negative control). First-class, on by default. |
+| **CG sovereign-state signals (experimental)** | Real CG checkpoint trained + three internal experiments completed. Raw entropy out-performed the 32-D CG-state projection; CG is **OFF by default**. See *Internal Signal Research Status*. |
 | **LLM adapters shipped** | OpenAI · Anthropic · Mistral (CG) · Mock — all behind a common `BaseLLMAdapter` |
 
 All numbers above are from our own repository and CI — not third-party
 benchmarks. An external benchmark is planned (see roadmap).
+
+### Internal Signal Research Status
+
+We ran a disciplined program to test whether model-internal signals improve governance
+beyond cheap baselines. Three experiments are complete:
+
+- **Real CG checkpoint pilot — completed.** A real CG head (Mistral-7B backbone + a trained
+  sovereign-state head) was trained and run through the signal harness. The 32-D state's
+  vritti component was non-discriminative (standalone AUROC 0.500).
+- **Fair-baseline pilot — completed.** With a *real* verbalized-confidence baseline (not a
+  placeholder), the full internal-signal config did **not** significantly beat verbalized
+  confidence (ΔAUROC ≈ +0.02, p ≈ 0.18, N=30). The model's own verbalized safety judgment
+  captured most of the available signal.
+- **Fastest-falsification — completed.** On a confident-but-unsafe fabrication probe, scored
+  on the subset where verbalized confidence is fooled, **raw next-token entropy was the
+  strongest signal (AUROC 0.857)**, while the 32-D CG-state entropy was anti-predictive
+  (0.457). Verdict: deprioritize the CG projection.
+
+**Net:** raw next-token entropy currently emerges as the strongest *measured* model-internal
+uncertainty signal. The CG sovereign-state projection remains experimental research, off the
+product path, until it beats the cheap baseline on a held-out benchmark.
+
+| Signal | Evidence | Status |
+|---|---|---|
+| **Risk taxonomy** | Strongest single feature across pilots (standalone AUROC ≈ 0.82) | **MEASURED** — shipped, default |
+| **Raw next-token entropy** | Strongest measured uncertainty signal; fooled-subset AUROC 0.857 | **MEASURED** — shipped, first-class default |
+| **Confidence-risk gap** | End-to-end validated wiring (escalation + audit + negative control) | **MEASURED** (wiring) / **DIRECTIONAL** (governance value, not yet powered) — shipped |
+| **CG entropy (32-D state)** | Fooled-subset AUROC 0.457 (anti-predictive); beaten by raw entropy | **RESEARCH** — off by default |
+| **JEPA / coherence** | Pilot standalone AUROC ≈ 0.70 / 0.68; no demonstrated value *over* raw entropy | **RESEARCH** — off by default |
+| **Vritti** | Standalone AUROC 0.500 (non-discriminative in every run) | **RESEARCH** — candidate for removal |
+
+*Classification key: **MEASURED** = supported by repo/CI or our own experiments;
+**DIRECTIONAL** = plausible but not yet established at statistical power; **RESEARCH** = open
+question, off the product path.*
 
 ### Developer-surface improvements (v1.7 → v1.9)
 
@@ -268,9 +322,15 @@ benchmarks. An external benchmark is planned (see roadmap).
 **Quarter 3 — Multi-agent and retrieval**
 - Agent-to-agent handoffs that preserve governance across the handoff
   boundary
-- First-party retrieval adapter with coherence-scored provenance
-- Phase Quad LLM integration as a first-class CG adapter, enabling
-  signal-enriched governance by default for Cognade customers
+- First-party retrieval adapter with relevance-scored provenance
+- Harden the raw-entropy uncertainty signal across providers (logits/logprobs
+  ingestion for OpenAI/Anthropic where exposed)
+
+**Parallel research track (separate from the product roadmap)**
+- CG sovereign-state "fix-or-falsify": run the signal-survival diagnostics and the
+  held-out promotion gate. CG returns to product positioning **only** if it beats
+  risk taxonomy + verbalized confidence + raw entropy on a held-out benchmark. The
+  product roadmap above does not depend on this outcome.
 
 **Quarter 4 — Scale and certification**
 - Begin SOC 2 Type II process on the managed runtime
@@ -291,11 +351,14 @@ Governance is increasingly becoming a procurement requirement for
 autonomous agents, not just a nice-to-have. We think the next 12–18 months are the right
 window to establish a credible default for that layer, and we believe
 the combination of a tested runtime contract, a clean developer
-surface, and a path to model-internal signal enrichment gives Agentic
-Framework a defensible position in it.
+surface, and the ability to enforce risk taxonomy, approvals, audit, budget, and
+model-uncertainty signals together in the execution path gives Agentic Framework a
+defensible position in it. Model-internal signals are an enhancement on that foundation
+(raw next-token entropy today; the deeper CG-state path is research-only until it earns
+its place on held-out benchmarks) — not the thing the company rests on.
 
 ---
 
 *Contact: Rakesh Mohan — Cognade Labs*
 *Repo: `rasaha/symbolu` · Module: `agentic/agentic_framework/`*
-*v1.9.0 · 1,550+ internal tests · 2 internal pilots · live-adapter validated*
+*v1.10.0 · 1,550+ internal tests · 2 internal pilots · live-adapter validated · raw-entropy escalation validated end-to-end*

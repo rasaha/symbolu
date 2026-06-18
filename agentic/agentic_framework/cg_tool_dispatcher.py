@@ -141,6 +141,14 @@ class CGToolDispatcher:
             The gateway's ``MCPToolResult``.
         """
         cg_metadata = self._current_cg_metadata()
+        # Model-uncertainty enrichment (provider-agnostic). Pulls raw entropy and a
+        # verbalized safety score off the adapter IF it exposes them; an adapter that
+        # does not (OpenAI/Anthropic/Mistral-cloud) yields {} and the call proceeds
+        # exactly as before — no provider is broken by this seam.
+        from agentic.agentic_framework.request_enrichment import (
+            build_uncertainty_enrichment_kwargs,
+        )
+        uncertainty = build_uncertainty_enrichment_kwargs(self.adapter)
         return await self.gateway.call_tool_simple(
             tool_name=tool_name,
             parameters=parameters,
@@ -148,6 +156,7 @@ class CGToolDispatcher:
             coherence_score=coherence_score,
             cg_metadata=cg_metadata,
             tier=self.tier,
+            **uncertainty,
         )
 
 

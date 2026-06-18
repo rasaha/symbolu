@@ -168,3 +168,42 @@ scenarios, scored conditionally, with raw-entropy as a ceiling check. Cheap, dec
 (2) Only if it survives, build the powered H+I benchmark. (3) In parallel and independent of
 the result, position and harden the control-plane/audit product — that is what customers buy
 either way.
+
+---
+
+## RESULT & PIVOT (2026-06) — fastest falsification ran; signal layer pivoted
+
+The fastest-falsification fabrication probe ran on the trained CG checkpoint (N=20, 10
+surface-matched hallucinated-tool pairs; `experiments/signal_gov/falsification/`).
+
+- **Gate 1:** `fool_rate = 0.70` — the regime is real; verbalized confidence judged 7/10
+  fabricated-tool actions "safe".
+- **Gate 2 (conditional AUROC on the fooled subset, N=12):**
+  - `raw_entropy` = **0.857** (CI [0.500, 1.000]) — raw next-token entropy concentrates its
+    power exactly where verbalized confidence fails.
+  - `internal_risk` (CG aggregate) = **0.600**; `cg_state_entropy` = **0.457** (anti-predictive).
+  - `C4 − C3` on the fooled subset = **−0.043** (CG internals *hurt* slightly).
+- **Verdict: `DEPRIORITIZE_CG_PROJECTION`.** The *idea* (internal uncertainty catches confident
+  hallucination) holds — via **free raw entropy**. The *CG 32-D projection* does not earn its
+  complexity (beaten by a one-line `entropy(logits)`; its own state-entropy is anti-predictive).
+  This is the second independent experiment to reach this conclusion (the fair-baseline pilot
+  was the first). Caveat: N=12 subset, wide CIs — directional, and a KILL/DEPRIORITIZE is the
+  reliable direction at this N.
+
+**Implemented pivot (shipped):**
+- **Raw next-token entropy → first-class gateway signal.** `signal_adapters/raw_entropy_adapter.py`
+  (provider-agnostic: scalar | logits | logprobs; graceful degrade), wired into
+  `mcp_gateway.py` as the default uncertainty penalty.
+- **Confidence-risk gap → execution-path primitive.** `signal_adapters/confidence_risk_gap.py`:
+  high verbalized safety + high raw entropy on a non-trivial tool ⇒ escalate to a human, with a
+  structured audit record. Conservative, configurable thresholds in `signal_config.py`.
+- **CG 32-D signals → experimental, OFF by default** (`SignalConfig.enable_cg_state_signals=False`).
+  Not deleted; re-promoted only if it beats cheap uncertainty signals on a **held-out** benchmark.
+- **Positioning (VC brief updated):** no proprietary claim on raw entropy; the differentiation is
+  the *combination* — risk taxonomy + approvals + audit + budget + model-uncertainty signals in
+  the execution path. Internal signals are an enhancement on the control-plane foundation, not
+  the bet.
+
+**Re-promotion gate for CG:** a powered (N≥150), held-out, paired benchmark on which the 32-D
+CG-state signal's conditional-on-fooled AUROC exceeds raw next-token entropy by a significant
+margin. Until then, CG stays research-only.

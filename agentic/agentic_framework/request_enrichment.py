@@ -48,7 +48,10 @@ CG metadata alone.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def build_governance_enrichment_kwargs(
@@ -112,3 +115,78 @@ def build_governance_enrichment_kwargs(
         governance_inputs_from_cg_metadata,
     )
     return governance_inputs_from_cg_metadata(cg_metadata, tier=tier)
+
+
+def _read_adapter_attr(adapter: Any, *names: str) -> Any:
+    """Return the first present, non-None attribute among ``names`` (calling it if it
+    is a zero-arg method). Provider-agnostic + fail-open: any error yields None."""
+    for name in names:
+        try:
+            val = getattr(adapter, name, None)
+            if callable(val):
+                val = val()
+            if val is not None:
+                return val
+        except Exception:  # pragma: no cover - defensive; adapters vary widely
+            continue
+    return None
+
+
+def build_uncertainty_enrichment_kwargs(
+    adapter: Any = None,
+    *,
+    enabled: bool = True,
+) -> Dict[str, Any]:
+    """Pull model-uncertainty signals off an adapter, if it exposes any.
+
+    Provider-agnostic and fail-open. Reads, in order of preference:
+      - a precomputed raw-entropy scalar  (``last_raw_entropy`` / ``get_last_raw_entropy``)
+      - decision-point logits             (``last_decision_logits`` / ``get_last_decision_logits``)
+      - a (top-k) logprobs list           (``last_raw_logprobs`` / ``get_last_logprobs`` / ``last_logprobs``)
+      - a verbalized safety confidence    (``last_safety_confidence`` / ``get_last_safety_confidence``)
+
+    Returns a dict with any of ``raw_entropy`` / ``raw_logprobs`` /
+    ``verbalized_safety_confidence`` to splat into ``call_tool_simple``. An adapter that
+    exposes none of these (OpenAI / Anthropic / Mistral-cloud today) yields ``{}`` and
+    governance degrades to verbalized confidence + the risk taxonomy. NEVER raises, and
+    never invents a verbalized safety score — only forwards one the adapter actually set.
+    """
+    if adapter is None or not enabled:
+        return {}
+
+    out: Dict[str, Any] = {}
+    scalar = _read_adapter_attr(adapter, "last_raw_entropy", "get_last_raw_entropy")
+    logits = _read_adapter_attr(adapter, "last_decision_logits", "get_last_decision_logits")
+    logprobs = _read_adapter_attr(
+        adapter, "last_raw_logprobs", "get_last_logprobs", "last_logprobs")
+
+    if scalar is not None:
+        try:
+            out["raw_entropy"] = float(scalar)
+        except (TypeError, ValueError):
+            pass
+    elif logits is not None:
+        try:
+            from agentic.agentic_framework.signal_adapters.raw_entropy_adapter import (
+                predictive_entropy_from_logits,
+            )
+            ent = predictive_entropy_from_logits(logits)
+            if ent is not None:
+                out["raw_entropy"] = ent
+        except Exception:  # pragma: no cover - defensive
+            pass
+    elif logprobs is not None:
+        out["raw_logprobs"] = logprobs
+
+    vs = _read_adapter_attr(adapter, "last_safety_confidence", "get_last_safety_confidence")
+    if vs is not None:
+        try:
+            out["verbalized_safety_confidence"] = float(vs)
+        except (TypeError, ValueError):
+            pass
+
+    if not out:
+        logger.debug(
+            "no model-uncertainty signals from adapter %s; governance degrades to "
+            "verbalized confidence + risk taxonomy", type(adapter).__name__)
+    return out
