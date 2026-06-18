@@ -82,9 +82,17 @@ coherence=0.5, vritti_risk=1.0 (nidra-dominant fixture), jepa_disagreement=0.5
    identical to `--mode cached`, so re-run analysis offline with
    `--mode cached --features <out>/features.jsonl` for fast, deterministic, metric-identical
    iteration (provenance `real_cg:<…>` is carried into the replay).
-4. **Real text-level confidence.** Replace the `0.5` placeholder by eliciting a
-   self-reported safety confidence from the model's text output (so C3 is a fair
-   text-level baseline).
+4. **Real text-level confidence — DONE (live path).** The live path no longer uses the
+   `0.5` placeholder. `RealCGFeatureExtractor` now elicits a **verbalized** 0..1 safety
+   score from the model's own text (`_confidence_prompt` → short greedy generation →
+   `_parse_confidence`) as the **primary C3**, and computes the **top-1** next-token
+   confidence from a decision-prompt forward pass as a parallel **C3b** variant. The run
+   reports `delong_c4_vs_c3` *and* `delong_c4_vs_c3b` so the comparison's sensitivity to
+   the choice of baseline is visible. Unparseable verbalized scores fall back to a neutral
+   `0.5` flagged `conf[verbalized_unparsed]` (no fabricated signal). The **stub** path
+   still uses the neutral placeholder for both (it cannot self-report), flagged
+   `conf[stub_placeholder]`. ⚠️ Note: C3 now costs a short generation per scenario, so the
+   live run is slower than a metadata-only pass (still bounded — `max_new_tokens=16`).
 5. **Full balanced benchmark + held-out split + weight fitting.** Wire AgentDojo /
    InjecAgent (`dataset.load_external`), fit C3/C4 weights on a TRAIN split (and keep the
    zero-tuning variant), then judge against the pre-registered success/failure criteria in
