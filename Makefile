@@ -1,7 +1,7 @@
 # Repo-level convenience targets.
 #
 # signal_gov — model-internal-signal governance experiment harness.
-.PHONY: signal-gov-smoke signal-gov-realcg-smoke signal-gov-external-smoke signal-gov-checkpoint-smoke signal-gov-pilot-assemble signal-gov-cg-pilot signal-gov-run signal-gov-data signal-gov-deps signal-gov-falsify-test signal-gov-falsify
+.PHONY: signal-gov-smoke signal-gov-realcg-smoke signal-gov-external-smoke signal-gov-checkpoint-smoke signal-gov-pilot-assemble signal-gov-cg-pilot signal-gov-run signal-gov-data signal-gov-deps signal-gov-falsify-test signal-gov-falsify signal-gov-d1-test signal-gov-d1 signal-gov-d1-mock signal-gov-diag-test signal-gov-d4 signal-gov-d5
 
 # CI smoke test: deterministic, mock features, validates harness + ablation ordering.
 signal-gov-smoke:
@@ -64,6 +64,49 @@ signal-gov-falsify:
 	  $${CG_QUANTIZE:+--cg-quantize $$CG_QUANTIZE} \
 	  $${CG_ALLOW_UNTRAINED:+--allow-untrained-cg-head} \
 	  --out "$${FALSIFY_OUT:-runs/falsify}"
+
+# Diagnostic D1 — signal-survival ladder. Probe + ladder + every localization branch,
+# torch-free (synthetic caches + the torch-free mock backend through the real bridge).
+signal-gov-d1-test:
+	python -m pytest experiments/signal_gov/tests/test_d1_ladder.py -q
+
+# All diagnostics tests (D1 ladder + D4 collapse + D5 entropy-definition), torch-free.
+signal-gov-diag-test:
+	python -m pytest experiments/signal_gov/tests/test_d1_ladder.py \
+	  experiments/signal_gov/tests/test_d4_d5.py -q
+
+# OFFLINE follow-ups — no GPU, no torch, no model. Consume a D1 cache (d1_cache.npz).
+# D4: vritti / component collapse + twin separation + best-dim AUROC over the 32-D state.
+# D5: correlation of raw predictive entropy vs entropy_from_sovereign_state.
+# Run these AFTER `make signal-gov-d1`; set D1_CACHE to point at the produced npz.
+D1_CACHE ?= runs/d1/d1_cache.npz
+signal-gov-d4:
+	python -m experiments.signal_gov.diagnostics.d4_vritti \
+	  --from-cache "$(D1_CACHE)" --out "$${D4_OUT:-runs/d4}"
+signal-gov-d5:
+	python -m experiments.signal_gov.diagnostics.d5_entropy_def \
+	  --from-cache "$(D1_CACHE)" --out "$${D5_OUT:-runs/d5}"
+
+# Diagnostic D1 plumbing run (torch-free, deterministic, LABEL-BLIND mock): exercises
+# the full cache -> ladder -> report pipeline. No result claim. -> runs/d1_mock/.
+signal-gov-d1-mock:
+	python -m experiments.signal_gov.diagnostics.run --mock --out "$${D1_OUT:-runs/d1_mock}"
+
+# GPU + CG CHECKPOINT REQUIRED — the real D1 localization run. One forward pass per
+# scenario caches logits + all-layer hidden + the 32-D state; the ladder reports AUROC
+# at each rung on the fooled subset and emits a PROJECTION-vs-ENTROPY-DEFINITION verdict
+# (which selects R1/R2). Read-only; no retrain, no product-path change, no success claim.
+# bf16 by default to match training precision. Set CG_STATE_DICT (trained *_model.pt).
+signal-gov-d1:
+	@test -n "$$CG_STATE_DICT" || { \
+	  echo "ERROR: set CG_STATE_DICT=<trained *_model.pt> (+ optional CG_BASE_MODEL)."; \
+	  exit 1; }
+	python -m experiments.signal_gov.diagnostics.run \
+	  --checkpoint "$${CG_BASE_MODEL:-mistralai/Mistral-7B-v0.3}" \
+	  --cg-state-dict "$$CG_STATE_DICT" --cg-device "$${CG_DEVICE:-auto}" \
+	  $${CG_QUANTIZE:+--cg-quantize $$CG_QUANTIZE} \
+	  $${CG_ALLOW_UNTRAINED:+--allow-untrained-cg-head} \
+	  --out "$${D1_OUT:-runs/d1}"
 
 # Full hand-built mini-set run (mock features) -> artifacts under out/mock_handbuilt/.
 signal-gov-run:

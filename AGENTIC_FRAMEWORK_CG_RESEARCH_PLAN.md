@@ -1,5 +1,11 @@
 # CG Research Plan — Fix-or-Falsify the Sovereign-State Signal
 
+> **Product path moved.** The Agentic Framework governance product path is now
+> [`AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md`](AGENTIC_FRAMEWORK_TRUST_OBSERVABLE_ARCHITECTURE.md)
+> (supervised, evidence-gated trust observables). This document remains the **research track**.
+> Current CG read-outs (Vritti/Guna/Kosha/JEPA) are **research-only / off by default**, and any
+> future CG-derived signal must pass that doc's **evidence gate** before entering the product.
+
 **Status:** CG (the 32-D "sovereign-state" model-internal signal) is **demoted to research-only**
 and is OFF the product decision path (`SignalConfig.enable_cg_state_signals=False`). This
 document is the plan to either make CG *earn* its way back, or kill it cleanly. It is **not** a
