@@ -40,4 +40,12 @@ __all__ = [
     "TRUST_DOUBT", "TRUST_CLAIM_SAFE",
     "decide", "TrustOutcome",
     "observe_tool_call", "PRODUCT_OBSERVABLES", "CG_RESEARCH_OBSERVABLES",
+    "TrustMode",
 ]
+
+
+def __getattr__(name):  # lazy: keep the decision core importable without parity deps
+    if name == "TrustMode":
+        from agentic.agentic_framework.trust.parity import TrustMode
+        return TrustMode
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

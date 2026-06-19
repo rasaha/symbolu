@@ -334,6 +334,16 @@ class AuditEntry:
     session_confidence_adjustment: Optional[float] = None
     session_enrichment_detail: Optional[str] = None
 
+    # Phase 1.5: trust-core shadow comparison (populated when trust_mode != legacy).
+    # The trust decision is computed in PARALLEL and recorded; in shadow/trust_core the
+    # gateway still ACTS on the legacy decision (the flip to authoritative is parity-gated).
+    trust_decision: Optional[str] = None            # trust core's parallel decision
+    trust_legacy_decision: Optional[str] = None     # legacy decision mapped to trust space
+    trust_mismatch: Optional[bool] = None           # do they disagree?
+    trust_mismatch_class: Optional[str] = None      # match | intended | unintended | unresolved
+    trust_drivers: Optional[List[str]] = None       # which observables drove the trust decision
+    trust_reason: Optional[str] = None              # human-readable trust rationale
+
 
 # =============================================================================
 # Tool Risk Classification
@@ -713,6 +723,7 @@ class SafeMCPGateway:
         domain_id: Optional[str] = None,
         shadow_registry: Optional[ShadowRegistry] = None,
         signal_config: Optional[SignalConfig] = None,
+        trust_mode: Optional[Any] = None,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -758,6 +769,15 @@ class SafeMCPGateway:
         # experimental (off). The confidence-risk gap (confident-but-uncertain ->
         # escalate) is on. See signal_config.py / the 2026-06 falsification result.
         self._signal_config: SignalConfig = signal_config or DEFAULT_SIGNAL_CONFIG
+
+        # Phase 1.5 migration: trust decision core mode (legacy | shadow | trust_core).
+        # Default LEGACY = zero behavior change. SHADOW computes the trust decision in
+        # parallel and records it (still acts on legacy). TRUST_CORE is parity-gated and
+        # currently behaves as SHADOW until the differential harness shows zero unreviewed
+        # mismatches — the flip to authoritative is a deliberate, separate step.
+        from agentic.agentic_framework.trust.parity import TrustMode
+        self._trust_mode: TrustMode = (
+            TrustMode(trust_mode) if trust_mode is not None else TrustMode.LEGACY)
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -1114,6 +1134,34 @@ class SafeMCPGateway:
                 session_enrichment.source_detail if session_enrichment else None
             ),
         )
+
+        # Phase 1.5: shadow the trust decision core. This runs AFTER the legacy decision
+        # is final (the `result` is already decided), so it can NEVER change runtime
+        # behavior — it only records the parallel trust decision and any mismatch. The
+        # flip to trust_core being authoritative is a separate, parity-gated step.
+        from agentic.agentic_framework.trust.parity import TrustMode
+        if self._trust_mode != TrustMode.LEGACY:
+            try:
+                from agentic.agentic_framework.trust.parity import shadow_compare
+                cmp = shadow_compare(
+                    tool_def=tool_def, result=result, gate_decision=gate_decision,
+                    jepa_assessment=jepa_assessment, domain_result=domain_result,
+                    shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap)
+                entry.trust_decision = cmp.trust.value
+                entry.trust_legacy_decision = cmp.legacy.value
+                entry.trust_mismatch = cmp.mismatch
+                entry.trust_mismatch_class = cmp.classification
+                entry.trust_drivers = [o.name for o in cmp.outcome.drivers]
+                entry.trust_reason = cmp.outcome.reason
+                if cmp.mismatch:
+                    logger.warning(
+                        "TRUST SHADOW MISMATCH [%s] %s: legacy=%s trust=%s (%s) — drivers=%s",
+                        self._trust_mode.value, tool_call.tool_name,
+                        cmp.legacy.value, cmp.trust.value, cmp.classification,
+                        entry.trust_drivers)
+            except Exception:  # pragma: no cover - shadow must never break governance
+                logger.exception("trust shadow comparison failed (non-fatal)")
+
         self.audit_log.append(entry)
 
         # Persist to durable store
