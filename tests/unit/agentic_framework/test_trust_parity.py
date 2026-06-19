@@ -179,6 +179,32 @@ def test_good_reputation_and_below_volume_are_inert():
     assert "outcome_reputation" not in [o.name for o in cmp.outcome.observations]
 
 
+# ---- hallucinated-capability observable (PROVISIONAL advisory) --------------
+
+def test_hallucinated_capability_escalates_to_confirm_intended():
+    from agentic.agentic_framework.trust.hallucinated_capability import CapabilityContext
+    result, tool_def, gate = _ctx(decision="allowed")
+    ctx = CapabilityContext(referenced_tools=("teleport",),
+                            available_tools=frozenset({"file_read"}))
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         capability_context=ctx)
+    assert cmp.legacy == TrustDecision.ALLOW
+    assert cmp.trust == TrustDecision.CONFIRM
+    assert cmp.classification == "intended"
+    assert "hallucinated_capability" in [o.name for o in cmp.outcome.drivers]
+
+
+def test_hallucinated_valid_and_absent_are_inert():
+    from agentic.agentic_framework.trust.hallucinated_capability import CapabilityContext
+    result, tool_def, gate = _ctx(decision="allowed")
+    valid = CapabilityContext(referenced_tools=("file_read",),
+                              available_tools=frozenset({"file_read"}))
+    assert shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                          capability_context=valid).classification == "match"
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate)
+    assert "hallucinated_capability" not in [o.name for o in cmp.outcome.observations]
+
+
 # ---- forbidden-capability HARD_VETO (hard pre-gate parity) ------------------
 
 def _forbidden_ctx(cap="credential_access", *, decision="blocked", risk="write",

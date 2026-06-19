@@ -178,6 +178,30 @@ def test_forbidden_capability_gateway_trust_matches_legacy_block():
     assert "forbidden_capability" in (e.trust_drivers or [])
 
 
+# ---- hallucinated-capability through the real gateway (shadow) --------------
+
+def test_hallucinated_capability_flows_through_gateway_shadow():
+    # A capability_context referencing an unavailable tool escalates the SHADOW-recorded
+    # decision to CONFIRM (driver hallucinated_capability) while legacy still ALLOWs/executes.
+    from agentic.agentic_framework.trust.hallucinated_capability import CapabilityContext
+    gw = create_mock_mcp_gateway()
+    gw._trust_mode = TrustMode.SHADOW
+    gw.mcp_client.register_tool("cap_tool", lambda p: "ok", ToolRiskLevel.READ_ONLY)
+    gw.tool_definitions["cap_tool"] = MCPToolDefinition(
+        name="cap_tool", description="x", risk_level=ToolRiskLevel.READ_ONLY, min_confidence=0.0)
+    ctx = CapabilityContext(referenced_tools=("ghost_tool",),
+                            available_tools=frozenset({"cap_tool"}))
+    res = _run(gw.call_tool(MCPToolCall(
+        tool_name="cap_tool", parameters={"x": 1}, quality_score=0.9, coherence_score=0.9,
+        raw_entropy=0.1, capability_context=ctx)))
+    e = gw.audit_log[-1]
+    assert res.decision.value == "allowed"               # legacy unchanged (executed)
+    assert e.trust_legacy_decision == "allow"
+    assert e.trust_decision == "confirm"                 # advisory escalation recorded
+    assert e.trust_mismatch_class == "intended"
+    assert "hallucinated_capability" in (e.trust_drivers or [])
+
+
 # ---- shadow never changes behavior ------------------------------------------
 
 def test_shadow_mode_does_not_change_behavior():

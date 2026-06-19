@@ -231,6 +231,10 @@ class MCPToolCall:
     # inert and the recorded/authoritative decision is unchanged.
     permission_context: Optional[Any] = None
 
+    # Phase 2: optional capability profile (referenced vs available) for the deterministic
+    # hallucinated-capability observable. Dormant by default (None → inert).
+    capability_context: Optional[Any] = None
+
     # Request metadata
     request_id: str = field(default_factory=lambda: f"mcp-{int(time.time() * 1000)}")
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -1195,6 +1199,7 @@ class SafeMCPGateway:
                     forbidden_capabilities=self.forbidden_capabilities,
                     permission_context=getattr(tool_call, "permission_context", None),
                     reputation_context=reputation_context,
+                    capability_context=getattr(tool_call, "capability_context", None),
                     policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value

@@ -195,6 +195,7 @@ def build_parity_observations(
     forbidden_capabilities: Any = (),
     permission_context: Any = None,
     reputation_context: Any = None,
+    capability_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> List[Observation]:
     """Map the legacy decision authorities to trust observations.
@@ -306,6 +307,15 @@ def build_parity_observations(
     reputation_obs = build_reputation_observation(reputation_context)
     if reputation_obs is not None:
         obs.append(reputation_obs)
+
+    # Phase 2: hallucinated-capability observable (PROVISIONAL, advisory-only). Appended ONLY
+    # when an explicit CapabilityContext is supplied — inert otherwise, so a production call
+    # with no context is unchanged.
+    from agentic.agentic_framework.trust.hallucinated_capability import (
+        build_hallucination_observation)
+    hallucination_obs = build_hallucination_observation(capability_context)
+    if hallucination_obs is not None:
+        obs.append(hallucination_obs)
     return obs
 
 
@@ -341,6 +351,7 @@ def shadow_compare(
     forbidden_capabilities: Any = (),
     permission_context: Any = None,
     reputation_context: Any = None,
+    capability_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> ParityComparison:
     """Compute the parallel trust decision under `policy` and compare it to legacy.
@@ -359,7 +370,8 @@ def shadow_compare(
               shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
               forbidden_capabilities=forbidden_capabilities,
               permission_context=permission_context,
-              reputation_context=reputation_context)
+              reputation_context=reputation_context,
+              capability_context=capability_context)
     outcome = decide(build_parity_observations(policy=policy, **kw))
     legacy = legacy_decision_to_trust(result)
     mismatch = outcome.decision != legacy
