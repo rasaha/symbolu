@@ -31,14 +31,13 @@ from agentic.agentic_framework.trust.parity import (
 
 
 def _run(coro):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            raise RuntimeError
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+        asyncio.set_event_loop(asyncio.new_event_loop())
 
 
 def _call(tool="file_read", q=0.9, c=0.9, **kw):
@@ -125,16 +124,12 @@ def test_parity_mismatch_detected_and_classified():
     assert classify_mismatch(TrustDecision.ALLOW, TrustDecision.BLOCK) == "unintended"
 
 
-def test_mismatch_is_logged_by_gateway(caplog):
-    # Force a mismatch by monkeypatching shadow_compare via a crafted call is fragile;
-    # instead assert the gateway emits a warning when a mismatch is present, using a
-    # gateway whose _audit path runs shadow on a constructed mismatch.
-    import agentic.agentic_framework.mcp_gateway as gw_mod
+def test_mismatch_is_logged_by_gateway(caplog, monkeypatch):
+    # The gateway imports shadow_compare lazily inside _audit, so patch it on the parity
+    # module. monkeypatch auto-restores it after the test (no leakage into sibling tests).
+    from agentic.agentic_framework.trust import parity as parity_mod
     gw = create_mock_mcp_gateway()
     gw._trust_mode = TrustMode.SHADOW
-    # Patch shadow_compare to report a mismatch for this run.
-    real = gw_mod.__dict__.get("shadow_compare")
-    from agentic.agentic_framework.trust import parity as parity_mod
 
     def fake_compare(**kw):
         from agentic.agentic_framework.trust.decision import decide
@@ -146,14 +141,11 @@ def test_mismatch_is_logged_by_gateway(caplog):
             legacy=TrustDecision.ALLOW, trust=TrustDecision.BLOCK, mismatch=True,
             classification="unintended", outcome=out)
 
-    parity_mod.shadow_compare = fake_compare
-    try:
-        with caplog.at_level(logging.WARNING):
-            _run(gw.call_tool(_call()))
-        assert any("TRUST SHADOW MISMATCH" in r.message for r in caplog.records)
-        assert gw.audit_log[-1].trust_mismatch is True
-    finally:
-        parity_mod.shadow_compare = real if real else parity_mod.shadow_compare
+    monkeypatch.setattr(parity_mod, "shadow_compare", fake_compare)
+    with caplog.at_level(logging.WARNING):
+        _run(gw.call_tool(_call()))
+    assert any("TRUST SHADOW MISMATCH" in r.message for r in caplog.records)
+    assert gw.audit_log[-1].trust_mismatch is True
 
 
 def test_audit_includes_trust_drivers_on_confirm():
