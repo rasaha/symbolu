@@ -203,3 +203,47 @@ authorities **and** the forbidden-capability hard pre-gate — 0 unintended / 0 
 across in-scope, external, and the synthetic export. **The flip itself is still NOT taken**: it
 remains gated on the same property holding over **real** volume (not just the offline corpus),
 and on the standing items in §6 (authority demotions reviewed). No `trust_core` flip performed.
+
+---
+
+## 8. Real SHADOW-volume validation run
+
+`experiments/trust_signal/shadow_volume_validation.py` assembles the broadest committed
+offline corpus, drives it through `SafeMCPGateway(trust_mode=SHADOW)` into a durable
+`GovernanceAuditStore`, exports JSONL, and runs `shadow_report` for a flip-readiness verdict.
+No flip, no policy demotion, no new observable — legacy decides and executes throughout.
+
+```bash
+PYTHONPATH="$(pwd)" python3 -m experiments.trust_signal.shadow_volume_validation
+# options: --policy {reviewed|parity}  --db PATH  --jsonl PATH  --fail-on-unintended
+#          --no-external  --no-signalgov  --max-examples N
+```
+
+Corpus (**105 scenarios**, all real fixtures, no fabricated model signals, no accuracy
+metric): 28 mapped-authority + 12 AgentDojo/InjecAgent minis + 15 signal_gov handbuilt +
+30 signal_gov pilot + 20 confident-unsafe twins.
+
+Result under the **REVIEWED** flip candidate (hash chain valid):
+
+| metric | value |
+|---|---|
+| total decisions / with trust_shadow | 105 / 105 |
+| match rate | 97.1% (102/105) |
+| **intended** | **3** (JEPA demotions: `jepa_ro`, `jepa_w`, `jepa_write`) |
+| **unintended** | **0** |
+| **unsafe_relaxation** | **0** |
+| mismatch by driver | jepa ×3, execution_permission ×3 |
+| mismatch by risk | write ×2, read_only ×1 |
+| entropy slices | raw-entropy available 25 · gap escalate 4 (provenance only) |
+| **verdict / exit** | **READY FOR REVIEW / 0** |
+
+PARITY policy: 105/105 match (0 mismatch). The runner exits non-zero on any
+`unsafe_relaxation` (and, with `--fail-on-unintended`, any `unintended`).
+
+**Conclusion:** the offline real-shape SHADOW volume is **CLEAN** — every divergence is a
+reviewed/intended JEPA demotion; zero unintended, zero unsafe relaxation, across all
+authorities, the forbidden hard veto, external benchmarks, and enterprise/confident-unsafe
+scenarios. This is the evidence a flip *could be considered* — but the flip is **NOT taken**:
+it still requires the same `unintended == 0 / unsafe_relaxation == 0` to hold over **production
+SHADOW traffic** (run this same script against the live store), plus sign-off on the reviewed
+JEPA demotion (§6). No `trust_core` flip performed.
