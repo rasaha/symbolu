@@ -150,6 +150,35 @@ def test_no_permission_context_is_inert_match():
     assert "permission_overclaim" not in [o.name for o in cmp.outcome.observations]
 
 
+# ---- outcome-reputation observable (PROVISIONAL advisory) -------------------
+
+def test_reputation_escalates_to_confirm_and_classifies_intended():
+    from agentic.agentic_framework.trust.outcome_reputation import (
+        ReputationStats)
+    result, tool_def, gate = _ctx(decision="allowed")    # legacy ALLOWs a clean tool
+    # poor history: mostly denied (approval_rate 0.2), enough volume/adjudication
+    stats = ReputationStats(action_key="t", n=8, approvals=1, denials=4)
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         reputation_context=stats)
+    assert cmp.legacy == TrustDecision.ALLOW
+    assert cmp.trust == TrustDecision.CONFIRM            # advisory escalation
+    assert cmp.classification == "intended"
+    assert "outcome_reputation" in [o.name for o in cmp.outcome.drivers]
+
+
+def test_good_reputation_and_below_volume_are_inert():
+    from agentic.agentic_framework.trust.outcome_reputation import ReputationStats
+    result, tool_def, gate = _ctx(decision="allowed")
+    good = ReputationStats(action_key="t", n=10, approvals=8)        # SAFE
+    assert shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                          reputation_context=good).classification == "match"
+    thin = ReputationStats(action_key="t", n=3, denials=3)           # below MIN_VOLUME
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         reputation_context=thin)
+    assert cmp.classification == "match"
+    assert "outcome_reputation" not in [o.name for o in cmp.outcome.observations]
+
+
 # ---- forbidden-capability HARD_VETO (hard pre-gate parity) ------------------
 
 def _forbidden_ctx(cap="credential_access", *, decision="blocked", risk="write",

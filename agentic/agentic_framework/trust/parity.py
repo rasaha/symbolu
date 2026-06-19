@@ -194,6 +194,7 @@ def build_parity_observations(
     confidence_risk_gap: Any = None,
     forbidden_capabilities: Any = (),
     permission_context: Any = None,
+    reputation_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> List[Observation]:
     """Map the legacy decision authorities to trust observations.
@@ -296,6 +297,15 @@ def build_parity_observations(
     overclaim_obs = build_overclaim_observation(permission_context)
     if overclaim_obs is not None:
         obs.append(overclaim_obs)
+
+    # Phase 2: outcome-reputation observable (PROVISIONAL, advisory-only). Appended ONLY when
+    # reputation stats (from the existing audit chain) are supplied AND have enough volume —
+    # inert otherwise, so a production call with no reputation context is unchanged.
+    from agentic.agentic_framework.trust.outcome_reputation import (
+        build_reputation_observation)
+    reputation_obs = build_reputation_observation(reputation_context)
+    if reputation_obs is not None:
+        obs.append(reputation_obs)
     return obs
 
 
@@ -330,6 +340,7 @@ def shadow_compare(
     confidence_risk_gap: Any = None,
     forbidden_capabilities: Any = (),
     permission_context: Any = None,
+    reputation_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> ParityComparison:
     """Compute the parallel trust decision under `policy` and compare it to legacy.
@@ -347,7 +358,8 @@ def shadow_compare(
               jepa_assessment=jepa_assessment, domain_result=domain_result,
               shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
               forbidden_capabilities=forbidden_capabilities,
-              permission_context=permission_context)
+              permission_context=permission_context,
+              reputation_context=reputation_context)
     outcome = decide(build_parity_observations(policy=policy, **kw))
     legacy = legacy_decision_to_trust(result)
     mismatch = outcome.decision != legacy

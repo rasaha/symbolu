@@ -730,6 +730,7 @@ class SafeMCPGateway:
         signal_config: Optional[SignalConfig] = None,
         trust_mode: Optional[Any] = None,
         trust_authority_policy: Optional[Any] = None,
+        enable_outcome_reputation: bool = False,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -808,6 +809,12 @@ class SafeMCPGateway:
             self._trust_authority_policy = _policy_by_name[trust_authority_policy.lower()]
         else:
             self._trust_authority_policy = trust_authority_policy
+
+        # Phase 2: outcome-reputation observable. Off by default → never computed, so the
+        # recorded/authoritative decision is unchanged. When True, reputation is derived from
+        # the gateway's own audit log (the in-memory view of the durable chain) and fed to the
+        # shadow comparison only (still advisory/PROVISIONAL). No new production behaviour.
+        self._enable_outcome_reputation = bool(enable_outcome_reputation)
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -1173,12 +1180,21 @@ class SafeMCPGateway:
         if self._trust_mode != TrustMode.LEGACY:
             try:
                 from agentic.agentic_framework.trust.parity import shadow_compare
+                # Phase 2: outcome reputation from PRIOR history (audit_log holds entries from
+                # earlier calls; the current entry is appended below, so this is historical).
+                reputation_context = None
+                if self._enable_outcome_reputation:
+                    from agentic.agentic_framework.trust.outcome_reputation import (
+                        compute_reputation)
+                    reputation_context = compute_reputation(
+                        self.audit_log, tool_name=tool_call.tool_name)
                 cmp = shadow_compare(
                     tool_def=tool_def, result=result, gate_decision=gate_decision,
                     jepa_assessment=jepa_assessment, domain_result=domain_result,
                     shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
                     forbidden_capabilities=self.forbidden_capabilities,
                     permission_context=getattr(tool_call, "permission_context", None),
+                    reputation_context=reputation_context,
                     policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value
