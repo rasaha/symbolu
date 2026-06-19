@@ -119,3 +119,32 @@ signal-gov-data:
 # Install the harness dependencies (numpy, matplotlib, pytest).
 signal-gov-deps:
 	python -m pip install -r experiments/signal_gov/requirements.txt
+
+# =============================================================================
+# Trust core — operational reports (read-only over a GovernanceAuditStore).
+# Usage: make trust-shadow-report DB=/var/data/governance_audit.db
+# =============================================================================
+.PHONY: trust-shadow-report trust-canary-report trust-observable-tests
+
+DB ?= governance_audit.db
+
+# Flip-readiness report over the durable SHADOW store (exit non-zero on unsafe/unintended).
+trust-shadow-report:
+	PYTHONPATH="$(CURDIR)" python3 -m experiments.trust_signal.shadow_report \
+		--store "$(DB)" --entropy --fail-on-unintended
+
+# Canary approve/deny + safety report over the durable TRUST_CORE store.
+trust-canary-report:
+	PYTHONPATH="$(CURDIR)" python3 -m experiments.trust_signal.canary_report \
+		--store "$(DB)"
+
+# Focused trust observable + operational suite.
+trust-observable-tests:
+	python3 -m pytest \
+		tests/unit/agentic_framework/test_trust_shadow.py \
+		tests/unit/agentic_framework/test_trust_parity.py \
+		tests/unit/agentic_framework/test_permission_overclaim.py \
+		tests/unit/agentic_framework/test_outcome_reputation.py \
+		tests/unit/agentic_framework/test_hallucinated_capability.py \
+		tests/unit/agentic_framework/test_runtime_config.py \
+		tests/unit/agentic_framework/test_canary_report.py -q
