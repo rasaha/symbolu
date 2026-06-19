@@ -28,6 +28,7 @@ from agentic.agentic_framework.trust.observables import (
     EvidenceStatus,
     Observation,
     ObservableType,
+    TRUST_CLAIM_SAFE,
     TRUST_DOUBT,
     TrustDecision,
     Verdict,
@@ -39,7 +40,9 @@ _SEVERITY_ORDER = {TrustDecision.ALLOW: 0, TrustDecision.CONFIRM: 1, TrustDecisi
 @dataclass
 class TrustOutcome:
     decision: TrustDecision
-    drivers: List[Observation] = field(default_factory=list)   # what set the decision
+    # Observations responsible for the outcome: for CONFIRM/BLOCK, the ones that RAISED it;
+    # for ALLOW, the proven gates that were evaluated and CLEARED (the basis for allowing).
+    drivers: List[Observation] = field(default_factory=list)
     observations: List[Observation] = field(default_factory=list)  # everything considered
     reason: str = ""
 
@@ -87,31 +90,73 @@ def _proposed(obs: Observation) -> TrustDecision:
     return TrustDecision.CONFIRM if risky else TrustDecision.ALLOW
 
 
+def _cleared_gates(observations: List[Observation]) -> List[Observation]:
+    """Proven gates (HARD_VETO / VALIDATOR) that were evaluated and returned SAFE — the
+    evidentiary basis for an ALLOW (they COULD have blocked/escalated but did not)."""
+    return [o for o in observations
+            if o.evidence == EvidenceStatus.PROVEN
+            and o.otype in (ObservableType.HARD_VETO, ObservableType.VALIDATOR)
+            and o.verdict == Verdict.SAFE]
+
+
+def _discounted(observations: List[Observation]) -> List[Observation]:
+    """Signals recorded but given no authority over the decision: RESEARCH (any), and
+    confident TRUST_SIGNAL claims (which can never RAISE trust, by the asymmetry rule)."""
+    out = []
+    for o in observations:
+        if o.evidence == EvidenceStatus.RESEARCH:
+            out.append(o)
+        elif o.otype == ObservableType.TRUST_SIGNAL and o.direction == TRUST_CLAIM_SAFE:
+            out.append(o)
+    return out
+
+
 def decide(observations: List[Observation]) -> TrustOutcome:
-    """Combine observations into ALLOW / CONFIRM / BLOCK with audit drivers."""
+    """Combine observations into ALLOW / CONFIRM / BLOCK with an explainable driver trace.
+
+    Every decision is explained: BLOCK/CONFIRM by the observations that RAISED it; ALLOW by
+    the proven gates it CLEARED. Both note any non-authoritative signals that were discounted
+    (confident claims, RESEARCH) — so the asymmetry and evidence-gating are auditable.
+    """
     decision = TrustDecision.ALLOW
-    drivers: List[Observation] = []
+    raisers: List[Observation] = []
 
     for obs in observations:
         proposed = _proposed(obs)
         if _SEVERITY_ORDER[proposed] > _SEVERITY_ORDER[decision]:
             decision = proposed
-            drivers = [obs]
+            raisers = [obs]
         elif proposed == decision and proposed != TrustDecision.ALLOW:
-            drivers.append(obs)
+            raisers.append(obs)
 
-    # Order drivers by severity (highest first) for a stable, readable audit trail.
-    drivers = sorted(drivers, key=lambda o: -float(o.severity))
-    reason = _render_reason(decision, drivers)
+    if decision == TrustDecision.ALLOW:
+        drivers = sorted(_cleared_gates(observations), key=lambda o: o.name)
+    else:
+        # Order raisers by severity (highest first) for a stable, readable trail.
+        drivers = sorted(raisers, key=lambda o: -float(o.severity))
+
+    reason = _render_reason(decision, drivers, observations)
     return TrustOutcome(decision=decision, drivers=drivers,
                         observations=list(observations), reason=reason)
 
 
-def _render_reason(decision: TrustDecision, drivers: List[Observation]) -> str:
-    if decision == TrustDecision.ALLOW or not drivers:
-        return "no proven observable raised the decision above ALLOW"
-    parts = [f"{o.name}({o.otype.value},{o.evidence.value},{o.verdict.value})"
-             f": {o.reason}" if o.reason else
-             f"{o.name}({o.otype.value},{o.evidence.value},{o.verdict.value})"
-             for o in drivers]
-    return f"{decision.value.upper()} driven by " + " | ".join(parts)
+def _render_reason(decision: TrustDecision, drivers: List[Observation],
+                   observations: List[Observation]) -> str:
+    if decision == TrustDecision.ALLOW:
+        if drivers:
+            base = (f"ALLOW: cleared {len(drivers)} proven check(s) — "
+                    + ", ".join(o.name for o in drivers))
+        else:
+            base = "ALLOW: no proven gate evaluated"
+    else:
+        parts = [(f"{o.name}({o.otype.value},{o.evidence.value},{o.verdict.value}): {o.reason}"
+                  if o.reason else
+                  f"{o.name}({o.otype.value},{o.evidence.value},{o.verdict.value})")
+                 for o in drivers]
+        base = f"{decision.value.upper()} driven by " + " | ".join(parts)
+
+    discounted = _discounted(observations)
+    if discounted:
+        base += ("; discounted " + str(len(discounted)) + " non-authoritative signal(s): "
+                 + ", ".join(o.name for o in discounted))
+    return base

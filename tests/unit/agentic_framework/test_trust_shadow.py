@@ -70,6 +70,18 @@ def test_shadow_records_trust_decision_and_no_mismatch_on_clean_allow():
     assert e.trust_mismatch_class == "match"
 
 
+def test_audit_explains_allow_with_cleared_gates():
+    # An ALLOW must be auditable: the recorded trust trace names the proven gates it
+    # cleared (e.g. confidence_floor / execution_permission), not an empty list.
+    gw = create_mock_mcp_gateway()
+    gw._trust_mode = TrustMode.SHADOW
+    _run(gw.call_tool(_call()))
+    e = gw.audit_log[-1]
+    assert e.trust_decision == "allow"
+    assert e.trust_drivers                       # ALLOW now has a non-empty driver trace
+    assert "ALLOW: cleared" in (e.trust_reason or "")
+
+
 def test_trust_core_mode_toggles_and_is_not_yet_authoritative():
     legacy_gw = create_mock_mcp_gateway()
     core_gw = create_mock_mcp_gateway()

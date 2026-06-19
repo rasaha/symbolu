@@ -116,6 +116,46 @@ def test_approval_required_confirms_not_blocks():
     assert out.decision == TrustDecision.CONFIRM
 
 
+def test_allow_explains_cleared_proven_gates():
+    # A clean write call → ALLOW, but the audit must now explain WHY: the proven gates
+    # that were evaluated and cleared (tool_validity, budget_gate, raw_entropy, gap).
+    obs = observe_tool_call(
+        tool_risk_level="write", raw_entropy=0.1, verbalized_safety_confidence=0.95)
+    out = decide(obs)
+    assert out.decision == TrustDecision.ALLOW
+    names = [o.name for o in out.drivers]
+    assert "tool_validity" in names and "raw_entropy" in names
+    assert "ALLOW: cleared" in out.reason
+    # action_risk is ADVISORY (not a gate) and must NOT appear as a cleared gate.
+    assert "action_risk" not in names
+
+
+def test_allow_discounts_confident_claim_in_reason():
+    obs = observe_tool_call(
+        tool_risk_level="write", raw_entropy=0.1, verbalized_safety_confidence=0.95)
+    out = decide(obs)
+    # The confident verbalized-safety claim cannot raise trust → recorded as discounted.
+    assert "discounted" in out.reason
+    assert "verbalized_safety" in out.reason
+
+
+def test_research_signal_discounted_and_inert():
+    research = Observation("vritti_risk", ObservableType.VALIDATOR,
+                           EvidenceStatus.RESEARCH, Verdict.UNSAFE, severity=1.0)
+    safe_gate = Observation("raw_entropy", ObservableType.VALIDATOR,
+                            EvidenceStatus.PROVEN, Verdict.SAFE, severity=0.1)
+    out = decide([research, safe_gate])
+    assert out.decision == TrustDecision.ALLOW
+    assert "raw_entropy" in [o.name for o in out.drivers]          # cleared gate
+    assert "discounted" in out.reason and "vritti_risk" in out.reason
+
+
+def test_block_reason_still_explains_driver():
+    out = decide([_veto(Verdict.UNSAFE)])
+    assert out.decision == TrustDecision.BLOCK
+    assert "BLOCK driven by" in out.reason and "tool_validity" in out.reason
+
+
 def test_registry_declares_cg_as_research_only():
     from agentic.agentic_framework.trust import CG_RESEARCH_OBSERVABLES, PRODUCT_OBSERVABLES
     # No CG-state signal is a product observable.
