@@ -97,19 +97,39 @@ Missing report must summarize, over `event_type == "mcp_tool_call"` records that
 - **mismatch by tool / action type** (`tool_name` column)
 - a hard flag: any `unsafe_relaxation > 0` (the flip blocker)
 
+> **Implemented:** `experiments/trust_signal/shadow_report.py` (read-only) now produces all
+> of the above. Run it against a live store DB or a JSONL export:
+>
+> ```bash
+> # against the durable store DB:
+> PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --store governance_audit.db
+> # against a JSONL export (store.export_jsonl(path)):
+> PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --jsonl audit_export.jsonl
+> # CI-gate also on mapping gaps:
+> PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --store governance_audit.db --fail-on-unintended
+> ```
+>
+> It prints total/with-trust counts, legacy + trust decision counts, match rate,
+> `mismatch_class` counts, mismatch by driver / risk level / tool, the top mismatch examples,
+> and a **READY FOR REVIEW** vs **NOT READY TO FLIP** verdict. It **exits non-zero** when
+> `unsafe_relaxation > 0` (always), when `unintended > 0` and `--fail-on-unintended`, or when
+> no `trust_shadow` data is present — so it can gate a pipeline.
+
 ---
 
 ## 5. Smallest next implementation to make analysis usable
 
-**Primary (smallest, unblocks §4) — a read-only report script.** No behavior change, no new
-observable, no policy change, no flip.
+**Primary (smallest, unblocks §4) — a read-only report script. ✅ DONE.** No behavior change,
+no new observable, no policy change, no flip.
 
 - Location: `experiments/trust_signal/shadow_report.py` (sibling of `parity_harness.py`),
-  callable as a module and importable as a function.
-- Signature (sketch):
-  `summarize_shadow(store_or_jsonl) -> dict` + a `main()` that prints a markdown block in the
-  same shape as `parity_harness` (Total · match · intended · unintended · unsafe_relaxation),
-  plus three breakdown tables (by driver / by risk_level / by tool).
+  callable as a module (`python3 -m` / direct) and importable (`build_report`, `verdict`,
+  `render`, `load_records`, `extract_trust_shadow`).
+- Signature (as built):
+  `load_records(store_path=… | jsonl_path=…) -> [records]`; `build_report(records) ->
+  ShadowReport`; `verdict(rep, fail_on_unintended=…) -> {ready, exit_code, label, detail}`;
+  `render(rep) -> markdown` (Total · match · intended · unintended · unsafe_relaxation +
+  breakdown tables by driver / risk_level / tool + top examples).
 - Input: a `GovernanceAuditStore` (use `list_recent`/`export_jsonl`) **or** a JSONL export
   path — so it runs against a live DB or a copied export. Read-only: opens nothing for write.
 - Logic: filter `event_type=="mcp_tool_call"`; skip records without `trust_shadow`; bucket by
