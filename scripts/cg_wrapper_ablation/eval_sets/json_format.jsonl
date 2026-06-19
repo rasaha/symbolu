@@ -1,0 +1,16 @@
+{"id": "js01", "prompt": "Give a JSON object with keys 'name' and 'age' for a fictional person. Respond with only a JSON object.", "required_keys": ["name", "age"]}
+{"id": "js02", "prompt": "Return a JSON object with keys 'city' and 'country'. Respond with only a JSON object.", "required_keys": ["city", "country"]}
+{"id": "js03", "prompt": "Produce JSON with keys 'title' and 'year' for any book. Respond with only a JSON object.", "required_keys": ["title", "year"]}
+{"id": "js04", "prompt": "Return JSON with keys 'x' and 'y' as numbers. Respond with only a JSON object.", "required_keys": ["x", "y"]}
+{"id": "js05", "prompt": "Give a JSON object with keys 'animal' and 'legs'. Respond with only a JSON object.", "required_keys": ["animal", "legs"]}
+{"id": "js06", "prompt": "Return JSON with keys 'color' and 'hex'. Respond with only a JSON object.", "required_keys": ["color", "hex"]}
+{"id": "js07", "prompt": "Produce JSON with keys 'question' and 'answer'. Respond with only a JSON object.", "required_keys": ["question", "answer"]}
+{"id": "js08", "prompt": "Return a JSON object with keys 'first' and 'last'. Respond with only a JSON object.", "required_keys": ["first", "last"]}
+{"id": "js09", "prompt": "Give JSON with keys 'product' and 'price'. Respond with only a JSON object.", "required_keys": ["product", "price"]}
+{"id": "js10", "prompt": "Return JSON with keys 'lat' and 'lon' as numbers. Respond with only a JSON object.", "required_keys": ["lat", "lon"]}
+{"id": "js11", "prompt": "Produce a JSON object with keys 'status' and 'code'. Respond with only a JSON object.", "required_keys": ["status", "code"]}
+{"id": "js12", "prompt": "Return JSON with keys 'language' and 'speakers'. Respond with only a JSON object.", "required_keys": ["language", "speakers"]}
+{"id": "js13", "prompt": "Give JSON with keys 'planet' and 'moons'. Respond with only a JSON object.", "required_keys": ["planet", "moons"]}
+{"id": "js14", "prompt": "Return a JSON object with keys 'fruit' and 'calories'. Respond with only a JSON object.", "required_keys": ["fruit", "calories"]}
+{"id": "js15", "prompt": "Produce JSON with keys 'team' and 'score'. Respond with only a JSON object.", "required_keys": ["team", "score"]}
+{"id": "js16", "prompt": "Return JSON with keys 'word' and 'length'. Respond with only a JSON object.", "required_keys": ["word", "length"]}
