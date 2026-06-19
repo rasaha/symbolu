@@ -1151,6 +1151,7 @@ class SafeMCPGateway:
                     tool_def=tool_def, result=result, gate_decision=gate_decision,
                     jepa_assessment=jepa_assessment, domain_result=domain_result,
                     shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
+                    forbidden_capabilities=self.forbidden_capabilities,
                     policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value

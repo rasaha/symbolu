@@ -190,6 +190,7 @@ def build_parity_observations(
     domain_result: Any = None,
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
+    forbidden_capabilities: Any = (),
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> List[Observation]:
     """Map the legacy decision authorities to trust observations.
@@ -200,6 +201,21 @@ def build_parity_observations(
     """
     obs: List[Observation] = []
     read_only = getattr(getattr(tool_def, "risk_level", None), "value", "") == "read_only"
+
+    # Hard pre-gate: a forbidden capability is a deterministic kill-switch that the gateway
+    # enforces ABOVE the normal flow (it blocks before confidence/JEPA/domain/shadow). Map
+    # it as a PROVEN HARD_VETO so the trust core reproduces the legacy BLOCK terminally —
+    # no confidence, entropy, or gap can override it (BLOCK wins by weakest-link). Always
+    # PROVEN (a correctness gate, never a heuristic) — unaffected by the authority policy.
+    forbidden_hit = sorted(
+        set(getattr(tool_def, "capabilities", None) or [])
+        & set(forbidden_capabilities or []))
+    if forbidden_hit:
+        obs.append(Observation(
+            name="forbidden_capability", otype=ObservableType.HARD_VETO,
+            evidence=EvidenceStatus.PROVEN, verdict=Verdict.UNSAFE, severity=1.0,
+            reason=f"forbidden capability: {', '.join(forbidden_hit)}",
+            detail={"capabilities": forbidden_hit}))
 
     # min_confidence floor (base ConfidenceGate threshold).
     eff_conf = float(getattr(result, "confidence", 1.0))
@@ -280,6 +296,7 @@ def shadow_compare(
     domain_result: Any = None,
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
+    forbidden_capabilities: Any = (),
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> ParityComparison:
     """Compute the parallel trust decision under `policy` and compare it to legacy.
@@ -293,7 +310,8 @@ def shadow_compare(
     """
     kw = dict(tool_def=tool_def, result=result, gate_decision=gate_decision,
               jepa_assessment=jepa_assessment, domain_result=domain_result,
-              shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap)
+              shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
+              forbidden_capabilities=forbidden_capabilities)
     outcome = decide(build_parity_observations(policy=policy, **kw))
     legacy = legacy_decision_to_trust(result)
     mismatch = outcome.decision != legacy

@@ -19,6 +19,8 @@ from types import SimpleNamespace
 
 from agentic.agentic_framework.mcp_gateway import (
     MCPToolCall,
+    MCPToolDefinition,
+    ToolRiskLevel,
     create_mock_mcp_gateway,
 )
 from agentic.agentic_framework.trust.observables import TrustDecision
@@ -42,6 +44,28 @@ def _run(coro):
 def _call(tool="file_read", q=0.9, c=0.9, **kw):
     return MCPToolCall(tool_name=tool, parameters={"path": "/tmp/x"},
                        quality_score=q, coherence_score=c, **kw)
+
+
+# ---- forbidden-capability hard veto (gateway integration) -------------------
+
+def test_forbidden_capability_gateway_trust_matches_legacy_block():
+    # A forbidden-capability tool with HIGH confidence is BLOCKED by the legacy pre-gate;
+    # the shadowed trust core must now reproduce that BLOCK (PROVEN HARD_VETO), not allow it.
+    gw = create_mock_mcp_gateway()
+    gw._trust_mode = TrustMode.SHADOW
+    gw.mcp_client.register_tool("cred_tool", lambda p: "ok", ToolRiskLevel.WRITE)
+    gw.tool_definitions["cred_tool"] = MCPToolDefinition(
+        name="cred_tool", description="x", risk_level=ToolRiskLevel.WRITE,
+        min_confidence=0.0, capabilities=["credential_access"])
+    res = _run(gw.call_tool(MCPToolCall(
+        tool_name="cred_tool", parameters={"x": 1}, quality_score=0.99, coherence_score=0.99,
+        raw_entropy=0.05, verbalized_safety_confidence=0.99)))
+    e = gw.audit_log[-1]
+    assert res.decision.value == "blocked"               # legacy hard pre-gate blocked
+    assert e.trust_legacy_decision == "block"
+    assert e.trust_decision == "block"                   # trust reproduces it (no relaxation)
+    assert e.trust_mismatch_class == "match"
+    assert "forbidden_capability" in (e.trust_drivers or [])
 
 
 # ---- shadow never changes behavior ------------------------------------------

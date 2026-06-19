@@ -113,6 +113,56 @@ def test_shadow_mode_parity_mapping(containment, expected):
     assert cmp.trust == expected
 
 
+# ---- forbidden-capability HARD_VETO (hard pre-gate parity) ------------------
+
+def _forbidden_ctx(cap="credential_access", *, decision="blocked", risk="write",
+                   confidence=0.99, min_confidence=0.0):
+    result = SimpleNamespace(decision=SimpleNamespace(value=decision),
+                             human_confirmed=False, confidence=confidence)
+    tool_def = SimpleNamespace(min_confidence=min_confidence, requires_confirmation=False,
+                               risk_level=SimpleNamespace(value=risk), capabilities=[cap])
+    gate = SimpleNamespace(execution=SimpleNamespace(can_execute=True),
+                           escalation=SimpleNamespace(requires_human=False))
+    return result, tool_def, gate
+
+
+def test_forbidden_capability_hard_veto_blocks():
+    result, tool_def, gate = _forbidden_ctx()
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         forbidden_capabilities={"credential_access"})
+    assert cmp.legacy == TrustDecision.BLOCK
+    assert cmp.trust == TrustDecision.BLOCK          # trust reproduces the legacy BLOCK
+    assert cmp.classification == "match"
+    assert "forbidden_capability" in [o.name for o in cmp.outcome.drivers]
+
+
+def test_forbidden_veto_unoverridable_by_confidence_and_gap():
+    # Max confidence + a confidence-risk gap escalation must NOT lower the veto below BLOCK.
+    result, tool_def, gate = _forbidden_ctx(confidence=0.999)
+    gap = SimpleNamespace(available=True, escalate=True, level="confirm")
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         confidence_risk_gap=gap,
+                         forbidden_capabilities={"credential_access"})
+    assert cmp.trust == TrustDecision.BLOCK
+
+
+def test_forbidden_veto_holds_under_reviewed_policy():
+    # The HARD_VETO is PROVEN regardless of authority policy (not demotable like JEPA).
+    result, tool_def, gate = _forbidden_ctx(cap="privilege_escalation")
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         forbidden_capabilities={"privilege_escalation"},
+                         policy=REVIEWED_POLICY)
+    assert cmp.trust == TrustDecision.BLOCK and cmp.classification == "match"
+
+
+def test_non_forbidden_capability_adds_no_veto():
+    result, tool_def, gate = _forbidden_ctx(cap="read_files", decision="allowed")
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         forbidden_capabilities={"credential_access"})
+    assert cmp.trust == TrustDecision.ALLOW          # no false veto / no regression
+    assert "forbidden_capability" not in [o.name for o in cmp.outcome.observations]
+
+
 # ---- shadow driver attribution (reporting only — no decision change) --------
 # A shadow escalation that is SOLELY caused by a derived (JEPA-regime / semantic-mismatch)
 # signal is attributed to a distinct driver name so a future demotion is measurable from the
@@ -377,16 +427,20 @@ def test_in_scope_flip_gate_clean_and_default_exit_zero():
     assert exit_code(res) == 0                    # in-scope clean → default exit 0
 
 
-def test_hard_pregate_boundary_is_surfaced_not_hidden():
-    # The forbidden-capability / overclaim hard veto is NOT modelled by the trust core, so
-    # its isolated opinion relaxes a legacy BLOCK. The harness must SURFACE this (not hide
-    # it), scope it out of the default flip gate, and fail under --strict-pregate.
-    from experiments.trust_signal.parity_harness import build_report, exit_code
+def test_forbidden_hard_veto_now_mapped_in_scope():
+    # The forbidden-capability / overclaim hard veto is now a PROVEN HARD_VETO observation:
+    # every such scenario reproduces legacy BLOCK == trust BLOCK (match), and all exit
+    # codes are 0 (including the compat --strict-pregate path).
+    from experiments.trust_signal.parity_harness import (
+        build_report, exit_code, _hard_veto_rows)
     res = build_report()
-    pg = res["hard_pregate"]["reviewed"]["counts"]
-    assert pg.get("unsafe_relaxation", 0) >= 1     # boundary is exercised + visible
+    veto = _hard_veto_rows(res["in_scope"]["reviewed"])
+    assert len(veto) >= 3
+    for r in veto:
+        assert r["legacy"] == "block" and r["trust"] == "block" and r["class"] == "match"
+        assert "forbidden_capability" in r["drivers"]
     assert exit_code(res, strict_pregate=False) == 0
-    assert exit_code(res, strict_pregate=True) == 1
+    assert exit_code(res, strict_pregate=True) == 0   # compat no-op, still clean
 
 
 def test_external_cohort_parity_clean_if_fixtures_present():

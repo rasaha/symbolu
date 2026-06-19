@@ -162,34 +162,44 @@ sliceable in the report); aggregation report = **shipped**.
 
 ---
 
-## 7. Broadened offline parity stress (pre-flip)
+## 7. Broadened offline parity stress + parity-completion (pre-flip)
 
-`parity_harness.py` was broadened to **25 in-scope scenarios** across every mapped authority
-(confidence floor, confidence-risk gap, raw-entropy high/low, JEPA **DEFER** and **DENY**,
-domain allow/confirm/block, shadow allow/block, approval incl. destructive) plus a
-**hard-pre-gate** cohort (forbidden capability / permission overclaim) and an optional
-**external** cohort (committed AgentDojo/InjecAgent minisets, mapped structurally — no
-fabricated model signals, no accuracy metric).
+`parity_harness.py` was broadened to **28 in-scope scenarios** across every mapped authority
+(forbidden-capability HARD_VETO, confidence floor, confidence-risk gap, raw-entropy high/low,
+JEPA **DEFER** and **DENY**, domain allow/confirm/block, shadow allow/block, approval incl.
+destructive) plus an optional **external** cohort (committed AgentDojo/InjecAgent minisets,
+mapped structurally — no fabricated model signals, no accuracy metric).
 
 Result (REVIEWED policy):
 
-- **In-scope: CLEAN** — 22 match + **3 intended** JEPA demotions (`jepa_defer_block`,
+- **In-scope: CLEAN** — 25 match + **3 intended** JEPA demotions (`jepa_defer_block`,
   `jepa_deny_ro`, `jepa_deny_write`), **0 unintended, 0 unsafe_relaxation**. PARITY policy is
-  25/25 match. Default `main()` exits 0.
-- **External: CLEAN** (12/12, 0/0) — but only **after** a parity fix the broadened corpus
-  surfaced: `_shadow_verdict` previously mapped shadow's *intermediate* containment modes
-  (observe_only / read_only / draft_only / sandbox_only / memory_write_denied) to SAFE while
-  legacy maps them to DEFER (confirm) — a silent CONFIRM→ALLOW. Now mapped to UNSURE
-  (confirm), mirroring `shadow_containment_to_governance`. Shadow-only/non-authoritative →
-  **no runtime behaviour change**; strictly safer in the (off-by-default) authoritative path.
-- **Hard pre-gate: SCOPE BOUNDARY** — forbidden-capability / overclaim is a hard veto ABOVE
-  the trust layer, **not** modelled by the trust observables and **preserved across any flip**.
-  The trust core's isolated opinion relaxes it (3 unsafe_relaxation), so it is reported,
-  scoped out of the default flip gate, and fails under `--strict-pregate`. Mapping it as a
-  HARD_VETO observable is required before the trust core could be a *standalone* replacement
-  (future; out of current scope — no new observables).
+  28/28 match. Default `main()` exits 0; `--strict-pregate` (now a compat no-op) also exits 0.
+- **External: CLEAN** (12/12, 0/0).
+
+Two real parity gaps the broadened corpus found, both now closed (audit-mapping only, no
+runtime behaviour change — the trust core is shadow/non-authoritative; both are strictly
+safer/correct in the off-by-default authoritative path):
+
+1. **Shadow intermediate containment** — `_shadow_verdict` mapped observe_only / read_only /
+   draft_only / sandbox_only / memory_write_denied to SAFE while legacy maps them to DEFER
+   (confirm). Now mapped to UNSURE, mirroring `shadow_containment_to_governance`.
+2. **Forbidden-capability hard pre-gate** — the gateway's `_check_forbidden_capabilities`
+   kill-switch (credential_access, privilege_escalation, data_exfiltration, …) is now mapped
+   as a **PROVEN HARD_VETO** observation (`forbidden_capability`) in `build_parity_observations`,
+   threaded from `SafeMCPGateway.forbidden_capabilities`. The trust core now reproduces the
+   legacy BLOCK **terminally** — high confidence, raw entropy, and the confidence-risk gap
+   cannot override it (BLOCK wins by weakest-link). The hard-pre-gate cohort is therefore now
+   in-scope and clean (legacy BLOCK == trust BLOCK). Note: an unregistered/hallucinated tool
+   is **not** a pre-gate block — it surfaces as an execution ERROR (nothing executes) and maps
+   benignly to ALLOW==ALLOW; permission overclaim is the forbidden-capability path.
+
+The synthetic `--export` → `shadow_report` over 56 generated events now reads **READY FOR
+REVIEW** (0 unsafe_relaxation; the only mismatches are the 3 reviewed JEPA demotions).
 
 **Is it ready for real SHADOW volume?** **Yes for observation** (shadow never acts; safe to
-run at volume and collect data). **The flip remains blocked** until (a) real-volume in-scope
-metrics stay `unintended == 0 / unsafe_relaxation == 0`, and (b) the forbidden-capability hard
-veto is either mapped into the trust observables or explicitly asserted as a retained pre-gate.
+run at volume and collect data), and the trust core is now **parity-complete** over the mapped
+authorities **and** the forbidden-capability hard pre-gate — 0 unintended / 0 unsafe_relaxation
+across in-scope, external, and the synthetic export. **The flip itself is still NOT taken**: it
+remains gated on the same property holding over **real** volume (not just the offline corpus),
+and on the standing items in §6 (authority demotions reviewed). No `trust_core` flip performed.
