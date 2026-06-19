@@ -1195,6 +1195,14 @@ class SafeMCPGateway:
                 domain_overrode=entry.domain_overrode,
                 shadow_assessment=entry.shadow_assessment,
                 shadow_overrode=entry.shadow_overrode,
+                # Phase 1.5: persist the parallel trust-core shadow decision durably
+                # (in-memory only until now) so mismatch data survives for analysis.
+                trust_decision=entry.trust_decision,
+                trust_legacy_decision=entry.trust_legacy_decision,
+                trust_mismatch=entry.trust_mismatch,
+                trust_mismatch_class=entry.trust_mismatch_class,
+                trust_drivers=entry.trust_drivers,
+                trust_reason=entry.trust_reason,
             )
             try:
                 self._audit_store.append(canonical_event)

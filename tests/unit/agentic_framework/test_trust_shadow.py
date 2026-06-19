@@ -99,6 +99,46 @@ def test_legacy_mode_records_no_trust_fields():
     assert e.trust_decision is None and e.trust_mismatch is None
 
 
+# ---- durable persistence of the shadow decision -----------------------------
+
+def test_shadow_decision_is_persisted_to_durable_store():
+    # The in-memory entry already carries the trust decision; verify it ALSO survives
+    # into the durable, tamper-evident canonical event (embedded in request_snapshot)
+    # so mismatch data can be analysed at volume — and the hash chain still verifies.
+    from agentic.ledger.governance_audit_store import GovernanceAuditStore
+
+    store = GovernanceAuditStore(":memory:")
+    gw = create_mock_mcp_gateway()
+    gw._audit_store = store
+    gw._trust_mode = TrustMode.SHADOW
+
+    _run(gw.call_tool(_call()))
+
+    persisted = store.list_recent(limit=1)[0]
+    ts = persisted["request_snapshot"]["trust_shadow"]
+    entry = gw.audit_log[-1]
+    assert ts["decision"] == entry.trust_decision           # parallel decision persisted
+    assert ts["legacy_decision"] == entry.trust_legacy_decision
+    assert ts["mismatch"] == entry.trust_mismatch
+    assert ts["mismatch_class"] == entry.trust_mismatch_class
+    assert ts["drivers"] == (entry.trust_drivers or [])
+    assert store.verify_chain().valid                       # tamper-evident chain intact
+
+
+def test_legacy_mode_persists_no_trust_shadow():
+    # Under LEGACY the trust core does not run → durable events are unchanged.
+    from agentic.ledger.governance_audit_store import GovernanceAuditStore
+
+    store = GovernanceAuditStore(":memory:")
+    gw = create_mock_mcp_gateway()        # default LEGACY
+    gw._audit_store = store
+
+    _run(gw.call_tool(_call()))
+
+    persisted = store.list_recent(limit=1)[0]
+    assert "trust_shadow" not in persisted["request_snapshot"]
+
+
 # ---- parity comparison logic (unit) -----------------------------------------
 
 def _fake(decision, *, human_confirmed=False, can_execute=True, requires_human=False,

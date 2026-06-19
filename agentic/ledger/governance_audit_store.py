@@ -660,12 +660,24 @@ def event_from_mcp_audit(
     domain_overrode: bool = False,
     shadow_assessment: Optional[Dict[str, Any]] = None,
     shadow_overrode: bool = False,
+    trust_decision: Optional[str] = None,
+    trust_legacy_decision: Optional[str] = None,
+    trust_mismatch: Optional[bool] = None,
+    trust_mismatch_class: Optional[str] = None,
+    trust_drivers: Optional[List[str]] = None,
+    trust_reason: Optional[str] = None,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from MCP gateway audit data.
 
     Maps the existing AuditEntry fields to the canonical event model.
     JEPA governance fields are persisted into request_snapshot so they
     survive into the durable audit store.
+
+    Phase 1.5 trust shadow: when the gateway runs the trust decision core in
+    parallel (shadow/trust_core mode), the parallel decision and the legacy↔trust
+    mismatch are embedded under request_snapshot["trust_shadow"] so the migration
+    differential is durable and tamper-evident — the substrate for analysing
+    mismatches at volume before the authoritative flip. Behaviour is unchanged.
     """
     blocked = []
     if decision in ("BLOCKED", "ERROR"):
@@ -692,6 +704,19 @@ def event_from_mcp_audit(
     if shadow_assessment is not None:
         snapshot["shadow_assessment"] = shadow_assessment
         snapshot["shadow_overrode"] = shadow_overrode
+
+    # Embed the Phase 1.5 trust-core shadow decision (parallel decision + legacy
+    # mismatch) for durable persistence. Only present when the trust core ran
+    # (shadow/trust_core mode); absent under LEGACY so legacy events are unchanged.
+    if trust_decision is not None:
+        snapshot["trust_shadow"] = {
+            "decision": trust_decision,
+            "legacy_decision": trust_legacy_decision,
+            "mismatch": trust_mismatch,
+            "mismatch_class": trust_mismatch_class,
+            "drivers": list(trust_drivers) if trust_drivers else [],
+            "reason": trust_reason or "",
+        }
 
     return GovernanceAuditEvent(
         event_id=request_id or create_event_id(),

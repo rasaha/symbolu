@@ -523,6 +523,45 @@ class TestEventFactories:
         assert event.eligible is False
         assert "forbidden capability" in event.blocked_reasons
 
+    def test_event_from_mcp_audit_embeds_trust_shadow(self):
+        # Phase 1.5: the parallel trust-core decision + legacy mismatch must be
+        # embedded in request_snapshot so the migration differential is durable.
+        event = event_from_mcp_audit(
+            timestamp="2025-01-01T00:00:00",
+            request_id="req-003",
+            tool_name="file_read",
+            parameters={"path": "/tmp"},
+            decision="ALLOWED",
+            confidence=0.9,
+            risk_level="read_only",
+            trust_decision="block",
+            trust_legacy_decision="allow",
+            trust_mismatch=True,
+            trust_mismatch_class="unintended",
+            trust_drivers=["jepa"],
+            trust_reason="BLOCK driven by jepa(...)",
+        )
+        ts = event.request_snapshot["trust_shadow"]
+        assert ts["decision"] == "block"
+        assert ts["legacy_decision"] == "allow"
+        assert ts["mismatch"] is True
+        assert ts["mismatch_class"] == "unintended"
+        assert ts["drivers"] == ["jepa"]
+        assert ts["reason"].startswith("BLOCK driven by")
+
+    def test_event_from_mcp_audit_without_trust_has_no_trust_shadow(self):
+        # Legacy mode passes no trust args → events are unchanged (no trust_shadow key).
+        event = event_from_mcp_audit(
+            timestamp="2025-01-01T00:00:00",
+            request_id="req-004",
+            tool_name="file_read",
+            parameters={"path": "/tmp"},
+            decision="ALLOWED",
+            confidence=0.9,
+            risk_level="read_only",
+        )
+        assert "trust_shadow" not in event.request_snapshot
+
 
 # =============================================================================
 # Test: Integration with GovernanceService

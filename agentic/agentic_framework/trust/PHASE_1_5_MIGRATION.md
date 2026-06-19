@@ -66,8 +66,10 @@ differential-checked change — not as a side effect of the migration.
    `{HARD_VETO | VALIDATOR | ADVISORY} × {PROVEN | PROVISIONAL | RESEARCH}`, reaching
    **parity with current behavior** (no policy change yet).
 4. **Shadow-run legacy vs trust core behind a flag.** Compute both, **act on legacy**,
-   log mismatches. Flip the gateway to the trust core only when mismatches are
-   zero/reviewed.
+   log mismatches. The parallel decision + legacy mismatch are now persisted **durably**
+   into the tamper-evident audit store (`request_snapshot["trust_shadow"]`), not just the
+   in-memory `AuditEntry` — so mismatch data survives for at-volume analysis. Flip the
+   gateway to the trust core only when mismatches are zero/reviewed.
 5. **Unify audit on the trust driver trace.** Make `TrustOutcome.to_audit()` (decision +
    ordered drivers + all observations) the canonical decision section of `AuditEntry`,
    so **ALLOW, CONFIRM, and BLOCK are all explained** by the same structure.
