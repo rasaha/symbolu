@@ -193,6 +193,7 @@ def build_parity_observations(
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
     forbidden_capabilities: Any = (),
+    permission_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> List[Observation]:
     """Map the legacy decision authorities to trust observations.
@@ -286,7 +287,36 @@ def build_parity_observations(
         reason=(f"can_execute={can_exec} requires_human={requires_human} "
                 f"requires_confirmation={requires_conf} gap_human={gap_human}"),
     ))
+
+    # Phase 2: permission-overclaim observable (PROVISIONAL, advisory-only). Appended ONLY
+    # when an explicit PermissionContext is supplied — inert (and absent) otherwise, so a
+    # production call with no context never changes the recorded decision.
+    from agentic.agentic_framework.trust.permission_overclaim import (
+        build_overclaim_observation)
+    overclaim_obs = build_overclaim_observation(permission_context)
+    if overclaim_obs is not None:
+        obs.append(overclaim_obs)
     return obs
+
+
+_SEVERITY_RANK = {TrustDecision.ALLOW: 0, TrustDecision.CONFIRM: 1, TrustDecision.BLOCK: 2}
+
+
+def _is_advisory_escalation(outcome: TrustOutcome, legacy: TrustDecision) -> bool:
+    """True when the trust decision is STRICTER than legacy and every driver raising it is a
+    non-PROVEN (PROVISIONAL/RESEARCH) or ADVISORY observable.
+
+    Such a divergence is a deliberately-added advisory signal escalating beyond legacy — it
+    can only raise trust (CONFIRM/BLOCK), never relax it, so it is `intended`, not a mapping
+    bug. A PROVEN-driven divergence (a real mapping gap) is excluded and stays `unintended`.
+    """
+    if _SEVERITY_RANK[outcome.decision] <= _SEVERITY_RANK[legacy]:
+        return False
+    for o in outcome.drivers:
+        if (o.evidence == EvidenceStatus.PROVEN
+                and o.otype != ObservableType.ADVISORY):
+            return False
+    return bool(outcome.drivers)
 
 
 def shadow_compare(
@@ -299,21 +329,25 @@ def shadow_compare(
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
     forbidden_capabilities: Any = (),
+    permission_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> ParityComparison:
     """Compute the parallel trust decision under `policy` and compare it to legacy.
 
     Classification:
       match            trust == legacy
-      intended         a reviewed demotion explains the difference (under PARITY the
-                       decision WOULD match legacy; the active policy relaxes BLOCK→CONFIRM)
+      intended         a reviewed demotion explains the difference (PARITY would match
+                       legacy), OR a stricter-only escalation introduced solely by a
+                       PROVISIONAL/advisory observable (e.g. permission_overclaim) — these
+                       only ever raise trust, never relax it
       unsafe_relaxation a demotion turned BLOCK/CONFIRM into ALLOW (silent allow) — STOP
       unintended       a mapping gap independent of the demotion (PARITY also mismatches)
     """
     kw = dict(tool_def=tool_def, result=result, gate_decision=gate_decision,
               jepa_assessment=jepa_assessment, domain_result=domain_result,
               shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
-              forbidden_capabilities=forbidden_capabilities)
+              forbidden_capabilities=forbidden_capabilities,
+              permission_context=permission_context)
     outcome = decide(build_parity_observations(policy=policy, **kw))
     legacy = legacy_decision_to_trust(result)
     mismatch = outcome.decision != legacy
@@ -325,7 +359,12 @@ def shadow_compare(
         classification = "unsafe_relaxation"   # demotion must never produce a silent allow
     else:
         parity_decision = decide(build_parity_observations(policy=PARITY_POLICY, **kw)).decision
-        classification = "intended" if parity_decision == legacy else "unintended"
+        if parity_decision == legacy:
+            classification = "intended"
+        elif _is_advisory_escalation(outcome, legacy):
+            classification = "intended"        # advisory observable raised trust (never relaxed)
+        else:
+            classification = "unintended"
 
     return ParityComparison(legacy=legacy, trust=outcome.decision, mismatch=mismatch,
                             classification=classification, outcome=outcome)

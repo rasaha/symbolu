@@ -226,6 +226,11 @@ class MCPToolCall:
     # (higher = safer). Pairs with raw_entropy to drive the confidence-risk gap.
     verbalized_safety_confidence: Optional[float] = field(default=None)
 
+    # Phase 2: optional permission profile (requested vs granted) for the deterministic
+    # permission-overclaim observable. Dormant by default — when None the observable is
+    # inert and the recorded/authoritative decision is unchanged.
+    permission_context: Optional[Any] = None
+
     # Request metadata
     request_id: str = field(default_factory=lambda: f"mcp-{int(time.time() * 1000)}")
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -1173,6 +1178,7 @@ class SafeMCPGateway:
                     jepa_assessment=jepa_assessment, domain_result=domain_result,
                     shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
                     forbidden_capabilities=self.forbidden_capabilities,
+                    permission_context=getattr(tool_call, "permission_context", None),
                     policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value

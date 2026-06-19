@@ -113,6 +113,43 @@ def test_shadow_mode_parity_mapping(containment, expected):
     assert cmp.trust == expected
 
 
+# ---- permission-overclaim observable (PROVISIONAL advisory) -----------------
+
+def test_overclaim_escalates_to_confirm_and_classifies_intended():
+    from agentic.agentic_framework.trust.permission_overclaim import PermissionContext
+    result, tool_def, gate = _ctx(decision="allowed")     # legacy ALLOWs a clean tool
+    ctx = PermissionContext(requested_authority="admin", granted_authority="read")
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         permission_context=ctx)
+    assert cmp.legacy == TrustDecision.ALLOW
+    assert cmp.trust == TrustDecision.CONFIRM            # advisory escalation (never blocks)
+    assert cmp.classification == "intended"             # stricter-only, not unintended
+    assert "permission_overclaim" in [o.name for o in cmp.outcome.drivers]
+
+
+def test_overclaim_does_not_relax_a_real_block():
+    # The observable only ever raises trust; a real (domain) BLOCK dominates the overclaim
+    # CONFIRM by weakest-link → still BLOCK, classified match, never unsafe_relaxation.
+    from agentic.agentic_framework.trust.permission_overclaim import PermissionContext
+    result, tool_def, gate = _ctx(decision="blocked")
+    domain = SimpleNamespace(mode=DomainActionMode.BLOCKED)
+    ctx = PermissionContext(policy_bypass_requested=True)
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         domain_result=domain, permission_context=ctx)
+    assert cmp.trust == TrustDecision.BLOCK
+    assert cmp.classification == "match"
+    assert cmp.classification != "unsafe_relaxation"
+    assert "permission_overclaim" in [o.name for o in cmp.outcome.observations]
+
+
+def test_no_permission_context_is_inert_match():
+    # Absent context → no overclaim observation → decision identical to baseline (match).
+    result, tool_def, gate = _ctx(decision="allowed")
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate)
+    assert cmp.classification == "match"
+    assert "permission_overclaim" not in [o.name for o in cmp.outcome.observations]
+
+
 # ---- forbidden-capability HARD_VETO (hard pre-gate parity) ------------------
 
 def _forbidden_ctx(cap="credential_access", *, decision="blocked", risk="write",
