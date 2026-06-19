@@ -235,6 +235,10 @@ class MCPToolCall:
     # hallucinated-capability observable. Dormant by default (None → inert).
     capability_context: Optional[Any] = None
 
+    # Phase 2: optional plan/action profile for the heuristic plan-action-consistency
+    # observable. Dormant by default (None → inert).
+    plan_action_context: Optional[Any] = None
+
     # Request metadata
     request_id: str = field(default_factory=lambda: f"mcp-{int(time.time() * 1000)}")
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -1200,6 +1204,7 @@ class SafeMCPGateway:
                     permission_context=getattr(tool_call, "permission_context", None),
                     reputation_context=reputation_context,
                     capability_context=getattr(tool_call, "capability_context", None),
+                    plan_action_context=getattr(tool_call, "plan_action_context", None),
                     policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value

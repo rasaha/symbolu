@@ -205,6 +205,31 @@ def test_hallucinated_valid_and_absent_are_inert():
     assert "hallucinated_capability" not in [o.name for o in cmp.outcome.observations]
 
 
+# ---- plan-action-consistency observable (PROVISIONAL advisory) --------------
+
+def test_plan_action_escalates_to_confirm_intended():
+    from agentic.agentic_framework.trust.plan_action_consistency import PlanActionContext
+    result, tool_def, gate = _ctx(decision="allowed")
+    ctx = PlanActionContext(stated_plan="read and summarize the report",
+                            proposed_action="delete_report", action_args={"id": "q3"})
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         plan_action_context=ctx)
+    assert cmp.legacy == TrustDecision.ALLOW
+    assert cmp.trust == TrustDecision.CONFIRM
+    assert cmp.classification == "intended"
+    assert "plan_action_consistency" in [o.name for o in cmp.outcome.drivers]
+
+
+def test_plan_action_consistent_and_absent_inert():
+    from agentic.agentic_framework.trust.plan_action_consistency import PlanActionContext
+    result, tool_def, gate = _ctx(decision="allowed")
+    ok = PlanActionContext(stated_plan="read the logs", proposed_action="read_logs")
+    assert shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                          plan_action_context=ok).classification == "match"
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate)
+    assert "plan_action_consistency" not in [o.name for o in cmp.outcome.observations]
+
+
 # ---- forbidden-capability HARD_VETO (hard pre-gate parity) ------------------
 
 def _forbidden_ctx(cap="credential_access", *, decision="blocked", risk="write",
