@@ -44,8 +44,10 @@ class TrustMode(str, Enum):
     """How SafeMCPGateway treats the trust decision core."""
     LEGACY = "legacy"          # trust core not computed; pure legacy behavior
     SHADOW = "shadow"          # trust core computed in parallel + audited; legacy acts
-    TRUST_CORE = "trust_core"  # trust core computed + audited; FLIP to authoritative is
-                               # parity-gated and not yet enabled (behaves as SHADOW)
+    TRUST_CORE = "trust_core"  # trust core AUTHORITATIVE for the reviewed JEPA-relax path
+                               # ONLY (with REVIEWED policy): a JEPA-sole BLOCK relaxes to a
+                               # human CONFIRM, never a silent ALLOW. Parity gate met; opt-in.
+                               # With PARITY policy this is inert (behaves as SHADOW).
 
 
 @dataclass(frozen=True)

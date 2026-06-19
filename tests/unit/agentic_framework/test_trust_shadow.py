@@ -23,12 +23,122 @@ from agentic.agentic_framework.mcp_gateway import (
     ToolRiskLevel,
     create_mock_mcp_gateway,
 )
+from agentic.agentic_framework.mcp_gateway import (
+    EscalationHandler,
+    MockMCPClient,
+    SafeMCPGateway,
+)
 from agentic.agentic_framework.trust.observables import TrustDecision
 from agentic.agentic_framework.trust.parity import (
+    PARITY_POLICY,
+    REVIEWED_POLICY,
     TrustMode,
     legacy_decision_to_trust,
     shadow_compare,
 )
+
+
+class _Escalation(EscalationHandler):
+    """Escalation handler with a deterministic human decision (confirm/deny)."""
+
+    def __init__(self, decision: bool):
+        super().__init__()
+        self._decision = decision
+
+    async def request_confirmation(self, tool_call, tool_def, gate_decision) -> bool:
+        return self._decision
+
+
+def _jepa_block_tool(gw, tool="jw", risk=None, q=0.05, c=0.05):
+    """Register a tool whose low quality/coherence trips a JEPA-SOLE block.
+
+    min_confidence=0 keeps the confidence floor SAFE so JEPA is the only blocker; no
+    domain/shadow registry on the mock gateway, so the block is JEPA-driven only.
+    """
+    risk = risk or ToolRiskLevel.WRITE
+    gw.mcp_client.register_tool(tool, lambda p: "ok", risk)
+    gw.tool_definitions[tool] = MCPToolDefinition(
+        name=tool, description="jepa-sole", risk_level=risk, min_confidence=0.0)
+    return MCPToolCall(tool_name=tool, parameters={"x": 1}, quality_score=q,
+                       coherence_score=c, raw_entropy=0.1)
+
+
+# ---- trust_core authoritative flip (reviewed JEPA-relax path) ----------------
+
+def test_flip_relaxes_jepa_sole_block_to_human_confirm_denied():
+    # Under TRUST_CORE + REVIEWED a JEPA-sole BLOCK becomes a human confirmation; with the
+    # default (deny) handler the result is ESCALATE — NOT a silent ALLOW, NOT a hard BLOCK.
+    gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode="trust_core",
+                        trust_authority_policy="reviewed",
+                        escalation_handler=_Escalation(False))
+    res = _run(gw.call_tool(_jepa_block_tool(gw)))
+    assert res.decision.value == "escalate"          # human asked, denied → escalate
+    assert res.human_confirmed is False
+    assert res.decision.value != "allowed"           # never a silent allow
+
+
+def test_flip_human_confirm_allows_execution():
+    # Same JEPA-sole block, but a human CONFIRMS → executes (the only route to ALLOWED).
+    gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode="trust_core",
+                        trust_authority_policy="reviewed",
+                        escalation_handler=_Escalation(True))
+    res = _run(gw.call_tool(_jepa_block_tool(gw)))
+    assert res.decision.value == "allowed"
+    assert res.human_confirmed is True
+
+
+def test_flip_never_silent_allow_no_block_to_allow():
+    # Across confirm/deny, a relaxed JEPA-sole block is ALWAYS human-gated; ALLOWED only
+    # ever co-occurs with human_confirmed=True (no BLOCK→ALLOW without a human).
+    for decision in (True, False):
+        gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode="trust_core",
+                            trust_authority_policy="reviewed",
+                            escalation_handler=_Escalation(decision))
+        res = _run(gw.call_tool(_jepa_block_tool(gw)))
+        if res.decision.value == "allowed":
+            assert res.human_confirmed is True
+
+
+def test_flip_forbidden_veto_remains_terminal():
+    # The forbidden-capability hard pre-gate still hard-BLOCKS under the flip (terminal).
+    gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode="trust_core",
+                        trust_authority_policy="reviewed",
+                        escalation_handler=_Escalation(True))
+    gw.mcp_client.register_tool("cred", lambda p: "ok", ToolRiskLevel.WRITE)
+    gw.tool_definitions["cred"] = MCPToolDefinition(
+        name="cred", description="x", risk_level=ToolRiskLevel.WRITE,
+        min_confidence=0.0, capabilities=["credential_access"])
+    res = _run(gw.call_tool(MCPToolCall(tool_name="cred", parameters={"x": 1},
+                                        quality_score=0.99, coherence_score=0.99)))
+    assert res.decision.value == "blocked"           # not relaxed, not confirmed
+
+
+def test_flip_inert_under_parity_policy():
+    # TRUST_CORE alone (PARITY policy) does NOT relax — behaves as SHADOW (legacy blocks).
+    gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode="trust_core",
+                        trust_authority_policy="parity",
+                        escalation_handler=_Escalation(True))
+    res = _run(gw.call_tool(_jepa_block_tool(gw)))
+    assert res.decision.value == "blocked"
+
+
+def test_rollback_to_shadow_and_legacy_restores_block():
+    # Reverting trust_mode instantly disables the relax: the JEPA-sole block hard-BLOCKS
+    # again under SHADOW and LEGACY (no human confirm path).
+    for mode in ("shadow", "legacy"):
+        gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode=mode,
+                            trust_authority_policy="reviewed",
+                            escalation_handler=_Escalation(True))
+        res = _run(gw.call_tool(_jepa_block_tool(gw)))
+        assert res.decision.value == "blocked"       # legacy authoritative again
+
+
+def test_authority_policy_constructor_control():
+    # The supported control wires the policy without poking private state.
+    assert SafeMCPGateway(mcp_client=MockMCPClient(),
+                          trust_authority_policy="reviewed")._trust_authority_policy \
+        is REVIEWED_POLICY
+    assert SafeMCPGateway(mcp_client=MockMCPClient())._trust_authority_policy is PARITY_POLICY
 
 
 def _run(coro):

@@ -136,10 +136,19 @@ Rollback = set the flag back to **SHADOW** (keep collecting evidence) or **LEGAC
 
 ## 7. Code path changed during the flip
 
-**Configuration only — no code edit is required to flip; it is a flag + policy selection:**
+**Configuration only — no code edit is required to flip; it is a supported flag + policy
+selection** (both now first-class constructor controls; no private-state poking):
 
-- Set `trust_mode=TRUST_CORE` (constructor arg / `self._trust_mode`) and
-  `self._trust_authority_policy = REVIEWED_POLICY` on the gateway.
+- `SafeMCPGateway(..., trust_mode="trust_core", trust_authority_policy="reviewed")`.
+- Reverting is the same control: `trust_mode="shadow"` or `"legacy"` (or
+  `trust_authority_policy="parity"`) — either disables the relax instantly.
+
+> **Enablement status:** the authoritative relax is now a **supported, validated opt-in**
+> (constructor control + tests), and a correctness fix landed so a relaxed-then-**approved**
+> JEPA block records `human_confirmed=True` and audits as CONFIRM (legacy=confirm/trust=confirm
+> = `match`) rather than a spurious `unintended`. The **production flip is still NOT taken**:
+> default remains `LEGACY`/`PARITY`, and enabling it in production still requires §5 thresholds
+> over real traffic + §3 sign-offs.
 
 **The single behavioural branch this activates** (already present, currently inert):
 
