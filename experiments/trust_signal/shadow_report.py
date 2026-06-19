@@ -105,6 +105,66 @@ def extract_trust_shadow(record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return ts if isinstance(ts, dict) else None
 
 
+def _snapshot(record: Dict[str, Any]) -> Dict[str, Any]:
+    snap = record.get("request_snapshot") or {}
+    if isinstance(snap, str):
+        try:
+            snap = json.loads(snap)
+        except (ValueError, TypeError):
+            return {}
+    return snap if isinstance(snap, dict) else {}
+
+
+def extract_entropy_gap(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the entropy_gap provenance block, or {} if absent (e.g. legacy events)."""
+    eg = _snapshot(record).get("entropy_gap")
+    return eg if isinstance(eg, dict) else {}
+
+
+# -- entropy/gap slice labels (provenance only — never decision inputs) --------
+
+def entropy_available_label(eg: Dict[str, Any]) -> str:
+    a = eg.get("raw_entropy_available") if eg else None
+    if a is None:
+        return "n/a"
+    return "available" if a else "unavailable"
+
+
+def entropy_bucket_label(eg: Dict[str, Any], threshold: float) -> str:
+    """high / low / n/a — by raw next-token entropy magnitude vs `threshold`."""
+    if not eg or not eg.get("raw_entropy_available"):
+        return "n/a"
+    v = eg.get("raw_entropy")
+    if v is None:
+        return "n/a"
+    return "high" if float(v) >= threshold else "low"
+
+
+def gap_escalate_label(eg: Dict[str, Any]) -> str:
+    e = eg.get("confidence_risk_gap_escalate") if eg else None
+    if e is None:
+        return "n/a"
+    return "escalate" if e else "no_escalate"
+
+
+def gap_reason_label(eg: Dict[str, Any]) -> str:
+    return (eg.get("confidence_risk_gap_reason") if eg else None) or "(none)"
+
+
+def filter_records(records: List[Dict[str, Any]], *, only_gap_escalated: bool = False,
+                   only_entropy_available: bool = False) -> List[Dict[str, Any]]:
+    """Subset records by entropy/gap provenance (for slicing, not the readiness gate)."""
+    out = []
+    for r in records:
+        eg = extract_entropy_gap(r)
+        if only_gap_escalated and gap_escalate_label(eg) != "escalate":
+            continue
+        if only_entropy_available and entropy_available_label(eg) != "available":
+            continue
+        out.append(r)
+    return out
+
+
 # =============================================================================
 # Aggregation (pure)
 # =============================================================================
@@ -120,6 +180,14 @@ class ShadowReport:
     mismatch_by_driver: Counter = field(default_factory=Counter)  # multi-driver → counts in each
     mismatch_by_risk: Counter = field(default_factory=Counter)
     mismatch_by_tool: Counter = field(default_factory=Counter)
+    # entropy / confidence-risk-gap slices (provenance only) — distributions over all
+    # trust events, and the same dims restricted to mismatches.
+    entropy_available_counts: Counter = field(default_factory=Counter)
+    gap_escalate_counts: Counter = field(default_factory=Counter)
+    mismatch_by_entropy_available: Counter = field(default_factory=Counter)
+    mismatch_by_entropy_bucket: Counter = field(default_factory=Counter)
+    mismatch_by_gap_escalate: Counter = field(default_factory=Counter)
+    mismatch_by_gap_reason: Counter = field(default_factory=Counter)
     examples: List[Dict[str, Any]] = field(default_factory=list)  # all mismatches (unsorted)
 
     # -- derived metrics ---------------------------------------------------
@@ -155,7 +223,8 @@ class ShadowReport:
         return ordered[:limit] if limit and limit > 0 else ordered
 
 
-def build_report(records: List[Dict[str, Any]]) -> ShadowReport:
+def build_report(records: List[Dict[str, Any]],
+                 *, entropy_high_threshold: float = 0.5) -> ShadowReport:
     """Aggregate trust_shadow data across audit records. Pure: no I/O, no exit."""
     rep = ShadowReport(total_events=len(records))
     for rec in records:
@@ -168,11 +237,18 @@ def build_report(records: List[Dict[str, Any]]) -> ShadowReport:
         trust = ts.get("decision") or _UNKNOWN
         cls = ts.get("mismatch_class") or _UNKNOWN
         drivers = [d for d in (ts.get("drivers") or []) if isinstance(d, str)]
-        is_mismatch = bool(ts.get("mismatch")) or cls not in ("match",)
+
+        eg = extract_entropy_gap(rec)
+        avail = entropy_available_label(eg)
+        bucket = entropy_bucket_label(eg, entropy_high_threshold)
+        gap = gap_escalate_label(eg)
+        gap_reason = gap_reason_label(eg)
 
         rep.legacy_counts[legacy] += 1
         rep.trust_counts[trust] += 1
         rep.class_counts[cls] += 1
+        rep.entropy_available_counts[avail] += 1
+        rep.gap_escalate_counts[gap] += 1
 
         if cls == "match":
             continue
@@ -183,6 +259,10 @@ def build_report(records: List[Dict[str, Any]]) -> ShadowReport:
         rep.mismatch_by_tool[tool] += 1
         for d in (drivers or ["(no-driver)"]):
             rep.mismatch_by_driver[d] += 1
+        rep.mismatch_by_entropy_available[avail] += 1
+        rep.mismatch_by_entropy_bucket[bucket] += 1
+        rep.mismatch_by_gap_escalate[gap] += 1
+        rep.mismatch_by_gap_reason[gap_reason] += 1
 
         rep.examples.append({
             "tool": tool,
@@ -192,6 +272,8 @@ def build_report(records: List[Dict[str, Any]]) -> ShadowReport:
             "mismatch_class": cls,
             "drivers": drivers,
             "reason": ts.get("reason") or "",
+            "raw_entropy": eg.get("raw_entropy"),
+            "gap_escalate": eg.get("confidence_risk_gap_escalate"),
         })
     return rep
 
@@ -244,7 +326,7 @@ def _counter_table(title: str, counter: Counter, *, total: Optional[int] = None)
 
 
 def render(rep: ShadowReport, *, max_examples: int = 10,
-           fail_on_unintended: bool = False) -> str:
+           fail_on_unintended: bool = False, include_entropy: bool = False) -> str:
     v = verdict(rep, fail_on_unintended=fail_on_unintended)
     out: List[str] = []
     out.append("# Trust SHADOW differential report\n")
@@ -265,6 +347,21 @@ def render(rep: ShadowReport, *, max_examples: int = 10,
     out.append(_counter_table("Mismatch by driver", rep.mismatch_by_driver))
     out.append(_counter_table("Mismatch by risk level", rep.mismatch_by_risk))
     out.append(_counter_table("Mismatch by tool / action", rep.mismatch_by_tool))
+
+    if include_entropy:
+        out.append("### Entropy / confidence-risk-gap dimensions "
+                   "(provenance only — not decision inputs)\n")
+        out.append(_counter_table("Raw-entropy availability (all trust events)",
+                                  rep.entropy_available_counts, total=rep.events_with_trust))
+        out.append(_counter_table("Gap escalation (all trust events)",
+                                  rep.gap_escalate_counts, total=rep.events_with_trust))
+        out.append(_counter_table("Mismatch by entropy availability",
+                                  rep.mismatch_by_entropy_available))
+        out.append(_counter_table("Mismatch by raw-entropy bucket",
+                                  rep.mismatch_by_entropy_bucket))
+        out.append(_counter_table("Mismatch by gap escalation",
+                                  rep.mismatch_by_gap_escalate))
+        out.append(_counter_table("Mismatch by gap reason", rep.mismatch_by_gap_reason))
 
     examples = rep.sorted_examples(max_examples)
     if examples:
@@ -304,12 +401,24 @@ def main(argv: Optional[List[str]] = None) -> int:
                         help="max mismatch examples to print (default 10)")
     parser.add_argument("--fail-on-unintended", action="store_true",
                         help="exit non-zero if any unintended mismatch is present")
+    parser.add_argument("--entropy", action="store_true",
+                        help="include the raw-entropy / confidence-risk-gap breakdown tables")
+    parser.add_argument("--entropy-high-threshold", type=float, default=0.5,
+                        help="raw-entropy magnitude at/above which an event is 'high' "
+                             "(default 0.5)")
+    parser.add_argument("--only-gap-escalated", action="store_true",
+                        help="slice: only events where the confidence-risk gap escalated")
+    parser.add_argument("--only-entropy-available", action="store_true",
+                        help="slice: only events where raw entropy was available")
     args = parser.parse_args(argv)
 
     records = load_records(store_path=args.store, jsonl_path=args.jsonl)
-    rep = build_report(records)
+    records = filter_records(records, only_gap_escalated=args.only_gap_escalated,
+                             only_entropy_available=args.only_entropy_available)
+    rep = build_report(records, entropy_high_threshold=args.entropy_high_threshold)
     print(render(rep, max_examples=args.max_examples,
-                 fail_on_unintended=args.fail_on_unintended))
+                 fail_on_unintended=args.fail_on_unintended,
+                 include_entropy=args.entropy))
     return verdict(rep, fail_on_unintended=args.fail_on_unintended)["exit_code"]
 
 

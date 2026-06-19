@@ -1203,6 +1203,16 @@ class SafeMCPGateway:
                 trust_mismatch_class=entry.trust_mismatch_class,
                 trust_drivers=entry.trust_drivers,
                 trust_reason=entry.trust_reason,
+                # Phase 1.5: persist raw-entropy + confidence-risk-gap provenance
+                # (already on the entry) so shadow-volume analysis is sliceable by
+                # model-uncertainty. Provenance only — no decision observable.
+                raw_entropy_available=entry.raw_entropy_available,
+                raw_entropy=entry.raw_entropy,
+                raw_entropy_source=entry.raw_entropy_source,
+                confidence_risk_gap_escalate=entry.confidence_risk_gap_escalate,
+                confidence_risk_gap_value=entry.confidence_risk_gap_value,
+                confidence_risk_gap_reason=entry.confidence_risk_gap_reason,
+                confidence_risk_gap_verbalized_safety=entry.confidence_risk_gap_verbalized_safety,
             )
             try:
                 self._audit_store.append(canonical_event)

@@ -139,6 +139,30 @@ def test_legacy_mode_persists_no_trust_shadow():
     assert "trust_shadow" not in persisted["request_snapshot"]
 
 
+def test_entropy_gap_provenance_persisted_and_behavior_unchanged():
+    # The gateway computes raw-entropy + confidence-risk-gap regardless of trust_mode; the
+    # provenance must now survive into the durable event (request_snapshot["entropy_gap"])
+    # without changing the runtime decision. Compared against a store-less run.
+    from agentic.ledger.governance_audit_store import GovernanceAuditStore
+
+    store = GovernanceAuditStore(":memory:")
+    gw = create_mock_mcp_gateway()
+    gw._audit_store = store
+    no_store_gw = create_mock_mcp_gateway()
+
+    acted = _run(gw.call_tool(_call()))
+    baseline = _run(no_store_gw.call_tool(_call()))
+
+    assert acted.decision == baseline.decision              # behavior unchanged
+    eg = store.list_recent(limit=1)[0]["request_snapshot"]["entropy_gap"]
+    entry = gw.audit_log[-1]
+    # mirrors the AuditEntry provenance fields (already computed upstream)
+    assert eg["raw_entropy_available"] == entry.raw_entropy_available
+    assert eg["confidence_risk_gap_escalate"] == entry.confidence_risk_gap_escalate
+    assert eg["confidence_risk_gap_reason"] == entry.confidence_risk_gap_reason
+    assert store.verify_chain().valid
+
+
 # ---- parity comparison logic (unit) -----------------------------------------
 
 def _fake(decision, *, human_confirmed=False, can_execute=True, requires_human=False,

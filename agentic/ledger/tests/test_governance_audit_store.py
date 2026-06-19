@@ -562,6 +562,62 @@ class TestEventFactories:
         )
         assert "trust_shadow" not in event.request_snapshot
 
+    def test_event_from_mcp_audit_embeds_entropy_gap(self):
+        # Phase 1.5: raw-entropy + confidence-risk-gap provenance is embedded for slicing.
+        event = event_from_mcp_audit(
+            timestamp="2025-01-01T00:00:00",
+            request_id="req-005",
+            tool_name="file_write",
+            parameters={"path": "/tmp"},
+            decision="ESCALATE",
+            confidence=0.7,
+            risk_level="write",
+            raw_entropy_available=True,
+            raw_entropy=0.83,
+            raw_entropy_source="producer",
+            confidence_risk_gap_escalate=True,
+            confidence_risk_gap_value=0.42,
+            confidence_risk_gap_reason="verbalized-safe but high raw entropy",
+            confidence_risk_gap_verbalized_safety=0.9,
+        )
+        eg = event.request_snapshot["entropy_gap"]
+        assert eg["raw_entropy_available"] is True
+        assert eg["raw_entropy"] == 0.83
+        assert eg["raw_entropy_source"] == "producer"
+        assert eg["confidence_risk_gap_escalate"] is True
+        assert eg["confidence_risk_gap_value"] == 0.42
+        assert eg["confidence_risk_gap_reason"].startswith("verbalized-safe")
+        assert eg["confidence_risk_gap_verbalized_safety"] == 0.9
+
+    def test_event_from_mcp_audit_without_entropy_gap_is_compatible(self):
+        # Callers that pass no entropy/gap args → legacy-compatible (no entropy_gap key).
+        event = event_from_mcp_audit(
+            timestamp="2025-01-01T00:00:00",
+            request_id="req-006",
+            tool_name="file_read",
+            parameters={"path": "/tmp"},
+            decision="ALLOWED",
+            confidence=0.9,
+            risk_level="read_only",
+        )
+        assert "entropy_gap" not in event.request_snapshot
+
+    def test_entropy_gap_persists_durably_and_chain_stays_valid(self, store):
+        # Mixed events (with and without entropy_gap) persist and the hash chain verifies.
+        store.append(event_from_mcp_audit(
+            timestamp="2025-01-01T00:00:00", request_id="e1", tool_name="t1",
+            parameters={}, decision="ALLOWED", confidence=0.9, risk_level="read_only"))
+        store.append(event_from_mcp_audit(
+            timestamp="2025-01-01T00:00:01", request_id="e2", tool_name="t2",
+            parameters={}, decision="ESCALATE", confidence=0.6, risk_level="write",
+            raw_entropy_available=True, raw_entropy=0.9, raw_entropy_source="producer",
+            confidence_risk_gap_escalate=True, confidence_risk_gap_reason="gap"))
+        assert store.verify_chain().valid
+        recs = store.list_recent(limit=10)
+        with_eg = [r for r in recs if "entropy_gap" in r["request_snapshot"]]
+        assert len(with_eg) == 1
+        assert with_eg[0]["request_snapshot"]["entropy_gap"]["raw_entropy"] == 0.9
+
 
 # =============================================================================
 # Test: Integration with GovernanceService

@@ -15,7 +15,9 @@ import json
 
 from experiments.trust_signal.shadow_report import (
     build_report,
+    extract_entropy_gap,
     extract_trust_shadow,
+    filter_records,
     load_records,
     render,
     verdict,
@@ -26,7 +28,7 @@ from experiments.trust_signal.shadow_report import (
 
 def _rec(*, tool="file_read", risk="read_only", legacy="allow", trust="allow",
          cls="match", drivers=None, reason="", event_type="mcp_tool_call",
-         with_trust=True):
+         with_trust=True, entropy_gap=None):
     snap = {"path": "/tmp/x"}
     if with_trust:
         snap["trust_shadow"] = {
@@ -37,12 +39,26 @@ def _rec(*, tool="file_read", risk="read_only", legacy="allow", trust="allow",
             "drivers": drivers if drivers is not None else [],
             "reason": reason,
         }
+    if entropy_gap is not None:
+        snap["entropy_gap"] = entropy_gap
     return {
         "event_type": event_type,
         "tool_name": tool,
         "risk_level": risk,
         "decision_outcome": "ALLOWED",
         "request_snapshot": snap,
+    }
+
+
+def _eg(*, available=True, raw=0.8, source="producer", escalate=True, reason="gap"):
+    return {
+        "raw_entropy_available": available,
+        "raw_entropy": raw,
+        "raw_entropy_source": source,
+        "confidence_risk_gap_escalate": escalate,
+        "confidence_risk_gap_value": 0.4,
+        "confidence_risk_gap_reason": reason,
+        "confidence_risk_gap_verbalized_safety": 0.9,
     }
 
 
@@ -188,6 +204,81 @@ def test_load_from_store_db_roundtrip(tmp_path):
     assert rep.events_with_trust == 2
     assert rep.intended == 1
     assert verdict(rep)["label"] == "READY FOR REVIEW"
+
+
+# ---- entropy / gap dimensions ----------------------------------------------
+
+def test_groups_by_entropy_and_gap_dimensions():
+    recs = [
+        # match with high entropy + gap escalate (counts in distributions, not mismatches)
+        _rec(entropy_gap=_eg(available=True, raw=0.9, escalate=True)),
+        # intended mismatch, high entropy, gap escalate, reason A
+        _rec(legacy="block", trust="confirm", cls="intended", tool="w1", risk="write",
+             entropy_gap=_eg(available=True, raw=0.9, escalate=True, reason="reasonA")),
+        # unintended mismatch, low entropy, no gap escalate, reason B
+        _rec(legacy="allow", trust="block", cls="unintended", tool="w2", risk="write",
+             entropy_gap=_eg(available=True, raw=0.1, escalate=False, reason="reasonB")),
+        # intended mismatch, entropy unavailable
+        _rec(legacy="block", trust="confirm", cls="intended", tool="w3", risk="write",
+             entropy_gap=_eg(available=False, raw=None, escalate=False, reason="(none)")),
+    ]
+    rep = build_report(recs, entropy_high_threshold=0.5)
+    # distributions over ALL trust events
+    assert rep.entropy_available_counts["available"] == 3
+    assert rep.entropy_available_counts["unavailable"] == 1
+    assert rep.gap_escalate_counts["escalate"] == 2
+    assert rep.gap_escalate_counts["no_escalate"] == 2
+    # mismatch slices (3 mismatches: w1 intended, w2 unintended, w3 intended)
+    assert rep.mismatch_by_entropy_bucket["high"] == 1     # w1
+    assert rep.mismatch_by_entropy_bucket["low"] == 1      # w2
+    assert rep.mismatch_by_entropy_bucket["n/a"] == 1      # w3 unavailable
+    assert rep.mismatch_by_gap_escalate["escalate"] == 1   # w1
+    assert rep.mismatch_by_gap_escalate["no_escalate"] == 2  # w2, w3
+    assert rep.mismatch_by_gap_reason["reasonA"] == 1
+    assert rep.mismatch_by_gap_reason["reasonB"] == 1
+
+
+def test_entropy_gap_does_not_change_decision_or_mismatch_counts():
+    # Same trust_shadow data, with vs without entropy_gap → identical class/decision counts.
+    base = [
+        _rec(),
+        _rec(legacy="block", trust="confirm", cls="intended", tool="w", risk="write"),
+    ]
+    enriched = [
+        _rec(entropy_gap=_eg(raw=0.9)),
+        _rec(legacy="block", trust="confirm", cls="intended", tool="w", risk="write",
+             entropy_gap=_eg(raw=0.9)),
+    ]
+    rb, re = build_report(base), build_report(enriched)
+    assert rb.class_counts == re.class_counts             # mismatch counts unchanged
+    assert rb.legacy_counts == re.legacy_counts
+    assert rb.trust_counts == re.trust_counts
+    assert rb.mismatches == re.mismatches == 1
+    assert verdict(rb)["label"] == verdict(re)["label"]   # verdict unchanged
+
+
+def test_filter_records_by_gap_and_entropy():
+    recs = [
+        _rec(entropy_gap=_eg(escalate=True, available=True)),
+        _rec(entropy_gap=_eg(escalate=False, available=True)),
+        _rec(entropy_gap=_eg(escalate=True, available=False)),
+        _rec(with_trust=True),                              # no entropy_gap at all
+    ]
+    assert len(filter_records(recs, only_gap_escalated=True)) == 2
+    assert len(filter_records(recs, only_entropy_available=True)) == 2
+    assert len(filter_records(recs, only_gap_escalated=True,
+                              only_entropy_available=True)) == 1
+
+
+def test_extract_entropy_gap_absent_returns_empty():
+    assert extract_entropy_gap(_rec()) == {}
+
+
+def test_render_entropy_section_only_when_requested():
+    rep = build_report([_rec(legacy="block", trust="confirm", cls="intended", tool="w",
+                             risk="write", entropy_gap=_eg(raw=0.9))])
+    assert "Entropy / confidence-risk-gap dimensions" not in render(rep)
+    assert "Entropy / confidence-risk-gap dimensions" in render(rep, include_entropy=True)
 
 
 def test_load_from_jsonl_export(tmp_path):

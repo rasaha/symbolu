@@ -41,8 +41,8 @@ and embedded into the canonical, hash-chained event as `request_snapshot["trust_
 
 | Dimension | Distinct driver today? | Notes |
 |---|---|---|
-| raw entropy | **No** | Not a trust observation. It feeds the confidence-risk gap upstream; never surfaces as a driver. |
-| confidence-risk gap | **No** | Folded into `execution_permission` via `_gap_requires_human`. A gap-driven CONFIRM is indistinguishable from a plain `can_execute=False` in `drivers` (only the free-text `reason` hints). |
+| raw entropy | **As a slice (not a driver)** | Not a trust observation (would be a new observable — out of scope). Now persisted as **provenance** under `request_snapshot["entropy_gap"]` and sliceable in the report (availability + high/low bucket). |
+| confidence-risk gap | **As a slice (not a driver)** | Still folded into `execution_permission` for the *decision*; but its escalate flag / reason / value are now persisted under `entropy_gap` and sliceable. |
 | JEPA | **Yes** | `jepa` |
 | domain policy | **Yes** | `domain` |
 | shadow deterministic | **Yes** | `shadow` |
@@ -51,14 +51,13 @@ and embedded into the canonical, hash-chained event as `request_snapshot["trust_
 
 Also present and specific: `confidence_floor`, `approval_required`, `execution_permission`.
 
-**Partially ready.** The five policy-authority dimensions the migration cares about
-(JEPA / domain / shadow split) are fully attributable. **raw entropy and the
-confidence-risk gap are not** — and adding them as drivers would be a *new observable*
-(out of scope). Their already-computed provenance fields (`raw_entropy_*`,
-`confidence_risk_gap_*`) live on `AuditEntry` but are **dropped** by `event_from_mcp_audit`
-(no params for them) — so they are not even available for *correlation* in the durable store.
-Closing this is **persistence-only** (embed existing fields in `request_snapshot`), not a
-new observable — see §5 item 2.
+**Ready (updated).** The five policy-authority dimensions (JEPA / domain / shadow split) are
+fully attributable as drivers. Raw entropy and the confidence-risk gap are intentionally
+**not** drivers (that would be a new observable), but their already-computed provenance
+fields are now **persisted durably** under `request_snapshot["entropy_gap"]`
+(`raw_entropy[_available/_source]`, `confidence_risk_gap_{escalate,value,reason,
+verbalized_safety}`) and are sliceable in the report — so mismatches can be correlated with
+model-uncertainty without changing any decision.
 
 ---
 
@@ -107,6 +106,9 @@ Missing report must summarize, over `event_type == "mcp_tool_call"` records that
 > PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --jsonl audit_export.jsonl
 > # CI-gate also on mapping gaps:
 > PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --store governance_audit.db --fail-on-unintended
+> # uncertainty breakdown + slicing by model-uncertainty provenance:
+> PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --store governance_audit.db --entropy
+> PYTHONPATH="$(pwd)" python3 experiments/trust_signal/shadow_report.py --jsonl audit_export.jsonl --entropy --only-gap-escalated
 > ```
 >
 > It prints total/with-trust counts, legacy + trust decision counts, match rate,
@@ -124,7 +126,7 @@ no new observable, no policy change, no flip.
 
 - Location: `experiments/trust_signal/shadow_report.py` (sibling of `parity_harness.py`),
   callable as a module (`python3 -m` / direct) and importable (`build_report`, `verdict`,
-  `render`, `load_records`, `extract_trust_shadow`).
+  `render`, `load_records`, `filter_records`, `extract_trust_shadow`, `extract_entropy_gap`).
 - Signature (as built):
   `load_records(store_path=… | jsonl_path=…) -> [records]`; `build_report(records) ->
   ShadowReport`; `verdict(rep, fail_on_unintended=…) -> {ready, exit_code, label, detail}`;
@@ -138,20 +140,22 @@ no new observable, no policy change, no flip.
   `event_from_mcp_audit(...)` events with crafted `trust_*` (match / intended / unintended /
   unsafe_relaxation), assert the aggregate counts and that `unsafe_relaxation` is surfaced.
 
-**Secondary (optional, persistence-only) — embed gap/entropy provenance.** Only if the
-raw-entropy / confidence-risk-gap dimensions are required for the readiness decision: extend
-`event_from_mcp_audit` to also embed the already-computed `confidence_risk_gap_*` and
-`raw_entropy_*` fields into `request_snapshot` (exactly the pattern used for `trust_shadow`).
-This adds **no observable** and changes **no behavior** — it only stops dropping fields that
-already exist on `AuditEntry`, so the report can correlate `execution_permission` CONFIRMs
-with the gap/entropy that caused them.
+**Secondary (persistence-only) — embed gap/entropy provenance. ✅ DONE.**
+`event_from_mcp_audit` now also embeds the already-computed `raw_entropy[_available/_source]`
+and `confidence_risk_gap_{escalate,value,reason,verbalized_safety}` fields under
+`request_snapshot["entropy_gap"]` (same pattern as `trust_shadow`); the gateway `_audit`
+forwards them from the `AuditEntry`. This adds **no observable** and changes **no behavior**
+— it only stops dropping fields that already existed on `AuditEntry`. The report consumes
+them via `--entropy` (breakdown tables) and the `--only-gap-escalated` /
+`--only-entropy-available` slice filters, so mismatches can be correlated with
+model-uncertainty. Behavior invariance is proven by the unchanged parity harness and the
+gateway test comparing a store-backed run to a store-less run.
 
-**Recommendation:** ship item 1 first (it makes the already-captured data usable and is the
-true blocker for "usable shadow-volume analysis"); treat item 2 as a fast follow only if the
-entropy/gap dimensions are needed. Then enable SHADOW with a configured `GovernanceAuditStore`
-on broader traffic and read the report; the flip stays gated on `unintended == 0` and
-`unsafe_relaxation == 0` over that real volume.
+**Recommendation:** both items are now shipped. Enable SHADOW with a configured
+`GovernanceAuditStore` on broader traffic and read the report (add `--entropy` for the
+uncertainty breakdown); the flip stays gated on `unintended == 0` and `unsafe_relaxation == 0`
+over that real volume.
 
 **Readiness summary:** capture = **ready**; query/export = **ready**; policy-authority driver
-attribution = **ready**; entropy/gap analysis dimensions = **not ready** (persistence-only fix
-available); aggregation report = **missing (smallest next step)**.
+attribution = **ready**; entropy/gap analysis dimensions = **ready** (persisted as provenance,
+sliceable in the report); aggregation report = **shipped**.
