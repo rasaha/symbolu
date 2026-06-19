@@ -906,20 +906,43 @@ class SafeMCPGateway:
             overall_confidence=overall,
         )
 
-        # Phase 1: Resolve vritti via adapter (real > approximation)
-        # Pass layer_weights so the approximation fallback can apply the
-        # Ontology → Vritti prior (cognitive-axis cause direction).
-        vritti_result = getattr(tool_call, "vritti_result", None)
+        # CG-state off-by-default GATE (2026-06 falsification). enable_cg_state_signals
+        # gates the DECISION, not observability: a caller-attached CG vritti_result /
+        # entropy_result is STILL resolved and recorded in audit (as experimental), but
+        # when CG is OFF it must not DRIVE the decision. Previously only the CG-entropy
+        # confidence *penalty* was gated (below); a real CG vritti_result still flowed
+        # into the JEPA regime (which can DEGRADE/CONFIRM/BLOCK) — a partial off-switch.
+        # Fix: keep the real resolutions for AUDIT, but feed the JEPA *assessment* (the
+        # decision path) the non-CG approximation when CG is off. With the default cloud
+        # adapters (no CG metadata) this is a no-op.
+        _cg_on = self._signal_config.enable_cg_state_signals
+
+        # Phase 1: Resolve vritti via adapter (real > approximation) — for AUDIT.
+        attached_vritti = getattr(tool_call, "vritti_result", None)
         vritti_resolution = resolve_vritti_signal(
-            vritti_result=vritti_result,
+            vritti_result=attached_vritti,
             quality=q,
             coherence=c,
             overall_confidence=overall,
             layer_weights=layer_weights,
         )
-        vritti_dist = vritti_resolution.distribution
+        # Distribution that actually FEEDS the decision: CG-real only when enabled;
+        # otherwise the non-CG approximation (CG decision effect gated off).
+        if _cg_on or attached_vritti is None:
+            decision_vritti = vritti_resolution
+        else:
+            decision_vritti = resolve_vritti_signal(
+                vritti_result=None,
+                quality=q,
+                coherence=c,
+                overall_confidence=overall,
+                layer_weights=layer_weights,
+            )
+        vritti_dist = decision_vritti.distribution
 
-        # Phase 1: Resolve entropy for governance context
+        # Phase 1: Resolve entropy for governance context — recorded for AUDIT. Its
+        # confidence PENALTY is separately gated by enable_cg_state_signals at the call
+        # site (cg_entropy_penalty); entropy never feeds the JEPA regime.
         entropy_result = getattr(tool_call, "entropy_result", None)
         combined_entropy = getattr(tool_call, "combined_entropy", None)
         entropy_resolution = resolve_entropy_signal(
@@ -930,8 +953,8 @@ class SafeMCPGateway:
         assessment = safe_jepa_governance_check(
             layer_weights=layer_weights,
             vritti_distribution=vritti_dist,
-            coherence=vritti_resolution.coherence,
-            score=vritti_resolution.score,
+            coherence=decision_vritti.coherence,
+            score=decision_vritti.score,
             action_type="call_tool",
             tool_name=tool_call.tool_name,
             risk_level=tool_def.risk_level.value,
