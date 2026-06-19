@@ -119,14 +119,20 @@ def _domain_verdict(domain_result: Any) -> Optional[Verdict]:
 
 
 def _shadow_verdict(shadow_assessment: Any) -> Optional[Verdict]:
+    """Map a shadow containment mode to a verdict, faithfully mirroring the legacy
+    `shadow_containment_to_governance`: ALLOW→SAFE; BLOCKED/QUARANTINED→UNSAFE (block);
+    **every intermediate containment mode** (observe_only / read_only / draft_only /
+    sandbox_only / memory_write_denied / require_confirmation) → DEFER → UNSURE (confirm).
+    Treating the intermediate modes as SAFE would silently relax a legacy CONFIRM to ALLOW.
+    """
     if shadow_assessment is None or not hasattr(shadow_assessment, "containment_mode"):
         return None
     cm = getattr(shadow_assessment.containment_mode, "value", "allow")
     if cm in ("blocked", "quarantined"):
         return Verdict.UNSAFE
-    if cm == "require_confirmation":
-        return Verdict.UNSURE
-    return Verdict.SAFE
+    if cm == "allow":
+        return Verdict.SAFE
+    return Verdict.UNSURE
 
 
 # Shadow `reason_codes` prefixes that establish a DETERMINISTIC / policy-backed basis for

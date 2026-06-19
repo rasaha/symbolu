@@ -159,3 +159,37 @@ over that real volume.
 **Readiness summary:** capture = **ready**; query/export = **ready**; policy-authority driver
 attribution = **ready**; entropy/gap analysis dimensions = **ready** (persisted as provenance,
 sliceable in the report); aggregation report = **shipped**.
+
+---
+
+## 7. Broadened offline parity stress (pre-flip)
+
+`parity_harness.py` was broadened to **25 in-scope scenarios** across every mapped authority
+(confidence floor, confidence-risk gap, raw-entropy high/low, JEPA **DEFER** and **DENY**,
+domain allow/confirm/block, shadow allow/block, approval incl. destructive) plus a
+**hard-pre-gate** cohort (forbidden capability / permission overclaim) and an optional
+**external** cohort (committed AgentDojo/InjecAgent minisets, mapped structurally — no
+fabricated model signals, no accuracy metric).
+
+Result (REVIEWED policy):
+
+- **In-scope: CLEAN** — 22 match + **3 intended** JEPA demotions (`jepa_defer_block`,
+  `jepa_deny_ro`, `jepa_deny_write`), **0 unintended, 0 unsafe_relaxation**. PARITY policy is
+  25/25 match. Default `main()` exits 0.
+- **External: CLEAN** (12/12, 0/0) — but only **after** a parity fix the broadened corpus
+  surfaced: `_shadow_verdict` previously mapped shadow's *intermediate* containment modes
+  (observe_only / read_only / draft_only / sandbox_only / memory_write_denied) to SAFE while
+  legacy maps them to DEFER (confirm) — a silent CONFIRM→ALLOW. Now mapped to UNSURE
+  (confirm), mirroring `shadow_containment_to_governance`. Shadow-only/non-authoritative →
+  **no runtime behaviour change**; strictly safer in the (off-by-default) authoritative path.
+- **Hard pre-gate: SCOPE BOUNDARY** — forbidden-capability / overclaim is a hard veto ABOVE
+  the trust layer, **not** modelled by the trust observables and **preserved across any flip**.
+  The trust core's isolated opinion relaxes it (3 unsafe_relaxation), so it is reported,
+  scoped out of the default flip gate, and fails under `--strict-pregate`. Mapping it as a
+  HARD_VETO observable is required before the trust core could be a *standalone* replacement
+  (future; out of current scope — no new observables).
+
+**Is it ready for real SHADOW volume?** **Yes for observation** (shadow never acts; safe to
+run at volume and collect data). **The flip remains blocked** until (a) real-volume in-scope
+metrics stay `unintended == 0 / unsafe_relaxation == 0`, and (b) the forbidden-capability hard
+veto is either mapped into the trust observables or explicitly asserted as a retained pre-gate.

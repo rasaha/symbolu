@@ -95,6 +95,12 @@ def test_domain_mode_parity_mapping(mode, expected):
 
 @pytest.mark.parametrize("containment,expected", [
     ("allow", TrustDecision.ALLOW),
+    # every intermediate containment mode is a legacy DEFER → CONFIRM (must not relax to ALLOW)
+    ("observe_only", TrustDecision.CONFIRM),
+    ("read_only", TrustDecision.CONFIRM),
+    ("draft_only", TrustDecision.CONFIRM),
+    ("sandbox_only", TrustDecision.CONFIRM),
+    ("memory_write_denied", TrustDecision.CONFIRM),
     ("require_confirmation", TrustDecision.CONFIRM),
     ("quarantined", TrustDecision.BLOCK),
     ("blocked", TrustDecision.BLOCK),
@@ -350,4 +356,49 @@ def test_parity_harness_reviewed_policy_only_intended_and_safe():
     c = report["counts"]
     assert c.get("unintended", 0) == 0           # no unreviewed mismatches
     assert c.get("unsafe_relaxation", 0) == 0    # no BLOCK/CONFIRM → ALLOW
-    assert c.get("intended", 0) >= 1             # the JEPA demotion is exercised
+    assert c.get("intended", 0) >= 3             # JEPA DEFER + two JEPA DENY demotions
+
+
+def test_broadened_corpus_covers_each_authority():
+    # The broadened in-scope corpus stresses every mapped authority at least once.
+    from experiments.trust_signal.parity_harness import CORPUS
+    authorities = {s.authority for s in CORPUS}
+    assert {"confidence_risk_gap", "raw_entropy", "jepa", "domain", "shadow",
+            "approval", "confidence_floor"} <= authorities
+    assert len(CORPUS) >= 24
+
+
+def test_in_scope_flip_gate_clean_and_default_exit_zero():
+    from experiments.trust_signal.parity_harness import build_report, exit_code
+    res = build_report()
+    rev = res["in_scope"]["reviewed"]["counts"]
+    assert rev.get("unintended", 0) == 0
+    assert rev.get("unsafe_relaxation", 0) == 0
+    assert exit_code(res) == 0                    # in-scope clean → default exit 0
+
+
+def test_hard_pregate_boundary_is_surfaced_not_hidden():
+    # The forbidden-capability / overclaim hard veto is NOT modelled by the trust core, so
+    # its isolated opinion relaxes a legacy BLOCK. The harness must SURFACE this (not hide
+    # it), scope it out of the default flip gate, and fail under --strict-pregate.
+    from experiments.trust_signal.parity_harness import build_report, exit_code
+    res = build_report()
+    pg = res["hard_pregate"]["reviewed"]["counts"]
+    assert pg.get("unsafe_relaxation", 0) >= 1     # boundary is exercised + visible
+    assert exit_code(res, strict_pregate=False) == 0
+    assert exit_code(res, strict_pregate=True) == 1
+
+
+def test_external_cohort_parity_clean_if_fixtures_present():
+    # AgentDojo/InjecAgent minisets, mapped structurally, must reproduce legacy (no
+    # unintended / unsafe_relaxation) — this is what the shadow intermediate-containment
+    # parity fix guarantees. Skips cleanly if the committed fixtures are absent.
+    from experiments.trust_signal.parity_harness import external_scenarios, run_harness
+    ext = external_scenarios()
+    if not ext:
+        import pytest as _pytest
+        _pytest.skip("external fixtures not present")
+    for policy in (PARITY_POLICY, REVIEWED_POLICY):
+        c = run_harness(policy, ext)["counts"]
+        assert c.get("unintended", 0) == 0
+        assert c.get("unsafe_relaxation", 0) == 0
