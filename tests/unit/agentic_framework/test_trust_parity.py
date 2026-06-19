@@ -6,7 +6,7 @@ Two layers:
     containment modes) via shadow_compare with crafted inputs — deterministic, exhaustive;
   * an integration CG decision-gate regression: CG-derived vritti is recorded in audit and
     is INERT when enable_cg_state_signals=False, but CAN change the decision when True.
-  * a harness smoke test (zero unintended/unresolved on the focused corpus).
+  * a harness smoke test (zero unintended/unsafe_relaxation on the focused corpus).
 """
 
 from __future__ import annotations
@@ -105,6 +105,79 @@ def test_shadow_mode_parity_mapping(containment, expected):
     cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
                          shadow_assessment=shadow)
     assert cmp.trust == expected
+
+
+# ---- shadow driver attribution (reporting only — no decision change) --------
+# A shadow escalation that is SOLELY caused by a derived (JEPA-regime / semantic-mismatch)
+# signal is attributed to a distinct driver name so a future demotion is measurable from the
+# persisted trust_shadow.drivers. The verdict/authority/decision are never affected.
+
+def _shadow(containment, reason_codes=()):
+    return SimpleNamespace(containment_mode=SimpleNamespace(value=containment),
+                           reason_codes=tuple(reason_codes))
+
+
+def _shadow_cmp(shadow):
+    result, tool_def, gate = _ctx()
+    return shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                          shadow_assessment=shadow)
+
+
+def test_shadow_jepa_derived_block_is_attributed_not_hidden():
+    # QUARANTINE caused ONLY by the JEPA-regime escalation → reattributed, not hidden
+    # behind the generic `shadow` driver. Decision is still BLOCK.
+    cmp = _shadow_cmp(_shadow("quarantined",
+                              ["UNKNOWN_ASSET:x", "JEPA_REGIME_ESCALATION:dual_anomaly"]))
+    names = [o.name for o in cmp.outcome.drivers]
+    assert "shadow_jepa_derived" in names
+    assert "shadow" not in names                       # generic name no longer used here
+    assert cmp.trust == TrustDecision.BLOCK            # decision unchanged
+
+
+def test_shadow_semantic_derived_confirm_is_attributed():
+    cmp = _shadow_cmp(_shadow("require_confirmation",
+                              ["SEMANTIC_MISMATCH_ESCALATION:mismatch=0.50"]))
+    names = [o.name for o in cmp.outcome.drivers]
+    assert "shadow_semantic_derived" in names
+    assert cmp.trust == TrustDecision.CONFIRM
+
+
+def test_shadow_deterministic_rule_keeps_generic_name():
+    # A named declarative rule (policy-backed) keeps `shadow`, even when a derived escalation
+    # ALSO fired — the block stands on policy grounds (conservative: no demotion over-claim).
+    cmp = _shadow_cmp(_shadow("quarantined",
+                              ["RULE:unapproved_mcp_quarantine:quarantined",
+                               "JEPA_REGIME_ESCALATION:dual_anomaly"]))
+    names = [o.name for o in cmp.outcome.drivers]
+    assert "shadow" in names and "shadow_jepa_derived" not in names
+
+
+def test_shadow_failclosed_keeps_generic_name():
+    cmp = _shadow_cmp(_shadow("blocked", ["FAIL_CLOSED:shadow_mutating"]))
+    names = [o.name for o in cmp.outcome.drivers]
+    assert "shadow" in names and "shadow_jepa_derived" not in names
+
+
+def test_shadow_safe_is_never_reattributed():
+    # SAFE shadow does not escalate → stays generic `shadow` (a cleared gate, not a raiser),
+    # even if a derived reason code is present.
+    cmp = _shadow_cmp(_shadow("allow", ["JEPA_REGIME_ESCALATION:dual_anomaly"]))
+    names = [o.name for o in cmp.outcome.drivers]
+    assert "shadow" in names
+    assert all(not n.startswith("shadow_") for n in names)
+
+
+def test_attribution_is_reporting_only_decision_and_class_unchanged():
+    # Identical containment, with vs without derived reason codes → identical decision AND
+    # mismatch classification; ONLY the driver name differs. Proves reporting-only.
+    plain = _shadow_cmp(_shadow("quarantined"))                       # legacy-style, no codes
+    derived = _shadow_cmp(_shadow("quarantined",
+                                  ["JEPA_REGIME_ESCALATION:dual_anomaly"]))
+    assert plain.trust == derived.trust                              # decision identical
+    assert plain.legacy == derived.legacy
+    assert plain.classification == derived.classification            # mismatch class identical
+    assert "shadow" in {o.name for o in plain.outcome.drivers}
+    assert "shadow_jepa_derived" in {o.name for o in derived.outcome.drivers}
 
 
 # ---- confidence-risk gap + min_confidence floor (unit) ---------------------

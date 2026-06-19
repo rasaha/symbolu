@@ -129,6 +129,45 @@ def _shadow_verdict(shadow_assessment: Any) -> Optional[Verdict]:
     return Verdict.SAFE
 
 
+# Shadow `reason_codes` prefixes that establish a DETERMINISTIC / policy-backed basis for
+# the containment (named declarative rules, fail-closed defaults, registry max-risk /
+# blocked-capability enforcement). If any of these is present, the shadow block stands on
+# policy grounds regardless of any derived escalation.
+_SHADOW_DETERMINISTIC_PREFIXES = (
+    "RULE:", "FAIL_CLOSED:", "EXCEEDS_MAX_RISK:", "BLOCKED_CAPABILITY:",
+)
+# Reason codes for the two DERIVED (heuristic-signal) escalations inside shadow.
+_SHADOW_JEPA_DERIVED_CODE = "JEPA_REGIME_ESCALATION"
+_SHADOW_SEMANTIC_DERIVED_CODE = "SEMANTIC_MISMATCH_ESCALATION"
+
+
+def _shadow_driver_name(shadow_assessment: Any, verdict: Verdict) -> str:
+    """Attribute an escalating shadow observation to its true source — REPORTING ONLY.
+
+    A shadow CONFIRM/BLOCK is reattributed to ``shadow_jepa_derived`` /
+    ``shadow_semantic_derived`` ONLY when the escalation is *solely* due to the JEPA-regime
+    (Step 6) or semantic-mismatch (Step 5) escalation — i.e. no deterministic/policy-backed
+    rule independently establishes the containment. When any deterministic rule co-fires,
+    the block stands on policy grounds and keeps the generic ``shadow`` name (conservative:
+    never over-claims a demotion opportunity). A non-escalating (SAFE) shadow observation
+    always stays ``shadow``.
+
+    This changes the audit DRIVER NAME only; it never affects the observation's verdict,
+    evidence/authority, severity, or the resulting ALLOW/CONFIRM/BLOCK decision. JEPA is the
+    more-severe escalation and so wins attribution when both derived escalations are present.
+    """
+    if verdict == Verdict.SAFE:
+        return "shadow"
+    codes = tuple(getattr(shadow_assessment, "reason_codes", ()) or ())
+    if any(c.startswith(_SHADOW_DETERMINISTIC_PREFIXES) for c in codes):
+        return "shadow"
+    if any(c.startswith(_SHADOW_JEPA_DERIVED_CODE) for c in codes):
+        return "shadow_jepa_derived"
+    if any(c.startswith(_SHADOW_SEMANTIC_DERIVED_CODE) for c in codes):
+        return "shadow_semantic_derived"
+    return "shadow"
+
+
 def _gap_requires_human(confidence_risk_gap: Any) -> bool:
     g = confidence_risk_gap
     return bool(g is not None and getattr(g, "available", False)
@@ -184,10 +223,14 @@ def build_parity_observations(
         ))
 
     # Shadow AI control — named deterministic registry rules (policy authority).
+    # The driver NAME is attributed to the true source (deterministic `shadow` vs a
+    # JEPA-/semantic-derived escalation) for honest demotion analysis; verdict/authority
+    # and the resulting decision are unchanged.
     sv = _shadow_verdict(shadow_assessment)
     if sv is not None:
         obs.append(Observation(
-            name="shadow", otype=ObservableType.VALIDATOR, evidence=policy.shadow,
+            name=_shadow_driver_name(shadow_assessment, sv),
+            otype=ObservableType.VALIDATOR, evidence=policy.shadow,
             verdict=sv, severity=0.7, reason="shadow containment mode",
         ))
 

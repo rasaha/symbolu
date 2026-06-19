@@ -9,6 +9,18 @@ Scope guardrails honored: no new observables, no ML, no D1, no CG wrapper, no VC
 **no flip**, no behavior change. All findings below are from reading the current code on
 this branch.
 
+> **Update — reporting-only patch implemented.** The §6 patch is now in `parity.py`:
+> a shadow CONFIRM/BLOCK caused *solely* by the JEPA-regime (Step 6) or semantic-mismatch
+> (Step 5) escalation is attributed to a distinct driver — `shadow_jepa_derived` /
+> `shadow_semantic_derived` — instead of the generic `shadow`. When any deterministic /
+> policy-backed rule co-fires (`RULE:` / `FAIL_CLOSED:` / `EXCEEDS_MAX_RISK:` /
+> `BLOCKED_CAPABILITY:`), it stays `shadow` (conservative). This is **driver-name only**:
+> verdict, evidence/authority, and the ALLOW/CONFIRM/BLOCK decision are unchanged — proven
+> by `test_trust_parity.py` (decision + mismatch-class invariant) and an identical parity
+> harness (PARITY 15/15; REVIEWED 14 match / 1 intended / 0 unintended / 0 unsafe_relaxation).
+> The persisted `trust_shadow.drivers` now make a future shadow demotion measurable. The
+> `unresolved → unsafe_relaxation` comment drift is also fixed. **No demotion / flip done.**
+
 ---
 
 ## 1. Inspection findings
@@ -167,16 +179,19 @@ python3 -m pytest agentic/agentic_framework/tests/test_jepa_governance.py -q
 (JEPA → confirm-only) is the right direction and is already safely gated behind
 `trust_core`. Domain stays blocking; shadow's deterministic core stays blocking.
 
-**One no-behavior-change reporting improvement is recommended** (not implemented here —
-awaiting explicit go-ahead) because it is the **prerequisite to measure the shadow
-demotion** and to keep the flip decision honest:
+**One no-behavior-change reporting improvement was recommended and is now IMPLEMENTED**
+(see the update note at the top) because it is the **prerequisite to measure the shadow
+demotion** and to keep the flip decision honest. The plan that was carried out:
 
 **Smallest safe patch plan (reporting only, zero decision change):**
 1. In `parity.py`, when building the `shadow` observation, inspect the already-present
-   `shadow_assessment.fired_rules`. If containment came (only) from `_jepa_regime_escalation`
-   or `_semantic_mismatch_escalation`, tag the observation (e.g. `name="shadow_jepa_derived"`
-   / a `detail={"derived": True}` flag) **without changing its verdict or evidence** —
-   so the persisted `drivers` distinguish deterministic shadow blocks from JEPA-laundered ones.
+   `shadow_assessment.reason_codes` (the durable audit field; `ShadowAssessment` exposes
+   `reason_codes`, not a `fired_rules` attribute). If containment came (only) from
+   `JEPA_REGIME_ESCALATION` / `SEMANTIC_MISMATCH_ESCALATION` — with no deterministic
+   `RULE:` / `FAIL_CLOSED:` / `EXCEEDS_MAX_RISK:` / `BLOCKED_CAPABILITY:` code present —
+   name the observation `shadow_jepa_derived` / `shadow_semantic_derived`
+   **without changing its verdict or evidence** — so the persisted `drivers` distinguish
+   deterministic shadow blocks from JEPA-laundered ones.
 2. Add a parity unit test asserting the attribution split on a crafted
    `dual_anomaly` + unknown-asset case, and asserting the **decision is byte-identical**
    to today (pure reporting).

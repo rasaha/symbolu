@@ -340,7 +340,7 @@ class AuditEntry:
     trust_decision: Optional[str] = None            # trust core's parallel decision
     trust_legacy_decision: Optional[str] = None     # legacy decision mapped to trust space
     trust_mismatch: Optional[bool] = None           # do they disagree?
-    trust_mismatch_class: Optional[str] = None      # match | intended | unintended | unresolved
+    trust_mismatch_class: Optional[str] = None      # match | intended | unintended | unsafe_relaxation
     trust_drivers: Optional[List[str]] = None       # which observables drove the trust decision
     trust_reason: Optional[str] = None              # human-readable trust rationale
 
