@@ -1331,6 +1331,18 @@ class SafeMCPGateway:
                 tool_name=tool_call.tool_name,
             )
 
+        # Phase 1.5B: trust_core authoritative path (ONLY when explicitly selected). When
+        # the authority policy demotes JEPA (REVIEWED) and trust_mode is TRUST_CORE, a
+        # JEPA-DRIVEN block (not domain-driven) is RELAXED to a human-confirmation instead
+        # of a hard block — routed through the EXISTING async confirmation flow below, never
+        # a silent allow. Domain/shadow blocks and the confidence floor are unaffected.
+        # In LEGACY/SHADOW (default) and under PARITY policy this is inert.
+        from agentic.agentic_framework.trust.observables import EvidenceStatus as _Ev
+        from agentic.agentic_framework.trust.parity import TrustMode as _TM
+        force_confirm = False
+        _jepa_relax = (self._trust_mode == _TM.TRUST_CORE
+                       and self._trust_authority_policy.jepa != _Ev.PROVEN)
+
         if regime != GovernanceRegime.NORMAL:
             # Use shared override to determine action
             jepa_override = apply_jepa_override(
@@ -1351,6 +1363,14 @@ class SafeMCPGateway:
                       and merged_decision == "ALLOW"):
                     merged_decision = "DEFER"
                     domain_overrode = True
+
+            # trust_core + JEPA demoted: a JEPA-driven block becomes a human-confirm.
+            if _jepa_relax and not domain_overrode and merged_decision in ("DENY", "DEFER"):
+                logger.info("TRUST_CORE: JEPA demoted — relaxing %s/%s block to "
+                            "human-confirm on %s", regime.value, merged_decision,
+                            tool_call.tool_name)
+                force_confirm = True
+                merged_decision = "ALLOW"  # skip the block returns; confirm enforced below
 
             if merged_decision == "DENY":
                 # DUAL_ANOMALY / UNKNOWN / HALT / domain BLOCKED → hard block
@@ -1658,12 +1678,15 @@ class SafeMCPGateway:
 
         # Check execution permission. The confidence-risk gap can require a human
         # even when the gate would allow execution (the gate keys off verbalized
-        # confidence alone; the gap adds raw model-uncertainty).
-        if not gate_decision.execution.can_execute or gap_requires_human:
+        # confidence alone; the gap adds raw model-uncertainty). `force_confirm` is the
+        # trust_core JEPA-demotion path: a relaxed JEPA block MUST require human
+        # confirmation here (never a silent allow).
+        if not gate_decision.execution.can_execute or gap_requires_human or force_confirm:
             # Check if we need escalation
             if (gate_decision.escalation.requires_human
                     or tool_def.requires_confirmation
-                    or gap_requires_human):
+                    or gap_requires_human
+                    or force_confirm):
                 # Request human confirmation
                 confirmed = await self.escalation.request_confirmation(
                     tool_call, tool_def, gate_decision
