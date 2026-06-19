@@ -218,6 +218,48 @@ def test_jepa_demotion_classified_intended_when_legacy_blocked():
     assert cmp.classification == "intended"
 
 
+# ---- Phase 1.5B: trust_core authoritative flip (safe, opt-in) ---------------
+
+def _jepa_block_gateway(*, trust_mode, policy):
+    gw = SafeMCPGateway(mcp_client=MockMCPClient(), trust_mode=trust_mode)
+    gw._trust_authority_policy = policy
+    gw.mcp_client.register_tool("jw", lambda p: "ok", ToolRiskLevel.WRITE)
+    gw.tool_definitions["jw"] = MCPToolDefinition(
+        name="jw", description="", risk_level=ToolRiskLevel.WRITE, min_confidence=0.0)
+    return gw
+
+
+def _jepa_block_call():
+    # low quality/coherence trips JEPA process_drift; min_confidence=0 keeps the floor SAFE
+    return MCPToolCall(tool_name="jw", parameters={"x": 1},
+                       quality_score=0.05, coherence_score=0.05, raw_entropy=0.1)
+
+
+def test_trust_core_default_policy_keeps_jepa_block():
+    # TRUST_CORE but PARITY policy (jepa PROVEN) → no relaxation → still blocked.
+    gw = _jepa_block_gateway(trust_mode=TrustMode.TRUST_CORE, policy=PARITY_POLICY)
+    r = _run(gw.call_tool(_jepa_block_call()))
+    assert r.decision.value == "blocked"
+
+
+def test_shadow_mode_never_relaxes_behavior():
+    # SHADOW + REVIEWED must NOT change runtime behavior — still blocked (shadow only audits).
+    gw = _jepa_block_gateway(trust_mode=TrustMode.SHADOW, policy=REVIEWED_POLICY)
+    r = _run(gw.call_tool(_jepa_block_call()))
+    assert r.decision.value == "blocked"
+
+
+def test_trust_core_reviewed_relaxes_jepa_block_to_human_confirm_not_allow():
+    # TRUST_CORE + REVIEWED (jepa demoted): the JEPA-only block is relaxed to require human
+    # confirmation. It must NOT be a hard block and must NOT be a silent allow — the default
+    # escalation handler denies/does-not-confirm, so the safe outcome is ESCALATE.
+    gw = _jepa_block_gateway(trust_mode=TrustMode.TRUST_CORE, policy=REVIEWED_POLICY)
+    r = _run(gw.call_tool(_jepa_block_call()))
+    assert r.decision.value != "blocked"            # relaxed
+    assert r.decision.value != "allowed"            # but NOT a silent allow (no human yes)
+    assert r.decision.value == "escalate"
+
+
 # ---- harness smoke ----------------------------------------------------------
 
 def test_parity_harness_parity_policy_all_match():
