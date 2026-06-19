@@ -226,6 +226,19 @@ class MCPToolCall:
     # (higher = safer). Pairs with raw_entropy to drive the confidence-risk gap.
     verbalized_safety_confidence: Optional[float] = field(default=None)
 
+    # Phase 2: optional permission profile (requested vs granted) for the deterministic
+    # permission-overclaim observable. Dormant by default — when None the observable is
+    # inert and the recorded/authoritative decision is unchanged.
+    permission_context: Optional[Any] = None
+
+    # Phase 2: optional capability profile (referenced vs available) for the deterministic
+    # hallucinated-capability observable. Dormant by default (None → inert).
+    capability_context: Optional[Any] = None
+
+    # Phase 2: optional plan/action profile for the heuristic plan-action-consistency
+    # observable. Dormant by default (None → inert).
+    plan_action_context: Optional[Any] = None
+
     # Request metadata
     request_id: str = field(default_factory=lambda: f"mcp-{int(time.time() * 1000)}")
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -340,7 +353,7 @@ class AuditEntry:
     trust_decision: Optional[str] = None            # trust core's parallel decision
     trust_legacy_decision: Optional[str] = None     # legacy decision mapped to trust space
     trust_mismatch: Optional[bool] = None           # do they disagree?
-    trust_mismatch_class: Optional[str] = None      # match | intended | unintended | unresolved
+    trust_mismatch_class: Optional[str] = None      # match | intended | unintended | unsafe_relaxation
     trust_drivers: Optional[List[str]] = None       # which observables drove the trust decision
     trust_reason: Optional[str] = None              # human-readable trust rationale
 
@@ -724,6 +737,8 @@ class SafeMCPGateway:
         shadow_registry: Optional[ShadowRegistry] = None,
         signal_config: Optional[SignalConfig] = None,
         trust_mode: Optional[Any] = None,
+        trust_authority_policy: Optional[Any] = None,
+        enable_outcome_reputation: bool = False,
     ):
         """
         Initialize Safe MCP Gateway.
@@ -742,6 +757,14 @@ class SafeMCPGateway:
             domain_registry: Optional DomainRegistry for domain-specific policy.
             domain_id: Which domain profile to use from the registry.
             shadow_registry: Optional ShadowRegistry for shadow AI control.
+            trust_mode: Trust decision-core mode — "legacy" (default; not computed),
+                        "shadow" (computed + recorded, legacy acts), or "trust_core"
+                        (authoritative for the reviewed JEPA-relax path only, when paired
+                        with the "reviewed" authority policy). Reverting to "shadow"/"legacy"
+                        instantly disables the relax.
+            trust_authority_policy: Authority policy — "parity" (default; reproduce legacy,
+                        no relax even under trust_core) or "reviewed" (JEPA demoted to
+                        confirm-only; the flip candidate). May also be an AuthorityPolicy.
         """
         self.mcp_client = mcp_client
         self.gate = confidence_gate or create_confidence_gate()
@@ -772,16 +795,34 @@ class SafeMCPGateway:
 
         # Phase 1.5 migration: trust decision core mode (legacy | shadow | trust_core).
         # Default LEGACY = zero behavior change. SHADOW computes the trust decision in
-        # parallel and records it (still acts on legacy). TRUST_CORE is parity-gated and
-        # currently behaves as SHADOW until the differential harness shows zero unreviewed
-        # mismatches — the flip to authoritative is a deliberate, separate step.
-        from agentic.agentic_framework.trust.parity import PARITY_POLICY, TrustMode
+        # parallel and records it (still acts on legacy). TRUST_CORE makes the trust core
+        # AUTHORITATIVE for the reviewed JEPA-relax path ONLY — and only when paired with
+        # the REVIEWED authority policy below: a JEPA-SOLE block is relaxed to a human
+        # CONFIRM (never a silent ALLOW). The parity gate for this flip is met (0 unintended,
+        # 0 unsafe_relaxation over the parity/shadow-volume corpora); it stays opt-in.
+        from agentic.agentic_framework.trust.parity import (
+            PARITY_POLICY, REVIEWED_POLICY, TrustMode)
         self._trust_mode: TrustMode = (
             TrustMode(trust_mode) if trust_mode is not None else TrustMode.LEGACY)
-        # Authority policy for the shadow/parity mapping (which heuristics may BLOCK vs
-        # only CONFIRM). Default PARITY = reproduce legacy exactly. REVIEWED demotes JEPA
-        # to confirm-only (Phase 1.5A). Affects only the shadow comparison, never legacy.
-        self._trust_authority_policy = PARITY_POLICY
+        # Authority policy for the shadow/parity mapping AND the TRUST_CORE relax (which
+        # heuristics may BLOCK vs only CONFIRM). Default PARITY = reproduce legacy exactly
+        # (no relax even under TRUST_CORE). REVIEWED demotes JEPA to confirm-only (Phase
+        # 1.5A) — the flip candidate. Accepts a policy object or the strings "parity" /
+        # "reviewed". Under SHADOW this affects only the recorded comparison, never legacy;
+        # under TRUST_CORE+REVIEWED it relaxes JEPA-sole blocks to human confirmation.
+        _policy_by_name = {"parity": PARITY_POLICY, "reviewed": REVIEWED_POLICY}
+        if trust_authority_policy is None:
+            self._trust_authority_policy = PARITY_POLICY
+        elif isinstance(trust_authority_policy, str):
+            self._trust_authority_policy = _policy_by_name[trust_authority_policy.lower()]
+        else:
+            self._trust_authority_policy = trust_authority_policy
+
+        # Phase 2: outcome-reputation observable. Off by default → never computed, so the
+        # recorded/authoritative decision is unchanged. When True, reputation is derived from
+        # the gateway's own audit log (the in-memory view of the durable chain) and fed to the
+        # shadow comparison only (still advisory/PROVISIONAL). No new production behaviour.
+        self._enable_outcome_reputation = bool(enable_outcome_reputation)
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -1147,10 +1188,23 @@ class SafeMCPGateway:
         if self._trust_mode != TrustMode.LEGACY:
             try:
                 from agentic.agentic_framework.trust.parity import shadow_compare
+                # Phase 2: outcome reputation from PRIOR history (audit_log holds entries from
+                # earlier calls; the current entry is appended below, so this is historical).
+                reputation_context = None
+                if self._enable_outcome_reputation:
+                    from agentic.agentic_framework.trust.outcome_reputation import (
+                        compute_reputation)
+                    reputation_context = compute_reputation(
+                        self.audit_log, tool_name=tool_call.tool_name)
                 cmp = shadow_compare(
                     tool_def=tool_def, result=result, gate_decision=gate_decision,
                     jepa_assessment=jepa_assessment, domain_result=domain_result,
                     shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
+                    forbidden_capabilities=self.forbidden_capabilities,
+                    permission_context=getattr(tool_call, "permission_context", None),
+                    reputation_context=reputation_context,
+                    capability_context=getattr(tool_call, "capability_context", None),
+                    plan_action_context=getattr(tool_call, "plan_action_context", None),
                     policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value
@@ -1195,6 +1249,24 @@ class SafeMCPGateway:
                 domain_overrode=entry.domain_overrode,
                 shadow_assessment=entry.shadow_assessment,
                 shadow_overrode=entry.shadow_overrode,
+                # Phase 1.5: persist the parallel trust-core shadow decision durably
+                # (in-memory only until now) so mismatch data survives for analysis.
+                trust_decision=entry.trust_decision,
+                trust_legacy_decision=entry.trust_legacy_decision,
+                trust_mismatch=entry.trust_mismatch,
+                trust_mismatch_class=entry.trust_mismatch_class,
+                trust_drivers=entry.trust_drivers,
+                trust_reason=entry.trust_reason,
+                # Phase 1.5: persist raw-entropy + confidence-risk-gap provenance
+                # (already on the entry) so shadow-volume analysis is sliceable by
+                # model-uncertainty. Provenance only — no decision observable.
+                raw_entropy_available=entry.raw_entropy_available,
+                raw_entropy=entry.raw_entropy,
+                raw_entropy_source=entry.raw_entropy_source,
+                confidence_risk_gap_escalate=entry.confidence_risk_gap_escalate,
+                confidence_risk_gap_value=entry.confidence_risk_gap_value,
+                confidence_risk_gap_reason=entry.confidence_risk_gap_reason,
+                confidence_risk_gap_verbalized_safety=entry.confidence_risk_gap_verbalized_safety,
             )
             try:
                 self._audit_store.append(canonical_event)
@@ -1681,6 +1753,11 @@ class SafeMCPGateway:
         # confidence alone; the gap adds raw model-uncertainty). `force_confirm` is the
         # trust_core JEPA-demotion path: a relaxed JEPA block MUST require human
         # confirmation here (never a silent allow).
+        # Tracks whether a force_confirm/gap escalation was APPROVED by a human, so the
+        # executed result records human_confirmed=True and audits as CONFIRM (not a plain
+        # ALLOW). Without this, a relaxed JEPA block that a human approves would mis-audit
+        # as legacy=allow/trust=confirm (a spurious "unintended" mismatch).
+        escalation_confirmed = False
         if not gate_decision.execution.can_execute or gap_requires_human or force_confirm:
             # Check if we need escalation
             if (gate_decision.escalation.requires_human
@@ -1713,6 +1790,8 @@ class SafeMCPGateway:
                                 vritti_resolution=vritti_resolution,
                                 entropy_resolution=entropy_resolution, raw_entropy_resolution=raw_entropy_resolution, confidence_risk_gap=gap_result)
                     return result
+                # Confirmed: a human approved (force_confirm / gap / requires_human path).
+                escalation_confirmed = True
             else:
                 result = MCPToolResult(
                     request_id=tool_call.request_id,
@@ -1738,8 +1817,9 @@ class SafeMCPGateway:
         if gate_decision.escalation.level == EscalationLevel.NOTIFY:
             await self.escalation.notify(tool_call, tool_def, gate_decision)
 
-        # Check if tool explicitly requires confirmation
-        human_confirmed = False
+        # Check if tool explicitly requires confirmation. Seed from any force_confirm/gap
+        # approval above so a relaxed-then-approved JEPA block records human_confirmed=True.
+        human_confirmed = escalation_confirmed
         if tool_def.requires_confirmation:
             confirmed = await self.escalation.request_confirmation(
                 tool_call, tool_def, gate_decision

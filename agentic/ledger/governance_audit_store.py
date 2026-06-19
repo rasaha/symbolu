@@ -660,12 +660,37 @@ def event_from_mcp_audit(
     domain_overrode: bool = False,
     shadow_assessment: Optional[Dict[str, Any]] = None,
     shadow_overrode: bool = False,
+    trust_decision: Optional[str] = None,
+    trust_legacy_decision: Optional[str] = None,
+    trust_mismatch: Optional[bool] = None,
+    trust_mismatch_class: Optional[str] = None,
+    trust_drivers: Optional[List[str]] = None,
+    trust_reason: Optional[str] = None,
+    raw_entropy_available: Optional[bool] = None,
+    raw_entropy: Optional[float] = None,
+    raw_entropy_source: Optional[str] = None,
+    confidence_risk_gap_escalate: Optional[bool] = None,
+    confidence_risk_gap_value: Optional[float] = None,
+    confidence_risk_gap_reason: Optional[str] = None,
+    confidence_risk_gap_verbalized_safety: Optional[float] = None,
 ) -> GovernanceAuditEvent:
     """Create a GovernanceAuditEvent from MCP gateway audit data.
 
     Maps the existing AuditEntry fields to the canonical event model.
     JEPA governance fields are persisted into request_snapshot so they
     survive into the durable audit store.
+
+    Phase 1.5 trust shadow: when the gateway runs the trust decision core in
+    parallel (shadow/trust_core mode), the parallel decision and the legacy↔trust
+    mismatch are embedded under request_snapshot["trust_shadow"] so the migration
+    differential is durable and tamper-evident — the substrate for analysing
+    mismatches at volume before the authoritative flip. Behaviour is unchanged.
+
+    Phase 1.5 entropy/gap provenance: the already-computed raw next-token entropy and
+    confidence-risk-gap fields are embedded under request_snapshot["entropy_gap"] so
+    shadow-volume analysis can be sliced by model-uncertainty signals. This is durable
+    audit/provenance only — it introduces NO new decision observable and changes NO
+    behaviour; the fields already exist on AuditEntry and were merely being dropped here.
     """
     blocked = []
     if decision in ("BLOCKED", "ERROR"):
@@ -692,6 +717,36 @@ def event_from_mcp_audit(
     if shadow_assessment is not None:
         snapshot["shadow_assessment"] = shadow_assessment
         snapshot["shadow_overrode"] = shadow_overrode
+
+    # Embed the Phase 1.5 trust-core shadow decision (parallel decision + legacy
+    # mismatch) for durable persistence. Only present when the trust core ran
+    # (shadow/trust_core mode); absent under LEGACY so legacy events are unchanged.
+    if trust_decision is not None:
+        snapshot["trust_shadow"] = {
+            "decision": trust_decision,
+            "legacy_decision": trust_legacy_decision,
+            "mismatch": trust_mismatch,
+            "mismatch_class": trust_mismatch_class,
+            "drivers": list(trust_drivers) if trust_drivers else [],
+            "reason": trust_reason or "",
+        }
+
+    # Embed raw-entropy + confidence-risk-gap provenance (already computed upstream) so
+    # shadow-volume analysis is sliceable by model-uncertainty. Present only when any of
+    # these signals was supplied; absent for callers that don't pass them (e.g. the
+    # governance_service path), keeping legacy events unchanged. Provenance only — these
+    # are NOT decision observables.
+    if (raw_entropy_available is not None
+            or confidence_risk_gap_escalate is not None):
+        snapshot["entropy_gap"] = {
+            "raw_entropy_available": raw_entropy_available,
+            "raw_entropy": raw_entropy,
+            "raw_entropy_source": raw_entropy_source,
+            "confidence_risk_gap_escalate": confidence_risk_gap_escalate,
+            "confidence_risk_gap_value": confidence_risk_gap_value,
+            "confidence_risk_gap_reason": confidence_risk_gap_reason,
+            "confidence_risk_gap_verbalized_safety": confidence_risk_gap_verbalized_safety,
+        }
 
     return GovernanceAuditEvent(
         event_id=request_id or create_event_id(),

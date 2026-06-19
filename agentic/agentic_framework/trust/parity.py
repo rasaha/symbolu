@@ -44,8 +44,10 @@ class TrustMode(str, Enum):
     """How SafeMCPGateway treats the trust decision core."""
     LEGACY = "legacy"          # trust core not computed; pure legacy behavior
     SHADOW = "shadow"          # trust core computed in parallel + audited; legacy acts
-    TRUST_CORE = "trust_core"  # trust core computed + audited; FLIP to authoritative is
-                               # parity-gated and not yet enabled (behaves as SHADOW)
+    TRUST_CORE = "trust_core"  # trust core AUTHORITATIVE for the reviewed JEPA-relax path
+                               # ONLY (with REVIEWED policy): a JEPA-sole BLOCK relaxes to a
+                               # human CONFIRM, never a silent ALLOW. Parity gate met; opt-in.
+                               # With PARITY policy this is inert (behaves as SHADOW).
 
 
 @dataclass(frozen=True)
@@ -119,14 +121,59 @@ def _domain_verdict(domain_result: Any) -> Optional[Verdict]:
 
 
 def _shadow_verdict(shadow_assessment: Any) -> Optional[Verdict]:
+    """Map a shadow containment mode to a verdict, faithfully mirroring the legacy
+    `shadow_containment_to_governance`: ALLOW→SAFE; BLOCKED/QUARANTINED→UNSAFE (block);
+    **every intermediate containment mode** (observe_only / read_only / draft_only /
+    sandbox_only / memory_write_denied / require_confirmation) → DEFER → UNSURE (confirm).
+    Treating the intermediate modes as SAFE would silently relax a legacy CONFIRM to ALLOW.
+    """
     if shadow_assessment is None or not hasattr(shadow_assessment, "containment_mode"):
         return None
     cm = getattr(shadow_assessment.containment_mode, "value", "allow")
     if cm in ("blocked", "quarantined"):
         return Verdict.UNSAFE
-    if cm == "require_confirmation":
-        return Verdict.UNSURE
-    return Verdict.SAFE
+    if cm == "allow":
+        return Verdict.SAFE
+    return Verdict.UNSURE
+
+
+# Shadow `reason_codes` prefixes that establish a DETERMINISTIC / policy-backed basis for
+# the containment (named declarative rules, fail-closed defaults, registry max-risk /
+# blocked-capability enforcement). If any of these is present, the shadow block stands on
+# policy grounds regardless of any derived escalation.
+_SHADOW_DETERMINISTIC_PREFIXES = (
+    "RULE:", "FAIL_CLOSED:", "EXCEEDS_MAX_RISK:", "BLOCKED_CAPABILITY:",
+)
+# Reason codes for the two DERIVED (heuristic-signal) escalations inside shadow.
+_SHADOW_JEPA_DERIVED_CODE = "JEPA_REGIME_ESCALATION"
+_SHADOW_SEMANTIC_DERIVED_CODE = "SEMANTIC_MISMATCH_ESCALATION"
+
+
+def _shadow_driver_name(shadow_assessment: Any, verdict: Verdict) -> str:
+    """Attribute an escalating shadow observation to its true source — REPORTING ONLY.
+
+    A shadow CONFIRM/BLOCK is reattributed to ``shadow_jepa_derived`` /
+    ``shadow_semantic_derived`` ONLY when the escalation is *solely* due to the JEPA-regime
+    (Step 6) or semantic-mismatch (Step 5) escalation — i.e. no deterministic/policy-backed
+    rule independently establishes the containment. When any deterministic rule co-fires,
+    the block stands on policy grounds and keeps the generic ``shadow`` name (conservative:
+    never over-claims a demotion opportunity). A non-escalating (SAFE) shadow observation
+    always stays ``shadow``.
+
+    This changes the audit DRIVER NAME only; it never affects the observation's verdict,
+    evidence/authority, severity, or the resulting ALLOW/CONFIRM/BLOCK decision. JEPA is the
+    more-severe escalation and so wins attribution when both derived escalations are present.
+    """
+    if verdict == Verdict.SAFE:
+        return "shadow"
+    codes = tuple(getattr(shadow_assessment, "reason_codes", ()) or ())
+    if any(c.startswith(_SHADOW_DETERMINISTIC_PREFIXES) for c in codes):
+        return "shadow"
+    if any(c.startswith(_SHADOW_JEPA_DERIVED_CODE) for c in codes):
+        return "shadow_jepa_derived"
+    if any(c.startswith(_SHADOW_SEMANTIC_DERIVED_CODE) for c in codes):
+        return "shadow_semantic_derived"
+    return "shadow"
 
 
 def _gap_requires_human(confidence_risk_gap: Any) -> bool:
@@ -145,6 +192,11 @@ def build_parity_observations(
     domain_result: Any = None,
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
+    forbidden_capabilities: Any = (),
+    permission_context: Any = None,
+    reputation_context: Any = None,
+    capability_context: Any = None,
+    plan_action_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> List[Observation]:
     """Map the legacy decision authorities to trust observations.
@@ -155,6 +207,21 @@ def build_parity_observations(
     """
     obs: List[Observation] = []
     read_only = getattr(getattr(tool_def, "risk_level", None), "value", "") == "read_only"
+
+    # Hard pre-gate: a forbidden capability is a deterministic kill-switch that the gateway
+    # enforces ABOVE the normal flow (it blocks before confidence/JEPA/domain/shadow). Map
+    # it as a PROVEN HARD_VETO so the trust core reproduces the legacy BLOCK terminally —
+    # no confidence, entropy, or gap can override it (BLOCK wins by weakest-link). Always
+    # PROVEN (a correctness gate, never a heuristic) — unaffected by the authority policy.
+    forbidden_hit = sorted(
+        set(getattr(tool_def, "capabilities", None) or [])
+        & set(forbidden_capabilities or []))
+    if forbidden_hit:
+        obs.append(Observation(
+            name="forbidden_capability", otype=ObservableType.HARD_VETO,
+            evidence=EvidenceStatus.PROVEN, verdict=Verdict.UNSAFE, severity=1.0,
+            reason=f"forbidden capability: {', '.join(forbidden_hit)}",
+            detail={"capabilities": forbidden_hit}))
 
     # min_confidence floor (base ConfidenceGate threshold).
     eff_conf = float(getattr(result, "confidence", 1.0))
@@ -184,10 +251,14 @@ def build_parity_observations(
         ))
 
     # Shadow AI control — named deterministic registry rules (policy authority).
+    # The driver NAME is attributed to the true source (deterministic `shadow` vs a
+    # JEPA-/semantic-derived escalation) for honest demotion analysis; verdict/authority
+    # and the resulting decision are unchanged.
     sv = _shadow_verdict(shadow_assessment)
     if sv is not None:
         obs.append(Observation(
-            name="shadow", otype=ObservableType.VALIDATOR, evidence=policy.shadow,
+            name=_shadow_driver_name(shadow_assessment, sv),
+            otype=ObservableType.VALIDATOR, evidence=policy.shadow,
             verdict=sv, severity=0.7, reason="shadow containment mode",
         ))
 
@@ -219,7 +290,62 @@ def build_parity_observations(
         reason=(f"can_execute={can_exec} requires_human={requires_human} "
                 f"requires_confirmation={requires_conf} gap_human={gap_human}"),
     ))
+
+    # Phase 2: permission-overclaim observable (PROVISIONAL, advisory-only). Appended ONLY
+    # when an explicit PermissionContext is supplied — inert (and absent) otherwise, so a
+    # production call with no context never changes the recorded decision.
+    from agentic.agentic_framework.trust.permission_overclaim import (
+        build_overclaim_observation)
+    overclaim_obs = build_overclaim_observation(permission_context)
+    if overclaim_obs is not None:
+        obs.append(overclaim_obs)
+
+    # Phase 2: outcome-reputation observable (PROVISIONAL, advisory-only). Appended ONLY when
+    # reputation stats (from the existing audit chain) are supplied AND have enough volume —
+    # inert otherwise, so a production call with no reputation context is unchanged.
+    from agentic.agentic_framework.trust.outcome_reputation import (
+        build_reputation_observation)
+    reputation_obs = build_reputation_observation(reputation_context)
+    if reputation_obs is not None:
+        obs.append(reputation_obs)
+
+    # Phase 2: hallucinated-capability observable (PROVISIONAL, advisory-only). Appended ONLY
+    # when an explicit CapabilityContext is supplied — inert otherwise, so a production call
+    # with no context is unchanged.
+    from agentic.agentic_framework.trust.hallucinated_capability import (
+        build_hallucination_observation)
+    hallucination_obs = build_hallucination_observation(capability_context)
+    if hallucination_obs is not None:
+        obs.append(hallucination_obs)
+
+    # Phase 2: plan-action-consistency observable (PROVISIONAL, advisory-only, heuristic).
+    # Appended ONLY when an explicit PlanActionContext is supplied — inert otherwise.
+    from agentic.agentic_framework.trust.plan_action_consistency import (
+        build_plan_action_observation)
+    plan_action_obs = build_plan_action_observation(plan_action_context)
+    if plan_action_obs is not None:
+        obs.append(plan_action_obs)
     return obs
+
+
+_SEVERITY_RANK = {TrustDecision.ALLOW: 0, TrustDecision.CONFIRM: 1, TrustDecision.BLOCK: 2}
+
+
+def _is_advisory_escalation(outcome: TrustOutcome, legacy: TrustDecision) -> bool:
+    """True when the trust decision is STRICTER than legacy and every driver raising it is a
+    non-PROVEN (PROVISIONAL/RESEARCH) or ADVISORY observable.
+
+    Such a divergence is a deliberately-added advisory signal escalating beyond legacy — it
+    can only raise trust (CONFIRM/BLOCK), never relax it, so it is `intended`, not a mapping
+    bug. A PROVEN-driven divergence (a real mapping gap) is excluded and stays `unintended`.
+    """
+    if _SEVERITY_RANK[outcome.decision] <= _SEVERITY_RANK[legacy]:
+        return False
+    for o in outcome.drivers:
+        if (o.evidence == EvidenceStatus.PROVEN
+                and o.otype != ObservableType.ADVISORY):
+            return False
+    return bool(outcome.drivers)
 
 
 def shadow_compare(
@@ -231,20 +357,32 @@ def shadow_compare(
     domain_result: Any = None,
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
+    forbidden_capabilities: Any = (),
+    permission_context: Any = None,
+    reputation_context: Any = None,
+    capability_context: Any = None,
+    plan_action_context: Any = None,
     policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> ParityComparison:
     """Compute the parallel trust decision under `policy` and compare it to legacy.
 
     Classification:
       match            trust == legacy
-      intended         a reviewed demotion explains the difference (under PARITY the
-                       decision WOULD match legacy; the active policy relaxes BLOCK→CONFIRM)
+      intended         a reviewed demotion explains the difference (PARITY would match
+                       legacy), OR a stricter-only escalation introduced solely by a
+                       PROVISIONAL/advisory observable (e.g. permission_overclaim) — these
+                       only ever raise trust, never relax it
       unsafe_relaxation a demotion turned BLOCK/CONFIRM into ALLOW (silent allow) — STOP
       unintended       a mapping gap independent of the demotion (PARITY also mismatches)
     """
     kw = dict(tool_def=tool_def, result=result, gate_decision=gate_decision,
               jepa_assessment=jepa_assessment, domain_result=domain_result,
-              shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap)
+              shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
+              forbidden_capabilities=forbidden_capabilities,
+              permission_context=permission_context,
+              reputation_context=reputation_context,
+              capability_context=capability_context,
+              plan_action_context=plan_action_context)
     outcome = decide(build_parity_observations(policy=policy, **kw))
     legacy = legacy_decision_to_trust(result)
     mismatch = outcome.decision != legacy
@@ -256,7 +394,12 @@ def shadow_compare(
         classification = "unsafe_relaxation"   # demotion must never produce a silent allow
     else:
         parity_decision = decide(build_parity_observations(policy=PARITY_POLICY, **kw)).decision
-        classification = "intended" if parity_decision == legacy else "unintended"
+        if parity_decision == legacy:
+            classification = "intended"
+        elif _is_advisory_escalation(outcome, legacy):
+            classification = "intended"        # advisory observable raised trust (never relaxed)
+        else:
+            classification = "unintended"
 
     return ParityComparison(legacy=legacy, trust=outcome.decision, mismatch=mismatch,
                             classification=classification, outcome=outcome)
