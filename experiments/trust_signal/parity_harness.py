@@ -32,7 +32,11 @@ from agentic.agentic_framework.mcp_gateway import (
     ToolRiskLevel,
     create_mock_mcp_gateway,
 )
-from agentic.agentic_framework.trust.parity import TrustMode
+from agentic.agentic_framework.trust.parity import (
+    PARITY_POLICY,
+    REVIEWED_POLICY,
+    TrustMode,
+)
 
 
 def _run(coro):
@@ -91,6 +95,12 @@ CORPUS: List[Scenario] = [
              profile="shadow_basic", raw_entropy=0.1),
     Scenario("shadow_unknown_exec", "unknown_shadow_exec", ToolRiskLevel.EXECUTE,
              profile="shadow_basic", raw_entropy=0.1),
+    # --- JEPA-sole block (legacy blocks ONLY because of the JEPA heuristic). Under the
+    #     REVIEWED policy this demotes BLOCK→CONFIRM (intended, still human-gated). The
+    #     low quality/coherence trips JEPA process_drift; min_confidence=0 keeps the
+    #     confidence floor SAFE so JEPA is the sole blocker. ---
+    Scenario("jepa_sole_block", "jepa_write", ToolRiskLevel.WRITE,
+             quality=0.05, coherence=0.05, raw_entropy=0.1, min_confidence=0.0),
 ]
 
 
@@ -107,7 +117,7 @@ def _make_shadow_registry():
     ])
 
 
-def _gateway_for_profile(profile: str) -> SafeMCPGateway:
+def _gateway_for_profile(profile: str, policy) -> SafeMCPGateway:
     if profile == "domain_finance":
         from agentic.agentic_framework.domain_policy import create_default_registry
         gw = SafeMCPGateway(mcp_client=MockMCPClient(),
@@ -118,14 +128,15 @@ def _gateway_for_profile(profile: str) -> SafeMCPGateway:
     else:
         gw = create_mock_mcp_gateway()
     gw._trust_mode = TrustMode.SHADOW
+    gw._trust_authority_policy = policy
     return gw
 
 
-def run_harness() -> dict:
+def run_harness(policy=PARITY_POLICY) -> dict:
     gateways: Dict[str, SafeMCPGateway] = {}
     rows = []
     for sc in CORPUS:
-        gw = gateways.setdefault(sc.profile, _gateway_for_profile(sc.profile))
+        gw = gateways.setdefault(sc.profile, _gateway_for_profile(sc.profile, policy))
         gw.mcp_client.register_tool(sc.tool, lambda p: "ok", sc.risk)
         gw.tool_definitions[sc.tool] = MCPToolDefinition(
             name=sc.tool, description=sc.name, risk_level=sc.risk,
@@ -146,31 +157,46 @@ def run_harness() -> dict:
     return {"rows": rows, "counts": dict(counts)}
 
 
-def render(report: dict) -> str:
-    lines = ["# Phase 1.5 differential parity report (shadow mode)", "",
+def _table(report: dict, title: str) -> str:
+    lines = [f"## {title}", "",
              "| scenario | profile | legacy | trust | class | drivers |",
              "|---|---|---|---|---|---|"]
     for r in report["rows"]:
         lines.append(f"| {r['scenario']} | {r['profile']} | {r['legacy']} | {r['trust']} "
                      f"| {r['class']} | {','.join(r['drivers'])} |")
-    lines.append("")
     c = report["counts"]
     total = sum(c.values())
-    lines.append(f"**Total:** {total}  ·  **match:** {c.get('match', 0)}  ·  "
-                 f"**mismatch:** {total - c.get('match', 0)} "
-                 f"(intended={c.get('intended', 0)}, unintended={c.get('unintended', 0)}, "
-                 f"unresolved={c.get('unresolved', 0)})")
     lines.append("")
-    lines.append("**Flip gate:** trust_core may become authoritative only when "
-                 "unintended == 0 and unresolved == 0.")
-    return "\n".join(lines) + "\n"
+    lines.append(f"**Total:** {total}  ·  **match:** {c.get('match', 0)}  ·  "
+                 f"intended={c.get('intended', 0)} · unintended={c.get('unintended', 0)} · "
+                 f"unsafe_relaxation={c.get('unsafe_relaxation', 0)}")
+    return "\n".join(lines)
+
+
+def render_both() -> str:
+    before = run_harness(PARITY_POLICY)
+    after = run_harness(REVIEWED_POLICY)
+    out = ["# Phase 1.5A authority-policy differential (shadow mode)", "",
+           _table(before, "BEFORE — PARITY policy (all heuristics blocking)"), "",
+           _table(after, "AFTER — REVIEWED policy (JEPA demoted to confirm-only)"), ""]
+    ca = after["counts"]
+    changed = [r["scenario"] for r in after["rows"] if r["class"] != "match"]
+    out.append(f"**Affected scenarios (REVIEWED):** {changed or 'none'}")
+    out.append(f"**Safety:** unsafe_relaxation (BLOCK/CONFIRM→ALLOW) = "
+               f"{ca.get('unsafe_relaxation', 0)} "
+               f"({'OK' if ca.get('unsafe_relaxation', 0) == 0 else 'STOP — unsafe allow!'})")
+    out.append("")
+    out.append("**Flip gate:** trust_core may flip only when unintended == 0 and "
+               "unsafe_relaxation == 0 (intended demotions are reviewed/accepted).")
+    return "\n".join(out) + "\n"
 
 
 def main() -> int:
-    report = run_harness()
-    print(render(report))
-    c = report["counts"]
-    return 0 if (c.get("unintended", 0) == 0 and c.get("unresolved", 0) == 0) else 1
+    print(render_both())
+    after = run_harness(REVIEWED_POLICY)["counts"]
+    # Block the flip on unintended mismatches or any unsafe relaxation.
+    ok = after.get("unintended", 0) == 0 and after.get("unsafe_relaxation", 0) == 0
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":

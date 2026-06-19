@@ -26,7 +26,12 @@ from agentic.agentic_framework.mcp_gateway import (
 )
 from agentic.agentic_framework.signal_config import SignalConfig
 from agentic.agentic_framework.trust.observables import TrustDecision
-from agentic.agentic_framework.trust.parity import TrustMode, shadow_compare
+from agentic.agentic_framework.trust.parity import (
+    PARITY_POLICY,
+    REVIEWED_POLICY,
+    TrustMode,
+    shadow_compare,
+)
 
 
 def _run(coro):
@@ -171,12 +176,63 @@ def test_cg_can_affect_decision_when_enabled():
     assert (on.decision != off.decision) or (on_entry.jepa_regime != off_entry.jepa_regime)
 
 
+# ---- Phase 1.5A: authority-policy demotion ----------------------------------
+
+def test_jepa_demotion_relaxes_block_to_confirm_not_allow():
+    # A JEPA-only block: PARITY blocks; REVIEWED (JEPA provisional) → CONFIRM, never ALLOW.
+    result, tool_def, gate = _ctx(risk="write")
+    jepa = SimpleNamespace(regime=SimpleNamespace(value="dual_anomaly"))
+    parity = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                            jepa_assessment=jepa, policy=PARITY_POLICY)
+    reviewed = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                              jepa_assessment=jepa, policy=REVIEWED_POLICY)
+    assert parity.trust == TrustDecision.BLOCK
+    assert reviewed.trust == TrustDecision.CONFIRM        # relaxed, still human-gated
+    assert reviewed.trust != TrustDecision.ALLOW          # never a silent allow
+
+
+def test_domain_kept_blocking_under_reviewed():
+    result, tool_def, gate = _ctx()
+    domain = SimpleNamespace(mode=DomainActionMode.BLOCKED)
+    reviewed = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                              domain_result=domain, policy=REVIEWED_POLICY)
+    assert reviewed.trust == TrustDecision.BLOCK
+
+
+def test_shadow_kept_blocking_under_reviewed():
+    result, tool_def, gate = _ctx()
+    shadow = SimpleNamespace(containment_mode=SimpleNamespace(value="quarantined"))
+    reviewed = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                              shadow_assessment=shadow, policy=REVIEWED_POLICY)
+    assert reviewed.trust == TrustDecision.BLOCK
+
+
+def test_jepa_demotion_classified_intended_when_legacy_blocked():
+    # legacy BLOCKED solely via JEPA; under REVIEWED the difference is a reviewed demotion.
+    result, tool_def, gate = _ctx(decision="blocked", risk="write")
+    jepa = SimpleNamespace(regime=SimpleNamespace(value="process_drift"))
+    cmp = shadow_compare(tool_def=tool_def, result=result, gate_decision=gate,
+                         jepa_assessment=jepa, policy=REVIEWED_POLICY)
+    assert cmp.legacy == TrustDecision.BLOCK
+    assert cmp.trust == TrustDecision.CONFIRM
+    assert cmp.classification == "intended"
+
+
 # ---- harness smoke ----------------------------------------------------------
 
-def test_parity_harness_zero_unreviewed_mismatches():
+def test_parity_harness_parity_policy_all_match():
     from experiments.trust_signal.parity_harness import run_harness
-    report = run_harness()
+    report = run_harness(PARITY_POLICY)
     c = report["counts"]
     assert c.get("unintended", 0) == 0
-    assert c.get("unresolved", 0) == 0
+    assert c.get("unsafe_relaxation", 0) == 0
     assert c.get("match", 0) == len(report["rows"])
+
+
+def test_parity_harness_reviewed_policy_only_intended_and_safe():
+    from experiments.trust_signal.parity_harness import run_harness
+    report = run_harness(REVIEWED_POLICY)
+    c = report["counts"]
+    assert c.get("unintended", 0) == 0           # no unreviewed mismatches
+    assert c.get("unsafe_relaxation", 0) == 0    # no BLOCK/CONFIRM → ALLOW
+    assert c.get("intended", 0) >= 1             # the JEPA demotion is exercised

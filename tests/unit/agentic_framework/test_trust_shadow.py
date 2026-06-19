@@ -24,7 +24,6 @@ from agentic.agentic_framework.mcp_gateway import (
 from agentic.agentic_framework.trust.observables import TrustDecision
 from agentic.agentic_framework.trust.parity import (
     TrustMode,
-    classify_mismatch,
     legacy_decision_to_trust,
     shadow_compare,
 )
@@ -133,7 +132,6 @@ def test_parity_mismatch_detected_and_classified():
     assert cmp.trust == TrustDecision.BLOCK
     assert cmp.mismatch is True
     assert cmp.classification == "unintended"
-    assert classify_mismatch(TrustDecision.ALLOW, TrustDecision.BLOCK) == "unintended"
 
 
 def test_mismatch_is_logged_by_gateway(caplog, monkeypatch):

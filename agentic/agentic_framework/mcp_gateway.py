@@ -775,9 +775,13 @@ class SafeMCPGateway:
         # parallel and records it (still acts on legacy). TRUST_CORE is parity-gated and
         # currently behaves as SHADOW until the differential harness shows zero unreviewed
         # mismatches — the flip to authoritative is a deliberate, separate step.
-        from agentic.agentic_framework.trust.parity import TrustMode
+        from agentic.agentic_framework.trust.parity import PARITY_POLICY, TrustMode
         self._trust_mode: TrustMode = (
             TrustMode(trust_mode) if trust_mode is not None else TrustMode.LEGACY)
+        # Authority policy for the shadow/parity mapping (which heuristics may BLOCK vs
+        # only CONFIRM). Default PARITY = reproduce legacy exactly. REVIEWED demotes JEPA
+        # to confirm-only (Phase 1.5A). Affects only the shadow comparison, never legacy.
+        self._trust_authority_policy = PARITY_POLICY
 
     def register_tool(self, tool_def: MCPToolDefinition) -> None:
         """
@@ -1146,7 +1150,8 @@ class SafeMCPGateway:
                 cmp = shadow_compare(
                     tool_def=tool_def, result=result, gate_decision=gate_decision,
                     jepa_assessment=jepa_assessment, domain_result=domain_result,
-                    shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap)
+                    shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap,
+                    policy=self._trust_authority_policy)
                 entry.trust_decision = cmp.trust.value
                 entry.trust_legacy_decision = cmp.legacy.value
                 entry.trust_mismatch = cmp.mismatch

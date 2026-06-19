@@ -48,12 +48,33 @@ class TrustMode(str, Enum):
                                # parity-gated and not yet enabled (behaves as SHADOW)
 
 
+@dataclass(frozen=True)
+class AuthorityPolicy:
+    """Evidence status (decision authority) assigned to each heuristic authority.
+
+    PROVEN → may BLOCK; PROVISIONAL → confirm-only (never blocks). This makes the
+    blocking-vs-advisory decision for JEPA / domain / shadow EXPLICIT and reviewable,
+    rather than hardcoded. Default = PARITY (everything PROVEN, reproduces legacy).
+    """
+    jepa: EvidenceStatus = EvidenceStatus.PROVEN
+    domain: EvidenceStatus = EvidenceStatus.PROVEN
+    shadow: EvidenceStatus = EvidenceStatus.PROVEN
+
+
+# PARITY: reproduce legacy exactly (all heuristics blocking).
+PARITY_POLICY = AuthorityPolicy()
+# REVIEWED (Phase 1.5A): JEPA demoted to confirm-only (heuristic, no proven evidence);
+# domain kept blocking (explicit configured rules); shadow kept blocking (fires named
+# deterministic registry rules, not a risk-score threshold).
+REVIEWED_POLICY = AuthorityPolicy(jepa=EvidenceStatus.PROVISIONAL)
+
+
 @dataclass
 class ParityComparison:
     legacy: TrustDecision
     trust: TrustDecision
     mismatch: bool
-    classification: str        # "match" | "intended" | "unintended" | "unresolved"
+    classification: str        # match | intended | unintended | unsafe_relaxation
     outcome: TrustOutcome
 
 
@@ -124,8 +145,14 @@ def build_parity_observations(
     domain_result: Any = None,
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
+    policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> List[Observation]:
-    """Reproduce the legacy decision authorities as PROVEN trust observations."""
+    """Map the legacy decision authorities to trust observations.
+
+    `policy` sets the decision authority (evidence status) of the heuristic authorities
+    (JEPA / domain / shadow). PARITY_POLICY = all PROVEN (reproduces legacy); a demoted
+    authority becomes PROVISIONAL (confirm-only, never blocks).
+    """
     obs: List[Observation] = []
     read_only = getattr(getattr(tool_def, "risk_level", None), "value", "") == "read_only"
 
@@ -141,26 +168,26 @@ def build_parity_observations(
                 if eff_conf < min_conf else f"confidence {eff_conf:.2f} ≥ min {min_conf:.2f}"),
     ))
 
-    # JEPA heuristic regime.
+    # JEPA heuristic regime — authority set by policy (PROVEN blocks; PROVISIONAL confirms).
     obs.append(Observation(
-        name="jepa", otype=ObservableType.VALIDATOR, evidence=EvidenceStatus.PROVEN,
+        name="jepa", otype=ObservableType.VALIDATOR, evidence=policy.jepa,
         verdict=_jepa_verdict(jepa_assessment, read_only),
         severity=0.6, reason=f"jepa regime={getattr(getattr(jepa_assessment,'regime',None),'value','normal')}",
     ))
 
-    # Domain Semantic Policy.
+    # Domain Semantic Policy — explicit configured rules (policy authority).
     dv = _domain_verdict(domain_result)
     if dv is not None:
         obs.append(Observation(
-            name="domain", otype=ObservableType.VALIDATOR, evidence=EvidenceStatus.PROVEN,
+            name="domain", otype=ObservableType.VALIDATOR, evidence=policy.domain,
             verdict=dv, severity=0.7, reason="domain policy mode",
         ))
 
-    # Shadow AI control.
+    # Shadow AI control — named deterministic registry rules (policy authority).
     sv = _shadow_verdict(shadow_assessment)
     if sv is not None:
         obs.append(Observation(
-            name="shadow", otype=ObservableType.VALIDATOR, evidence=EvidenceStatus.PROVEN,
+            name="shadow", otype=ObservableType.VALIDATOR, evidence=policy.shadow,
             verdict=sv, severity=0.7, reason="shadow containment mode",
         ))
 
@@ -204,25 +231,32 @@ def shadow_compare(
     domain_result: Any = None,
     shadow_assessment: Any = None,
     confidence_risk_gap: Any = None,
+    policy: "AuthorityPolicy" = PARITY_POLICY,
 ) -> ParityComparison:
-    """Compute the parallel trust decision and compare it to the legacy outcome."""
-    observations = build_parity_observations(
-        tool_def=tool_def, result=result, gate_decision=gate_decision,
-        jepa_assessment=jepa_assessment, domain_result=domain_result,
-        shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap)
-    outcome = decide(observations)
+    """Compute the parallel trust decision under `policy` and compare it to legacy.
+
+    Classification:
+      match            trust == legacy
+      intended         a reviewed demotion explains the difference (under PARITY the
+                       decision WOULD match legacy; the active policy relaxes BLOCK→CONFIRM)
+      unsafe_relaxation a demotion turned BLOCK/CONFIRM into ALLOW (silent allow) — STOP
+      unintended       a mapping gap independent of the demotion (PARITY also mismatches)
+    """
+    kw = dict(tool_def=tool_def, result=result, gate_decision=gate_decision,
+              jepa_assessment=jepa_assessment, domain_result=domain_result,
+              shadow_assessment=shadow_assessment, confidence_risk_gap=confidence_risk_gap)
+    outcome = decide(build_parity_observations(policy=policy, **kw))
     legacy = legacy_decision_to_trust(result)
     mismatch = outcome.decision != legacy
-    classification = "match" if not mismatch else classify_mismatch(legacy, outcome.decision)
+
+    if not mismatch:
+        classification = "match"
+    elif outcome.decision == TrustDecision.ALLOW and legacy in (
+            TrustDecision.BLOCK, TrustDecision.CONFIRM):
+        classification = "unsafe_relaxation"   # demotion must never produce a silent allow
+    else:
+        parity_decision = decide(build_parity_observations(policy=PARITY_POLICY, **kw)).decision
+        classification = "intended" if parity_decision == legacy else "unintended"
+
     return ParityComparison(legacy=legacy, trust=outcome.decision, mismatch=mismatch,
                             classification=classification, outcome=outcome)
-
-
-# Known, reviewed difference patterns. Phase 1.5 starts with none "intended" — every
-# mismatch is "unintended" until a reviewer promotes a pattern here. Conservative by
-# design: trust STRICTER than legacy is safer than trust LOOSER.
-def classify_mismatch(legacy: TrustDecision, trust: TrustDecision) -> str:
-    order = {TrustDecision.ALLOW: 0, TrustDecision.CONFIRM: 1, TrustDecision.BLOCK: 2}
-    if order[trust] > order[legacy]:
-        return "unintended"   # trust stricter than legacy — safe but a behavior change
-    return "unintended"       # trust looser than legacy — must NOT flip until resolved
