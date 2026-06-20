@@ -138,6 +138,41 @@ class TestReportGeneration:
         assert "HIDDEN_ONLY_SIGNAL" in (tmp_path / "report.md").read_text()
 
 
+class TestDatasetBuilder:
+    """The generate→score labeling produces correct objective labels (scoring is pure)."""
+
+    def _mod(self):
+        import importlib
+        return importlib.import_module("build_probe_dataset")
+
+    def test_exact_match_scoring(self):
+        B = self._mod()
+        assert B.score_generation({"kind": "exact_match", "answer": 42}, "work #### 42") == 1
+        assert B.score_generation({"kind": "exact_match", "answer": 42}, "#### 41") == 0
+
+    def test_constraint_scoring(self):
+        B = self._mod()
+        sc = {"kind": "constraint", "constraints": [{"type": "one_of", "value": ["yes", "no"]}]}
+        assert B.score_generation(sc, "YES") == 1
+        assert B.score_generation(sc, "maybe") == 0
+
+    def test_json_scoring(self):
+        B = self._mod()
+        sc = {"kind": "json", "required_keys": ["name", "age"]}
+        assert B.score_generation(sc, '{"name":"x","age":3}') == 1
+        assert B.score_generation(sc, '{"name":"x"}') == 0
+
+    def test_pool_integrity(self):
+        pool_path = _ABL / "probe_pool" / "pool.jsonl"
+        rows = [json.loads(l) for l in pool_path.read_text().splitlines() if l.strip()]
+        assert len(rows) >= 200
+        ids = [r["id"] for r in rows]
+        assert len(ids) == len(set(ids))
+        for r in rows:
+            assert {"id", "prompt", "label_type", "scorer"} <= set(r)
+            assert r["label_type"] in PS.ALLOWED_LABEL_TYPES
+
+
 # ===========================================================================
 # Tier 2 — numpy (skips if numpy absent)
 # ===========================================================================
