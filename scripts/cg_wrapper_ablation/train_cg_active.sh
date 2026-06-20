@@ -11,7 +11,10 @@
 #
 # Usage:
 #   PYTHONPATH=$PWD bash scripts/cg_wrapper_ablation/train_cg_active.sh
-# Override via env: DATASET, MAX_STEPS, BATCH, ACCUM, LR, CKPT_DIR, PROBE_EVERY.
+# Override via env: DATASET, MAX_STEPS, SEQ_LEN, BATCH, ACCUM, LR, EVAL_EVERY, SAVE_EVERY,
+#                   WARMUP, CKPT_DIR, PROBE_EVERY.
+#   e.g. SEQ_LEN=1024 BATCH=48 ACCUM=1 MAX_STEPS=3000 EVAL_EVERY=500 LR=3e-4 \
+#        PYTHONPATH=$PWD bash scripts/cg_wrapper_ablation/train_cg_active.sh
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -19,27 +22,33 @@ export PYTHONPATH="${PYTHONPATH:-$PWD}"
 
 DATASET="${DATASET:-wikitext103}"
 MAX_STEPS="${MAX_STEPS:-5000}"
+SEQ_LEN="${SEQ_LEN:-2048}"
 BATCH="${BATCH:-16}"
 ACCUM="${ACCUM:-2}"
 LR="${LR:-3e-4}"
+EVAL_EVERY="${EVAL_EVERY:-1000}"
+SAVE_EVERY="${SAVE_EVERY:-$EVAL_EVERY}"        # default: save whenever we eval (-> best_model.pt)
+WARMUP="${WARMUP:-500}"
 CKPT_DIR="${CKPT_DIR:-$PWD/checkpoints_mistral_cg}"
 export CG_BOOTSTRAP_PROBE_EVERY="${PROBE_EVERY:-50}"
 
 echo "== Active-CG training =="
-echo "  dataset=$DATASET steps=$MAX_STEPS batch=${BATCH}x${ACCUM} lr=$LR"
+echo "  dataset=$DATASET steps=$MAX_STEPS seq_len=$SEQ_LEN batch=${BATCH}x${ACCUM} lr=$LR"
+echo "  eval_every=$EVAL_EVERY save_every=$SAVE_EVERY warmup=$WARMUP"
 echo "  ckpt=$CKPT_DIR  probe_every=$CG_BOOTSTRAP_PROBE_EVERY"
-echo "  GATE CHECK: by ~step 1000 expect [CG-BOOTSTRAP] gate rising past ~0.25 and corr/hidden > ~0.05;"
-echo "             if not, stop — the head is not activating."
+echo "  NOTE: best_model.pt requires at least one eval -> keep EVAL_EVERY <= MAX_STEPS."
+echo "  GATE CHECK: by ~step 1000 expect [CG-BOOTSTRAP] gate ~0.27 (parked is fine) and corr/hidden > ~0.05;"
+echo "             if gate fell back to 0.1191 or corr/hidden < 1e-2, stop — the head is not active."
 
 python train_unified_llm.py \
   --model_type mistral_cg \
   --mistral_model_name mistralai/Mistral-7B-v0.3 --mistral_quantize none \
   --cg_bootstrap_mode active \
-  --dataset "$DATASET" \
+  --dataset "$DATASET" --max_seq_len "$SEQ_LEN" \
   --max_steps "$MAX_STEPS" \
   --batch_size "$BATCH" --gradient_accumulation "$ACCUM" \
-  --learning_rate "$LR" --warmup_steps 500 \
-  --eval_every 1000 --save_every 1000 --log_every 50 --sample_every 1000 \
+  --learning_rate "$LR" --warmup_steps "$WARMUP" \
+  --eval_every "$EVAL_EVERY" --save_every "$SAVE_EVERY" --log_every 50 --sample_every "$EVAL_EVERY" \
   --mixed_precision bf16 \
   --enable_conscious_generation \
   --lambda_ont 0.01 --lambda_kosha_routing 0.01 --lambda_bliss_token 0.01 \
