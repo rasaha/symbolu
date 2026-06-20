@@ -161,54 +161,79 @@ class TestEvalSetsIntegrity:
 
 
 class TestMetricsReportVerdict:
-    """The kill-criteria evaluator (pure Python) decides correctly per pre-registered rules."""
+    """The decision evaluator (pure Python) resolves the post-Active-CG categories correctly."""
 
     def _import(self):
         import importlib
         return importlib.import_module("metrics_report")
 
+    # active (non-inert) B vs base diagnostics shared by most cases
+    _ACTIVE_DIAG = {
+        "D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
+        "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
+                   "mean_correction_to_hidden_ratio": 0.047},
+    }
+
+    @staticmethod
+    def _p(direction, sig):
+        return {"gsm8k_style": {"significant": sig, "direction": direction}}
+
     def test_k0_hidden_coupling_wins(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.5},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
+        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.5}, "B_full": self._ACTIVE_DIAG["B_full"]}
         v = R.evaluate_kill_criteria({}, {}, diag)
         assert v["decision"] == "INVESTIGATE_K0_HIDDEN_COUPLING"
 
-    def test_inert_stop(self):
+    def test_inert(self):
         R = self._import()
         diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
                 "B_full": {"mean_logit_kl_vs_base": 1e-6, "mean_top1_flip_vs_base": 0.0,
                            "mean_correction_to_hidden_ratio": 1e-5}}
         v = R.evaluate_kill_criteria({}, {}, diag)
-        assert v["decision"] == "INERT_STOP"
+        assert v["decision"] == "INERT"
 
-    def test_no_effect_deprioritize(self):
+    def test_active_no_effect(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
-        paired = {"gsm8k_style": {"significant": False, "direction": "none"}}
-        v = R.evaluate_kill_criteria({}, paired, diag)
-        assert v["decision"] == "NO_EFFECT_DEPRIORITIZE"
+        v = R.evaluate_kill_criteria({}, self._p("none", False), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("none", False),
+                                     paired_c_vs_a=self._p("none", False),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.3, "mean_top1_flip_B_vs_C": 0.1})
+        assert v["decision"] == "ACTIVE_NO_EFFECT"
 
-    def test_regression_kills(self):
+    def test_regression(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
-        paired = {"gsm8k_style": {"significant": True, "direction": "regress"}}
-        v = R.evaluate_kill_criteria({}, paired, diag)
-        assert v["decision"] == "KILL_OR_RETRAIN"
+        v = R.evaluate_kill_criteria({}, self._p("regress", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("none", False),
+                                     paired_c_vs_a=self._p("none", False),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.1, "mean_top1_flip_B_vs_C": 0.05})
+        assert v["decision"] == "REGRESSION" and v["b_regresses_A_sets"] == ["gsm8k_style"]
 
-    def test_benefit_recorded(self):
+    def test_cg_dynamic_signal(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
-        paired = {"gsm8k_style": {"significant": True, "direction": "improve"}}
-        v = R.evaluate_kill_criteria({}, paired, diag)
-        assert v["decision"] == "BENEFIT_RECORDED" and v["benefit_sets"] == ["gsm8k_style"]
+        v = R.evaluate_kill_criteria({}, self._p("improve", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("improve", True),
+                                     paired_c_vs_a=self._p("none", False),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.3, "mean_top1_flip_B_vs_C": 0.1})
+        assert v["decision"] == "CG_DYNAMIC_SIGNAL"
+
+    def test_static_offset_no_cg_dynamic(self):
+        R = self._import()
+        # B>A but B≈C (not distinguishable, logits ~equal) => the gain is the static offset.
+        v = R.evaluate_kill_criteria({}, self._p("improve", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("none", False),
+                                     paired_c_vs_a=self._p("improve", True),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 1e-5, "mean_top1_flip_B_vs_C": 0.0})
+        assert v["decision"] == "STATIC_OFFSET_NO_CG_DYNAMIC"
+        assert any("STATIC OFFSET" in w for w in v["warnings"])
+
+    def test_weak_objective_gain(self):
+        R = self._import()
+        # B>A, but B-vs-C distinguishable in the WRONG direction (C beats B) => ambiguous/weak.
+        v = R.evaluate_kill_criteria({}, self._p("improve", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("regress", True),
+                                     paired_c_vs_a=self._p("improve", True),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.3, "mean_top1_flip_B_vs_C": 0.1})
+        assert v["decision"] == "WEAK_OBJECTIVE_GAIN"
 
 
 # ===========================================================================

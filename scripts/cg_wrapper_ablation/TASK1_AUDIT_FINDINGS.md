@@ -1,5 +1,13 @@
 # Task 1 — CG Wrapper Path Audit (findings)
 
+> **Update (post Active-CG).** This audit describes the **ORIGINAL** wrapper. Follow-up analysis
+> (`BOOTSTRAP_ANALYSIS.md`) proved the ORIGINAL init is **structurally inert** — it cannot
+> bootstrap an active gate under an LM objective on a frozen backbone (at init `adapter_output=0`
+> ⇒ `∂L/∂gate≡0`). The ablation is run against a trained **Active-CG** variant
+> (`--cg_bootstrap_mode active`, gate −1.0 + N(0,1e-3) adapter). Active-CG makes the wrapper
+> participate in generation; it does **not** imply usefulness. The decisive comparison is **B vs C**
+> (full vs phase/Bhava-off static offset) — see `RESEARCH_PLAN.md §6`.
+
 **Scope:** the CG wrapper as a *generation-quality* modifier only. Governance paths
 (trust observables, JEPA governance, Vritti/Guna/Kosha *governance*, shadow/parity) are out of
 scope and were not modified. This is a read-only audit of the code paths that produce logits.

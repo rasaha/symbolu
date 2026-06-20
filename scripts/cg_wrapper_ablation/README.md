@@ -37,9 +37,16 @@ torch/wrapper tests skip cleanly without torch/GPU/checkpoint).
 |-----|--------|---------|
 | `A_base` | raw backbone | base model, no wrapper |
 | `B_full` | `ablation=None` | full CG wrapper |
-| `C_phase_off` | `use_phase_sync=False` | phase signal into adapter zeroed |
+| `C_phase_off` | `use_phase_sync=False` | phase/Bhava signal into adapter zeroed → **static offset only** (the B-vs-C reference) |
 | `D_gate0` | `use_guna_bias=False` | adapter_gate forced 0 (**must == base**, K0) |
 | `E_csr` | — | **N/A**: CSR is not in the generation path (auto-skipped) |
+
+> **ORIGINAL vs Active-CG.** The as-designed wrapper (`--cg_bootstrap_mode original`, gate −2.0 +
+> zero-init adapter) is **structurally inert** — it cannot bootstrap an active gate (proof:
+> `BOOTSTRAP_ANALYSIS.md`). The ablation is run against a **trained Active-CG** head
+> (`--cg_bootstrap_mode active`, gate −1.0 + N(0,1e-3) adapter; train via `train_cg_active.sh`).
+> Active-CG only proves the wrapper *can participate* in generation — it does **not** prove
+> usefulness. Usefulness is decided by B > A **and** B > C on objective metrics.
 
 ## Environment variables (pre-registered)
 
@@ -78,10 +85,20 @@ python scripts/cg_wrapper_ablation/metrics_report.py runs/cg_wrapper_ablation/<t
 ## Verdict decisions (from `metrics_report.py`)
 
 - `INVESTIGATE_K0_HIDDEN_COUPLING` — gate=0 ≠ base (the "off" switch doesn't fully turn it off).
-- `INERT_STOP` — wrapper changes ~nothing (KL<1e-3, flip<0.5%, corr/hidden<1e-2). Stop.
-- `NO_EFFECT_DEPRIORITIZE` — changes logits but no significant task-metric movement.
-- `KILL_OR_RETRAIN` — significant regression on a task metric.
-- `BENEFIT_RECORDED` — significant improvement, no regression. Only here is benefit claimed.
+- `INVESTIGATE_K0_HIDDEN_COUPLING` — gate=0 (arm D) ≠ base.
+- `INERT` — wrapper changes ~nothing (KL<1e-3, flip<0.5%, corr/hidden<1e-2). The ORIGINAL design
+  lands here by construction (see BOOTSTRAP_ANALYSIS.md); a *trained Active-CG* head should not.
+- `ACTIVE_NO_EFFECT` — wrapper changes logits but no significant task-metric movement vs base.
+- `REGRESSION` — B significantly worse than A on a task metric (format/reasoning/constraint).
+- `STATIC_OFFSET_NO_CG_DYNAMIC` — B moves metrics but **B ≈ C** (phase/Bhava off): the effect is a
+  constant adapter offset, **not** CG dynamics.
+- `WEAK_OBJECTIVE_GAIN` — B > A on something, but the B-vs-C picture is ambiguous.
+- `CG_DYNAMIC_SIGNAL` — **B > A AND B > C**: the gain needs the phase/Bhava dynamics. Only this
+  (and only on objective metrics) justifies continuing CG-wrapper research.
+
+> **The decisive comparison is B vs C, not just B vs A.** A (base), B (full Active-CG), C (phase/
+> Bhava dynamics off, static offset only), D (gate=0 ≡ base). If B≈C the wrapper is a constant
+> offset; subjective "coherence" examples never count as success.
 
 ## What requires GPU
 
