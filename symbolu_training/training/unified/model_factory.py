@@ -563,6 +563,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             phase_adapter_hidden=config.mistral_phase_adapter_hidden,
             device_map=config.mistral_device_map,
             trust_remote_code=config.mistral_trust_remote_code,
+            bootstrap_mode=getattr(config, "cg_bootstrap_mode", "original"),
         )
         # Override dims for CG module creation below
         embed_dim = model.mistral_hidden_dim

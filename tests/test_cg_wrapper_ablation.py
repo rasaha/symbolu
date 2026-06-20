@@ -324,6 +324,80 @@ class TestStateDeltaBehaviour:
 
 
 @pytestmark_torch
+class TestCGBootstrapMode:
+    """ACTIVE init must escape the inert fixed point; ORIGINAL must stay the quiet baseline."""
+
+    def _build(self, mode):
+        from cg_ablation.stub_backend import StubBackbone
+        from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
+        backbone = StubBackbone(64, 128, 8, seed=0)
+        w = MistralCGWrapper(pretrained_model=backbone, pretrained_tokenizer=None,
+                             phase_adapter_hidden=32, bootstrap_mode=mode)
+        w.eval()
+        return w
+
+    def test_original_gate_and_zero_adapter(self):
+        w = self._build("original")
+        assert float(torch.sigmoid(w.adapter_gate).item()) == pytest.approx(0.1192, abs=1e-3)
+        assert float(w.phase_adapter[-1].weight.abs().sum().item()) == 0.0
+
+    def test_active_gate_and_nonzero_adapter(self):
+        w = self._build("active")
+        assert float(torch.sigmoid(w.adapter_gate).item()) == pytest.approx(0.2689, abs=1e-3)
+        assert float(w.phase_adapter[-1].weight.abs().sum().item()) > 0.0
+
+    def test_active_full_arm_changes_logits_but_gate0_still_base(self):
+        from cg_ablation.arms import ARMS_BY_NAME, run_arm_logits
+        w = self._build("active")
+        ids = torch.randint(0, 128, (1, 8))
+        base = run_arm_logits(w, ARMS_BY_NAME["A_base"], ids)["logits"]
+        full = run_arm_logits(w, ARMS_BY_NAME["B_full"], ids)["logits"]
+        gate0 = run_arm_logits(w, ARMS_BY_NAME["D_gate0"], ids)["logits"]
+        # ACTIVE + nonzero adapter => the wrapper actually moves logits...
+        assert not torch.allclose(base, full, atol=1e-4, rtol=1e-3)
+        # ...but the gate=0 ablation is still logit-identical to base (K0 holds in any mode).
+        assert torch.allclose(base, gate0, atol=1e-4, rtol=1e-3)
+
+
+@pytestmark_torch
+class TestBootstrapProbe:
+    """The instrumentation reads grads/activations without affecting training."""
+
+    def test_probe_reports_nonzero_gate_grad_in_active_mode(self):
+        from cg_ablation.stub_backend import StubBackbone
+        from cg_ablation.bootstrap_probe import BootstrapProbe
+        from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
+
+        backbone = StubBackbone(64, 128, 8, seed=0)
+        w = MistralCGWrapper(pretrained_model=backbone, pretrained_tokenizer=None,
+                             phase_adapter_hidden=32, bootstrap_mode="active")
+        probe = BootstrapProbe(w, every=1).install()
+        ids = torch.randint(0, 128, (1, 8))
+        out = w(input_ids=ids, reset_state=True)
+        loss = out["logits"].float().pow(2).mean()  # any scalar to get grads flowing
+        loss.backward()
+        # gate grad should be NON-zero in active mode (adapter_output != 0 => dL/dgate != 0)
+        assert w.adapter_gate.grad is not None
+        assert float(w.adapter_gate.grad.abs().sum().item()) > 0.0
+        probe.log(0)   # must not raise; activation norms captured by the forward hook
+        probe.remove()
+
+    def test_probe_is_inert_in_original_mode_gate_grad_zero(self):
+        from cg_ablation.stub_backend import StubBackbone
+        from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
+
+        backbone = StubBackbone(64, 128, 8, seed=0)
+        w = MistralCGWrapper(pretrained_model=backbone, pretrained_tokenizer=None,
+                             phase_adapter_hidden=32, bootstrap_mode="original")
+        ids = torch.randint(0, 128, (1, 8))
+        out = w(input_ids=ids, reset_state=True)
+        out["logits"].float().pow(2).mean().backward()
+        # ORIGINAL: adapter_output == 0 => dL/dgate == 0 exactly (the bootstrap-failure proof).
+        g = w.adapter_gate.grad
+        assert g is None or float(g.abs().sum().item()) == pytest.approx(0.0, abs=1e-8)
+
+
+@pytestmark_torch
 class TestCheckpointSanity:
     """Shape/key checks against a checkpoint manifest; skip if the file is absent."""
 

@@ -49,6 +49,29 @@ from symbolu_core.phase_transformer import (
 from symbolu_training.jepa.state_projector import SovereignStateProjector
 
 
+class CGBootstrapMode:
+    """Initialization regimes for the CG adapter path (generation-quality research).
+
+    ORIGINAL — the as-designed quiet residual: adapter_gate=-2.0 (sigmoid≈0.119) and the
+        phase_adapter output layer zero-initialized. The wrapper starts logit-identical to base
+        and is supposed to "ramp up as CG losses teach meaningful phase/state signals."
+        Analysis (see scripts/cg_wrapper_ablation/) shows this CANNOT bootstrap a useful active
+        gate under an LM objective on a frozen, already-competent backbone: with the adapter
+        output exactly zero, ∂L/∂gate ≡ 0, and the only systematic force on the gate is weight
+        decay. It is retained as the faithful baseline.
+
+    ACTIVE — escapes the a≈0 fixed point: adapter_gate=-1.0 (sigmoid≈0.269) and the phase_adapter
+        output layer initialized to small N(0, 1e-3). The correction is non-zero from step 0, so
+        the gate receives real gradient immediately and the wrapper genuinely affects logits.
+        This is the variant to train when you need a NON-INERT head to ablate; it does not by
+        itself create a benefit (the objective still doesn't reward the correction), it only
+        makes the pre-registered ablation meaningful instead of trivially inert.
+    """
+
+    ORIGINAL = "original"
+    ACTIVE = "active"
+
+
 class MistralCGWrapper(nn.Module):
     """
     Wraps a frozen HuggingFace Mistral model with trainable CG modules.
@@ -69,11 +92,13 @@ class MistralCGWrapper(nn.Module):
         phase_adapter_hidden: int = 1024,
         device_map: str = "auto",
         trust_remote_code: bool = False,
+        bootstrap_mode: str = CGBootstrapMode.ORIGINAL,
         # Allow passing pre-loaded model (for testing / custom loading)
         pretrained_model: Optional[nn.Module] = None,
         pretrained_tokenizer: Optional[object] = None,
     ):
         super().__init__()
+        self.bootstrap_mode = bootstrap_mode
 
         # ── Load or accept Mistral backbone ──────────────────────────
         if pretrained_model is not None:
@@ -128,8 +153,13 @@ class MistralCGWrapper(nn.Module):
             nn.GELU(),
             nn.Linear(phase_adapter_hidden, self.mistral_hidden_dim),
         )
-        # Initialize adapter output near zero (residual start)
-        nn.init.zeros_(self.phase_adapter[-1].weight)
+        # Initialize adapter output. ORIGINAL: exact zero (quiet residual; cannot bootstrap the
+        # gate). ACTIVE: small N(0,1e-3) so the correction — hence ∂L/∂gate — is non-zero from
+        # step 0 and the gate can actually move. See CGBootstrapMode.
+        if bootstrap_mode == CGBootstrapMode.ACTIVE:
+            nn.init.normal_(self.phase_adapter[-1].weight, mean=0.0, std=1e-3)
+        else:
+            nn.init.zeros_(self.phase_adapter[-1].weight)
         nn.init.zeros_(self.phase_adapter[-1].bias)
 
         # Output normalization: prevents adapter_output_norm from growing
@@ -137,11 +167,13 @@ class MistralCGWrapper(nn.Module):
         # learnable params beyond a scale) and matches Mistral's internal norm.
         self.adapter_output_norm = nn.RMSNorm(self.mistral_hidden_dim)
 
-        # Adapter gate (learnable scalar)
-        # sigmoid(-2) ≈ 0.12: adapter starts with minimal influence,
-        # ramps up as CG losses teach meaningful phase/state signals.
-        # Previous: zeros(1) → sigmoid(0)=0.5 → 50% noise before CG learns.
-        self.adapter_gate = nn.Parameter(torch.tensor([-2.0]))
+        # Adapter gate (learnable scalar).
+        # ORIGINAL: sigmoid(-2)≈0.12 (minimal influence, intended to ramp up — but with a
+        #   zero-init adapter it provably does not, see CGBootstrapMode).
+        # ACTIVE: sigmoid(-1)≈0.27 — open enough that the (now non-zero) correction reaches
+        #   logits and the gate receives gradient from step 0.
+        _gate_init = -1.0 if bootstrap_mode == CGBootstrapMode.ACTIVE else -2.0
+        self.adapter_gate = nn.Parameter(torch.tensor([_gate_init]))
 
         # Store config
         self.state_dim = state_dim
