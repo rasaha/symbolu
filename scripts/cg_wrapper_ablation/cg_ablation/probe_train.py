@@ -1,0 +1,200 @@
+"""Lightweight supervised probes (numpy-only, CPU) + metrics for the Bhava/ontology probe.
+
+Models: L2-regularized logistic regression (GD) and a ridge classifier (closed form on ±1).
+Evaluation: k-fold out-of-fold (OOF) predictions → accuracy / AUROC / F1 / Brier, bootstrap CIs,
+paired comparison vs a reference feature set (McNemar + paired bootstrap), and a Hewitt–Liang
+selectivity control (same probe on permuted labels).
+
+Pure numpy so it runs on CPU with no torch and is unit-testable on toy data.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Callable, Dict, List, Sequence, Tuple
+
+import numpy as np
+
+# Reuse the project's exact paired stats so probe + ablation report the same way.
+from .metrics import mcnemar_exact, paired_bootstrap_ci
+
+
+# ---------------------------------------------------------------------------
+# Models
+# ---------------------------------------------------------------------------
+
+def _standardize(train: np.ndarray, X: np.ndarray) -> np.ndarray:
+    mu = train.mean(axis=0, keepdims=True)
+    sd = train.std(axis=0, keepdims=True)
+    sd[sd < 1e-8] = 1.0
+    return (X - mu) / sd
+
+
+def _logreg_fit(X: np.ndarray, y: np.ndarray, l2: float = 1.0,
+                lr: float = 0.1, iters: int = 500) -> np.ndarray:
+    """L2-regularized logistic regression via full-batch gradient descent. Returns weights (+bias)."""
+    n, d = X.shape
+    Xb = np.hstack([X, np.ones((n, 1))])
+    w = np.zeros(d + 1)
+    for _ in range(iters):
+        z = Xb @ w
+        p = 1.0 / (1.0 + np.exp(-np.clip(z, -30, 30)))
+        grad = Xb.T @ (p - y) / n
+        grad[:-1] += l2 * w[:-1] / n   # L2 on weights, not bias
+        w -= lr * grad
+    return w
+
+
+def _logreg_proba(w: np.ndarray, X: np.ndarray) -> np.ndarray:
+    Xb = np.hstack([X, np.ones((X.shape[0], 1))])
+    return 1.0 / (1.0 + np.exp(-np.clip(Xb @ w, -30, 30)))
+
+
+def _ridge_fit(X: np.ndarray, y: np.ndarray, l2: float = 1.0) -> np.ndarray:
+    """Ridge regression on ±1 targets (closed form). Returns weights (+bias)."""
+    n, d = X.shape
+    Xb = np.hstack([X, np.ones((n, 1))])
+    t = 2.0 * y - 1.0
+    A = Xb.T @ Xb
+    reg = l2 * np.eye(d + 1)
+    reg[-1, -1] = 0.0  # no penalty on bias
+    w = np.linalg.solve(A + reg, Xb.T @ t)
+    return w
+
+
+def _ridge_decision(w: np.ndarray, X: np.ndarray) -> np.ndarray:
+    Xb = np.hstack([X, np.ones((X.shape[0], 1))])
+    s = Xb @ w
+    return 1.0 / (1.0 + np.exp(-np.clip(s, -30, 30)))  # squash to [0,1] for AUROC/Brier
+
+
+_MODELS: Dict[str, Tuple[Callable, Callable]] = {
+    "logreg": (lambda X, y, l2: _logreg_fit(X, y, l2=l2), _logreg_proba),
+    "ridge": (lambda X, y, l2: _ridge_fit(X, y, l2=l2), _ridge_decision),
+}
+
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+def auroc(y: np.ndarray, p: np.ndarray) -> float:
+    """Rank-based AUROC. Returns NaN if only one class present."""
+    y = np.asarray(y)
+    pos = p[y == 1]
+    neg = p[y == 0]
+    if len(pos) == 0 or len(neg) == 0:
+        return float("nan")
+    order = np.argsort(p, kind="mergesort")
+    ranks = np.empty(len(p), dtype=float)
+    ranks[order] = np.arange(1, len(p) + 1)
+    # average ranks for ties
+    _, inv, counts = np.unique(p, return_inverse=True, return_counts=True)
+    sums = np.zeros(len(counts))
+    np.add.at(sums, inv, ranks)
+    avg = sums / counts
+    ranks = avg[inv]
+    r_pos = ranks[y == 1].sum()
+    return float((r_pos - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg)))
+
+
+def f1(y: np.ndarray, p: np.ndarray, thr: float = 0.5) -> float:
+    pred = (p >= thr).astype(int)
+    tp = int(((pred == 1) & (y == 1)).sum())
+    fp = int(((pred == 1) & (y == 0)).sum())
+    fn = int(((pred == 0) & (y == 1)).sum())
+    denom = 2 * tp + fp + fn
+    return float(2 * tp / denom) if denom else 0.0
+
+
+def brier(y: np.ndarray, p: np.ndarray) -> float:
+    return float(np.mean((p - y) ** 2))
+
+
+def accuracy(y: np.ndarray, p: np.ndarray, thr: float = 0.5) -> float:
+    return float(((p >= thr).astype(int) == y).mean())
+
+
+# ---------------------------------------------------------------------------
+# k-fold OOF evaluation
+# ---------------------------------------------------------------------------
+
+def kfold_indices(n: int, k: int, seed: int = 0) -> List[np.ndarray]:
+    rng = np.random.RandomState(seed)
+    idx = rng.permutation(n)
+    return [idx[i::k] for i in range(k)]
+
+
+def oof_predict(X: np.ndarray, y: np.ndarray, model: str = "logreg",
+                k: int = 5, l2: float = 1.0, seed: int = 0) -> np.ndarray:
+    """Out-of-fold predicted probabilities, aligned to X's row order."""
+    n = len(y)
+    k = max(2, min(k, n))
+    fit, proba = _MODELS[model]
+    folds = kfold_indices(n, k, seed)
+    oof = np.full(n, np.nan)
+    for f in range(k):
+        test = folds[f]
+        train = np.concatenate([folds[j] for j in range(k) if j != f])
+        if len(test) == 0 or len(train) == 0:
+            continue
+        Xtr_s = _standardize(X[train], X[train])
+        Xte_s = _standardize(X[train], X[test])
+        w = fit(Xtr_s, y[train], l2)
+        oof[test] = proba(w, Xte_s)
+    # any unassigned (degenerate) → 0.5
+    oof[np.isnan(oof)] = 0.5
+    return oof
+
+
+def evaluate_feature_set(X: np.ndarray, y: np.ndarray, *, model: str = "logreg",
+                         k: int = 5, l2: float = 1.0, seed: int = 0,
+                         n_boot: int = 2000) -> Dict:
+    """OOF metrics + bootstrap CI on accuracy + selectivity control for one feature matrix."""
+    y = np.asarray(y).astype(int)
+    oof = oof_predict(X, y, model=model, k=k, l2=l2, seed=seed)
+    acc = accuracy(y, oof)
+    # bootstrap CI on accuracy
+    rng = np.random.RandomState(seed + 7)
+    n = len(y)
+    accs = []
+    correct = ((oof >= 0.5).astype(int) == y).astype(float)
+    for _ in range(n_boot):
+        s = rng.randint(0, n, n)
+        accs.append(correct[s].mean())
+    accs.sort()
+    lo = float(accs[int(0.025 * n_boot)])
+    hi = float(accs[min(n_boot - 1, int(0.975 * n_boot))])
+    # selectivity: same probe on permuted labels (Hewitt-Liang control)
+    yp = rng.permutation(y)
+    oof_ctrl = oof_predict(X, yp, model=model, k=k, l2=l2, seed=seed)
+    acc_ctrl = accuracy(yp, oof_ctrl)
+    chance = max(float(y.mean()), float(1 - y.mean()))  # majority-class
+    return {
+        "n": int(n),
+        "dim": int(X.shape[1]),
+        "accuracy": acc,
+        "acc_ci": [lo, hi],
+        "auroc": auroc(y, oof),
+        "f1": f1(y, oof),
+        "brier": brier(y, oof),
+        "chance": float(chance),
+        "control_accuracy": float(acc_ctrl),
+        "selectivity": float(acc - acc_ctrl),
+        "beats_chance": bool(lo > chance),     # 95% CI lower bound above majority floor
+        "oof_correct": [float(x) for x in correct],  # per-example, for paired comparison
+    }
+
+
+def paired_vs_reference(y: Sequence[int], correct_ref: Sequence[float],
+                        correct_cand: Sequence[float]) -> Dict:
+    """Paired comparison of two feature sets' per-example OOF correctness (cand vs ref)."""
+    a = [bool(x) for x in correct_ref]
+    b = [bool(x) for x in correct_cand]
+    mc = mcnemar_exact(a, b)
+    pt, lo, hi = paired_bootstrap_ci([float(x) for x in a], [float(x) for x in b])
+    return {
+        "delta_acc": pt, "ci": [lo, hi], "mcnemar_p": mc["p_value"],
+        "significant": (mc["p_value"] < 0.05) and (lo > 0 or hi < 0),
+        "direction": "cand_better" if pt > 0 else ("ref_better" if pt < 0 else "tie"),
+    }
