@@ -11281,6 +11281,7 @@ def main():
         mistral_device_map=args.mistral_device_map,
         mistral_trust_remote_code=args.mistral_trust_remote_code,
         mistral_phase_adapter_hidden=args.mistral_phase_adapter_hidden,
+        cg_bootstrap_mode=args.cg_bootstrap_mode,
         # Knowledge Distillation
         distill_from_mistral=args.distill_from_mistral,
         distill_temperature=args.distill_temperature,
