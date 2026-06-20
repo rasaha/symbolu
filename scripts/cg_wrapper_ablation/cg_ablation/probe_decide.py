@@ -39,33 +39,41 @@ def decide(results: Dict[str, Dict[str, Any]],
     delta = results.get("delta_bhava_only", {})
     hpb = paired.get("hidden_plus_bhava_vs_hidden", {})
 
-    # --- Q1-Q5 answers (for the report) ---
+    def _auroc(r):
+        a = r.get("auroc", float("nan"))
+        return a if a == a else 0.0  # NaN -> 0
+
+    # --- Q1-Q5 answers (for the report; decodability is AUROC-based, imbalance-robust) ---
     out["answers"]["bhava_beats_chance"] = bool(bhava.get("beats_chance"))
     out["answers"]["hidden_beats_chance"] = bool(hidden.get("beats_chance"))
     out["answers"]["bhava_beats_delta_bhava"] = (
-        bhava.get("accuracy", 0) > delta.get("accuracy", 0) if delta else None
+        _auroc(bhava) > _auroc(delta) if delta else None
     )
     out["answers"]["bhava_beats_hidden"] = (
-        bhava.get("accuracy", 0) >= hidden.get("accuracy", 0) if hidden else None
+        _auroc(bhava) >= _auroc(hidden) if hidden else None
     )
     out["answers"]["bhava_complements_hidden"] = bool(
         hpb.get("significant") and hpb.get("direction") == "cand_better"
     )
 
-    # --- insufficient data gate ---
-    classes_ok = True  # caller computes per-class; we gate on n + CI width here
-    widest_ci = max((r.get("acc_ci", [0, 1])[1] - r.get("acc_ci", [0, 1])[0]
-                     for r in results.values()), default=1.0)
-    if n < MIN_EXAMPLES or widest_ci > 0.5 or not classes_ok:
+    # --- insufficient data gate (AUROC CI too wide to resolve, or too few examples) ---
+    def _ci_w(r):
+        ci = r.get("auroc_ci", [0.0, 1.0])
+        lo, hi = ci[0], ci[1]
+        if lo != lo or hi != hi:   # NaN -> uninformative
+            return 1.0
+        return hi - lo
+    widest_ci = max((_ci_w(r) for r in results.values()), default=1.0)
+    if n < MIN_EXAMPLES or widest_ci > 0.5:
         out["decision"] = "INSUFFICIENT_DATA"
         out["reasons"].append(
-            f"n={n} (<{MIN_EXAMPLES}) or accuracy CI width {widest_ci:.2f} > 0.5 — cannot resolve.")
+            f"n={n} (<{MIN_EXAMPLES}) or AUROC CI width {widest_ci:.2f} > 0.5 — cannot resolve.")
         return out
 
     bhava_sig = bool(bhava.get("beats_chance"))
     hidden_sig = bool(hidden.get("beats_chance"))
     complements = out["answers"]["bhava_complements_hidden"]
-    bhava_ge_hidden = bhava.get("accuracy", 0) >= hidden.get("accuracy", 0)
+    bhava_ge_hidden = _auroc(bhava) >= _auroc(hidden)
 
     # --- decision tree (pre-registered) ---
     if not bhava_sig and not hidden_sig:

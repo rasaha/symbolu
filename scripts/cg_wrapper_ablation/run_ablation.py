@@ -92,9 +92,9 @@ def main() -> int:
         "decoding_consistency": {"temperature": 0.7, "top_p": 0.9, "top_k": 50},
     }, indent=2))
 
-    gen_fp = (run_dir / "raw_generations.jsonl").open("w")
-    score_fp = (run_dir / "per_example_scores.jsonl").open("w")
-    diag_fp = (run_dir / "diagnostics.jsonl").open("w")
+    gen_fp = (run_dir / "raw_generations.jsonl").open("w", buffering=1)
+    score_fp = (run_dir / "per_example_scores.jsonl").open("w", buffering=1)
+    diag_fp = (run_dir / "diagnostics.jsonl").open("w", buffering=1)
 
     t0 = time.time()
     for set_name, meta in EVAL_SETS.items():
@@ -102,38 +102,41 @@ def main() -> int:
         rows = load_eval_set(set_name)
         if cfg.n_samples:
             rows = rows[: cfg.n_samples]
-        for row in rows:
+        # Cross-seed consistency (stochastic decoding over seeds) is the expensive part; only do
+        # it when more than one seed is requested. Greedy is seed-independent → generate it ONCE.
+        do_consistency = len(cfg.seeds) > 1
+        for ei, row in enumerate(rows):
             prompt = row["prompt"]
 
-            # Per-arm, per-seed greedy generation for task metrics (seed 0 used for the
-            # deterministic exact-match score; all seeds used for cross-seed consistency).
             for arm in arms:
-                seed_answers = []
-                for seed in cfg.seeds:
-                    # greedy for the scored answer (deterministic); sampling for consistency.
-                    g = generate(wrapper, tok, prompt, arm,
-                                 max_new_tokens=cfg.max_new_tokens, temperature=0.0, seed=seed)
-                    if seed == cfg.seeds[0]:
-                        ok, ans = _score(kind, g["text"], row, metrics)
-                        gen_fp.write(json.dumps({
-                            "set": set_name, "id": row["id"], "arm": arm.name,
-                            "seed": seed, "prompt": prompt, "text": g["text"],
-                            "n_new_tokens": g["n_new_tokens"], "diag": g["diag"],
-                        }) + "\n")
-                        score_fp.write(json.dumps({
-                            "set": set_name, "id": row["id"], "arm": arm.name,
-                            "kind": kind, "ok": bool(ok), "answer": ans,
-                        }) + "\n")
-                    # cross-seed consistency uses stochastic decoding
-                    cs = generate(wrapper, tok, prompt, arm, max_new_tokens=cfg.max_new_tokens,
-                                  temperature=0.7, top_p=0.9, top_k=50, seed=seed)
-                    _, cans = _score(kind, cs["text"], row, metrics)
-                    seed_answers.append(cans)
-                agreement = metrics.pairwise_agreement(seed_answers)
+                # greedy (deterministic) for the scored answer — generated ONCE, not per seed.
+                g = generate(wrapper, tok, prompt, arm,
+                             max_new_tokens=cfg.max_new_tokens, temperature=0.0, seed=cfg.seeds[0])
+                ok, ans = _score(kind, g["text"], row, metrics)
+                gen_fp.write(json.dumps({
+                    "set": set_name, "id": row["id"], "arm": arm.name,
+                    "seed": cfg.seeds[0], "prompt": prompt, "text": g["text"],
+                    "n_new_tokens": g["n_new_tokens"], "diag": g["diag"],
+                }) + "\n")
                 score_fp.write(json.dumps({
                     "set": set_name, "id": row["id"], "arm": arm.name,
-                    "kind": kind, "metric": "seed_agreement", "value": agreement,
+                    "kind": kind, "ok": bool(ok), "answer": ans,
                 }) + "\n")
+                # cross-seed consistency via stochastic decoding (only if >1 seed)
+                if do_consistency:
+                    seed_answers = []
+                    for seed in cfg.seeds:
+                        cs = generate(wrapper, tok, prompt, arm, max_new_tokens=cfg.max_new_tokens,
+                                      temperature=0.7, top_p=0.9, top_k=50, seed=seed)
+                        _, cans = _score(kind, cs["text"], row, metrics)
+                        seed_answers.append(cans)
+                    score_fp.write(json.dumps({
+                        "set": set_name, "id": row["id"], "arm": arm.name,
+                        "kind": kind, "metric": "seed_agreement",
+                        "value": metrics.pairwise_agreement(seed_answers),
+                    }) + "\n")
+            print(f"  [{set_name}] {ei+1}/{len(rows)} "
+                  f"({time.time()-t0:.0f}s)", flush=True)
 
             # Base-vs-wrapper logit diagnostics (teacher-forced on the prompt), per non-base arm.
             for arm in arms:

@@ -59,9 +59,12 @@ class TestSchema:
 
 
 class TestDecisionLogic:
-    def _r(self, acc, chance, beats, sel=0.1):
-        return {"accuracy": acc, "acc_ci": [acc - 0.05, acc + 0.05], "chance": chance,
-                "beats_chance": beats, "selectivity": sel, "auroc": acc, "f1": acc, "brier": 0.2}
+    def _r(self, auroc, beats, sel=0.1):
+        # beats=True => decodable, tight CI above 0.5; else CI spans 0.5
+        ci = [0.55, auroc + 0.05] if beats else [0.40, 0.62]
+        return {"auroc": auroc, "auroc_ci": ci, "beats_chance": beats,
+                "balanced_accuracy": auroc, "selectivity": sel, "f1": auroc,
+                "accuracy": auroc, "chance": 0.5, "brier": 0.2}
 
     def _sig(self, better):
         return {"delta_acc": 0.1 if better else 0.0, "ci": [0.05, 0.15] if better else [-0.1, 0.1],
@@ -69,37 +72,37 @@ class TestDecisionLogic:
                 "direction": "cand_better" if better else "tie"}
 
     def test_insufficient_data_small_n(self):
-        res = {"bhava_only": self._r(0.9, 0.5, True), "hidden_only": self._r(0.9, 0.5, True)}
+        res = {"bhava_only": self._r(0.9, True), "hidden_only": self._r(0.9, True)}
         v = PD.decide(res, {}, n=10, min_per_class=8)
         assert v["decision"] == "INSUFFICIENT_DATA"
 
     def test_no_signal(self):
-        res = {"bhava_only": self._r(0.5, 0.5, False), "hidden_only": self._r(0.5, 0.5, False)}
+        res = {"bhava_only": self._r(0.5, False), "hidden_only": self._r(0.5, False)}
         v = PD.decide(res, {}, n=100, min_per_class=8)
         assert v["decision"] == "NO_SIGNAL"
 
     def test_hidden_only_signal(self):
-        res = {"bhava_only": self._r(0.5, 0.5, False), "hidden_only": self._r(0.85, 0.5, True),
-               "hidden_plus_bhava": self._r(0.85, 0.5, True)}
+        res = {"bhava_only": self._r(0.5, False), "hidden_only": self._r(0.85, True),
+               "hidden_plus_bhava": self._r(0.85, True)}
         v = PD.decide(res, {"hidden_plus_bhava_vs_hidden": self._sig(False)}, n=100, min_per_class=8)
         assert v["decision"] == "HIDDEN_ONLY_SIGNAL"
 
     def test_bhava_weak_signal(self):
-        res = {"bhava_only": self._r(0.62, 0.5, True), "hidden_only": self._r(0.85, 0.5, True),
-               "hidden_plus_bhava": self._r(0.85, 0.5, True)}
+        res = {"bhava_only": self._r(0.62, True), "hidden_only": self._r(0.85, True),
+               "hidden_plus_bhava": self._r(0.85, True)}
         v = PD.decide(res, {"hidden_plus_bhava_vs_hidden": self._sig(False)}, n=100, min_per_class=8)
         assert v["decision"] == "BHAVA_WEAK_SIGNAL"
 
     def test_bhava_complementary(self):
-        res = {"bhava_only": self._r(0.6, 0.5, True), "hidden_only": self._r(0.8, 0.5, True),
-               "hidden_plus_bhava": self._r(0.88, 0.5, True)}
+        res = {"bhava_only": self._r(0.6, True), "hidden_only": self._r(0.8, True),
+               "hidden_plus_bhava": self._r(0.88, True)}
         v = PD.decide(res, {"hidden_plus_bhava_vs_hidden": self._sig(True)}, n=100, min_per_class=8)
         assert v["decision"] == "BHAVA_COMPLEMENTARY_SIGNAL"
         assert PD.continues_bhava(v["decision"])
 
     def test_bhava_strong(self):
-        res = {"bhava_only": self._r(0.86, 0.5, True), "hidden_only": self._r(0.8, 0.5, True),
-               "hidden_plus_bhava": self._r(0.9, 0.5, True)}
+        res = {"bhava_only": self._r(0.86, True), "hidden_only": self._r(0.8, True),
+               "hidden_plus_bhava": self._r(0.9, True)}
         v = PD.decide(res, {"hidden_plus_bhava_vs_hidden": self._sig(True)}, n=100, min_per_class=8)
         assert v["decision"] == "BHAVA_STRONG_SIGNAL"
 

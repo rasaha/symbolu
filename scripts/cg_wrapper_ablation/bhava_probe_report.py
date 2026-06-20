@@ -21,11 +21,12 @@ from cg_ablation.probe_decide import parks_bhava, continues_bhava  # noqa: E402
 
 
 def _fmt_set(name, r):
-    return (f"  {name:<22} acc={r['accuracy']:.3f} "
-            f"CI[{r['acc_ci'][0]:.3f},{r['acc_ci'][1]:.3f}] "
-            f"AUROC={r['auroc']:.3f} F1={r['f1']:.3f} "
-            f"chance={r['chance']:.3f} selectivity={r['selectivity']:+.3f} "
-            f"{'>chance' if r['beats_chance'] else 'ns'}")
+    ci = r.get("auroc_ci", [float("nan"), float("nan")])
+    return (f"  {name:<22} AUROC={r['auroc']:.3f} "
+            f"CI[{ci[0]:.3f},{ci[1]:.3f}] "
+            f"bal_acc={r.get('balanced_accuracy', float('nan')):.3f} "
+            f"F1={r['f1']:.3f} selectivity={r['selectivity']:+.3f} "
+            f"{'DECODABLE' if r['beats_chance'] else 'ns'}")
 
 
 def build(run_dir: Path) -> dict:

@@ -31,15 +31,27 @@ def _standardize(train: np.ndarray, X: np.ndarray) -> np.ndarray:
 
 
 def _logreg_fit(X: np.ndarray, y: np.ndarray, l2: float = 1.0,
-                lr: float = 0.1, iters: int = 500) -> np.ndarray:
-    """L2-regularized logistic regression via full-batch gradient descent. Returns weights (+bias)."""
+                lr: float = 0.1, iters: int = 500, class_weight: bool = True) -> np.ndarray:
+    """L2-regularized, class-weighted logistic regression (full-batch GD). Returns weights (+bias).
+
+    Class weighting (inverse frequency) stops the probe collapsing to the majority class under
+    imbalance — essential here, where the base model is right/wrong at very uneven rates.
+    """
     n, d = X.shape
     Xb = np.hstack([X, np.ones((n, 1))])
     w = np.zeros(d + 1)
+    sw = np.ones(n)
+    if class_weight:
+        for c in (0, 1):
+            m = (y == c)
+            cnt = int(m.sum())
+            if cnt > 0:
+                sw[m] = n / (2.0 * cnt)
+    swsum = sw.sum()
     for _ in range(iters):
         z = Xb @ w
         p = 1.0 / (1.0 + np.exp(-np.clip(z, -30, 30)))
-        grad = Xb.T @ (p - y) / n
+        grad = Xb.T @ (sw * (p - y)) / swsum
         grad[:-1] += l2 * w[:-1] / n   # L2 on weights, not bias
         w -= lr * grad
     return w
@@ -115,6 +127,39 @@ def accuracy(y: np.ndarray, p: np.ndarray, thr: float = 0.5) -> float:
     return float(((p >= thr).astype(int) == y).mean())
 
 
+def balanced_accuracy(y: np.ndarray, p: np.ndarray, thr: float = 0.5) -> float:
+    """Mean per-class recall — imbalance-robust (chance = 0.5 regardless of class skew)."""
+    pred = (p >= thr).astype(int)
+    recalls = []
+    for c in (0, 1):
+        m = (y == c)
+        if m.sum() > 0:
+            recalls.append(float((pred[m] == c).mean()))
+    return float(np.mean(recalls)) if recalls else 0.0
+
+
+def auroc_ci(y: np.ndarray, p: np.ndarray, n_boot: int = 1000, seed: int = 0):
+    """Bootstrap CI for AUROC (resample examples). Returns (point, lo, hi)."""
+    y = np.asarray(y)
+    point = auroc(y, p)
+    if math.isnan(point):
+        return float("nan"), float("nan"), float("nan")
+    rng = np.random.RandomState(seed)
+    n = len(y)
+    vals = []
+    for _ in range(n_boot):
+        s = rng.randint(0, n, n)
+        a = auroc(y[s], p[s])
+        if not math.isnan(a):
+            vals.append(a)
+    if not vals:
+        return float(point), float("nan"), float("nan")
+    vals.sort()
+    lo = vals[int(0.025 * len(vals))]
+    hi = vals[min(len(vals) - 1, int(0.975 * len(vals)))]
+    return float(point), float(lo), float(hi)
+
+
 # ---------------------------------------------------------------------------
 # k-fold OOF evaluation
 # ---------------------------------------------------------------------------
@@ -152,36 +197,34 @@ def evaluate_feature_set(X: np.ndarray, y: np.ndarray, *, model: str = "logreg",
                          n_boot: int = 2000) -> Dict:
     """OOF metrics + bootstrap CI on accuracy + selectivity control for one feature matrix."""
     y = np.asarray(y).astype(int)
+    n = len(y)
     oof = oof_predict(X, y, model=model, k=k, l2=l2, seed=seed)
     acc = accuracy(y, oof)
-    # bootstrap CI on accuracy
-    rng = np.random.RandomState(seed + 7)
-    n = len(y)
-    accs = []
+    bal_acc = balanced_accuracy(y, oof)
     correct = ((oof >= 0.5).astype(int) == y).astype(float)
-    for _ in range(n_boot):
-        s = rng.randint(0, n, n)
-        accs.append(correct[s].mean())
-    accs.sort()
-    lo = float(accs[int(0.025 * n_boot)])
-    hi = float(accs[min(n_boot - 1, int(0.975 * n_boot))])
-    # selectivity: same probe on permuted labels (Hewitt-Liang control)
+    # AUROC + bootstrap CI (imbalance-robust decodability; chance = 0.5)
+    au, au_lo, au_hi = auroc_ci(y, oof, n_boot=n_boot, seed=seed + 11)
+    # selectivity: same probe on permuted labels (Hewitt-Liang control), on balanced accuracy
+    rng = np.random.RandomState(seed + 7)
     yp = rng.permutation(y)
     oof_ctrl = oof_predict(X, yp, model=model, k=k, l2=l2, seed=seed)
-    acc_ctrl = accuracy(yp, oof_ctrl)
-    chance = max(float(y.mean()), float(1 - y.mean()))  # majority-class
+    bal_ctrl = balanced_accuracy(yp, oof_ctrl)
+    chance = max(float(y.mean()), float(1 - y.mean()))  # majority-class (accuracy floor)
+    # "beats_chance" is now AUROC-based: lower bound of the 95% CI above 0.5.
+    decodable = bool(not math.isnan(au_lo) and au_lo > 0.5)
     return {
         "n": int(n),
         "dim": int(X.shape[1]),
         "accuracy": acc,
-        "acc_ci": [lo, hi],
-        "auroc": auroc(y, oof),
+        "balanced_accuracy": bal_acc,
+        "auroc": au,
+        "auroc_ci": [au_lo, au_hi],
         "f1": f1(y, oof),
         "brier": brier(y, oof),
         "chance": float(chance),
-        "control_accuracy": float(acc_ctrl),
-        "selectivity": float(acc - acc_ctrl),
-        "beats_chance": bool(lo > chance),     # 95% CI lower bound above majority floor
+        "control_balanced_accuracy": float(bal_ctrl),
+        "selectivity": float(bal_acc - bal_ctrl),
+        "beats_chance": decodable,             # AUROC CI lower bound > 0.5
         "oof_correct": [float(x) for x in correct],  # per-example, for paired comparison
     }
 
