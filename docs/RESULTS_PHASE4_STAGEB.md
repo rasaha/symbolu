@@ -103,3 +103,39 @@ incremental-value claim. Per the pre-registered gate, the next move is **expand 
 dataset** (raise within-arm, especially framed, positives toward ≥90 so a ~0.65 AUROC can be resolved),
 then re-run this exact H1 + robustness pass. If the signal stays UNSTABLE under real power → stop the
 Phase 4 hidden-state track and keep C×R×S as the validated wrapper/audit product.
+
+## 8. Expanded re-test (n=1032) — power-vs-level RESOLVED → outcome (1a)
+
+Per the pre-registered §2.2 protocol, the *same* static-h0 probe was re-run on the expanded combined
+dataset (`framed_answer_eval_v3_combined`, 516 rows × 2 arms = 1032; labels balanced ~50%).
+
+Robustness (3 seeds × 2 n_pca, within-arm; bar = ≥80% configs CI>0.5 **and** mean AUROC ≥0.60):
+
+| target / arm | verdict | %CI>0.5 | mean AUROC | clears bar |
+|---|---|---|---|---|
+| audit_fail / framed | STABLE_PREDICTIVE | 100% | 0.703 | ✅ primary |
+| frame_violation / framed | STABLE_PREDICTIVE | 100% | 0.760 | ✅ primary |
+| rejected_domain_leak / framed | STABLE_PREDICTIVE | 100% | 0.771 | ✅ |
+| secondary_promoted / framed | STABLE_PREDICTIVE | 100% | 0.823 | ✅ |
+| rejected_domain_leak / base | STABLE_PREDICTIVE | 100% | 0.708 | ✅ |
+| audit_fail / base | STABLE_PREDICTIVE | 100% | 0.588 | ~ (below 0.60) |
+| frame_violation / base | STABLE_PREDICTIVE | 83% | 0.590 | ~ (below 0.60) |
+| secondary_promoted / base | UNSTABLE | 50% | 0.609 | ✗ |
+
+**Both primary targets clear the locked bar in the framed arm → outcome (1a): static h0 is a stable
+hidden-only positive with power.** The Stage-B1 (n=110) weakness was **underpowered, not the wrong
+level**; the latent→semantic-transition reframe (Phase 4C) is therefore demoted from *rescue* to
+*optional enhancement* and is not needed to establish H1.
+
+**Honest qualifications.** The framed arm carries the strong signal (0.70–0.82); the base arm is
+stably-above-chance but below the 0.60 mean bar (~0.59). **OPEN CONFOUND (must clear before Stage-B2):**
+most failure mass now comes from adversarial-drift prompts, whose text the hidden state encodes — so a
+probe "predicting failure" could be detecting *"this is an adversarial prompt"* (high failure base-rate)
+rather than a genuine pre-answer failure signal. This is the row-type analog of the arm confound. The
+gate is `phase4_subset_analysis.py`: failure must stay predictable **within the adversarial subset**
+(not only across row types), else the signal is prompt-style detection.
+
+**Next:** (a) run the subset/field-stress analysis; (b) if failure is predictable *within* row type →
+proceed to **Stage-B2** (does a learned Bhava read add over the hidden-only baseline, under the strict
+incremental-value gate?); (c) if the signal is mostly across-row-type prompt detection → the H1 result
+is partly an artifact of the drift dataset and Stage-B2 is not yet justified.
