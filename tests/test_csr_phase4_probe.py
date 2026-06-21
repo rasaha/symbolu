@@ -21,6 +21,7 @@ np = pytest.importorskip("numpy", reason="numpy required")
 from csr_match_filter import phase4_probe as PB              # noqa: E402
 from csr_match_filter import phase4_collect_states as PC     # noqa: E402
 from csr_match_filter import phase4_probe_eval as PE         # noqa: E402
+from csr_match_filter import phase4_subset_analysis as SA    # noqa: E402
 
 
 def _groups(n, n_terms, seed=0):
@@ -437,6 +438,26 @@ def test_robustness_aggregates_within_arm(tmp_path):
     assert "above_chance_frac" in u and "auroc_mean" in u
     md = PE.to_markdown_robust(rep)
     assert "robustness" in md and "audit_fail" in md
+
+
+def test_subset_analysis_helpers_detect_stronger_rows():
+    rng = np.random.default_rng(0)
+    rows = ([{"category": "ordinary"}] * 4 + [{"category": "drift_adversarial"}] * 4
+            + [{"category": "drift_onframe"}] * 2)
+    rt = SA.row_type(rows)
+    assert (rt == 0).sum() == 4 and (rt == 1).sum() == 4 and (rt == 2).sum() == 2
+    # adversarial rows carry a bigger margin -> higher within-arm AUROC than ordinary
+    n, D = 160, 48
+    X3d = rng.standard_normal((n, 3, D))
+    y = rng.integers(0, 2, n)
+    adv = np.zeros(n, bool); adv[n // 2:] = True
+    X3d[np.arange(n), 1, 0] += np.where(y == 1, 1.0, -1.0) * np.where(adv, 3.0, 0.6)
+    groups = np.array([f"t{i % 20}" for i in range(n)])
+    arm = np.ones(n, bool)
+    X2d = SA.reduce_at_layer(X3d, 1, 16)
+    a_adv = SA.auroc_within_arm(X2d, y, groups, adv, 4, 0)["auroc"]
+    a_ord = SA.auroc_within_arm(X2d, y, groups, ~adv, 4, 0)["auroc"]
+    assert a_adv is not None and a_ord is not None and a_adv > a_ord
 
 
 def test_dry_run_marked_non_valid(tmp_path, monkeypatch):
