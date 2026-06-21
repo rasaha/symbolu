@@ -108,3 +108,91 @@ def parks_bhava(decision: str) -> bool:
 
 def continues_bhava(decision: str) -> bool:
     return decision in ("BHAVA_COMPLEMENTARY_SIGNAL", "BHAVA_STRONG_SIGNAL")
+
+
+# ===========================================================================
+# Static CSR = Context x Semantic x Resonance  (docs/STL_CSR_REFACTOR_PLAN.md)
+# ===========================================================================
+
+CSR_DECISIONS = (
+    "INSUFFICIENT_DATA", "NO_SIGNAL", "STATE_BHAVA_ONLY_SIGNAL", "RESONANCE_ONLY_SIGNAL",
+    "CONTEXT_ONLY_SIGNAL", "SEMANTIC_ONLY_SIGNAL", "CSR_REDUNDANT", "CSR_COMPLEMENTARY",
+    "CSR_STRONG_SIGNAL", "HIDDEN_ONLY_SIGNAL",
+)
+
+
+def csr_continues(decision: str) -> bool:
+    return decision in ("CSR_COMPLEMENTARY", "CSR_STRONG_SIGNAL")
+
+
+def decide_csr(results: Dict[str, Dict[str, Any]], paired: Dict[str, Dict[str, Any]],
+               *, n: int) -> Dict[str, Any]:
+    """Static-CSR decision (Task 5). `results`: set->metrics; `paired`: cand_vs_ref dicts.
+
+    CONTINUE only on CSR_COMPLEMENTARY (csr_static beats its best part) or CSR_STRONG_SIGNAL
+    (hidden+state_bhava+csr beats hidden_only). Beating chance with one part is not enough.
+    """
+    out: Dict[str, Any] = {"reasons": [], "answers": {}}
+
+    def dec(name):  # decodable (AUROC CI lower bound > 0.5)
+        return bool(results.get(name, {}).get("beats_chance"))
+
+    def sig(key):   # a paired comparison is significant & cand_better
+        p = paired.get(key, {})
+        return bool(p.get("significant") and p.get("direction") == "cand_better")
+
+    sb = dec("state_bhava_only")
+    res = dec("resonance_combined") or dec("phoneme_bhava_only") or dec("vritti_consonant_only")
+    ctx = dec("context_r_ctx_only")
+    sem = dec("semantic_only")
+    hid = dec("hidden_only")
+
+    csr_beats_parts = (sig("csr_vs_context") or sig("csr_vs_semantic") or sig("csr_vs_resonance"))
+    full_beats_hidden = sig("hidden_plus_all_vs_hidden")
+    csr_adds_to_sb = sig("state_bhava_plus_csr_vs_state_bhava")
+
+    out["answers"] = {
+        "state_bhava_decodable": sb, "resonance_decodable": res,
+        "context_decodable": ctx, "semantic_decodable": sem, "hidden_decodable": hid,
+        "csr_beats_parts": csr_beats_parts, "csr_adds_to_state_bhava": csr_adds_to_sb,
+        "full_beats_hidden": full_beats_hidden,
+    }
+
+    # insufficient-data gate (wide AUROC CI or tiny n)
+    def ci_w(nm):
+        ci = results.get(nm, {}).get("auroc_ci", [0.0, 1.0])
+        lo, hi = ci[0], ci[1]
+        return 1.0 if (lo != lo or hi != hi) else (hi - lo)
+    widest = max((ci_w(k) for k in results), default=1.0)
+    if n < MIN_EXAMPLES or widest > 0.5:
+        out["decision"] = "INSUFFICIENT_DATA"
+        out["reasons"].append(f"n={n} (<{MIN_EXAMPLES}) or AUROC CI width {widest:.2f}>0.5.")
+        return out
+
+    parts_decodable = sum([res, ctx, sem])
+    if not (sb or res or ctx or sem or hid):
+        decision = "NO_SIGNAL"
+    elif full_beats_hidden:
+        decision = "CSR_STRONG_SIGNAL"
+        out["reasons"].append("hidden+state_bhava+CSR beats hidden_only (significant).")
+    elif csr_beats_parts:
+        decision = "CSR_COMPLEMENTARY"
+        out["reasons"].append("csr_static beats its best individual part (significant).")
+    elif parts_decodable >= 2:
+        decision = "CSR_REDUNDANT"
+        out["reasons"].append("CSR parts decodable but the combination improves on none.")
+    elif res and not ctx and not sem:
+        decision = "RESONANCE_ONLY_SIGNAL"
+    elif ctx and not res and not sem:
+        decision = "CONTEXT_ONLY_SIGNAL"
+    elif sem and not res and not ctx:
+        decision = "SEMANTIC_ONLY_SIGNAL"
+    elif sb and not (res or ctx or sem):
+        decision = "STATE_BHAVA_ONLY_SIGNAL"
+    elif hid:
+        decision = "HIDDEN_ONLY_SIGNAL"
+        out["reasons"].append("hidden decodes; state_bhava/CSR add nothing over hidden.")
+    else:
+        decision = "NO_SIGNAL"
+    out["decision"] = decision
+    return out

@@ -97,28 +97,57 @@ def build(run_dir: Path) -> dict:
                   f"  Q6 DECISION: {v['decision']}",
                   "      " + "; ".join(v.get("reasons", [])),
                   ""]
+        # --- static CSR = Context x Semantic x Resonance verdict (if extracted) ---
+        cv = blk.get("csr_verdict")
+        if cv:
+            ca = cv.get("answers", {})
+            lines += ["", "  -- static CSR (Context x Semantic x Resonance) --",
+                      f"    state_bhava decodable : {ca.get('state_bhava_decodable')}",
+                      f"    resonance decodable   : {ca.get('resonance_decodable')}",
+                      f"    context decodable     : {ca.get('context_decodable')}",
+                      f"    semantic decodable    : {ca.get('semantic_decodable')}",
+                      f"    CSR beats its parts   : {ca.get('csr_beats_parts')}",
+                      f"    CSR adds to state_bhava: {ca.get('csr_adds_to_state_bhava')}",
+                      f"    hidden+state_bhava+CSR beats hidden: {ca.get('full_beats_hidden')}",
+                      f"    CSR DECISION: {cv['decision']}",
+                      "      " + "; ".join(cv.get("reasons", []))]
+
         overall.append(v["decision"])
         summary["by_label_type"][lt] = {"decision": v["decision"], "answers": ans,
                                         "n": blk["n"], "pos": blk["pos"], "neg": blk["neg"],
-                                        "warnings": warns}
+                                        "warnings": warns,
+                                        "csr_decision": (cv or {}).get("decision"),
+                                        "csr_answers": (cv or {}).get("answers")}
 
-    # overall recommendation: continue if ANY label_type shows complementary/strong; else park.
-    if any(continues_bhava(d) for d in overall):
-        overall_decision = "CONTINUE_CG"
-    elif overall and all(d == "INSUFFICIENT_DATA" for d in overall):
-        overall_decision = "INSUFFICIENT_DATA"
-    elif any(parks_bhava(d) for d in overall):
-        overall_decision = "PARK_CG"
+    # overall — prefer the static-CSR verdict when CSR was extracted; else the bhava verdict.
+    from cg_ablation.probe_decide import csr_continues
+    csr_decisions = [b.get("csr_decision") for b in summary["by_label_type"].values()
+                     if b.get("csr_decision")]
+    if csr_decisions:
+        if any(csr_continues(d) for d in csr_decisions):
+            overall_decision = "CONTINUE_CSR"
+        elif all(d == "INSUFFICIENT_DATA" for d in csr_decisions):
+            overall_decision = "INSUFFICIENT_DATA"
+        else:
+            overall_decision = "PARK_CSR"
+        rule = ("- CONTINUE_CSR only on CSR_COMPLEMENTARY (CSR beats its best part) or "
+                "CSR_STRONG_SIGNAL (hidden+state_bhava+CSR beats hidden_only). Park otherwise.")
+        per = csr_decisions
     else:
-        overall_decision = "REVIEW"
+        if any(continues_bhava(d) for d in overall):
+            overall_decision = "CONTINUE_CG"
+        elif overall and all(d == "INSUFFICIENT_DATA" for d in overall):
+            overall_decision = "INSUFFICIENT_DATA"
+        elif any(parks_bhava(d) for d in overall):
+            overall_decision = "PARK_CG"
+        else:
+            overall_decision = "REVIEW"
+        rule = ("- CONTINUE_CG only on BHAVA_COMPLEMENTARY/STRONG. PARK_CG if Bhava adds nothing "
+                "over generic hidden features.")
+        per = overall
     summary["overall_decision"] = overall_decision
-    lines += ["## Overall", "",
-              f"**{overall_decision}**  (per-label: {overall})", "",
-              "- CONTINUE_CG only if some label shows BHAVA_COMPLEMENTARY_SIGNAL or "
-              "BHAVA_STRONG_SIGNAL (bhava beats chance AND hidden+bhava beats hidden_only).",
-              "- PARK_CG if Bhava adds nothing over generic hidden features.",
-              "- Probe = correlation only; a causal generation test is a separate later step.",
-              ""]
+    lines += ["## Overall", "", f"**{overall_decision}**  (per-label: {per})", "", rule,
+              "- Probe = correlation only; a causal generation test is a separate later step.", ""]
 
     (run_dir / "report.md").write_text("\n".join(lines))
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2))

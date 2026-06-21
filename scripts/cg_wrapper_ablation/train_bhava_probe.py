@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from cg_ablation import probe_features as PF      # noqa: E402
 from cg_ablation import probe_train as PT          # noqa: E402
-from cg_ablation.probe_decide import decide, MIN_PER_CLASS  # noqa: E402
+from cg_ablation.probe_decide import decide, decide_csr, MIN_PER_CLASS  # noqa: E402
 
 
 def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed: int = 0,
@@ -68,7 +68,27 @@ def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed:
                 y, results["delta_bhava_only"]["oof_correct"],
                 results["bhava_only"]["oof_correct"])
 
+        # --- static CSR paired comparisons (Task 4/5), only when both sets present ---
+        def _pair(key, ref, cand):
+            if ref in results and cand in results:
+                paired[key] = PT.paired_vs_reference(
+                    y, results[ref]["oof_correct"], results[cand]["oof_correct"])
+        _pair("csr_vs_context", "context_r_ctx_only", "csr_static")
+        _pair("csr_vs_semantic", "semantic_only", "csr_static")
+        _pair("csr_vs_resonance", "resonance_combined", "csr_static")
+        _pair("state_bhava_plus_csr_vs_state_bhava", "state_bhava_only", "state_bhava_plus_csr")
+        _pair("hidden_plus_all_vs_hidden", "hidden_only", "hidden_plus_state_bhava_plus_csr")
+
         verdict = decide(results, paired, n=n, min_per_class=MIN_PER_CLASS)
+        # static-CSR verdict when CSR features were extracted
+        csr_verdict = None
+        if "csr_static" in results:
+            cv = decide_csr(results, paired, n=n)
+            csr_verdict = cv if per_class_ok else {
+                "decision": "INSUFFICIENT_DATA",
+                "reasons": [f"per-class count < {MIN_PER_CLASS} "
+                            f"(pos={int((y==1).sum())}, neg={int((y==0).sum())})"],
+                "answers": cv.get("answers", {})}
         if not per_class_ok:
             verdict = {"decision": "INSUFFICIENT_DATA",
                        "reasons": [f"per-class count < {MIN_PER_CLASS} "
@@ -81,6 +101,7 @@ def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed:
         report["by_label_type"][ltype] = {
             "n": n, "pos": int((y == 1).sum()), "neg": int((y == 0).sum()),
             "results": slim, "paired": paired, "verdict": verdict,
+            "csr_verdict": csr_verdict,
         }
 
     (run_dir / "results.json").write_text(json.dumps(report, indent=2))

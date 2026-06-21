@@ -12,27 +12,45 @@ from typing import Dict, List, Sequence
 import numpy as np
 
 # probe feature set -> ordered list of saved feature keys to concatenate.
+# Naming follows docs/STL_CSR_REFACTOR_PLAN.md (CSR = Context x Semantic x Resonance):
+#   state_bhava (state[0:12], learned summary)  vs  phoneme_bhava (vowel cognitive mode, Resonance)
+#   vritti_consonant (consonant motion, Resonance) ; context_r_ctx ; semantic ; hidden baseline.
 FEATURE_SETS: Dict[str, List[str]] = {
+    # --- legacy bhava-only probe sets (UNCHANGED keys so the existing report keeps working) ---
     "bhava_only": ["bhava", "bhava_entropy"],
     "cg_state_32d": ["state32"],
     "delta_bhava_only": ["delta_bhava", "delta_bhava_norm"],
-    "vowel_bhava": ["vowel_bhava"],                          # B1 Sanskrit-varna sound basis (12-d)
-    "csr_contextual": ["csr_contextual"],                    # B2 contextual CSR (16-d)
-    "csr_resonance": ["csr_resonance"],                      # B3 resonance summary
-    "hidden_only": ["hidden_pooled"],                        # the REQUIRED control
+    "hidden_only": ["hidden_pooled"],                        # generic strong baseline/control
     "hidden_plus_bhava": ["hidden_pooled", "bhava"],
     "hidden_plus_cg_state": ["hidden_pooled", "state32"],
+    # --- STL/CSR static probe sets (corrected naming) ---
+    "state_bhava_only": ["state_bhava", "state_bhava_entropy"],
+    "state_32d": ["state32"],
+    "phoneme_bhava_only": ["phoneme_bhava"],                 # R: vowel -> cognitive mode
+    "vritti_consonant_only": ["vritti_consonant"],           # R: consonant -> motion
+    "resonance_combined": ["resonance_combined"],            # R: 12D varna affinity
+    "phoneme_bhava_plus_vritti": ["phoneme_bhava", "vritti_consonant"],
+    "context_r_ctx_only": ["context_r_ctx"],                 # C: contextual CSR (16D)
+    "semantic_only": ["semantic"],                           # S: referential embedding/ontology
+    "state_bhava_plus_resonance": ["state_bhava", "resonance_combined"],
+    "csr_static": ["context_r_ctx", "semantic", "resonance_combined"],   # C x S x R
+    "state_bhava_plus_csr": ["state_bhava", "context_r_ctx", "semantic", "resonance_combined"],
+    "hidden_plus_state_bhava": ["hidden_pooled", "state_bhava"],
+    "hidden_plus_csr": ["hidden_pooled", "context_r_ctx", "semantic", "resonance_combined"],
+    "hidden_plus_state_bhava_plus_csr":
+        ["hidden_pooled", "state_bhava", "context_r_ctx", "semantic", "resonance_combined"],
 }
 
-# The separable CSR parts (audit: two-part Sanskrit-vowel + contextual, + resonance).
-CSR_PART_KEYS: List[str] = ["csr_contextual", "vowel_bhava", "csr_resonance"]
+# The separable CSR/Resonance component keys (audit: phoneme-Bhava + Vritti + contextual).
+CSR_PART_KEYS: List[str] = ["context_r_ctx", "semantic", "resonance_combined",
+                            "phoneme_bhava", "vritti_consonant"]
 
 # The reference/control every Bhava set is compared against.
 CONTROL_SET = "hidden_only"
 
 # High-dim feature keys that must be PCA-reduced PER GROUP (before concatenation) so they don't
-# swamp the low-dim Bhava features in combined sets.
-HIDDEN_KEYS = frozenset({"hidden_pooled", "hidden_last"})
+# swamp the low-dim Bhava/CSR features in combined sets. 'semantic' (pooled embeddings) is high-dim.
+HIDDEN_KEYS = frozenset({"hidden_pooled", "hidden_last", "semantic"})
 
 
 def group_arrays_for_set(arrays: Dict[str, np.ndarray], set_name: str, idxs) -> Dict[str, np.ndarray]:
