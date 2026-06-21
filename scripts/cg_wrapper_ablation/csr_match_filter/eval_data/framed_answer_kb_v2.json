@@ -1,0 +1,13 @@
+{
+  "_comment": "Phase 2B additive external-definition supplement. Merged on top of the Phase 1 KB (term_definitions.json) at runtime; the Phase 1 KB is NOT modified. Definitions feed the frozen frame's S firewall via definition_provider. Sense keys match an example's 'context'.",
+  "teacher": {"default": "a teacher who provides education teaching and learning to students in a school"},
+  "priest": {"default": "a priest who leads religion faith worship and spiritual ritual in a church"},
+  "lawyer": {"default": "a lawyer who practices law in court and provides legal justice and advocacy"},
+  "healer": {"default": "a healer who provides care healing and treatment to restore health"},
+  "cardiologist": {"default": "a cardiologist a medical physician who treats heart disease in medicine"},
+  "river": {"default": "a river of flowing water in nature a natural stream and shore in the landscape"},
+  "engineer": {"default": "an engineer in technology and construction who designs and builds systems and structures"},
+  "soldier": {"default": "a soldier trained for combat and the danger of armed conflict serving with authority"},
+  "monk": {"default": "a monk devoted to religion faith worship and spiritual contemplation"},
+  "professor": {"default": "a professor who provides education teaching research and learning at a university"}
+}

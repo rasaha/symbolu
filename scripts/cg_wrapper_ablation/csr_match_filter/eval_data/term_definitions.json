@@ -1,0 +1,58 @@
+{
+  "_comment": "EVAL FIXTURE — an external definition-source stand-in (models a dictionary/KB/LLM gloss feeding definition_provider). This is NOT the wrapper's curated TERM_GLOSSES and is NOT loaded by the production path. Ambiguous terms carry sense keys matched against an example's 'context' field; otherwise 'default' is used. Terms absent here exercise the raw-term fallback.",
+  "doctor": {"default": "a physician who diagnoses and treats illness disease and patient health"},
+  "nurse": {"default": "a trained practitioner who provides patient care nursing treatment and support"},
+  "judge": {"default": "a legal official who applies the law in court and renders justice and rulings"},
+  "attorney": {"default": "a legal advocate and lawyer who represents clients in court and justice matters"},
+  "king": {"default": "a monarch who holds authority power and command to rule and govern a realm"},
+  "engineer": {"default": "a technology professional who designs builds machines devices and engineering systems"},
+  "programmer": {"default": "a developer who writes software code in a programming language using algorithms"},
+  "biologist": {"default": "a scientist who studies biology life organisms cells species and evolution"},
+  "chemist": {"default": "a scientist who studies chemistry elements compounds reactions and molecules"},
+  "astronomer": {"default": "a scientist who studies astronomy planets stars space and the cosmos"},
+  "farmer": {"default": "a worker in agriculture who tends crops soil harvest fields and cultivation"},
+  "surgeon": {"default": "a clinician who performs surgical operations and treatments on patients"},
+  "clinician": {"default": "a medical practitioner who treats patients in a clinical healthcare setting"},
+  "therapist": {"default": "a care practitioner who provides therapy treatment and mental health support"},
+  "paramedic": {"default": "an emergency medical responder who provides patient care and treatment"},
+  "banker": {"default": "a finance professional who manages money banking investment and credit"},
+  "trader": {"default": "a person who buys and sells goods and currency in markets for profit and trade"},
+  "chair": {"default": "a piece of furniture a seat with a back used in a household at a table or desk"},
+  "soldier": {"default": "a member of an army trained for combat force and the danger of armed conflict"},
+  "apple": {
+    "default": "an edible sweet fruit that grows on an orchard tree and is eaten as food produce",
+    "fruit": "an edible sweet fruit that grows on an orchard tree and is eaten as food produce",
+    "technology": "Apple a technology company that builds computers software phones and electronic devices"
+  },
+  "fire": {
+    "default": "fire the heat flame and burning combustion that produces warmth and thermal energy",
+    "heat": "fire the heat flame and burning combustion that produces warmth and thermal energy",
+    "danger": "fire an uncontrolled blaze that is a hazard emergency and danger causing harm and destruction"
+  },
+  "virus": {
+    "default": "a virus a biological pathogen that infects cells and causes disease in organisms",
+    "biology": "a virus a biological pathogen that infects cells and causes disease in organisms",
+    "security": "a computer virus malware software that infects machines and spreads over a network in an attack"
+  },
+  "bank": {
+    "default": "a financial institution that holds money provides credit and banking deposit services",
+    "finance": "a financial institution that holds money provides credit and banking deposit services",
+    "nature": "the sloping land and shore beside a river or stream of flowing water in a landscape"
+  },
+  "python": {
+    "default": "python a programming language for software code computing and algorithms",
+    "programming": "python a programming language for software code computing and algorithms",
+    "biology": "a python a large snake reptile and animal predator species found in the wild"
+  },
+  "mercury": {
+    "default": "mercury a chemical element a heavy liquid metal substance that is toxic matter",
+    "chemistry": "mercury a chemical element a heavy liquid metal substance that is toxic matter",
+    "astronomy": "mercury the planet nearest the sun in the solar system orbiting in space",
+    "mythology": "mercury the roman god and divine messenger deity of ancient myth and legend"
+  },
+  "saturn": {
+    "default": "saturn the ringed planet in the solar system orbiting the sun in space",
+    "astronomy": "saturn the ringed planet in the solar system orbiting the sun in space",
+    "mythology": "saturn an ancient roman god and divine deity of myth and legend"
+  }
+}

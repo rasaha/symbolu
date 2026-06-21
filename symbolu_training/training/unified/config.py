@@ -1165,6 +1165,7 @@ class UnifiedTrainingConfig:
     mistral_device_map: str = "auto"                        # Device placement strategy
     mistral_trust_remote_code: bool = False                 # Trust remote code in model repo
     mistral_phase_adapter_hidden: int = 1024                # Hidden dim for phase adapter MLP
+    cg_bootstrap_mode: str = "original"                     # "original" | "active" (CGBootstrapMode)
 
     # ==========================================================================
     # Mistral Hybrid Wrapper (--model_type mistral_hybrid)

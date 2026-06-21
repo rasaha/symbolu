@@ -161,54 +161,79 @@ class TestEvalSetsIntegrity:
 
 
 class TestMetricsReportVerdict:
-    """The kill-criteria evaluator (pure Python) decides correctly per pre-registered rules."""
+    """The decision evaluator (pure Python) resolves the post-Active-CG categories correctly."""
 
     def _import(self):
         import importlib
         return importlib.import_module("metrics_report")
 
+    # active (non-inert) B vs base diagnostics shared by most cases
+    _ACTIVE_DIAG = {
+        "D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
+        "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
+                   "mean_correction_to_hidden_ratio": 0.047},
+    }
+
+    @staticmethod
+    def _p(direction, sig):
+        return {"gsm8k_style": {"significant": sig, "direction": direction}}
+
     def test_k0_hidden_coupling_wins(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.5},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
+        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.5}, "B_full": self._ACTIVE_DIAG["B_full"]}
         v = R.evaluate_kill_criteria({}, {}, diag)
         assert v["decision"] == "INVESTIGATE_K0_HIDDEN_COUPLING"
 
-    def test_inert_stop(self):
+    def test_inert(self):
         R = self._import()
         diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
                 "B_full": {"mean_logit_kl_vs_base": 1e-6, "mean_top1_flip_vs_base": 0.0,
                            "mean_correction_to_hidden_ratio": 1e-5}}
         v = R.evaluate_kill_criteria({}, {}, diag)
-        assert v["decision"] == "INERT_STOP"
+        assert v["decision"] == "INERT"
 
-    def test_no_effect_deprioritize(self):
+    def test_active_no_effect(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
-        paired = {"gsm8k_style": {"significant": False, "direction": "none"}}
-        v = R.evaluate_kill_criteria({}, paired, diag)
-        assert v["decision"] == "NO_EFFECT_DEPRIORITIZE"
+        v = R.evaluate_kill_criteria({}, self._p("none", False), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("none", False),
+                                     paired_c_vs_a=self._p("none", False),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.3, "mean_top1_flip_B_vs_C": 0.1})
+        assert v["decision"] == "ACTIVE_NO_EFFECT"
 
-    def test_regression_kills(self):
+    def test_regression(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
-        paired = {"gsm8k_style": {"significant": True, "direction": "regress"}}
-        v = R.evaluate_kill_criteria({}, paired, diag)
-        assert v["decision"] == "KILL_OR_RETRAIN"
+        v = R.evaluate_kill_criteria({}, self._p("regress", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("none", False),
+                                     paired_c_vs_a=self._p("none", False),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.1, "mean_top1_flip_B_vs_C": 0.05})
+        assert v["decision"] == "REGRESSION" and v["b_regresses_A_sets"] == ["gsm8k_style"]
 
-    def test_benefit_recorded(self):
+    def test_cg_dynamic_signal(self):
         R = self._import()
-        diag = {"D_gate0": {"max_abs_logit_diff_vs_base": 0.0},
-                "B_full": {"mean_logit_kl_vs_base": 0.4, "mean_top1_flip_vs_base": 0.2,
-                           "mean_correction_to_hidden_ratio": 0.1}}
-        paired = {"gsm8k_style": {"significant": True, "direction": "improve"}}
-        v = R.evaluate_kill_criteria({}, paired, diag)
-        assert v["decision"] == "BENEFIT_RECORDED" and v["benefit_sets"] == ["gsm8k_style"]
+        v = R.evaluate_kill_criteria({}, self._p("improve", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("improve", True),
+                                     paired_c_vs_a=self._p("none", False),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.3, "mean_top1_flip_B_vs_C": 0.1})
+        assert v["decision"] == "CG_DYNAMIC_SIGNAL"
+
+    def test_static_offset_no_cg_dynamic(self):
+        R = self._import()
+        # B>A but B≈C (not distinguishable, logits ~equal) => the gain is the static offset.
+        v = R.evaluate_kill_criteria({}, self._p("improve", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("none", False),
+                                     paired_c_vs_a=self._p("improve", True),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 1e-5, "mean_top1_flip_B_vs_C": 0.0})
+        assert v["decision"] == "STATIC_OFFSET_NO_CG_DYNAMIC"
+        assert any("STATIC OFFSET" in w for w in v["warnings"])
+
+    def test_weak_objective_gain(self):
+        R = self._import()
+        # B>A, but B-vs-C distinguishable in the WRONG direction (C beats B) => ambiguous/weak.
+        v = R.evaluate_kill_criteria({}, self._p("improve", True), self._ACTIVE_DIAG,
+                                     paired_b_vs_c=self._p("regress", True),
+                                     paired_c_vs_a=self._p("improve", True),
+                                     b_vs_c_logit={"mean_logit_kl_B_vs_C": 0.3, "mean_top1_flip_B_vs_C": 0.1})
+        assert v["decision"] == "WEAK_OBJECTIVE_GAIN"
 
 
 # ===========================================================================
@@ -321,6 +346,80 @@ class TestStateDeltaBehaviour:
         # Only meaningful if the two inputs actually differ.
         if not torch.equal(ids_a, ids_b):
             assert float(out2["delta_bhava"].norm().item()) > 0.0
+
+
+@pytestmark_torch
+class TestCGBootstrapMode:
+    """ACTIVE init must escape the inert fixed point; ORIGINAL must stay the quiet baseline."""
+
+    def _build(self, mode):
+        from cg_ablation.stub_backend import StubBackbone
+        from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
+        backbone = StubBackbone(64, 128, 8, seed=0)
+        w = MistralCGWrapper(pretrained_model=backbone, pretrained_tokenizer=None,
+                             phase_adapter_hidden=32, bootstrap_mode=mode)
+        w.eval()
+        return w
+
+    def test_original_gate_and_zero_adapter(self):
+        w = self._build("original")
+        assert float(torch.sigmoid(w.adapter_gate).item()) == pytest.approx(0.1192, abs=1e-3)
+        assert float(w.phase_adapter[-1].weight.abs().sum().item()) == 0.0
+
+    def test_active_gate_and_nonzero_adapter(self):
+        w = self._build("active")
+        assert float(torch.sigmoid(w.adapter_gate).item()) == pytest.approx(0.2689, abs=1e-3)
+        assert float(w.phase_adapter[-1].weight.abs().sum().item()) > 0.0
+
+    def test_active_full_arm_changes_logits_but_gate0_still_base(self):
+        from cg_ablation.arms import ARMS_BY_NAME, run_arm_logits
+        w = self._build("active")
+        ids = torch.randint(0, 128, (1, 8))
+        base = run_arm_logits(w, ARMS_BY_NAME["A_base"], ids)["logits"]
+        full = run_arm_logits(w, ARMS_BY_NAME["B_full"], ids)["logits"]
+        gate0 = run_arm_logits(w, ARMS_BY_NAME["D_gate0"], ids)["logits"]
+        # ACTIVE + nonzero adapter => the wrapper actually moves logits...
+        assert not torch.allclose(base, full, atol=1e-4, rtol=1e-3)
+        # ...but the gate=0 ablation is still logit-identical to base (K0 holds in any mode).
+        assert torch.allclose(base, gate0, atol=1e-4, rtol=1e-3)
+
+
+@pytestmark_torch
+class TestBootstrapProbe:
+    """The instrumentation reads grads/activations without affecting training."""
+
+    def test_probe_reports_nonzero_gate_grad_in_active_mode(self):
+        from cg_ablation.stub_backend import StubBackbone
+        from cg_ablation.bootstrap_probe import BootstrapProbe
+        from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
+
+        backbone = StubBackbone(64, 128, 8, seed=0)
+        w = MistralCGWrapper(pretrained_model=backbone, pretrained_tokenizer=None,
+                             phase_adapter_hidden=32, bootstrap_mode="active")
+        probe = BootstrapProbe(w, every=1).install()
+        ids = torch.randint(0, 128, (1, 8))
+        out = w(input_ids=ids, reset_state=True)
+        loss = out["logits"].float().pow(2).mean()  # any scalar to get grads flowing
+        loss.backward()
+        # gate grad should be NON-zero in active mode (adapter_output != 0 => dL/dgate != 0)
+        assert w.adapter_gate.grad is not None
+        assert float(w.adapter_gate.grad.abs().sum().item()) > 0.0
+        probe.log(0)   # must not raise; activation norms captured by the forward hook
+        probe.remove()
+
+    def test_probe_is_inert_in_original_mode_gate_grad_zero(self):
+        from cg_ablation.stub_backend import StubBackbone
+        from symbolu_training.training.unified.mistral_wrapper import MistralCGWrapper
+
+        backbone = StubBackbone(64, 128, 8, seed=0)
+        w = MistralCGWrapper(pretrained_model=backbone, pretrained_tokenizer=None,
+                             phase_adapter_hidden=32, bootstrap_mode="original")
+        ids = torch.randint(0, 128, (1, 8))
+        out = w(input_ids=ids, reset_state=True)
+        out["logits"].float().pow(2).mean().backward()
+        # ORIGINAL: adapter_output == 0 => dL/dgate == 0 exactly (the bootstrap-failure proof).
+        g = w.adapter_gate.grad
+        assert g is None or float(g.abs().sum().item()) == pytest.approx(0.0, abs=1e-8)
 
 
 @pytestmark_torch

@@ -36,6 +36,16 @@ from cg_ablation.runtime import (  # noqa: E402
 )
 
 
+def _adapter_weight_norm(wrapper) -> float:
+    """L2 norm of the phase_adapter output-layer weight (static checkpoint property)."""
+    try:
+        import torch  # noqa: F401
+        w = wrapper.phase_adapter[-1].weight
+        return float(w.detach().float().norm().item())
+    except Exception:
+        return 0.0
+
+
 def _score(kind, text, row, metrics):
     """Objective score for one (kind, text, row). Returns (ok: bool, answer)."""
     if kind == "exact_match":
@@ -82,9 +92,9 @@ def main() -> int:
         "decoding_consistency": {"temperature": 0.7, "top_p": 0.9, "top_k": 50},
     }, indent=2))
 
-    gen_fp = (run_dir / "raw_generations.jsonl").open("w")
-    score_fp = (run_dir / "per_example_scores.jsonl").open("w")
-    diag_fp = (run_dir / "diagnostics.jsonl").open("w")
+    gen_fp = (run_dir / "raw_generations.jsonl").open("w", buffering=1)
+    score_fp = (run_dir / "per_example_scores.jsonl").open("w", buffering=1)
+    diag_fp = (run_dir / "diagnostics.jsonl").open("w", buffering=1)
 
     t0 = time.time()
     for set_name, meta in EVAL_SETS.items():
@@ -92,46 +102,60 @@ def main() -> int:
         rows = load_eval_set(set_name)
         if cfg.n_samples:
             rows = rows[: cfg.n_samples]
-        for row in rows:
+        # Cross-seed consistency (stochastic decoding over seeds) is the expensive part; only do
+        # it when more than one seed is requested. Greedy is seed-independent → generate it ONCE.
+        do_consistency = len(cfg.seeds) > 1
+        for ei, row in enumerate(rows):
             prompt = row["prompt"]
 
-            # Per-arm, per-seed greedy generation for task metrics (seed 0 used for the
-            # deterministic exact-match score; all seeds used for cross-seed consistency).
             for arm in arms:
-                seed_answers = []
-                for seed in cfg.seeds:
-                    # greedy for the scored answer (deterministic); sampling for consistency.
-                    g = generate(wrapper, tok, prompt, arm,
-                                 max_new_tokens=cfg.max_new_tokens, temperature=0.0, seed=seed)
-                    if seed == cfg.seeds[0]:
-                        ok, ans = _score(kind, g["text"], row, metrics)
-                        gen_fp.write(json.dumps({
-                            "set": set_name, "id": row["id"], "arm": arm.name,
-                            "seed": seed, "prompt": prompt, "text": g["text"],
-                            "n_new_tokens": g["n_new_tokens"], "diag": g["diag"],
-                        }) + "\n")
-                        score_fp.write(json.dumps({
-                            "set": set_name, "id": row["id"], "arm": arm.name,
-                            "kind": kind, "ok": bool(ok), "answer": ans,
-                        }) + "\n")
-                    # cross-seed consistency uses stochastic decoding
-                    cs = generate(wrapper, tok, prompt, arm, max_new_tokens=cfg.max_new_tokens,
-                                  temperature=0.7, top_p=0.9, top_k=50, seed=seed)
-                    _, cans = _score(kind, cs["text"], row, metrics)
-                    seed_answers.append(cans)
-                agreement = metrics.pairwise_agreement(seed_answers)
+                # greedy (deterministic) for the scored answer — generated ONCE, not per seed.
+                g = generate(wrapper, tok, prompt, arm,
+                             max_new_tokens=cfg.max_new_tokens, temperature=0.0, seed=cfg.seeds[0])
+                ok, ans = _score(kind, g["text"], row, metrics)
+                gen_fp.write(json.dumps({
+                    "set": set_name, "id": row["id"], "arm": arm.name,
+                    "seed": cfg.seeds[0], "prompt": prompt, "text": g["text"],
+                    "n_new_tokens": g["n_new_tokens"], "diag": g["diag"],
+                }) + "\n")
                 score_fp.write(json.dumps({
                     "set": set_name, "id": row["id"], "arm": arm.name,
-                    "kind": kind, "metric": "seed_agreement", "value": agreement,
+                    "kind": kind, "ok": bool(ok), "answer": ans,
                 }) + "\n")
+                # cross-seed consistency via stochastic decoding (only if >1 seed)
+                if do_consistency:
+                    seed_answers = []
+                    for seed in cfg.seeds:
+                        cs = generate(wrapper, tok, prompt, arm, max_new_tokens=cfg.max_new_tokens,
+                                      temperature=0.7, top_p=0.9, top_k=50, seed=seed)
+                        _, cans = _score(kind, cs["text"], row, metrics)
+                        seed_answers.append(cans)
+                    score_fp.write(json.dumps({
+                        "set": set_name, "id": row["id"], "arm": arm.name,
+                        "kind": kind, "metric": "seed_agreement",
+                        "value": metrics.pairwise_agreement(seed_answers),
+                    }) + "\n")
+            print(f"  [{set_name}] {ei+1}/{len(rows)} "
+                  f"({time.time()-t0:.0f}s)", flush=True)
 
             # Base-vs-wrapper logit diagnostics (teacher-forced on the prompt), per non-base arm.
             for arm in arms:
                 if arm.name == "A_base":
                     continue
                 d = prompt_logit_diag(wrapper, tok, prompt, base_arm, arm)
+                d["adapter_weight_norm"] = _adapter_weight_norm(wrapper)
                 diag_fp.write(json.dumps({
                     "set": set_name, "id": row["id"], "arm": arm.name, **d,
+                }) + "\n")
+
+            # B-vs-C logit separation: phase ON (B) vs phase OFF (C) on the SAME prompt.
+            # KL(C||B) ~ 0 ⇒ the phase/Bhava dynamics add ~nothing beyond C's static offset.
+            c_arm = next((a for a in arms if a.name == "C_phase_off"), None)
+            b_arm = next((a for a in arms if a.name == "B_full"), None)
+            if c_arm is not None and b_arm is not None:
+                dbc = prompt_logit_diag(wrapper, tok, prompt, c_arm, b_arm)
+                diag_fp.write(json.dumps({
+                    "set": set_name, "id": row["id"], "arm": "B_vs_C", **dbc,
                 }) + "\n")
 
         print(f"  [{set_name}] {len(rows)} examples done ({time.time()-t0:.0f}s elapsed)")

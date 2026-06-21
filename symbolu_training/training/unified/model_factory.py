@@ -563,6 +563,7 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
             phase_adapter_hidden=config.mistral_phase_adapter_hidden,
             device_map=config.mistral_device_map,
             trust_remote_code=config.mistral_trust_remote_code,
+            bootstrap_mode=getattr(config, "cg_bootstrap_mode", "original"),
         )
         # Override dims for CG module creation below
         embed_dim = model.mistral_hidden_dim
@@ -575,6 +576,9 @@ def create_model(config: UnifiedTrainingConfig, device: torch.device) -> nn.Modu
         print(f"    Backbone hidden_dim: {embed_dim}")
         print(f"    State dim: {config.state_dim}D Sovereign State")
         print(f"    Phase adapter hidden: {config.mistral_phase_adapter_hidden}")
+        _bm = getattr(model, "bootstrap_mode", "original")
+        _g0 = float(torch.sigmoid(model.adapter_gate).item()) if hasattr(model, "adapter_gate") else float("nan")
+        print(f"    CG bootstrap mode: {_bm}  (gate init = {_g0:.4f})")
         model.print_trainable_summary()
 
     else:

@@ -5952,6 +5952,23 @@ def train(config: UnifiedTrainingConfig):
             else:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), config.max_grad_norm)
 
+            # --- CG bootstrap probe (additive, env-gated, removable; no behavioral change) ---
+            # Reads gate/adapter grads (post-clip, pre-zero_grad) + captured activation norms.
+            # Disabled unless CG_BOOTSTRAP_PROBE_EVERY is set; never affects training.
+            if os.environ.get("CG_BOOTSTRAP_PROBE_EVERY"):
+                try:
+                    try:
+                        from cg_ablation.bootstrap_probe import get_probe as _cg_get_probe
+                    except ImportError:
+                        import pathlib as _pl
+                        sys.path.insert(0, str(
+                            _pl.Path(__file__).resolve().parents[3]
+                            / "scripts" / "cg_wrapper_ablation"))
+                        from cg_ablation.bootstrap_probe import get_probe as _cg_get_probe
+                    _cg_get_probe(model, int(os.environ["CG_BOOTSTRAP_PROBE_EVERY"])).log(global_step)
+                except Exception:
+                    pass  # instrumentation must never break training
+
             if scaler is not None:
                 scaler.step(optimizer)
                 scaler.update()
@@ -9196,6 +9213,12 @@ def main():
                        help="Trust remote code when loading Mistral model")
     parser.add_argument("--mistral_phase_adapter_hidden", type=int, default=1024,
                        help="Hidden dimension for phase-conditioned adapter MLP")
+    parser.add_argument("--cg_bootstrap_mode", type=str, default="original",
+                       choices=["original", "active"],
+                       help="CG adapter init regime. 'original' = gate -2.0 + zero-init adapter "
+                            "(faithful baseline, cannot bootstrap the gate). 'active' = gate -1.0 "
+                            "+ N(0,1e-3) adapter (non-inert from step 0; for the generation-quality "
+                            "ablation). See scripts/cg_wrapper_ablation/.")
 
     # Mistral Hybrid Wrapper (--model_type mistral_hybrid)
     parser.add_argument("--mistral_hybrid_num_phase_layers", type=int, default=4,
@@ -11258,6 +11281,7 @@ def main():
         mistral_device_map=args.mistral_device_map,
         mistral_trust_remote_code=args.mistral_trust_remote_code,
         mistral_phase_adapter_hidden=args.mistral_phase_adapter_hidden,
+        cg_bootstrap_mode=args.cg_bootstrap_mode,
         # Knowledge Distillation
         distill_from_mistral=args.distill_from_mistral,
         distill_temperature=args.distill_temperature,

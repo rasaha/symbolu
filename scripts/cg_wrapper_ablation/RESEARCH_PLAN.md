@@ -53,11 +53,14 @@ is identically zero and the wrapper is inert by construction.
 - **D ≡ A** to within `atol=1e-4, rtol=1e-3` on logits. With `gate=0`,
   `adapted_hidden == hidden`, so `lm_head(adapted_hidden) == lm_head(hidden)`. If D ≠ A, that
   is a **hidden-coupling finding** (something other than the gated residual is moving logits).
-- **C is *not* guaranteed to equal A.** `use_phase_sync=False` only zeroes the *input* to
-  `phase_adapter`; the adapter still emits `phase_adapter(0)` (a trained constant/bias term)
-  which, after `sigmoid(gate)` scaling, perturbs logits. We report the C−A delta. If C ≠ A,
-  the phase_adapter carries a constant correction independent of any phase signal — itself a
-  finding about where the wrapper's effect actually comes from (constant bias vs phase-driven).
+- **C is *not* guaranteed to equal A — and under Active-CG it is the key reference.**
+  `use_phase_sync=False` only zeroes the *input* to `phase_adapter`; the adapter still emits
+  `phase_adapter(0)` (a trained constant/bias term) scaled by `sigmoid(gate)`. So C is the
+  **static-offset arm**: the wrapper with its constant correction but no phase/Bhava dynamics.
+  **B vs C is therefore the decisive comparison** — it isolates the CG-dynamic component from the
+  static offset. (The 600-step activation check showed the state-projector grad collapsing, so a
+  largely-static offset is a live possibility; `STATIC_OFFSET_NO_CG_DYNAMIC` is a pre-registered
+  outcome, not a surprise.) We report C−A (offset size) and B−C (dynamic component) every run.
 - **E is excluded.** A grep of the generation path (`mistral_wrapper.py`, `llm_adapters.py`)
   finds no CSR / Varna stage feeding logits. The script verifies this programmatically and
   records the result; if a CSR stage is ever wired in, arm E activates automatically.
@@ -138,35 +141,41 @@ All artifacts are saved under `runs/cg_wrapper_ablation/<timestamp>/`:
 
 ---
 
-## 6. Kill criteria (PRE-REGISTERED, numeric thresholds)
+## 6. Kill criteria + decision categories (PRE-REGISTERED, numeric thresholds)
 
-Evaluated in order. Thresholds are fixed here, before looking at results.
+> **Update (post Active-CG).** The ORIGINAL wrapper is **structurally inert** — it cannot bootstrap
+> an active gate under an LM objective on a frozen backbone (proof + math: `BOOTSTRAP_ANALYSIS.md`).
+> The ablation is therefore run on a **trained Active-CG** head (gate −1.0 + N(0,1e-3) adapter,
+> `--cg_bootstrap_mode active`), which *is* active. Because the wrapper is now active, the decisive
+> question shifts from "does it change logits" (B vs A) to **"is any effect CG-DYNAMIC or just a
+> static adapter offset"** — i.e. **B vs C**. Active ≠ useful.
 
-**K0 — Sanity / hidden coupling.**
-`max|logit_D − logit_A| > 1e-4` (i.e. `allclose(atol=1e-4, rtol=1e-3)` fails) ⇒ the gate=0
-arm is not identical to base ⇒ **hidden coupling**. Report and investigate before trusting any
-other number (the "off" switch does not fully turn the wrapper off).
+**Significance** = paired McNemar exact `p < 0.05` **AND** the 95% paired-bootstrap CI of the
+rate difference excludes 0. Comparisons computed every run: **B vs A**, **B vs C**, **C vs A**,
+plus the B-vs-C logit separation `KL(B‖C)` / top-1 flip.
 
-**K1 — Inert wrapper.** If, for arm B vs A:
-`mean per-token logit KL < 1e-3 nats` **AND** `top-1 flip rate < 0.5%` **AND**
-`mean correction/hidden norm ratio < 1e-2`
-⇒ the wrapper is **INERT** (it changes essentially nothing). Report and **stop** — it cannot
-help if it changes nothing. (This is the expected outcome if the loaded head is untrained.)
+Checks (evaluated in order → one `DECISION`):
 
-**K2 — Changes logits but no measurable benefit.** If the wrapper is *not* inert but, for every
-primary task metric, the paired 95% bootstrap CI of `(B − A)` **includes 0** *and* McNemar
-`p > 0.05` ⇒ **no measurable effect** ⇒ **DEPRIORITIZE**.
+**K0 — Sanity / hidden coupling.** `max|logit_D − logit_A| > 1e-4` ⇒ gate=0 ≠ base ⇒
+`INVESTIGATE_K0_HIDDEN_COUPLING`. Fix before trusting anything else.
 
-**K3 — Regression.** If for any task metric the paired 95% CI of `(B − A)` is **strictly
-negative** *and* McNemar `p < 0.05` ⇒ the wrapper **worsens** that metric ⇒ **KILL or flag for
-retrain** (record which metric and the effect size).
+**K1 — Inert.** For B vs A: `KL < 1e-3` **AND** `flip < 0.5%` **AND** `corr/hidden < 1e-2`
+⇒ `INERT`. Expected for ORIGINAL; for a trained Active-CG head this firing means the checkpoint is
+untrained/mis-loaded.
 
-**K4 — Benefit.** Only if some task metric has a paired 95% CI of `(B − A)` **strictly
-positive** *and* McNemar `p < 0.05`, with **no** K3 regression on another metric, do we record
-a measurable benefit — stated with the metric, effect size, and CI. No benefit is claimed on
-any other basis.
+**Decision categories** (active head, K0 ok, not inert):
 
-> If a benefit is only subjective / not measurable by the above, we do **not** claim success.
+| Decision | Condition | Meaning / action |
+|----------|-----------|------------------|
+| `REGRESSION` | B **<** A significant on any task metric | wrapper **hurts** → KILL / flag retrain |
+| `CG_DYNAMIC_SIGNAL` | B **>** A significant **AND** B **>** C significant | gain needs the phase/Bhava dynamics → **continue** CG research |
+| `STATIC_OFFSET_NO_CG_DYNAMIC` | B moves metrics vs A (or C does) **AND** B ≈ C (not distinguishable, `KL(B‖C)`≈0) | effect is a **constant adapter offset**, not CG dynamics → park CG-dynamics claim |
+| `WEAK_OBJECTIVE_GAIN` | B **>** A significant, but B-vs-C ambiguous (distinguishable yet not B>C) | weak/uncertain → more data before any claim |
+| `ACTIVE_NO_EFFECT` | active, no significant task movement anywhere | logits move, metrics don't → DEPRIORITIZE |
+
+Rules: a benefit is recorded **only** for `CG_DYNAMIC_SIGNAL` (objective, B>A and B>C). A
+`STATIC_OFFSET_NO_CG_DYNAMIC` is **not** evidence for the CG mechanism even if B>A. Subjective /
+coherence-only impressions never count. Any `REGRESSION` is reported with metric + effect size.
 
 ---
 
