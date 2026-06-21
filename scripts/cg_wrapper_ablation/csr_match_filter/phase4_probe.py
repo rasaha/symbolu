@@ -55,6 +55,21 @@ def predict_proba(model, X):
     return 1.0 / (1.0 + np.exp(-(Xs @ model["w"] + model["b"])))
 
 
+# ---- PCA (numpy SVD; fit on train, apply to test — used in-fold to avoid leakage) -----------------
+
+
+def pca_fit(X, n_components):
+    X = np.asarray(X, float)
+    mu = X.mean(0)
+    U, S, Vt = np.linalg.svd(X - mu, full_matrices=False)
+    k = int(min(n_components, Vt.shape[0]))
+    return {"mu": mu, "comps": Vt[:k]}
+
+
+def pca_transform(p, X):
+    return (np.asarray(X, float) - p["mu"]) @ p["comps"].T
+
+
 # ---- AUROC (tie-aware, no scipy) ------------------------------------------------------------------
 
 
@@ -105,8 +120,9 @@ def group_kfold_indices(groups, n_splits: int = 5, seed: int = 0):
     return out
 
 
-def cv_oof_scores(X, y, groups, n_splits: int = 5, l2: float = 1.0, seed: int = 0):
-    """Out-of-fold predicted scores under group-by-term CV (NaN where a fold could not be scored)."""
+def cv_oof_scores(X, y, groups, n_splits: int = 5, l2: float = 1.0, seed: int = 0, n_pca=None):
+    """Out-of-fold predicted scores under group-by-term CV (NaN where a fold could not be scored).
+    If n_pca is set, PCA is fit on each fold's TRAIN split and applied to test (no leakage)."""
     X = np.asarray(X, float)
     y = np.asarray(y, float)
     oof = np.full(len(y), np.nan)
@@ -116,16 +132,41 @@ def cv_oof_scores(X, y, groups, n_splits: int = 5, l2: float = 1.0, seed: int = 
         if len(set(y[tr].tolist())) < 2:                      # degenerate (one class) -> prior
             oof[te] = float(y[tr].mean()) if len(tr) else 0.5
             continue
-        m = fit_logreg(X[tr], y[tr], l2=l2)
-        oof[te] = predict_proba(m, X[te])
+        Xtr, Xte = X[tr], X[te]
+        if n_pca and Xtr.shape[1] > n_pca:
+            p = pca_fit(Xtr, n_pca)
+            Xtr, Xte = pca_transform(p, Xtr), pca_transform(p, Xte)
+        m = fit_logreg(Xtr, y[tr], l2=l2)
+        oof[te] = predict_proba(m, Xte)
     return oof
 
 
-def evaluate_probe(X, y, groups, n_splits: int = 5, l2: float = 1.0, seed: int = 0):
-    oof = cv_oof_scores(X, y, groups, n_splits=n_splits, l2=l2, seed=seed)
+def evaluate_probe(X, y, groups, n_splits: int = 5, l2: float = 1.0, seed: int = 0, n_pca=None):
+    oof = cv_oof_scores(X, y, groups, n_splits=n_splits, l2=l2, seed=seed, n_pca=n_pca)
     mask = ~np.isnan(oof)
     y = np.asarray(y)
     return {"auroc": auroc(y[mask], oof[mask]) if mask.any() else 0.5, "oof": oof, "mask": mask}
+
+
+def bootstrap_auroc_ci(y, scores, n_boot: int = 1000, seed: int = 0, alpha: float = 0.05):
+    """Bootstrap CI for a SINGLE AUROC (is it above chance?)."""
+    y = np.asarray(y)
+    s = np.asarray(scores, float)
+    base = auroc(y, s)
+    rng = np.random.default_rng(seed)
+    n = len(y)
+    vals = []
+    for _ in range(n_boot):
+        idx = rng.integers(0, n, n)
+        if len(set(y[idx].tolist())) < 2:
+            continue
+        vals.append(auroc(y[idx], s[idx]))
+    if not vals:
+        return {"auroc": float(base), "ci_low": float("nan"), "ci_high": float("nan"),
+                "above_chance": False}
+    lo, hi = np.percentile(vals, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    return {"auroc": float(base), "ci_low": float(lo), "ci_high": float(hi),
+            "above_chance": bool(lo > 0.5)}
 
 
 # ---- controls & diagnostics -----------------------------------------------------------------------

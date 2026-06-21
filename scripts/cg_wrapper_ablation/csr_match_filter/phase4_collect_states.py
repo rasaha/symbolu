@@ -355,7 +355,10 @@ def main():
     X, meta = [], []
     ri = 0
     skipped = 0
-    for ex in rows:
+    n_total = len(rows) * len(arms)
+    for ei, ex in enumerate(rows):
+        if not args.dry_run and ei % 20 == 0:
+            print(f"[phase4] {ri}/{n_total} rows ({ei}/{len(rows)} examples) …", flush=True)
         trace, terms = EF.frame_for(ex, adapter, provider)
         prompts = build_prompts(ex, trace)
         frame = frame_dict_from_trace(trace)

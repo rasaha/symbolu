@@ -6,6 +6,7 @@ check, bootstrap AUROC-delta CIs, decide_phase4 label logic, and the collector's
 no-answer-token guarantee. This is Stage-A infrastructure only — NO Phase 4 claim is made.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -19,6 +20,8 @@ np = pytest.importorskip("numpy", reason="numpy required")
 
 from csr_match_filter import phase4_probe as PB              # noqa: E402
 from csr_match_filter import phase4_collect_states as PC     # noqa: E402
+from csr_match_filter import phase4_probe_eval as PE         # noqa: E402
+from csr_match_filter import phase4_subset_analysis as SA    # noqa: E402
 
 
 def _groups(n, n_terms, seed=0):
@@ -278,6 +281,183 @@ def test_leakage_assertions_pass_and_fail():
     bad = _good_manifest(); bad["contains_phonemic_12d_profile"] = True
     res = PC.assert_no_feature_leakage(bad, [])
     assert res["ok"] is False and any("phonemic_12d" in p for p in res["problems"])
+
+
+# ---- Stage-B primitives: PCA + single-AUROC CI ---------------------------------------------------
+
+def test_pca_fit_transform_shapes_and_infold():
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((40, 50))
+    p = PB.pca_fit(X[:30], 8)
+    assert p["comps"].shape == (8, 50)
+    assert PB.pca_transform(p, X[30:]).shape == (10, 8)
+
+
+def test_cv_oof_with_pca_recovers_signal():
+    rng = np.random.default_rng(1)
+    n, d = 220, 80
+    X = rng.standard_normal((n, d))
+    w = np.zeros(d); w[:4] = [4, -4, 4, -4]
+    y = (X @ w + rng.standard_normal(n) * 0.5 > 0).astype(int)
+    auc = PB.evaluate_probe(X, y, _groups(n, 22), n_pca=32, seed=0)["auroc"]
+    assert auc > 0.75
+
+
+def test_bootstrap_auroc_ci_above_chance():
+    rng = np.random.default_rng(2)
+    n = 200
+    y = rng.integers(0, 2, n)
+    good = y + rng.standard_normal(n) * 0.3
+    ci = PB.bootstrap_auroc_ci(y, good, n_boot=400, seed=0)
+    assert ci["above_chance"] and ci["ci_low"] > 0.5
+    noise = PB.bootstrap_auroc_ci(y, rng.standard_normal(n), n_boot=400, seed=0)
+    assert not noise["above_chance"]
+
+
+# ---- Stage-B driver (synthetic activations) ------------------------------------------------------
+
+def _write_synthetic_run(tmp_path, n_terms=40, planted_layer=2, signal=True, seed=0):
+    """Build a tiny phase4 run dir: 2 layers of noise + 1 planted layer carrying audit_fail signal."""
+    rng = np.random.default_rng(seed)
+    rows, Xs = [], []
+    layers = [0, 1, 2, 3]
+    D = 40
+    for t in range(n_terms):
+        for arm in ("base", "framed"):
+            y = int(rng.integers(0, 2))
+            cube = rng.standard_normal((len(layers), D))
+            if signal:
+                cube[planted_layer, :4] += (3.0 if y else -3.0)     # planted in one layer
+            term = f"wd{chr(97 + t // 26)}{chr(97 + t % 26)}qx"     # distinct alphabetic term per t
+            rows.append({"id": f"trm_{t}", "arm": arm, "query": term,
+                         "labels": {"audit_fail": bool(y), "frame_violation": bool(y),
+                                    "rejected_domain_leak": False, "secondary_promoted": False}})
+            Xs.append(cube)
+    X = np.stack(Xs, 0)
+    rd = tmp_path / "csr_phase4"
+    rd.mkdir(parents=True)
+    np.savez_compressed(rd / "phase4_activations.npz", X=X.astype("float32"),
+                        layers=np.array(layers), ids=np.array([r["id"] for r in rows], dtype=object),
+                        arms=np.array([r["arm"] for r in rows], dtype=object))
+    (rd / "phase4_metadata.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    return rd
+
+
+def test_driver_groups_by_term_and_loads(tmp_path):
+    import json as _json  # noqa
+    rd = _write_synthetic_run(tmp_path)
+    X, layers, arms, rows = PE.load_run(rd)
+    assert X.ndim == 3 and len(layers) == 4 and len(arms) == len(rows)
+    groups = PE.groups_for(rows)
+    # base+framed of the same term share a group
+    assert groups[0] == groups[1]
+
+
+def test_driver_detects_signal_and_writes_outputs(tmp_path):
+    rd = _write_synthetic_run(tmp_path, signal=True)
+    rep = PE.run(rd, ["audit_fail"], [], "all", n_pca=8, n_splits=4, n_boot=200, seed=0, min_pos=10)
+    t = rep["targets"]["audit_fail"]
+    # planted within-arm signal -> predictive (per-arm CI above chance)
+    assert t["decision"] == "PHASE4_HIDDEN_STATE_PREDICTIVE"
+    assert t["units"]["framed"]["sufficient"] and t["units"]["framed"]["ci_low"] > 0.5
+    md = PE.to_markdown(rep)
+    assert "audit_fail" in md and "PHASE4_HIDDEN_STATE_PREDICTIVE" in md
+
+
+def test_driver_no_signal_not_predictive(tmp_path):
+    rd = _write_synthetic_run(tmp_path, signal=False)
+    rep = PE.run(rd, ["audit_fail"], [], "all", n_pca=8, n_splits=4, n_boot=200, seed=0, min_pos=10)
+    assert rep["targets"]["audit_fail"]["decision"] in ("PHASE4_NOT_PREDICTIVE",)
+
+
+def test_driver_insufficient_label_power(tmp_path):
+    rd = _write_synthetic_run(tmp_path)
+    # rejected_domain_leak is all-False in the fixture -> 0 positives -> insufficient
+    rep = PE.run(rd, [], ["rejected_domain_leak"], "all", n_pca=8, n_splits=4, n_boot=100, seed=0,
+                 min_pos=10)
+    assert rep["targets"]["rejected_domain_leak"]["decision"] == "PHASE4_INSUFFICIENT_LABEL_POWER"
+
+
+def test_driver_decision_label_set():
+    assert set(PE.DECISIONS) == {"PHASE4_HIDDEN_STATE_PREDICTIVE", "PHASE4_NOT_PREDICTIVE",
+                                 "PHASE4_INSUFFICIENT_LABEL_POWER", "PHASE4_LEAKAGE_SUSPECTED"}
+
+
+def _write_arm_confounded_run(tmp_path, n_terms=40, seed=0):
+    """Label tracks the ARM (base 70% pos, framed 30% pos) and the hidden state encodes ONLY the arm;
+    within-arm the state is pure noise. A pooled probe rides the arm -> must be LEAKAGE_SUSPECTED."""
+    rng = np.random.default_rng(seed)
+    rows, Xs = [], []
+    layers = [0, 1, 2, 3]
+    D = 40
+    for t in range(n_terms):
+        for arm in ("base", "framed"):
+            y = int(rng.random() < (0.7 if arm == "base" else 0.3))
+            cube = rng.standard_normal((len(layers), D))
+            if arm == "framed":
+                cube[:, :4] += 4.0                            # arm marker only (constant within arm)
+            term = f"wd{chr(97 + t // 26)}{chr(97 + t % 26)}qx"
+            rows.append({"id": f"trm_{t}", "arm": arm, "query": term,
+                         "labels": {"audit_fail": bool(y)}})
+            Xs.append(cube)
+    rd = tmp_path / "csr_phase4"
+    rd.mkdir(parents=True)
+    np.savez_compressed(rd / "phase4_activations.npz", X=np.stack(Xs, 0).astype("float32"),
+                        layers=np.array(layers), ids=np.array([r["id"] for r in rows], dtype=object),
+                        arms=np.array([r["arm"] for r in rows], dtype=object))
+    (rd / "phase4_metadata.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    return rd
+
+
+def test_driver_flags_arm_confound_as_leakage():
+    # pooled rides the arm, no clean within-arm signal -> tightened guard returns LEAKAGE_SUSPECTED
+    rep = PE.decide_target(
+        {"base": {"sufficient": True, "ci_low": 0.44, "honest_auroc": 0.55},
+         "framed": {"sufficient": True, "ci_low": 0.40, "honest_auroc": 0.51},
+         "pooled": {"sufficient": True, "ci_low": 0.56, "honest_auroc": 0.67}},
+        {"hidden_predicts_arm_auroc": 1.0, "target_from_arm_only_auroc": 0.66})
+    assert rep == "PHASE4_LEAKAGE_SUSPECTED"
+
+
+def test_driver_clean_within_arm_beats_pooled_confound():
+    # a clean within-arm positive earns PREDICTIVE even if pooled is also high
+    rep = PE.decide_target(
+        {"base": {"sufficient": True, "ci_low": 0.60, "honest_auroc": 0.72},
+         "framed": {"sufficient": False},
+         "pooled": {"sufficient": True, "ci_low": 0.55, "honest_auroc": 0.65}},
+        {"hidden_predicts_arm_auroc": 1.0, "target_from_arm_only_auroc": 0.66})
+    assert rep == "PHASE4_HIDDEN_STATE_PREDICTIVE"
+
+
+def test_robustness_aggregates_within_arm(tmp_path):
+    rd = _write_synthetic_run(tmp_path, signal=True)         # planted within-arm signal
+    rep = PE.robustness(rd, ["audit_fail"], [], seeds=[0, 1], pca_grid=[8],
+                        n_splits=4, n_boot=150, min_pos=10, layer_step=1)
+    u = rep["targets"]["audit_fail"]["units"]["framed"]
+    assert u["n_configs"] == 2 and u["verdict"] in ("STABLE_PREDICTIVE", "UNSTABLE")
+    assert "above_chance_frac" in u and "auroc_mean" in u
+    md = PE.to_markdown_robust(rep)
+    assert "robustness" in md and "audit_fail" in md
+
+
+def test_subset_analysis_helpers_detect_stronger_rows():
+    rng = np.random.default_rng(0)
+    rows = ([{"category": "ordinary"}] * 4 + [{"category": "drift_adversarial"}] * 4
+            + [{"category": "drift_onframe"}] * 2)
+    rt = SA.row_type(rows)
+    assert (rt == 0).sum() == 4 and (rt == 1).sum() == 4 and (rt == 2).sum() == 2
+    # adversarial rows carry a bigger margin -> higher within-arm AUROC than ordinary
+    n, D = 160, 48
+    X3d = rng.standard_normal((n, 3, D))
+    y = rng.integers(0, 2, n)
+    adv = np.zeros(n, bool); adv[n // 2:] = True
+    X3d[np.arange(n), 1, 0] += np.where(y == 1, 1.0, -1.0) * np.where(adv, 3.0, 0.6)
+    groups = np.array([f"t{i % 20}" for i in range(n)])
+    arm = np.ones(n, bool)
+    X2d = SA.reduce_at_layer(X3d, 1, 16)
+    a_adv = SA.auroc_within_arm(X2d, y, groups, adv, 4, 0)["auroc"]
+    a_ord = SA.auroc_within_arm(X2d, y, groups, ~adv, 4, 0)["auroc"]
+    assert a_adv is not None and a_ord is not None and a_adv > a_ord
 
 
 def test_dry_run_marked_non_valid(tmp_path, monkeypatch):
