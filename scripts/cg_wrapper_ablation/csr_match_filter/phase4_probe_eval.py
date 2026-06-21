@@ -131,22 +131,22 @@ def arm_confound(X3d, arm_bin, target_y, groups, layers, n_pca, n_splits, seed):
 
 # ---- decision -------------------------------------------------------------------------------------
 
-def decide_target(units, confound, leak_margin=0.05, arm_floor=0.80, auroc_floor=0.55):
-    """Headline H1 verdict, preferring confound-free PER-ARM evidence over the pooled probe."""
+def decide_target(units, confound, arm_floor=0.80, auroc_floor=0.55):
+    """Headline H1 verdict. Only CONFOUND-CLEAN within-arm evidence can earn PREDICTIVE. When the arm
+    is fully encoded in the hidden state (hidden->arm >= arm_floor), a pooled-only positive is treated
+    as leakage — because a pooled probe can exploit arm structure beyond a linear arm baseline, so
+    'pooled beats arm-only' does NOT prove the signal is confound-free."""
     arm_units = [u for k, u in units.items() if k in ("base", "framed") and u.get("sufficient")]
     pooled = units.get("pooled", {})
-    any_sufficient = bool(arm_units) or pooled.get("sufficient")
-    if not any_sufficient:
+    if not arm_units and not pooled.get("sufficient"):
         return "PHASE4_INSUFFICIENT_LABEL_POWER"
-    # genuine within-arm signal?
-    predictive_arms = [u for u in arm_units if u["ci_low"] > 0.5 and u["honest_auroc"] >= auroc_floor]
-    if predictive_arms:
+    clean = [u for u in arm_units if u["ci_low"] > 0.5 and u["honest_auroc"] >= auroc_floor]
+    if clean:                                                 # genuine within-arm signal (arm constant)
         return "PHASE4_HIDDEN_STATE_PREDICTIVE"
-    # only the (confounded) pooled probe shows signal?
-    leak = (confound["hidden_predicts_arm_auroc"] >= arm_floor
-            and (pooled.get("honest_auroc", 0.0) - confound["target_from_arm_only_auroc"]) < leak_margin)
+    arm_encoded = confound["hidden_predicts_arm_auroc"] >= arm_floor
     if pooled.get("sufficient") and pooled.get("ci_low", 0.0) > 0.5:
-        return "PHASE4_LEAKAGE_SUSPECTED" if leak else "PHASE4_HIDDEN_STATE_PREDICTIVE"
+        # pooled shows signal but no clean within-arm unit did:
+        return "PHASE4_LEAKAGE_SUSPECTED" if arm_encoded else "PHASE4_HIDDEN_STATE_PREDICTIVE"
     return "PHASE4_NOT_PREDICTIVE"
 
 
@@ -205,6 +205,86 @@ def run(run_dir, targets, exploratory, layers_arg, n_pca, n_splits, n_boot, seed
     return report
 
 
+# ---- robustness (within-arm only; multi-seed x n_pca) --------------------------------------------
+
+def robustness(run_dir, targets, exploratory, seeds, pca_grid, n_splits, n_boot, min_pos, layer_step):
+    """Stability of the WITHIN-ARM signals across CV seeds and PCA dims. Pooled is omitted (confounded).
+    Per (target, unit): fraction of (seed x n_pca) configs whose AUROC CI excludes 0.5."""
+    X, all_layers, arms, rows = load_run(run_dir)
+    sub = list(range(0, len(all_layers), layer_step))
+    layers_r = [all_layers[i] for i in sub]
+    X3d = X[:, sub, :]
+    groups = groups_for(rows)
+    report = {"meta": {"run_dir": str(run_dir), "n_rows": len(rows), "layers_swept": layers_r,
+                       "layer_step": layer_step, "seeds": seeds, "pca_grid": pca_grid,
+                       "n_splits": n_splits, "n_boot": n_boot, "min_pos": min_pos,
+                       "stage": "B1_robustness", "scope": "within_arm_only"}, "targets": {}}
+    for key, role in [(t, "primary") for t in targets] + [(t, "exploratory") for t in exploratory]:
+        print(f"[phase4-robust] target={key} ({role}) …", flush=True)
+        y = labels_for(rows, key)
+        if y is None:
+            report["targets"][key] = {"role": role, "note": "labels missing"}
+            continue
+        report["targets"][key] = {"role": role, "units": {}}
+        for unit in ("base", "framed"):
+            sel = arms == unit
+            cfgs = []
+            for npca in pca_grid:
+                Xred = reduce_layers(X3d[sel], npca)          # PCA fit on this arm's rows
+                for sd in seeds:
+                    r = evaluate_unit(Xred, y[sel], groups[sel], layers_r, None, n_splits,
+                                      n_boot, sd, min_pos)
+                    if r.get("sufficient"):
+                        cfgs.append({"n_pca": npca, "seed": sd, "auroc": r["honest_auroc"],
+                                     "ci_low": r["ci_low"], "ci_high": r["ci_high"],
+                                     "above_chance": r["above_chance"]})
+            if not cfgs:
+                report["targets"][key]["units"][unit] = {"n_configs": 0, "verdict": "INSUFFICIENT",
+                                                         "n_pos": int(y[sel].sum())}
+                continue
+            aurocs = [c["auroc"] for c in cfgs]
+            frac = sum(c["above_chance"] for c in cfgs) / len(cfgs)
+            mean = float(np.mean(aurocs))
+            verdict = ("STABLE_PREDICTIVE" if frac >= 0.8 and mean >= 0.55
+                       else "UNSTABLE" if frac > 0.0 else "STABLE_NULL")
+            report["targets"][key]["units"][unit] = {
+                "n_configs": len(cfgs), "above_chance_frac": round(frac, 3),
+                "auroc_mean": round(mean, 3), "auroc_min": round(float(min(aurocs)), 3),
+                "auroc_max": round(float(max(aurocs)), 3), "n_pos": int(y[sel].sum()),
+                "verdict": verdict, "configs": cfgs}
+    return report
+
+
+def to_markdown_robust(report):
+    m = report["meta"]
+    out = ["# Phase 4 Stage-B1 robustness — within-arm H1 stability", "",
+           f"Run `{m['run_dir']}` · layers swept {m['layers_swept']} (step {m['layer_step']}) · "
+           f"seeds {m['seeds']} · PCA {m['pca_grid']} · {m['n_splits']}-fold group-by-term CV.", "",
+           "> Within-arm only (pooled is arm-confounded). A signal is STABLE_PREDICTIVE if its AUROC CI "
+           "excludes 0.5 in ≥80% of (seed×n_pca) configs and mean AUROC ≥ 0.55.", "",
+           "| target | role | arm | configs | %CI>0.5 | AUROC mean [min,max] | n_pos | verdict |",
+           "|---|---|---|---|---|---|---|---|"]
+    for k, t in report["targets"].items():
+        if "units" not in t:
+            out.append(f"| {k} | {t.get('role','')} | — | — | — | — | — | {t.get('note','')} |")
+            continue
+        for unit, u in t["units"].items():
+            if u["verdict"] == "INSUFFICIENT":
+                out.append(f"| {k} | {t['role']} | {unit} | 0 | — | — | {u.get('n_pos','?')} | "
+                           f"INSUFFICIENT |")
+            else:
+                out.append(f"| {k} | {t['role']} | {unit} | {u['n_configs']} | "
+                           f"{u['above_chance_frac']:.0%} | {u['auroc_mean']:.3f} "
+                           f"[{u['auroc_min']:.2f},{u['auroc_max']:.2f}] | {u['n_pos']} | "
+                           f"**{u['verdict']}** |")
+    out += ["", "### Read", "- `STABLE_PREDICTIVE` within an arm → the H1 signal replicates → Stage-B2 "
+            "(learned Bhava + strict incremental-value gate) is justified for that target.",
+            "- `UNSTABLE` → signal appears in some configs only; treat as fragile, prefer expanding data.",
+            "- `STABLE_NULL` → reliably at chance within-arm.",
+            "- `INSUFFICIENT` → too few within-arm positives at n=110 (expected for rare labels)."]
+    return "\n".join(out) + "\n"
+
+
 # ---- markdown -------------------------------------------------------------------------------------
 
 def to_markdown(report):
@@ -260,9 +340,41 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--min-pos", type=int, default=15)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--robust", action="store_true",
+                    help="within-arm stability sweep over --seeds x --pca-grid (no pooled)")
+    ap.add_argument("--seeds", default="0,1,2,3,4")
+    ap.add_argument("--pca-grid", default="16,32,64")
+    ap.add_argument("--robust-layer-step", type=int, default=3)
     args = ap.parse_args()
     targets = [t.strip() for t in args.targets.split(",") if t.strip()]
     expl = [t.strip() for t in args.exploratory.split(",") if t.strip()]
+
+    if args.robust:
+        seeds = [int(s) for s in args.seeds.split(",") if s.strip()]
+        pca_grid = [int(p) for p in args.pca_grid.split(",") if p.strip()]
+        rep = robustness(args.run_dir, targets, expl, seeds, pca_grid, args.n_splits,
+                         args.n_boot, args.min_pos, args.robust_layer_step)
+        out = Path(args.out) if args.out else Path(args.run_dir) / "phase4_probe_robust.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(rep, indent=2))
+        out.with_suffix(".md").write_text(to_markdown_robust(rep))
+        print("=" * 80)
+        print("PHASE 4 STAGE-B1 ROBUSTNESS (within-arm; seeds x n_pca)")
+        for k, t in rep["targets"].items():
+            if "units" not in t:
+                continue
+            for unit, u in t["units"].items():
+                if u["verdict"] == "INSUFFICIENT":
+                    print(f"  {k:22} {unit:6} INSUFFICIENT (n_pos={u.get('n_pos','?')})")
+                else:
+                    print(f"  {k:22} {unit:6} {u['verdict']:18} "
+                          f"%CI>0.5={u['above_chance_frac']:.0%}  "
+                          f"AUROC {u['auroc_mean']:.3f}[{u['auroc_min']:.2f},{u['auroc_max']:.2f}] "
+                          f"(n={u['n_configs']}, pos={u['n_pos']})")
+        print(f"\nwrote {out}\nwrote {out.with_suffix('.md')}")
+        print("=" * 80)
+        return 0
+
     report = run(args.run_dir, targets, expl, args.layers, args.n_pca, args.n_splits, args.n_boot,
                  args.seed, args.min_pos)
     out = Path(args.out) if args.out else Path(args.run_dir) / "phase4_probe_eval.json"

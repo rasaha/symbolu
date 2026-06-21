@@ -382,6 +382,63 @@ def test_driver_decision_label_set():
                                  "PHASE4_INSUFFICIENT_LABEL_POWER", "PHASE4_LEAKAGE_SUSPECTED"}
 
 
+def _write_arm_confounded_run(tmp_path, n_terms=40, seed=0):
+    """Label tracks the ARM (base 70% pos, framed 30% pos) and the hidden state encodes ONLY the arm;
+    within-arm the state is pure noise. A pooled probe rides the arm -> must be LEAKAGE_SUSPECTED."""
+    rng = np.random.default_rng(seed)
+    rows, Xs = [], []
+    layers = [0, 1, 2, 3]
+    D = 40
+    for t in range(n_terms):
+        for arm in ("base", "framed"):
+            y = int(rng.random() < (0.7 if arm == "base" else 0.3))
+            cube = rng.standard_normal((len(layers), D))
+            if arm == "framed":
+                cube[:, :4] += 4.0                            # arm marker only (constant within arm)
+            term = f"wd{chr(97 + t // 26)}{chr(97 + t % 26)}qx"
+            rows.append({"id": f"trm_{t}", "arm": arm, "query": term,
+                         "labels": {"audit_fail": bool(y)}})
+            Xs.append(cube)
+    rd = tmp_path / "csr_phase4"
+    rd.mkdir(parents=True)
+    np.savez_compressed(rd / "phase4_activations.npz", X=np.stack(Xs, 0).astype("float32"),
+                        layers=np.array(layers), ids=np.array([r["id"] for r in rows], dtype=object),
+                        arms=np.array([r["arm"] for r in rows], dtype=object))
+    (rd / "phase4_metadata.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+    return rd
+
+
+def test_driver_flags_arm_confound_as_leakage():
+    # pooled rides the arm, no clean within-arm signal -> tightened guard returns LEAKAGE_SUSPECTED
+    rep = PE.decide_target(
+        {"base": {"sufficient": True, "ci_low": 0.44, "honest_auroc": 0.55},
+         "framed": {"sufficient": True, "ci_low": 0.40, "honest_auroc": 0.51},
+         "pooled": {"sufficient": True, "ci_low": 0.56, "honest_auroc": 0.67}},
+        {"hidden_predicts_arm_auroc": 1.0, "target_from_arm_only_auroc": 0.66})
+    assert rep == "PHASE4_LEAKAGE_SUSPECTED"
+
+
+def test_driver_clean_within_arm_beats_pooled_confound():
+    # a clean within-arm positive earns PREDICTIVE even if pooled is also high
+    rep = PE.decide_target(
+        {"base": {"sufficient": True, "ci_low": 0.60, "honest_auroc": 0.72},
+         "framed": {"sufficient": False},
+         "pooled": {"sufficient": True, "ci_low": 0.55, "honest_auroc": 0.65}},
+        {"hidden_predicts_arm_auroc": 1.0, "target_from_arm_only_auroc": 0.66})
+    assert rep == "PHASE4_HIDDEN_STATE_PREDICTIVE"
+
+
+def test_robustness_aggregates_within_arm(tmp_path):
+    rd = _write_synthetic_run(tmp_path, signal=True)         # planted within-arm signal
+    rep = PE.robustness(rd, ["audit_fail"], [], seeds=[0, 1], pca_grid=[8],
+                        n_splits=4, n_boot=150, min_pos=10, layer_step=1)
+    u = rep["targets"]["audit_fail"]["units"]["framed"]
+    assert u["n_configs"] == 2 and u["verdict"] in ("STABLE_PREDICTIVE", "UNSTABLE")
+    assert "above_chance_frac" in u and "auroc_mean" in u
+    md = PE.to_markdown_robust(rep)
+    assert "robustness" in md and "audit_fail" in md
+
+
 def test_dry_run_marked_non_valid(tmp_path, monkeypatch):
     import json as _json
     monkeypatch.setattr(sys, "argv",
