@@ -22,8 +22,47 @@ All eight criteria pass:
 Landing: primary 48, secondary 9, weak 0, rejected 3 (rank-1 rate 0.917). The 5 residual context
 misses (heat/danger/programming/biology/astronomy) are rank-1 but land secondary at MATCH 0.07–0.20 —
 a phoneme→ontology *required-lane* gap (the term doesn't realize the domain's required lanes), not a
-veto or S error; lowering primary to the calibrated 0.167 recovers the 0.18–0.20 subset if desired.
-**Verdict: CONTINUE.** Earlier sections are the derivation; this is the result.
+veto or S error. **Verdict: CONTINUE.** Earlier sections are the derivation; this is the result.
+
+## PHASE 1 CLOSEOUT — `C×R×S MATCH-filter wrapper = PASS / CONTINUE` (FROZEN)
+
+**Frozen configuration:** group-aware R + S-gated C **and** R blocked-lane penalty
+(`C_GATE_LO=0.35, C_GATE_HI=0.70`), `CSRThresholds(primary_match=0.20, secondary_match=0.05,
+reject_C=0.20, reject_S=0.20)`. Semantic backend `real_embed_fn` (sentence-transformers
+`all-MiniLM-L6-v2`) via `definition_provider`; offline backends remain architecture-smoke.
+
+**1. Final metrics at `primary_match=0.20` (real_embed_fn):**
+primary_frame_accuracy **0.814** · expected_primary_misrejected **0.050** · ontological_veto (C)
+**1.000** · semantic_veto (S) **0.947** · phoneme_overreach_prevention **1.000** · rejected_recall
+**0.991** · unknown_term_generalization **0.784** · context_disambiguation **0.615** ·
+trace_completeness **1.000**. Landing: primary 48 / secondary 9 / weak 0 / rejected 3 (rank-1 0.917).
+
+**2. `0.167` is the held-out F1-optimal primary cutoff — recorded, NOT adopted.** Kept at 0.20 because
+all production criteria already pass at 0.20, 0.20 is more conservative, and lowering it now would
+shrink the rejection margin before Phase 2. 0.167 is logged as an optional calibrated threshold for
+future experiments only.
+
+**3. Remaining context misses (5/13) are rank-1 but secondary, not wrong-domain failures.** heat,
+danger, programming, biology, astronomy land at MATCH 0.07–0.20 (correct domain on top); limiter is C's
+required-lane score (a phoneme→ontology realization gap), not a veto or S error. No invalid domain
+slipped (`ontological_not_rejected = 0`).
+
+**4. Phase 2 recommendation — framed-answer eval vs. base LLM.** Phase 1 proved the *frame selection*
+(C×R×S) is correct, vetoed, and generalizes. Phase 2 should test the *behavioral* payoff: run the
+wrapper end-to-end (prompt-frame → LLM answer → rerank → post-check) against the **base LLM** on the
+same queries and measure (a) correct-primary-frame rate in the generated answer, (b) rejected-domain
+avoidance, (c) factuality preserved (no regression), (d) no phoneme-overreach in prose, (e) trace
+completeness. Use a real chat model behind `CSRMatchFilterWrapper(llm=...)`; keep the frozen scorer.
+
+**5. Reproduce / commit:**
+```
+# frozen Phase-1 PASS configuration, production backend
+git checkout claude/cg-wrapper-quality-ablation-gro5iw      # closeout commit: see chat / git log
+pip install sentence-transformers; unset CSR_EMBED_MODEL    # default all-MiniLM-L6-v2
+python scripts/cg_wrapper_ablation/csr_match_filter/eval_match_filter.py \
+    --semantic-backend real --explain-failures --calibrate --json runs/csr_eval_real.json
+```
+Config-defining commits: thresholds `e3b14ab`, conservative C-gate `84ceb8d`, R-gate `2e364c7`.
 
 ---
 
