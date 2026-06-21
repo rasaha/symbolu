@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from csr_match_filter import CSRThresholds, build_trace, dominant_terms  # noqa: E402
+from csr_match_filter import answer_audit as AA         # Phase 3 audit (opt-in)  # noqa: E402
 from csr_match_filter import eval_match_filter as EV   # reuse frame adapter + KB  # noqa: E402
 from csr_match_filter import llm_adapter as LA          # noqa: E402
 from csr_match_filter import prompts as P               # noqa: E402
@@ -101,6 +102,35 @@ def aggregate(per, arm):
     return out
 
 
+def audit_arm(ex, trace, answer, llm, rewrite_mode):
+    """Phase 3 (opt-in): audit one arm's answer vs the frozen frame. Returns a serialisable dict.
+
+    rewrite_mode: off (no prompt) | suggest (attach a rewrite prompt, do NOT call the model) |
+    auto (build the prompt AND perform one rewrite). Never changes the original arm's score.
+    """
+    res = AA.audit_answer(ex["query"], answer, trace,
+                          alternate_true_senses=ex.get("alternate_true_senses"),
+                          false_claims=ex.get("false_claims"), answer_id=ex["id"])
+    rec = res.to_dict()
+    rec["critical"] = any(f["severity"] == "critical" for f in rec["findings"])
+    if rewrite_mode != "off" and res.needs_rewrite:
+        prompt = AA.build_rewrite_prompt(ex["query"], answer, trace, res)
+        rec["rewrite_prompt"] = prompt
+        if rewrite_mode == "auto":
+            rec["rewritten_answer"] = llm.generate(prompt)
+    return rec
+
+
+def aggregate_audit(per, arm):
+    audits = [p["audit"][arm] for p in per if "audit" in p and arm in p["audit"]]
+    if not audits:
+        return None
+    n = len(audits)
+    return {"audit_pass_rate": sum(a["passed"] for a in audits) / n,
+            "rewrite_recommended_rate": sum(a["needs_rewrite"] for a in audits) / n,
+            "critical_findings_rate": sum(a["critical"] for a in audits) / n}
+
+
 def _delta(a, b):
     return None if (a is None or b is None) else round(a - b, 4)
 
@@ -138,10 +168,13 @@ def summarize(per, arms, meta, explain, out, write_traces):
         deltas["framed_postcheck_minus_framed"] = {
             k: _delta(metrics["framed_postcheck"][k], metrics["framed"][k]) for k in DELTA_KEYS}
     label = decide_label(meta["llm_backend"], metrics)
+    audit_metrics = {arm: aggregate_audit(per, arm) for arm in arms} if any("audit" in p for p in per) else None
     report = {"meta": {"n": len(per), "arms": arms, **meta, "judge_backend": "deterministic_rubric",
                        "frozen_thresholds": {"primary": _FROZEN.primary_match,
                                              "secondary": _FROZEN.secondary_match}},
               "metrics": metrics, "trace_completeness": metrics_tc, "deltas": deltas, "label": label}
+    if audit_metrics:
+        report["audit_metrics"] = audit_metrics
 
     print("=" * 74)
     print(f"PHASE 2 — FRAMED-ANSWER EVAL   llm_backend={meta['llm_backend']} "
@@ -162,6 +195,15 @@ def summarize(per, arms, meta, explain, out, write_traces):
     for name, d in deltas.items():
         print(f"  {name}: " + "  ".join(f"{k}={'n/a' if v is None else f'{v:+.3f}'}"
                                         for k, v in d.items()))
+    if audit_metrics:
+        print("-" * 74)
+        print("PHASE 3 ANSWER AUDIT (opt-in; does not affect the Phase 2 scores above)")
+        for k in ("audit_pass_rate", "rewrite_recommended_rate", "critical_findings_rate"):
+            row = "  " + k.ljust(30)
+            for a in arms:
+                v = (audit_metrics.get(a) or {}).get(k)
+                row += ("n/a" if v is None else f"{v:.3f}").rjust(16)
+            print(row)
     print("-" * 74)
     print(f"LABEL: {label}")
     if label == "PHASE2_STUB_SMOKE_ONLY":
@@ -233,6 +275,10 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--explain-failures", action="store_true")
     ap.add_argument("--write-traces", action="store_true")
+    ap.add_argument("--audit-answers", action="store_true",
+                    help="Phase 3: audit each arm's answer vs the frozen frame (default off)")
+    ap.add_argument("--rewrite-mode", default="off", choices=["off", "suggest", "auto"],
+                    help="Phase 3 rewrite policy (default off; 'auto' performs one rewrite)")
     ap.add_argument("--rescore", default=None,
                     help="re-score a saved --write-traces JSON with the current rubric (no LLM re-run)")
     ap.add_argument("--out", default=None)
@@ -249,7 +295,7 @@ def main():
     llm, llm_info = LA.load_llm_adapter(args.llm_backend)
     adapter, provider, sem_info = build_frame_adapter(args.semantic_backend, kb)
 
-    per = []
+    per, audit = [], {}
     for ex in rows:
         trace, terms = frame_for(ex, adapter, provider)
         answers, scores, pc = {}, {}, {"needed_rewrite": False, "reasons": []}
@@ -268,15 +314,20 @@ def main():
             scores[arm] = RB.score_answer(ans, ex, terms)
             if arm == "framed_postcheck":
                 pc = pci
+            if args.audit_answers:
+                audit.setdefault(ex["id"], {})[arm] = audit_arm(ex, trace, ans, llm, args.rewrite_mode)
         complete = (all(a in answers and answers[a] for a in arms)
                     and bool(trace.scores) is not None)
-        per.append({"id": ex["id"], "category": ex.get("category"), "query": ex["query"],
-                    "csr_trace": {"primary_domains": trace.primary_domains,
-                                  "secondary_domains": trace.secondary_domains,
-                                  "rejected_domains": trace.rejected_domains,
-                                  "scores": [s.domain + ":" + str(s.match) for s in trace.scores]},
-                    "answers": answers, "scores": scores, "postcheck": pc,
-                    "trace_complete": 1.0 if complete else 0.0})
+        rec = {"id": ex["id"], "category": ex.get("category"), "query": ex["query"],
+               "csr_trace": {"primary_domains": trace.primary_domains,
+                             "secondary_domains": trace.secondary_domains,
+                             "rejected_domains": trace.rejected_domains,
+                             "scores": [s.domain + ":" + str(s.match) for s in trace.scores]},
+               "answers": answers, "scores": scores, "postcheck": pc,
+               "trace_complete": 1.0 if complete else 0.0}
+        if args.audit_answers:
+            rec["audit"] = audit[ex["id"]]
+        per.append(rec)
 
     summarize(per, arms, {"llm_backend": llm.backend, "llm_info": llm_info,
                           "production_valid": llm.production_valid, "semantic_frame_backend": sem_info},
