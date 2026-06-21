@@ -150,6 +150,25 @@ term was scored from an external definition via the scalable path — no curated
 **DONE** (group-aware R, confusability 0.92→0.67). Remaining prerequisite for a production verdict is
 a **real `embed_fn`** so S can clear the framing thresholds.
 
+## PRODUCTION VERDICT at calibrated thresholds (real_embed_fn, primary=0.20 / secondary=0.05)
+
+| metric | value | criterion | |
+|---|---:|---|:--:|
+| primary_frame_accuracy | **0.712** | ≥0.70 | PASS |
+| unknown_term_generalization | **0.667** | ≥0.60 | PASS |
+| rejected_recall | 0.991 | ≥0.85 | PASS |
+| semantic_veto (S) | 0.947 | ≥0.80 | PASS |
+| ontological_veto (C) | 1.000 | ≥0.80 | PASS |
+| phoneme_overreach_prevention | 1.000 | ≥0.90 | PASS |
+| context_disambiguation | 0.462 | ≥0.60 | miss |
+| expected_primary_misrejected | 0.133 | ≤0.10 | miss |
+
+Landing: primary 42, secondary 9, weak 1, rejected 8 (was 0 primary at the 0.60 default). The two
+misses are the **same 8 misrejections** (failure category 2/3): C ontologically vetoes the *correct*
+blocked-lane domain (fire→heat, apple→fruit, fire→danger — these are context cases, so they depress
+context_disambiguation too) plus paramedic→care S=0. **CONTINUE — one scoped fix (S-gated C penalty)
+addresses both misses.**
+
 ## Verdict (production-valid `real_embed_fn` run)
 - **Vetoes/rejection: PASS, production-valid.** C veto 1.000, S veto 0.947, overreach 1.000,
   rejected_recall 0.991 with real embeddings.
