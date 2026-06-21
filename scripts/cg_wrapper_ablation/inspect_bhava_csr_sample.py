@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """inspect_bhava_csr_sample.py — per-example trace viewer for the Bhava + CSR probe.
 
+LEGACY / PROBE-ONLY — NOT part of the current C×R×S MATCH-filter runtime (csr_match_filter/). Viewer
+for the older hidden-state Bhava probe; read-only, it does not affect CSR scoring or generation.
+
 Interpretability/debugging only (no training, no generation injection, no governance). Reads an
 existing probe run dir (features.npz, labels.json, results.json, config.json) and, for selected
 examples, prints a human-readable trace of every C/S/R component + per-component probe scores +

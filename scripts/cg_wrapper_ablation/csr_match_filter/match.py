@@ -3,6 +3,13 @@
 MATCH(term, domain) = C × R × S  (multiplicative veto). S is the non-phonemic firewall and, together
 with C, holds veto power over MATCH magnitude. The wrapper constrains the answer-space; the base LLM
 (injected, optional) only verbalizes within the CSR-selected frame. No logits, no governance.
+
+NOT A BHAVA LATENT VECTOR. C and R consume the deterministic PHONEMIC 12D profile
+(`compute_12d_profile`, derived from the term's letters — see profile.py); S consumes non-phonemic
+semantic definitions/embeddings (semantic.py). No hidden-state "Bhava" latent vector and no model
+hidden state are used anywhere in Phase 1–3 scoring. The 12D layer names (Identity, Cognition, …) are
+a varna-flavoured phonemic ontology, not a learned Bhava read. Hidden-state / learned-Bhava work is
+Phase 4 only (design + Stage-A plumbing) and is NOT runtime-active here.
 """
 
 from __future__ import annotations

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """extract_bhava_probe_features.py — run a model+checkpoint over labeled examples, save features.
 
+LEGACY / PROBE-ONLY — NOT part of the current C×R×S MATCH-filter runtime (csr_match_filter/). Computes
+and saves a hidden-state Bhava slice (state[0:12]) as read-only telemetry for probe training; it does
+not feed CSR scoring, frame selection, prompts, audit, or rewrite, and does not steer generation.
+
 For each probe-JSONL example, extracts (Deliverable 2):
   A. Bhava value : bhava[12], dominant_bhava, bhava_entropy
   B. CG state    : state32, kosha/vritti/guna/reserved slices

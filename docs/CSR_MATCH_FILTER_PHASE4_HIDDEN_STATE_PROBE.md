@@ -36,6 +36,33 @@ A clean negative result ("hidden-only suffices; Bhava is interpretive, not yet m
 accepted, pre-committed outcome that ends the hidden-state track and keeps C×R×S as a wrapper/audit
 system.
 
+## 2.1 Current Bhava wiring status (factual, as of this audit)
+
+To prevent confusion between the **active CSR phonemic 12D profile** and a **hidden-state Bhava latent
+vector**, the actual wiring today is:
+
+- **CSR Phase 1–3 (active wrapper): Bhava is NOT wired.** C and R consume a deterministic *phonemic*
+  12D profile (`profile.compute_12d_profile`, derived from the term's letters — explicitly "NOT the
+  meaning"); S consumes non-phonemic semantic definitions/embeddings. No Bhava latent vector and no
+  model hidden state enter C×R×S scoring, frame selection, the framed prompt, the answer audit, or the
+  rewrite policy. The varna→bhava-flavoured naming is phonemic, not a latent read.
+- **Old probe path (`scripts/cg_wrapper_ablation/` probe/ablation scripts): passive / probe-only.**
+  `state_bhava = state[0:12]` is computed and saved to `features.npz` and used only to *train/evaluate
+  correlation probes*. It does not feed CSR and does not steer generation; it does not import
+  `csr_match_filter`.
+- **SymbolU training wrapper (`symbolu_training/.../mistral_wrapper.py`): separate subsystem, not CSR.**
+  There `delta_bhava` → `intent_projector` → `phase_adapter` can modify hidden states/logits during
+  model training, but that is a different codebase, uses the *delta* (not the Bhava vector), and is
+  unconnected to the C×R×S wrapper.
+- **Phase 4: planned diagnostic, NOT active.** Stage-A (`phase4_collect_states.py`) collects **raw
+  hidden states only** (manifest `feature_provenance=residual_stream_hidden_state`;
+  `contains_phonemic_12d_profile=false`, `contains_phase1_csr_scores=false`,
+  `contains_csr_trace_vector=false`). The **learned Bhava directions are not yet built** and are not
+  runtime-active anywhere. The `PHASE4_BHAVA_*` labels and "Bhava read" naming in `phase4_probe.py`
+  are placeholders for that unbuilt work, evaluated only on synthetic activations.
+
+**Bottom line:** within CSR, Bhava changes no runtime behavior today (classification: *not wired*).
+
 ## 3. Definitions
 
 - **Bhava (Phase 4)** = a *learned latent state-pattern read from hidden states*. It is **not** an
@@ -50,7 +77,21 @@ system.
 - **The labels** (all from Phase 1–3, deterministic): `object_primary`, `state_primary`,
   `state_object_aligned`, `state_object_conflict`, `frame_compliant`, `frame_violation`,
   `primary_frame_missing`, `secondary_promoted`, `rejected_domain_leak`, `phoneme_overreach`,
-  `audit_pass`, `audit_fail`.
+  `factuality_suspected`, `answer_too_generic`, `audit_pass`, `audit_fail`, **and the meta-parroting
+  family** `meta_parroting` / `frame_label_parroting` / `answering_mode_vs_frame_description_mode`
+  (see §3.0; derived from a deterministic surface detector, `eval_real_output_audit.is_meta_parrot`).
+
+### 3.0 Target state discovered in the Phase 3 real-output run: **frame-echo / meta-parroting**
+
+The Phase 3 real-output audit on real Mistral surfaced a distinct failure mode: under the framed
+prompt the model sometimes **echoes the C×R×S frame labels instead of answering** — e.g. *"The term
+'apple' belongs to the primary domain of fruit"*, *"Primary domain: medicine / Secondary domain:
+(none)"* (rows `poly_001/002/007/008`, `ctxsec_001/002`, `sec_005`). Both the rubric and the auditor
+parse these ambiguously. This is a **generation** behaviour, not an audit bug, and it is an ideal
+Phase 4 probe target: **does the pre-answer hidden state look "parroting/meta" vs "answering"?** Add a
+`frame_echo` label (derived from a deterministic surface detector: answer is dominated by frame-naming
+phrases like "primary domain", "belongs to the domain", "secondary domain") to the Phase 4 label set,
+and include matched answer/meta-parrot pairs in the Stage-B set.
 
 ### 3.1 How the prediction target is constructed (no leakage)
 
@@ -188,6 +229,52 @@ Steps 2–5 are CPU and reproducible from saved activations; only step 1 needs t
 - `tests/test_csr_phase4_probe.py` — CPU tests on **synthetic** activations (probe math, CV grouping,
   dimension-matched control, collapse + leakage detectors) so the harness is verified without a GPU.
 - `RESULTS_PHASE4.md` — the verdict.
+
+## 11.1 Stage-A runbook (RunPod) — built, plumbing only (no Phase 4 claim)
+
+Stage-A ships two modules: `phase4_collect_states.py` (GPU collector) and `phase4_probe.py` (pure-numpy
+probe math, CPU). Activations and metadata are written to a gitignored `runs/csr_phase4/`.
+
+**1 — Collect hidden states (GPU pod).** Reads the Phase 2B-v2 dataset, builds the *frozen* base/framed
+prompts, captures the residual stream at the **final prompt token** (pre-generation) across all layers,
+and labels each row from the saved Phase 2B answers via the frozen Phase 3 audit (no re-generation):
+```
+git pull origin claude/cg-wrapper-quality-ablation-gro5iw
+export CSR_LLM_MODEL="mistralai/Mistral-7B-Instruct-v0.3"
+python scripts/cg_wrapper_ablation/csr_match_filter/phase4_collect_states.py \
+  --data   scripts/cg_wrapper_ablation/csr_match_filter/eval_data/framed_answer_eval_v2_rubricv2.jsonl \
+  --traces runs/csr_phase2b/robustness_eval_v2.json \
+  --arms base,framed --layers all --semantic-backend real \
+  --out-dir runs/csr_phase4
+```
+Outputs: `runs/csr_phase4/phase4_activations.npz` (`X` = [N, n_layers, d_model]),
+`phase4_metadata.jsonl` (aligned labels + `extraction_mode=last_prompt_token_pre_generation`,
+`features_from_answer_tokens=false`), and `phase4_manifest.json`. If you have no saved traces, add
+`--generate` to produce answers *for labels only* (features still come from the prompt forward pass).
+A CPU `--dry-run` (writes zero activations) is available to smoke-test the output schema without a GPU.
+
+**2 — Probe on saved activations (CPU; no GPU needed).** `phase4_probe.py` is a library
+(`evaluate_probe`, `incremental_value`, `effective_rank`, `leakage_check`, `bootstrap_auroc_delta`,
+`decide_phase4`); the Stage-B driver that wires it to `X`/labels is intentionally **not** built yet
+(that's the actual experiment, gated on a feasibility signal). To sanity-check the saved arrays now:
+```
+python - <<'PY'
+import numpy as np
+d = np.load("runs/csr_phase4/phase4_activations.npz", allow_pickle=True)
+print("X", d["X"].shape, "layers", d["layers"], "n", len(d["ids"]))
+PY
+```
+
+**3 — Inspect the layer sweep.** `X[:, L, :]` selects layer `L`; group probes by term using the `id`
+prefix (e.g. `poly_`, `ord_`) for the group-by-term CV. A per-layer `evaluate_probe(X[:,L,:], y, groups)`
+AUROC curve identifies the most decodable layer (chosen *inside* CV folds in Stage B, never globally).
+
+**4 — Interpret decision labels.** `decide_phase4(...)` precedence: `PHASE4_BHAVA_LEAKAGE_SUSPECTED`
+(controls failed) > `PHASE4_BHAVA_COLLAPSE` (effective rank < 3) > `PHASE4_PILOT_INCONCLUSIVE` (CIs too
+wide) > `PHASE4_NOT_PREDICTIVE` (hidden AUROC below floor) > `PHASE4_BHAVA_ADDS_SIGNAL` (beats
+hidden-only AND a dimension-matched random control by ≥0.05 AUROC with non-overlapping CIs) else
+`PHASE4_HIDDEN_STATE_PREDICTIVE`. **Stage-A makes none of these claims** — the labels are tested only
+on synthetic activations (`tests/test_csr_phase4_probe.py`).
 
 ## 12. Out of scope / explicitly future
 
