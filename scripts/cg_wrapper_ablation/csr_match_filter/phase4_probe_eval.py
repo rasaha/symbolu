@@ -152,19 +152,39 @@ def decide_target(units, confound, leak_margin=0.05, arm_floor=0.80, auroc_floor
 
 # ---- run ------------------------------------------------------------------------------------------
 
+def reduce_layers(X3d, n_pca):
+    """GLOBAL label-free PCA per layer, computed ONCE (33 SVDs, not 15k in-fold). Unsupervised — uses
+    no labels, so there is NO target leakage; group-by-term CV still guards the probe. Returns
+    [N, n_layers, n_pca]."""
+    if not n_pca:
+        return X3d
+    outs = []
+    for i in range(X3d.shape[1]):
+        Xi = X3d[:, i, :]
+        if Xi.shape[1] > n_pca:
+            p = PB.pca_fit(Xi, n_pca)
+            outs.append(PB.pca_transform(p, Xi))
+        else:
+            outs.append(Xi)
+    return np.stack(outs, 1)
+
+
 def run(run_dir, targets, exploratory, layers_arg, n_pca, n_splits, n_boot, seed, min_pos):
     X, all_layers, arms, rows = load_run(run_dir)
     layers = all_layers if layers_arg in (None, "all") else [int(x) for x in layers_arg.split(",")]
     lidx = [all_layers.index(L) for L in layers]
     X3d = X[:, lidx, :]
+    Xred = reduce_layers(X3d, n_pca)                          # reduce once, then cheap 32-dim probes
     groups = groups_for(rows)
     arm_bin = (arms == "framed").astype(int)
     report = {"meta": {"run_dir": str(run_dir), "n_rows": len(rows), "layers": layers,
-                       "n_pca": n_pca, "n_splits": n_splits, "n_boot": n_boot, "seed": seed,
-                       "min_pos": min_pos, "stage": "B_hidden_only", "tests": "H1_only"},
+                       "n_pca": n_pca, "pca": "global_label_free_per_layer", "n_splits": n_splits,
+                       "n_boot": n_boot, "seed": seed, "min_pos": min_pos, "stage": "B_hidden_only",
+                       "tests": "H1_only"},
               "targets": {}}
     all_specs = [(t, "primary") for t in targets] + [(t, "exploratory") for t in exploratory]
     for key, role in all_specs:
+        print(f"[phase4-probe] target={key} ({role}) …", flush=True)
         y = labels_for(rows, key)
         if y is None:
             report["targets"][key] = {"role": role, "decision": "PHASE4_INSUFFICIENT_LABEL_POWER",
@@ -173,9 +193,9 @@ def run(run_dir, targets, exploratory, layers_arg, n_pca, n_splits, n_boot, seed
         units = {}
         for unit, sel in (("base", arms == "base"), ("framed", arms == "framed"),
                           ("pooled", np.ones(len(rows), bool))):
-            units[unit] = evaluate_unit(X3d[sel], y[sel], groups[sel], layers, n_pca, n_splits,
-                                        n_boot, seed, min_pos)
-        confound = arm_confound(X3d, arm_bin, y, groups, layers, n_pca, n_splits, seed)
+            units[unit] = evaluate_unit(Xred[sel], y[sel], groups[sel], layers, None, n_splits,
+                                        n_boot, seed, min_pos)   # Xred already PCA-reduced -> n_pca=None
+        confound = arm_confound(Xred, arm_bin, y, groups, layers, None, n_splits, seed)
         decision = decide_target(units, confound)
         report["targets"][key] = {
             "role": role, "balance": {"pooled_pos": int(y.sum()), "pooled_neg": int((y == 0).sum()),
