@@ -200,3 +200,94 @@ def test_labels_from_audit_maps_findings():
     leak = "A doctor is basically about business, market, and trade above all."
     lab2 = PC.labels_from_audit("What is a doctor?", leak, _FRAME, terms=["doctor"])
     assert lab2["audit_fail"] and lab2["rejected_domain_leak"] and lab2["frame_violation"]
+
+
+# ---- diagnostics: manifest / metadata / shape / labels / leakage / dry-run ----------------------
+
+def _good_manifest():
+    return {k: v for k, v in {
+        "model_id": "m", "tokenizer_name": "m", "n_examples": 2, "arms": ["base", "framed"],
+        "n_layers": 3, "d_model": 8, "layers": [0, 1, 2],
+        "extraction_mode": PC.EXTRACTION_MODE, "token_position": -1,
+        "token_position_desc": "final_prompt_token", "features_from_answer_tokens": False,
+        "reads_answer_tokens": False, "feature_provenance": "residual_stream_hidden_state",
+        "contains_phase1_csr_scores": False, "contains_phonemic_12d_profile": False,
+        "contains_csr_trace_vector": False, "prompt_hashes_present": 2, "trace_source": "none",
+        "label_sources": ["none"], "skipped_examples": 0, "dry_run": False,
+        "activations_synthetic": False, "valid_for_phase4_signal": True}.items()}
+
+
+def test_manifest_schema_has_all_required_fields():
+    assert PC.validate_manifest(_good_manifest()) == []
+    bad = _good_manifest(); del bad["d_model"]
+    assert "d_model" in PC.validate_manifest(bad)
+
+
+def test_metadata_has_token_position_fields():
+    ex = {"id": "x", "query": "What is a doctor?", "category": "ordinary"}
+    m = PC.build_metadata_row(0, ex, "framed", "PROMPT", "model", [0, 8, 16],
+                              {"audit_pass": True}, "phase2b_traces", feature_dim=4096,
+                              prompt_token_count=42, final_prompt_token_id=733,
+                              final_prompt_token_text="]", frame_summary={"primary": ["medicine"]},
+                              answer_trace_source_id="x")
+    assert m["prompt_token_count"] == 42 and m["final_prompt_token_id"] == 733
+    assert m["final_prompt_token_text"] == "]" and m["token_position"] == -1
+    assert m["prompt_hash"] == m["prompt_sha256"] and len(m["prompt_hash"]) == 64
+    assert m["csr_frame_summary"] == {"primary": ["medicine"]}
+    assert m["answer_trace_source_id"] == "x"
+    assert m["feature_provenance"] == "residual_stream_hidden_state"
+
+
+def test_shape_validation_catches_mismatched_n(tmp_path):
+    p = tmp_path / "a.npz"
+    X = np.random.default_rng(0).standard_normal((4, 3, 8)).astype("float32")
+    np.savez_compressed(p, X=X, layers=np.array([0, 1, 2]),
+                        ids=np.array(["a", "b", "c"], dtype=object),     # len 3 != N 4
+                        arms=np.array(["base"] * 4, dtype=object))
+    chk = PC.validate_saved_activations(p, expected_n_layers=3)
+    assert chk["ok"] is False and any("len(ids)==N" in i for i in chk["issues"])
+
+
+def test_shape_validation_flags_nan_and_zero_variance(tmp_path):
+    p = tmp_path / "z.npz"
+    X = np.zeros((5, 3, 8), dtype="float32")                              # zero variance
+    np.savez_compressed(p, X=X, layers=np.array([0, 1, 2]),
+                        ids=np.array(["a"] * 5, dtype=object), arms=np.array(["base"] * 5, dtype=object))
+    chk = PC.validate_saved_activations(p, expected_n_layers=3)
+    assert chk["ok"] is False and any("variance" in i for i in chk["issues"])
+
+
+def test_label_balance_warning_below_threshold():
+    meta = [{"labels": {k: (i < 3 and k == "audit_fail") for k in PC.DIAG_LABELS}}
+            for i in range(20)]
+    diag = PC.label_diagnostics(meta, min_pos=5)
+    assert diag["balance"]["audit_fail"]["pos"] == 3
+    assert any("audit_fail" in w for w in diag["warnings"])
+    # missing labels counted
+    diag2 = PC.label_diagnostics([{"labels": None}, {"labels": {k: True for k in PC.DIAG_LABELS}}],
+                                 min_pos=1)
+    assert diag2["n_missing_labels"] == 1
+
+
+def test_leakage_assertions_pass_and_fail():
+    ok = PC.assert_no_feature_leakage(_good_manifest(), [PC.build_metadata_row(
+        0, {"id": "x", "query": "q"}, "base", "p", "m", [0], None, "none")])
+    assert ok["ok"] and not ok["problems"]
+    assert ok["answer_tokens_used_as_features"] is False
+    assert ok["phonemic_12d_in_features"] is False and ok["csr_trace_vector_in_features"] is False
+    bad = _good_manifest(); bad["contains_phonemic_12d_profile"] = True
+    res = PC.assert_no_feature_leakage(bad, [])
+    assert res["ok"] is False and any("phonemic_12d" in p for p in res["problems"])
+
+
+def test_dry_run_marked_non_valid(tmp_path, monkeypatch):
+    import json as _json
+    monkeypatch.setattr(sys, "argv",
+                        ["prog", "--dry-run", "--limit", "2", "--arms", "base,framed",
+                         "--out-dir", str(tmp_path)])
+    PC.main()
+    man = _json.loads((tmp_path / "phase4_manifest.json").read_text())
+    assert man["dry_run"] is True and man["activations_synthetic"] is True
+    assert man["valid_for_phase4_signal"] is False
+    assert man["manifest_complete"] is True and man["leakage_diagnostics"]["ok"] is True
+    assert man["features_from_answer_tokens"] is False
