@@ -22,6 +22,19 @@ from . import registry as REG
 
 PENALTY_WEIGHT = 0.6   # how hard blocked lanes being lit docks R
 
+# S-gate for the phoneme-derived blocked-lane penalty (shared by C and R): only a STRONG semantic
+# match relaxes it. S < C_GATE_LO -> no relaxation (penalty intact); S >= C_GATE_HI -> fully relaxed.
+C_GATE_LO = 0.35
+C_GATE_HI = 0.70
+
+
+def s_gate_suppression(s) -> float:
+    """Fraction by which a strong semantic match S relaxes the phoneme blocked-lane penalty, in [0,1]."""
+    if s is None:
+        return 0.0
+    sc = float(np.clip(s, 0.0, 1.0))
+    return float(np.clip((sc - C_GATE_LO) / (C_GATE_HI - C_GATE_LO), 0.0, 1.0))
+
 
 def group_activations(vec) -> Dict[str, float]:
     """Mean activation of each resonance group for a 12D vector."""
@@ -53,10 +66,13 @@ def _blocked_lanes(domain: str, template=None):
 
 
 def realization_grouped(term_vec, domain: str, template=None,
-                        penalty_weight: float = PENALTY_WEIGHT) -> Tuple[float, Dict]:
+                        penalty_weight: float = PENALTY_WEIGHT, s=None) -> Tuple[float, Dict]:
     """Group-aware R in [0,1] plus a per-group trace.
 
     `template` lets callers score a domain whose template isn't in the registry (e.g. audits).
+    `s` (semantic coherence) S-gates the blocked-lane penalty exactly as in C: a strong semantic match
+    relaxes the phoneme-derived penalty so a correct blocked-lane domain isn't crushed; weak S never
+    relaxes it (so doctor→fruit stays low). Template-vs-template audits pass s=None (full penalty).
     """
     v = np.asarray(term_vec, dtype=float)
     d_vec = np.asarray(template if template is not None else REG.DOMAIN_TEMPLATES[domain].vector, float)
@@ -76,10 +92,11 @@ def realization_grouped(term_vec, domain: str, template=None,
 
     blocked = _blocked_lanes(domain, template)
     pen_raw = float(np.mean([v[REG.LAYER_INDEX[l]] for l in blocked])) if blocked else 0.0
-    penalty = penalty_weight * pen_raw
+    supp = s_gate_suppression(s)                       # strong S relaxes the phoneme blocked penalty
+    penalty = penalty_weight * pen_raw * (1.0 - supp)
     R = float(np.clip(reward - penalty, 0.0, 1.0))
-    trace = {"groups": groups, "reward": round(reward, 4),
-             "blocked_lanes": list(blocked), "penalty": round(penalty, 4), "R": round(R, 4)}
+    trace = {"groups": groups, "reward": round(reward, 4), "blocked_lanes": list(blocked),
+             "penalty": round(penalty, 4), "s_suppression": round(supp, 3), "R": round(R, 4)}
     return R, trace
 
 

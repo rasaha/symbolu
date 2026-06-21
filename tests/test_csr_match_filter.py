@@ -287,6 +287,19 @@ def test_grouped_R_keeps_true_domain_high_and_penalises_blocked():
     assert t_fruit["penalty"] > 0 and t_med["penalty"] == 0   # fruit's blocked lanes are lit
 
 
+def test_grouped_R_penalty_is_s_gated():
+    from csr_match_filter import compute_12d_profile, realization_grouped
+    v = compute_12d_profile("fire")
+    r_none, t_none = realization_grouped(v, "heat")              # template audit path (no S)
+    r_low, _ = realization_grouped(v, "heat", s=0.05)           # weak S: penalty intact
+    r_high, t_high = realization_grouped(v, "heat", s=0.9)      # strong S: penalty relaxed
+    assert r_high >= r_low                                       # strong S rescues R
+    assert t_high["penalty"] <= t_none["penalty"]               # penalty suppressed under high S
+    # weak S must NOT relax (doctor->fruit stays low)
+    vf = compute_12d_profile("doctor")
+    assert realization_grouped(vf, "fruit", s=0.02)[0] < 0.4
+
+
 def test_per_domain_group_weights_override_applied():
     from csr_match_filter import domain_group_weights
     w = domain_group_weights("medicine")

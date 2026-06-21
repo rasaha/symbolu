@@ -16,7 +16,7 @@ import numpy as np
 
 from . import registry as REG
 from .profile import compute_12d_profile, dominant_layers
-from .resonance import realization_flat, realization_grouped
+from .resonance import C_GATE_HI, C_GATE_LO, realization_flat, realization_grouped, s_gate_suppression
 from .semantic import SemanticCoherenceAdapter, compute_semantic_coherence
 
 
@@ -47,11 +47,8 @@ class CSRThresholds:
 
 DEFAULT_THRESHOLDS = CSRThresholds()
 
-# S-gating of the C blocked-lane penalty: only a STRONG semantic match relaxes the ontological veto.
-# S below C_GATE_LO gives no relaxation (the C veto stays intact for moderate/low-S invalid domains);
-# S at/above C_GATE_HI fully suppresses the phoneme-derived blocked-lane penalty.
-C_GATE_LO = 0.35
-C_GATE_HI = 0.70
+# S-gating of the blocked-lane penalty (shared by C and R) lives in resonance.py: C_GATE_LO/HI +
+# s_gate_suppression(). Only a STRONG semantic match relaxes the phoneme-derived penalty.
 
 
 @dataclass
@@ -118,9 +115,7 @@ def compute_constraint(term_vec: np.ndarray, domain: str, s: Optional[float] = N
     blocked_score = mean_over(rule.blocked_high)
     blocked_penalty = 1.0 - blocked_score
     if s is not None:                                  # S-gate: only STRONG semantic support relaxes it
-        sc = float(np.clip(s, 0.0, 1.0))
-        supp = float(np.clip((sc - C_GATE_LO) / (C_GATE_HI - C_GATE_LO), 0.0, 1.0))
-        blocked_penalty = blocked_penalty + (1.0 - blocked_penalty) * supp
+        blocked_penalty = blocked_penalty + (1.0 - blocked_penalty) * s_gate_suppression(s)
     on_names = set(rule.required_high) | set(rule.allowed_high)
     on_target = mean_over(list(on_names)) if on_names else 0.0
     off_names = [n for n in REG.LAYERS_12 if n not in on_names and n not in rule.blocked_high]
@@ -131,15 +126,16 @@ def compute_constraint(term_vec: np.ndarray, domain: str, s: Optional[float] = N
     return float(np.clip(C, 0.0, 1.0))
 
 
-def compute_realization(term_vec: np.ndarray, domain: str, grouped: bool = True):
+def compute_realization(term_vec: np.ndarray, domain: str, grouped: bool = True, s=None):
     """R — realization strength. Group-aware by default (returns (R, trace)); flat cosine optional.
 
     Group-aware R compares per-resonance-group emphasis (weighted per domain) and penalises blocked
     lanes, so domains that differ in which family of structure is active are separable — unlike flat
-    12D cosine, which is near-collinear for all positive templates.
+    12D cosine, which is near-collinear for all positive templates. `s` S-gates the blocked-lane
+    penalty (a strong semantic match relaxes it), parallel to C.
     """
     if grouped:
-        return realization_grouped(term_vec, domain)
+        return realization_grouped(term_vec, domain, s=s)
     return realization_flat(term_vec, domain), None
 
 
@@ -163,8 +159,8 @@ def score_match(term: str, domain: str,
                 term_vec: Optional[np.ndarray] = None) -> CSRMatchScore:
     vec = compute_12d_profile(term) if term_vec is None else term_vec
     S = compute_semantic_coherence(term, domain, adapter)
-    C = compute_constraint(vec, domain, s=S)           # S-gated blocked penalty
-    R, r_trace = compute_realization(vec, domain)
+    C = compute_constraint(vec, domain, s=S)           # S-gated blocked penalty (allowance)
+    R, r_trace = compute_realization(vec, domain, s=S)  # S-gated blocked penalty (realization)
     match = C * R * S
     dec = decide(match, C, S, thr)
     return CSRMatchScore(term, domain, round(C, 4), round(R, 4), round(S, 4),
