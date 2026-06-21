@@ -129,9 +129,15 @@ class _OntologyRulesView:
 
 ONTOLOGY_RULES = _OntologyRulesView()
 
-# Curated term glosses (the non-phonemic "definition(term)" the S firewall reads). Production would
-# pull these from a dictionary/KB/embeddings; here they are seed glosses for the demo terms.
-TERM_GLOSSES: Dict[str, str] = {
+# ----------------------------------------------------------------------------------------------- #
+# DEMO / TEST FIXTURES ONLY — never required by the production path.                                #
+# The S firewall sources term meaning from a definition_provider (dictionary/KB/embeddings) and     #
+# similarity from an embedder; these curated tables exist purely to make the canonical doctor demo  #
+# and the CPU tests deterministic. Do NOT rely on them in production.                               #
+# ----------------------------------------------------------------------------------------------- #
+
+# Demo glosses — also reused (legitimately) as a *known-concept* hint list for term extraction.
+DEMO_TERM_GLOSSES: Dict[str, str] = {
     "doctor": "licensed medical practitioner who diagnoses and treats illness a healer and clinician",
     "healer": "one who restores health a practitioner of healing care and remedy",
     "authority figure": "a person with institutional power to command enforce and govern",
@@ -139,10 +145,14 @@ TERM_GLOSSES: Dict[str, str] = {
     "judge": "official who applies the law in court and renders justice",
 }
 
-# Optional curated S prior for clean, deterministic demos (term, domain) -> similarity in [0,1].
-# This stands in for an embedding model; it is non-phonemic (keyed on meaning, not sound).
-CURATED_SEMANTIC: Dict[tuple, float] = {
+# Demo curated S prior (term, domain) -> similarity in [0,1]; stands in for an embedding model.
+DEMO_CURATED_SEMANTIC: Dict[tuple, float] = {
     ("doctor", "medicine"): 0.97, ("doctor", "care"): 0.86, ("doctor", "authority"): 0.48,
     ("doctor", "law"): 0.28, ("doctor", "service"): 0.55, ("doctor", "commerce"): 0.12,
     ("doctor", "fruit"): 0.02,
 }
+
+# Back-compat aliases (deprecated names). TERM_GLOSSES is consumed by term extraction as a
+# known-concept list; CURATED_SEMANTIC is a demo fixture only.
+TERM_GLOSSES = DEMO_TERM_GLOSSES
+CURATED_SEMANTIC = DEMO_CURATED_SEMANTIC

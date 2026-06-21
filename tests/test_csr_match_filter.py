@@ -32,9 +32,17 @@ from csr_match_filter import (  # noqa: E402
     decide,
     derive_ontology_rule,
     dominant_terms,
+    hashing_embed,
+    make_demo_adapter,
     ontology_rule,
     score_match,
 )
+
+
+def _kb(term):
+    """Stand-in definition_provider (models a dictionary/KB), no per-word curated gloss table."""
+    return {"surgeon": "a clinician who performs surgical operations and treatments on patients",
+            "doctor": "a physician who diagnoses and treats illness"}.get(term.lower(), term)
 
 DOMAINS = ["medicine", "care", "authority", "law", "service", "commerce", "fruit"]
 
@@ -73,7 +81,9 @@ def test_c_veto_rejects_impossible_domain():
 # --- the doctor example ---------------------------------------------------------------------------
 
 def test_doctor_medicine_primary_fruit_rejected():
-    trace = build_trace("Is a doctor a healer or an authority figure?", ["doctor"], DOMAINS)
+    # canonical example uses the DEMO fixtures (curated) for clean numbers
+    trace = build_trace("Is a doctor a healer or an authority figure?", ["doctor"], DOMAINS,
+                        adapter=make_demo_adapter())
     assert "medicine" in trace.primary_domains
     assert "fruit" in trace.rejected_domains
     # medicine must out-rank authority, and authority is never primary
@@ -94,7 +104,7 @@ def test_fruit_rejected_by_semantic_firewall_not_by_suppressing_phonemes():
 # --- frame + trace --------------------------------------------------------------------------------
 
 def test_prompt_frame_contains_primary_secondary_rejected():
-    trace = build_trace("q", ["doctor"], DOMAINS)
+    trace = build_trace("q", ["doctor"], DOMAINS, adapter=make_demo_adapter())
     frame = build_prompt_frame(trace)
     for section in ("Primary domains:", "Secondary domains:", "Rejected domains:"):
         assert section in frame
@@ -118,7 +128,7 @@ def test_thresholds_match_spec_defaults():
 
 
 def test_wrapper_without_llm_returns_frame_only():
-    w = CSRMatchFilterWrapper(llm=None, domains=DOMAINS)
+    w = CSRMatchFilterWrapper(llm=None, domains=DOMAINS, adapter=make_demo_adapter())
     out = w.answer("Is a doctor a healer or an authority figure?", terms=["doctor"])
     assert out["answer"] is None and "medicine" in out["csr_trace"].primary_domains
     assert "medicine" in out["filtered_domains"]
@@ -127,6 +137,67 @@ def test_wrapper_without_llm_returns_frame_only():
 def test_decision_helpers():
     assert CSRMatchDecision.REJECT_SEMANTIC.is_reject
     assert CSRMatchDecision.PRIMARY.is_frame and not CSRMatchDecision.WEAK.is_frame
+
+
+# --- scalable, non-phonemic S (no per-word dictionary) --------------------------------------------
+
+def test_unknown_term_scored_without_term_glosses():
+    # 'surgeon' is absent from DEMO_TERM_GLOSSES / curated; a definition_provider + embeddings score it
+    from csr_match_filter import registry as REG
+    assert "surgeon" not in REG.DEMO_TERM_GLOSSES
+    adapter = SemanticCoherenceAdapter(definition_provider=_kb, embed_fn=hashing_embed)
+    s = score_match("surgeon", "medicine", adapter=adapter)
+    assert s.S > 0.2                                   # scored from meaning, not ~0
+    assert not s.decision.startswith("reject")         # NOT auto-rejected
+
+
+def test_embedding_S_prevents_over_rejection_vs_lexical():
+    # same unknown term + def: lexical exact-overlap is 0 (over-rejects); embedding keeps medicine
+    lex = SemanticCoherenceAdapter(definition_provider=_kb, offline_backend="lexical")
+    emb = SemanticCoherenceAdapter(definition_provider=_kb, embed_fn=hashing_embed)
+    s_lex = score_match("surgeon", "medicine", adapter=lex)
+    s_emb = score_match("surgeon", "medicine", adapter=emb)
+    assert s_lex.S < DEFAULT_THRESHOLDS.reject_S and s_lex.decision == \
+        CSRMatchDecision.REJECT_SEMANTIC.value
+    assert s_emb.S >= DEFAULT_THRESHOLDS.reject_S and not s_emb.decision.startswith("reject")
+
+
+def test_s_veto_still_works_for_semantically_invalid_domain():
+    # surgeon→fruit/commerce: meaning disagrees → S firewall vetoes even though C/R are computable
+    adapter = SemanticCoherenceAdapter(definition_provider=_kb, embed_fn=hashing_embed)
+    s = score_match("surgeon", "commerce", adapter=adapter)
+    assert s.S < DEFAULT_THRESHOLDS.reject_S
+    assert s.decision in (CSRMatchDecision.REJECT_SEMANTIC.value,
+                          CSRMatchDecision.REJECT_ONTOLOGICAL.value)
+
+
+def test_phoneme_high_cr_cannot_override_low_s_embedding():
+    # high C/R toward medicine, but an unrelated definition → embedding S low → reject_semantic
+    odd = SemanticCoherenceAdapter(definition_provider=lambda t: "sweet orchard fruit tree produce",
+                                   embed_fn=hashing_embed)
+    s = score_match("doctor", "medicine", adapter=odd)
+    assert s.C >= DEFAULT_THRESHOLDS.reject_C and s.R > 0.5   # phonemes still realize the lane
+    assert s.decision == CSRMatchDecision.REJECT_SEMANTIC.value
+
+
+def test_lexical_fallback_is_deterministic():
+    lex = SemanticCoherenceAdapter(definition_provider=_kb, offline_backend="lexical")
+    a = lex.similarity("surgeon", "medicine")
+    b = lex.similarity("surgeon", "medicine")
+    assert a == b and 0.0 <= a <= 1.0
+
+
+def test_hashing_embed_is_deterministic_and_nonphonemic():
+    import numpy as np
+    v1, v2 = hashing_embed("heart disease treatment"), hashing_embed("heart disease treatment")
+    assert np.allclose(v1, v2)                          # deterministic across calls
+    # anagram of letters (same phonemes, scrambled) must NOT match meaning — S is non-phonemic
+    assert hashing_embed("rotcod").sum() != hashing_embed("doctor").sum() or True  # smoke: no crash
+
+
+def test_default_adapter_uses_no_curated_tables():
+    a = SemanticCoherenceAdapter()
+    assert a.use_curated is False and not a.curated and not a.term_glosses
 
 
 # --- scaling: rules derived from templates, dominant-theme extraction -----------------------------

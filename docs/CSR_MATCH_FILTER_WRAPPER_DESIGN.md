@@ -69,9 +69,10 @@ is what confirms or vetoes meaning. **Phonemes alone never determine meaning.**
   S = semantic_similarity(definition(term), definition(domain))
   ```
   Computed from **words/definitions/taxonomy/embeddings** — never from phonemes. This is the firewall
-  that prevents phoneme-only claims. In the MVP the backend is a pluggable
-  `SemanticCoherenceAdapter` (lexical-overlap default, optional curated/embedding prior). Production
-  should use sentence embeddings or RAG metadata.
+  that prevents phoneme-only claims. The backend is a pluggable `SemanticCoherenceAdapter`: term text
+  via a `definition_provider`, similarity via `embed_fn` (real embeddings in production; a built-in
+  deterministic hashing embedder offline; explicit `lexical` mode for the simplest tests). It needs
+  **no per-word dictionary** — see §5b. Production should use sentence embeddings or RAG metadata.
 
 ## 4. Zero-kill (veto) rules and thresholds
 
@@ -130,6 +131,34 @@ every query token × every domain.
   theme (multi-word known concepts first, then content words by salience, dropping filler/question
   words). This keeps the term axis small (latency) and on-topic (relevance). Candidate domains can be
   similarly pre-filtered by retrieval before scoring.
+
+## 5b. Scalable S — no per-word dictionary required
+
+S is **external semantic coherence, not phonemic**. It is built so it never needs a hand-maintained
+per-word gloss table:
+
+- **Term meaning comes from a `definition_provider(term) → text`** (a dictionary / KB / WordNet / LLM
+  gloss). If none is supplied, the raw term text is used. There is **no required per-term curated
+  dictionary**.
+- **Similarity comes from `embed_fn`** (a real sentence embedder) in production:
+  `S = cos(embed(definition(term)), embed(domain_definition))`. Offline/CPU falls back to a built-in
+  **deterministic hashing embedder** (signed feature-hash of stemmed tokens) so unknown terms are
+  still scored without the automatic over-rejection that exact-token overlap causes; a pure `lexical`
+  overlap mode remains available for the simplest deterministic tests.
+- **Curated `(term, domain)` scores and curated glosses are DEMO/TEST fixtures only**
+  (`DEMO_CURATED_SEMANTIC`, `DEMO_TERM_GLOSSES`), opt-in via `use_curated`. They make the canonical
+  doctor example deterministic; they are never on the production path. The default adapter uses no
+  curated tables.
+
+**What you DO curate — the ontology, not a dictionary.** The only required curation is a **small
+domain registry**: per lane a 12D **template** and a short **definition**. Ontology allowance rules
+are then *derived* from the template (§5a). That registry *is* your ontology — a bounded, deliberate
+artifact — not an open-ended word list.
+
+**Worked contrast** (`demo_unknown_term.py`, term `surgeon`, absent from all fixtures):
+lexical `S(medicine)=0.000` → over-rejects; embedding `S(medicine)=0.387` → kept (`weak`); `fruit`
+and unrelated lanes are vetoed by the S firewall. The term is scored entirely from its provided
+definition — no curated gloss, no curated S.
 
 ## 6. Behavior hooks (what makes it behavioral, not decoration)
 
@@ -191,10 +220,12 @@ phoneme-only mappings (then S/templates need rework before any further investmen
 scripts/cg_wrapper_ablation/csr_match_filter/
   registry.py   — LAYERS_12, OntologyRule, DomainTemplate, DOMAIN_REGISTRY, glosses/keywords
   profile.py    — compute_12d_profile(term)  (phoneme/letter → varna-ish → 12D)
-  semantic.py   — SemanticCoherenceAdapter (non-phonemic), compute_semantic_coherence
+  semantic.py   — SemanticCoherenceAdapter (non-phonemic): definition_provider + embed_fn,
+                  hashing_embed (offline), lexical fallback, make_demo_adapter (fixtures)
   match.py      — CSRMatchScore/Trace/Decision dataclasses, scoring, thresholds,
                   build_trace, build_prompt_frame, csr_alignment, CSRMatchFilterWrapper
-  demo_doctor.py
+  demo_doctor.py        — canonical example (uses demo fixtures)
+  demo_unknown_term.py  — scalable S: unknown term scored via definition_provider + embeddings
 ```
 
 No governance/trust, no generation-injection, no logit access. CPU-only (numpy), API-mode wrapper.

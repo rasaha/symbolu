@@ -36,12 +36,17 @@ from .registry import (
     derive_ontology_rule,
     ontology_rule,
 )
-from .semantic import SemanticCoherenceAdapter, compute_semantic_coherence
+from .semantic import (
+    SemanticCoherenceAdapter,
+    compute_semantic_coherence,
+    hashing_embed,
+    make_demo_adapter,
+)
 
 __all__ = [
     "LAYERS_12", "OntologyRule", "DomainTemplate", "DOMAIN_TEMPLATES", "ONTOLOGY_RULES",
     "DOMAIN_REGISTRY", "compute_12d_profile", "compute_12d_profile_dict", "dominant_layers",
-    "SemanticCoherenceAdapter",
+    "SemanticCoherenceAdapter", "hashing_embed", "make_demo_adapter",
     "compute_semantic_coherence", "compute_constraint", "compute_realization", "decide",
     "score_match", "build_trace", "build_prompt_frame", "csr_alignment", "dominant_terms",
     "derive_ontology_rule", "ontology_rule", "ONTOLOGY_OVERRIDES", "CSRMatchScore",

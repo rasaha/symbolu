@@ -22,6 +22,7 @@ from csr_match_filter import (  # noqa: E402
     build_prompt_frame,
     compute_12d_profile,
     dominant_layers,
+    make_demo_adapter,
 )
 
 
@@ -30,7 +31,9 @@ def main() -> int:
     terms = ["doctor"]
     domains = ["medicine", "care", "authority", "law", "service", "commerce", "fruit"]
 
-    wrapper = CSRMatchFilterWrapper(llm=None, domains=domains)
+    # canonical example uses the DEMO fixtures (curated glosses + curated S) for clean numbers;
+    # see demo_unknown_term.py for the scalable embedding path with no curation.
+    wrapper = CSRMatchFilterWrapper(llm=None, domains=domains, adapter=make_demo_adapter())
     trace = wrapper.analyze(query, terms=terms)
 
     vec = compute_12d_profile("doctor")
