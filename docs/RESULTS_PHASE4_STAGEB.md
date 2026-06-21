@@ -139,3 +139,34 @@ gate is `phase4_subset_analysis.py`: failure must stay predictable **within the 
 proceed to **Stage-B2** (does a learned Bhava read add over the hidden-only baseline, under the strict
 incremental-value gate?); (c) if the signal is mostly across-row-type prompt detection → the H1 result
 is partly an artifact of the drift dataset and Stage-B2 is not yet justified.
+
+## 9. Field-stress vs sample-size + row-type confound (phase4_subset_analysis) — gate result
+
+**[1] Power gain is BOTH field stress and sample size.** Downsampling the expanded field to the old
+n=220 (×10) still beats the old set at the same size: frame_violation 0.726 vs 0.628; rejected_leak
+0.780 vs 0.569; audit_fail 0.715 vs 0.560 (+0.10…+0.21). Full n=1032 is higher still — so the
+adversarial rows are *intrinsically stronger* and there are also simply more of them.
+
+**[2] Row-type confound — the decisive control.** `hidden→row_type AUROC = 1.00`: the hidden state
+trivially encodes whether a prompt is adversarial, so the test is whether failure stays predictable
+*within* a single row type (N-matched@110):
+
+| target | original_v2 | drift_onframe | drift_adversarial (matched) | gate |
+|---|---|---|---|---|
+| frame_violation | 0.679 | 0.785 | 0.746 (0.699) | ✅ genuine in every subset |
+| rejected_domain_leak | 0.591 (7 pos) | 0.535 (17 pos) | 0.771 (0.853) | ✅ genuine where leaks occur |
+| audit_fail | 0.628 | 0.787 | 0.719 (0.461) | ⚠️ fragile within-subset |
+
+**Result:** the prompt-style-detection confound is **CLEARED for `frame_violation` and
+`rejected_domain_leak`** — failure is predictable within a single row type, not merely across types —
+*despite* the hidden state perfectly encoding row type. **`audit_fail` does NOT clear cleanly** (within
+the adversarial subset it collapses under N-matching, 0.719→0.461, while the other two stay stable),
+so it is **demoted to a noisy secondary** target. Honest claim scope: the within-arm pre-answer signal
+is strongest in the adversarially-stressed regime and present-but-weaker on ordinary prompts
+(frame_violation ≈0.68 within original_v2).
+
+**Pre-Stage-B2 gate: PASSED** for `frame_violation` (framed) and `rejected_domain_leak`
+(adversarial/framed). Clean hidden-only baselines to beat: frame_violation ≈0.76, rejected_leak ≈0.83
+(framed). Stage-B2 question (unchanged, strict): does a learned Bhava read add **≥0.05 AUROC** over
+this hidden-only baseline with **non-overlapping CIs**, **and** beat a dimension-matched random control
+**and** a decoded-token baseline? `audit_fail` stays diagnostic-only.
