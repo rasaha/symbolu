@@ -39,26 +39,62 @@ User query
 - **[X] Experimental** — correlational, model-dependent, heavy; gated, not part of the deterministic core.
 - **[P] Patent-described / future** — appears in patent text; NOT implemented or validated in this repo.
 
-## 4. Vritti registry — "how the answer is moving"
-Vritti is a deterministic function of the Phase 3 audit `finding_types` (the validated detectors):
-`('frame_compliant','primary_frame_missing','secondary_promoted_to_primary','rejected_domain_promoted',
-'rejected_domain_mentioned_as_refutation','alternate_true_sense_allowed','phoneme_overreach_claim',
-'factuality_suspected','answer_too_generic')` plus `is_meta_parrot`.
+## 4. Vritti — the FIVE cognitive states (canonical) + a derived movement layer
+There are **two distinct things** that must not be conflated:
 
-| Vritti mode | source (audit finding) | status |
+### 4.1 Canonical Vritti = the five cognitive states (Yoga Sūtra 1.6; patent `p_v`)
+Vritti proper is a **distribution `p_v` over five cognitive states**, not a set of drift labels. It is
+the `p_v[v]` used by the patent's template-fit `φ_t(t|p_v)` and relevance score.
+
+```
+V = {Pramāṇa, Viparyaya, Vikalpa, Nidrā, Smṛti}
+  = {Evidence,  Error,    Imagination, Latency, Memory}
+p_v = [p_evidence, p_error, p_imagination, p_latency, p_memory]   # sums to 1
+```
+
+| state (Sanskrit) | English | operational reading in the answer-audit context | candidate deterministic proxy | status |
+|---|---|---|---|---|
+| Pramāṇa | Evidence / valid cognition | grounded, factual, stays on the C×R×S primary frame | `frame_compliant ∧ factuality_preserved` | **[N]** proxy / **[P]** canonical |
+| Viparyaya | Error / misperception | false claim or rejected-domain assertion | `factuality_suspected ∨ rejected_domain_promoted` | **[N]/[P]** |
+| Vikalpa | Imagination / conceptual-only (verbal construct, no object) | frame-label parroting / contentless abstraction | `is_meta_parrot ∨ answer_too_generic(conceptual)` | **[N]/[P]** |
+| Nidrā | Latency / inertia (absence) | non-answer, empty, generic escape, refusal | `answer_too_generic(low-content)` | **[N]/[P]** |
+| Smṛti | Memory / recall | repetition/retrieval of supplied material | `must_include` verbatim recall | **[N]/[P]** |
+
+**Status is [P]/[N], NOT [V]/[D]:** the patent computes `p_v` via a syllable→softmax
+`p_v(v|σ,c)=softmax_v(W_v·features(σ,c))` — **[P], not implemented**. A *deterministic audit-derived
+proxy distribution* over the five states is **[N] (new, unvalidated)** — the audit findings only loosely
+and partially cover the five, and the mapping above is interpretive. **Do not claim the five Vrittis are
+decoded** from anything today.
+
+### 4.2 Patent template-fit `φ_t` (reference, [P], not implemented)
+```
+φ_t(t | p_v) = softmax_t( β · [ w_t^Evidence·p_v[Evidence] + w_t^Imagination·p_v[Imagination]
+                              + w_t^Error·p_v[Error] + w_t^Latency·p_v[Latency]
+                              + w_t^Memory·p_v[Memory] ] )
+```
+Older 3-state form uses `{Pramāṇa, Vikalpa, Viparyaya}`. This `φ_t` and the relevance score that consumes
+it (§8) are **patent-scope, not built here**.
+
+### 4.3 Derived **movement / trajectory** layer (NOT the five Vrittis — a separate diagnostic)
+What my earlier draft called "Vritti modes" are really **trajectory diagnostics over the audit** — *how
+the answer moved relative to the frame* — and are a DIFFERENT object from the five-state `p_v`. Kept,
+but renamed to avoid conflation, and used for policy hooks:
+
+| trajectory mode | source (audit finding) | status |
 |---|---|---|
-| `primary_frame_stable` | `frame_compliant` (audit passed) | **[D]** |
+| `primary_frame_stable` | `frame_compliant` | **[D]** |
 | `secondary_promoted` | `secondary_promoted_to_primary` | **[D]** |
 | `rejected_domain_drift` | `rejected_domain_promoted` | **[D]** |
 | `primary_frame_missing` | `primary_frame_missing` | **[D]** |
-| `frame_parroting` | `is_meta_parrot` (⚠ detector over-fires, 64% — needs tightening) | **[N]** (fix detector) |
+| `frame_parroting` | `is_meta_parrot` (⚠ over-fires ~64% — needs tightening) | **[N]** |
 | `generic_escape` | `answer_too_generic` | **[D]** |
 | `phoneme_overreach` | `phoneme_overreach_claim` | **[D]** |
 | `associative_jump` / `domain_jump` / `over_expansion` | — (no detector today) | **[N]** |
 
-Vritti is intended to drive: rewrite triggers, secondary-frame demotion, domain-jump penalties,
-retrieval/rerank filtering, and audit finding categories. **Most Vritti modes are [D]** — a renaming of
-findings the frozen auditor already emits.
+The trajectory layer is **[D]** (relabels validated findings) and is what drives the deterministic
+policy hooks (§6). The canonical five-state `p_v` (§4.1) is **[P]/[N]** and is NOT required by the
+deterministic product — it belongs to the patent symbolic engine and any future, separately-validated
+build of it.
 
 ## 5. Guna registry — "quality of expression"
 | Guna quality | source | status |
