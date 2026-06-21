@@ -82,9 +82,15 @@ MATCH by expected role (hashing; real shows the same shape with a higher primary
 | expected-secondary | 50 | 0.029 | 0.000 |
 | expected-rejected | 111 | 0.003 | 0.000 |
 
-Expected-primary (~0.23) vs expected-rejected (~0.003) are **cleanly separated**. F1-optimal cutoffs:
-**suggested primary ≈ 0.075 (F1 0.852)**, secondary ≈ 0.005 (F1 0.808) — vs the current 0.60/0.30
-defaults. Re-run with `--calibrate` on the real backend for the production cutoffs.
+Expected-primary (~0.28 real / ~0.23 hashing) vs expected-rejected (~0.003) are **cleanly separated**.
+Real-S F1-optimal: **primary ≈ 0.195 (F1 0.83)**, secondary ≈ 0.012 (use ≈0.05 to keep `other` out).
+Held-out (even/odd split) cutoffs are stable (t≈0.07–0.13, test-F1 0.79–0.85) → they generalise.
+
+**What-if at calibrated thresholds** (`--primary-threshold 0.195 --secondary-threshold 0.05`, hashing):
+`primary_frame_accuracy 0.000 → 0.627`, `unknown_term_generalization → 0.647`,
+`context_disambiguation → 0.308`, **vetoes unchanged** (C 1.0 / S 0.947 / overreach 1.0). The same
+sweep on `real_embed_fn` is the production calibration. Defaults stay 0.60/0.30 in code until adopted
+via `CSRThresholds`.
 
 ## Template-quality audit — finding and FIX
 

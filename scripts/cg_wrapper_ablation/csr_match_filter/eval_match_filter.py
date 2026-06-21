@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from csr_match_filter import (  # noqa: E402
     DOMAIN_TEMPLATES,
+    CSRThresholds,
     SemanticCoherenceAdapter,
     build_trace,
     compute_12d_profile,
@@ -168,7 +169,7 @@ def _primary_correct(P, Sec, R, EP, ESec, ER):
     return EP_ <= P and not (P & ER_) and P <= (EP_ | ESec_)
 
 
-def run_eval(rows, adapter, provider):
+def run_eval(rows, adapter, provider, thr=None):
     per = []
     rej_tp = rej_fp = rej_fn = 0
     sem_tot = sem_ok = ont_tot = ont_ok = ovr_tot = ovr_ok = 0
@@ -181,7 +182,8 @@ def run_eval(rows, adapter, provider):
     for ex in rows:
         provider.context = ex.get("context")
         cand = ex["candidate_domains"]
-        trace = build_trace(ex["query"], ex["dominant_terms"], cand, adapter=adapter)
+        trace = build_trace(ex["query"], ex["dominant_terms"], cand, adapter=adapter,
+                            thr=thr or CSRThresholds())
         dec = {s.domain: s.decision for s in trace.scores}
         P, Sec, R = set(trace.primary_domains), set(trace.secondary_domains), set(trace.rejected_domains)
         EP, ESec, ER = ex["expected_primary"], ex["expected_secondary"], ex["expected_rejected"]
@@ -346,8 +348,23 @@ def calibrate_thresholds(match_by_role):
                 best_f1, best_t_ = f1, t
         return round(best_t_, 3), round(best_f1, 3)
 
-    pt, pf1 = best_t(mbr["primary"], mbr["secondary"] + mbr["rejected"] + mbr["other"])
-    st, sf1 = best_t(mbr["primary"] + mbr["secondary"], mbr["rejected"])
+    pos_p, neg_p = mbr["primary"], mbr["secondary"] + mbr["rejected"] + mbr["other"]
+    # secondary: keep 'other' as negatives too, so the cutoff doesn't sweep unlabeled domains in
+    pos_s, neg_s = mbr["primary"] + mbr["secondary"], mbr["rejected"] + mbr["other"]
+    pt, pf1 = best_t(pos_p, neg_p)
+    st, sf1 = best_t(pos_s, neg_s)
+
+    def _f1_at(t, pos, neg):
+        tp = sum(1 for x in pos if x >= t); fp = sum(1 for x in neg if x >= t)
+        fn = sum(1 for x in pos if x < t)
+        return round(tp / (tp + 0.5 * (fp + fn)), 3) if (tp + fp + fn) else None
+
+    # held-out check: fit the primary cutoff on even-indexed scores, score odd-indexed (and swap)
+    def holdout(pos, neg):
+        pe, po = pos[::2], pos[1::2]; ne, no = neg[::2], neg[1::2]
+        ta, _ = best_t(pe, ne); tb, _ = best_t(po, no)
+        return {"fit_A_test_B": {"t": ta, "f1": _f1_at(ta, po, no) if ta is not None else None},
+                "fit_B_test_A": {"t": tb, "f1": _f1_at(tb, pe, ne) if tb is not None else None}}
 
     def stats(xs):
         a = np.asarray(xs, float)
@@ -357,6 +374,7 @@ def calibrate_thresholds(match_by_role):
     return {"by_role_match": {k: stats(v) for k, v in mbr.items()},
             "suggested_primary_threshold": pt, "primary_f1_at_suggested": pf1,
             "suggested_secondary_threshold": st, "secondary_f1_at_suggested": sf1,
+            "primary_holdout": holdout(pos_p, neg_p),
             "current_defaults": {"primary": 0.60, "secondary": 0.30}}
 
 
@@ -372,7 +390,12 @@ def print_calibration(res):
           f"(F1={c['primary_f1_at_suggested']})   [current default 0.60]")
     print(f"  suggested secondary threshold = {c['suggested_secondary_threshold']} "
           f"(F1={c['secondary_f1_at_suggested']})   [current default 0.30]")
-    print("  NOTE: suggestions only — adopt via CSRThresholds, do not hard-tune blindly.")
+    ho = c["primary_holdout"]
+    print(f"  held-out primary cutoff: fit-A/test-B t={ho['fit_A_test_B']['t']} "
+          f"F1={ho['fit_A_test_B']['f1']}   fit-B/test-A t={ho['fit_B_test_A']['t']} "
+          f"F1={ho['fit_B_test_A']['f1']}  (stable => generalises)")
+    print("  NOTE: suggestions only — adopt via CSRThresholds; verify with --primary-threshold/"
+          "--secondary-threshold before changing defaults.")
 
 
 def resonance_confusability(domains):
@@ -405,7 +428,7 @@ def mean_primary_S(rows, adapter, provider):
 
 # --- reporting ------------------------------------------------------------------------------------
 
-def run_one(backend, rows, kb):
+def run_one(backend, rows, kb, thr=None):
     provider = ContextualDefinitionProvider(kb)
     audit = {}
     made = make_adapter(backend, provider, audit)
@@ -415,7 +438,7 @@ def run_one(backend, rows, kb):
             return None, info
     else:
         adapter, info = made, None
-    metrics, counts, per = run_eval(rows, adapter, provider)
+    metrics, counts, per = run_eval(rows, adapter, provider, thr)
     usage = backend_usage(audit, backend)
     return {"backend": backend, "info": info, "metrics": metrics, "counts": counts,
             "usage": usage, "per": per, "mean_primary_S": mean_primary_S(rows, adapter, provider)}, info
@@ -492,6 +515,10 @@ def main():
     ap.add_argument("--calibrate", action="store_true",
                     help="report F1-optimal primary/secondary cutoffs for the MATCH distribution "
                          "(analysis only; does not change the 0.60/0.30 defaults)")
+    ap.add_argument("--primary-threshold", type=float, default=None,
+                    help="WHAT-IF: evaluate at this primary MATCH cutoff (defaults unchanged in code)")
+    ap.add_argument("--secondary-threshold", type=float, default=None,
+                    help="WHAT-IF: evaluate at this secondary MATCH cutoff")
     ap.add_argument("--json", default=None)
     args = ap.parse_args()
 
@@ -499,10 +526,19 @@ def main():
     kb = load_kb(args.kb)
     all_domains = sorted({d for ex in rows for d in ex["candidate_domains"]})
 
+    thr = None
+    if args.primary_threshold is not None or args.secondary_threshold is not None:
+        thr = CSRThresholds(primary_match=args.primary_threshold if args.primary_threshold is not None
+                            else 0.60,
+                            secondary_match=args.secondary_threshold if args.secondary_threshold
+                            is not None else 0.30)
+        print(f"[what-if] evaluating at primary={thr.primary_match} secondary={thr.secondary_match} "
+              f"(code defaults unchanged)")
+
     backends = ["hashing", "lexical", "demo", "real"] if args.compare else [args.semantic_backend]
     results = {}
     for b in backends:
-        res, info = run_one(b, rows, kb)
+        res, info = run_one(b, rows, kb, thr)
         if res is None:
             print(f"[skip] backend '{b}' unavailable: {info}")
             continue
