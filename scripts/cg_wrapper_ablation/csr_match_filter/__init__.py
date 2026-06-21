@@ -21,6 +21,7 @@ from .match import (
     compute_realization,
     csr_alignment,
     decide,
+    dominant_terms,
     score_match,
 )
 from .profile import compute_12d_profile, compute_12d_profile_dict, dominant_layers
@@ -28,9 +29,12 @@ from .registry import (
     DOMAIN_REGISTRY,
     DOMAIN_TEMPLATES,
     LAYERS_12,
+    ONTOLOGY_OVERRIDES,
     ONTOLOGY_RULES,
     DomainTemplate,
     OntologyRule,
+    derive_ontology_rule,
+    ontology_rule,
 )
 from .semantic import SemanticCoherenceAdapter, compute_semantic_coherence
 
@@ -39,7 +43,8 @@ __all__ = [
     "DOMAIN_REGISTRY", "compute_12d_profile", "compute_12d_profile_dict", "dominant_layers",
     "SemanticCoherenceAdapter",
     "compute_semantic_coherence", "compute_constraint", "compute_realization", "decide",
-    "score_match", "build_trace", "build_prompt_frame", "csr_alignment", "CSRMatchScore",
+    "score_match", "build_trace", "build_prompt_frame", "csr_alignment", "dominant_terms",
+    "derive_ontology_rule", "ontology_rule", "ONTOLOGY_OVERRIDES", "CSRMatchScore",
     "CSRMatchTrace", "CSRMatchDecision", "CSRThresholds", "DEFAULT_THRESHOLDS",
     "CSRMatchFilterWrapper",
 ]

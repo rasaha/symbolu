@@ -93,7 +93,7 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
 
 def compute_constraint(term_vec: np.ndarray, domain: str) -> float:
     """C — ontological allowance: required layers lit, blocked layers dark, mass on-target."""
-    rule = REG.ONTOLOGY_RULES[domain]
+    rule = REG.ontology_rule(domain)   # hand-tagged override if present, else derived from template
     idx = REG.LAYER_INDEX
 
     def mean_over(names):
@@ -272,15 +272,48 @@ class CSRMatchFilterWrapper:
         return result
 
 
-def _default_term_extractor(query: str) -> List[str]:
-    """MVP term extractor: known glosses found in the query, else capitalised/long nouns-ish tokens."""
+# filler / question / generic words that are never the dominant theme of a query
+_THEME_STOP = {
+    "is", "are", "was", "were", "the", "a", "an", "of", "to", "or", "and", "more", "most", "than",
+    "what", "which", "who", "whom", "whose", "why", "how", "does", "do", "did", "can", "could",
+    "would", "should", "explain", "whether", "about", "between", "kind", "type", "sort", "really",
+    "actually", "just", "like", "figure", "thing", "something", "someone",
+}
+
+
+def dominant_terms(query: str, k: int = 2) -> List[str]:
+    """Pick the dominant word(s)/theme of the user input — not every token.
+
+    Keeps the term axis small (latency) and focused (relevance). Multi-word known glosses
+    (e.g. 'authority figure') are the strongest theme signal; otherwise rank content words by a
+    light salience (length + position, minus filler/question words).
+    """
     import re
     q = query.lower()
-    found = [t for t in REG.TERM_GLOSSES if t in q]
-    if found:
-        return found
-    toks = [w for w in re.findall(r"[a-zA-Z]+", query) if len(w) > 3]
-    return toks[:5] or toks
+    glosses = sorted((t for t in REG.TERM_GLOSSES if t in q), key=lambda t: -len(t))
+    claimed = set()
+    chosen: List[str] = []
+    for g in glosses:                       # prefer multi-word themes, longest first
+        if not any(w in claimed for w in g.split()):
+            chosen.append(g)
+            claimed.update(g.split())
+    toks = re.findall(r"[A-Za-z]+", query)
+    cands = []
+    for i, w in enumerate(toks):
+        lw = w.lower()
+        if lw in _THEME_STOP or len(lw) <= 3 or lw in claimed:
+            continue
+        salience = len(lw) + (1.5 if w[0].isupper() and i > 0 else 0) - 0.1 * i
+        cands.append((salience, i, lw))
+    for _, _, w in sorted(cands, key=lambda x: (-x[0], x[1])):
+        if w not in chosen:
+            chosen.append(w)
+    return chosen[:k] if chosen else (toks[:1] or [query])
+
+
+def _default_term_extractor(query: str) -> List[str]:
+    """Default wrapper extractor — the dominant theme of the query."""
+    return dominant_terms(query)
 
 
 def _generate(llm, prompt: str, n: int) -> List[str]:

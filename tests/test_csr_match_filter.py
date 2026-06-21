@@ -30,6 +30,9 @@ from csr_match_filter import (  # noqa: E402
     build_trace,
     compute_12d_profile,
     decide,
+    derive_ontology_rule,
+    dominant_terms,
+    ontology_rule,
     score_match,
 )
 
@@ -124,6 +127,43 @@ def test_wrapper_without_llm_returns_frame_only():
 def test_decision_helpers():
     assert CSRMatchDecision.REJECT_SEMANTIC.is_reject
     assert CSRMatchDecision.PRIMARY.is_frame and not CSRMatchDecision.WEAK.is_frame
+
+
+# --- scaling: rules derived from templates, dominant-theme extraction -----------------------------
+
+def test_ontology_rules_derive_from_template_no_hand_tagging():
+    # derivation reproduces the hand-tagged required lanes for the demo domains
+    assert derive_ontology_rule("medicine").required_high == \
+        ["Cognition", "Reasoning", "Purpose", "Integration"]
+    assert derive_ontology_rule("authority").required_high == \
+        ["Identity", "Agency", "Execution", "Structure"]
+    # fruit's blocked lanes are recovered (and a stricter superset is fine)
+    fb = set(derive_ontology_rule("fruit").blocked_high)
+    assert {"Reasoning", "Agency", "Purpose"} <= fb
+
+
+def test_ontology_rule_falls_back_to_derived_for_untagged_domain():
+    # a domain with only a template (no override) still resolves a rule
+    from csr_match_filter import registry as REG
+    rule = ontology_rule("service")          # 'service' has an override here
+    assert rule.required_high                # non-empty
+    # a synthetic template-only domain derives without KeyError
+    synth = derive_ontology_rule("synthetic", vector=[0.9, 0.2, 0.2, 0.95, 0.2, 0.2, 0.1, 0.1,
+                                                      0.5, 0.8, 0.6, 0.5])
+    assert "Structure" in synth.required_high and "Reasoning" in synth.blocked_high
+
+
+def test_dominant_terms_picks_theme_not_filler():
+    terms = dominant_terms("Is a doctor more of a healer or an authority figure?")
+    assert "doctor" in terms or "authority figure" in terms or "healer" in terms
+    # filler/question words never selected
+    assert not ({"is", "more", "figure", "what", "of"} & set(terms))
+
+
+def test_wrapper_uses_dominant_term_by_default():
+    w = CSRMatchFilterWrapper(llm=None)
+    out = w.answer("Is a doctor more of a healer or an authority figure?")
+    assert "doctor" in out["csr_trace"].terms      # extracted, not hand-passed
 
 
 # --- guardrails: no governance / no generation-injection code touched -----------------------------

@@ -115,6 +115,22 @@ User query
 The base LLM is never asked to decide ontology. **CSR constrains the answer-space; the LLM verbalizes
 within it.**
 
+## 5a. Scaling — no per-domain hand tagging, dominant-theme focus
+
+Two costs would otherwise blow up: authoring `required/allowed/blocked` for every domain, and scoring
+every query token × every domain.
+
+- **Ontology rules are derived, not tagged.** A domain's allowance is already implied by its 12D
+  template — high layers are required/allowed, low layers are blocked. `derive_ontology_rule(domain)`
+  recovers this (it reproduces the hand-tagged `medicine`/`authority` required lanes exactly), so a new
+  domain needs only a template (which can itself come from a definition/embedding). Hand-tagged rules
+  remain as **optional overrides** (`ONTOLOGY_OVERRIDES`) where precision matters; `ontology_rule()`
+  resolves override-else-derived.
+- **Score the dominant theme, not every token.** `dominant_terms(query)` selects the head word(s)/
+  theme (multi-word known concepts first, then content words by salience, dropping filler/question
+  words). This keeps the term axis small (latency) and on-topic (relevance). Candidate domains can be
+  similarly pre-filtered by retrieval before scoring.
+
 ## 6. Behavior hooks (what makes it behavioral, not decoration)
 
 1. **Retrieval filtering** — drop domains with `MATCH < secondary_match` (or any `reject_*`) from RAG,

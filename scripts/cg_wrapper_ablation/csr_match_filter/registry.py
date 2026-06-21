@@ -10,7 +10,7 @@ maintained registry and S from real embeddings. Nothing here touches governance/
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 LAYERS_12: List[str] = [
     "Potential", "Identity", "Execution", "Structure",
@@ -86,8 +86,48 @@ _ONTOLOGY = {
 DOMAIN_TEMPLATES: Dict[str, DomainTemplate] = {
     d: DomainTemplate(d, _TEMPLATES[d], _DEFINITIONS[d], _KEYWORDS[d]) for d in _TEMPLATES
 }
-ONTOLOGY_RULES: Dict[str, OntologyRule] = _ONTOLOGY
+# Hand-tagged rules are now OPTIONAL OVERRIDES, kept only where precision matters. Any domain with a
+# 12D template gets its rule auto-derived (see derive_ontology_rule) — no per-domain tagging required.
+ONTOLOGY_OVERRIDES: Dict[str, OntologyRule] = _ONTOLOGY
 DOMAIN_REGISTRY: List[str] = sorted(DOMAIN_TEMPLATES)
+
+
+def derive_ontology_rule(domain: str, vector: Optional[List[float]] = None,
+                         required_min: float = 0.70, allowed_min: float = 0.65,
+                         blocked_max: float = 0.30, k_required: int = 4) -> OntologyRule:
+    """Derive an OntologyRule from a domain's 12D template (no hand tagging).
+
+    The template already encodes which lanes a domain lives in: its high layers are required/allowed,
+    its low layers are blocked. This is what makes the registry scale to arbitrary domains — author a
+    template (or derive one from a definition/embedding) and the allowance rule follows.
+    """
+    vec = vector if vector is not None else DOMAIN_TEMPLATES[domain].vector
+    ranked = sorted(zip(LAYERS_12, vec), key=lambda nv: -nv[1])
+    required = [n for n, v in ranked if v >= required_min][:k_required]
+    allowed = [n for n, v in zip(LAYERS_12, vec) if v >= allowed_min and n not in required]
+    blocked = [n for n, v in zip(LAYERS_12, vec) if v <= blocked_max]
+    return OntologyRule(domain, required, allowed, blocked)
+
+
+def ontology_rule(domain: str) -> OntologyRule:
+    """Resolve a domain's allowance rule: hand-tagged override if present, else derived from template."""
+    if domain in ONTOLOGY_OVERRIDES:
+        return ONTOLOGY_OVERRIDES[domain]
+    if domain in DOMAIN_TEMPLATES:
+        return derive_ontology_rule(domain)
+    raise KeyError(f"unknown domain '{domain}' (no override and no template)")
+
+
+# Back-compat alias: a mapping-like view that resolves overrides-or-derived on access.
+class _OntologyRulesView:
+    def __getitem__(self, domain: str) -> OntologyRule:
+        return ontology_rule(domain)
+
+    def __contains__(self, domain: str) -> bool:
+        return domain in ONTOLOGY_OVERRIDES or domain in DOMAIN_TEMPLATES
+
+
+ONTOLOGY_RULES = _OntologyRulesView()
 
 # Curated term glosses (the non-phonemic "definition(term)" the S firewall reads). Production would
 # pull these from a dictionary/KB/embeddings; here they are seed glosses for the demo terms.
