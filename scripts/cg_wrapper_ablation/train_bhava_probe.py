@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """train_bhava_probe.py — train/evaluate lightweight probes over the extracted features.
 
+LEGACY / PROBE-ONLY — NOT part of the current C×R×S MATCH-filter runtime (csr_match_filter/). Passive
+correlation analysis over a hidden-state Bhava slice (state[0:12]); it does not feed CSR scoring, frame
+selection, prompts, audit, or rewrite, and does not steer generation.
+
 Evaluates each feature set (bhava_only, cg_state_32d, delta_bhava_only, hidden_only,
 hidden_plus_bhava, hidden_plus_cg_state) with k-fold OOF logistic regression, computes the paired
 hidden_plus_bhava-vs-hidden_only comparison, and writes results.json for the report generator.

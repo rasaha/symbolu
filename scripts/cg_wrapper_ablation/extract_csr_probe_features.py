@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """extract_csr_probe_features.py — features for the static CSR = Context x Semantic x Resonance probe.
 
+LEGACY / PROBE-ONLY — NOT part of the current C×R×S MATCH-filter runtime (csr_match_filter/). NOTE the
+name collision: this "CSR" probe is an older state[0:12]-based experiment, distinct from the active
+C×R×S MATCH-filter. The hidden-state Bhava slice here is read-only telemetry for probe training; it
+does not feed the MATCH-filter scoring, frame, prompt, or audit, and does not steer generation.
+
 Per labeled example, extracts (docs/STL_CSR_REFACTOR_PLAN.md), each with per-component availability:
   state_bhava (state[0:12]+entropy)  [also saved as 'bhava' for the legacy probe]
   state32                            (32D CG state baseline)

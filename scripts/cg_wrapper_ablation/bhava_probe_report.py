@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """bhava_probe_report.py — results.json -> report.md + summary.json (Deliverable 5).
 
+LEGACY / PROBE-ONLY — NOT part of the current C×R×S MATCH-filter runtime (csr_match_filter/). Reports
+correlation-probe results over a hidden-state Bhava slice; nothing here affects CSR runtime behavior.
+
 Answers, per label_type and overall:
   1. Does Bhava beat chance?
   2. Does Bhava beat delta-Bhava?

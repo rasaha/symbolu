@@ -5,6 +5,13 @@ seed mapping). The output is a phonemic-ontological *realization* — NOT the me
 used for C (allowance) and R (realization). Meaning is confirmed separately by the non-phonemic S
 firewall (semantic.py). If the real varna pipeline is importable it is preferred; otherwise this
 built-in table runs (CPU-only, no torch).
+
+IMPORTANT — THIS IS NOT A BHAVA LATENT VECTOR. The 12D output here is a deterministic
+phonemic/orthographic realization profile computed from the term's *letters*. It is NOT a hidden-state
+"Bhava" latent vector, NOT a learned probe direction, and NOT derived from any model activation. The
+varna→bhava-flavoured naming (and the layer names in registry.py) describes a phonemic ontology, not a
+latent Bhava read. Any hidden-state / learned-Bhava work belongs to Phase 4 (not built, not
+runtime-active). See docs/CSR_MATCH_FILTER_PHASE4_HIDDEN_STATE_PROBE.md §"Current Bhava wiring status".
 """
 
 from __future__ import annotations

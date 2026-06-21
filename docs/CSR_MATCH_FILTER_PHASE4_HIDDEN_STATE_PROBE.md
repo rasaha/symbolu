@@ -36,6 +36,33 @@ A clean negative result ("hidden-only suffices; Bhava is interpretive, not yet m
 accepted, pre-committed outcome that ends the hidden-state track and keeps C×R×S as a wrapper/audit
 system.
 
+## 2.1 Current Bhava wiring status (factual, as of this audit)
+
+To prevent confusion between the **active CSR phonemic 12D profile** and a **hidden-state Bhava latent
+vector**, the actual wiring today is:
+
+- **CSR Phase 1–3 (active wrapper): Bhava is NOT wired.** C and R consume a deterministic *phonemic*
+  12D profile (`profile.compute_12d_profile`, derived from the term's letters — explicitly "NOT the
+  meaning"); S consumes non-phonemic semantic definitions/embeddings. No Bhava latent vector and no
+  model hidden state enter C×R×S scoring, frame selection, the framed prompt, the answer audit, or the
+  rewrite policy. The varna→bhava-flavoured naming is phonemic, not a latent read.
+- **Old probe path (`scripts/cg_wrapper_ablation/` probe/ablation scripts): passive / probe-only.**
+  `state_bhava = state[0:12]` is computed and saved to `features.npz` and used only to *train/evaluate
+  correlation probes*. It does not feed CSR and does not steer generation; it does not import
+  `csr_match_filter`.
+- **SymbolU training wrapper (`symbolu_training/.../mistral_wrapper.py`): separate subsystem, not CSR.**
+  There `delta_bhava` → `intent_projector` → `phase_adapter` can modify hidden states/logits during
+  model training, but that is a different codebase, uses the *delta* (not the Bhava vector), and is
+  unconnected to the C×R×S wrapper.
+- **Phase 4: planned diagnostic, NOT active.** Stage-A (`phase4_collect_states.py`) collects **raw
+  hidden states only** (manifest `feature_provenance=residual_stream_hidden_state`;
+  `contains_phonemic_12d_profile=false`, `contains_phase1_csr_scores=false`,
+  `contains_csr_trace_vector=false`). The **learned Bhava directions are not yet built** and are not
+  runtime-active anywhere. The `PHASE4_BHAVA_*` labels and "Bhava read" naming in `phase4_probe.py`
+  are placeholders for that unbuilt work, evaluated only on synthetic activations.
+
+**Bottom line:** within CSR, Bhava changes no runtime behavior today (classification: *not wired*).
+
 ## 3. Definitions
 
 - **Bhava (Phase 4)** = a *learned latent state-pattern read from hidden states*. It is **not** an
