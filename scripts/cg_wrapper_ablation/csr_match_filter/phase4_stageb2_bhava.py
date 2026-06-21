@@ -327,11 +327,17 @@ def main():
             report["ablations"][name][tgt] = {"mode_predicts_target_auroc": a, "n_classes": len(classes)}
 
     primary_decisions = {t: report["targets"][t]["decision"] for t in targets if t in report["targets"]}
-    overall = ("PHASE4_BHAVA_ADDS_SIGNAL"
-               if any(d == "PHASE4_BHAVA_ADDS_SIGNAL" for d in primary_decisions.values())
-               else "PHASE4_BHAVA_LEAKAGE_SUSPECTED"
-               if any(d == "PHASE4_BHAVA_LEAKAGE_SUSPECTED" for d in primary_decisions.values())
-               else "PHASE4_HIDDEN_ONLY_SUFFICIENT")
+    ds = set(primary_decisions.values())
+    if "PHASE4_BHAVA_ADDS_SIGNAL" in ds:
+        overall = "PHASE4_BHAVA_ADDS_SIGNAL"
+    elif "PHASE4_BHAVA_LEAKAGE_SUSPECTED" in ds:
+        overall = "PHASE4_BHAVA_LEAKAGE_SUSPECTED"
+    elif ds and ds == {"PHASE4_BHAVA_COLLAPSE"}:        # surface collapse rather than mask it
+        overall = "PHASE4_BHAVA_COLLAPSE"
+    elif "PHASE4_BHAVA_NO_INCREMENTAL_SIGNAL" in ds:
+        overall = "PHASE4_BHAVA_NO_INCREMENTAL_SIGNAL"
+    else:
+        overall = "PHASE4_HIDDEN_ONLY_SUFFICIENT"
     report["overall_primary_verdict"] = overall
 
     out = Path(args.out) if args.out else Path(args.run_dir) / "phase4_stageb2_bhava.json"
