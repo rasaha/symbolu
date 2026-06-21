@@ -5,6 +5,22 @@
 > Mistral-7B-Instruct-v0.3, real frame (`all-MiniLM-L6-v2`), deterministic judge. rubric_v1, the frozen
 > scorer, and the framed prompt are UNCHANGED.
 
+## 🧊 PHASE 2B-v2 CLOSEOUT (FROZEN)
+
+- ✅ **Deterministic gates all pass** (primary, rejected-avoidance, overreach, factuality, trace) —
+  robustly, lift distributed across 10/10 categories with no single-category domination.
+- ✅ **Primary-frame lift survives** — +0.154 (base 0.609 → framed 0.764) on the held-out set under a
+  rubric locked before the run.
+- ✅ **Factuality regression disappears** — framed = base = 0.945 (Δ 0.000); the Phase 2B-v1 −0.073 was
+  a rubric_v1 artifact (factuality↔must_not coupling), removed by decoupling factuality to `false_claims`.
+- ⚖️ **Final label remains `PHASE2B_V2_NEEDS_HUMAN_REVIEW`** — *because the judge is deterministic*. The
+  harness will not certify a full `ROBUSTNESS_PASS` on a deterministic proxy.
+
+**Next recommended work: Phase 2C — independent (LLM/human) judge validation. NOT architecture changes.**
+rubric_v2 is locked and will not be modified; no rescoring with changed scoring. **Phase 2B-v2 stops here.**
+
+---
+
 ## Verdict: `PHASE2B_V2_NEEDS_HUMAN_REVIEW` — the Phase 2 lift SURVIVED; full pass needs an independent judge
 
 Under the decoupled rubric_v2, **every deterministic gate passes robustly and the v1 factuality
