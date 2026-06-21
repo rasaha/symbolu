@@ -81,6 +81,16 @@ lower `critical_findings_rate` than base. A real-LLM audit eval is the recommend
 `PHASE3_ANSWER_AUDIT_PASS` (F1 ≥ 0.95, rewrite P/R ≥ 0.9, false_rewrite ≤ 0.05, 0 missed critical);
 else `PHASE3_AUDIT_NEEDS_HUMAN_REVIEW`. **This run: `PHASE3_ANSWER_AUDIT_PASS`.**
 
+## Observation from the real-output run: meta-parroting (a Phase 2/2B generation quirk)
+
+Meta-parroting is a Phase 2/2B generation quirk where the framed model echoes the semantic-frame
+labels instead of answering the user (e.g. *"The term 'apple' belongs to the primary domain of fruit"*,
+*"Primary domain: medicine / Secondary domain: none"*). It is **not** an audit-rule defect, a C×R×S
+scorer defect, or a rubric_v2 defect — it is a generation-state / prompt-following drift (the model
+chooses *frame-description mode* over *answering mode*). It is a useful **Phase 4 hidden-state probe
+target**: can last-prompt-token hidden states predict answering-mode vs frame-label-parroting-mode
+before generation begins? See `docs/CSR_MATCH_FILTER_PHASE4_HIDDEN_STATE_PROBE.md` §3.0.
+
 ## Phase 2 runner integration (opt-in, off by default)
 
 `eval_framed_answers.py` gains `--audit-answers` and `--rewrite-mode {off,suggest,auto}` (default

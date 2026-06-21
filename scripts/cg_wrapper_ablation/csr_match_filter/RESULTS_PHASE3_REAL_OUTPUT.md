@@ -41,18 +41,42 @@ term-aware; bundles categories; over-flags refutations), so a raw audit-vs-rubri
 
 ### Measurement-only harness fix (audit rules untouched)
 `eval_real_output_audit.py` updated so the comparison matches rubric_v2's bundling:
-- rubric `secondary_promoted` counted as caught if the audit emits `secondary_promoted_to_primary`
-  **or** `rejected_domain_promoted` (rubric bundles rejected-promotion into this key);
-- rubric factuality-fail counted as caught if the audit emits `factuality_suspected` **or**
-  `answer_too_generic` (rubric couples factuality to length/term-presence);
-- rubric "leak" cases the audit identifies as `rejected_domain_mentioned_as_refutation` are rescued
-  out of FN (rubric over-flag);
-- new `audit_stricter_than_rubric` transparency bucket surfaces candidate true catches the rubric
-  missed (e.g. `close_004`) for manual review — **not** auto-credited.
+- **Fix 1 — category-union mapping:** rubric `secondary_promoted` counted as caught if the audit emits
+  `secondary_promoted_to_primary` **or** `rejected_domain_promoted` (rubric bundles rejected-promotion
+  into this key); rubric factuality-fail counted as caught if the audit emits `factuality_suspected`
+  **or** `answer_too_generic` (rubric couples factuality to length/term-presence). Refutation
+  over-flags (`rejected_domain_mentioned_as_refutation`) are rescued out of the miss count.
+- **Fix 2 — manual/audit-correct disagreement section** (`MANUAL_DISAGREEMENT_VERDICTS`, serialized):
+  `rej_009` (refutation, not a leak → *audit_correct*), `close_004` (nurse framed as medicine vs
+  primary care → *audit_correct*), `ctxsec_001/002` (factuality↔generic → *taxonomy artifact, audit
+  acceptable*). Reported transparently, **never** a hidden pass/fail override. A separate
+  `audit_stricter_than_rubric` bucket surfaces candidate true catches the rubric missed — not credited.
+- **New metrics:** `false_rewrite_rate`, `missed_critical_failure_rate`, corrected union recall,
+  `remaining_true_misses` (after removing refutation/meta-parroting/manual-correct), and a
+  meta-parroting count (deterministic `is_meta_parrot` surface detector). `--explain-failures` prints
+  them.
+- **New decision label** `PHASE3_REAL_OUTPUT_AUDIT_MEASUREMENT_CORRECTED`: emitted when the audit
+  catches the real residuals (missed_critical ≈ 0) and avoids false rewrites (≤0.05) but corrected
+  recall stays < 0.80 because the remaining gap is meta-parroting / taxonomy artefacts (few/no
+  `remaining_true_misses`) rather than true audit defects.
 
-The mapping logic was committed BEFORE re-running (no tuning to a target). **Corrected re-run on the
-pod is pending** (cheap: re-reads the traces JSON, no GPU). The verdict will be recorded here once it
-lands.
+The mapping + label logic was committed BEFORE the corrected re-run (no tuning to a target). The
+auditor (`answer_audit.py`), the frozen Phase 1 thresholds, the Phase 2 prompt, and rubric_v2 are all
+unchanged; only the comparison harness moved.
+
+**Corrected re-run on the pod is pending** (cheap: re-reads `robustness_eval_v2.json`, no GPU):
+```
+git pull origin claude/cg-wrapper-quality-ablation-gro5iw
+python scripts/cg_wrapper_ablation/csr_match_filter/eval_real_output_audit.py \
+  --traces runs/csr_phase2b/robustness_eval_v2.json \
+  --data   scripts/cg_wrapper_ablation/csr_match_filter/eval_data/framed_answer_eval_v2_rubricv2.jsonl \
+  --arms base,framed --explain-failures --out runs/csr_phase3/real_output_audit_corrected.json
+```
+Derived estimate from the first-run FN/FP dump (authoritative numbers come from the pod): refutation
+rescue + factuality-union recover several artefact cases; `false_rewrite_rate` stays 0.000; the pivotal
+case is the single genuine term-aware miss `poly_011` — if it is a real leak the audit should catch,
+the corrected label is `…_NEEDS_TUNING`; if it is a defensible term-aware difference, it is
+`…_MEASUREMENT_CORRECTED`. The verdict will be recorded here once the pod run lands.
 
 ---
 

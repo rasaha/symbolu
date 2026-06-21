@@ -50,7 +50,9 @@ system.
 - **The labels** (all from Phase 1–3, deterministic): `object_primary`, `state_primary`,
   `state_object_aligned`, `state_object_conflict`, `frame_compliant`, `frame_violation`,
   `primary_frame_missing`, `secondary_promoted`, `rejected_domain_leak`, `phoneme_overreach`,
-  `audit_pass`, `audit_fail`.
+  `factuality_suspected`, `answer_too_generic`, `audit_pass`, `audit_fail`, **and the meta-parroting
+  family** `meta_parroting` / `frame_label_parroting` / `answering_mode_vs_frame_description_mode`
+  (see §3.0; derived from a deterministic surface detector, `eval_real_output_audit.is_meta_parrot`).
 
 ### 3.0 Target state discovered in the Phase 3 real-output run: **frame-echo / meta-parroting**
 
