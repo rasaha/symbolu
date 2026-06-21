@@ -25,12 +25,20 @@ from .match import (
     score_match,
 )
 from .profile import compute_12d_profile, compute_12d_profile_dict, dominant_layers
+from .resonance import (
+    domain_group_weights,
+    group_activations,
+    realization_flat,
+    realization_grouped,
+)
 from .registry import (
+    DOMAIN_GROUP_WEIGHTS,
     DOMAIN_REGISTRY,
     DOMAIN_TEMPLATES,
     LAYERS_12,
     ONTOLOGY_OVERRIDES,
     ONTOLOGY_RULES,
+    RESONANCE_GROUPS,
     DomainTemplate,
     OntologyRule,
     derive_ontology_rule,
@@ -47,6 +55,8 @@ __all__ = [
     "LAYERS_12", "OntologyRule", "DomainTemplate", "DOMAIN_TEMPLATES", "ONTOLOGY_RULES",
     "DOMAIN_REGISTRY", "compute_12d_profile", "compute_12d_profile_dict", "dominant_layers",
     "SemanticCoherenceAdapter", "hashing_embed", "make_demo_adapter",
+    "RESONANCE_GROUPS", "DOMAIN_GROUP_WEIGHTS", "group_activations", "domain_group_weights",
+    "realization_grouped", "realization_flat",
     "compute_semantic_coherence", "compute_constraint", "compute_realization", "decide",
     "score_match", "build_trace", "build_prompt_frame", "csr_alignment", "dominant_terms",
     "derive_ontology_rule", "ontology_rule", "ONTOLOGY_OVERRIDES", "CSRMatchScore",

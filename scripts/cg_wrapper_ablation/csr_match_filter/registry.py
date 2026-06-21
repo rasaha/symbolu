@@ -19,6 +19,31 @@ LAYERS_12: List[str] = [
 ]
 LAYER_INDEX: Dict[str, int] = {name: i for i, name in enumerate(LAYERS_12)}
 
+# Resonance groups — families of the 12 ontological layers. Group-aware R compares per-group
+# activations (relative emphasis across families), not just a flat 12D cosine, so domains that differ
+# in WHICH families they emphasize become separable even when their raw vectors are near-collinear.
+RESONANCE_GROUPS: Dict[str, List[str]] = {
+    "ground":    ["Potential", "Identity"],              # being / origin
+    "force":     ["Execution", "Agency", "Structure"],   # doing / power / form
+    "intellect": ["Cognition", "Reasoning"],             # knowing
+    "telos":     ["Purpose", "Integration"],             # direction / wholeness
+    "field":     ["Witness", "Unifying", "Absolving"],   # awareness / unity / release
+}
+
+# Optional per-domain group weights (relative importance of each resonance group to the domain).
+# Domains absent here have weights DERIVED from their own group activations. Group-match rewards
+# emphasis agreement; a separate penalty (see resonance.py) docks R when the domain's blocked lanes
+# are lit. Weights need not sum to 1 (they are normalised).
+DOMAIN_GROUP_WEIGHTS: Dict[str, Dict[str, float]] = {
+    # intellect (cognition/reasoning) + telos (purpose/integration) lead; force + ground support
+    "medicine":  {"intellect": 0.35, "telos": 0.30, "force": 0.20, "ground": 0.15},
+    # ground (identity) + force (agency/execution/structure) lead; a little intellect (reasoning)
+    "authority": {"ground": 0.35, "force": 0.50, "intellect": 0.15},
+    # ground (potential) + force (structural/biological form) + field; reasoning/agency/purpose are
+    # penalised as blocked lanes, not weighted here
+    "fruit":     {"ground": 0.50, "force": 0.30, "field": 0.20},
+}
+
 
 @dataclass(frozen=True)
 class OntologyRule:

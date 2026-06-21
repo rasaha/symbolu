@@ -237,6 +237,54 @@ def test_wrapper_uses_dominant_term_by_default():
     assert "doctor" in out["csr_trace"].terms      # extracted, not hand-passed
 
 
+# --- group-aware R (resonance) --------------------------------------------------------------------
+
+def test_group_activations_cover_all_layers():
+    from csr_match_filter import RESONANCE_GROUPS, group_activations, LAYERS_12
+    covered = [l for lanes in RESONANCE_GROUPS.values() for l in lanes]
+    assert sorted(covered) == sorted(LAYERS_12)          # families partition the 12 layers
+    ga = group_activations([0.5] * 12)
+    assert set(ga) == set(RESONANCE_GROUPS) and all(abs(v - 0.5) < 1e-9 for v in ga.values())
+
+
+def test_grouped_R_reduces_template_confusability():
+    import numpy as np
+    from csr_match_filter import DOMAIN_TEMPLATES, realization_flat, realization_grouped
+    doms = sorted(DOMAIN_TEMPLATES)
+    flat = [realization_flat(DOMAIN_TEMPLATES[a].vector, b)
+            for a in doms for b in doms if a != b]
+    grp = [realization_grouped(DOMAIN_TEMPLATES[a].vector, b)[0]
+           for a in doms for b in doms if a != b]
+    # group-aware R is more separable: lower mean off-diagonal, larger spread
+    assert np.mean(grp) < np.mean(flat) - 0.1
+    assert np.std(grp) > np.std(flat)
+
+
+def test_grouped_R_keeps_true_domain_high_and_penalises_blocked():
+    from csr_match_filter import compute_12d_profile, realization_grouped
+    v = compute_12d_profile("doctor")
+    r_med, t_med = realization_grouped(v, "medicine")
+    r_fruit, t_fruit = realization_grouped(v, "fruit")
+    assert r_med > 0.85 and r_fruit < 0.4                # doctor realizes medicine, not fruit
+    assert t_fruit["penalty"] > 0 and t_med["penalty"] == 0   # fruit's blocked lanes are lit
+
+
+def test_per_domain_group_weights_override_applied():
+    from csr_match_filter import domain_group_weights
+    w = domain_group_weights("medicine")
+    assert w["intellect"] == max(w.values())             # medicine leads on intellect (0.35)
+    assert w["field"] == 0.0
+
+
+def test_r_groups_trace_attached_and_serialises():
+    s = score_match("doctor", "medicine")
+    assert s.r_groups and set(s.r_groups["groups"]) and "reward" in s.r_groups
+    trace = build_trace("q", ["doctor"], ["medicine", "fruit"])
+    import json
+    parsed = json.loads(trace.to_json())                 # r_groups survives JSON round-trip
+    assert any(sc.get("r_groups") for sc in parsed["scores"])
+
+
 # --- guardrails: no governance / no generation-injection code touched -----------------------------
 
 def test_no_governance_or_generation_imports():

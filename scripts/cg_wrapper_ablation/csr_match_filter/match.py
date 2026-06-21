@@ -16,6 +16,7 @@ import numpy as np
 
 from . import registry as REG
 from .profile import compute_12d_profile, dominant_layers
+from .resonance import realization_flat, realization_grouped
 from .semantic import SemanticCoherenceAdapter, compute_semantic_coherence
 
 
@@ -55,7 +56,8 @@ class CSRMatchScore:
     R: float
     S: float
     match: float
-    decision: str   # CSRMatchDecision value
+    decision: str                       # CSRMatchDecision value
+    r_groups: Optional[dict] = None      # group-aware R trace (per resonance group + penalty)
 
 
 @dataclass
@@ -112,10 +114,16 @@ def compute_constraint(term_vec: np.ndarray, domain: str) -> float:
     return float(np.clip(C, 0.0, 1.0))
 
 
-def compute_realization(term_vec: np.ndarray, domain: str) -> float:
-    """R — realization strength: cosine of the 12D profile with the domain template."""
-    tmpl = np.asarray(REG.DOMAIN_TEMPLATES[domain].vector, dtype=float)
-    return float(np.clip(_cosine(term_vec, tmpl), 0.0, 1.0))
+def compute_realization(term_vec: np.ndarray, domain: str, grouped: bool = True):
+    """R — realization strength. Group-aware by default (returns (R, trace)); flat cosine optional.
+
+    Group-aware R compares per-resonance-group emphasis (weighted per domain) and penalises blocked
+    lanes, so domains that differ in which family of structure is active are separable — unlike flat
+    12D cosine, which is near-collinear for all positive templates.
+    """
+    if grouped:
+        return realization_grouped(term_vec, domain)
+    return realization_flat(term_vec, domain), None
 
 
 def decide(match: float, C: float, S: float,
@@ -138,12 +146,12 @@ def score_match(term: str, domain: str,
                 term_vec: Optional[np.ndarray] = None) -> CSRMatchScore:
     vec = compute_12d_profile(term) if term_vec is None else term_vec
     C = compute_constraint(vec, domain)
-    R = compute_realization(vec, domain)
+    R, r_trace = compute_realization(vec, domain)
     S = compute_semantic_coherence(term, domain, adapter)
     match = C * R * S
     dec = decide(match, C, S, thr)
     return CSRMatchScore(term, domain, round(C, 4), round(R, 4), round(S, 4),
-                         round(match, 4), dec.value)
+                         round(match, 4), dec.value, r_groups=r_trace)
 
 
 def build_trace(query: str, terms: List[str], domains: List[str],

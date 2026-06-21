@@ -43,17 +43,22 @@ is `MATCH≈0.33` → lands in **secondary** (0.30–0.60), never crossing the *
 for the threshold. A real embedder (S≈0.85–0.97, as the demo-curated doctor shows → MATCH 0.69) is
 expected to clear it. This is precisely why offline runs are labeled architecture-smoke.
 
-## Template-quality audit — a real architectural finding
+## Template-quality audit — finding and FIX
 
-The 20 domain templates are **highly confusable**: pairwise cosine 0.96–0.999
-(authority/finance 0.999, programming/technology 0.997, law/security 0.995, commerce/authority 0.996).
-Consequence: **R (cosine realization) is nearly non-discriminative** — almost every term realizes
-almost every domain at ~0.95+. Discrimination is carried entirely by **C (blocked lanes)** and
-**S (firewall)**. Flags: `fruit` = `too_strict_blocked` (5 blocked lanes), `service` = `too_flat`.
+**Finding (flat 12D cosine R):** the 20 templates are **highly confusable** — pairwise cosine
+0.96–0.999 (authority/finance 0.999, programming/technology 0.997). R was nearly non-discriminative;
+discrimination fell entirely on C and S. Flags: `fruit` = `too_strict_blocked`, `service` = `too_flat`.
 
-**Implication:** templates need a redesign (wider dynamic range / mean-centering / sparser peaks) so R
-contributes signal; until then R is effectively a constant and the filter is a **C×S** gate in
-practice.
+**FIX — group-aware R (resonance groups, §4a of the design doc).** R now compares per-family emphasis
+(`ground / force / intellect / telos / field`), weighted per domain, minus a blocked-lane penalty.
+Off-diagonal template R drops from flat **mean 0.923 / std 0.054** to grouped **mean 0.670 / std
+0.225** (4× the spread): genuinely-different domains separate (doctor→fruit R **0.99→0.27**) while true
+twins (authority/finance) stay close. Each score carries a per-group R trace. Inspect with
+`--template-audit`.
+
+**Residual:** under the *offline* hashing S, grouped R slightly lowers framed-rate (0.38→0.25) because
+it compounds with an already-weak S; grouped R's benefit (sharper rejection, fewer false primaries) is
+realized with a **strong/real S**. Re-run the framing verdict with `--semantic-backend real`.
 
 ## Semantic-backend audit (hashing run)
 `definition_provider_used=True`, `offline_hashing_used=True`, `demo_fixture_used=False`;
@@ -73,8 +78,9 @@ term was scored from an external definition via the scalable path — no curated
 - phoneme_overreach_prevention < 0.70 (firewall leaks sound-only meaning), or
 - unknown_term_generalization < 0.40 (does not generalize beyond fixtures).
 
-**Prerequisite regardless of backend:** redesign the 12D templates so R is discriminative (current
-confusability 0.96–0.999 makes R inert).
+**Prerequisite regardless of backend:** ~~redesign the 12D templates so R is discriminative~~ —
+**DONE** (group-aware R, confusability 0.92→0.67). Remaining prerequisite for a production verdict is
+a **real `embed_fn`** so S can clear the framing thresholds.
 
 ## Verdict (this run)
 - **Harness: valid and informative.** Vetoes/rejection (C + S firewall) **pass** their criteria even
@@ -82,8 +88,8 @@ confusability 0.96–0.999 makes R inert).
   and audit work.
 - **Framing/primary decision: INCONCLUSIVE under smoke** (threshold-limited) — **deferred** to a
   real-embedder run. Do not read offline primary=0 as a refutation.
-- **Template redesign: REQUIRED** (R non-discriminative) — flagged for follow-up; does not touch
-  generation/governance.
+- **Template/R redesign: DONE** — group-aware R cut template confusability from 0.92 to 0.67 (std 4×);
+  R now separates domains by which family of structure is active. Does not touch generation/governance.
 
 ## Reproduce
 ```

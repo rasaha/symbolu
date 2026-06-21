@@ -45,6 +45,16 @@ def main() -> int:
     for s in sorted(trace.scores, key=lambda x: -x.match):
         print(f"{s.domain:<12}{s.C:>7.3f}{s.R:>7.3f}{s.S:>7.3f}{s.match:>8.3f}   {s.decision}")
 
+    # group-level R trace for the winning domain (which family of structure is active?)
+    med = next(s for s in trace.scores if s.domain == "medicine")
+    if med.r_groups:
+        print("\nGroup-aware R trace — doctor vs medicine "
+              f"(R={med.r_groups['R']}, reward={med.r_groups['reward']}, "
+              f"penalty={med.r_groups['penalty']}):")
+        for g, gd in med.r_groups["groups"].items():
+            print(f"  {g:<10} term={gd['term_emphasis']:.2f} domain={gd['domain_emphasis']:.2f} "
+                  f"w={gd['weight']:.2f} match={gd['match']:.2f} -> {gd['contribution']:.3f}")
+
     print("\nFrame:")
     print(f"  primary   = {trace.primary_domains}")
     print(f"  secondary = {trace.secondary_domains}")

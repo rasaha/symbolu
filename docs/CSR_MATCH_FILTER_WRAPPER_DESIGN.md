@@ -57,12 +57,14 @@ is what confirms or vetoes meaning. **Phonemes alone never determine meaning.**
   ```
   C is **permission**: it falls when a domain's *blocked* layers are lit, or its *required* layers are dark.
 
-- **R — `compute_realization(term_vec, domain)`**
+- **R — `compute_realization(term_vec, domain)`** — *group-aware* (see §4a)
   ```
-  R = clip( cosine(term_vec, domain.template), 0, 1 )
+  R = Σ_g w_g · group_match_g  −  pen_w · mean(term[blocked_lanes])
   ```
-  R is **strength**: how well the realized profile points along the lane. R is permissive by design
-  (non-negative profiles ⇒ moderately high cosines); discrimination comes from C and S, not R.
+  R is **strength**: how well the realized profile points along the lane. Flat 12D cosine was
+  non-discriminative (all-positive templates ⇒ cosine 0.96–0.999); group-aware R compares per-family
+  emphasis weighted per domain and penalises blocked lanes, so R now separates domains by *which*
+  family of structure is active.
 
 - **S — `compute_semantic_coherence(term, domain)`** *(non-phonemic firewall)*
   ```
@@ -115,6 +117,35 @@ User query
 
 The base LLM is never asked to decide ontology. **CSR constrains the answer-space; the LLM verbalizes
 within it.**
+
+## 4a. Group-aware R (resonance groups)
+
+Flat 12D cosine fails because all-positive, structured templates are near-collinear (off-diagonal
+cosine **mean 0.923, max 0.999**) — it answers "are both vectors generally positive and structured?"
+(yes) instead of "**which type of structure is active?**". Group-aware R fixes this.
+
+**Resonance groups** (families of the 12 layers): `ground` (Potential, Identity), `force` (Execution,
+Agency, Structure), `intellect` (Cognition, Reasoning), `telos` (Purpose, Integration), `field`
+(Witness, Unifying, Absolving).
+
+```
+tp, dp        = L1-normalised group activations of term / domain   (relative emphasis, not magnitude)
+group_match_g = min(tp_g, dp_g) / max(tp_g, dp_g)
+R = Σ_g w_g · group_match_g  −  pen_w · mean(term[domain.blocked_lanes])
+```
+
+- **w_g** are **per-domain group weights** (`DOMAIN_GROUP_WEIGHTS`, normalised) — explicit override if
+  present, else derived from the domain's own group activations. E.g. medicine = intellect 0.35 /
+  telos 0.30 / force 0.20 / ground 0.15; authority = ground 0.35 / force 0.50 / intellect 0.15.
+- **penalty** docks R when the domain's blocked lanes are lit (e.g. fruit penalises high
+  Reasoning/Agency/Purpose), so phonemically-busy terms cannot "realize" a structurally-forbidden lane.
+- Every score carries a **per-group R trace** (`CSRMatchScore.r_groups`): term/domain emphasis,
+  weight, match, and contribution per group, plus reward and penalty.
+
+**Effect (template-vs-template, 20 domains):** off-diagonal R drops from flat **mean 0.923 / std
+0.054** to grouped **mean 0.670 / std 0.225** (4× the spread) — genuinely-different domains separate
+(doctor→fruit R 0.99→0.27) while true twins (authority/finance) stay appropriately close. Inspect with
+`eval_match_filter.py --template-audit`.
 
 ## 5a. Scaling — no per-domain hand tagging, dominant-theme focus
 
@@ -220,6 +251,7 @@ phoneme-only mappings (then S/templates need rework before any further investmen
 scripts/cg_wrapper_ablation/csr_match_filter/
   registry.py   — LAYERS_12, OntologyRule, DomainTemplate, DOMAIN_REGISTRY, glosses/keywords
   profile.py    — compute_12d_profile(term)  (phoneme/letter → varna-ish → 12D)
+  resonance.py  — group-aware R: resonance groups, per-domain weights, blocked-lane penalty, R trace
   semantic.py   — SemanticCoherenceAdapter (non-phonemic): definition_provider + embed_fn,
                   hashing_embed (offline), lexical fallback, make_demo_adapter (fixtures)
   match.py      — CSRMatchScore/Trace/Decision dataclasses, scoring, thresholds,

@@ -230,25 +230,45 @@ def backend_usage(audit, backend):
 
 def template_audit(domains):
     import numpy as np
+    from csr_match_filter import domain_group_weights, realization_flat, realization_grouped
     tmpls = {d: np.asarray(DOMAIN_TEMPLATES[d].vector, float) for d in domains if d in DOMAIN_TEMPLATES}
     rows = []
     for d, v in tmpls.items():
         rule = derive_ontology_rule(d)
-        sims = sorted(((float(v @ u / ((np.linalg.norm(v) * np.linalg.norm(u)) or 1)), e)
-                       for e, u in tmpls.items() if e != d), reverse=True)
-        nearest = [(e, round(s, 3)) for s, e in sims[:2]]
-        confusable = [e for s, e in sims if s > 0.97]
+        # nearest neighbours under BOTH flat cosine and group-aware R (template d as a 'term')
+        flat = sorted(((realization_flat(v, e), e) for e in tmpls if e != d), reverse=True)
+        grp = sorted(((realization_grouped(v, e)[0], e) for e in tmpls if e != d), reverse=True)
+        w = domain_group_weights(d)
         rows.append({
             "domain": d,
             "required_high": rule.required_high,
             "blocked_high": rule.blocked_high,
+            "group_weights": {g: round(x, 2) for g, x in w.items() if x > 0.01},
             "too_strict_blocked": len(rule.blocked_high) >= 5,
             "too_flat": float(v.std()) < 0.12,
             "too_generic": float(v.mean()) > 0.72 and len(rule.required_high) >= 6,
-            "nearest": nearest,
-            "confusable_with": confusable,
+            "nearest_flat": [(e, round(s, 3)) for s, e in flat[:2]],
+            "nearest_grouped": [(e, round(s, 3)) for s, e in grp[:2]],
+            "confusable_flat": [e for s, e in flat if s > 0.97],
+            "confusable_grouped": [e for s, e in grp if s > 0.90],
         })
     return rows
+
+
+def resonance_confusability(domains):
+    """Off-diagonal R between domain templates under flat vs group-aware R (lower = more separable)."""
+    import numpy as np
+    from csr_match_filter import realization_flat, realization_grouped
+    doms = [d for d in domains if d in DOMAIN_TEMPLATES]
+    flat, grp = [], []
+    for a in doms:
+        va = DOMAIN_TEMPLATES[a].vector
+        for b in doms:
+            if a != b:
+                flat.append(realization_flat(va, b)); grp.append(realization_grouped(va, b)[0])
+    f, g = np.asarray(flat), np.asarray(grp)
+    return {"flat": {"mean": float(f.mean()), "max": float(f.max()), "std": float(f.std())},
+            "grouped": {"mean": float(g.mean()), "max": float(g.max()), "std": float(g.std())}}
 
 
 def mean_primary_S(rows, adapter, provider):
@@ -315,14 +335,21 @@ def print_report(res):
 
 
 def print_template_audit(domains):
+    doms = sorted(set(domains))
     print("=" * 72)
-    print("TEMPLATE-QUALITY AUDIT")
-    for r in template_audit(sorted(set(domains))):
+    print("TEMPLATE-QUALITY AUDIT (R: flat 12D cosine  vs  group-aware)")
+    conf = resonance_confusability(doms)
+    print(f"  off-diagonal R confusability (lower=more separable):")
+    print(f"    flat   : mean={conf['flat']['mean']:.3f} max={conf['flat']['max']:.3f} "
+          f"std={conf['flat']['std']:.3f}")
+    print(f"    grouped: mean={conf['grouped']['mean']:.3f} max={conf['grouped']['max']:.3f} "
+          f"std={conf['grouped']['std']:.3f}")
+    for r in template_audit(doms):
         flags = [f for f, on in (("too_strict_blocked", r["too_strict_blocked"]),
                                  ("too_flat", r["too_flat"]), ("too_generic", r["too_generic"])) if on]
-        print(f"  {r['domain']:<12} req={r['required_high']}")
-        print(f"               blocked={r['blocked_high']}  nearest={r['nearest']}"
-              f"  confusable={r['confusable_with']}  flags={flags or '-'}")
+        print(f"  {r['domain']:<12} weights={r['group_weights']}")
+        print(f"               blocked={r['blocked_high']}  nearest(flat)={r['nearest_flat']}  "
+              f"nearest(grouped)={r['nearest_grouped']}  flags={flags or '-'}")
 
 
 def main():

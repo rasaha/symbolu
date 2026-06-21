@@ -187,6 +187,8 @@ def test_template_audit_flags_confusable_and_strict_blocked():
     rows = EV.template_audit(["medicine", "fruit", "authority", "finance"])
     by = {r["domain"]: r for r in rows}
     assert by["fruit"]["too_strict_blocked"] is True     # fruit blocks >=5 lanes
-    # authority/finance are near-duplicates → flagged confusable with each other
-    assert "finance" in by["authority"]["confusable_with"] or \
-           "authority" in by["finance"]["confusable_with"]
+    # authority/finance are near-duplicates under flat cosine → flagged confusable with each other
+    assert "finance" in by["authority"]["confusable_flat"] or \
+           "authority" in by["finance"]["confusable_flat"]
+    # group-aware R reports its own weights + neighbours
+    assert by["medicine"]["group_weights"] and by["medicine"]["nearest_grouped"]
