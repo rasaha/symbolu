@@ -249,8 +249,15 @@ def load_model(model_id):
     sys.path[:] = [p for p in sys.path if p not in ("", here, parent)]   # avoid HF relative-import bug
     try:
         tok = AutoTokenizer.from_pretrained(model_id)
-        model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype="auto", device_map="auto",
-                                                     output_hidden_states=True)
+        try:                                                   # prefer accelerate sharding if present
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, torch_dtype="auto", device_map="auto", output_hidden_states=True)
+        except (ValueError, ImportError):                      # no `accelerate`: plain single-device load
+            dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+            model = AutoModelForCausalLM.from_pretrained(
+                model_id, torch_dtype=dtype, output_hidden_states=True)
+            if torch.cuda.is_available():
+                model = model.to("cuda")
         model.eval()
         device = next(model.parameters()).device
         return tok, model, device
