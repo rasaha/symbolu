@@ -177,6 +177,7 @@ def run_eval(rows, adapter, provider):
     ep_ranks = []; ep_scores = []                            # rank/score distribution of EP domains
     ep_band = {"primary": 0, "secondary": 0, "weak": 0, "rejected": 0}
     ep_secondary_due_to_threshold = 0                        # MATCH in [0.30,0.60) -> secondary
+    match_by_role = {"primary": [], "secondary": [], "rejected": [], "other": []}  # for calibration
     for ex in rows:
         provider.context = ex.get("context")
         cand = ex["candidate_domains"]
@@ -200,6 +201,10 @@ def run_eval(rows, adapter, provider):
             ep_band[band] += 1
             if band == "secondary" and 0.30 <= mscore.get(d, 0.0) < 0.60:
                 ep_secondary_due_to_threshold += 1
+        for d in cand:                                # MATCH by expected role (for calibration)
+            role = ("primary" if d in EP else "secondary" if d in ESec
+                    else "rejected" if d in ER else "other")
+            match_by_role[role].append(mscore.get(d, 0.0))
         srec = _safe(len(Sec & set(ESec)), len(ESec))
         rej_tp += len(R & set(ER)); rej_fp += len(R - set(ER)); rej_fn += len(set(ER) - R)
         for d in ex.get("semantic_invalid_domains", []):
@@ -262,6 +267,7 @@ def run_eval(rows, adapter, provider):
         "landing": dict(ep_band),
         "secondary_due_to_threshold": ep_secondary_due_to_threshold,
     }
+    metrics["match_by_role"] = match_by_role
     counts = {"n": len(rows), "n_unknown": len(unknown_ids), "n_context": len(ctx_ids),
               "n_semantic_veto": sem_tot, "n_ontological_veto": ont_tot, "n_overreach": ovr_tot}
     return metrics, counts, per
@@ -318,6 +324,55 @@ def template_audit(domains):
             "confusable_grouped": [e for s, e in grp if s > 0.90],
         })
     return rows
+
+
+def calibrate_thresholds(match_by_role):
+    """Suggest F1-optimal primary/secondary cutoffs for THIS MATCH distribution. Reporting only —
+    does NOT change the live 0.60/0.30 defaults. primary: expected-primary vs the rest;
+    secondary(framed): expected-primary+secondary vs expected-rejected."""
+    import numpy as np
+    mbr = match_by_role
+
+    def best_t(pos, neg):
+        if not pos:
+            return None, None
+        grid = sorted({round(x, 3) for x in (pos + neg)} | {0.0})
+        best_f1, best_t_ = -1.0, 0.0
+        for t in grid:
+            tp = sum(1 for x in pos if x >= t); fp = sum(1 for x in neg if x >= t)
+            fn = sum(1 for x in pos if x < t)
+            f1 = tp / (tp + 0.5 * (fp + fn)) if (tp + fp + fn) else 0.0
+            if f1 > best_f1:
+                best_f1, best_t_ = f1, t
+        return round(best_t_, 3), round(best_f1, 3)
+
+    pt, pf1 = best_t(mbr["primary"], mbr["secondary"] + mbr["rejected"] + mbr["other"])
+    st, sf1 = best_t(mbr["primary"] + mbr["secondary"], mbr["rejected"])
+
+    def stats(xs):
+        a = np.asarray(xs, float)
+        return {"n": len(xs), "mean": round(float(a.mean()), 3) if a.size else None,
+                "median": round(float(np.median(a)), 3) if a.size else None,
+                "p90": round(float(np.percentile(a, 90)), 3) if a.size else None}
+    return {"by_role_match": {k: stats(v) for k, v in mbr.items()},
+            "suggested_primary_threshold": pt, "primary_f1_at_suggested": pf1,
+            "suggested_secondary_threshold": st, "secondary_f1_at_suggested": sf1,
+            "current_defaults": {"primary": 0.60, "secondary": 0.30}}
+
+
+def print_calibration(res):
+    c = calibrate_thresholds(res["metrics"]["match_by_role"])
+    print("=" * 72)
+    print(f"THRESHOLD CALIBRATION ({res['usage']['semantic_backend']}) — reporting only, defaults UNCHANGED")
+    for role in ("primary", "secondary", "rejected", "other"):
+        s = c["by_role_match"][role]
+        print(f"  expected-{role:<10} MATCH: n={s['n']:>3} mean={s['mean']} median={s['median']} "
+              f"p90={s['p90']}")
+    print(f"  suggested primary threshold   = {c['suggested_primary_threshold']} "
+          f"(F1={c['primary_f1_at_suggested']})   [current default 0.60]")
+    print(f"  suggested secondary threshold = {c['suggested_secondary_threshold']} "
+          f"(F1={c['secondary_f1_at_suggested']})   [current default 0.30]")
+    print("  NOTE: suggestions only — adopt via CSRThresholds, do not hard-tune blindly.")
 
 
 def resonance_confusability(domains):
@@ -434,6 +489,9 @@ def main():
                     choices=["hashing", "lexical", "demo", "real"])
     ap.add_argument("--compare", action="store_true", help="run all available backends and compare")
     ap.add_argument("--template-audit", action="store_true")
+    ap.add_argument("--calibrate", action="store_true",
+                    help="report F1-optimal primary/secondary cutoffs for the MATCH distribution "
+                         "(analysis only; does not change the 0.60/0.30 defaults)")
     ap.add_argument("--json", default=None)
     args = ap.parse_args()
 
@@ -450,6 +508,8 @@ def main():
             continue
         results[b] = res
         print_report(res)
+        if args.calibrate:
+            print_calibration(res)
 
     if args.compare and "hashing" in results and "lexical" in results:
         sh = results["hashing"]["mean_primary_S"]; sl = results["lexical"]["mean_primary_S"]
