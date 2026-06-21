@@ -225,7 +225,9 @@ def run_eval(rows, adapter, provider, thr=None):
         trace_complete += int(ok)
         per.append({"id": ex["id"], "category": ex.get("category"), "primary_correct": pc,
                     "secondary_recall": srec, "produced": {"primary": sorted(P),
-                    "secondary": sorted(Sec), "rejected": sorted(R)}, "decisions": dec})
+                    "secondary": sorted(Sec), "rejected": sorted(R)}, "decisions": dec,
+                    "scores": {s.domain: (round(s.C, 3), round(s.R, 3), round(s.S, 3),
+                                          round(s.match, 3)) for s in trace.scores}})
 
     def acc(key, subset=None):
         vals = [r[key] for r in per if r[key] is not None and (subset is None or subset(r))]
@@ -398,6 +400,43 @@ def print_calibration(res):
           "--secondary-threshold before changing defaults.")
 
 
+def explain_failures(rows, per):
+    """List the cases that miss expectation, with C/R/S, to localise veto/framing errors."""
+    byid = {ex["id"]: ex for ex in rows}
+    out = {"ontological_not_rejected": [], "semantic_not_rejected": [],
+           "expected_primary_misframed": [], "context_wrong": []}
+    for p in per:
+        ex = byid[p["id"]]; dec = p["decisions"]; sc = p["scores"]
+        P = set(p["produced"]["primary"])
+        for d in ex.get("ontological_invalid_domains", []):
+            if dec.get(d) != "reject_ontological":
+                out["ontological_not_rejected"].append((p["id"], d, dec.get(d), sc.get(d)))
+        for d in ex.get("semantic_invalid_domains", []):
+            if dec.get(d) != "reject_semantic":
+                out["semantic_not_rejected"].append((p["id"], d, dec.get(d), sc.get(d)))
+        for d in ex["expected_primary"]:
+            if d not in P:
+                out["expected_primary_misframed"].append((p["id"], d, dec.get(d), sc.get(d)))
+        if ex.get("category") == "context" and not (set(ex["expected_primary"]) <= P):
+            out["context_wrong"].append((p["id"], ex.get("context"), ex["expected_primary"],
+                                         p["produced"]["primary"]))
+    return out
+
+
+def print_failures(res):
+    f = explain_failures(load_eval(), res["per"])
+    print("=" * 72)
+    print(f"FAILURE EXPLAINER ({res['usage']['semantic_backend']})  [domain: (C, R, S, MATCH)]")
+    for k in ("ontological_not_rejected", "semantic_not_rejected", "expected_primary_misframed"):
+        rows = f[k]
+        print(f"  {k} (n={len(rows)}):")
+        for r in rows:
+            print(f"    {r[0]:7} {r[1]:<11} decision={r[2]:<18} CRS={r[3]}")
+    print(f"  context_wrong (n={len(f['context_wrong'])}):")
+    for r in f["context_wrong"]:
+        print(f"    {r[0]:7} ctx={r[1]} expected={r[2]} got_primary={r[3]}")
+
+
 def resonance_confusability(domains):
     """Off-diagonal R between domain templates under flat vs group-aware R (lower = more separable)."""
     import numpy as np
@@ -515,6 +554,9 @@ def main():
     ap.add_argument("--calibrate", action="store_true",
                     help="report F1-optimal primary/secondary cutoffs for the MATCH distribution "
                          "(analysis only; does not change the 0.60/0.30 defaults)")
+    ap.add_argument("--explain-failures", action="store_true",
+                    help="list cases that miss expectation (ontological/semantic veto, primary "
+                         "framing, context) with their C/R/S — for tuning the S-gate")
     ap.add_argument("--primary-threshold", type=float, default=None,
                     help="WHAT-IF: evaluate at this primary MATCH cutoff (defaults unchanged in code)")
     ap.add_argument("--secondary-threshold", type=float, default=None,
@@ -546,6 +588,8 @@ def main():
         print_report(res)
         if args.calibrate:
             print_calibration(res)
+        if args.explain_failures:
+            print_failures(res)
 
     if args.compare and "hashing" in results and "lexical" in results:
         sh = results["hashing"]["mean_primary_S"]; sl = results["lexical"]["mean_primary_S"]

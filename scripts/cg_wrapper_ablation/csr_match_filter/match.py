@@ -47,6 +47,12 @@ class CSRThresholds:
 
 DEFAULT_THRESHOLDS = CSRThresholds()
 
+# S-gating of the C blocked-lane penalty: only a STRONG semantic match relaxes the ontological veto.
+# S below C_GATE_LO gives no relaxation (the C veto stays intact for moderate/low-S invalid domains);
+# S at/above C_GATE_HI fully suppresses the phoneme-derived blocked-lane penalty.
+C_GATE_LO = 0.35
+C_GATE_HI = 0.70
+
 
 @dataclass
 class CSRMatchScore:
@@ -111,9 +117,10 @@ def compute_constraint(term_vec: np.ndarray, domain: str, s: Optional[float] = N
     required_score = mean_over(rule.required_high)
     blocked_score = mean_over(rule.blocked_high)
     blocked_penalty = 1.0 - blocked_score
-    if s is not None:                                  # S-gate: strong semantic support relaxes it
+    if s is not None:                                  # S-gate: only STRONG semantic support relaxes it
         sc = float(np.clip(s, 0.0, 1.0))
-        blocked_penalty = blocked_penalty + (1.0 - blocked_penalty) * sc
+        supp = float(np.clip((sc - C_GATE_LO) / (C_GATE_HI - C_GATE_LO), 0.0, 1.0))
+        blocked_penalty = blocked_penalty + (1.0 - blocked_penalty) * supp
     on_names = set(rule.required_high) | set(rule.allowed_high)
     on_target = mean_over(list(on_names)) if on_names else 0.0
     off_names = [n for n in REG.LAYERS_12 if n not in on_names and n not in rule.blocked_high]
