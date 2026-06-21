@@ -157,11 +157,16 @@ a **real `embed_fn`** so S can clear the framing thresholds.
 high, so C no longer ontologically vetoes a semantically-correct domain (fire→heat, fire→danger,
 apple→fruit are rescued; doctor→fruit and phoneme-overreach still reject because their S is low).
 
-Hashing re-eval at the new defaults: **expected_primary_misrejected 0.150 → 0.067 (PASS)**,
-rejected_recall 1.000, vetoes unchanged (C 1.0 / S 0.947 / overreach 1.0). The C-veto context cases
-are rescued; the 4 residual hashing misrejections are weak-embedder S=0 cases (soldier→danger,
-paramedic→care) that the real embedder resolves. Re-run `--semantic-backend real` for the production
-context/misrejected numbers.
+The same conservative gate (`C_GATE_LO=0.35, C_GATE_HI=0.70`, ramped) is applied to **R's** blocked-lane
+penalty (it was double-counted with C and not gated, crushing R for correct blocked-lane domains, e.g.
+fire→heat R 0.165→0.655). Gate is threshold-ramped: weak S never relaxes, moderate S partially,
+strong S fully — so the C ontological veto and R's rejection of true-impossible domains stay intact
+(`ontological_not_rejected: n=0` on hashing; doctor→fruit R stays <0.4).
+
+Hashing re-eval at the new defaults (C+R S-gated): **misrejected 0.067**, primary 0.678, unknown
+0.706, context 0.385, ontological_veto 1.0, rejected_recall 1.0, overreach 1.0. The 4 residual hashing
+misrejections are weak-embedder S=0 cases (soldier→danger, paramedic→care) the real embedder resolves.
+Re-run `--semantic-backend real --explain-failures` for production numbers and per-case S.
 
 ## PRODUCTION VERDICT at calibrated thresholds (real_embed_fn, primary=0.20 / secondary=0.05)
 
