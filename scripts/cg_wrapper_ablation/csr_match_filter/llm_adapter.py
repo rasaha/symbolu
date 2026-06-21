@@ -231,16 +231,26 @@ def _try_local_hf(default_model: str = "mistralai/Mistral-7B-Instruct-v0.3") -> 
         model.eval()
 
         def fn(prompt, _tok=tok, _mdl=model, _max=max_new):
+            import torch as _t
+            dev = next(_mdl.parameters()).device
             if getattr(_tok, "chat_template", None):
-                ids = _tok.apply_chat_template([{"role": "user", "content": prompt}],
-                                               add_generation_prompt=True, return_tensors="pt")
+                msgs = [{"role": "user", "content": prompt}]
+                try:
+                    enc = _tok.apply_chat_template(msgs, add_generation_prompt=True,
+                                                   return_tensors="pt", return_dict=True)
+                except TypeError:
+                    enc = _tok.apply_chat_template(msgs, add_generation_prompt=True,
+                                                   return_tensors="pt")
             else:
-                ids = _tok(prompt, return_tensors="pt").input_ids
-            ids = ids.to(_mdl.device)
-            with torch.no_grad():
-                out = _mdl.generate(ids, max_new_tokens=_max, do_sample=False,
-                                    pad_token_id=(_tok.eos_token_id or 0))
-            return _tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True).strip()
+                enc = _tok(prompt, return_tensors="pt")
+            if not hasattr(enc, "keys"):                  # bare tensor -> wrap as dict
+                enc = {"input_ids": enc}
+            enc = {k: v.to(dev) for k, v in enc.items() if hasattr(v, "to")}
+            in_len = enc["input_ids"].shape[1]
+            with _t.no_grad():
+                out = _mdl.generate(**enc, max_new_tokens=_max, do_sample=False,
+                                    pad_token_id=(_tok.eos_token_id or _tok.pad_token_id or 0))
+            return _tok.decode(out[0][in_len:], skip_special_tokens=True).strip()
         return LocalHFAdapter(fn, f"local_hf:{name}"), f"local_hf:{name}"
     except Exception as exc:
         return None, f"local HF model unavailable ({name}): {type(exc).__name__}: {exc}"

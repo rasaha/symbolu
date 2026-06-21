@@ -155,11 +155,13 @@ def main():
         for arm in arms:
             try:
                 ans, pci = run_arm(arm, ex, trace, terms, llm)
-            except Exception as exc:   # LLM backend failure (bad key, rate limit, network)
+            except Exception as exc:   # LLM backend failure (bad key, model API, OOM, network)
+                import traceback
                 print(f"[error] LLM backend '{llm.backend}' ({llm_info}) failed on {ex['id']}/{arm}: "
-                      f"{type(exc).__name__}: {exc}")
-                print("  -> fix the API key/credentials (CSR_LLM_BACKEND + *_API_KEY), or use "
-                      "--llm-backend stub. No partial report written.")
+                      f"{type(exc).__name__}: {exc!r}")
+                traceback.print_exc()
+                print("  -> fix the backend (credentials/model), or use --llm-backend stub. "
+                      "No partial report written.")
                 return 2
             answers[arm] = ans
             scores[arm] = RB.score_answer(ans, ex, terms)
