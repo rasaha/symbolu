@@ -137,6 +137,9 @@ def run_eval(rows, adapter, provider):
     sem_tot = sem_ok = ont_tot = ont_ok = ovr_tot = ovr_ok = 0
     trace_complete = 0
     ep_inst = ep_primary = ep_framed = ep_misrejected = 0   # where expected-primary domains land
+    ep_ranks = []; ep_scores = []                            # rank/score distribution of EP domains
+    ep_band = {"primary": 0, "secondary": 0, "weak": 0, "rejected": 0}
+    ep_secondary_due_to_threshold = 0                        # MATCH in [0.30,0.60) -> secondary
     for ex in rows:
         provider.context = ex.get("context")
         cand = ex["candidate_domains"]
@@ -146,11 +149,20 @@ def run_eval(rows, adapter, provider):
         EP, ESec, ER = ex["expected_primary"], ex["expected_secondary"], ex["expected_rejected"]
 
         pc = _primary_correct(P, Sec, R, EP, ESec, ER)
+        ranked = sorted(trace.scores, key=lambda s: -s.match)
+        order = {s.domain: i + 1 for i, s in enumerate(ranked)}
+        mscore = {s.domain: s.match for s in trace.scores}
         for d in EP:                                  # pooled landing of each expected-primary domain
             ep_inst += 1
             ep_primary += int(d in P)
             ep_framed += int(d in P or d in Sec)
             ep_misrejected += int(d in R)
+            ep_ranks.append(order.get(d)); ep_scores.append(mscore.get(d, 0.0))
+            band = ("primary" if d in P else "secondary" if d in Sec
+                    else "rejected" if d in R else "weak")
+            ep_band[band] += 1
+            if band == "secondary" and 0.30 <= mscore.get(d, 0.0) < 0.60:
+                ep_secondary_due_to_threshold += 1
         srec = _safe(len(Sec & set(ESec)), len(ESec))
         rej_tp += len(R & set(ER)); rej_fp += len(R - set(ER)); rej_fn += len(set(ER) - R)
         for d in ex.get("semantic_invalid_domains", []):
@@ -196,6 +208,22 @@ def run_eval(rows, adapter, provider):
         "expected_primary_as_primary": _safe(ep_primary, ep_inst),
         "expected_primary_framed": _safe(ep_framed, ep_inst),
         "expected_primary_misrejected": _safe(ep_misrejected, ep_inst),
+    }
+    import numpy as np
+    ranks = [r for r in ep_ranks if r is not None]
+    sc = np.asarray(ep_scores, float) if ep_scores else np.zeros(0)
+    metrics["expected_primary_detail"] = {
+        "n": ep_inst,
+        "rank_distribution": {"rank1": ranks.count(1), "rank2": ranks.count(2),
+                              "rank3plus": sum(1 for r in ranks if r >= 3)},
+        "rank1_rate": _safe(ranks.count(1), len(ranks)),
+        "match_score": {"mean": float(sc.mean()) if sc.size else None,
+                        "median": float(np.median(sc)) if sc.size else None,
+                        "min": float(sc.min()) if sc.size else None,
+                        "max": float(sc.max()) if sc.size else None,
+                        "lt_0.60": int((sc < 0.60).sum()), "lt_0.30": int((sc < 0.30).sum())},
+        "landing": dict(ep_band),
+        "secondary_due_to_threshold": ep_secondary_due_to_threshold,
     }
     counts = {"n": len(rows), "n_unknown": len(unknown_ids), "n_context": len(ctx_ids),
               "n_semantic_veto": sem_tot, "n_ontological_veto": ont_tot, "n_overreach": ovr_tot}
@@ -319,6 +347,15 @@ def print_report(res):
     print("  -- ranking vs threshold (where expected-primary domains land) --")
     for k in ("expected_primary_as_primary", "expected_primary_framed", "expected_primary_misrejected"):
         print(f"  {k:<32} {_fmt(m[k])}")
+    epd = m["expected_primary_detail"]
+    print(f"  rank distribution (n={epd['n']}): rank1={epd['rank_distribution']['rank1']} "
+          f"rank2={epd['rank_distribution']['rank2']} rank3+={epd['rank_distribution']['rank3plus']} "
+          f"(rank1_rate={_fmt(epd['rank1_rate'])})")
+    ms = epd["match_score"]
+    print(f"  MATCH score: mean={_fmt(ms['mean'])} median={_fmt(ms['median'])} "
+          f"min={_fmt(ms['min'])} max={_fmt(ms['max'])}  (<0.60: {ms['lt_0.60']}  <0.30: {ms['lt_0.30']})")
+    print(f"  landing: {epd['landing']}   secondary-because-MATCH<0.60 = "
+          f"{epd['secondary_due_to_threshold']}")
     print("-" * 72)
     print("SEMANTIC-BACKEND AUDIT")
     print(f"  embed_fn_used={u['embed_fn_used']}  offline_hashing_used={u['offline_hashing_used']}  "
