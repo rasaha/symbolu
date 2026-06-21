@@ -24,7 +24,8 @@ from cg_ablation import probe_train as PT          # noqa: E402
 from cg_ablation.probe_decide import decide, MIN_PER_CLASS  # noqa: E402
 
 
-def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed: int = 0) -> dict:
+def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed: int = 0,
+        pca_dim: int = 64) -> dict:
     import numpy as np
 
     npz = np.load(run_dir / "features.npz")
@@ -37,7 +38,7 @@ def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed:
         by_type[lab["label_type"]].append(i)
 
     sets = PF.available_sets_arrays(arrays)
-    report = {"model": model, "k": k, "l2": l2, "sets_available": sets, "by_label_type": {}}
+    report = {"model": model, "k": k, "l2": l2, "pca_dim": pca_dim, "sets_available": sets, "by_label_type": {}}
 
     for ltype, idxs in by_type.items():
         idxs = np.asarray(idxs)
@@ -48,7 +49,7 @@ def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed:
         results = {}
         for s in sets:
             X = PF.build_matrix_from_arrays(arrays, s)[idxs]
-            results[s] = PT.evaluate_feature_set(X, y, model=model, k=k, l2=l2, seed=seed)
+            results[s] = PT.evaluate_feature_set(X, y, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
 
         # paired comparisons (cand vs ref), same folds/seed -> aligned per-example correctness
         paired = {}
@@ -91,12 +92,13 @@ def main() -> int:
     ap.add_argument("--k", type=int, default=5)
     ap.add_argument("--l2", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--pca-dim", type=int, default=64, help="PCA-reduce feature sets with dim>this inside CV folds (fair hidden baseline); 0=off")
     args = ap.parse_args()
     run_dir = Path(args.run_dir)
     if not (run_dir / "features.npz").exists():
         print(f"no features.npz in {run_dir} — run extract_bhava_probe_features.py first")
         return 2
-    rep = run(run_dir, model=args.model, k=args.k, l2=args.l2, seed=args.seed)
+    rep = run(run_dir, model=args.model, k=args.k, l2=args.l2, seed=args.seed, pca_dim=args.pca_dim)
     for lt, blk in rep["by_label_type"].items():
         print(f"  [{lt}] n={blk['n']} -> {blk['verdict']['decision']}")
     print(f"results written to {run_dir/'results.json'}")

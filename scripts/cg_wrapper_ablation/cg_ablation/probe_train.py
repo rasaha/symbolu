@@ -170,9 +170,24 @@ def kfold_indices(n: int, k: int, seed: int = 0) -> List[np.ndarray]:
     return [idx[i::k] for i in range(k)]
 
 
+def _pca_fit(Xtr_s: np.ndarray, dim: int) -> np.ndarray:
+    """Top-`dim` principal directions of standardized train data. Returns [dim, d]."""
+    # Xtr_s already ~zero-mean per column (standardized). SVD of the data matrix.
+    _, _, Vt = np.linalg.svd(Xtr_s, full_matrices=False)
+    return Vt[:dim]
+
+
 def oof_predict(X: np.ndarray, y: np.ndarray, model: str = "logreg",
-                k: int = 5, l2: float = 1.0, seed: int = 0) -> np.ndarray:
-    """Out-of-fold predicted probabilities, aligned to X's row order."""
+                k: int = 5, l2: float = 1.0, seed: int = 0,
+                pca_dim: int = 64) -> np.ndarray:
+    """Out-of-fold predicted probabilities, aligned to X's row order.
+
+    For high-dim feature sets (d > pca_dim, e.g. the 4096-d hidden baseline), PCA-reduce to
+    pca_dim INSIDE each fold (fit on train only). Without this, a logistic probe on 4096 dims with
+    ~100 examples overfits so badly it scores below chance out-of-fold — a broken baseline that
+    invalidates any "X beats hidden" comparison. Low-dim sets (bhava 13-d, state 32-d) are
+    untouched. pca_dim<=0 disables.
+    """
     n = len(y)
     k = max(2, min(k, n))
     fit, proba = _MODELS[model]
@@ -185,6 +200,10 @@ def oof_predict(X: np.ndarray, y: np.ndarray, model: str = "logreg",
             continue
         Xtr_s = _standardize(X[train], X[train])
         Xte_s = _standardize(X[train], X[test])
+        if pca_dim and Xtr_s.shape[1] > pca_dim and pca_dim < len(train):
+            comp = _pca_fit(Xtr_s, pca_dim)        # fit on train only (no leakage)
+            Xtr_s = Xtr_s @ comp.T
+            Xte_s = Xte_s @ comp.T
         w = fit(Xtr_s, y[train], l2)
         oof[test] = proba(w, Xte_s)
     # any unassigned (degenerate) → 0.5
@@ -194,11 +213,11 @@ def oof_predict(X: np.ndarray, y: np.ndarray, model: str = "logreg",
 
 def evaluate_feature_set(X: np.ndarray, y: np.ndarray, *, model: str = "logreg",
                          k: int = 5, l2: float = 1.0, seed: int = 0,
-                         n_boot: int = 2000) -> Dict:
-    """OOF metrics + bootstrap CI on accuracy + selectivity control for one feature matrix."""
+                         n_boot: int = 2000, pca_dim: int = 64) -> Dict:
+    """OOF metrics + AUROC CI + selectivity control for one feature matrix (fold-internal PCA)."""
     y = np.asarray(y).astype(int)
     n = len(y)
-    oof = oof_predict(X, y, model=model, k=k, l2=l2, seed=seed)
+    oof = oof_predict(X, y, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
     acc = accuracy(y, oof)
     bal_acc = balanced_accuracy(y, oof)
     correct = ((oof >= 0.5).astype(int) == y).astype(float)
@@ -207,7 +226,7 @@ def evaluate_feature_set(X: np.ndarray, y: np.ndarray, *, model: str = "logreg",
     # selectivity: same probe on permuted labels (Hewitt-Liang control), on balanced accuracy
     rng = np.random.RandomState(seed + 7)
     yp = rng.permutation(y)
-    oof_ctrl = oof_predict(X, yp, model=model, k=k, l2=l2, seed=seed)
+    oof_ctrl = oof_predict(X, yp, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
     bal_ctrl = balanced_accuracy(yp, oof_ctrl)
     chance = max(float(y.mean()), float(1 - y.mean()))  # majority-class (accuracy floor)
     # "beats_chance" is now AUROC-based: lower bound of the 95% CI above 0.5.
