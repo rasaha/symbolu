@@ -73,10 +73,17 @@ def _try_varna_profile(term: str):
     return None
 
 
-def compute_12d_profile(term: str) -> np.ndarray:
-    """Deterministic phonemic-ontological realization profile for `term`, max-normalised to [0,1].
+# every ontological layer carries some baseline presence — a realization profile should never have a
+# hard zero (that would read as "this layer does not exist for the word"). The floor lifts the dominant
+# range into ~[FLOOR, 1.0], matching a fully-populated 12D affinity.
+PROFILE_FLOOR = 0.45
 
-    NOT the meaning of the term — only its realization profile, consumed by C and R.
+
+def compute_12d_profile(term: str, floor: float = PROFILE_FLOOR) -> np.ndarray:
+    """Deterministic phonemic-ontological realization profile for `term`, in [floor, 1.0] per layer.
+
+    NOT the meaning of the term — only its realization profile, consumed by C and R. Every layer is
+    populated (no hard zeros): affinity = floor + (1-floor) · (raw / max(raw)).
     """
     real = _try_varna_profile(term)
     if real is not None:
@@ -87,8 +94,13 @@ def compute_12d_profile(term: str) -> np.ndarray:
             for layer, w in _LETTER_MAP.get(ch, []):
                 raw[layer] += w
     if raw.max() <= 0:
-        return np.zeros(12, dtype=float)
-    return raw / raw.max()   # per-layer affinity in [0,1], dominant layer = 1.0
+        return np.full(12, floor, dtype=float)
+    return floor + (1.0 - floor) * (raw / raw.max())   # filled affinity in [floor, 1.0]
+
+
+def compute_12d_profile_dict(term: str) -> Dict[str, float]:
+    """Named {layer: affinity} view of the realization profile (for tracing/inspection)."""
+    return {name: round(float(v), 3) for name, v in zip(LAYERS_12, compute_12d_profile(term))}
 
 
 def dominant_layers(vec: np.ndarray, k: int = 3) -> List[str]:
