@@ -82,7 +82,7 @@ def _resonance_extractors(tokenizer):
         def combined_fn(input_ids):
             import torch
             with torch.no_grad():
-                out = prov(input_ids)
+                out = prov(input_ids.cpu())            # affinity table is CPU — index with CPU ids
             aff = out["csr_affinity"][0].float()   # [T,12]
             return aff.mean(0).cpu().numpy()
         meta["resonance_combined"] = "ok (CSREmbeddingProvider)"
@@ -198,13 +198,25 @@ def main() -> int:
             feats["semantic"].append(embed(ids)[0].float().mean(0).cpu().numpy())  # input embeddings
 
             if ctx_fn is not None:
-                x = torch.cat([torch.tensor(hidden_pooled), torch.tensor(state)]).float().unsqueeze(0)
-                feats["context_r_ctx"].append(ctx_fn(x)[0].cpu().numpy())
+                try:
+                    x = torch.cat([torch.tensor(hidden_pooled), torch.tensor(state)]).float().unsqueeze(0)
+                    feats["context_r_ctx"].append(ctx_fn(x)[0].cpu().numpy())
+                except Exception as exc:
+                    avail.setdefault("context_r_ctx_unavailable", f"runtime error: {exc}")
+                    ctx_fn = None
             if res_combined_fn is not None:
-                feats["resonance_combined"].append(res_combined_fn(ids))
+                try:
+                    feats["resonance_combined"].append(res_combined_fn(ids))
+                except Exception as exc:
+                    avail.setdefault("resonance_combined_unavailable", f"runtime error: {exc}")
+                    res_combined_fn = None
             if res_split_fn is not None:
-                vb, vc = res_split_fn(r["prompt"])
-                feats["phoneme_bhava"].append(vb); feats["vritti_consonant"].append(vc)
+                try:
+                    vb, vc = res_split_fn(r["prompt"])
+                    feats["phoneme_bhava"].append(vb); feats["vritti_consonant"].append(vc)
+                except Exception as exc:
+                    avail.setdefault("resonance_split_unavailable", f"runtime error: {exc}")
+                    res_split_fn = None
             labels.append({"id": r["id"], "label": r["label"], "label_type": r["label_type"]})
 
     out_dir = Path(args.out) if args.out else _REPO / "runs" / "bhava_probe" / \
