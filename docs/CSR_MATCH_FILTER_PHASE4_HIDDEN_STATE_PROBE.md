@@ -203,6 +203,52 @@ Steps 2–5 are CPU and reproducible from saved activations; only step 1 needs t
   dimension-matched control, collapse + leakage detectors) so the harness is verified without a GPU.
 - `RESULTS_PHASE4.md` — the verdict.
 
+## 11.1 Stage-A runbook (RunPod) — built, plumbing only (no Phase 4 claim)
+
+Stage-A ships two modules: `phase4_collect_states.py` (GPU collector) and `phase4_probe.py` (pure-numpy
+probe math, CPU). Activations and metadata are written to a gitignored `runs/csr_phase4/`.
+
+**1 — Collect hidden states (GPU pod).** Reads the Phase 2B-v2 dataset, builds the *frozen* base/framed
+prompts, captures the residual stream at the **final prompt token** (pre-generation) across all layers,
+and labels each row from the saved Phase 2B answers via the frozen Phase 3 audit (no re-generation):
+```
+git pull origin claude/cg-wrapper-quality-ablation-gro5iw
+export CSR_LLM_MODEL="mistralai/Mistral-7B-Instruct-v0.3"
+python scripts/cg_wrapper_ablation/csr_match_filter/phase4_collect_states.py \
+  --data   scripts/cg_wrapper_ablation/csr_match_filter/eval_data/framed_answer_eval_v2_rubricv2.jsonl \
+  --traces runs/csr_phase2b/robustness_eval_v2.json \
+  --arms base,framed --layers all --semantic-backend real \
+  --out-dir runs/csr_phase4
+```
+Outputs: `runs/csr_phase4/phase4_activations.npz` (`X` = [N, n_layers, d_model]),
+`phase4_metadata.jsonl` (aligned labels + `extraction_mode=last_prompt_token_pre_generation`,
+`features_from_answer_tokens=false`), and `phase4_manifest.json`. If you have no saved traces, add
+`--generate` to produce answers *for labels only* (features still come from the prompt forward pass).
+A CPU `--dry-run` (writes zero activations) is available to smoke-test the output schema without a GPU.
+
+**2 — Probe on saved activations (CPU; no GPU needed).** `phase4_probe.py` is a library
+(`evaluate_probe`, `incremental_value`, `effective_rank`, `leakage_check`, `bootstrap_auroc_delta`,
+`decide_phase4`); the Stage-B driver that wires it to `X`/labels is intentionally **not** built yet
+(that's the actual experiment, gated on a feasibility signal). To sanity-check the saved arrays now:
+```
+python - <<'PY'
+import numpy as np
+d = np.load("runs/csr_phase4/phase4_activations.npz", allow_pickle=True)
+print("X", d["X"].shape, "layers", d["layers"], "n", len(d["ids"]))
+PY
+```
+
+**3 — Inspect the layer sweep.** `X[:, L, :]` selects layer `L`; group probes by term using the `id`
+prefix (e.g. `poly_`, `ord_`) for the group-by-term CV. A per-layer `evaluate_probe(X[:,L,:], y, groups)`
+AUROC curve identifies the most decodable layer (chosen *inside* CV folds in Stage B, never globally).
+
+**4 — Interpret decision labels.** `decide_phase4(...)` precedence: `PHASE4_BHAVA_LEAKAGE_SUSPECTED`
+(controls failed) > `PHASE4_BHAVA_COLLAPSE` (effective rank < 3) > `PHASE4_PILOT_INCONCLUSIVE` (CIs too
+wide) > `PHASE4_NOT_PREDICTIVE` (hidden AUROC below floor) > `PHASE4_BHAVA_ADDS_SIGNAL` (beats
+hidden-only AND a dimension-matched random control by ≥0.05 AUROC with non-overlapping CIs) else
+`PHASE4_HIDDEN_STATE_PREDICTIVE`. **Stage-A makes none of these claims** — the labels are tested only
+on synthetic activations (`tests/test_csr_phase4_probe.py`).
+
 ## 12. Out of scope / explicitly future
 
 Generation control, logit/representation steering, Guna/Vritti, JEPA ontology, and any claim that
