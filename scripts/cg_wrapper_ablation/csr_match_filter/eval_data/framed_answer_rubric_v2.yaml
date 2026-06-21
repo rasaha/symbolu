@@ -1,0 +1,97 @@
+# Pre-registered deterministic rubric v2 for the C×R×S Phase 2B-v2 framed-answer eval.
+# WRITTEN AND COMMITTED BEFORE the v2 rerun. Separates FACTUALITY from FRAME COMPLIANCE — the
+# rubric_v1 flaw found in Phase 2B-v1 (alternate true senses penalized as factuality/leak failures).
+# rubric_v1 is NOT modified; this is a NEW versioned rubric.
+version: framed_answer_rubric_v2
+locked: true
+judge_default: deterministic_rubric
+supersedes: framed_answer_rubric_v1
+motivation: >
+  Phase 2B-v1: the primary-frame lift survived (+0.164, distributed), but rubric_v1 coupled
+  factuality_preserved to must_not_violation and marked polysemy alternate TRUE senses (e.g.
+  "python is also a snake", "virus can also mean computer malware") as rejected leaks, producing a
+  spurious PHASE2B_FACTUALITY_REGRESSION. v2 decouples these.
+
+# --- pre-registered rules (LOCKED before rerun) --------------------------------------------------
+rules:
+  - id: 1
+    name: factuality_is_no_false_claim
+    text: >
+      factuality_preserved = the answer asserts NO false claim. It is computed from a separate
+      `false_claims` field ONLY, and is INDEPENDENT of frame compliance, rejected-domain mentions,
+      and must_not_include. Mentioning a true alternate sense is never a factuality failure.
+  - id: 2
+    name: alternate_true_sense_is_secondary_allowed
+    text: >
+      Mentioning an alternate TRUE sense of a polysemous term (expected_secondary_true_senses) is
+      ALLOWED if brief and subordinate to the primary sense. It is NOT rejected-domain leakage and
+      NOT a factuality failure.
+  - id: 3
+    name: rejected_avoidance_is_irrelevant_only
+    text: >
+      rejected_domain_avoidance concerns only expected_rejected = truly irrelevant/false domains.
+      A leak = an expected_rejected domain POSITIVELY ASSERTED (negation-aware). Brief alternate
+      true-sense mentions do not count against it; refuting a rejected domain is not a leak.
+  - id: 4
+    name: promotion_is_a_frame_error
+    text: >
+      Promoting an alternate or rejected sense AS THE PRIMARY FRAME (the non-primary sense is asserted
+      while expected_primary is NOT asserted) is a framing error: primary_frame_correct = false,
+      secondary_handling_correct = false, rejected_domain_promotion = true.
+  - id: 5
+    name: secondary_allowed_only_as_secondary
+    text: >
+      Expected secondary domains (role secondaries and alternate true senses) are allowed only if the
+      primary domain remains the lead (positively asserted). Otherwise it is a promotion error (rule 4).
+  - id: 6
+    name: overreach_requires_assertion
+    text: >
+      phoneme_overreach is TRUE only for an ASSERTION that phonemes/sounds prove or determine meaning.
+      Mere mention or negation of phonemes is not overreach (negation-aware).
+  - id: 7
+    name: refutation_is_not_a_leak
+    text: >
+      Refuting/negating a rejected domain ("a doctor is NOT a fruit") is not a rejected-domain leak.
+
+# --- metrics (deterministic; factuality and frame are SEPARATE) -----------------------------------
+metrics:
+  factuality_preserved:
+    definition: no false_claims asserted (negation-aware) AND answer >= 5 words AND term mentioned
+    independent_of: [must_not_violation, rejected_domain_avoidance, primary_frame_correct]
+    type: boolean
+  primary_frame_correct:
+    definition: expected_primary asserted AND no expected_rejected asserted AND no promotion
+    type: boolean
+  secondary_handling_correct:
+    definition: primary asserted AND no rejected promotion (secondaries kept subordinate)
+    type: boolean
+  rejected_domain_avoidance:
+    definition: no expected_rejected (truly irrelevant) domain positively asserted
+    type: boolean
+  alternate_true_sense_mention:
+    definition: an expected_secondary_true_sense is mentioned (informational; allowed if secondary)
+    type: boolean
+  rejected_domain_promotion:
+    definition: a rejected/alternate sense asserted while expected_primary is NOT asserted
+    type: boolean
+    target: false
+  phoneme_overreach:
+    definition: assertive sound/phoneme->meaning claim (negation-aware)
+    type: boolean
+    target: false
+  must_include_recall:
+    definition: fraction of must_include phrases whose content words are >=60% present
+    type: float
+  clarity_proxy:
+    definition: 1.0 if 5 <= word_count <= 160 and term mentioned else 0.0
+    type: float
+  trace_completeness:
+    definition: csr_trace present + all arm answers present
+    type: float
+
+params:
+  must_include_overlap_threshold: 0.6
+  clarity_min_words: 5
+  clarity_max_words: 160
+  negation_aware: true
+  factuality_source: false_claims   # NOT must_not_include

@@ -69,6 +69,9 @@ def _mean(vals):
     return (sum(vals) / len(vals)) if vals else None
 
 
+INFO_KEYS = ("alternate_true_sense_mention", "rejected_domain_promotion")
+
+
 def metric(judge_out, key):
     if key == "phoneme_overreach_rate":
         return 1.0 if judge_out["phoneme_overreach"] else 0.0
@@ -78,6 +81,10 @@ def metric(judge_out, key):
         return judge_out["must_include_recall"]
     if key == "must_not_violation_rate":
         return judge_out["must_not_violation_rate"]
+    if key == "alternate_true_sense_mention":
+        return 1.0 if judge_out.get("alternate_true_sense_mention") else 0.0
+    if key == "rejected_domain_promotion":
+        return 1.0 if judge_out.get("secondary_promoted") else 0.0
     v = judge_out.get(key)
     return (1.0 if v else 0.0) if isinstance(v, bool) else v
 
@@ -85,10 +92,38 @@ def metric(judge_out, key):
 def aggregate(per, arm):
     out = {}
     for k in BOOL_METRICS + ("phoneme_overreach_rate", "must_include_recall",
-                             "must_not_violation_rate", "clarity_proxy"):
+                             "must_not_violation_rate", "clarity_proxy") + INFO_KEYS:
         out[k] = _mean([metric(p["scores"][arm], k) for p in per])
     out["trace_completeness"] = _mean([p["trace_complete"] for p in per])
     return out
+
+
+def decide_phase2b_v2(base, framed, judge_backend, robust, polysemy_ok):
+    bf, ff = base["factuality_preserved"], framed["factuality_preserved"]
+    if bf is not None and ff is not None and ff < bf - 0.05:
+        return "PHASE2B_V2_FACTUALITY_REGRESSION"
+
+    def ge(a, b, d=0.0):
+        return a is not None and b is not None and a >= b + d
+    prim_ok = ge(framed["primary_frame_correct"], base["primary_frame_correct"], 0.10) or \
+        (framed["primary_frame_correct"] or 0) >= 0.80
+    rej_ok = ge(framed["rejected_domain_avoidance"], base["rejected_domain_avoidance"], 0.10) or \
+        (framed["rejected_domain_avoidance"] or 0) >= 0.90
+    over = framed["phoneme_overreach_rate"] or 0.0
+    over_ok = over <= (base["phoneme_overreach_rate"] or 1.0) and over <= 0.05
+    fact_ok = ff is None or bf is None or ff >= bf - 0.05
+    trace_ok = (framed.get("trace_completeness") or 0) >= 0.95
+    if not prim_ok:
+        return "PHASE2B_V2_NO_ROBUST_LIFT"
+    if not (over_ok and fact_ok and trace_ok):
+        return "PHASE2B_V2_NEEDS_HUMAN_REVIEW"
+    if not rej_ok:
+        return "PHASE2B_V2_PRIMARY_LIFT_ONLY"
+    if not (robust and polysemy_ok):
+        return "PHASE2B_V2_NEEDS_HUMAN_REVIEW"
+    # gates + robustness pass; only an independent judge can certify a full robustness pass
+    return "PHASE2B_V2_ROBUSTNESS_PASS" if judge_backend == "real_llm_judge" \
+        else "PHASE2B_V2_NEEDS_HUMAN_REVIEW"
 
 
 def stratify(per, arms, key_fn):
@@ -226,6 +261,8 @@ def main():
     if args.limit:
         rows = rows[: args.limit]
     rubric_cfg = load_rubric(args.rubric)
+    is_v2 = "v2" in str(rubric_cfg.get("version", ""))
+    decide_fn = decide_phase2b_v2 if is_v2 else decide_phase2b
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
     answer_backends = [b.strip() for b in args.answer_backends.split(",") if b.strip()]
 
@@ -270,8 +307,8 @@ def main():
             poly_ok = poly["polysemy"]["delta_primary"] >= -0.10
         robust = (ld.get("dominated_by_single_category") is None and
                   ld.get("categories_framed_ge_base", 0) >= max(2, (ld.get("n_categories", 0) // 2)))
-        label = decide_phase2b(metrics.get("base", {}), metrics.get("framed", {}),
-                               judge.judge_backend, robust, poly_ok) if "framed" in arms else "N/A"
+        label = decide_fn(metrics.get("base", {}), metrics.get("framed", {}),
+                          judge.judge_backend, robust, poly_ok) if "framed" in arms else "N/A"
         report["backends"][backend] = {
             "llm_backend": llm.backend, "production_valid": llm.production_valid,
             "metrics": metrics, "deltas": deltas, "lift_distribution": ld,
@@ -294,6 +331,12 @@ def main():
                 row += ("n/a" if v is None else f"{v:.3f}").rjust(14)
             d = deltas.get(k)
             row += ("" if d is None else f"   {d:+.3f}")
+            print(row)
+        for k in INFO_KEYS:   # informational (v2): alt-true-sense mention rate, promotion rate
+            row = "  " + k.ljust(30)
+            for a in arms:
+                v = metrics[a].get(k)
+                row += ("n/a" if v is None else f"{v:.3f}").rjust(14)
             print(row)
         tc = metrics["framed"].get("trace_completeness") if "framed" in arms else None
         print(f"  trace_completeness".ljust(32) + ("n/a" if tc is None else f"{tc:.3f}").rjust(14))

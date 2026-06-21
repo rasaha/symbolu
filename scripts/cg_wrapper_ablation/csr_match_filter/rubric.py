@@ -146,3 +146,46 @@ def score_answer(answer: str, example: Dict, terms: Optional[List[str]] = None) 
         "_mentioned_primary": sorted(men_prim),
         "_mentioned_rejected": sorted(men_rej),
     }
+
+
+def score_answer_v2(answer: str, example: Dict, terms: Optional[List[str]] = None) -> Dict:
+    """rubric_v2: factuality is SEPARATE from frame compliance.
+
+    factuality_preserved keys off `false_claims` ONLY (not must_not / rejected). Alternate true senses
+    (`expected_secondary_true_senses`) are secondary-allowed: mentioning one is not a leak and not a
+    factuality failure; only PROMOTING a non-primary sense (asserting it while the primary is absent)
+    is a frame error. expected_rejected is truly-irrelevant domains only.
+    """
+    answer = answer or ""
+    toks = _toks(answer)
+    words = answer.split()
+    prim = asserted_domains(answer, example.get("expected_primary", []))
+    sec_true = asserted_domains(answer, example.get("expected_secondary_true_senses", []))
+    rej = asserted_domains(answer, example.get("expected_rejected", []))
+    terms = terms or example.get("dominant_terms") or []
+    term_present = (not terms) or any(_toks(t) & toks for t in terms)
+
+    primary_asserted = bool(prim)
+    rejected_leak = bool(rej)
+    promotion = (rejected_leak or bool(sec_true)) and not primary_asserted   # non-primary led
+    primary_frame_correct = primary_asserted and not rejected_leak and not promotion
+
+    false_viol = forbidden_rate(answer, example.get("false_claims", []))      # FACTUALITY source
+    factuality_preserved = 1.0 if (false_viol == 0.0 and len(words) >= 5 and term_present) else 0.0
+
+    return {
+        "primary_frame_correct": 1.0 if primary_frame_correct else 0.0,
+        "secondary_handling_correct": 1.0 if (primary_frame_correct and not promotion) else 0.0,
+        "rejected_domain_avoidance": 0.0 if rejected_leak else 1.0,
+        "phoneme_overreach_rate": 1.0 if has_phoneme_overreach(answer) else 0.0,
+        "factuality_preserved": factuality_preserved,
+        "must_include_recall": phrase_recall(answer, example.get("must_include", [])),
+        "must_not_violation_rate": forbidden_rate(answer, example.get("must_not_include", [])),
+        "answer_clarity_proxy": 1.0 if (5 <= len(words) <= 160 and term_present) else 0.0,
+        "alternate_true_sense_mention": 1.0 if bool(sec_true) else 0.0,
+        "rejected_domain_promotion": 1.0 if promotion else 0.0,
+        "false_claim_rate": false_viol,
+        "_mentioned_primary": sorted(prim),
+        "_mentioned_rejected": sorted(rej),
+        "_mentioned_secondary_true": sorted(sec_true),
+    }

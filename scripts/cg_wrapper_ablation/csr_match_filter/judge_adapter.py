@@ -42,23 +42,32 @@ class DeterministicRubricJudge(Judge):
     def __init__(self, rubric_cfg: Optional[Dict] = None):
         self.rubric_cfg = rubric_cfg or {}
         self.rubric_version = (rubric_cfg or {}).get("version", "framed_answer_rubric_v1")
+        self.is_v2 = "v2" in self.rubric_version
 
     def score(self, query, answer, example, terms=None) -> Dict:
-        s = RB.score_answer(answer, example, terms)
-        promoted = _secondary_promoted(answer, example)
+        if self.is_v2:
+            s = RB.score_answer_v2(answer, example, terms)
+            promoted = bool(s["rejected_domain_promotion"])
+            pfc = bool(s["primary_frame_correct"])
+            alt = bool(s["alternate_true_sense_mention"])
+        else:
+            s = RB.score_answer(answer, example, terms)
+            promoted = _secondary_promoted(answer, example)
+            pfc = bool(s["primary_frame_correct"]) and not promoted
+            alt = False
         reasons = []
-        if not s["primary_frame_correct"]:
-            reasons.append("primary not asserted or rejected domain asserted")
+        if not pfc:
+            reasons.append("primary not asserted, rejected asserted, or non-primary promoted")
         if promoted:
-            reasons.append("secondary domain promoted to primary")
+            reasons.append("non-primary sense promoted to primary")
         if s["rejected_domain_avoidance"] == 0.0:
             reasons.append(f"rejected leak: {s.get('_mentioned_rejected')}")
         if s["phoneme_overreach_rate"]:
             reasons.append("phoneme-overreach assertion")
         if s["factuality_preserved"] == 0.0:
-            reasons.append("factuality not preserved")
+            reasons.append("factuality not preserved (false claim)")
         return {
-            "primary_frame_correct": bool(s["primary_frame_correct"]) and not promoted,
+            "primary_frame_correct": pfc,
             "secondary_handling_correct": bool(s["secondary_handling_correct"]) and not promoted,
             "rejected_domain_avoidance": bool(s["rejected_domain_avoidance"]),
             "phoneme_overreach": bool(s["phoneme_overreach_rate"]),
@@ -67,6 +76,8 @@ class DeterministicRubricJudge(Judge):
             "must_include_recall": s["must_include_recall"],
             "must_not_violation_rate": s["must_not_violation_rate"],
             "secondary_promoted": promoted,
+            "alternate_true_sense_mention": alt,
+            "rubric_version": self.rubric_version,
             "reasons": reasons,
         }
 
