@@ -1,0 +1,79 @@
+# Pre-registered deterministic rubric for the C×R×S Phase 2B framed-answer eval.
+# WRITTEN BEFORE the v2 run. The runner records rubric_version + rubric_locked. The deterministic
+# scorer in rubric.py implements exactly these rules; this file is the authoritative spec.
+version: framed_answer_rubric_v1
+locked: true
+judge_default: deterministic_rubric
+
+# --- pre-registered rules (the two Phase 2 corrections are LOCKED here as rules 1-2) --------------
+rules:
+  - id: 1
+    name: overreach_requires_assertion
+    text: >
+      Phoneme-overreach requires an ASSERTION that phonemes/sounds prove or determine meaning.
+      Mere mention of phonemes (e.g. an answer saying "phonemes do not prove meaning") is NOT overreach.
+      Detection is negation-aware: a sound/phoneme->meaning construction inside a negated clause does
+      not count.
+  - id: 2
+    name: refutation_is_not_a_leak
+    text: >
+      Refuting or negating a rejected domain does NOT count as a rejected-domain leak.
+      Example: "A doctor is not a fruit" must NOT count as fruit-domain leakage. A rejected domain
+      leaks only if it is POSITIVELY ASSERTED (named in a non-negated sentence).
+  - id: 3
+    name: secondary_allowed_only_as_secondary
+    text: >
+      Expected-secondary domains are allowed in the answer only if they remain secondary
+      (the primary domain is still positively asserted).
+  - id: 4
+    name: secondary_promotion_is_framing_error
+    text: >
+      A secondary domain promoted as primary (expected-secondary asserted while expected-primary is
+      NOT asserted) is a framing error: primary_frame_correct = false and secondary_handling_correct = false.
+  - id: 5
+    name: factuality_independent_of_frame
+    text: >
+      Factuality must NOT be rewarded for frame compliance. factuality_preserved is computed
+      independently of primary/secondary framing: it is false if the answer asserts a forbidden
+      factual claim (must_not_include, negation-aware), is empty/too short, or never mentions the term.
+
+# --- metric definitions (deterministic) ----------------------------------------------------------
+metrics:
+  primary_frame_correct:
+    definition: expected_primary positively asserted AND no expected_rejected positively asserted
+    type: boolean
+  secondary_handling_correct:
+    definition: same as primary_frame_correct (primary asserted, no rejected, no secondary promotion)
+    type: boolean
+  rejected_domain_avoidance:
+    definition: no expected_rejected domain positively asserted (refutations excluded)
+    type: boolean
+  phoneme_overreach:
+    definition: an assertive sound/phoneme->meaning claim is present (negation-aware)
+    type: boolean
+    target: false
+  factuality_preserved:
+    definition: no forbidden factual claim asserted, answer >= 5 words, term mentioned
+    type: boolean
+  must_include_recall:
+    definition: fraction of must_include phrases whose content words are >=60% present
+    type: float
+  must_not_violation_rate:
+    definition: fraction of must_not_include claims positively asserted (negation-aware, conjunctive)
+    type: float
+    target: 0.0
+  clarity_proxy:
+    definition: 1.0 if 5 <= word_count <= 160 and term mentioned else 0.0
+    type: float
+  trace_completeness:
+    definition: csr_trace has primary/secondary/rejected + scores, and all arm answers present
+    type: float
+
+# --- deterministic scorer knobs (locked) ---------------------------------------------------------
+params:
+  must_include_overlap_threshold: 0.6
+  must_not_conjunctive_max_missing_short: 0   # phrases <=3 tokens require all tokens
+  must_not_conjunctive_max_missing_long: 1    # longer phrases may miss 1 token
+  clarity_min_words: 5
+  clarity_max_words: 160
+  negation_aware: true

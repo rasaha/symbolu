@@ -92,6 +92,11 @@ _TEMPLATES = {
     "furniture":   [0.70, 0.75, 0.35, 0.95, 0.20, 0.20, 0.15, 0.40, 0.55, 0.60, 0.60, 0.50],
     "security":    [0.50, 0.70, 0.80, 0.85, 0.85, 0.90, 0.85, 0.60, 0.50, 0.50, 0.65, 0.40],
     "agriculture": [0.85, 0.50, 0.60, 0.75, 0.45, 0.50, 0.40, 0.75, 0.60, 0.75, 0.85, 0.60],
+    # --- Phase 2B additive lanes (new ontology, NOT a change to existing templates/thresholds/logic;
+    #     Phase 1 metrics are over a disjoint dataset and are unaffected) ---
+    "education":    [0.55, 0.55, 0.55, 0.65, 0.90, 0.55, 0.85, 0.85, 0.70, 0.85, 0.85, 0.60],
+    "religion":     [0.80, 0.60, 0.45, 0.50, 0.55, 0.50, 0.45, 0.85, 0.90, 0.85, 0.65, 0.90],
+    "construction": [0.70, 0.55, 0.90, 0.95, 0.55, 0.80, 0.55, 0.60, 0.40, 0.55, 0.65, 0.45],
 }
 
 _DEFINITIONS = {
@@ -115,6 +120,9 @@ _DEFINITIONS = {
     "furniture":   "furniture chair table seat couch household wooden domestic cabinet desk",
     "security":    "security protection defense malware computer network firewall attack hacker intrusion",
     "agriculture": "agriculture farming crop harvest soil cultivation field irrigation livestock plant",
+    "education":    "education teaching learning knowledge school student instruction curriculum pedagogy classroom",
+    "religion":     "religion faith worship god spiritual sacred prayer divine ritual belief priest church",
+    "construction": "construction building structure engineering site material concrete build infrastructure architect",
 }
 
 _KEYWORDS = {d: sorted(set(defn.split())) for d, defn in _DEFINITIONS.items()}
