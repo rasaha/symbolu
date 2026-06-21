@@ -3,6 +3,33 @@
 > Harness: `eval_framed_answers.py` over `eval_data/framed_answer_eval.jsonl` (44 cases). Frame =
 > frozen Phase 1 scorer (thresholds 0.20/0.05, unchanged). Judge = deterministic rubric proxy.
 
+## 🧊 PHASE 2 CLOSEOUT (FROZEN) — read this first
+
+1. **Phase 1 = PASS / FROZEN** at commit `5cb4f76` (tag `csr-match-filter-phase1-pass`): the C×R×S
+   frame selector (primary/secondary/rejected with vetoes) is validated and immutable.
+2. **Phase 2 = PASS / CAVEATED** at commit `c22a323`: C×R×S-framed answering beats base on a real
+   generator, with the caveats below. This closeout commit freezes it.
+3. **Exact Mistral-7B-Instruct-v0.3 metrics** (real frame `all-MiniLM-L6-v2`, n=44):
+   primary_frame_correct base **0.682** → framed **0.909** (+0.227); rejected_domain_avoidance
+   **0.773 → 0.909** (+0.136); factuality_preserved **0.909 → 0.955** (+0.045); phoneme_overreach
+   **0.000 → 0.000**; must_include_recall **0.568 → 0.659**; must_not_violation **0.030 → 0.019**;
+   clarity **0.932 → 0.955**; trace_completeness **1.000**. All four pass-gates clear.
+4. **The deterministic rubric was corrected TWICE after model outputs were seen** (overreach =
+   assertion not mention; refutation ≠ rejected-leak). Fixes are principled, tested, and applied
+   symmetrically to base + framed (base scores rose too) — but the rubric was **not pre-registered**,
+   so this is a strong signal, not a publication-grade claim.
+5. **Post-check rewrite did NOT improve over framed-only** (framed 0.909 ≥ framed+postcheck 0.886;
+   rewrite rate 0.432). On a strong instruct model the frame prompt suffices; the rewrite over-corrects.
+6. **Residual failures (5/44) are polysemy / secondary-role edges**, not framing-mechanism failures:
+   `ctx_apple_tech`, `ctx_virus_bio`, `ctx_virus_sec` (Phase-1 polysemy frame gaps) +
+   `adv_surgeon_authority`, `sec_judge_authority` (authority secondary-role).
+7. **Next validation = Phase 2B** (separate effort, NOT in this closeout): pre-registered rubric;
+   LLM-as-judge; multiple models; larger human-reviewed dataset.
+
+**Phase 2 work is stopped here.**
+
+---
+
 ## ✅ VERDICT: `PHASE2_FRAMED_ANSWER_PASS`
 
 Generator: **Mistral-7B-Instruct-v0.3** (`local_hf`, production_valid). Frame backend:
