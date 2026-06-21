@@ -84,15 +84,44 @@ class ContextualDefinitionProvider:
 
 
 def load_real_embed_fn():
-    """Try to build a real sentence embedder; return (fn, name) or (None, reason)."""
+    """Build a real sentence embedder; return (fn, label) or (None, reason).
+
+    Tries sentence-transformers first, then a direct transformers mean-pooling fallback (more robust
+    to packaging quirks). CSR_EMBED_MODEL may be a hub id or a local path. Errors are reported in full.
+    """
     import os
     name = os.environ.get("CSR_EMBED_MODEL", "all-MiniLM-L6-v2")
+    errs = []
+
+    # 1) sentence-transformers
     try:
         from sentence_transformers import SentenceTransformer
         model = SentenceTransformer(name)
-        return (lambda text: model.encode(text)), name
+        return (lambda text: model.encode(text)), f"sentence_transformers:{name}"
     except Exception as exc:
-        return None, f"sentence-transformers/{name} unavailable: {exc}"
+        errs.append(f"sentence_transformers({name}): {type(exc).__name__}: {exc}")
+
+    # 2) transformers AutoModel + mean pooling (try the name, then the sentence-transformers/ org)
+    candidates = [name] if "/" in name else [name, f"sentence-transformers/{name}"]
+    for cand in candidates:
+        try:
+            import torch
+            from transformers import AutoModel, AutoTokenizer
+            tok = AutoTokenizer.from_pretrained(cand)
+            mdl = AutoModel.from_pretrained(cand); mdl.eval()
+
+            def embed(text, _tok=tok, _mdl=mdl):
+                with torch.no_grad():
+                    enc = _tok(text, return_tensors="pt", truncation=True, max_length=128)
+                    out = _mdl(**enc).last_hidden_state[0]            # [T, H]
+                    mask = enc["attention_mask"][0].unsqueeze(-1).float()
+                    return ((out * mask).sum(0) / mask.sum().clamp(min=1.0)).cpu().numpy()
+
+            return embed, f"transformers:{cand}"
+        except Exception as exc:
+            errs.append(f"transformers({cand}): {type(exc).__name__}: {exc}")
+
+    return None, "; ".join(errs)
 
 
 def make_adapter(backend, provider, audit):
