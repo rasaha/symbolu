@@ -16,10 +16,16 @@ FEATURE_SETS: Dict[str, List[str]] = {
     "bhava_only": ["bhava", "bhava_entropy"],
     "cg_state_32d": ["state32"],
     "delta_bhava_only": ["delta_bhava", "delta_bhava_norm"],
-    "hidden_only": ["hidden_pooled"],                       # the REQUIRED control
+    "vowel_bhava": ["vowel_bhava"],                          # B1 Sanskrit-varna sound basis (12-d)
+    "csr_contextual": ["csr_contextual"],                    # B2 contextual CSR (16-d)
+    "csr_resonance": ["csr_resonance"],                      # B3 resonance summary
+    "hidden_only": ["hidden_pooled"],                        # the REQUIRED control
     "hidden_plus_bhava": ["hidden_pooled", "bhava"],
     "hidden_plus_cg_state": ["hidden_pooled", "state32"],
 }
+
+# The separable CSR parts (audit: two-part Sanskrit-vowel + contextual, + resonance).
+CSR_PART_KEYS: List[str] = ["csr_contextual", "vowel_bhava", "csr_resonance"]
 
 # The reference/control every Bhava set is compared against.
 CONTROL_SET = "hidden_only"

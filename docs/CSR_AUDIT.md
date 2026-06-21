@@ -3,14 +3,31 @@
 > Read-only audit of what **CSR** actually is in this repo, before any probe code. Generation-quality
 > representation track only. No governance/trust code, no generation/attention/mid-layer injection.
 
-## 0. Two unrelated "CSR" exist — disambiguate first
+## 0. ⚠ INTEGRITY WARNING — "CSR" is an overloaded/corrupted label (≥4 distinct subsystems)
 
-| Name | Location | Meaning | In scope? |
-|------|----------|---------|-----------|
-| **CSR (this probe)** | `symbolu_training/.../primitives/csr_scorer.py` + `csr_phoneme_provider.py` | **C**ontextual **S**emantic **R**esonance — phonemic/varna resonance scoring | **YES** |
-| CSR (governance) | `agentic/inference/csr_inference.py` | "Constraint-Structure-Resonance" inference guard (entropy/safety) | **NO — out of bounds** |
+The acronym **CSR** is reused for unrelated things. Verified from the code (not guessed):
 
-Everything below is the training-side phonemic CSR.
+| # | Subsystem | Location | Acronym as written in code | Mechanism | Trained in Active-CG ckpt? | Probe scope |
+|---|-----------|----------|-----------------------------|-----------|----------------------------|-------------|
+| 1 | **CSR token scorer** | `primitives/csr_scorer.py` (`CSRTokenScorer`) | (not expanded; "phonemic/mental resonance") | per-token **bilinear scorer** `r_ctx^T M r_w`; gated by `--lambda_csr_token` | **YES** — run used `--lambda_csr_token 0.005` → `conscious_gen.csr_scorer.*` present | **YES (the only trained CSR here)** |
+| 2 | **CSR spatial injection provider** | `csr_phoneme_provider.py` (`CSREmbeddingProvider`) | "**Constraint-Structure-Resonance**" | injects `E_input = E_token + λ_csr·E_CSR` into hidden at layers; gated by `csr_lambda`/`--enable_csr` | **NO** — not enabled in `train_cg_active.sh` → weights absent | unavailable (untrained) |
+| 3 | **CRS combined scorer** | `primitives/crs_combined_scorer.py` (`CRSCombinedScorer`) | "**C**ombined **R**esonance-**S**emantic" | gates csr+others; `use_crs_combined_scorer` (off by default) | NO | unavailable |
+| 4 | **CSR governance guard** | `agentic/inference/csr_inference.py` | "Constraint-Structure-Resonance" | inference entropy/safety guard | — | **OUT OF BOUNDS (governance)** |
+
+**Correction to an earlier draft:** there is no module that literally expands CSR as "Contextual
+Semantic Resonance"; that was my gloss and is withdrawn. The probe targets **subsystem #1 only**
+(the token scorer that is actually trained in this checkpoint), plus the **model-independent varna
+vowel basis** (below). Subsystems #2/#3 are *not trained* in the Active-CG checkpoint, so probing
+them would measure untrained/garbage weights → recorded `feature_unavailable`.
+
+**Diverged duplicate (corruption):** `symbolu/resonance/varna_bridge.py` and
+`symbolu_core/resonance/varna_bridge.py` are the same size/#defs but **different md5** → forked/drifted
+copies. The JSON data maps (`symbolu/formulas/data/` vs `docs/data/varna_bridge_map_v1.json`) are
+**identical** (md5 match), so the *vowel-basis data* is consistent; the *bridge code* is forked. The
+extractor uses `csr_phoneme_provider.py`'s own `VarnaCSRBridge` (loads the consistent JSON), not the
+forked `*/resonance/varna_bridge.py`.
+
+Everything below concerns subsystem #1 (token scorer) + the varna vowel basis.
 
 ## 1. The intended CSR has TWO separable parts (both implemented)
 
@@ -72,11 +89,12 @@ position) via a bilinear resonance. The two parts must not be collapsed.
 9. **Checkpoints with CSR**: `model.conscious_gen = nn.ModuleDict({... "csr_scorer", "token_cache"
    ...})` (`model_factory.py:732-746`) → CSR params + `R_tok` are in the **full** `{stem}_model.pt`
    under `conscious_gen.csr_scorer.*` and `conscious_gen.token_cache.R_tok`.
-10. **Active-CG checkpoint**: the run trained `--lambda_csr_token 0.005`, so
+10. **Active-CG checkpoint**: trained `--lambda_csr_token 0.005` (subsystem #1 only). So
     `conscious_gen.csr_scorer.context_proj.*`, `.token_proj.*`, `.A`/`.B`, and `token_cache.R_tok`
-    **should be present** in `checkpoints_cg_active/best_model.pt`. The extractor **verifies** this at
-    runtime and records `feature_unavailable` if any key is missing. (Note: the *ablation* loader
-    filters to CG-head keys only, so the probe extractor must read the **full** checkpoint directly.)
+    **should be present**. The **spatial-injection CSR (#2)** and **CRS-combined (#3)** were NOT
+    enabled → their weights are **absent/untrained** → `feature_unavailable`. The extractor reads the
+    **full** `best_model.pt` directly (the ablation loader filters to CG-head keys only) and verifies
+    each key, recording `feature_unavailable: {reason}` per missing part.
 
 ## 3. What is extractable as a per-example feature (and how)
 
