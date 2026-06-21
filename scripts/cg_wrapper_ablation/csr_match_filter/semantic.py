@@ -75,7 +75,8 @@ class SemanticCoherenceAdapter:
                  term_glosses: Optional[Dict[str, str]] = None,
                  curated: Optional[Dict[Tuple[str, str], float]] = None,
                  use_curated: bool = False,
-                 offline_backend: str = "hashing"):
+                 offline_backend: str = "hashing",
+                 audit: Optional[Dict[str, int]] = None):
         self.embed_fn = embed_fn
         self.definition_provider = definition_provider
         self.domain_definitions = dict(domain_definitions or {})
@@ -85,19 +86,27 @@ class SemanticCoherenceAdapter:
         if offline_backend not in ("hashing", "lexical"):
             raise ValueError("offline_backend must be 'hashing' or 'lexical'")
         self.offline_backend = offline_backend
+        self.audit = audit                                 # optional dict to tally backend/path usage
+
+    def _bump(self, key: str) -> None:
+        if self.audit is not None:
+            self.audit[key] = self.audit.get(key, 0) + 1
 
     # --- meaning text (no per-term dictionary required) -------------------------------------------
     def definition(self, term: str) -> str:
         if self.definition_provider is not None:
             try:
                 d = self.definition_provider(term)
-                if d:
+                if d and d.strip().lower() != term.strip().lower():
+                    self._bump("definition_external")      # scalable: external definition source
                     return d
             except Exception:
                 pass
         if term.lower() in self.term_glosses:              # demo fixture, only if explicitly supplied
+            self._bump("definition_demo_gloss")
             return self.term_glosses[term.lower()]
-        return term                                        # fall back to the raw term text
+        self._bump("definition_raw_term")                  # raw-term fallback
+        return term
 
     def domain_definition(self, domain: str) -> str:
         if domain in self.domain_definitions:
@@ -115,13 +124,17 @@ class SemanticCoherenceAdapter:
     def similarity(self, term: str, domain: str) -> float:
         key = (term.lower(), domain)
         if self.use_curated and key in self.curated:       # opt-in demo/test override
+            self._bump("s_demo_curated")
             return float(self.curated[key])
         td, dd = self.definition(term), self.domain_definition(domain)
-        if self.embed_fn is not None:                      # production: real embeddings
+        if self.embed_fn is not None:                      # production: real embeddings (or hashing fn)
+            self._bump("s_embed")
             return _cosine_text(self.embed_fn, td, dd)
         if self.offline_backend == "hashing":              # default offline: deterministic embedding
+            self._bump("s_hashing")
             return _cosine_text(hashing_embed, td, dd)
-        return float(self._lexical(term, domain))          # explicit lexical fallback
+        self._bump("s_lexical")                            # explicit lexical fallback
+        return float(self._lexical(term, domain))
 
 
 # default production-style adapter: deterministic offline embedding, no curation, raw-term definitions

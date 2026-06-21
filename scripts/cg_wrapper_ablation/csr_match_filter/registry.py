@@ -43,25 +43,53 @@ class DomainTemplate:
 
 
 # --- 12D templates (order = LAYERS_12) ------------------------------------------------------------
+# These templates ARE the curated ontology (a bounded, deliberate artifact). Ontology allowance rules
+# are derived from them; no per-domain hand tagging is required.
 #        Pot   Idn   Exe   Str   Cog   Agy   Rsn   Prp   Wit   Uni   Int   Abs
 _TEMPLATES = {
-    "medicine":  [0.55, 0.80, 0.75, 0.70, 0.95, 0.65, 0.95, 0.90, 0.60, 0.75, 0.90, 0.55],
-    "care":      [0.60, 0.65, 0.55, 0.55, 0.80, 0.55, 0.75, 0.90, 0.75, 0.85, 0.90, 0.70],
-    "authority": [0.60, 0.95, 0.90, 0.85, 0.70, 0.95, 0.75, 0.70, 0.40, 0.60, 0.65, 0.45],
-    "law":       [0.45, 0.85, 0.70, 0.95, 0.80, 0.85, 0.90, 0.65, 0.55, 0.55, 0.60, 0.45],
-    "service":   [0.55, 0.70, 0.75, 0.60, 0.60, 0.80, 0.55, 0.85, 0.60, 0.80, 0.80, 0.65],
-    "commerce":  [0.50, 0.80, 0.85, 0.75, 0.55, 0.85, 0.50, 0.55, 0.35, 0.55, 0.55, 0.40],
-    "fruit":     [0.85, 0.40, 0.30, 0.90, 0.20, 0.20, 0.15, 0.15, 0.55, 0.70, 0.60, 0.50],
+    "medicine":    [0.55, 0.80, 0.75, 0.70, 0.95, 0.65, 0.95, 0.90, 0.60, 0.75, 0.90, 0.55],
+    "care":        [0.60, 0.65, 0.55, 0.55, 0.80, 0.55, 0.75, 0.90, 0.75, 0.85, 0.90, 0.70],
+    "authority":   [0.60, 0.95, 0.90, 0.85, 0.70, 0.95, 0.75, 0.70, 0.40, 0.60, 0.65, 0.45],
+    "law":         [0.45, 0.85, 0.70, 0.95, 0.80, 0.85, 0.90, 0.65, 0.55, 0.55, 0.60, 0.45],
+    "service":     [0.55, 0.70, 0.75, 0.60, 0.60, 0.80, 0.55, 0.85, 0.60, 0.80, 0.80, 0.65],
+    "commerce":    [0.50, 0.80, 0.85, 0.75, 0.55, 0.85, 0.50, 0.55, 0.35, 0.55, 0.55, 0.40],
+    "fruit":       [0.85, 0.40, 0.30, 0.90, 0.20, 0.20, 0.15, 0.15, 0.55, 0.70, 0.60, 0.50],
+    "technology":  [0.55, 0.60, 0.90, 0.85, 0.90, 0.70, 0.85, 0.60, 0.45, 0.55, 0.70, 0.45],
+    "finance":     [0.50, 0.85, 0.85, 0.80, 0.65, 0.85, 0.70, 0.60, 0.35, 0.50, 0.55, 0.40],
+    "nature":      [0.90, 0.40, 0.30, 0.60, 0.40, 0.25, 0.30, 0.50, 0.85, 0.90, 0.80, 0.70],
+    "programming": [0.50, 0.55, 0.85, 0.90, 0.95, 0.60, 0.90, 0.60, 0.40, 0.50, 0.65, 0.40],
+    "biology":     [0.80, 0.55, 0.50, 0.75, 0.80, 0.45, 0.70, 0.60, 0.60, 0.75, 0.85, 0.55],
+    "astronomy":   [0.90, 0.45, 0.40, 0.60, 0.80, 0.30, 0.75, 0.55, 0.90, 0.85, 0.70, 0.65],
+    "chemistry":   [0.60, 0.55, 0.60, 0.90, 0.85, 0.50, 0.85, 0.50, 0.45, 0.60, 0.80, 0.50],
+    "mythology":   [0.75, 0.60, 0.40, 0.45, 0.55, 0.50, 0.45, 0.80, 0.90, 0.80, 0.60, 0.85],
+    "heat":        [0.80, 0.45, 0.85, 0.60, 0.35, 0.80, 0.30, 0.40, 0.40, 0.55, 0.50, 0.45],
+    "danger":      [0.50, 0.70, 0.85, 0.70, 0.50, 0.95, 0.45, 0.40, 0.30, 0.40, 0.40, 0.35],
+    "furniture":   [0.70, 0.75, 0.35, 0.95, 0.20, 0.20, 0.15, 0.40, 0.55, 0.60, 0.60, 0.50],
+    "security":    [0.50, 0.70, 0.80, 0.85, 0.85, 0.90, 0.85, 0.60, 0.50, 0.50, 0.65, 0.40],
+    "agriculture": [0.85, 0.50, 0.60, 0.75, 0.45, 0.50, 0.40, 0.75, 0.60, 0.75, 0.85, 0.60],
 }
 
 _DEFINITIONS = {
-    "medicine":  "diagnosis treatment healing clinical physician patient disease cure illness remedy",
-    "care":      "nurture support comfort attend wellbeing compassion tending nursing",
-    "authority": "power command rule control institution office govern enforce responsibility",
-    "law":       "legal court justice statute rights judge regulation enforce",
-    "service":   "serve assist help provide support duty public",
-    "commerce":  "trade business market buy sell money profit goods retail",
-    "fruit":     "edible plant produce sweet orchard tree food botanical apple",
+    "medicine":    "diagnosis treatment healing clinical physician patient disease cure illness remedy",
+    "care":        "nurture support comfort attend wellbeing compassion tending nursing therapy",
+    "authority":   "power command rule control institution office govern enforce responsibility monarch",
+    "law":         "legal court justice statute rights judge regulation enforce attorney advocate",
+    "service":     "serve assist help provide support duty public",
+    "commerce":    "trade business market buy sell money profit goods retail",
+    "fruit":       "edible plant produce sweet orchard tree food botanical apple",
+    "technology":  "technology engineering computing device software hardware machine innovation electronic system",
+    "finance":     "finance money banking investment market currency credit economic capital trading",
+    "nature":      "nature water river stream landscape environment ecosystem forest wild mountain shore",
+    "programming": "programming software code computing language algorithm developer function variable script",
+    "biology":     "biology life organism cell virus bacteria species evolution genetics anatomy animal",
+    "astronomy":   "astronomy planet star space celestial orbit galaxy cosmos universe telescope solar",
+    "chemistry":   "chemistry element compound reaction molecule atom matter metal substance acid liquid",
+    "mythology":   "mythology deity god myth legend ancient divine worship ritual hero messenger roman",
+    "heat":        "heat fire flame burning warmth thermal temperature combustion blaze ember",
+    "danger":      "danger hazard threat risk harm warning unsafe peril emergency injury destruction",
+    "furniture":   "furniture chair table seat couch household wooden domestic cabinet desk",
+    "security":    "security protection defense malware computer network firewall attack hacker intrusion",
+    "agriculture": "agriculture farming crop harvest soil cultivation field irrigation livestock plant",
 }
 
 _KEYWORDS = {d: sorted(set(defn.split())) for d, defn in _DEFINITIONS.items()}
