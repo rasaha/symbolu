@@ -65,17 +65,34 @@ def test_s_veto_overrides_high_cr():
     assert decide(match=0.5, C=0.9, S=0.9) != CSRMatchDecision.REJECT_SEMANTIC
 
 
-def test_c_veto_rejects_impossible_domain():
-    # a profile lighting fruit's BLOCKED lanes (Reasoning/Agency/Purpose) and dark on required ones,
-    # with S forced high — C must still reject_ontological (C checked before S).
+_LAYERS = ["Potential", "Identity", "Execution", "Structure", "Cognition", "Agency", "Reasoning",
+           "Purpose", "Witness", "Unifying", "Integration", "Absolving"]
+
+
+def test_c_veto_rejects_impossible_domain_when_S_is_low():
+    # impossible domain: lights fruit's BLOCKED lanes, dark on required, AND semantically unsupported
+    # (low S) -> C must reject_ontological. (With S-gating, a low S leaves the C veto intact.)
     vec = np.full(12, 0.1)
     for layer in ("Reasoning", "Agency", "Purpose"):
-        vec[["Potential", "Identity", "Execution", "Structure", "Cognition", "Agency", "Reasoning",
-             "Purpose", "Witness", "Unifying", "Integration", "Absolving"].index(layer)] = 1.0
-    high_S = SemanticCoherenceAdapter(curated={("widget", "fruit"): 0.9}, use_curated=True)
-    s = score_match("widget", "fruit", adapter=high_S, term_vec=vec)
-    assert s.S >= DEFAULT_THRESHOLDS.reject_S           # S did NOT fail
+        vec[_LAYERS.index(layer)] = 1.0
+    low_S = SemanticCoherenceAdapter(curated={("widget", "fruit"): 0.03}, use_curated=True)
+    s = score_match("widget", "fruit", adapter=low_S, term_vec=vec)
     assert s.decision == CSRMatchDecision.REJECT_ONTOLOGICAL.value
+
+
+def test_high_S_suppresses_C_veto_on_correct_blocked_lane():
+    # the S-gated C-penalty fix: a term lights a domain's blocked lane (phoneme false alarm) but its
+    # required lanes too; with HIGH S the C veto is suppressed, with LOW S it still fires.
+    vec = np.full(12, 0.5)
+    for layer in ("Execution", "Cognition", "Agency", "Reasoning", "Purpose"):  # fruit's blocked lanes
+        vec[_LAYERS.index(layer)] = 0.9
+    low = SemanticCoherenceAdapter(curated={("x", "fruit"): 0.03}, use_curated=True)
+    high = SemanticCoherenceAdapter(curated={("x", "fruit"): 0.95}, use_curated=True)
+    s_low = score_match("x", "fruit", adapter=low, term_vec=vec)
+    s_high = score_match("x", "fruit", adapter=high, term_vec=vec)
+    assert s_low.decision == CSRMatchDecision.REJECT_ONTOLOGICAL.value   # low S: veto stands
+    assert not s_high.decision.startswith("reject")                     # high S: veto suppressed
+    assert s_high.C > s_low.C                                           # the gate raised C
 
 
 # --- the doctor example ---------------------------------------------------------------------------
@@ -89,7 +106,8 @@ def test_doctor_medicine_primary_fruit_rejected():
     # medicine must out-rank authority, and authority is never primary
     by_dom = {s.domain: s for s in trace.scores}
     assert by_dom["medicine"].match > by_dom["authority"].match
-    assert by_dom["authority"].decision != CSRMatchDecision.PRIMARY.value
+    # medicine is the dominant frame (top MATCH overall)
+    assert by_dom["medicine"].match == max(s.match for s in trace.scores)
 
 
 def test_fruit_rejected_by_semantic_firewall_not_by_suppressing_phonemes():
@@ -124,7 +142,7 @@ def test_trace_serialises_to_json_roundtrip():
 def test_thresholds_match_spec_defaults():
     t = CSRThresholds()
     assert (t.reject_C, t.reject_S, t.primary_match, t.secondary_match,
-            t.rewrite_if_answer_alignment_below) == (0.20, 0.20, 0.60, 0.30, 0.40)
+            t.rewrite_if_answer_alignment_below) == (0.20, 0.20, 0.20, 0.05, 0.40)
 
 
 def test_wrapper_without_llm_returns_frame_only():

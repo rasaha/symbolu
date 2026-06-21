@@ -88,18 +88,23 @@ if MATCH ≥ secondary_match  →  secondary
 else                        →  weak          # ignore unless user asks
 ```
 
-Default thresholds:
+Default thresholds (calibrated to the C×R×S product scale on a real embedder; see
+`RESULTS_MATCH_FILTER_EVAL.md`):
 
 ```python
 reject_C = 0.20
 reject_S = 0.20
-primary_match = 0.60
-secondary_match = 0.30
+primary_match = 0.20      # F1-optimal on the real-embedder MATCH distribution (was 0.60, miscalibrated)
+secondary_match = 0.05    # separates true-secondary (~0.086) from unlabeled 'other' (~0.038)
 rewrite_if_answer_alignment_below = 0.40
 ```
 
 The **S veto sits above MATCH magnitude**: a high C and R can never rescue a semantically incoherent
-mapping. The **C veto** rejects ontologically impossible domains regardless of S.
+mapping. The **C veto** rejects ontologically impossible domains — but is **S-gated**: because C's
+blocked-lane penalty is computed from the *phoneme* profile, a strong semantic match (high S)
+suppresses it so C does not veto a semantically-correct domain on a phoneme false alarm (e.g.
+`fire→heat`). When S is low, the full penalty stands and C still vetoes impossible domains
+(`doctor→fruit`).
 
 ## 5. Wrapper pipeline (Mode A — API, no logits)
 

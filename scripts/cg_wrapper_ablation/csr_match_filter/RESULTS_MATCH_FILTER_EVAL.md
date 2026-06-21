@@ -150,6 +150,19 @@ term was scored from an external definition via the scalable path — no curated
 **DONE** (group-aware R, confusability 0.92→0.67). Remaining prerequisite for a production verdict is
 a **real `embed_fn`** so S can clear the framing thresholds.
 
+## ADOPTED (code defaults) — calibrated thresholds + S-gated C penalty
+
+`CSRThresholds` defaults are now **primary_match=0.20, secondary_match=0.05** (vetoes unchanged at
+0.20). The **C veto is S-gated**: its phoneme-derived blocked-lane penalty is suppressed when S is
+high, so C no longer ontologically vetoes a semantically-correct domain (fire→heat, fire→danger,
+apple→fruit are rescued; doctor→fruit and phoneme-overreach still reject because their S is low).
+
+Hashing re-eval at the new defaults: **expected_primary_misrejected 0.150 → 0.067 (PASS)**,
+rejected_recall 1.000, vetoes unchanged (C 1.0 / S 0.947 / overreach 1.0). The C-veto context cases
+are rescued; the 4 residual hashing misrejections are weak-embedder S=0 cases (soldier→danger,
+paramedic→care) that the real embedder resolves. Re-run `--semantic-backend real` for the production
+context/misrejected numbers.
+
 ## PRODUCTION VERDICT at calibrated thresholds (real_embed_fn, primary=0.20 / secondary=0.05)
 
 | metric | value | criterion | |

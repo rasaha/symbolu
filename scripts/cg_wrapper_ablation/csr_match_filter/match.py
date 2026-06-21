@@ -40,8 +40,8 @@ class CSRMatchDecision(str, Enum):
 class CSRThresholds:
     reject_C: float = 0.20
     reject_S: float = 0.20
-    primary_match: float = 0.60
-    secondary_match: float = 0.30
+    primary_match: float = 0.20      # calibrated to the C×R×S product scale (real_embed_fn, F1-optimal)
+    secondary_match: float = 0.05    # separates true-secondary (~0.086) from unlabeled 'other' (~0.038)
     rewrite_if_answer_alignment_below: float = 0.40
 
 
@@ -93,8 +93,15 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
     return float(a @ b / den) if den else 0.0
 
 
-def compute_constraint(term_vec: np.ndarray, domain: str) -> float:
-    """C — ontological allowance: required layers lit, blocked layers dark, mass on-target."""
+def compute_constraint(term_vec: np.ndarray, domain: str, s: Optional[float] = None) -> float:
+    """C — ontological allowance: required layers lit, blocked layers dark, mass on-target.
+
+    S-gated blocked penalty: the blocked-lane penalty is computed from the *phoneme* profile, which can
+    falsely light a correct domain's blocked lane (e.g. 'fire'→Reasoning, which `heat` blocks). When the
+    non-phonemic firewall S strongly supports the match, that penalty is suppressed (lerp toward no
+    penalty as s→1), so C does not ontologically veto a semantically-correct domain. When S is low
+    (semantically unsupported), the full penalty stands and C still vetoes impossible domains.
+    """
     rule = REG.ontology_rule(domain)   # hand-tagged override if present, else derived from template
     idx = REG.LAYER_INDEX
 
@@ -104,6 +111,9 @@ def compute_constraint(term_vec: np.ndarray, domain: str) -> float:
     required_score = mean_over(rule.required_high)
     blocked_score = mean_over(rule.blocked_high)
     blocked_penalty = 1.0 - blocked_score
+    if s is not None:                                  # S-gate: strong semantic support relaxes it
+        sc = float(np.clip(s, 0.0, 1.0))
+        blocked_penalty = blocked_penalty + (1.0 - blocked_penalty) * sc
     on_names = set(rule.required_high) | set(rule.allowed_high)
     on_target = mean_over(list(on_names)) if on_names else 0.0
     off_names = [n for n in REG.LAYERS_12 if n not in on_names and n not in rule.blocked_high]
@@ -145,9 +155,9 @@ def score_match(term: str, domain: str,
                 thr: CSRThresholds = DEFAULT_THRESHOLDS,
                 term_vec: Optional[np.ndarray] = None) -> CSRMatchScore:
     vec = compute_12d_profile(term) if term_vec is None else term_vec
-    C = compute_constraint(vec, domain)
-    R, r_trace = compute_realization(vec, domain)
     S = compute_semantic_coherence(term, domain, adapter)
+    C = compute_constraint(vec, domain, s=S)           # S-gated blocked penalty
+    R, r_trace = compute_realization(vec, domain)
     match = C * R * S
     dec = decide(match, C, S, thr)
     return CSRMatchScore(term, domain, round(C, 4), round(R, 4), round(S, 4),
