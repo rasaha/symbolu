@@ -86,42 +86,50 @@ class ContextualDefinitionProvider:
 def load_real_embed_fn():
     """Build a real sentence embedder; return (fn, label) or (None, reason).
 
-    Tries sentence-transformers first, then a direct transformers mean-pooling fallback (more robust
-    to packaging quirks). CSR_EMBED_MODEL may be a hub id or a local path. Errors are reported in full.
+    Imports/loads the embedder with THIS script's injected sys.path entries removed — running
+    eval_match_filter.py puts the csr_match_filter package dir on sys.path[0], which breaks
+    sentence-transformers' dynamic module loading (an 'attempted relative import' error). Stripping
+    those entries recreates the clean import environment, then we restore sys.path. Tries
+    sentence-transformers, then a transformers mean-pooling fallback. CSR_EMBED_MODEL = hub id or path.
     """
     import os
     name = os.environ.get("CSR_EMBED_MODEL", "all-MiniLM-L6-v2")
+    here = str(Path(__file__).resolve().parent)            # csr_match_filter/  (auto sys.path[0])
+    parent = str(Path(__file__).resolve().parents[1])      # scripts/cg_wrapper_ablation (injected)
+    saved = list(sys.path)
+    sys.path[:] = [p for p in sys.path if p not in ("", here, parent)]
     errs = []
-
-    # 1) sentence-transformers
     try:
-        from sentence_transformers import SentenceTransformer
-        model = SentenceTransformer(name)
-        return (lambda text: model.encode(text)), f"sentence_transformers:{name}"
-    except Exception as exc:
-        errs.append(f"sentence_transformers({name}): {type(exc).__name__}: {exc}")
-
-    # 2) transformers AutoModel + mean pooling (try the name, then the sentence-transformers/ org)
-    candidates = [name] if "/" in name else [name, f"sentence-transformers/{name}"]
-    for cand in candidates:
+        # 1) sentence-transformers
         try:
-            import torch
-            from transformers import AutoModel, AutoTokenizer
-            tok = AutoTokenizer.from_pretrained(cand)
-            mdl = AutoModel.from_pretrained(cand); mdl.eval()
-
-            def embed(text, _tok=tok, _mdl=mdl):
-                with torch.no_grad():
-                    enc = _tok(text, return_tensors="pt", truncation=True, max_length=128)
-                    out = _mdl(**enc).last_hidden_state[0]            # [T, H]
-                    mask = enc["attention_mask"][0].unsqueeze(-1).float()
-                    return ((out * mask).sum(0) / mask.sum().clamp(min=1.0)).cpu().numpy()
-
-            return embed, f"transformers:{cand}"
+            from sentence_transformers import SentenceTransformer
+            model = SentenceTransformer(name)
+            return (lambda text: model.encode(text)), f"sentence_transformers:{name}"
         except Exception as exc:
-            errs.append(f"transformers({cand}): {type(exc).__name__}: {exc}")
+            errs.append(f"sentence_transformers({name}): {type(exc).__name__}: {exc}")
 
-    return None, "; ".join(errs)
+        # 2) transformers AutoModel + mean pooling (try the name, then the sentence-transformers/ org)
+        for cand in ([name] if "/" in name else [name, f"sentence-transformers/{name}"]):
+            try:
+                import torch
+                from transformers import AutoModel, AutoTokenizer
+                tok = AutoTokenizer.from_pretrained(cand)
+                mdl = AutoModel.from_pretrained(cand); mdl.eval()
+
+                def embed(text, _tok=tok, _mdl=mdl):
+                    import torch as _t
+                    with _t.no_grad():
+                        enc = _tok(text, return_tensors="pt", truncation=True, max_length=128)
+                        out = _mdl(**enc).last_hidden_state[0]            # [T, H]
+                        mask = enc["attention_mask"][0].unsqueeze(-1).float()
+                        return ((out * mask).sum(0) / mask.sum().clamp(min=1.0)).cpu().numpy()
+
+                return embed, f"transformers:{cand}"
+            except Exception as exc:
+                errs.append(f"transformers({cand}): {type(exc).__name__}: {exc}")
+        return None, "; ".join(errs)
+    finally:
+        sys.path[:] = saved
 
 
 def make_adapter(backend, provider, audit):
