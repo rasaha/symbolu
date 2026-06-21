@@ -114,6 +114,10 @@ def test_phoneme_overreach_detector():
     assert RB.has_phoneme_overreach("The phonemes prove it means healing.")
     assert RB.has_phoneme_overreach("Because it sounds like healing, it means healing.")
     assert not RB.has_phoneme_overreach("A doctor heals patients.")
+    # negations / meta-mentions (framed answers echoing rule 4) are NOT overreach
+    assert not RB.has_phoneme_overreach("I will not claim that phonemes alone prove meaning.")
+    assert not RB.has_phoneme_overreach("Meaning is not determined by how the word sounds.")
+    assert not RB.has_phoneme_overreach("It sounds reasonable that medicine means healing.")
 
 
 def test_must_not_is_conjunctive():

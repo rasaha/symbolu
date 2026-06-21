@@ -16,12 +16,15 @@ _WORD = re.compile(r"[a-z]+")
 _STOP = {"a", "an", "the", "and", "or", "of", "to", "is", "are", "in", "on", "for", "by", "with",
          "it", "this", "that", "as", "be", "can", "may", "more", "than", "not", "but", "its"}
 
-# phoneme-overreach: claiming sound/phonemes determine meaning
+# phoneme-overreach: an ASSERTION that sound/phonemes determine meaning. Must NOT fire on negations
+# or meta-mentions ("phonemes do not prove meaning"), which framed answers produce when echoing rule 4.
 _OVERREACH = re.compile(
-    r"phoneme|phonetic|"
-    r"sound(?:s)?\s+(?:like|prove|alone|determine|mean)|"
-    r"by\s+(?:its|the)\s+sound|the\s+sound\s+of\s+the\s+word|because\s+it\s+sounds",
+    r"(?:phonemes?|phonetics?)\b[^.?!]{0,40}?\b(?:prove[sd]?|determine[sd]?|means?|equals?|impl\w+)"
+    r"|(?:sound of the word|the word sounds?|sounds?\s+like|by\s+(?:its|the)\s+sound)\b[^.?!]{0,45}?"
+    r"\b(?:prove[sd]?|determine[sd]?|means?|equals?|therefore|so\s+it)",
     re.IGNORECASE)
+_NEG = re.compile(r"\b(?:not|never|no|cannot|can\s?not|do(?:es)?\s+not|without|n't|alone\s+do(?:es)?\s+not)\b",
+                  re.IGNORECASE)
 
 
 def _toks(text: str) -> set:
@@ -43,7 +46,13 @@ def mentioned_domains(answer: str, domains: List[str]) -> set:
 
 
 def has_phoneme_overreach(answer: str) -> bool:
-    return bool(_OVERREACH.search(answer or ""))
+    """True only for an ASSERTION that sound/phonemes prove meaning (negations are not overreach)."""
+    a = answer or ""
+    for m in _OVERREACH.finditer(a):
+        window = a[max(0, m.start() - 35): m.end() + 5]
+        if not _NEG.search(window):
+            return True
+    return False
 
 
 def _phrase_hit(answer_toks: set, phrase: str, thresh: float = 0.5) -> bool:
