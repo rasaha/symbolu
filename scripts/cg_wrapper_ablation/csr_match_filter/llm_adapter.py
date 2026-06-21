@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import os
 import re
+import sys
+from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 from . import registry as REG
@@ -194,8 +196,66 @@ def _try_real() -> tuple:
                   "running in stub mode")
 
 
+# ----------------------------------------------------------------------------------------------- #
+# LocalHFAdapter — a local HuggingFace causal LM (e.g. Mistral); no API key, runs on the pod
+# ----------------------------------------------------------------------------------------------- #
+
+
+class LocalHFAdapter(LLMAdapter):
+    backend = "local_hf"
+    production_valid = True
+
+    def __init__(self, fn: Callable[[str], str], label: str):
+        self._fn = fn
+        self.label = label
+
+    def generate(self, prompt: str) -> str:
+        return self._fn(prompt)
+
+
+def _try_local_hf(default_model: str = "mistralai/Mistral-7B-Instruct-v0.3") -> tuple:
+    """Load a local/cached HF causal LM. CSR_LLM_MODEL = hub id or local path. (None, reason) on fail."""
+    name = os.environ.get("CSR_LLM_MODEL", default_model)
+    max_new = int(os.environ.get("CSR_LLM_MAX_TOKENS", "400"))
+    # strip THIS package's injected sys.path entries so HF dynamic module loading doesn't hit
+    # 'attempted relative import' (same fix as the embedder loader)
+    here = str(Path(__file__).resolve().parent)
+    parent = str(Path(__file__).resolve().parents[1])
+    saved = list(sys.path)
+    sys.path[:] = [p for p in sys.path if p not in ("", here, parent)]
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        tok = AutoTokenizer.from_pretrained(name)
+        model = AutoModelForCausalLM.from_pretrained(name, torch_dtype="auto", device_map="auto")
+        model.eval()
+
+        def fn(prompt, _tok=tok, _mdl=model, _max=max_new):
+            if getattr(_tok, "chat_template", None):
+                ids = _tok.apply_chat_template([{"role": "user", "content": prompt}],
+                                               add_generation_prompt=True, return_tensors="pt")
+            else:
+                ids = _tok(prompt, return_tensors="pt").input_ids
+            ids = ids.to(_mdl.device)
+            with torch.no_grad():
+                out = _mdl.generate(ids, max_new_tokens=_max, do_sample=False,
+                                    pad_token_id=(_tok.eos_token_id or 0))
+            return _tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True).strip()
+        return LocalHFAdapter(fn, f"local_hf:{name}"), f"local_hf:{name}"
+    except Exception as exc:
+        return None, f"local HF model unavailable ({name}): {type(exc).__name__}: {exc}"
+    finally:
+        sys.path[:] = saved
+
+
 def load_llm_adapter(backend: str = "stub"):
-    """Return (adapter, info). backend in {stub, fixture(*), real}. Falls back to stub if real absent."""
+    """Return (adapter, info). backend in {stub, real, local, mistral}. Falls back to stub if absent."""
+    if backend in ("local", "hf", "mistral"):
+        default = "mistralai/Mistral-7B-Instruct-v0.3"
+        adapter, info = _try_local_hf(default)
+        if adapter is not None:
+            return adapter, info
+        return StubLLMAdapter(), f"{backend} requested but unavailable -> stub ({info})"
     if backend == "real":
         adapter, info = _try_real()
         if adapter is not None:

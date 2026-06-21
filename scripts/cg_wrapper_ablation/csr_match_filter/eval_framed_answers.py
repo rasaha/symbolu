@@ -106,7 +106,8 @@ def _delta(a, b):
 
 
 def decide_label(llm_backend, m):
-    if llm_backend != "real":
+    # any real generator (API or local HF) gets a behavioral verdict; stub/fallback = smoke only
+    if llm_backend not in ("real", "local_hf"):
         return "PHASE2_STUB_SMOKE_ONLY"
     base, framed = m.get("base", {}), m.get("framed", {})
     bf, ff = base.get("factuality_preserved"), framed.get("factuality_preserved")
@@ -127,7 +128,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default=str(_DATA))
     ap.add_argument("--kb", default=str(EV._KB))
-    ap.add_argument("--llm-backend", default="stub", choices=["stub", "real"])
+    ap.add_argument("--llm-backend", default="stub",
+                    choices=["stub", "real", "local", "mistral", "hf"])
     ap.add_argument("--semantic-backend", default="hashing",
                     choices=["hashing", "lexical", "demo", "real"])
     ap.add_argument("--arms", default="base,framed,framed_postcheck")
@@ -186,7 +188,7 @@ def main():
         deltas["framed_postcheck_minus_framed"] = {
             k: _delta(metrics["framed_postcheck"][k], metrics["framed"][k]) for k in DELTA_KEYS}
 
-    label = decide_label(args.llm_backend, metrics)
+    label = decide_label(llm.backend, metrics)   # actual adapter backend (handles real->stub fallback)
     report = {"meta": {"n": len(per), "arms": arms, "llm_backend": llm.backend,
                        "llm_info": llm_info, "production_valid": llm.production_valid,
                        "judge_backend": "deterministic_rubric", "semantic_frame_backend": sem_info,
