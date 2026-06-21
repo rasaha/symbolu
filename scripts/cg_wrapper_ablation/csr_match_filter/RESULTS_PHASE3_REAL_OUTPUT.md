@@ -5,7 +5,58 @@
 > scorer, Phase 2 prompt, rubric_v2, generation behaviour, and the Phase 3 audit rules are all
 > UNCHANGED (read-only).
 
-## 🚧 Status: `PHASE3_REAL_OUTPUT_AUDIT_BLOCKED_NO_REAL_TRACES`
+## ✅ Real run completed on the GPU pod (supersedes the earlier BLOCKED status)
+
+The real Mistral run exists: `eval_framed_answers_robustness.py … --answer-backends mistral …`
+(`production_valid=True`, n=110, frame `all-MiniLM-L6-v2`) reproduced the published Phase 2B-v2 lift
+(primary +0.154) and residuals (rejected_leaks 9, secondary_promoted 9, factuality_regressions 6).
+`eval_real_output_audit.py` was then run over those traces.
+
+### Raw result (first pass, uncorrected harness) — `PHASE3_REAL_OUTPUT_AUDIT_NEEDS_TUNING`
+| arm | audit_pass_rate | critical_findings_rate | rewrite_recommended_rate |
+|---|---:|---:|---:|
+| base | 0.664 | 0.045 | 0.264 |
+| framed | **0.836** | **0.009** | 0.100 |
+
+Framed > base on every safety axis; **`false_rewrite_on_clean = 0.000`** on 81 clean framed answers —
+the conservative rewrite gate empirically does not churn good answers. Union recall vs rubric_v2 was
+~0.60, hence NEEDS_TUNING.
+
+### Why NEEDS_TUNING — classification of the 20 framed disagreements (manual review of FN/FP text)
+- **Audit is actually MORE correct than rubric_v2 (2):** `rej_009` ("a farmer is **not** furniture" —
+  refutation, not a leak; rubric over-flagged), `close_004` (nurse framed as *medicine* when primary is
+  *care* — audit caught the promotion the rubric passed).
+- **Comparison taxonomy artifact (~3):** `ctxsec_001/002` etc. — rubric_v2 marks factuality False on
+  too-short/meta answers, which the audit reports as `answer_too_generic` (different bucket).
+- **Generation quirk — frame-echo / meta-parroting (~6–8):** `poly_001/002/007/008`, `ctxsec_*`,
+  `sec_005` — the model echoes the frame labels ("…belongs to the primary domain of fruit") instead of
+  answering; both tools parse it ambiguously. Logged as a **Phase 4 probe target** (see Phase 4 doc
+  §3.0).
+- **Genuine term-aware divergence (~1):** `poly_011` — the principled, pre-flagged difference (the
+  audit excludes the bare subject term when deciding a domain is asserted).
+
+**Conclusion: no systematic audit defect.** rubric_v2 is an imperfect oracle for the auditor (not
+term-aware; bundles categories; over-flags refutations), so a raw audit-vs-rubric agreement number
+*understates* the auditor.
+
+### Measurement-only harness fix (audit rules untouched)
+`eval_real_output_audit.py` updated so the comparison matches rubric_v2's bundling:
+- rubric `secondary_promoted` counted as caught if the audit emits `secondary_promoted_to_primary`
+  **or** `rejected_domain_promoted` (rubric bundles rejected-promotion into this key);
+- rubric factuality-fail counted as caught if the audit emits `factuality_suspected` **or**
+  `answer_too_generic` (rubric couples factuality to length/term-presence);
+- rubric "leak" cases the audit identifies as `rejected_domain_mentioned_as_refutation` are rescued
+  out of FN (rubric over-flag);
+- new `audit_stricter_than_rubric` transparency bucket surfaces candidate true catches the rubric
+  missed (e.g. `close_004`) for manual review — **not** auto-credited.
+
+The mapping logic was committed BEFORE re-running (no tuning to a target). **Corrected re-run on the
+pod is pending** (cheap: re-reads the traces JSON, no GPU). The verdict will be recorded here once it
+lands.
+
+---
+
+## (Earlier, local container) Status was: `PHASE3_REAL_OUTPUT_AUDIT_BLOCKED_NO_REAL_TRACES`
 
 **No real Mistral answer text is available in this environment, and none can be produced here.**
 - The real Phase 2B-v2 Mistral run wrote to `runs/csr_phase2b/robustness_eval_v2.json`, which is

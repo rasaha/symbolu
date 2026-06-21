@@ -80,11 +80,20 @@ def _rubric_flags(sc):
 
 
 def _audit_flags(res):
+    """Map audit findings to the rubric_v2 score-key categories. MEASUREMENT-ONLY alignment — the
+    auditor is unchanged; this fixes the comparison because rubric_v2's keys BUNDLE categories the
+    Phase-3 taxonomy deliberately SPLITS:
+      - rubric `secondary_promoted` == promotion = (rejected_leak OR alt_sense) & primary absent, so it
+        also covers what the audit reports separately as `rejected_domain_promoted` -> union both.
+      - rubric `factuality_preserved` is also False on too-short / term-absent answers, which the audit
+        reports as `answer_too_generic` -> union it into the factuality category.
+    """
     ft = set(res.finding_types)
     return {"rejected_leak": "rejected_domain_promoted" in ft,
-            "secondary_promoted": "secondary_promoted_to_primary" in ft,
+            "secondary_promoted": ("secondary_promoted_to_primary" in ft
+                                   or "rejected_domain_promoted" in ft),
             "phoneme_overreach": "phoneme_overreach_claim" in ft,
-            "factuality_suspected": "factuality_suspected" in ft,
+            "factuality_suspected": ("factuality_suspected" in ft or "answer_too_generic" in ft),
             "off_frame": (not res.passed)}
 
 
@@ -99,6 +108,7 @@ def run_arm(rows, by_id, arm):
         res = AA.audit_answer(ex["query"], ans, frame, terms=dominant_terms(ex["query"])[:1] or None,
                               alternate_true_senses=alt, false_claims=false_claims, answer_id=r["id"])
         per.append({"id": r["id"], "category": r.get("category"), "answer": ans, "res": res,
+                    "ft": set(res.finding_types),
                     "rubric": _rubric_flags(r["scores"][arm]), "audit": _audit_flags(res)})
     return per
 
@@ -109,12 +119,29 @@ def confusion(per):
         tp = [p for p in per if p["rubric"][c] and p["audit"][c]]
         fn = [p for p in per if p["rubric"][c] and not p["audit"][c]]
         fp = [p for p in per if not p["rubric"][c] and p["audit"][c]]
+        rescued = []
+        if c == "rejected_leak":
+            # rubric over-flags a refutation ("a farmer is NOT furniture") as a leak; the audit
+            # correctly reports rejected_domain_mentioned_as_refutation. Don't score that as a miss.
+            rescued = [p for p in fn if "rejected_domain_mentioned_as_refutation" in p["ft"]]
+            fn = [p for p in fn if p not in rescued]
+        denom = len(tp) + len(fn)
         out[c] = {"rubric_positives": sum(1 for p in per if p["rubric"][c]),
                   "tp": len(tp), "fn": len(fn), "fp": len(fp),
-                  "recall": (len(tp) / (len(tp) + len(fn))) if (len(tp) + len(fn)) else None,
+                  "rubric_overflag_refutation": [(p["id"], p["answer"][:90]) for p in rescued],
+                  "recall": (len(tp) / denom) if denom else None,
                   "fp_examples": [(p["id"], p["answer"][:90]) for p in fp[:4]],
                   "fn_examples": [(p["id"], p["answer"][:90]) for p in fn[:4]]}
     return out
+
+
+def audit_stricter(per):
+    """Transparency bucket (NOT auto-credited): the audit flags a problem on an answer the rubric
+    marked clean in every category. These are candidate TRUE catches the rubric missed (e.g. a nurse
+    framed as 'medicine' when the primary is 'care') — surfaced for manual review, not scored."""
+    rows = [p for p in per if (not p["res"].passed) and not any(p["rubric"][c] for c in CATS)]
+    return {"n": len(rows),
+            "examples": [(p["id"], sorted(p["ft"]), p["answer"][:90]) for p in rows[:8]]}
 
 
 def arm_summary(per):
@@ -187,7 +214,8 @@ def main():
             per = per_by_arm[a]
             summ = arm_summary(per)
             conf = confusion(per)
-            bk["arms"][a] = {"summary": summ, "confusion": conf}
+            stricter = audit_stricter(per)
+            bk["arms"][a] = {"summary": summ, "confusion": conf, "audit_stricter_than_rubric": stricter}
             print("-" * 82)
             print(f"  ARM {a}:  audit_pass_rate={summ['audit_pass_rate']:.3f}  "
                   f"critical_findings_rate={summ['critical_findings_rate']:.3f}  "
@@ -195,8 +223,11 @@ def main():
             for c in CATS:
                 cc = conf[c]
                 rec = "n/a" if cc["recall"] is None else f"{cc['recall']:.3f}"
+                resc = cc.get("rubric_overflag_refutation") or []
+                extra = f"  [rubric-overflag-refutation rescued={len(resc)}]" if resc else ""
                 print(f"     {c:20} rubric+={cc['rubric_positives']:>3}  catch(recall)={rec}  "
-                      f"FN={cc['fn']}  FP={cc['fp']}")
+                      f"FN={cc['fn']}  FP={cc['fp']}{extra}")
+            print(f"     audit_stricter_than_rubric (manual review): {stricter['n']}")
         framed = per_by_arm.get("framed", [])
         help_ = helped_without_hurting(framed) if framed else {}
         bk["helped_without_hurting"] = help_

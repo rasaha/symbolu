@@ -52,6 +52,18 @@ system.
   `primary_frame_missing`, `secondary_promoted`, `rejected_domain_leak`, `phoneme_overreach`,
   `audit_pass`, `audit_fail`.
 
+### 3.0 Target state discovered in the Phase 3 real-output run: **frame-echo / meta-parroting**
+
+The Phase 3 real-output audit on real Mistral surfaced a distinct failure mode: under the framed
+prompt the model sometimes **echoes the C×R×S frame labels instead of answering** — e.g. *"The term
+'apple' belongs to the primary domain of fruit"*, *"Primary domain: medicine / Secondary domain:
+(none)"* (rows `poly_001/002/007/008`, `ctxsec_001/002`, `sec_005`). Both the rubric and the auditor
+parse these ambiguously. This is a **generation** behaviour, not an audit bug, and it is an ideal
+Phase 4 probe target: **does the pre-answer hidden state look "parroting/meta" vs "answering"?** Add a
+`frame_echo` label (derived from a deterministic surface detector: answer is dominated by frame-naming
+phrases like "primary domain", "belongs to the domain", "secondary domain") to the Phase 4 label set,
+and include matched answer/meta-parrot pairs in the Stage-B set.
+
 ### 3.1 How the prediction target is constructed (no leakage)
 
 | field | source | role |
