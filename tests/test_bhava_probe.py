@@ -100,6 +100,20 @@ class TestDecisionLogic:
         assert v["decision"] == "BHAVA_COMPLEMENTARY_SIGNAL"
         assert PD.continues_bhava(v["decision"])
 
+    def test_continue_requires_both_conditions(self):
+        # bhava decodable but NO complement -> WEAK (park), NOT continue
+        res = {"bhava_only": self._r(0.82, True), "hidden_only": self._r(0.55, False),
+               "hidden_plus_bhava": self._r(0.82, True)}
+        v = PD.decide(res, {"hidden_plus_bhava_vs_hidden": self._sig(False)}, n=100, min_per_class=8)
+        assert v["decision"] == "BHAVA_WEAK_SIGNAL" and not PD.continues_bhava(v["decision"])
+
+    def test_complement_without_decodable_bhava_parks(self):
+        # complement significant but bhava_only NOT decodable -> must NOT continue (strict rule)
+        res = {"bhava_only": self._r(0.5, False), "hidden_only": self._r(0.8, True),
+               "hidden_plus_bhava": self._r(0.85, True)}
+        v = PD.decide(res, {"hidden_plus_bhava_vs_hidden": self._sig(True)}, n=100, min_per_class=8)
+        assert not PD.continues_bhava(v["decision"])
+
     def test_bhava_strong(self):
         res = {"bhava_only": self._r(0.86, True), "hidden_only": self._r(0.8, True),
                "hidden_plus_bhava": self._r(0.9, True)}
@@ -175,6 +189,46 @@ class TestDatasetBuilder:
             assert {"id", "prompt", "label_type", "scorer"} <= set(r)
             assert r["label_type"] in PS.ALLOWED_LABEL_TYPES
 
+    def test_pool_balanced_correctness_and_no_format_leak(self):
+        from collections import Counter
+        pool_path = _ABL / "probe_pool" / "pool.jsonl"
+        rows = [json.loads(l) for l in pool_path.read_text().splitlines() if l.strip()]
+        c = Counter(r["label_type"] for r in rows)
+        # format_validity dropped (template-leaked); correctness has a large graded pool.
+        assert "format_validity" not in c
+        assert c["correctness"] >= 100
+        # graded-difficulty present: trivial single-op and hard multi-step both exist
+        prompts = " ".join(r["prompt"] for r in rows if r["label_type"] == "correctness")
+        assert "What is" in prompts and "depot" in prompts
+
+
+class TestReportWarnings:
+    def _mod(self):
+        import importlib
+        return importlib.import_module("bhava_probe_report")
+
+    def test_single_class_warning(self):
+        W = self._mod().data_warnings({"pos": 40, "neg": 0, "results": {}})
+        assert any("SINGLE-CLASS" in w for w in W)
+
+    def test_too_few_warning(self):
+        W = self._mod().data_warnings({"pos": 3, "neg": 90, "results": {}})
+        assert any("TOO FEW" in w for w in W)
+
+    def test_imbalance_warning(self):
+        W = self._mod().data_warnings({"pos": 13, "neg": 87, "results": {}})
+        assert any("CLASS IMBALANCE" in w for w in W)
+
+    def test_hidden_below_chance_warning(self):
+        W = self._mod().data_warnings({"pos": 50, "neg": 50,
+                                       "results": {"hidden_only": {"auroc": 0.35}}})
+        assert any("HIDDEN BASELINE" in w for w in W)
+
+    def test_leakage_warning(self):
+        res = {k: {"auroc": 1.0} for k in ("bhava_only", "hidden_only", "hidden_plus_bhava")}
+        W = self._mod().data_warnings({"pos": 30, "neg": 50, "results": res})
+        assert any("LEAKED" in w for w in W)
+
 
 # ===========================================================================
 # Tier 2 — numpy (skips if numpy absent)
@@ -224,6 +278,49 @@ class TestProbeTrainer:
         assert 0.0 <= rg["auroc"] <= 1.0 and rg["auroc"] > rn["auroc"]
         pr = PT.paired_vs_reference(y, rn["oof_correct"], rg["oof_correct"])
         assert pr["direction"] == "cand_better"
+
+
+@npmark
+class TestPerGroupPCA:
+    def test_pca_keeps_bhava_from_being_swamped(self):
+        import numpy as np
+        from cg_ablation import probe_train as PT, probe_features as PF
+        rng = np.random.RandomState(0)
+        n = 120
+        y = (rng.rand(n) > 0.5).astype(int)
+        bhava = (y[:, None] * 2 - 1) * 1.2 + rng.randn(n, 12) * 0.6   # signal
+        hidden = rng.randn(n, 4096)                                   # noise
+        rb = PT.evaluate_groups({"bhava": bhava}, y, reduce_groups=PF.HIDDEN_KEYS,
+                                pca_dim=24, n_boot=200)
+        rh = PT.evaluate_groups({"hidden_pooled": hidden}, y, reduce_groups=PF.HIDDEN_KEYS,
+                                pca_dim=24, n_boot=200)
+        rhpb = PT.evaluate_groups({"hidden_pooled": hidden, "bhava": bhava}, y,
+                                  reduce_groups=PF.HIDDEN_KEYS, pca_dim=24, n_boot=200)
+        assert rb["beats_chance"]                       # bhava decodable
+        assert not rh["beats_chance"]                   # hidden noise ~chance (NOT below)
+        assert rhpb["auroc"] > 0.7                       # bhava survives concatenation
+
+    def test_pca_gives_near_chance_on_noise(self):
+        import numpy as np
+        from cg_ablation import probe_train as PT
+        rng = np.random.RandomState(1)
+        n = 100
+        y = np.zeros(n, int); y[rng.choice(n, 13, replace=False)] = 1
+        hidden = rng.randn(n, 4096)   # pure noise -> a fair baseline must be ~chance
+        with_pca = PT.evaluate_feature_set(hidden, y, pca_dim=24, n_boot=200)
+        assert abs(with_pca["auroc"] - 0.5) < 0.2 and not with_pca["beats_chance"]
+
+
+@npmark
+class TestSingleClassHandling:
+    def test_single_class_auroc_is_nan(self):
+        import numpy as np
+        from cg_ablation import probe_train as PT
+        y = np.ones(40, int)           # all positive — degenerate
+        X = np.random.RandomState(0).randn(40, 8)
+        r = PT.evaluate_feature_set(X, y, n_boot=100)
+        import math
+        assert math.isnan(r["auroc"]) and not r["beats_chance"]
 
 
 @npmark

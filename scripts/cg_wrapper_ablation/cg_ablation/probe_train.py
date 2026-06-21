@@ -211,41 +211,85 @@ def oof_predict(X: np.ndarray, y: np.ndarray, model: str = "logreg",
     return oof
 
 
-def evaluate_feature_set(X: np.ndarray, y: np.ndarray, *, model: str = "logreg",
-                         k: int = 5, l2: float = 1.0, seed: int = 0,
-                         n_boot: int = 2000, pca_dim: int = 64) -> Dict:
-    """OOF metrics + AUROC CI + selectivity control for one feature matrix (fold-internal PCA)."""
-    y = np.asarray(y).astype(int)
-    n = len(y)
-    oof = oof_predict(X, y, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
+def _metrics_from_oof(y: np.ndarray, oof: np.ndarray, oof_ctrl: np.ndarray, yp: np.ndarray,
+                      dim: int, n_boot: int, seed: int) -> Dict:
     acc = accuracy(y, oof)
     bal_acc = balanced_accuracy(y, oof)
     correct = ((oof >= 0.5).astype(int) == y).astype(float)
-    # AUROC + bootstrap CI (imbalance-robust decodability; chance = 0.5)
     au, au_lo, au_hi = auroc_ci(y, oof, n_boot=n_boot, seed=seed + 11)
-    # selectivity: same probe on permuted labels (Hewitt-Liang control), on balanced accuracy
+    bal_ctrl = balanced_accuracy(yp, oof_ctrl)
+    chance = max(float(y.mean()), float(1 - y.mean()))
+    decodable = bool(not math.isnan(au_lo) and au_lo > 0.5)
+    return {
+        "n": int(len(y)), "dim": int(dim),
+        "accuracy": acc, "balanced_accuracy": bal_acc,
+        "auroc": au, "auroc_ci": [au_lo, au_hi],
+        "f1": f1(y, oof), "brier": brier(y, oof),
+        "chance": float(chance), "control_balanced_accuracy": float(bal_ctrl),
+        "selectivity": float(bal_acc - bal_ctrl),
+        "beats_chance": decodable,
+        "oof_correct": [float(x) for x in correct],
+    }
+
+
+def evaluate_feature_set(X: np.ndarray, y: np.ndarray, *, model: str = "logreg",
+                         k: int = 5, l2: float = 1.0, seed: int = 0,
+                         n_boot: int = 2000, pca_dim: int = 64) -> Dict:
+    """OOF metrics on a single prebuilt matrix (global fold-internal PCA). Used by tests."""
+    y = np.asarray(y).astype(int)
+    oof = oof_predict(X, y, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
     rng = np.random.RandomState(seed + 7)
     yp = rng.permutation(y)
     oof_ctrl = oof_predict(X, yp, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
-    bal_ctrl = balanced_accuracy(yp, oof_ctrl)
-    chance = max(float(y.mean()), float(1 - y.mean()))  # majority-class (accuracy floor)
-    # "beats_chance" is now AUROC-based: lower bound of the 95% CI above 0.5.
-    decodable = bool(not math.isnan(au_lo) and au_lo > 0.5)
-    return {
-        "n": int(n),
-        "dim": int(X.shape[1]),
-        "accuracy": acc,
-        "balanced_accuracy": bal_acc,
-        "auroc": au,
-        "auroc_ci": [au_lo, au_hi],
-        "f1": f1(y, oof),
-        "brier": brier(y, oof),
-        "chance": float(chance),
-        "control_balanced_accuracy": float(bal_ctrl),
-        "selectivity": float(bal_acc - bal_ctrl),
-        "beats_chance": decodable,             # AUROC CI lower bound > 0.5
-        "oof_correct": [float(x) for x in correct],  # per-example, for paired comparison
-    }
+    return _metrics_from_oof(y, oof, oof_ctrl, yp, X.shape[1], n_boot, seed)
+
+
+def _oof_from_groups(group_arrays, y, reduce_groups, pca_dim, model, k, l2, seed):
+    """OOF probabilities where HIGH-DIM groups (hidden) are PCA-reduced PER GROUP, per fold.
+
+    Reducing hidden to a few dims BEFORE concatenating with the 12-d Bhava prevents the 4096-d
+    hidden from swamping Bhava in `hidden_plus_bhava` — the bug that made the complement test
+    meaningless. PCA is fit on train only (no leakage). Returns (oof, total_dim).
+    """
+    n = len(y)
+    k = max(2, min(k, n))
+    fit, proba = _MODELS[model]
+    folds = kfold_indices(n, k, seed)
+    oof = np.full(n, np.nan)
+    total_dim = 0
+    for f in range(k):
+        test = folds[f]
+        train = np.concatenate([folds[j] for j in range(k) if j != f])
+        if len(test) == 0 or len(train) == 0:
+            continue
+        parts_tr, parts_te = [], []
+        for name, A in group_arrays.items():
+            Atr = _standardize(A[train], A[train])
+            Ate = _standardize(A[train], A[test])
+            if name in reduce_groups and Atr.shape[1] > pca_dim and 0 < pca_dim < len(train):
+                comp = _pca_fit(Atr, pca_dim)
+                Atr, Ate = Atr @ comp.T, Ate @ comp.T
+            parts_tr.append(Atr)
+            parts_te.append(Ate)
+        Xtr = np.hstack(parts_tr)
+        Xte = np.hstack(parts_te)
+        total_dim = Xtr.shape[1]
+        w = fit(Xtr, y[train], l2)
+        oof[test] = proba(w, Xte)
+    oof[np.isnan(oof)] = 0.5
+    return oof, total_dim
+
+
+def evaluate_groups(group_arrays: Dict[str, np.ndarray], y: np.ndarray, *,
+                    reduce_groups, pca_dim: int = 24, model: str = "logreg",
+                    k: int = 5, l2: float = 1.0, seed: int = 0, n_boot: int = 2000) -> Dict:
+    """Evaluate a feature set defined as named groups, PCA-reducing hidden groups per-fold."""
+    y = np.asarray(y).astype(int)
+    oof, dim = _oof_from_groups(group_arrays, y, reduce_groups, pca_dim, model, k, l2, seed)
+    rng = np.random.RandomState(seed + 7)
+    yp = rng.permutation(y)
+    oof_ctrl, _ = _oof_from_groups(group_arrays, yp, reduce_groups, pca_dim, model, k, l2, seed)
+    return _metrics_from_oof(y, oof, oof_ctrl, yp, dim, n_boot, seed)
 
 
 def paired_vs_reference(y: Sequence[int], correct_ref: Sequence[float],

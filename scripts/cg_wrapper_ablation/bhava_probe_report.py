@@ -20,6 +20,31 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cg_ablation.probe_decide import parks_bhava, continues_bhava  # noqa: E402
 
 
+def data_warnings(blk: dict) -> list:
+    """Surface data-quality problems that make a verdict unreliable (Task 5)."""
+    w = []
+    pos, neg = blk.get("pos", 0), blk.get("neg", 0)
+    tot = pos + neg
+    results = blk.get("results", {})
+    if pos == 0 or neg == 0:
+        w.append(f"SINGLE-CLASS labels (pos={pos}, neg={neg}) — degenerate; cannot probe "
+                 "(possible template leakage or model always passes/fails).")
+    elif pos < 8 or neg < 8:
+        w.append(f"TOO FEW per class (pos={pos}, neg={neg}; need >=8 each) — INSUFFICIENT_DATA.")
+    if tot and 0 < min(pos, neg) / tot < 0.2:
+        w.append(f"CLASS IMBALANCE (minority fraction {min(pos,neg)/tot:.2f} < 0.20) — "
+                 "AUROC is used (imbalance-robust), but power is low.")
+    hid = results.get("hidden_only", {})
+    au = hid.get("auroc", float("nan"))
+    if au == au and au < 0.5:
+        w.append(f"HIDDEN BASELINE AUROC={au:.3f} < 0.5 even after PCA — overfit/insufficient n; "
+                 "'beats hidden' comparisons are UNRELIABLE.")
+    aurocs = [r.get("auroc", float("nan")) for r in results.values()]
+    if aurocs and all((a == a and a >= 0.999) for a in aurocs):
+        w.append("ALL feature sets AUROC≈1.0 — label likely LEAKED by prompt template; uninformative.")
+    return w
+
+
 def _fmt_set(name, r):
     ci = r.get("auroc_ci", [float("nan"), float("nan")])
     return (f"  {name:<22} AUROC={r['auroc']:.3f} "
@@ -45,7 +70,12 @@ def build(run_dir: Path) -> dict:
     for lt, blk in results["by_label_type"].items():
         v = blk["verdict"]
         ans = v.get("answers", {})
+        warns = data_warnings(blk)
         lines += [f"## {lt}  (n={blk['n']}, pos={blk['pos']}, neg={blk['neg']})", ""]
+        for w in warns:
+            lines.append(f"  ⚠ {w}")
+        if warns:
+            lines.append("")
         for s, r in blk["results"].items():
             lines.append(_fmt_set(s, r))
         lines.append("")
@@ -69,7 +99,8 @@ def build(run_dir: Path) -> dict:
                   ""]
         overall.append(v["decision"])
         summary["by_label_type"][lt] = {"decision": v["decision"], "answers": ans,
-                                        "n": blk["n"]}
+                                        "n": blk["n"], "pos": blk["pos"], "neg": blk["neg"],
+                                        "warnings": warns}
 
     # overall recommendation: continue if ANY label_type shows complementary/strong; else park.
     if any(continues_bhava(d) for d in overall):

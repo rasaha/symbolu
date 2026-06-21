@@ -24,6 +24,21 @@ FEATURE_SETS: Dict[str, List[str]] = {
 # The reference/control every Bhava set is compared against.
 CONTROL_SET = "hidden_only"
 
+# High-dim feature keys that must be PCA-reduced PER GROUP (before concatenation) so they don't
+# swamp the low-dim Bhava features in combined sets.
+HIDDEN_KEYS = frozenset({"hidden_pooled", "hidden_last"})
+
+
+def group_arrays_for_set(arrays: Dict[str, np.ndarray], set_name: str, idxs) -> Dict[str, np.ndarray]:
+    """Return {key: array[idxs]} for the keys composing a feature set (for evaluate_groups)."""
+    out = {}
+    for k in FEATURE_SETS[set_name]:
+        a = np.asarray(arrays[k], dtype=float)
+        if a.ndim == 1:
+            a = a.reshape(-1, 1)
+        out[k] = a[idxs]
+    return out
+
 
 def _as_vec(v) -> np.ndarray:
     a = np.atleast_1d(np.asarray(v, dtype=float)).ravel()

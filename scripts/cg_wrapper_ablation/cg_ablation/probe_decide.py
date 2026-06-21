@@ -76,24 +76,26 @@ def decide(results: Dict[str, Dict[str, Any]],
     bhava_ge_hidden = _auroc(bhava) >= _auroc(hidden)
 
     # --- decision tree (pre-registered) ---
+    # CONTINUE rule (user-specified): bhava_only AUROC CI lower bound > 0.5 (bhava_sig)
+    # AND hidden_plus_bhava beats hidden_only with a significant paired delta (complements).
+    # Both are required; anything else parks Bhava for generation.
     if not bhava_sig and not hidden_sig:
         decision = "NO_SIGNAL"
-        out["reasons"].append("Both bhava_only and hidden_only ~chance: task not decodable here.")
-    elif bhava_sig and bhava_ge_hidden and complements:
+        out["reasons"].append("Both bhava_only and hidden_only ~chance (AUROC CI spans 0.5): "
+                              "task not decodable here.")
+    elif bhava_sig and complements and bhava_ge_hidden:
         decision = "BHAVA_STRONG_SIGNAL"
-        out["reasons"].append("bhava_only ≥ hidden_only AND hidden+bhava improves further.")
-    elif complements:
+        out["reasons"].append("bhava_only decodable AND ≥ hidden AUROC AND hidden+bhava beats hidden.")
+    elif bhava_sig and complements:
         decision = "BHAVA_COMPLEMENTARY_SIGNAL"
-        out["reasons"].append("hidden+bhava significantly beats hidden_only — Bhava adds signal.")
-    elif hidden_sig and not bhava_sig:
-        decision = "HIDDEN_ONLY_SIGNAL"
-        out["reasons"].append("hidden_only predicts; bhava_only ~chance — Bhava not load-bearing.")
+        out["reasons"].append("bhava_only decodable (CI>0.5) AND hidden+bhava significantly beats hidden.")
     elif bhava_sig and not complements:
         decision = "BHAVA_WEAK_SIGNAL"
-        out["reasons"].append("bhava_only beats chance but adds nothing over hidden_only.")
+        out["reasons"].append("bhava_only decodable but adds nothing over hidden_only — park.")
     else:
         decision = "HIDDEN_ONLY_SIGNAL"
-        out["reasons"].append("Fallback: signal present but Bhava not complementary.")
+        out["reasons"].append("hidden_only predicts; bhava_only not decodable (CI spans 0.5) — "
+                              "Bhava not load-bearing.")
 
     out["decision"] = decision
     return out

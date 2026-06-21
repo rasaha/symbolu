@@ -48,8 +48,10 @@ def run(run_dir: Path, model: str = "logreg", k: int = 5, l2: float = 1.0, seed:
 
         results = {}
         for s in sets:
-            X = PF.build_matrix_from_arrays(arrays, s)[idxs]
-            results[s] = PT.evaluate_feature_set(X, y, model=model, k=k, l2=l2, seed=seed, pca_dim=pca_dim)
+            groups = PF.group_arrays_for_set(arrays, s, idxs)
+            results[s] = PT.evaluate_groups(
+                groups, y, reduce_groups=PF.HIDDEN_KEYS, pca_dim=pca_dim,
+                model=model, k=k, l2=l2, seed=seed)
 
         # paired comparisons (cand vs ref), same folds/seed -> aligned per-example correctness
         paired = {}
@@ -92,7 +94,7 @@ def main() -> int:
     ap.add_argument("--k", type=int, default=5)
     ap.add_argument("--l2", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--pca-dim", type=int, default=64, help="PCA-reduce feature sets with dim>this inside CV folds (fair hidden baseline); 0=off")
+    ap.add_argument("--pca-dim", type=int, default=24, help="PCA-reduce feature sets with dim>this inside CV folds (fair hidden baseline); 0=off")
     args = ap.parse_args()
     run_dir = Path(args.run_dir)
     if not (run_dir / "features.npz").exists():
