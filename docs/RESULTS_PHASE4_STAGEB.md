@@ -75,3 +75,31 @@ to call Phase 4 a success.
 2. **Then decide:** if `frame_violation` (framed) and `rejected_domain_leak` (base) are
    `STABLE_PREDICTIVE` → build Stage-B2; if `UNSTABLE`/underpowered → **expand the adversarial-drift
    dataset** to raise within-arm (esp. framed) power before any Bhava work.
+
+## 7. Stage-B1 robustness verdict (multi-seed × n_pca) — COMPLETED
+
+Within-arm stability sweep, 15 configs each (seeds 0–4 × PCA {16,32,64}), group-by-term CV:
+
+| target / arm | verdict | %CI>0.5 | AUROC mean [min,max] | n_pos |
+|---|---|---|---|---|
+| audit_fail / base | STABLE_NULL | 0% | 0.514 [0.40,0.59] | 56 |
+| audit_fail / framed | UNSTABLE | 13% | 0.572 [0.48,0.66] | 27 |
+| frame_violation / base | STABLE_NULL | 0% | 0.514 [0.40,0.59] | 56 |
+| **frame_violation / framed** | **UNSTABLE** | 53% | 0.625 [0.51,0.74] | 25 |
+| **rejected_domain_leak / base** | **UNSTABLE** | 67% | 0.658 [0.57,0.76] | 25 |
+| rejected_domain_leak / framed | INSUFFICIENT | — | — | 7 |
+| secondary_promoted / base | STABLE_NULL | 0% | 0.474 [0.38,0.58] | 19 |
+| secondary_promoted / framed | INSUFFICIENT | — | — | 14 |
+
+**Verdict: no target reaches `STABLE_PREDICTIVE` (≥80% of configs with CI>0.5).** The headline
+single-seed positives (frame_violation framed 0.67, rejected_leak base 0.72) were the optimistic ends
+of UNSTABLE spreads (53% / 67% of configs significant). The signal is **real but underpowered**, not
+absent: the true nulls are flat (audit_fail-base 0.514, secondary-base 0.474) while frame_violation
+(framed) and rejected_leak (base) sit clearly above — the wide CIs are a power problem at ~25 within-arm
+positives, not evidence of no signal.
+
+**Decision: do NOT build Stage-B2 (Bhava) yet** — there is no stable hidden-only floor for an
+incremental-value claim. Per the pre-registered gate, the next move is **expand the adversarial-drift
+dataset** (raise within-arm, especially framed, positives toward ≥90 so a ~0.65 AUROC can be resolved),
+then re-run this exact H1 + robustness pass. If the signal stays UNSTABLE under real power → stop the
+Phase 4 hidden-state track and keep C×R×S as the validated wrapper/audit product.
