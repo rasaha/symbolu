@@ -42,6 +42,56 @@ complementary signal → park.
 - The C × S × R decomposition is **redundant**: parts are individually decodable (all correlate with
   difficulty) but carry no joint signal beyond hidden.
 
+## Per-example traces (`inspect_bhava_csr_sample.py`) — three mechanistic findings
+
+Sampling top-correct / top-incorrect / csr-dilutes on the same run sharpens the verdict:
+
+1. **State-Bhava has collapsed to a constant.** All 170 examples — correct, incorrect, clean,
+   garbage — have dominant **WIT (idx 8) at 0.988–0.996**, entropy 0.02–0.09. The learned 12D Bhava
+   slice is pinned to WITNESS for everything; its only per-example variance is the entropy wiggle
+   (0.02 on clean templates vs ~0.08 on the `5-2`/`2*4` templates). Its 0.818 AUROC is therefore an
+   **entropy-as-template-ID proxy**, not ontological content — consistent with the inert wrapper
+   (`ACTIVE_NO_EFFECT`): the state never moved, so its Bhava never differentiated.
+
+2. **Phoneme-Bhava / Vritti are template fingerprints, not per-example signal.** Every
+   `"Sam has X apples and buys Y more"` prompt yields the *identical* phoneme-Bhava (`a`-dominant) and
+   *identical* Vritti ("Blind attachment"); the `"box of pens"` family shares a different identical
+   vector (`e`-dominant); `"What is 5-2"` a third. They are deterministic functions of template
+   wording — their decode-ability is pure template-clustering (= difficulty proxy). This is also why
+   the phoneme/vritti split came out degenerate: both are template-constant.
+
+3. **The static `semantic` component is the *worst* predictor and *dominates* `csr_static`.** On the
+   garbage-output cases (corr88/84/82 — model emits "Not Rated Yet / Based on 0 answers", gold=incorrect):
+   hidden (0.00–0.11), resonance (0.09–0.17) and state_bhava (0.25–0.37) all correctly say *incorrect*,
+   but **semantic = 1.00** and **csr_static = 0.85–0.99** (confident-wrong). Every "CSR dilutes" flag
+   fires this way, with the viewer's note *"csr_static agrees with semantic but not state_bhava"*.
+   Because `csr_static` is an **additive concatenation** through logistic regression, it cannot express
+   a multiplicative veto and instead lets its loudest component (semantic) override the others.
+
+### Scope note — this probe did NOT test the C × R × S match-filter
+
+The intended CSR is a **conditional `(word, candidate-meaning)` compatibility gate**:
+`MATCH = C × R × S` (multiplicative veto), where **C** = phonemic layer-allowance, **R** = phonemic
+realization into a **12D ontological profile**, and **S** = a **non-phonemic** firewall that derives
+semantic traits from the realized 12D structure and matches them against an **external domain
+template** (dominant gate). The static probe tested none of this:
+- features are per-example, with **no candidate-meaning / domain axis** to match against;
+- `csr_static` is **additive**, so the multiplicative veto is structurally inexpressible;
+- the `semantic` feature was pooled prompt-input embeddings — **no domain templates, no realized-12D
+  input, no veto** — and it behaves as an *anti-signal* (systematic false-accepts on garbage outputs),
+  the exact opposite of S-as-firewall.
+
+So the `CSR_REDUNDANT` / PARK verdict applies to the **static decomposition**, not to the match-filter
+hypothesis, which **remains untested**. A faithful test needs a separate pairwise instrument
+(`word × candidate-domain → C·R·S product` with accept/veto labels and external domain templates).
+**Deferred** — recorded here, not scheduled.
+
+### One methodological cap on the whole static track
+All probe features are extracted from the **prompt**, while the label is the correctness of a
+**separately generated continuation**. The static probe is therefore a *difficulty-prediction* task
+("will the model fail this prompt?"), not output evaluation — which is why hidden/resonance "work"
+(they encode prompt difficulty) and is precisely the text-difficulty confound noted above.
+
 ## CG / STL / CSR track — combined verdict: **PARK** (all questions negative)
 
 | Question | Result |
