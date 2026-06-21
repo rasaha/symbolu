@@ -1,9 +1,31 @@
 # C×R×S MATCH-Filter Wrapper — Held-out Evaluation (RESULTS)
 
 > Harness: `eval_match_filter.py` over `eval_data/domain_match_eval.jsonl` (59 cases, 20-domain
-> registry). **Semantic backend used: `offline_hashing_embed` → ARCHITECTURE-SMOKE only.** A real
-> `embed_fn` (sentence-transformers) was **not available** in this environment, so these numbers are
-> smoke evidence, not production evidence.
+> registry). Offline backends are ARCHITECTURE-SMOKE; the production verdict is from `real_embed_fn`
+> (sentence-transformers `all-MiniLM-L6-v2`).
+
+## ✅ FINAL PRODUCTION VERDICT — PASS (real_embed_fn, primary=0.20/secondary=0.05, C+R S-gated)
+
+All eight criteria pass:
+
+| metric | value | criterion | |
+|---|---:|---|:--:|
+| primary_frame_accuracy | **0.814** | ≥0.70 | PASS |
+| expected_primary_misrejected | **0.050** | ≤0.10 | PASS |
+| ontological_veto (C) | **1.000** | ≥0.80 | PASS |
+| semantic_veto (S) | **0.947** | ≥0.80 | PASS |
+| phoneme_overreach_prevention | **1.000** | ≥0.90 | PASS |
+| rejected_recall | **0.991** | ≥0.85 | PASS |
+| unknown_term_generalization | **0.784** | ≥0.60 | PASS |
+| context_disambiguation | **0.615** | ≥0.60 | PASS |
+
+Landing: primary 48, secondary 9, weak 0, rejected 3 (rank-1 rate 0.917). The 5 residual context
+misses (heat/danger/programming/biology/astronomy) are rank-1 but land secondary at MATCH 0.07–0.20 —
+a phoneme→ontology *required-lane* gap (the term doesn't realize the domain's required lanes), not a
+veto or S error; lowering primary to the calibrated 0.167 recovers the 0.18–0.20 subset if desired.
+**Verdict: CONTINUE.** Earlier sections are the derivation; this is the result.
+
+---
 
 ## Backends compared (mean S on expected-primary pairs; primary-frame accuracy)
 
