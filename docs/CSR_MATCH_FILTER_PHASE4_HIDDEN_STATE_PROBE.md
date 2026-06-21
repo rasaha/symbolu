@@ -63,6 +63,43 @@ vector**, the actual wiring today is:
 
 **Bottom line:** within CSR, Bhava changes no runtime behavior today (classification: *not wired*).
 
+## 2.2 Pre-registered power-vs-level protocol + KILL CRITERION (locked before the expanded re-test)
+
+Stage-B1 (n=110) found a *real-but-underpowered* within-arm signal (frame_violation framed ≈0.63,
+rejected_leak base ≈0.66, both UNSTABLE at ~25 positives; `RESULTS_PHASE4_STAGEB.md §7`). Two
+competing explanations: **(i) underpowered**, or **(ii) wrong level** — the static *final-prompt-token*
+hidden state may be a compressed, not-yet-committed potential, with semantic signal only crystallising
+during the latent→answer **transition** (first generated tokens). To keep the hidden-state track
+**falsifiable**, the following is fixed BEFORE the expanded-data result is seen:
+
+**Step 1 — Expanded static-h0 re-test (the power test, runs first).** Re-run the *same* static
+final-prompt-token probe on the expanded combined dataset (516 rows; `framed_answer_eval_v3_combined`),
+within-arm, group-by-term CV, multi-seed × n_pca robustness. Define a **stable hidden-only positive** =
+within-arm AUROC CI excludes 0.5 in **≥80%** of (seed×n_pca) configs **and** mean AUROC **≥0.60**.
+- **(1a)** ≥1 primary target (`audit_fail` or `frame_violation`) is a stable hidden-only positive →
+  static h0 is sufficient; the "wrong level" hypothesis is **not needed**. Proceed to Stage-B2 (learned
+  Bhava directions on h0) under the existing strict incremental-value gate.
+- **(1b)** primary targets stay UNSTABLE/NULL **with adequate power** (framed within-arm positives ≳60)
+  → the power explanation is rejected; **Phase 4C is licensed.**
+- **(1c)** still underpowered (framed positives < ~60) → expand further or stop; do not over-interpret.
+
+**Step 2 — Phase 4C transition probe (only if 1b), honestly relabeled.** Capture hidden states at the
+final prompt token (h0), the **first generated token** (h1), a few early generated tokens, and
+Δh = h1 − h0. This is **no longer a pre-answer predictor** — it is an **early-warning DETECTOR during
+answer formation**, and is labeled as such (`detection`, not `prediction`). Incremental gate: a
+transition/early-expression representation must beat static-h0 by **≥0.05 AUROC with non-overlapping
+bootstrap CIs** AND clear the **≥80%** within-arm stability bar.
+
+**KILL CRITERION (locked).** If, *with adequate power*, **neither** static-h0 (Step 1) **nor** the
+transition/early-expression states (Step 2) clear the stability bar and the incremental-value gate,
+then the **hidden-state Bhava track STOPS**. We keep C×R×S as the validated Phase 1–3 wrapper/audit
+product and do **not** pursue further "deeper levels" — this forecloses the infinite-regress hazard of
+"try the next level" after every null. The metaphysical interpretation (a singular, undifferentiated
+Bhava that only becomes visible through semantic expression) is **bracketed**: the experiment reports
+only the *observable* — does linearly-decodable signal sharpen across token positions? — not the
+ontology, because "disposition crystallising" and "the model hasn't computed the feature yet" predict
+the same data.
+
 ## 3. Definitions
 
 - **Bhava (Phase 4)** = a *learned latent state-pattern read from hidden states*. It is **not** an
