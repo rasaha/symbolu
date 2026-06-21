@@ -7,9 +7,10 @@
 > until separately built and validated. Bhava stays out of runtime.
 
 ## 0. One line
-`CSR_policy = Π(MATCH, Vritti_mode, Guna_quality, [hidden_risk?], audit_trace)` — Vritti is the
-*movement* detector, Guna the *quality/stability* detector, C×R×S the *semantic-frame* controller,
-Bhava is **not** a runtime control signal.
+`CSR_policy = Π(MATCH, TrajectoryMode, Guna_quality, [hidden_risk?], audit_trace)` — **`TrajectoryMode`
+(a.k.a. `DerivedVrittiTrajectory`) is the audit-derived *movement* diagnostic** (NOT canonical Vritti),
+Guna the *quality/stability* detector, C×R×S the *semantic-frame* controller. The canonical five-state
+`p_v` and Bhava are **not** runtime control signals.
 
 ## 1. Why symbolic, not hidden-state (ties to Phase 4 results)
 Phase 4 tested whether Bhava/Guna/Vritti are cleanly decodable from hidden states and got **multiply-
@@ -20,17 +21,20 @@ conclusion: **do not depend on isolable hidden vectors.** This spec therefore de
 **deterministic symbolic registers derived from the validated Phase 3 audit**, which is exactly where
 the signal already lives.
 
-## 2. Architecture
+## 2. Architecture (immediate product path — derived trajectory, NOT canonical p_v)
 ```
 User query
-  → C×R×S frame selection            (VALIDATED, frozen — Phase 1)
-  → framed prompt + LLM answer       (VALIDATED — Phase 2/2B)
-  → Phase 3 answer audit             (VALIDATED — deterministic findings)
-  → Vritti_mode  (movement)          (NEW: relabels/groups audit findings)
-  → Guna_quality (quality/stability) (NEW: partly audit-derived, partly new detectors)
+  → C×R×S frame selection                 (VALIDATED, frozen — Phase 1)
+  → framed prompt + LLM answer            (VALIDATED — Phase 2/2B)
+  → Phase 3 answer audit                  (VALIDATED — deterministic findings)
+  → DerivedVrittiTrajectory (TrajectoryMode)  (NEW [D]: relabels audit findings — NOT five-state p_v)
+  → Guna_quality (quality/stability)      (NEW: partly [D] audit-derived, partly [N] new detectors)
   → CSR_policy   (answer / tighten / rewrite / escalate)   (NEW: extends existing rewrite gate)
   → final answer
 ```
+This is explicitly `C×R×S → answer → audit → derived-trajectory + Guna diagnostics → deterministic
+policy`. It is **NOT** `C×R×S → canonical five-state p_v runtime control`. The canonical `p_v` (§4.1) and
+its `φ_t`/relevance consumers are a separate future track (§4.4), not in this path.
 
 ## 3. Validation-status legend (read before trusting any row below)
 - **[V] Validated** — implemented and tested in this repo today.
@@ -75,12 +79,17 @@ decoded** from anything today.
 Older 3-state form uses `{Pramāṇa, Vikalpa, Viparyaya}`. This `φ_t` and the relevance score that consumes
 it (§8) are **patent-scope, not built here**.
 
-### 4.3 Derived **movement / trajectory** layer (NOT the five Vrittis — a separate diagnostic)
-What my earlier draft called "Vritti modes" are really **trajectory diagnostics over the audit** — *how
-the answer moved relative to the frame* — and are a DIFFERENT object from the five-state `p_v`. Kept,
-but renamed to avoid conflation, and used for policy hooks:
+### 4.3 `DerivedVrittiTrajectory` (`TrajectoryMode`) — the RUNTIME movement layer (NOT canonical p_v)
+**This is the layer the product uses today.** It is an **audit-derived movement/trajectory diagnostic**
+— *how the answer moved relative to the C×R×S frame* — and is a **DIFFERENT object from the five-state
+`p_v`** (§4.1). It deliberately does **not** carry the Sanskrit names (Pramāṇa/Viparyaya/…), precisely
+because the audit→five-state mapping is unvalidated. Canonical name for code/enums:
+**`DerivedVrittiTrajectory`** (the layer) / **`TrajectoryMode`** (the per-finding flag).
 
-| trajectory mode | source (audit finding) | status |
+It is **multi-label** (an answer can be both `secondary_promoted` and `frame_parroting`); represent it
+as the *set* of active `TrajectoryMode` flags, not a single mode.
+
+| `TrajectoryMode` flag | source (audit finding) | status |
 |---|---|---|
 | `primary_frame_stable` | `frame_compliant` | **[D]** |
 | `secondary_promoted` | `secondary_promoted_to_primary` | **[D]** |
@@ -91,10 +100,15 @@ but renamed to avoid conflation, and used for policy hooks:
 | `phoneme_overreach` | `phoneme_overreach_claim` | **[D]** |
 | `associative_jump` / `domain_jump` / `over_expansion` | — (no detector today) | **[N]** |
 
-The trajectory layer is **[D]** (relabels validated findings) and is what drives the deterministic
-policy hooks (§6). The canonical five-state `p_v` (§4.1) is **[P]/[N]** and is NOT required by the
-deterministic product — it belongs to the patent symbolic engine and any future, separately-validated
-build of it.
+The trajectory layer is **[D]** (relabels validated findings) and drives the deterministic policy hooks
+(§6). It is NOT canonical Vritti and makes no claim about the five cognitive states.
+
+### 4.4 Canonical five-state `p_v` — SEPARATE FUTURE TRACK (not in runtime)
+The canonical five-state `p_v` (§4.1) and its consumers `φ_t(t|p_v)` / relevance score are **out of the
+runtime product** until a future, independently pre-registered effort: (1) pre-register a `p_v`
+estimator; (2) define proxy labels for the five states carefully; (3) test separability, entropy, and
+incremental value over the trajectory layer (same strict gate as Phase 4); (4) only then consider
+feeding `φ_t`/relevance. Until that passes, `p_v` is **[P]/[N]** and never a product control signal.
 
 ## 5. Guna registry — "quality of expression"
 | Guna quality | source | status |
@@ -119,7 +133,7 @@ CSR_policy = Π(MATCH, Vritti_mode, Guna_quality, [hidden_risk], audit_trace)
 Practical deterministic scoring form (weights `w*` and thresholds `τ*` are **to be tuned and
 PRE-REGISTERED before any "improves outcomes" claim** — currently unset):
 ```
-policy_risk = w1·(1 − MATCH_primary) + w2·vritti_drift + w3·guna_instability
+policy_risk = w1·(1 − MATCH_primary) + w2·trajectory_drift + w3·guna_instability
             + w4·hidden_risk        + w5·audit_severity
 action:
   policy_risk < τ_answer    → answer normally
@@ -127,13 +141,25 @@ action:
   policy_risk < τ_escalate  → rewrite / rerank
   else                      → ask clarifying question / escalate
 ```
+**⚠ Collinearity / double-counting caveat (learned from Phase 4D).** `trajectory_drift`, `audit_severity`,
+and `(1 − MATCH_primary)` are **not independent** — `trajectory_drift` is *derived from* the same audit
+findings that define `audit_severity`, and frame drift lowers MATCH alignment. Summing them with free
+weights double-counts one signal (the same nesting that made Phase 4D leak). Therefore: define the terms
+to be **non-overlapping** (e.g., `audit_severity` = critical/factuality findings only; `trajectory_drift`
+= frame-movement findings only), and the **near-term policy must be shown to BEAT the current Phase 3
+`needs_rewrite` gate** under a pre-registered test before claiming added value — most of `CSR_policy`
+today is a *repackaging* of the existing audit decision, and the only genuinely NEW signal would come
+from the [N] Guna detectors and the [X] `hidden_risk`, both unvalidated.
+
 Deterministic policy hooks (extend the existing Phase 3 `needs_rewrite` gate; **[D]/[N]**):
 ```
-vritti == rejected_domain_drift  → rewrite_with_primary_frame()         # [D]
-vritti == secondary_promoted     → demote_secondary_frame()             # [D]
-guna   == generic_low_signal     → ask_for_specificity_or_rewrite()     # [D]
-guna   == overconfident AND csr_alignment_low → add_caution_and_audit() # [N] (needs overconfidence detector)
+rejected_domain_drift ∈ TrajectoryMode  → rewrite_with_primary_frame()        # [D]
+secondary_promoted    ∈ TrajectoryMode  → demote_secondary_frame()            # [D]
+guna == generic_low_signal             → ask_for_specificity_or_rewrite()    # [D]
+guna == overconfident AND csr_alignment_low → add_caution_and_audit()         # [N] (needs detector)
 ```
+Near-term, run the policy on **[D]/[V] terms only** (`MATCH`, `trajectory_drift`, `audit_severity`); keep
+`w3` (Guna) and `w4` (hidden_risk) at **0** until the [N] detectors and [X] probe are separately validated.
 **`hidden_risk` is [X] (experimental, optional):** the Stage-B1 finding — the pre-answer hidden state
 predicts `frame_violation` (~0.76) and `rejected_domain_leak` (~0.83) within-arm — is real but
 **correlational, model-specific, and requires running a probe at inference**. It is NOT part of the
@@ -158,9 +184,10 @@ a description of current behavior. Any future build of it is a separate, indepen
 with its own pre-registration; nothing in this spec claims those formulas work.
 
 ## 9. Implementation plan (phased; deterministic-first; each phase gated)
-1. **P-A [D]:** `vritti.py` + `guna.py` registries that map the **existing** audit findings →
-   Vritti_mode / Guna_quality (pure relabel; unit-tested against `answer_audit` outputs). No behavior
-   change — diagnostic only.
+1. **P-A [D]:** `trajectory.py` (`DerivedVrittiTrajectory` / `TrajectoryMode`, multi-label) + `guna.py`
+   registries that map the **existing** audit findings → trajectory flags / Guna_quality (pure relabel;
+   unit-tested against `answer_audit` outputs). No behavior change — diagnostic only. **Canonical
+   five-state `p_v` is explicitly NOT built here** (it is the §4.4 future track).
 2. **P-B [D]:** `csr_policy.py` deterministic policy over `(MATCH, Vritti_mode, Guna_quality,
    audit_trace)` that reproduces and then extends the current `needs_rewrite` gate. Off by default;
    opt-in flag; A/B against the Phase 3 audit so it never regresses the validated behavior.
@@ -171,10 +198,15 @@ with its own pre-registration; nothing in this spec claims those formulas work.
 5. `hidden_risk` **[X]** remains optional/off until separately justified.
 
 ## 10. Boundaries & patent-safe positioning
-- **Valid framing:** *Guna and Vritti are symbolic control variables the wrapper uses to modulate
-  retrieval, framing, reranking, tone, audit, and rewrite policy. They are not asserted to be directly
-  separable hidden-state entities. Bhava remains an interpretive latent disposition unless separately
-  validated.* (Claims scoping is a matter for patent counsel; this spec is engineering-only.)
+- **Naming boundary (explicit):** the runtime layer is **`DerivedVrittiTrajectory` / `TrajectoryMode`**
+  — an audit-derived movement diagnostic. It is **not** canonical Vritti and is **not** the five-state
+  `p_v`. The canonical five-state `p_v` (Pramāṇa/Viparyaya/Vikalpa/Nidrā/Smṛti), `φ_t`, and the relevance
+  formula stay a **separate future track** (§4.4) and are never described as runtime-active.
+- **Valid framing:** *Guna and the derived Vritti-trajectory are symbolic control variables the wrapper
+  uses to modulate retrieval, framing, reranking, tone, audit, and rewrite policy. They are not asserted
+  to be directly separable hidden-state entities, nor the canonical five-state p_v. Bhava remains an
+  interpretive latent disposition unless separately validated.* (Claims scoping is for patent counsel;
+  this spec is engineering-only.)
 - **Do NOT claim:** consciousness; Bhava proven/runtime-active; hidden-state CSR active; the patent
   symbolic engine is implemented; causal generation control; cross-model generalization.
 - **Unchanged invariants:** Phase 1 scorer/thresholds frozen; Phase 2 prompt, rubric_v2, Phase 3 audit
