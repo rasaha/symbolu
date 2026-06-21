@@ -124,6 +124,103 @@ def decide_label(llm_backend, m):
     return "PHASE2_FRAMED_ANSWER_PASS" if (rej_ok and prim_ok and over_ok) else "PHASE2_NO_BEHAVIORAL_LIFT"
 
 
+def summarize(per, arms, meta, explain, out, write_traces):
+    metrics = {arm: aggregate(per, arm) for arm in arms}
+    metrics_tc = _mean([p.get("trace_complete", 1.0) for p in per])
+    deltas = {}
+    if "framed" in arms and "base" in arms:
+        deltas["framed_minus_base"] = {k: _delta(metrics["framed"][k], metrics["base"][k])
+                                       for k in DELTA_KEYS}
+    if "framed_postcheck" in arms and "base" in arms:
+        deltas["framed_postcheck_minus_base"] = {
+            k: _delta(metrics["framed_postcheck"][k], metrics["base"][k]) for k in DELTA_KEYS}
+    if "framed_postcheck" in arms and "framed" in arms:
+        deltas["framed_postcheck_minus_framed"] = {
+            k: _delta(metrics["framed_postcheck"][k], metrics["framed"][k]) for k in DELTA_KEYS}
+    label = decide_label(meta["llm_backend"], metrics)
+    report = {"meta": {"n": len(per), "arms": arms, **meta, "judge_backend": "deterministic_rubric",
+                       "frozen_thresholds": {"primary": _FROZEN.primary_match,
+                                             "secondary": _FROZEN.secondary_match}},
+              "metrics": metrics, "trace_completeness": metrics_tc, "deltas": deltas, "label": label}
+
+    print("=" * 74)
+    print(f"PHASE 2 — FRAMED-ANSWER EVAL   llm_backend={meta['llm_backend']} "
+          f"(production_valid={meta['production_valid']})  judge=deterministic_rubric")
+    print(f"  frame backend={meta['semantic_frame_backend']}  n={len(per)}  arms={arms}  "
+          f"thresholds=frozen {_FROZEN.primary_match}/{_FROZEN.secondary_match}")
+    print("-" * 74)
+    print("  metric".ljust(32) + "".join(a[:14].rjust(16) for a in arms))
+    for k in RUBRIC_KEYS + ("postcheck_rewrite_rate",):
+        row = "  " + k.ljust(30)
+        for a in arms:
+            v = metrics[a].get(k)
+            row += ("n/a" if v is None else f"{v:.3f}").rjust(16)
+        print(row)
+    print(f"  {'trace_completeness'.ljust(30)}" + f"{metrics_tc:.3f}".rjust(16 * len(arms)))
+    print("-" * 74)
+    print("DELTAS (positive = framing helps; phoneme_overreach/must_not lower is better)")
+    for name, d in deltas.items():
+        print(f"  {name}: " + "  ".join(f"{k}={'n/a' if v is None else f'{v:+.3f}'}"
+                                        for k, v in d.items()))
+    print("-" * 74)
+    print(f"LABEL: {label}")
+    if label == "PHASE2_STUB_SMOKE_ONLY":
+        print("  NOTE: stub LLM — validates harness/scoring/deltas, NOT real behavioral lift.")
+    if explain:
+        print("=" * 74 + "\nFAILURE EXPLAINER (framed arm)")
+        for p in per:
+            s = p["scores"].get("framed", {})
+            probs = []
+            if s.get("primary_frame_correct") == 0.0:
+                probs.append("primary-miss")
+            if s.get("rejected_domain_avoidance") == 0.0:
+                probs.append(f"rejected:{s.get('_mentioned_rejected')}")
+            if s.get("phoneme_overreach_rate"):
+                probs.append("overreach")
+            if (s.get("must_not_violation_rate") or 0) > 0:
+                probs.append("must-not")
+            if probs:
+                print(f"  {p['id']:28} {probs}")
+    if out:
+        outp = Path(out)
+        outp.parent.mkdir(parents=True, exist_ok=True)
+        blob = dict(report)
+        if write_traces:
+            blob["traces"] = per
+        outp.write_text(json.dumps(blob, indent=2))
+        print(f"\nwrote {outp}")
+    return report
+
+
+def rescore(traces_path, rows, explain, out):
+    """Re-score saved answers with the CURRENT rubric — no LLM/frame re-run."""
+    saved = json.loads(Path(traces_path).read_text())
+    traces = saved.get("traces") or []
+    if not traces:
+        print(f"[error] {traces_path} has no traces (run the eval with --write-traces).")
+        return 2
+    by_id = {ex["id"]: ex for ex in rows}
+    meta = saved.get("meta", {})
+    arms = meta.get("arms", ["base", "framed", "framed_postcheck"])
+    per = []
+    for tr in traces:
+        ex = by_id.get(tr["id"])
+        if not ex:
+            continue
+        terms = ex.get("dominant_terms") or []
+        per.append({"id": tr["id"], "category": ex.get("category"), "answers": tr["answers"],
+                    "scores": {a: RB.score_answer(tr["answers"].get(a, ""), ex, terms) for a in arms},
+                    "postcheck": tr.get("postcheck", {"needed_rewrite": False}),
+                    "trace_complete": tr.get("trace_complete", 1.0)})
+    print(f"[rescored {len(per)} examples from {traces_path} with the current rubric]")
+    summarize(per, arms, {"llm_backend": meta.get("llm_backend", "stub"),
+                          "llm_info": meta.get("llm_info", ""),
+                          "production_valid": meta.get("production_valid", False),
+                          "semantic_frame_backend": meta.get("semantic_frame_backend", "")},
+              explain, out, write_traces=False)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default=str(_DATA))
@@ -136,10 +233,14 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--explain-failures", action="store_true")
     ap.add_argument("--write-traces", action="store_true")
+    ap.add_argument("--rescore", default=None,
+                    help="re-score a saved --write-traces JSON with the current rubric (no LLM re-run)")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     rows = load_data(args.data)
+    if args.rescore:
+        return rescore(args.rescore, rows, args.explain_failures, args.out)
     if args.limit:
         rows = rows[: args.limit]
     kb = EV.load_kb(args.kb)
@@ -177,78 +278,9 @@ def main():
                     "answers": answers, "scores": scores, "postcheck": pc,
                     "trace_complete": 1.0 if complete else 0.0})
 
-    metrics = {arm: aggregate(per, arm) for arm in arms}
-    metrics_tc = _mean([p["trace_complete"] for p in per])
-    deltas = {}
-    if "framed" in arms and "base" in arms:
-        deltas["framed_minus_base"] = {k: _delta(metrics["framed"][k], metrics["base"][k])
-                                       for k in DELTA_KEYS}
-    if "framed_postcheck" in arms and "base" in arms:
-        deltas["framed_postcheck_minus_base"] = {
-            k: _delta(metrics["framed_postcheck"][k], metrics["base"][k]) for k in DELTA_KEYS}
-    if "framed_postcheck" in arms and "framed" in arms:
-        deltas["framed_postcheck_minus_framed"] = {
-            k: _delta(metrics["framed_postcheck"][k], metrics["framed"][k]) for k in DELTA_KEYS}
-
-    label = decide_label(llm.backend, metrics)   # actual adapter backend (handles real->stub fallback)
-    report = {"meta": {"n": len(per), "arms": arms, "llm_backend": llm.backend,
-                       "llm_info": llm_info, "production_valid": llm.production_valid,
-                       "judge_backend": "deterministic_rubric", "semantic_frame_backend": sem_info,
-                       "frozen_thresholds": {"primary": _FROZEN.primary_match,
-                                             "secondary": _FROZEN.secondary_match}},
-              "metrics": metrics, "trace_completeness": metrics_tc, "deltas": deltas, "label": label}
-
-    # ---- report ----
-    print("=" * 74)
-    print(f"PHASE 2 — FRAMED-ANSWER EVAL   llm_backend={llm.backend} "
-          f"(production_valid={llm.production_valid})  judge=deterministic_rubric")
-    print(f"  frame backend={sem_info}  n={len(per)}  arms={arms}  thresholds=frozen "
-          f"{_FROZEN.primary_match}/{_FROZEN.secondary_match}")
-    print("-" * 74)
-    hdr = "  metric".ljust(32) + "".join(a[:14].rjust(16) for a in arms)
-    print(hdr)
-    for k in RUBRIC_KEYS + ("postcheck_rewrite_rate",):
-        row = "  " + k.ljust(30)
-        for a in arms:
-            v = metrics[a].get(k)
-            row += ("n/a" if v is None else f"{v:.3f}").rjust(16)
-        print(row)
-    print(f"  {'trace_completeness'.ljust(30)}" + f"{metrics_tc:.3f}".rjust(16 * len(arms)))
-    print("-" * 74)
-    print("DELTAS (positive = framing helps; phoneme_overreach/must_not lower is better)")
-    for name, d in deltas.items():
-        print(f"  {name}: " + "  ".join(f"{k}={'n/a' if v is None else f'{v:+.3f}'}"
-                                        for k, v in d.items()))
-    print("-" * 74)
-    print(f"LABEL: {label}")
-    if label == "PHASE2_STUB_SMOKE_ONLY":
-        print("  NOTE: stub LLM — validates harness/scoring/deltas, NOT real behavioral lift.")
-
-    if args.explain_failures:
-        print("=" * 74)
-        print("FAILURE EXPLAINER (framed arm)")
-        for p in per:
-            s = p["scores"].get("framed", {})
-            probs = []
-            if s.get("primary_frame_correct") == 0.0:
-                probs.append("primary-miss")
-            if s.get("rejected_domain_avoidance") == 0.0:
-                probs.append(f"rejected:{s.get('_mentioned_rejected')}")
-            if s.get("phoneme_overreach_rate"):
-                probs.append("overreach")
-            if (s.get("must_not_violation_rate") or 0) > 0:
-                probs.append("must-not")
-            if probs:
-                print(f"  {p['id']:28} {probs}")
-
-    if args.out:
-        outp = Path(args.out)
-        outp.parent.mkdir(parents=True, exist_ok=True)
-        blob = dict(report)
-        if args.write_traces:
-            blob["traces"] = per
-        outp.write_text(json.dumps(blob, indent=2))
-        print(f"\nwrote {outp}")
+    summarize(per, arms, {"llm_backend": llm.backend, "llm_info": llm_info,
+                          "production_valid": llm.production_valid, "semantic_frame_backend": sem_info},
+              args.explain_failures, args.out, args.write_traces)
     return 0
 
 

@@ -40,9 +40,32 @@ def _domain_terms(domain: str) -> set:
 
 
 def mentioned_domains(answer: str, domains: List[str]) -> set:
-    """Domains whose name or registry keywords appear in the answer."""
+    """Domains whose name or registry keywords appear ANYWHERE in the answer."""
     toks = _toks(answer)
     return {d for d in domains if toks & _domain_terms(d)}
+
+
+# negation / refutation cues — a clause containing one is NOT asserting what it names
+_NEG_CUE = re.compile(
+    r"\b(?:not|never|no|cannot|can\s?not|n't|neither|nor|rather than|instead of|unlike|"
+    r"isn't|aren't|wasn't|don't|doesn't|wouldn't|shouldn't|false|incorrect|mistaken|misconception)\b",
+    re.IGNORECASE)
+_SENT = re.compile(r"[^.!?;]+")
+
+
+def asserted_domains(answer: str, domains: List[str]) -> set:
+    """Domains POSITIVELY asserted: keyword appears in a sentence with no negation/refutation cue.
+
+    So 'a doctor is NOT a fruit' does not count fruit as asserted, but 'apples are a fruit' does."""
+    out = set()
+    for s in _SENT.findall(answer or ""):
+        if _NEG_CUE.search(s):
+            continue
+        st = _toks(s)
+        for d in domains:
+            if st & _domain_terms(d):
+                out.add(d)
+    return out
 
 
 def has_phoneme_overreach(answer: str) -> bool:
@@ -68,21 +91,24 @@ def phrase_recall(answer: str, phrases: List[str]) -> Optional[float]:
     return sum(_phrase_hit(toks, p, 0.6) for p in phrases) / len(phrases)
 
 
-def _forbidden_hit(answer_toks: set, phrase: str) -> bool:
-    """A forbidden claim counts as present only if essentially ALL its content words appear
-    (conjunctive) — so 'doctor is a fruit' fires only when both 'doctor' AND 'fruit' are present."""
+def _forbidden_hit(sent_toks: set, phrase: str) -> bool:
+    """A forbidden claim is present in a sentence only if essentially ALL its content words appear."""
     p = _toks(phrase)
     if not p:
         return False
-    missing = len(p - answer_toks)
+    missing = len(p - sent_toks)
     return missing == 0 if len(p) <= 3 else missing <= 1
 
 
 def forbidden_rate(answer: str, phrases: List[str]) -> float:
+    """Fraction of forbidden phrases ASSERTED (present in a non-negated sentence). Refutations such as
+    'a doctor is not a fruit' do not count."""
     if not phrases:
         return 0.0
-    toks = _toks(answer)
-    return sum(_forbidden_hit(toks, p) for p in phrases) / len(phrases)
+    sents = [s for s in _SENT.findall(answer or "") if not _NEG_CUE.search(s)]
+    sent_toks = [_toks(s) for s in sents]
+    hit = sum(any(_forbidden_hit(st, p) for st in sent_toks) for p in phrases)
+    return hit / len(phrases)
 
 
 def score_answer(answer: str, example: Dict, terms: Optional[List[str]] = None) -> Dict:
@@ -94,8 +120,8 @@ def score_answer(answer: str, example: Dict, terms: Optional[List[str]] = None) 
     sec = example.get("expected_secondary", [])
     rej = example.get("expected_rejected", [])
 
-    men_prim = mentioned_domains(answer, prim)
-    men_rej = mentioned_domains(answer, rej)
+    men_prim = asserted_domains(answer, prim)        # primary positively asserted
+    men_rej = asserted_domains(answer, rej)          # rejected leaks only if asserted (not refuted)
     overreach = has_phoneme_overreach(answer)
     mni = example.get("must_not_include", [])
     must_not_viol = forbidden_rate(answer, mni)

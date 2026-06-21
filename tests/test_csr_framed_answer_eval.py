@@ -110,6 +110,22 @@ def test_rejected_domain_detector():
     assert RB.mentioned_domains("This is about healing patients.", ["fruit"]) == set()
 
 
+def test_refutation_is_not_a_rejected_leak():
+    # correct adversarial refutation: names the rejected domain only to deny it -> not asserted
+    assert RB.asserted_domains("No, a doctor is not a fruit; it is a medical professional.",
+                               ["fruit"]) == set()
+    # genuine leak: frames the answer around the rejected domain (no negation)
+    assert RB.asserted_domains("A doctor mainly works in commerce and trade.", ["commerce"]) == {"commerce"}
+
+
+def test_forbidden_rate_ignores_refutations():
+    ex = {"expected_primary": ["medicine"], "expected_secondary": [], "expected_rejected": ["fruit"],
+          "must_not_include": ["doctor is a fruit"], "dominant_terms": ["doctor"]}
+    refute = RB.score_answer("A doctor is not a fruit; a doctor is a physician.", ex, ["doctor"])
+    assert refute["must_not_violation_rate"] == 0.0 and refute["rejected_domain_avoidance"] == 1.0
+    assert RB.score_answer("Yes, a doctor is a fruit you eat.", ex, ["doctor"])["must_not_violation_rate"] > 0
+
+
 def test_phoneme_overreach_detector():
     assert RB.has_phoneme_overreach("The phonemes prove it means healing.")
     assert RB.has_phoneme_overreach("Because it sounds like healing, it means healing.")

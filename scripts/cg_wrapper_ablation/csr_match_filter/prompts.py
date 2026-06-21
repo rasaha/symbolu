@@ -57,11 +57,11 @@ def postcheck_answer(answer: str, primary: List[str], secondary: List[str],
                      rejected: List[str]) -> Tuple[bool, List[str]]:
     """Audit a framed answer. Returns (needed_rewrite, reasons)."""
     reasons = []
-    if primary and not rubric.mentioned_domains(answer, primary):
+    if primary and not rubric.asserted_domains(answer, primary):
         reasons.append("does not use the expected primary domain")
-    men_rej = rubric.mentioned_domains(answer, rejected)
+    men_rej = rubric.asserted_domains(answer, rejected)   # only flag rejected domains it ASSERTS
     if men_rej:
-        reasons.append(f"mentions rejected domain(s): {', '.join(sorted(men_rej))}")
+        reasons.append(f"frames around rejected domain(s): {', '.join(sorted(men_rej))}")
     if rubric.has_phoneme_overreach(answer):
         reasons.append("makes a phoneme-overreach claim")
     if len((answer or "").split()) < 5:
