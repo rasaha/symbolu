@@ -151,7 +151,14 @@ def main():
         trace, terms = frame_for(ex, adapter, provider)
         answers, scores, pc = {}, {}, {"needed_rewrite": False, "reasons": []}
         for arm in arms:
-            ans, pci = run_arm(arm, ex, trace, terms, llm)
+            try:
+                ans, pci = run_arm(arm, ex, trace, terms, llm)
+            except Exception as exc:   # LLM backend failure (bad key, rate limit, network)
+                print(f"[error] LLM backend '{llm.backend}' ({llm_info}) failed on {ex['id']}/{arm}: "
+                      f"{type(exc).__name__}: {exc}")
+                print("  -> fix the API key/credentials (CSR_LLM_BACKEND + *_API_KEY), or use "
+                      "--llm-backend stub. No partial report written.")
+                return 2
             answers[arm] = ans
             scores[arm] = RB.score_answer(ans, ex, terms)
             if arm == "framed_postcheck":
