@@ -15,6 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from csr_match_filter.eval_real_output_audit import is_meta_parrot   # noqa: E402
 
+# This layer is `GunaQualityDiagnostic` — an audit-derived symbolic quality overlay. It is NOT canonical
+# Guna `p_g` (the softmax-3D Sattva/Rajas/Tamas distribution), which is reserved for a separate future
+# estimator track (see docs/CSR_GUNA_VRITTI_POLICY_SPEC.md §5.1).
+LAYER_NAME = "GunaQualityDiagnostic"
+
 # flag -> (source audit finding / signal, status, bucket). EXPRESSION QUALITY ONLY (not frame movement).
 GUNA_FLAGS = {
     "generic_low_signal": ("answer_too_generic", "[D]", "expression_quality"),

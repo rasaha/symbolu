@@ -124,6 +124,38 @@ overconfidence, hedging, and noise require **new deterministic detectors** (surf
 must be validated before use. Do not assert Guna tone control works until those detectors exist and are
 tested.
 
+## 5.1 Guna representation provenance & selection rationale (neutral record)
+The codebase computes "Guna" **four different ways**. This subsection records them and the locked
+runtime selection so no one later wires the wrong form into CSR.
+
+| form | where (evidence) | representation | distribution? | `H_G` definable? | runtime status |
+|---|---|---|---|---|---|
+| **A. symbolic / audit-derived** | `csr_match_filter/guna.py` (this layer); `phase4d_residual_bhava` `guna_label` | discrete multi-label flags from Phase 3 audit findings | n/a | n/a | **CSR runtime** ([D]/[N]) |
+| B. sigmoid 6-D slice | `losses/kosha_gyroscope.py:2329` `GUNA_SLICE=slice(22,28)`; `conscious_generation/token_ontology.py:93` `sigmoid(raw[22:28])`; `jepa/state_projector.py:197` | 6 independent [0,1] dims of the learned 32-D state | **NO** (does not sum to 1) | **not well-defined** | symbolu_training telemetry / probe |
+| C. softmax 3-D | `conscious_generation/governance/bliss_gate.py:124` `softmax(guna_proj(guna_6d))` | distribution over Sattva/Rajas/Tamas | **YES** (simplex) | **yes** | symbolu_training governance (generation-active) |
+| D. CG-entropy | `signal_gov/diagnostics/d5_entropy_def.py` | scalar entropy folded into `cg_entropy` | derived | it *is* the entropy | offline diagnostic (D5 flags `CG_ENTROPY_DEGENERATE` risk) |
+
+**Selection decision (locked):**
+1. **CSR runtime uses A (symbolic / audit-derived) ONLY** — deterministic, model-agnostic, boundary-safe,
+   Phase-3-audit-compatible, no hidden-state or generation-active wiring.
+2. **Softmax 3-D (C) remains the canonical FUTURE `p_g` form** — it is the correct theory object for
+   Sattva/Rajas/Tamas (a simplex), supports a proper `H_G`, and belongs to the patent entropy-feedback
+   engine. It is **not** wired into CSR until independently validated (a separate estimator track, same
+   bar as the five-state `p_v` future track §4.4).
+3. **Do NOT use the sigmoid 6-D slice (B) directly as `p_g`** — it is not a distribution, does not sum to
+   1, and `H_G` is undefined on it unless projected/normalized (which is exactly what C's `guna_proj`
+   does).
+4. **P-A Guna is NOT canonical Guna.** It is **`GunaQualityDiagnostic`**, an audit-derived symbolic
+   quality layer. Canonical `p_g` is reserved for the later estimator track.
+5. **P-B evaluation stays honest:** test whether the CSR policy using symbolic diagnostics beats the
+   current Phase 3 `needs_rewrite` gate, with `hidden_risk_weight = 0`, `canonical_p_g_weight = 0`, and
+   `new_Guna_detector_weight = 0` until each is separately validated.
+
+**Intra-CSR note:** even within form A there are two proxies — `guna.py` (P-A) = `{generic_low_signal,
+parroting}` with factuality moved to `audit_severity` for non-overlap; `phase4d` `guna_label =
+answer_too_generic ∨ factuality_suspected`. **P-B uses the P-A definition** (factuality is severity, not
+Guna).
+
 ## 6. CSR policy layer
 **Do NOT** compute `CSR = isolated Bhava + isolated Vritti + isolated Guna`. Use a policy function over
 the validated frame + diagnostics:
