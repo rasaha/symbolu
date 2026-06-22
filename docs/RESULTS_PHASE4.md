@@ -77,6 +77,11 @@ target-orthogonal Bhava-style readout adds no diagnostic signal beyond that hidd
 Stage-A collection → Stage-B1 (n=110 underpowered, fragile) → pre-registered §2.2 power-vs-level gate →
 expanded re-test (n=1032, static h0 stable-predictive) → field-stress + row-type confound checks →
 Stage-B2 pre-registration → Stage-B2 learned-Bhava test (negative).
+
+A **separate, later pre-registration — Phase 4D (Guna/Vritti-controlled residual Bhava)** — also landed
+negative (`PHASE4D_LEAKAGE_SUSPECTED`): the "Vritti" drift proxy is definitionally nested in the audit
+targets, and the residual added no signal over hidden-only. Same bottom line: hidden-only is
+sufficient; no Bhava-structured read adds value; Bhava stays out of runtime. See `RESULTS_PHASE4D.md`.
 Detail: `RESULTS_PHASE4_STAGEB.md` (§7 robustness, §8 expanded re-test, §9 subset/field-stress),
 `RESULTS_PHASE4_STAGEB2.md` (Bhava verdict),
 `CSR_MATCH_FILTER_PHASE4_HIDDEN_STATE_PROBE.md` (§2.1 wiring status, §2.2 kill criterion),

@@ -1,0 +1,12 @@
+# GPU stack for the CSR Phase 2B real-Mistral run + Phase 4 collection (RunPod).
+# torch/torchvision are pulled from the cu121 wheel index (works with NVIDIA driver >= CUDA 12.1,
+# including 12.4). Do NOT `pip install -U torch` — it grabs a cu130 build that needs a newer driver
+# and a mismatched torchvision (-> "operator torchvision::nms does not exist").
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.4.1
+torchvision==0.19.1
+transformers>=4.40,<4.46
+accelerate
+sentence-transformers
+sentencepiece
+protobuf
