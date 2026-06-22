@@ -3,6 +3,10 @@
 **Cognade Labs — a model-agnostic semantic-control & audit layer for LLMs, with a deeper symbolic-architecture research moat**
 *Updated June 2026*
 
+> **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
+> products share elements of the same symbolic-control patent architecture, but each brief describes a
+> distinct product boundary, validation state, and commercialization path.
+
 ---
 
 ## One-line positioning
