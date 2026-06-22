@@ -3,6 +3,10 @@
 **Cognade Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
 *Prepared April 2026*
 
+> **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
+> products share elements of the same symbolic-control patent architecture, but each brief describes a
+> distinct product boundary, validation state, and commercialization path.
+
 ---
 
 ## Page 1 — The Problem
@@ -253,6 +257,9 @@ limits that any solution to it will have to navigate.
 | Slot memory | 64 slots, detached write path, retrieval loss beyond the window, every-200-step ablation eval, adaptive slot LR controller with bootstrap → adaptive → stabilize phases. |
 | Inference path | `symbolu/inference/` module with Fast / Standard / Sovereign modes, Phase State Cache for O(1) per-step phase update, and V11.0.0 inference filters (Vritti gate, Kosha depth control, Sovereign Bridge). `generate_sovereign.py` CLI is wired end-to-end. Status doc: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` — the inference stack is implemented end-to-end; remaining work is benchmark and scale validation. |
 | Training-time instrumentation | `SovereignPhaseController`, `AdaptiveTrainingController`, and `AdaptiveSlotLRController` — surgical gradient clipping per numerical regime (slot keys on unit sphere, phase sin/cos amplification, global norm), PPL-alpha curriculum, adaptive warmup on validation PPL rather than fixed steps. |
+
+> Terms such as Vritti gate, Kosha depth control, and Sovereign Bridge are architecture-component names
+> in this system; they are not claims that the model has validated cognitive or conscious states.
 
 ### Preliminary retrieval signal (separate research report)
 

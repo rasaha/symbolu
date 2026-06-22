@@ -3,6 +3,10 @@
 **Cognade Labs | Governed Runtime for Autonomous AI Agents**
 *Version 1.10.0 — Updated June 2026 (external / evidence-based)*
 
+> **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
+> products share elements of the same symbolic-control patent architecture, but each brief describes a
+> distinct product boundary, validation state, and commercialization path.
+
 ---
 
 ## Page 1 — The Problem
