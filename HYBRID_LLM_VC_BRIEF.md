@@ -1,6 +1,6 @@
 # Hybrid LLM — VC Brief
 
-**Cognade Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
+**Xozence Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
 *Prepared April 2026*
 
 > **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
@@ -336,6 +336,6 @@ into a first-class option behind the Agentic Framework.
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Xozence Labs*
 *Repo: `rasaha/symbolu` · Modules: `symbolu/phase_transformer.py`, `train_hybrid_7b.py`, `symbolu_training/training/unified/mistral_hybrid_wrapper.py`, `symbolu/inference/`*
 *Architecture ref: `docs/HYBRID_PHASE_QUAD_ARCHITECTURE.md` · Training CLI: `docs/TRAIN_HYBRID_7B.md` · Inference status: `docs/INFERENCE_HYBRID_TRANSFORMER_GAPS.md` · Mechanism report: `docs/PHASE_ATTENTION_PAPER.md`*
