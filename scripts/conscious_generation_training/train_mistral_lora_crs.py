@@ -62,6 +62,18 @@ def gpu_available() -> bool:
         return False
 
 
+_TRAIN_DEPS = ("transformers", "peft", "trl", "datasets", "accelerate", "bitsandbytes")
+
+
+def missing_training_deps() -> list:
+    import importlib.util
+    return [m for m in _TRAIN_DEPS if importlib.util.find_spec(m) is None]
+
+
+_INSTALL_HINT = ("pip install -r requirements-cg-training.txt   "
+                 "# (after scripts/setup_runpod_phase2b.sh; do NOT reinstall torch)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="C×R×S LoRA SFT on Mistral (T1).")
     ap.add_argument("--data-dir", default="runs/cg_training/crs_sft")
@@ -87,6 +99,12 @@ def main(argv=None):
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         (Path(args.output_dir) / "train_plan.json").write_text(json.dumps(plan, indent=2))
         return 0
+
+    missing = missing_training_deps()
+    if missing:                                           # clean stop, not a traceback mid-run
+        print(f"CG_TRAINING_ENV_UNAVAILABLE: missing training deps {missing}")
+        print(f"  fix: {_INSTALL_HINT}")
+        return 1
 
     # ---- real training path (pod only) ----
     import torch  # noqa: F401

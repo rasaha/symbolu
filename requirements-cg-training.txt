@@ -1,0 +1,8 @@
+# CG T1 training stack (LoRA/QLoRA SFT on Mistral) — pod, on top of the existing cu121 torch 2.4.1.
+# Install AFTER the base stack (scripts/setup_runpod_phase2b.sh). Do NOT reinstall torch here.
+# trl is pinned <0.11 to match the SFTTrainer(dataset_text_field=..., max_seq_length=...) call.
+peft>=0.11,<0.14
+trl>=0.9,<0.11
+bitsandbytes>=0.43
+datasets>=2.19
+accelerate>=0.30
