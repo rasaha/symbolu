@@ -73,6 +73,40 @@ def _match_of(crs_match: dict, domains, *, scenario_id: str, role: str) -> float
     return max(out)
 
 
+def referenced_domains(scenario: dict) -> list:
+    """All domains a scenario's C×R×S features touch (for real-engine MATCH computation)."""
+    ds = list(scenario.get("intended_domains", [])) + list(scenario.get("secondary_domains", [])) \
+        + list(scenario.get("rejected_domains", []))
+    for k in ("tool_domain", "action_domain", "requested_domain"):
+        if scenario.get(k):
+            ds.append(scenario[k])
+    seen, out = set(), []
+    for d in ds:
+        if d not in seen:
+            seen.add(d); out.append(d)
+    return out
+
+
+def build_semantic_adapter(semantic_backend="real"):
+    """Build the production C×R×S semantic adapter. Returns (adapter_or_None, info). adapter is None when
+    the embedding backend is unavailable (e.g. no sentence-transformers/torch) — never faked."""
+    _CSR = Path(__file__).resolve().parent.parent / "cg_wrapper_ablation"
+    if str(_CSR) not in sys.path:
+        sys.path.insert(0, str(_CSR))
+    from csr_match_filter import eval_match_filter as EV          # noqa: E402
+    adapter, info = EV.make_adapter(semantic_backend, None, {})
+    return adapter, info
+
+
+def real_crs_match(term: str, domains, adapter) -> dict:
+    """crs_match[domain] = MATCH(term, domain) from the PRODUCTION engine (match.py, C×R×S). No authoring."""
+    _CSR = Path(__file__).resolve().parent.parent / "cg_wrapper_ablation"
+    if str(_CSR) not in sys.path:
+        sys.path.insert(0, str(_CSR))
+    from csr_match_filter.match import score_match                # noqa: E402
+    return {d: float(score_match(term, d, adapter).match) for d in domains}
+
+
 def compute_features(scenario: dict, thresholds=None) -> CRSAgentFeatures:
     """C×R×S features from declared domains + their offline MATCH annotations. FAILS LOUD on missing
     domain metadata. Uses only frame-MATCH quantities — no Bhava/Guna/Vritti/Kosha/hidden state/answer."""
@@ -269,10 +303,32 @@ def decide(*, delta, ci_excl_zero, unsafe_dec, wrong_dec, fb_increase, fe_increa
     return "AGENTIC_CRS_NO_INCREMENTAL_VALUE", reasons
 
 
-def run(scenarios, *, thresholds=None, seed=0) -> dict:
+def run(scenarios, *, thresholds=None, seed=0, crs_source="annotated", semantic_backend="real") -> dict:
     if not scenarios:
-        return {"decision": "AGENTIC_CRS_DATASET_UNAVAILABLE", "n": 0}
+        return {"decision": "AGENTIC_CRS_DATASET_UNAVAILABLE", "n": 0,
+                "provenance": {"crs_feature_source": crs_source, "reason": "no scenarios"}}
     th = {**DEFAULT_THRESHOLDS, **(thresholds or {})}
+
+    # ---- feature provenance: REAL engine vs hand-authored annotations -----------------------------
+    if crs_source == "real":
+        adapter, info = build_semantic_adapter(semantic_backend)
+        match_available = adapter is not None
+        provenance = {"crs_feature_source": "real_csr_match_filter",
+                      "semantic_backend": info, "match_available": match_available}
+        if not match_available:
+            # do NOT silently fall back to hand-authored scores for a real/validation run
+            return {"decision": "AGENTIC_CRS_DATASET_UNAVAILABLE", "n": len(scenarios),
+                    "provenance": provenance,
+                    "decision_reasons": {"reason": "real C×R×S features unavailable — no semantic "
+                                         "embedding backend (needs sentence-transformers/torch); "
+                                         "refusing to fall back to hand-authored MATCH scores"}}
+        scenarios = [dict(s, crs_match=real_crs_match(s["term"], referenced_domains(s), adapter))
+                     for s in scenarios]
+    else:
+        provenance = {"crs_feature_source": "annotated_handauthored",
+                      "semantic_backend": "none (annotations)", "match_available": True,
+                      "note": "hand-authored MATCH annotations — smoke/unit-test only, NOT validation"}
+
     overlap = leakage_check(scenarios)
 
     truth, base_pred, cand_pred, feats = [], [], [], []
@@ -325,6 +381,7 @@ def run(scenarios, *, thresholds=None, seed=0) -> dict:
         "false_block_increase": round(fb_inc, 4), "false_escalation_increase": round(fe_inc, 4),
         "slice_report": slice_report, "slices_improved": slices_improved,
         "leakage_overlap": overlap, "decision_agreement": base_pred == cand_pred,
+        "provenance": provenance,
         "decision": decision, "decision_reasons": reasons,
     }
 
@@ -334,11 +391,14 @@ def run(scenarios, *, thresholds=None, seed=0) -> dict:
 # ================================================================================================ #
 def to_markdown(rep) -> str:
     if rep.get("decision") == "AGENTIC_CRS_DATASET_UNAVAILABLE":
-        return "# Agentic C×R×S signal — DATASET UNAVAILABLE\n"
+        pv = rep.get("provenance", {})
+        return ("# Agentic C×R×S signal — `AGENTIC_CRS_DATASET_UNAVAILABLE`\n\n"
+                f"- provenance: `{pv}`\n- reason: {rep.get('decision_reasons', {}).get('reason', '')}\n")
     b, c = rep["baseline"], rep["candidate"]
     d = rep["delta_macro_f1"]
     L = ["# Agentic C×R×S Semantic-Frame Governance Signal — baseline vs candidate", "",
          f"- scenarios: **{rep['n']}**  ·  unsafe/non-ALLOW targets: **{rep['n_positive_unsafe']}**",
+         f"- provenance: `{rep.get('provenance', {})}`",
          f"- **DECISION: `{rep['decision']}`**", "",
          "| metric | baseline | candidate |", "|---|---|---|",
          f"| macro-F1 | {b['macro_f1']} | **{c['macro_f1']}** |",
@@ -372,14 +432,21 @@ def main(argv=None):
     ap.add_argument("--data", required=True, help="scenarios JSON (list or {scenarios:[...]})")
     ap.add_argument("--out", default="runs/agentic_crs_signal/agentic_crs_signal_eval.json")
     ap.add_argument("--report", default="runs/agentic_crs_signal/agentic_crs_signal_eval.md")
+    ap.add_argument("--crs-source", choices=("annotated", "real"), default="annotated",
+                    help="'real' = compute features from the production csr_match_filter engine "
+                         "(needs embeddings); 'annotated' = hand-authored MATCH (smoke/tests only)")
+    ap.add_argument("--semantic-backend", default="real")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args(argv)
 
     scenarios = load_scenarios(args.data)
-    rep = run(scenarios, seed=args.seed)
+    rep = run(scenarios, seed=args.seed, crs_source=args.crs_source,
+              semantic_backend=args.semantic_backend)
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(rep, indent=2), encoding="utf-8")
     Path(args.report).write_text(to_markdown(rep), encoding="utf-8")
+    print(f"crs_source={rep.get('provenance', {}).get('crs_feature_source')} "
+          f"match_available={rep.get('provenance', {}).get('match_available')}")
     print(f"n={rep.get('n')} baseline_f1={rep.get('baseline', {}).get('macro_f1')} "
           f"candidate_f1={rep.get('candidate', {}).get('macro_f1')}")
     print(f"DECISION: {rep['decision']}")

@@ -185,3 +185,24 @@ def test_no_runtime_modules_imported():
     bad = [m for m in sys.modules if "mcp_gateway" in m or m.endswith("agent_builder")
            or "agentic.agentic_framework" in m]
     assert bad == []
+
+
+# ---- real C×R×S feature source (provenance + no silent fallback) ---------------------------------
+def test_real_source_unavailable_is_dataset_unavailable(monkeypatch):
+    monkeypatch.setattr(H, "build_semantic_adapter", lambda sb="real": (None, "no-embed-backend"))
+    rep = H.run(_adds_signal_corpus(), seed=0, crs_source="real")
+    assert rep["decision"] == "AGENTIC_CRS_DATASET_UNAVAILABLE"
+    assert rep["provenance"]["crs_feature_source"] == "real_csr_match_filter"
+    assert rep["provenance"]["match_available"] is False           # never falls back to authored scores
+
+
+def test_real_source_available_uses_engine(monkeypatch):
+    # force a "real" adapter and a stub engine; check provenance reflects the real source and it scores
+    monkeypatch.setattr(H, "build_semantic_adapter", lambda sb="real": (object(), "fake-real-backend"))
+    monkeypatch.setattr(H, "real_crs_match",
+                        lambda term, domains, adapter: {"D_int": 0.85, "D_sec": 0.05, "D_rej": 0.0,
+                                                        "D_tool": 0.85})
+    rep = H.run([scen("x", "benign_control", risk="read_only")], seed=0, crs_source="real")
+    assert rep["provenance"]["crs_feature_source"] == "real_csr_match_filter"
+    assert rep["provenance"]["match_available"] is True
+    assert rep["decision"] != "AGENTIC_CRS_DATASET_UNAVAILABLE"
