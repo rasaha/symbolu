@@ -137,32 +137,27 @@ def read(phonemes):
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
     out = {"sequence": ann, "n_consonants": len(cons)}
-    if len(cons) == 2:
-        c1, c2 = cons
-        c1["role"], c2["role"] = "forward (+)", "reactive (−)"
-        out["rule"] = "R1+R2 (two-consonant)"
-        out["essence"] = (
-            f"«{c1['data']['iast']}» {_verb(c1['polarity'])} {c1['data']['leading_vritti']} and projects it "
-            f"FORWARD → «{c2['data']['iast']}» {_verb(c2['polarity'])} {c2['data']['leading_vritti']}, "
-            f"rebounding (reactive) on the first.")
-        s1 = ("+" if c1["polarity"] == "created" else "−") + _short(c1["data"]["leading_vritti"])
-        s2 = ("+" if c2["polarity"] == "created" else "−") + _short(c2["data"]["leading_vritti"])
-        out["essence_short"] = f"{s1} (fwd) → {s2} (reactive)"
-        out["counter_reading"] = (f"Liberation pole: {c1['data']['counter_vritti']} → "
-                                  f"{c2['data']['counter_vritti']}")
-    elif len(cons) == 1:
-        c1 = cons[0]; c1["role"] = "—"
+    if not cons:
+        out.update(rule="none", essence="(no lexicon consonants)", essence_short="")
+        return out
+    if len(cons) == 1:
+        c = cons[0]; c["role"] = "—"
         out["rule"] = "R1 (single consonant)"
-        out["essence"] = f"«{c1['data']['iast']}» {_verb(c1['polarity'])} {c1['data']['leading_vritti']}."
-        out["essence_short"] = ("+" if c1["polarity"] == "created" else "−") + _short(c1["data"]["leading_vritti"])
-        out["counter_reading"] = f"Liberation pole: {c1['data']['counter_vritti']}"
-    else:
-        for c in cons:
-            c["role"] = "chain"
-        out["rule"] = "R1 chain (>2 consonants — give me your >2 POSITION rule to finalize R2)"
-        parts = [(("+" if c["polarity"] == "created" else "−") + _short(c["data"]["leading_vritti"])) for c in cons]
-        out["essence"] = "PROVISIONAL chain: " + " → ".join(parts)
-        out["essence_short"] = " → ".join(parts)
+        out["essence"] = f"«{c['data']['iast']}» {_verb(c['polarity'])} {c['data']['leading_vritti']}."
+        out["essence_short"] = ("+" if c["polarity"] == "created" else "−") + _short(c["data"]["leading_vritti"])
+        out["counter_reading"] = f"Liberation pole: {c['data']['counter_vritti']}"
+        return out
+    # n>=2: pairwise CHAIN (R2 extended) — first=forward, last=reactive, middle=both; R1 polarity per cons
+    n = len(cons)
+    for i, c in enumerate(cons):
+        c["role"] = "forward (+)" if i == 0 else ("reactive (−)" if i == n - 1 else "link (−/+)")
+    out["rule"] = f"R1+R2 chain ({n} consonants)"
+    out["essence"] = " → ".join(
+        f"«{c['data']['iast']}» {_verb(c['polarity'])} {c['data']['leading_vritti']} [{c['role']}]"
+        for c in cons)
+    out["essence_short"] = " → ".join(
+        (("+" if c["polarity"] == "created" else "−") + _short(c["data"]["leading_vritti"])) for c in cons)
+    out["counter_reading"] = "Liberation chain: " + " → ".join(_short(c["data"]["counter_vritti"]) for c in cons)
     return out
 
 
