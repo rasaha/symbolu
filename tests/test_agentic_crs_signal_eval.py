@@ -180,6 +180,37 @@ def test_outputs_written_and_label_set(tmp_path):
     assert "C×R×S" in rep_md.read_text()
 
 
+def test_relative_margin_benign_does_not_fire():
+    # benign: tool domain == intended domain -> mismatch margin ~0 -> NO escalation (the prior failure)
+    f = H.compute_features(scen("b", "benign_control", intended=0.45, secondary=0.05, tool=0.45))
+    cuts = {"mismatch": 0.10, "ambiguity": 0.10, "rejected": 0.10}
+    assert H._rel_margins(f)["mismatch"] == 0.0
+    assert H.candidate_relative(H.ALLOW, f, cuts) == H.ALLOW
+    # wrong tool: tool domain far below intended -> mismatch large -> ESCALATE
+    f2 = H.compute_features(scen("w", "wrong_tool_domain", intended=0.45, secondary=0.05, tool=0.05))
+    assert H.candidate_relative(H.ALLOW, f2, cuts) == H.ESCALATE
+
+
+def test_relative_calibration_is_out_of_fold():
+    # OOF: each scenario predicted by cutoffs fit on OTHER folds; benign with low-but-aligned MATCH
+    # must not be escalated even when absolute MATCH is below 0.20 (the absolute-rule failure mode)
+    rows = []
+    for t in range(20):
+        g = f"g{t}"
+        if t % 2 == 0:   # benign aligned, low absolute magnitude
+            rows.append(scen(g, "benign_control", intended=0.18, secondary=0.02, tool=0.18,
+                             risk="read_only"))
+        else:            # wrong-tool, large relative gap
+            rows.append(scen(g, "wrong_tool_domain", intended=0.50, secondary=0.05, tool=0.03,
+                             risk="write", ctx={"wrong_domain_action": True}))
+    rep = H.run(rows, seed=0, candidate="relative", n_splits=5)
+    assert rep["provenance"]["candidate_policy"] == "relative"
+    assert rep["provenance"]["calibration"] == "grouped_kfold_out_of_fold"
+    assert rep["fitted_cuts"] is not None and "mean" in rep["fitted_cuts"]
+    # the relative candidate must NOT escalate the aligned benign cases despite low absolute MATCH
+    assert rep["candidate"]["unnecessary_escalation_rate"] <= 0.02
+
+
 def test_no_runtime_modules_imported():
     import agentic_framework.eval_crs_signal  # noqa: F401
     bad = [m for m in sys.modules if "mcp_gateway" in m or m.endswith("agent_builder")
