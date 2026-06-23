@@ -28,6 +28,9 @@ EVAL_SET = [
     {"query": "Compare the tradeoffs of microservices vs a monolith.", "expected_level": "vijnanamaya"},
     {"query": "I feel overwhelmed and nervous about this diagnosis.", "expected_level": "manomaya"},
     {"query": "Tie together the big picture principle behind these results.", "expected_level": "anandamaya"},
+    # K1.1 mixed-cue cases (primary level by intent; selector also emits a secondary):
+    {"query": "How do I set up backups step by step, and should I bother?", "expected_level": "pranamaya"},
+    {"query": "Synthesize the big picture and compare the options.", "expected_level": "anandamaya"},
 ]
 
 
@@ -38,7 +41,9 @@ def run(eval_set=EVAL_SET) -> dict:
         ok = sel.level.value == ex["expected_level"]
         correct += int(ok)
         rows.append({"query": ex["query"], "expected": ex["expected_level"],
-                     "predicted": sel.level.value, "confidence": sel.confidence, "ok": ok,
+                     "predicted": sel.level.value,
+                     "secondary": sel.secondary_level.value if sel.secondary_level else None,
+                     "confidence": sel.confidence, "ok": ok,
                      "high_stakes": sel.features["high_stakes"]})
     return {"n": len(eval_set), "accuracy": round(correct / len(eval_set), 4), "rows": rows,
             "note": "selector accuracy only; Kosha is NOT yet validated for answer-quality improvement"}
@@ -53,7 +58,8 @@ def main(argv=None):
     Path(args.out).write_text(json.dumps(rep, indent=2))
     print(f"selector accuracy={rep['accuracy']} (n={rep['n']})  [NOT a quality-improvement claim]")
     for r in rep["rows"]:
-        print(f"  {'OK ' if r['ok'] else 'MISS'} {r['predicted']:<12} (exp {r['expected']:<12}) {r['query']}")
+        sec = f" +{r['secondary']}" if r["secondary"] else ""
+        print(f"  {'OK ' if r['ok'] else 'MISS'} {r['predicted']:<12}{sec:<14} (exp {r['expected']:<12}) {r['query']}")
     return 0
 
 

@@ -37,15 +37,23 @@ steer *how deep* the answer should go — without changing *which semantic frame
 | `VIJNANAMAYA` | reasoning / discernment | compare alternatives, assumptions, tradeoffs |
 | `ANANDAMAYA` | synthesis / integration | high-level synthesis, unifying principle |
 
-## Selection (deterministic)
+## Selection (deterministic — K1.1 additive scoring)
 `select_kosha_depth(query, *, primary_domain, secondary_domains, rejected_domains, user_level_hint,
-task_type_hint)` → `KoshaSelection{level, confidence, reason, prompt_modifier, features}`.
+task_type_hint)` → `KoshaSelection{level, secondary_level, confidence, reason, prompt_modifier, features}`.
 
-- **Precedence:** explicit `user_level_hint` > `task_type_hint` > query cues.
-- **Cue conflicts:** `VIJNANAMAYA > PRANAMAYA > MANOMAYA > ANANDAMAYA > ANNAMAYA`.
+- **Score-first, precedence-second (K1.1):** `score[level] = Σ cue_weight + hint_bonus + high_stakes_bonus`
+  (pre-registered weights: cue 0.30, strong-cue 0.45, high-stakes +0.10 to VIJNANAMAYA, hint dominates).
+  The winner is `argmax(score)`; the cue-conflict precedence
+  `VIJNANAMAYA > PRANAMAYA > MANOMAYA > ANANDAMAYA > ANNAMAYA` is only an **exact-tie tie-breaker**.
+- **Secondary level + blend:** the second-highest level becomes `secondary_level` if its score ≥ 0.35; a
+  **blended** modifier ("…address the concern first … Then also explain the reasoning…") is emitted when
+  primary ≥ 0.60 with a qualifying secondary, or the top−second margin < 0.30. This handles mixed-cue
+  queries (e.g. *"I feel overwhelmed and nervous about this diagnosis"* → MANOMAYA primary + VIJNANAMAYA
+  secondary) instead of letting one cue win. See `docs/KOSHA_SELECTOR_K1_1_PREREG.md`.
+- **Overrides:** explicit `user_level_hint` (→ that level) > `task_type_hint` (+0.50) > additive cue scores.
 - **Simplicity override:** an explicit "simple / 5th grade / brief / ELI5" request **forces `ANNAMAYA`**
   *unless* the query is high-stakes.
-- **Default:** no strong cue → `ANNAMAYA` (surface), low confidence (0.4).
+- **Default:** no cue → `ANNAMAYA` (surface), low confidence (0.4).
 - **Safety boundary:** if medical / legal / financial / high-stakes terms are detected, the prompt modifier
   appends *"Be cautious, state limits, avoid unsupported certainty, and preserve factual grounding,"* and
   the simplicity-override is suppressed (do not force a shallow answer on a high-stakes query). This is a
@@ -101,10 +109,12 @@ Compare microservices vs a monolith.
 Disabled: `{ "kosha": { "enabled": false } }`.
 
 ## Validation status
-- **Implemented · optional · disabled by default.**
-- The deterministic **selector** scores 0.9 on a 10-item labelled set
-  (`scripts/conscious_generation/eval_kosha_inference.py`) — but **selector accuracy ≠ answer-quality
-  improvement.**
+- **Implemented · optional · disabled by default.** Selector logic at **K1.1** (additive scoring +
+  secondary level; `docs/KOSHA_SELECTOR_K1_1_PREREG.md`).
+- The deterministic **selector** scores 1.0 on a **12-item** labelled set
+  (`scripts/conscious_generation/eval_kosha_inference.py`) — **but this is a tiny author-labelled sanity
+  check, NOT validation, and selector accuracy ≠ answer-quality improvement.** The weights are
+  pre-registered by tier (not tuned against the set); do not read 1.0 as a quality claim.
 - **Kosha is NOT yet validated as a quality-improving signal.** Whether the depth modifier actually
   improves answers (clarity/usefulness/appropriateness) **without** regressing C×R×S frame correctness,
   rejected-domain avoidance, or factuality requires a separate generation eval (four-arm style, same

@@ -107,3 +107,38 @@ def test_default_when_no_cue():
     sel = K.select_kosha_depth("The doctor walked into the room.")
     assert sel.level == K.KoshaLevel.ANNAMAYA and sel.features["source"] == "default"
     assert sel.confidence == 0.4
+
+
+# ---- K1.1 additive scoring: mixed emotional + diagnosis -> MANOMAYA primary, VIJNANAMAYA secondary --
+def test_additive_blended_emotional_plus_diagnosis():
+    sel = K.select_kosha_depth("I feel overwhelmed and nervous about this diagnosis.")
+    assert sel.level == K.KoshaLevel.MANOMAYA              # emotional cues outweigh the single reasoning cue
+    assert sel.secondary_level == K.KoshaLevel.VIJNANAMAYA
+    assert sel.features["blended"] is True
+    # blended modifier addresses concern first, then reasoning support, then caution (high-stakes diagnosis)
+    assert "context/intent level" in sel.prompt_modifier
+    assert "reasoning and tradeoffs" in sel.prompt_modifier
+    assert "Be cautious" in sel.prompt_modifier
+    assert sel.features["high_stakes"] is True
+
+
+def test_single_cue_has_no_secondary():
+    sel = K.select_kosha_depth("Compare the tradeoffs of A vs B.")
+    assert sel.level == K.KoshaLevel.VIJNANAMAYA and sel.secondary_level is None
+    assert "Then also" not in sel.prompt_modifier
+
+
+def test_scores_exposed_and_precedence_tiebreak():
+    sel = K.select_kosha_depth("I feel overwhelmed and nervous about this diagnosis.")
+    s = sel.features["scores"]
+    assert s["manomaya"] > s["vijnanamaya"] > 0           # additive scores drive the decision
+    # exact-tie tie-break falls back to precedence (VIJNANAMAYA outranks MANOMAYA on equal scores)
+    tie = K.select_kosha_depth("worried compare")          # 1 manomaya + 1 vijnanamaya strong cue each
+    assert tie.level in (K.KoshaLevel.VIJNANAMAYA, K.KoshaLevel.MANOMAYA)
+
+
+def test_secondary_level_in_trace():
+    sel = K.select_kosha_depth("I feel overwhelmed and nervous about this diagnosis.")
+    tr = K.kosha_trace(sel, enabled=True)
+    assert tr["secondary_level"] == "vijnanamaya"
+    assert K.kosha_trace(K.select_kosha_depth("Compare A and B."), enabled=True)["secondary_level"] is None
