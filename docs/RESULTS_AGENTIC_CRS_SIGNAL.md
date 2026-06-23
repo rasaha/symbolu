@@ -78,6 +78,36 @@ split and frozen before scoring** — plus, for real product relevance, **extend
 registry** beyond its 23 word-sense domains to cover agentic tool domains (calendar, email, devops,
 payments, …), each needing a 12-D template. Both are scoping costs, not wiring details.
 
+## 7b. Relative-margin follow-up + a gate-enforcement correction (IMPORTANT)
+The calibrated relative-margin candidate (`docs/AGENTIC_CRS_RELATIVE_MARGIN_PREREG.md`,
+`--candidate relative`, held-out k-fold) was run on the same real-engine benchmark. The harness **initially
+printed `AGENTIC_CRS_ADDS_SIGNAL`** (macro-F1 0.357→0.648, ΔF1 +0.291 [0.143, 0.432], false-escalation
+0.0). **That green label was wrong** — caught by reading the per-slice table:
+
+| metric | baseline | candidate (relative) |
+|---|---|---|
+| macro-F1 | 0.357 | 0.648 |
+| unsafe_allow | 30 | 7 | 
+| wrong_tool_call | 20 | 1 |
+| unnecessary_escalation_rate | 0.0 | **0.0** (escalation over-fire FIXED) |
+| **unnecessary_clarification_rate** | 0.0 | **0.35** (over-fire MOVED here) |
+| benign_control slice F1 | 1.0 | **0.41 (regressed)** |
+| low_risk_action slice F1 | 1.0 | **0.375 (regressed)** |
+
+**Root cause (harness bug, now fixed):** the automated `decide()` only guarded false **blocks** and
+**escalations** — it did **not** count false **clarifications** nor enforce pre-reg §5 clause 6 ("no
+benign/low-risk slice regressing"). The relative margin fixed the escalation over-fire but **moved** the
+benign over-firing into `ASK_CLARIFICATION`, and benign/low-risk slices regressed — which the gate is
+supposed to forbid. We **tightened the gate to faithfully implement the pre-registration** (false
+clarification now counts as benign over-firing; benign/low-risk regression now fails). This is a
+*stricter* correction (it makes the candidate fail) — not a retune.
+
+**Corrected verdict: `AGENTIC_CRS_INCREASES_FALSE_BLOCKS`.** The relative margin genuinely fixed the
+*escalation* over-fire and kept strong signal on `wrong_tool_domain` (F1 1.0), but it **trades benign
+correctness for clarifications** (benign/low-risk F1 collapse; false-clarification +0.35 ≫ +0.02). It does
+**NOT** pass the gate. C×R×S stays out of agent runtime; no retune. A third attempt (e.g. a margin that
+also protects benign clarification) is a **third pre-registration**.
+
 ## 7. Standing claim (unchanged)
 C×R×S has an offline Agentic-Framework governance-validation harness with a real-engine feature path; on
 the first real independent run it showed **ranking signal but failed the gate on false escalations** with

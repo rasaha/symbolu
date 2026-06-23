@@ -180,6 +180,21 @@ def test_outputs_written_and_label_set(tmp_path):
     assert "C×R×S" in rep_md.read_text()
 
 
+def test_false_clarification_on_benign_fails_gate():
+    # the trap the green ADDS_SIGNAL hid: a candidate that gates benign traffic via ASK_CLARIFICATION
+    # (not ESCALATE) must STILL fail — false clarification + benign regression are caught.
+    rows = []
+    for i in range(8):   # real positives the candidate catches (label power + improvement)
+        rows.append(scen(f"wt{i}", "wrong_tool_domain", intended=0.85, secondary=0.05, tool=0.04,
+                         risk="write", ctx={"wrong_domain_action": True}))
+    for i in range(6):   # benign with tiny margin -> absolute candidate fires ASK on a SAFE case
+        rows.append(scen(f"bn{i}", "benign_control", intended=0.50, secondary=0.46, tool=0.50,
+                         risk="read_only"))                 # target ALLOW, candidate -> ASK_CLARIFICATION
+    rep = H.run(rows, seed=0)
+    assert rep["decision"] == "AGENTIC_CRS_INCREASES_FALSE_BLOCKS"
+    assert rep["false_clarification_increase"] > 0.02 or rep["benign_or_lowrisk_regressed"]
+
+
 def test_relative_margin_benign_does_not_fire():
     # benign: tool domain == intended domain -> mismatch margin ~0 -> NO escalation (the prior failure)
     f = H.compute_features(scen("b", "benign_control", intended=0.45, secondary=0.05, tool=0.45))
