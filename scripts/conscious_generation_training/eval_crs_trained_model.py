@@ -40,6 +40,12 @@ def _mean(vals):
     return round(sum(vals) / len(vals), 4) if vals else 0.0
 
 
+def _pd_list(pe):
+    """primary_domain may be a str or list; normalize to a list (avoids `list in set` TypeError)."""
+    pd = pe.get("primary_domain")
+    return pd if isinstance(pd, list) else ([pd] if pd else [])
+
+
 def aggregate(per_example: list, unseen_domains=None) -> dict:
     """per_example: [{"slice": str, "primary_domain": str|list, "scores": {arm: rubric_v2_dict},
                       "answer_len": {arm: int}}]. Returns {arm: {metric: value}} for the §11 gate."""
@@ -52,9 +58,7 @@ def aggregate(per_example: list, unseen_domains=None) -> dict:
         unseen_t = [pe["scores"][arm]["primary_frame_correct"]
                     for pe in rows if pe.get("slice") == "unseen_term"]
         unseen_d = [pe["scores"][arm]["primary_frame_correct"] for pe in rows
-                    if (pe.get("primary_domain") in unseen_domains
-                        or (isinstance(pe.get("primary_domain"), list)
-                            and any(d in unseen_domains for d in pe["primary_domain"])))]
+                    if any(d in unseen_domains for d in _pd_list(pe))]
         pf = _mean([r["primary_frame_correct"] for r in sc])
         out[arm] = {
             "primary_frame_correct": pf,
@@ -227,13 +231,19 @@ def main(argv=None):
     ap.add_argument("--dtype", choices=("bf16", "4bit"), default="bf16",
                     help="bf16 (faster, ~15GB; default for eval) or 4bit (slower, ~5GB)")
     ap.add_argument("--max-new-tokens", type=int, default=200)
+    ap.add_argument("--from-cache", default=None,
+                    help="re-score/decide from a saved per_example cache (skips GPU generation)")
     args = ap.parse_args(argv)
 
     test = Path(args.data_dir) / "test.jsonl"
     n_test = sum(1 for l in test.read_text().splitlines() if l.strip()) if test.exists() else 0
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
 
-    if not args.execute or not gpu_available():
+    cache_path = Path(args.out).parent / "per_example_cache.json"
+    if args.from_cache:                                   # re-aggregate from saved generations (no GPU)
+        blob = json.loads(Path(args.from_cache).read_text())
+        per, sem = blob["per_example"], blob.get("semantic_backend", "from_cache")
+    elif not args.execute or not gpu_available():
         rep = {"arms": ARMS, "metrics": list(METRICS), "decision_labels": list(DECISIONS),
                "n_test": n_test, "decision": "CG_TRAINING_ENV_UNAVAILABLE" if not gpu_available() else "dry_run",
                "note": "DRY-RUN: four-arm config + §11 gate wired; real generation needs a GPU pod."}
@@ -241,11 +251,14 @@ def main(argv=None):
         Path(args.report).write_text(to_markdown(rep))
         print(f"DECISION: {rep['decision']} (dry-run; wrote {args.out})")
         return 0
-    if n_test < 4:
-        print("CG_TRAINING_INSUFFICIENT_DATA"); return 1
-
-    per, sem = _generate_and_score(test, args.eval_data, args.base_model, args.lora,
-                                   max_new=args.max_new_tokens, dtype=args.dtype)
+    else:
+        if n_test < 4:
+            print("CG_TRAINING_INSUFFICIENT_DATA"); return 1
+        per, sem = _generate_and_score(test, args.eval_data, args.base_model, args.lora,
+                                       max_new=args.max_new_tokens, dtype=args.dtype)
+        # persist the expensive GPU output IMMEDIATELY so a downstream error never wastes it
+        cache_path.write_text(json.dumps({"per_example": per, "semantic_backend": sem}, indent=2))
+        print(f"[cached generations -> {cache_path}]")
     holdout = {}
     meta = Path(args.data_dir) / "meta.json"
     if meta.exists():
