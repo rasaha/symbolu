@@ -1,0 +1,1912 @@
+{
+  "_about": "depth-varied K2 query set; intended_depth = template intent (independent of the Kosha selector); all domains in the C\u00d7R\u00d7S registry. NO Guna/Vritti/Bhava.",
+  "n": 105,
+  "by_intended_depth": {
+    "annamaya": 30,
+    "pranamaya": 15,
+    "manomaya": 30,
+    "vijnanamaya": 15,
+    "anandamaya": 15
+  },
+  "by_slice": {
+    "annamaya": 15,
+    "pranamaya": 15,
+    "manomaya": 15,
+    "vijnanamaya": 15,
+    "anandamaya": 15,
+    "mixed": 15,
+    "negative_control": 15
+  },
+  "queries": [
+    {
+      "id": "doctor_annamaya",
+      "query": "What is a doctor? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "doctor_pranamaya",
+      "query": "How do I work with a doctor step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "doctor_manomaya",
+      "query": "I'm worried and confused about this doctor. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "doctor_vijnanamaya",
+      "query": "Compare the options for a doctor and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "doctor_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a doctor.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "doctor_mixed",
+      "query": "I feel overwhelmed about this doctor \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "doctor_negctrl",
+      "query": "Yesterday someone mentioned a doctor in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "doctor",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "care"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "medical"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_annamaya",
+      "query": "What is a vaccine? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_pranamaya",
+      "query": "How do I work with a vaccine step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_manomaya",
+      "query": "I'm worried and confused about this vaccine. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_vijnanamaya",
+      "query": "Compare the options for a vaccine and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a vaccine.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_mixed",
+      "query": "I feel overwhelmed about this vaccine \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "vaccine_negctrl",
+      "query": "Yesterday someone mentioned a vaccine in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "vaccine",
+      "primary_domain": "medicine",
+      "secondary_domains": [
+        "biology"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "immune"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_annamaya",
+      "query": "What is a lawsuit? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_pranamaya",
+      "query": "How do I work with a lawsuit step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_manomaya",
+      "query": "I'm worried and confused about this lawsuit. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_vijnanamaya",
+      "query": "Compare the options for a lawsuit and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a lawsuit.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_mixed",
+      "query": "I feel overwhelmed about this lawsuit \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "lawsuit_negctrl",
+      "query": "Yesterday someone mentioned a lawsuit in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "lawsuit",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "authority"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "legal"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_annamaya",
+      "query": "What is a contract? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_pranamaya",
+      "query": "How do I work with a contract step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_manomaya",
+      "query": "I'm worried and confused about this contract. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_vijnanamaya",
+      "query": "Compare the options for a contract and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a contract.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_mixed",
+      "query": "I feel overwhelmed about this contract \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "contract_negctrl",
+      "query": "Yesterday someone mentioned a contract in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "contract",
+      "primary_domain": "law",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "agreement"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_annamaya",
+      "query": "What is a mortgage? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_pranamaya",
+      "query": "How do I work with a mortgage step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_manomaya",
+      "query": "I'm worried and confused about this mortgage. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_vijnanamaya",
+      "query": "Compare the options for a mortgage and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a mortgage.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_mixed",
+      "query": "I feel overwhelmed about this mortgage \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "mortgage_negctrl",
+      "query": "Yesterday someone mentioned a mortgage in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "mortgage",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "loan"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_annamaya",
+      "query": "What is a budget? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_pranamaya",
+      "query": "How do I work with a budget step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_manomaya",
+      "query": "I'm worried and confused about this budget. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_vijnanamaya",
+      "query": "Compare the options for a budget and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a budget.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_mixed",
+      "query": "I feel overwhelmed about this budget \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "budget_negctrl",
+      "query": "Yesterday someone mentioned a budget in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "budget",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "money"
+      ],
+      "high_stakes": true
+    },
+    {
+      "id": "database_annamaya",
+      "query": "What is a database? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "database_pranamaya",
+      "query": "How do I work with a database step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "database_manomaya",
+      "query": "I'm worried and confused about this database. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "database_vijnanamaya",
+      "query": "Compare the options for a database and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "database_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a database.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "database_mixed",
+      "query": "I feel overwhelmed about this database \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "database_negctrl",
+      "query": "Yesterday someone mentioned a database in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "database",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "programming"
+      ],
+      "rejected_domains": [
+        "agriculture"
+      ],
+      "must_include": [
+        "data"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_annamaya",
+      "query": "What is a firewall? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_pranamaya",
+      "query": "How do I work with a firewall step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_manomaya",
+      "query": "I'm worried and confused about this firewall. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_vijnanamaya",
+      "query": "Compare the options for a firewall and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a firewall.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_mixed",
+      "query": "I feel overwhelmed about this firewall \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "firewall_negctrl",
+      "query": "Yesterday someone mentioned a firewall in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "firewall",
+      "primary_domain": "security",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "fruit"
+      ],
+      "must_include": [
+        "network"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_annamaya",
+      "query": "What is a algorithm? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_pranamaya",
+      "query": "How do I work with a algorithm step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_manomaya",
+      "query": "I'm worried and confused about this algorithm. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_vijnanamaya",
+      "query": "Compare the options for a algorithm and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a algorithm.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_mixed",
+      "query": "I feel overwhelmed about this algorithm \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "algorithm_negctrl",
+      "query": "Yesterday someone mentioned a algorithm in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "algorithm",
+      "primary_domain": "programming",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "steps"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_annamaya",
+      "query": "What is a backup? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_pranamaya",
+      "query": "How do I work with a backup step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_manomaya",
+      "query": "I'm worried and confused about this backup. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_vijnanamaya",
+      "query": "Compare the options for a backup and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a backup.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_mixed",
+      "query": "I feel overwhelmed about this backup \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "backup_negctrl",
+      "query": "Yesterday someone mentioned a backup in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "backup",
+      "primary_domain": "technology",
+      "secondary_domains": [
+        "security"
+      ],
+      "rejected_domains": [
+        "nature"
+      ],
+      "must_include": [
+        "copy"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_annamaya",
+      "query": "What is a telescope? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_pranamaya",
+      "query": "How do I work with a telescope step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_manomaya",
+      "query": "I'm worried and confused about this telescope. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_vijnanamaya",
+      "query": "Compare the options for a telescope and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a telescope.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_mixed",
+      "query": "I feel overwhelmed about this telescope \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "telescope_negctrl",
+      "query": "Yesterday someone mentioned a telescope in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "telescope",
+      "primary_domain": "astronomy",
+      "secondary_domains": [
+        "technology"
+      ],
+      "rejected_domains": [
+        "commerce"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_annamaya",
+      "query": "What is a fertilizer? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_pranamaya",
+      "query": "How do I work with a fertilizer step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_manomaya",
+      "query": "I'm worried and confused about this fertilizer. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_vijnanamaya",
+      "query": "Compare the options for a fertilizer and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a fertilizer.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_mixed",
+      "query": "I feel overwhelmed about this fertilizer \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "fertilizer_negctrl",
+      "query": "Yesterday someone mentioned a fertilizer in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "fertilizer",
+      "primary_domain": "agriculture",
+      "secondary_domains": [
+        "chemistry"
+      ],
+      "rejected_domains": [
+        "law"
+      ],
+      "must_include": [
+        "soil"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_annamaya",
+      "query": "What is a photosynthesis? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_pranamaya",
+      "query": "How do I work with a photosynthesis step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_manomaya",
+      "query": "I'm worried and confused about this photosynthesis. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_vijnanamaya",
+      "query": "Compare the options for a photosynthesis and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a photosynthesis.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_mixed",
+      "query": "I feel overwhelmed about this photosynthesis \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "photosynthesis_negctrl",
+      "query": "Yesterday someone mentioned a photosynthesis in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "photosynthesis",
+      "primary_domain": "biology",
+      "secondary_domains": [
+        "education"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "light"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_annamaya",
+      "query": "What is a cathedral? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_pranamaya",
+      "query": "How do I work with a cathedral step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_manomaya",
+      "query": "I'm worried and confused about this cathedral. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_vijnanamaya",
+      "query": "Compare the options for a cathedral and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a cathedral.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_mixed",
+      "query": "I feel overwhelmed about this cathedral \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "cathedral_negctrl",
+      "query": "Yesterday someone mentioned a cathedral in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "cathedral",
+      "primary_domain": "religion",
+      "secondary_domains": [
+        "construction"
+      ],
+      "rejected_domains": [
+        "finance"
+      ],
+      "must_include": [
+        "building"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_annamaya",
+      "query": "What is a invoice? Explain it simply and briefly.",
+      "intended_depth": "annamaya",
+      "slice": "annamaya",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_pranamaya",
+      "query": "How do I work with a invoice step by step? Give me a checklist.",
+      "intended_depth": "pranamaya",
+      "slice": "pranamaya",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_manomaya",
+      "query": "I'm worried and confused about this invoice. Can you help me understand?",
+      "intended_depth": "manomaya",
+      "slice": "manomaya",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_vijnanamaya",
+      "query": "Compare the options for a invoice and explain the tradeoffs.",
+      "intended_depth": "vijnanamaya",
+      "slice": "vijnanamaya",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_anandamaya",
+      "query": "Synthesize the big picture and deeper meaning of a invoice.",
+      "intended_depth": "anandamaya",
+      "slice": "anandamaya",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_mixed",
+      "query": "I feel overwhelmed about this invoice \u2014 should I compare my options?",
+      "intended_depth": "manomaya",
+      "slice": "mixed",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    },
+    {
+      "id": "invoice_negctrl",
+      "query": "Yesterday someone mentioned a invoice in passing.",
+      "intended_depth": "annamaya",
+      "slice": "negative_control",
+      "term": "invoice",
+      "primary_domain": "finance",
+      "secondary_domains": [
+        "commerce"
+      ],
+      "rejected_domains": [
+        "medicine"
+      ],
+      "must_include": [
+        "bill"
+      ],
+      "high_stakes": false
+    }
+  ]
+}
