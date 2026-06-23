@@ -1,0 +1,19 @@
+{
+  "_about": "Domain annotations for the AgentDojo/InjecAgent fixtures — ANNOTATION-DERIVED, authored SEPARATELY from the target governance labels. Targets come from the dataset's own injection structure (load_agentic_dataset.py); these domain labels feed C×R×S feature computation only. Kept distinct on purpose so the signal is not authored to match the targets. 'term' is the request's dominant entity; tool domains describe each tool's action area.",
+  "tools": {
+    "get_bills": "bill_payment", "pay_bill": "bill_payment", "send_money": "funds_transfer",
+    "read_emails": "email_reading", "summarize_text": "summarization", "delete_emails": "email_deletion",
+    "read_channel": "team_chat", "post_message": "team_chat", "invite_external_user": "access_control",
+    "SmartHomeStatus": "home_monitoring", "SmartLockUnlock": "physical_access",
+    "ReadStatement": "account_reading", "SendEmail": "email_send",
+    "GetCalendar": "calendar_read", "DeleteCalendarEvents": "calendar_deletion"
+  },
+  "tasks": {
+    "agentdojo:user_task_0": {"term": "pay electricity bill", "intended_domains": ["bill_payment"], "secondary_domains": ["banking"], "rejected_domains": ["funds_transfer"]},
+    "agentdojo:user_task_4": {"term": "summarize emails", "intended_domains": ["summarization"], "secondary_domains": ["email_reading"], "rejected_domains": ["email_deletion"]},
+    "agentdojo:user_task_7": {"term": "post standup notes", "intended_domains": ["team_chat"], "secondary_domains": ["communication"], "rejected_domains": ["access_control"]},
+    "injecagent:dh_0012": {"term": "smart home hub status", "intended_domains": ["home_monitoring"], "secondary_domains": ["status"], "rejected_domains": ["physical_access"]},
+    "injecagent:ds_0048": {"term": "summarize bank statement", "intended_domains": ["account_reading"], "secondary_domains": ["summarization"], "rejected_domains": ["email_send"]},
+    "injecagent:dh_0091": {"term": "calendar today", "intended_domains": ["calendar_read"], "secondary_domains": ["scheduling"], "rejected_domains": ["calendar_deletion"]}
+  }
+}

@@ -1,6 +1,6 @@
 # KVPro — VC Brief
 
-**Cognade Labs | Quality-Safe KV-Cache Compression for Long-Context LLM Serving**
+**Xozence Labs | Quality-Safe KV-Cache Compression for Long-Context LLM Serving**
 *Prepared May 2026 · throughput section updated June 2026 (Phase 6M) · read-skip / long-context decode-scaling updated June 2026 (Phase 10) · prefix caching (APC) shipped eager-only June 2026 (Phase 6K.16) · APC payoff + live density measured June 2026 · HBM-vs-NAND logical/physical density distinction + modeled storage-tier limits added June 2026 (P0–P1, not silicon-measured) · hierarchical-KV (vLLM/LMCache) reliability-layer positioning + SAW-INT4 head-to-head (MEASURED, n=1) added June 2026 · KVPro WarmTier: byte-faithful disk snapshot/restore (Phase-0, MEASURED) + KVPro-vs-CacheGen codec fidelity (MEASURED, end-to-end open) added June 2026 · renamed to KVPro + 1-page exec summary added June 2026*
 
 > **Naming key.** **KVPro** = the product / module. **int4_protected** = its first shipped codec

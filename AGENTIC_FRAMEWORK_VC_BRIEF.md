@@ -1,6 +1,6 @@
 # Agentic Framework — VC Brief
 
-**Cognade Labs | Governed Runtime for Autonomous AI Agents**
+**Xozence Labs | Governed Runtime for Autonomous AI Agents**
 *Version 1.10.0 — Updated June 2026 (external / evidence-based)*
 
 > **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
@@ -363,6 +363,6 @@ its place on held-out benchmarks) — not the thing the company rests on.
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Xozence Labs*
 *Repo: `rasaha/symbolu` · Module: `agentic/agentic_framework/`*
 *v1.10.0 · 1,550+ internal tests · 2 internal pilots · live-adapter validated · raw-entropy escalation validated end-to-end*

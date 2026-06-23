@@ -1,6 +1,6 @@
 # Autonomous Robotics — VC Brief
 
-**Cognade Labs | BCVF Autonomy Runtime — Trust-Weighted Predictor Consensus for Safety-Critical Robotics**
+**Xozence Labs | BCVF Autonomy Runtime — Trust-Weighted Predictor Consensus for Safety-Critical Robotics**
 *Version 0.1 — Prepared April 2026*
 
 ---
@@ -413,7 +413,7 @@ BCVF Autonomy Runtime a defensible position in that window.
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Xozence Labs*
 *Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
 *v0.1 · 166 internal tests · autonomy-validated at sign-test p<0.01 (N=21)*
 
