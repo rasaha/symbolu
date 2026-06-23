@@ -274,7 +274,7 @@ New `deploy/local-shadow/`:
 - `artifacts/cloud_controller_real_validation/`: Track-B report (md + raw
   JSON/CSV, REAL); Track-A live-report template + integration-test output (live
   numbers PENDING).
-- Update `docs/COGNADE_PITCHBOOK.md` + `docs/CLOUD_SCALING_CONTROLLER_VC_BRIEF.md`:
+- Update `docs/XOZENCE_PITCHBOOK.md` + `docs/CLOUD_SCALING_CONTROLLER_VC_BRIEF.md`:
   replace the bare "19 scenarios" claim with the explicit **maturity ladder**,
   every number labeled `simulated / real-trace-replay / live-shadow-self-run /
   third-party`.

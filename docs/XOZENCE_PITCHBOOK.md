@@ -1,13 +1,13 @@
-# Cognade Labs — Platform Overview
+# Xozence Labs — Platform Overview
 
 **AI Infrastructure Platform | Five Modules | Prepared April 2026**
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Xozence Labs*
 
 ---
 
 ## Executive Summary
 
-Cognade Labs is building an **AI infrastructure platform** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
+Xozence Labs is building an **AI infrastructure platform** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
 
 Our thesis is that the next wave of value in AI infrastructure comes not from bigger models or faster hardware, but from **smarter decisions at the seams** — where an autoscaler decides whether to scale, where an inference engine decides which cache block to evict, where an agent decides whether to execute a tool call, and where a language model decides which token to emit next. Each of those seams is currently handled by a shallow heuristic, a single-signal policy, or no policy at all. We build the multi-signal, feedback-aware, governance-ready layers that fill those gaps.
 
@@ -276,7 +276,7 @@ This isn't a research prototype. It's been staged, tested, and written to be dep
 
 We are the **decision-quality layer** for cloud autoscaling — the missing piece between "what's happening" and "what should we do about it." The product is validated, production-grade, and genuinely easy to try today: shadow mode has zero write permissions and auto-generates proof-of-value reports, which means any platform team can turn it on, watch for two weeks, and see exactly what it would have saved them without taking on any risk.
 
-The near-term path is Stage 5 (active mode), first design-partner deployments, and the learning loop that turns every customer into a self-improving control surface. This module is one of Cognade's most commercially ready wedges.
+The near-term path is Stage 5 (active mode), first design-partner deployments, and the learning loop that turns every customer into a self-improving control surface. This module is one of Xozence's most commercially ready wedges.
 
 > *"Scale because it works, not because the metrics say so."*
 
@@ -838,7 +838,7 @@ benchmarks. An external benchmark is planned (see roadmap).
   boundary
 - First-party retrieval adapter with coherence-scored provenance
 - Phase Quad LLM integration as a first-class CG adapter, enabling
-  signal-enriched governance by default for Cognade customers
+  signal-enriched governance by default for Xozence customers
 
 **Quarter 4 — Scale and certification**
 - Begin SOC 2 Type II process on the managed runtime
@@ -1487,7 +1487,7 @@ accelerators for this work.
 
 ## How the Platform Composes
 
-Cognade Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others:
+Xozence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -1528,7 +1528,7 @@ Each module is independently deployable and independently valuable. Initial comm
 | **Conscious Generation LLM** | Research-stage (phase adapter live) | Benchmark validation; adapter maturation for Agentic Framework |
 | **Hybrid LLM** | Research-stage (training stack built) | External benchmarks (LRA, retrieval); 7B training run |
 
-## Why Cognade for This Accelerator
+## Why Xozence for This Accelerator
 
 **The platform thesis is coherent.** The five modules compose into a single vertical stack, share common architectural patterns (multi-signal scoring, phase-aware state, spec-and-runtime separation), and reinforce each other's competitive position. They are one thesis — smarter decisions at the seams — applied at five layers of the AI infrastructure stack, not five independent bets.
 
@@ -1551,11 +1551,11 @@ Each module is independently deployable and independently valuable. Initial comm
 
 ## What Success Looks Like in 6–12 Months
 
-**Why now:** Every layer of AI infrastructure that Cognade addresses — autoscaling decision quality, KV-cache eviction, agent governance, token-selection quality, long-context attention — is under active pressure from the shift to larger models, longer contexts, and more autonomous agents. These are not future problems; they are problems that production teams are spending engineering time on today with inadequate tooling.
+**Why now:** Every layer of AI infrastructure that Xozence addresses — autoscaling decision quality, KV-cache eviction, agent governance, token-selection quality, long-context attention — is under active pressure from the shift to larger models, longer contexts, and more autonomous agents. These are not future problems; they are problems that production teams are spending engineering time on today with inadequate tooling.
 
 **Why this team:** The execution evidence speaks for itself: 3,200+ tests, adversarial safety validation, and production-grade implementations spanning cloud infrastructure, LLM inference, agent governance, and model architecture. The platform reflects unusual cross-layer technical range, and the shared architectural patterns across modules suggest that the breadth is disciplined rather than scattered. The immediate hiring priority is GTM and design-partner-facing roles.
 
-**Why this accelerator:** Cognade's primary bottleneck is not technology — it is access to the enterprise design partners, pilot validation infrastructure, and GTM mentorship that convert internally validated technology into externally validated commercial products. An accelerator with a strong enterprise network and infrastructure-company experience is the highest-leverage intervention at this stage.
+**Why this accelerator:** Xozence's primary bottleneck is not technology — it is access to the enterprise design partners, pilot validation infrastructure, and GTM mentorship that convert internally validated technology into externally validated commercial products. An accelerator with a strong enterprise network and infrastructure-company experience is the highest-leverage intervention at this stage.
 
 **Concrete 6–12 month goals:**
 
@@ -1565,5 +1565,5 @@ Each module is independently deployable and independently valuable. Initial comm
 
 ---
 
-*Contact: Rakesh Mohan — Cognade Labs*
+*Contact: Rakesh Mohan — Xozence Labs*
 *Repo: `rasaha/symbolu`*
