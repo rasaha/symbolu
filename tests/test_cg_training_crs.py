@@ -136,3 +136,34 @@ def test_gate_wrapper_still_best():
             "D": {**base, "primary_frame_correct": 0.79, "rejected_domain_avoidance": 0.92}}
     label, _ = EVAL.decide(arms)
     assert label in ("CG_TRAINING_WRAPPER_STILL_BEST", "CG_TRAINING_CRS_NO_INCREMENTAL_VALUE")
+
+
+# ---- aggregate() maps the validated rubric to the gate metrics (pure, CPU) -----------------------
+def _rub(pfc, rda, fact=1.0, clar=1.0, promo=0.0, mir=1.0):
+    return {"primary_frame_correct": pfc, "rejected_domain_avoidance": rda, "factuality_preserved": fact,
+            "answer_clarity_proxy": clar, "rejected_domain_promotion": promo, "must_include_recall": mir}
+
+
+def test_aggregate_maps_rubric_to_gate_metrics():
+    per = []
+    for i in range(6):
+        sl = "unseen_term" if i >= 4 else "high_conf_primary"
+        per.append({"id": f"e{i}", "slice": sl, "primary_domain": "medicine",
+                    "scores": {"A": _rub(0.0, 0.5), "B": _rub(1.0, 1.0),
+                               "C": _rub(1.0, 1.0), "D": _rub(1.0, 1.0)},
+                    "answer_len": {"A": 20, "B": 25, "C": 25, "D": 25}})
+    m = EVAL.aggregate(per)
+    assert m["A"]["primary_frame_correct"] == 0.0 and m["C"]["primary_frame_correct"] == 1.0
+    assert m["C"]["rejected_domain_leak_rate"] == 0.0          # 1 - avoidance(1.0)
+    assert m["C"]["generalization_to_unseen_terms"] == 1.0     # unseen-term slice mean
+    assert m["C"]["n"] == 6
+    # end-to-end: C beats A, generalizes, approaches B -> ADDS_VALUE
+    label, _ = EVAL.decide(m)
+    assert label == "CG_TRAINING_CRS_ADDS_VALUE"
+
+
+def test_bootstrap_delta_shape():
+    per = [{"scores": {"C": _rub(1.0, 1.0), "B": _rub(0.0, 0.0)}} for _ in range(10)]
+    d = EVAL.bootstrap_delta(per, "primary_frame_correct", "C", "B", n_boot=300, seed=0)
+    assert set(d) == {"delta", "ci_low", "ci_high", "excludes_zero"}
+    assert d["delta"] == 1.0 and d["excludes_zero"] is True
