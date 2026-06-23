@@ -98,6 +98,16 @@ def build_semantic_adapter(semantic_backend="real"):
     return adapter, info
 
 
+def domain_vocabulary() -> set:
+    """The set of domains the C×R×S engine can actually score (has a 12-D template for). Domains outside
+    this registry cannot be scored — the engine has no opinion, and we must NOT invent one."""
+    _CSR = Path(__file__).resolve().parent.parent / "cg_wrapper_ablation"
+    if str(_CSR) not in sys.path:
+        sys.path.insert(0, str(_CSR))
+    from csr_match_filter import registry as R                    # noqa: E402
+    return set(R.DOMAIN_REGISTRY)
+
+
 def real_crs_match(term: str, domains, adapter) -> dict:
     """crs_match[domain] = MATCH(term, domain) from the PRODUCTION engine (match.py, C×R×S). No authoring."""
     _CSR = Path(__file__).resolve().parent.parent / "cg_wrapper_ablation"
@@ -322,8 +332,27 @@ def run(scenarios, *, thresholds=None, seed=0, crs_source="annotated", semantic_
                     "decision_reasons": {"reason": "real C×R×S features unavailable — no semantic "
                                          "embedding backend (needs sentence-transformers/torch); "
                                          "refusing to fall back to hand-authored MATCH scores"}}
+        # the engine only scores domains in its registry — scenarios referencing out-of-vocabulary
+        # domains are UNSCOREABLE (the engine has no template); drop them and report, never invent a score
+        vocab = domain_vocabulary()
+        oov_domains, scoreable = set(), []
+        for s in scenarios:
+            unknown = [d for d in referenced_domains(s) if d not in vocab]
+            if unknown:
+                oov_domains.update(unknown)
+            else:
+                scoreable.append(s)
+        provenance.update(domain_registry_size=len(vocab),
+                          n_scoreable=len(scoreable), n_unscoreable=len(scenarios) - len(scoreable),
+                          out_of_vocabulary_domains=sorted(oov_domains))
+        if not scoreable:
+            return {"decision": "AGENTIC_CRS_DATASET_UNAVAILABLE", "n": len(scenarios),
+                    "provenance": provenance,
+                    "decision_reasons": {"reason": "every scenario references domains outside the C×R×S "
+                                         "23-domain registry — the engine cannot score them. Rebuild the "
+                                         "benchmark using registry domains (see registry.DOMAIN_REGISTRY)."}}
         scenarios = [dict(s, crs_match=real_crs_match(s["term"], referenced_domains(s), adapter))
-                     for s in scenarios]
+                     for s in scoreable]
     else:
         provenance = {"crs_feature_source": "annotated_handauthored",
                       "semantic_backend": "none (annotations)", "match_available": True,

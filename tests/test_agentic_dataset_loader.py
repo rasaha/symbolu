@@ -119,6 +119,22 @@ def test_committed_benchmark_is_powered():
         assert pos[key_slice] >= 8                               # ≥8 positives per key slice
 
 
+def test_committed_benchmark_domains_all_in_registry():
+    import json
+    _CSR = _SCR / "cg_wrapper_ablation"
+    if str(_CSR) not in sys.path:
+        sys.path.insert(0, str(_CSR))
+    from csr_match_filter import registry as R                  # noqa: E402
+    vocab = set(R.DOMAIN_REGISTRY)
+    annot = json.loads((_SCR / "agentic_framework" / "data" /
+                        "agentic_domain_annotations_full.json").read_text())["tasks"]
+    used = set()
+    for a in annot.values():
+        used.add(a["primary_domain"]); used.add(a["tool_domain"]); used.add(a["action_domain"])
+        used.update(a["secondary_domains"]); used.update(a["rejected_domains"])
+    assert used <= vocab, f"benchmark uses domains outside the engine registry: {sorted(used - vocab)}"
+
+
 def test_domain_annotations_have_no_governance_labels():
     import json
     annot = json.loads((_SCR / "agentic_framework" / "data" /

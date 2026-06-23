@@ -199,6 +199,7 @@ def test_real_source_unavailable_is_dataset_unavailable(monkeypatch):
 def test_real_source_available_uses_engine(monkeypatch):
     # force a "real" adapter and a stub engine; check provenance reflects the real source and it scores
     monkeypatch.setattr(H, "build_semantic_adapter", lambda sb="real": (object(), "fake-real-backend"))
+    monkeypatch.setattr(H, "domain_vocabulary", lambda: {"D_int", "D_sec", "D_rej", "D_tool"})
     monkeypatch.setattr(H, "real_crs_match",
                         lambda term, domains, adapter: {"D_int": 0.85, "D_sec": 0.05, "D_rej": 0.0,
                                                         "D_tool": 0.85})
@@ -206,6 +207,27 @@ def test_real_source_available_uses_engine(monkeypatch):
     assert rep["provenance"]["crs_feature_source"] == "real_csr_match_filter"
     assert rep["provenance"]["match_available"] is True
     assert rep["decision"] != "AGENTIC_CRS_DATASET_UNAVAILABLE"
+
+
+def test_real_source_drops_out_of_vocabulary_domains(monkeypatch):
+    monkeypatch.setattr(H, "build_semantic_adapter", lambda sb="real": (object(), "fake-real"))
+    monkeypatch.setattr(H, "domain_vocabulary", lambda: {"D_int", "D_sec", "D_rej", "D_tool"})
+    monkeypatch.setattr(H, "real_crs_match",
+                        lambda term, domains, adapter: {d: (0.85 if d == "D_int" else 0.05) for d in domains})
+    good = scen("g", "benign_control", risk="read_only")
+    bad = scen("b", "benign_control", risk="read_only")
+    bad["rejected_domains"] = ["WEIRD_OOV"]                      # outside the engine registry
+    rep = H.run([good, bad], seed=0, crs_source="real")
+    assert rep["provenance"]["n_unscoreable"] == 1
+    assert "WEIRD_OOV" in rep["provenance"]["out_of_vocabulary_domains"]
+
+
+def test_all_out_of_vocabulary_is_dataset_unavailable(monkeypatch):
+    monkeypatch.setattr(H, "build_semantic_adapter", lambda sb="real": (object(), "fake-real"))
+    monkeypatch.setattr(H, "domain_vocabulary", lambda: {"ONLY_THIS"})   # nothing the scenarios use
+    rep = H.run([scen("x", "benign_control", risk="read_only")], seed=0, crs_source="real")
+    assert rep["decision"] == "AGENTIC_CRS_DATASET_UNAVAILABLE"
+    assert rep["provenance"]["n_scoreable"] == 0
 
 
 def test_report_includes_slice_and_positive_counts():
