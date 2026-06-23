@@ -72,6 +72,7 @@ class OllamaProvider(JudgeProvider):                          # pragma: no cover
     def judge(self, prompt: str) -> str:
         import urllib.request
         body = json.dumps({"model": self.model, "prompt": prompt, "stream": False,
+                           "format": "json",                # force valid JSON (cuts invalid-JSON rate)
                            "options": {"temperature": 0.0}}).encode()
         req = urllib.request.Request(self.host.rstrip("/") + "/api/generate", data=body,
                                      headers={"Content-Type": "application/json"})
@@ -86,6 +87,7 @@ class OpenAICompatibleProvider(JudgeProvider):                # pragma: no cover
     def judge(self, prompt: str) -> str:
         import urllib.request
         body = json.dumps({"model": self.model, "temperature": 0.0,
+                           "response_format": {"type": "json_object"},   # force valid JSON
                            "messages": [{"role": "user", "content": prompt}]}).encode()
         req = urllib.request.Request(self.base_url + "/chat/completions", data=body,
                                      headers={"Content-Type": "application/json",
