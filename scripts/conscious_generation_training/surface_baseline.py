@@ -94,6 +94,35 @@ def best_single_feature_auroc(X: np.ndarray, y: np.ndarray):
     return round(best, 4), best_f
 
 
+def _f1(y: np.ndarray, pred: np.ndarray) -> float:
+    y = np.asarray(y, int); pred = np.asarray(pred, int)
+    tp = int(((y == 1) & (pred == 1)).sum())
+    fp = int(((y == 0) & (pred == 1)).sum())
+    fn = int(((y == 1) & (pred == 0)).sum())
+    if tp == 0:
+        return 0.0
+    prec, rec = tp / (tp + fp), tp / (tp + fn)
+    return 2 * prec * rec / (prec + rec)
+
+
+def best_single_feature_f1(X: np.ndarray, y: np.ndarray):
+    """Best F1 a single surface feature can reach (any threshold, either direction). A LOW value means the
+    label is hard to recover from surface alone. Returns (f1, feature_name)."""
+    y = np.asarray(y, int)
+    if len(set(y.tolist())) < 2:
+        return None, None
+    best, best_f = 0.0, None
+    for j, name in enumerate(SURFACE_FEATURE_NAMES):
+        col = X[:, j]
+        for thr in np.unique(col):
+            for ge in (True, False):
+                pred = (col >= thr) if ge else (col <= thr)
+                f1 = _f1(y, pred.astype(int))
+                if f1 > best:
+                    best, best_f = f1, name
+    return round(best, 4), best_f
+
+
 def _logistic_oof_auroc(X: np.ndarray, y: np.ndarray, k: int = 5, seed: int = 0, iters: int = 400):
     """Combined-feature surface AUROC via numpy logistic regression, k-fold OOF. None if N too small or a
     fold is single-class (avoids overfit nonsense on tiny N)."""
