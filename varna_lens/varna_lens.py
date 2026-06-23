@@ -25,6 +25,8 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -203,15 +205,107 @@ def format_reading(word, src, out, warnings):
     return "\n".join(L)
 
 
+LOG_HEADER = ["timestamp", "word", "predicted_essence", "actual_meaning", "verdict"]
+
+
 def log_row(log_path: Path, word, out, actual, verdict):
     new = not log_path.exists()
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with open(log_path, "a", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         if new:
-            w.writerow(["timestamp", "word", "predicted_essence", "actual_meaning", "verdict"])
+            w.writerow(LOG_HEADER)
         w.writerow([datetime.now().isoformat(timespec="seconds"), word,
-                    out.get("essence_short", ""), actual, verdict])
+                    out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
+
+
+def analyze(word, *, g2p=False, varnas=None):
+    """Segment + read one word. Returns (out|None, src, warnings)."""
+    if varnas:
+        ph, warn = phonemes_explicit(varnas); src = "explicit"
+    elif g2p:
+        ph, warn = phonemes_cmudict(word); src = "cmudict(English)"
+    else:
+        ph, warn = phonemes_roman(word); src = "roman/IAST"
+    if not ph:
+        return None, src, warn
+    return read(ph), src, warn
+
+
+def _norm_verdict(v):
+    v = (v or "").strip().lower()
+    if v.startswith("f"):
+        return "flowed"
+    if v.startswith("st"):
+        return "stretched"
+    if v.startswith("m"):
+        return "missed"
+    return ""
+
+
+def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=True):
+    """Run a word list (one per line; '#' comments; optional 'word<TAB/,/|>actual_meaning'). Appends a
+    predict/check row per word to log_path. With --interactive it prompts for actual + verdict in one pass;
+    otherwise it leaves verdict BLANK so you fill it offline WITHOUT bias (predict-then-check)."""
+    words = []
+    for line in Path(path).read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = re.split(r"[\t,|]", line, 1)
+        words.append((parts[0].strip(), parts[1].strip() if len(parts) > 1 else ""))
+
+    new = not log_path.exists()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    verdicts = Counter()
+    with open(log_path, "a", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        if new:
+            w.writerow(LOG_HEADER)
+        for word, actual in words:
+            out, src, warn = analyze(word, g2p=g2p)
+            pred = out.get("essence_short", "") if out else "(unparseable)"
+            verdict = ""
+            if interactive:
+                print("\n" + (format_reading(word, src, out, warn) if out
+                              else f"WORD: {word}  — unparseable {warn}"))
+                if not actual:
+                    actual = input(f"  actual meaning of '{word}'? ").strip()
+                verdict = _norm_verdict(input("  verdict [flowed/stretched/missed/skip]? "))
+            elif show:
+                line = f"  {word:<14} → {pred}"
+                print(line + (f"   ⚠{warn}" if warn else ""))
+            w.writerow([datetime.now().isoformat(timespec="seconds"), word, pred, actual, verdict])
+            if verdict:
+                verdicts[verdict] += 1
+    print(f"\n[{len(words)} words → {log_path}]")
+    if not interactive:
+        print("  verdicts left BLANK — fill the 'verdict' column (flowed/stretched/missed) in the CSV,")
+        print(f"  then:  python {Path(__file__).name} --tally {log_path}")
+    if verdicts:
+        _print_tally(verdicts, len(words))
+
+
+def _print_tally(counts: Counter, total: int):
+    judged = sum(counts.values())
+    print(f"\n  TALLY  (judged {judged}/{total}):")
+    for k in ("flowed", "stretched", "missed"):
+        n = counts.get(k, 0)
+        pct = (100.0 * n / judged) if judged else 0.0
+        bar = "█" * int(round(pct / 5))
+        print(f"    {k:<10} {n:>3}  {pct:5.1f}%  {bar}")
+    if judged:
+        print(f"\n  honest read: flowed {100*counts.get('flowed',0)/judged:.0f}% vs "
+              f"missed {100*counts.get('missed',0)/judged:.0f}%  "
+              f"— if flowed doesn't clearly beat missed on words you couldn't retrofit, it's the lens's "
+              f"flexibility, not the language.")
+
+
+def tally_csv(path: Path):
+    rows = list(csv.DictReader(open(path, newline="", encoding="utf-8")))
+    counts = Counter(_norm_verdict(r.get("verdict", "")) for r in rows)
+    counts.pop("", None)
+    _print_tally(counts, len(rows))
 
 
 def main(argv=None):
@@ -219,12 +313,23 @@ def main(argv=None):
     ap.add_argument("word", nargs="?", help="romanized word, e.g. kala / kāla / ak")
     ap.add_argument("--g2p", action="store_true", help="English acoustic breakdown via nltk-cmudict (approx)")
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
-    ap.add_argument("--log", help="append a predict/check row to this CSV")
+    ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
+    ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
+    ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
+    ap.add_argument("--log", default=None, help="predict/check CSV (default for --batch: varna_predict_check_log.csv)")
     ap.add_argument("--actual", default="", help="actual meaning (for --log)")
     ap.add_argument("--verdict", choices=("flowed", "stretched", "missed"), help="your honest verdict (--log)")
     args = ap.parse_args(argv)
+
+    if args.tally:
+        tally_csv(Path(args.tally)); return 0
+    if args.batch:
+        log = Path(args.log or "varna_predict_check_log.csv")
+        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive)
+        return 0
+
     if not args.word and not args.varnas:
-        ap.error("give a word or --varnas")
+        ap.error("give a word, --varnas, --batch, or --tally")
     if args.varnas:
         ph, warn = phonemes_explicit(args.varnas); src = "explicit"
     elif args.g2p:

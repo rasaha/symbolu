@@ -43,6 +43,19 @@ python varna_lens.py --varnas "ka,la"       # exact, authoritative
 python varna_lens.py "kāla" --log log.csv --actual "time" --verdict flowed
 ```
 
+## Batch test (the 30-word honest pass)
+```bash
+# 1. put words (one per line; '#' comments; optional 'word<TAB>actual') in words.txt, then:
+python varna_lens.py --batch words.txt --log run1.csv     # prints predictions, leaves verdict BLANK
+# 2. open run1.csv, fill the 'verdict' column (flowed/stretched/missed) WITHOUT pre-glancing meanings
+python varna_lens.py --tally run1.csv                     # counts + % + honest read
+
+# or do it in one interactive pass (prompts actual + verdict per word):
+python varna_lens.py --batch words.txt --interactive --log run1.csv
+```
+`words_sample.txt` is a starter list. The non-interactive flow is the cleaner test: the tool commits to its
+prediction first; you supply the truth and the verdict afterward, so you can't retrofit.
+
 ## The one discipline that keeps it honest
 **Predict, then check — and log both.** Abstract the essence *before* recalling the real meaning, then
 record `flowed / stretched / missed`. Over time the log shows you, without self-deception, where the lens
