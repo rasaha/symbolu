@@ -114,6 +114,9 @@ def main(argv=None):
     from datasets import load_dataset
 
     tok = AutoTokenizer.from_pretrained(cfg.base_model)
+    if tok.pad_token is None:                              # Mistral has no pad token -> reuse EOS
+        tok.pad_token = tok.eos_token
+    tok.padding_side = "right"                             # avoid half-precision overflow warning
     model_kw = {"load_in_4bit": True} if cfg.method == "qlora" else {}
     model = AutoModelForCausalLM.from_pretrained(cfg.base_model, device_map="auto", **model_kw)
     peft_cfg = LoraConfig(r=cfg.lora_r, lora_alpha=cfg.lora_alpha, lora_dropout=cfg.lora_dropout,
