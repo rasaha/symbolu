@@ -282,6 +282,38 @@ def ensemble_rows(labels_by_judge: Dict[str, Dict]) -> List[Dict]:
     return rows
 
 
+def per_arm_summary(label_rows: List[Dict]) -> Optional[Dict]:
+    """Screening rates broken out by arm (A/B/C/D), pooled across judges over VALID per-judge rows.
+    Lets a four-arm run be read as a direct C-vs-B comparison. None when no arm labels are present."""
+    from collections import defaultdict
+    buckets = defaultdict(list)
+    for r in label_rows:
+        if r.get("judge") == "ENSEMBLE" or not r.get("valid_json") or r.get("arm") is None:
+            continue
+        buckets[r["arm"]].append(r["labels"])
+    if not buckets:
+        return None
+
+    def _mean(labs, field):
+        vals = [lab.get(field) for lab in labs if lab.get(field) is not None]
+        return round(sum(1 if v is True else (0 if v is False else v) for v in vals) / len(vals), 4) \
+            if vals else None
+
+    out = {}
+    for arm in sorted(buckets):
+        labs = buckets[arm]
+        out[arm] = {"n": len(labs),
+                    "primary_frame_correct_rate": _mean(labs, "primary_frame_correct"),
+                    "rejected_domain_leak_rate": _mean(labs, "rejected_domain_leak"),
+                    "secondary_overpromotion_rate": _mean(labs, "secondary_overpromotion"),
+                    "rewrite_needed_rate": _mean(labs, "rewrite_needed"),
+                    "answer_acceptable_rate": _mean(labs, "answer_acceptable"),
+                    "generic_low_signal_rate": _mean(labs, "generic_low_signal"),
+                    "mean_clarity": _mean(labs, "clarity_usefulness_score"),
+                    "mean_recall": _mean(labs, "must_include_recall_score")}
+    return out
+
+
 def decide(*, mock_only: bool, invalid_json_rate: float, n_judges: int,
            agreement_avg: Optional[float], audit_agreement: Optional[float]) -> Tuple[str, Dict]:
     notes = {"invalid_json_rate": round(invalid_json_rate, 4), "n_judges": n_judges,
@@ -332,6 +364,7 @@ def run(records: List[Dict], judges: List[str], providers: Dict[str, JudgeProvid
     return {"n_records": len(records), "judges": judges, "mock_only": mock_only,
             "invalid_json_rate": round(invalid_rate, 4), "decision": decision, "decision_notes": notes,
             "flags": flags, "agreement": agreement, "audit_comparison": audit,
+            "per_arm_screen": per_arm_summary(label_rows),
             "ensemble_used": bool(ens), "decision_labels": list(DECISIONS),
             "label_rows": all_rows}
 
@@ -357,6 +390,17 @@ def to_markdown(rep: Dict) -> str:
         L += [""]
     else:
         L += [f"## Inter-judge agreement\n- {ag.get('note', 'N/A')}", ""]
+    pa = rep.get("per_arm_screen")
+    if pa:
+        cols = ("n", "primary_frame_correct_rate", "rejected_domain_leak_rate", "rewrite_needed_rate",
+                "answer_acceptable_rate", "generic_low_signal_rate", "mean_clarity", "mean_recall")
+        L += ["## Per-arm screen (A=base · B=base+wrapper · C=LoRA · D=LoRA+wrapper)",
+              "| arm | " + " | ".join(c.replace("_rate", "").replace("_", " ") for c in cols) + " |",
+              "|" + "---|" * (len(cols) + 1)]
+        for arm in sorted(pa):
+            L.append("| " + arm + " | " + " | ".join(str(pa[arm].get(c)) for c in cols) + " |")
+        L += ["", "> Weak screening only: judge-estimated rates per arm; not validation. Compare C/D vs B "
+              "for frame-leak / rewrite rates.", ""]
     au = rep.get("audit_comparison")
     if au:
         L += ["## vs Phase-3 audit (comparison only — audit is authoritative)",
