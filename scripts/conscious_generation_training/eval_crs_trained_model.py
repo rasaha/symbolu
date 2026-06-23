@@ -151,7 +151,8 @@ def gpu_available() -> bool:
 
 
 # ---- GPU generation path (pod only) --------------------------------------------------------------
-def _generate_and_score(test_path, eval_data_path, base_model, lora_dir, seed=0, max_new=256):
+def _generate_and_score(test_path, eval_data_path, base_model, lora_dir, seed=0, max_new=200,
+                        dtype="bf16"):
     import sys
     _CSR = Path(__file__).resolve().parent.parent / "cg_wrapper_ablation"
     if str(_CSR) not in sys.path:
@@ -173,7 +174,12 @@ def _generate_and_score(test_path, eval_data_path, base_model, lora_dir, seed=0,
     tok = AutoTokenizer.from_pretrained(base_model)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto", load_in_4bit=True)
+    # eval is NOT memory-bound on an 80GB card: bf16 is faster per-token than 4-bit. Use 4bit only to fit.
+    if dtype == "4bit":
+        base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto", load_in_4bit=True)
+    else:
+        base = AutoModelForCausalLM.from_pretrained(base_model, device_map="auto",
+                                                    torch_dtype=torch.bfloat16)
 
     def gen(model, prompt):
         inp = tok(prompt, return_tensors="pt").to(model.device)
@@ -218,6 +224,9 @@ def main(argv=None):
     ap.add_argument("--out", default="runs/cg_training/crs_eval/four_arm_eval.json")
     ap.add_argument("--report", default="runs/cg_training/crs_eval/four_arm_eval.md")
     ap.add_argument("--execute", action="store_true", help="run real generation (needs GPU + peft)")
+    ap.add_argument("--dtype", choices=("bf16", "4bit"), default="bf16",
+                    help="bf16 (faster, ~15GB; default for eval) or 4bit (slower, ~5GB)")
+    ap.add_argument("--max-new-tokens", type=int, default=200)
     args = ap.parse_args(argv)
 
     test = Path(args.data_dir) / "test.jsonl"
@@ -235,7 +244,8 @@ def main(argv=None):
     if n_test < 4:
         print("CG_TRAINING_INSUFFICIENT_DATA"); return 1
 
-    per, sem = _generate_and_score(test, args.eval_data, args.base_model, args.lora)
+    per, sem = _generate_and_score(test, args.eval_data, args.base_model, args.lora,
+                                   max_new=args.max_new_tokens, dtype=args.dtype)
     holdout = {}
     meta = Path(args.data_dir) / "meta.json"
     if meta.exists():
