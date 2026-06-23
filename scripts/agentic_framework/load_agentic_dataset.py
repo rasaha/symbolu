@@ -91,6 +91,34 @@ def load_injecagent(rows, domain_annot, pairing="both"):
     return out
 
 
+def load_benchmark(records, domain_annot) -> list:
+    """Merge structural benchmark records with the SEPARATE domain annotations -> harness scenarios.
+    Targets come from each record's policy_context (oracle); domains come from the annotations file.
+    Fails loud if a record's domain_key is unannotated. Never adds crs_match (real engine fills it)."""
+    tasks = domain_annot.get("tasks", {})
+    out = []
+    for r in records:
+        key = r["domain_key"]
+        if key not in tasks:
+            raise KeyError(f"missing domain annotation for domain_key {key!r} — author it in the "
+                           f"domain-annotations file (annotation-derived, not inferred)")
+        a = tasks[key]
+        if "primary_domain" not in a or "tool_domain" not in a:
+            raise KeyError(f"domain annotation {key!r} missing primary_domain/tool_domain")
+        out.append({
+            "scenario_id": r["scenario_id"], "slice": r["slice"], "source": "independent_benchmark",
+            "user_prompt": r.get("user_prompt", ""), "term": r["term"],
+            "intended_domains": [a["primary_domain"]], "secondary_domains": a.get("secondary_domains", []),
+            "rejected_domains": a.get("rejected_domains", []),
+            "tool_domain": a["tool_domain"], "action_domain": a.get("action_domain"),
+            "requested_domain": a.get("requested_domain"),
+            "proposed_tool": r["proposed_tool"], "tool_risk_level": r["tool_risk_level"],
+            "policy_context": r.get("policy_context", {}),
+            # crs_match intentionally absent — harness fills from the real engine (--crs-source real)
+        })
+    return out
+
+
 def load(kind: str, path: str | None, domain_annot: dict, pairing="both") -> list:
     """kind ∈ {agentdojo, injecagent, both}. Uses the mini fixtures when no --path is given; if a real
     full-dataset path is supplied it must already be in the fixture row schema (jsonl/json list)."""
@@ -115,15 +143,23 @@ def load(kind: str, path: str | None, domain_annot: dict, pairing="both") -> lis
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Build independent agentic scenarios from AgentDojo/InjecAgent.")
-    ap.add_argument("--kind", choices=("agentdojo", "injecagent", "both"), default="both")
+    ap.add_argument("--kind", choices=("agentdojo", "injecagent", "both", "benchmark"), default="both")
     ap.add_argument("--path", default=None, help="optional full-dataset path (fixture row schema)")
+    ap.add_argument("--records", default=None, help="benchmark records JSON (for --kind benchmark)")
     ap.add_argument("--domain-annotations", required=True)
     ap.add_argument("--pairing", choices=("both", "benign", "injected"), default="both")
     ap.add_argument("--out", required=True)
     args = ap.parse_args(argv)
 
     domain_annot = json.loads(Path(args.domain_annotations).read_text(encoding="utf-8"))
-    scenarios = load(args.kind, args.path, domain_annot, args.pairing)
+    if args.kind == "benchmark":
+        if not args.records:
+            ap.error("--kind benchmark requires --records")
+        blob = json.loads(Path(args.records).read_text(encoding="utf-8"))
+        recs = blob["records"] if isinstance(blob, dict) else blob
+        scenarios = load_benchmark(recs, domain_annot)
+    else:
+        scenarios = load(args.kind, args.path, domain_annot, args.pairing)
     blob = {"_provenance": {"target_labels": "independent (dataset injection structure)",
                             "domain_labels": "annotation-derived (separate file, distinct from targets)",
                             "kind": args.kind, "n": len(scenarios)},

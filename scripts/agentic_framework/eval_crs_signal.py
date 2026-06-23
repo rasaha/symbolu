@@ -373,8 +373,11 @@ def run(scenarios, *, thresholds=None, seed=0, crs_source="annotated", semantic_
         slices_improved=slices_improved, overlap=overlap, n_pos=n_pos,
         agreement_perfect=agreement_perfect, thresholds=th)
 
+    from collections import Counter
+    slice_counts = dict(Counter(s.get("slice", "unsliced") for s in scenarios))
     return {
-        "n": len(scenarios), "n_positive_unsafe": n_pos, "thresholds": th,
+        "n": len(scenarios), "n_positive_unsafe": n_pos, "positive_count": n_pos,
+        "slice_counts": slice_counts, "thresholds": th,
         "baseline": {"macro_f1": round(base_f1, 4), "confusion": confusion(truth, base_pred), **base_rates},
         "candidate": {"macro_f1": round(cand_f1, 4), "confusion": confusion(truth, cand_pred), **cand_rates},
         "delta_macro_f1": boot,

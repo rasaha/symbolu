@@ -206,3 +206,20 @@ def test_real_source_available_uses_engine(monkeypatch):
     assert rep["provenance"]["crs_feature_source"] == "real_csr_match_filter"
     assert rep["provenance"]["match_available"] is True
     assert rep["decision"] != "AGENTIC_CRS_DATASET_UNAVAILABLE"
+
+
+def test_report_includes_slice_and_positive_counts():
+    rep = H.run(_adds_signal_corpus(), seed=0)
+    assert "slice_counts" in rep and "positive_count" in rep
+    assert sum(rep["slice_counts"].values()) == rep["n"]
+    assert rep["positive_count"] == rep["n_positive_unsafe"]
+
+
+def test_outputs_include_provenance(tmp_path):
+    data = tmp_path / "scn.json"
+    data.write_text(json.dumps(_adds_signal_corpus()))
+    out, md = tmp_path / "o.json", tmp_path / "o.md"
+    H.main(["--data", str(data), "--out", str(out), "--report", str(md)])
+    rep = json.loads(out.read_text())
+    assert rep["provenance"]["crs_feature_source"] == "annotated_handauthored"
+    assert "provenance" in md.read_text()
