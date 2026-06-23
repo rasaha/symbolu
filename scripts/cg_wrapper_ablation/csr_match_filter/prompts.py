@@ -23,8 +23,15 @@ def build_base_prompt(query: str, ex_id: str = "") -> str:
 
 
 def build_framed_prompt(query: str, primary: List[str], secondary: List[str],
-                        rejected: List[str], ex_id: str = "") -> str:
+                        rejected: List[str], ex_id: str = "", kosha=None) -> str:
+    """Framed C×R×S prompt. `kosha` (a KoshaSelection or None) is OPTIONAL: when None the output is
+    byte-for-byte the original framed prompt; when provided, an inference-time depth/readiness
+    instruction is inserted AFTER the frame instructions and BEFORE the user question (see kosha.py)."""
     tag = f"[[id:{ex_id}]]\n" if ex_id else ""
+    depth = ""
+    if kosha is not None:
+        from . import kosha as _K
+        depth = _K.depth_block(kosha)
     return (
         f"{tag}CSR/C×R×S semantic-frame analysis:\n\n"
         f"Primary domains:\n  {_fmt(primary)}\n\n"
@@ -36,6 +43,7 @@ def build_framed_prompt(query: str, primary: List[str], secondary: List[str],
         "3. Do not introduce rejected domains unless the user explicitly asks.\n"
         "4. Do not claim phonemes alone prove meaning.\n"
         "5. Preserve factual correctness.\n\n"
+        f"{depth}"
         f"User question:\n{query}\n")
 
 

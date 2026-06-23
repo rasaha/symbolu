@@ -267,7 +267,7 @@ benchmarks. An external benchmark is planned (see roadmap).
 ### Internal Signal Research Status
 
 We ran a disciplined program to test whether model-internal signals improve governance
-beyond cheap baselines. Three experiments are complete:
+beyond cheap baselines. Four experiments are complete:
 
 - **Real CG checkpoint pilot — completed.** A real CG head (Mistral-7B backbone + a trained
   sovereign-state head) was trained and run through the signal harness. The 32-D state's
@@ -280,10 +280,22 @@ beyond cheap baselines. Three experiments are complete:
   on the subset where verbalized confidence is fooled, **raw next-token entropy was the
   strongest signal (AUROC 0.857)**, while the 32-D CG-state entropy was anti-predictive
   (0.457). Verdict: deprioritize the CG projection.
+- **C×R×S semantic-frame governance signal — completed (pre-registered, real engine).** We tested
+  whether the Conscious-Generation C×R×S frame signal (validated for inference-time answer *framing*)
+  adds value as an agent/tool-domain *governance* signal, on a 60-scenario independent benchmark with
+  features computed by the real C×R×S engine (no hand-authored scores) and labels independent of C×R×S.
+  It carries **real ranking signal** — wrong-tool-domain slice F1 0→1.0, `unsafe_allow` 30→7,
+  `wrong_tool_call` 20→1 — **but every variant over-gates benign traffic**: the absolute-threshold
+  candidate raised false escalations (+0.75), and a held-out-calibrated relative-margin candidate fixed
+  escalations but moved the over-firing into false *clarifications* (+0.35) and regressed benign/low-risk
+  slices. Both **failed the pre-registered gate** (`AGENTIC_CRS_INCREASES_FALSE_BLOCKS`). Verdict: **not
+  validated for agentic governance; off the product path; not wired into runtime.** (Detail:
+  `docs/RESULTS_AGENTIC_CRS_SIGNAL.md`.)
 
 **Net:** raw next-token entropy currently emerges as the strongest *measured* model-internal
-uncertainty signal. The CG sovereign-state projection remains experimental research, off the
-product path, until it beats the cheap baseline on a held-out benchmark.
+uncertainty signal. The CG sovereign-state projection and the C×R×S frame signal both remain
+experimental research, off the product path, until they beat the cheap baseline on a held-out benchmark
+without increasing false blocks/escalations.
 
 | Signal | Evidence | Status |
 |---|---|---|
@@ -291,6 +303,7 @@ product path, until it beats the cheap baseline on a held-out benchmark.
 | **Raw next-token entropy** | Strongest measured uncertainty signal; fooled-subset AUROC 0.857 | **MEASURED** — shipped, first-class default |
 | **Confidence-risk gap** | End-to-end validated wiring (escalation + audit + negative control) | **MEASURED** (wiring) / **DIRECTIONAL** (governance value, not yet powered) — shipped |
 | **CG entropy (32-D state)** | Fooled-subset AUROC 0.457 (anti-predictive); beaten by raw entropy | **RESEARCH** — off by default |
+| **C×R×S semantic-frame (agentic governance)** | Real ranking signal (wrong-tool F1→1.0, unsafe_allow 30→7) but over-gates benign; fails the pre-registered gate (absolute + calibrated relative): `AGENTIC_CRS_INCREASES_FALSE_BLOCKS` | **RESEARCH** — off the product path, not wired |
 | **JEPA / coherence** | Pilot standalone AUROC ≈ 0.70 / 0.68; no demonstrated value *over* raw entropy | **RESEARCH** — off by default |
 | **Vritti** | Standalone AUROC 0.500 (non-discriminative in every run) | **RESEARCH** — candidate for removal |
 
