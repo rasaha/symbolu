@@ -147,16 +147,24 @@ def read(phonemes):
         out["essence_short"] = ("+" if c["polarity"] == "created" else "−") + _short(c["data"]["leading_vritti"])
         out["counter_reading"] = f"Liberation pole: {c['data']['counter_vritti']}"
         return out
-    # n>=2: pairwise CHAIN (R2 extended) — first=forward, last=reactive, middle=both; R1 polarity per cons
+    # n>=2: OVERLAPPING PAIRS (R2). Each adjacent pair: 1st = +(giver/source), 2nd = −(receiver/result).
+    # A middle consonant is the − of the pair on its left and the + of the pair on its right.
+    # R1 (create/destroy from vowel order) is a SEPARATE tag shown per consonant.
     n = len(cons)
     for i, c in enumerate(cons):
-        c["role"] = "forward (+)" if i == 0 else ("reactive (−)" if i == n - 1 else "link (−/+)")
-    out["rule"] = f"R1+R2 chain ({n} consonants)"
-    out["essence"] = " → ".join(
-        f"«{c['data']['iast']}» {_verb(c['polarity'])} {c['data']['leading_vritti']} [{c['role']}]"
-        for c in cons)
-    out["essence_short"] = " → ".join(
-        (("+" if c["polarity"] == "created" else "−") + _short(c["data"]["leading_vritti"])) for c in cons)
+        c["role"] = "giver(+)" if i == 0 else ("receiver(−)" if i == n - 1 else "receiver(−) / giver(+)")
+    pairs = []
+    for i in range(n - 1):
+        a, b = cons[i], cons[i + 1]
+        pairs.append({"plus": a["data"], "plus_pol": a["polarity"],
+                      "minus": b["data"], "minus_pol": b["polarity"]})
+    out["pairs"] = pairs
+    out["rule"] = f"R2 overlapping pairs ({n} consonants → {n - 1} pair{'s' if n > 2 else ''}); R1 per consonant"
+    out["essence"] = "   ,   ".join(
+        f"«{p['plus']['iast']}»(+ {_short(p['plus']['leading_vritti'])}) → "
+        f"«{p['minus']['iast']}»(− {_short(p['minus']['leading_vritti'])})" for p in pairs)
+    out["pairs_short"] = " , ".join(f"{p['plus']['iast']}⁺→{p['minus']['iast']}⁻" for p in pairs)
+    out["essence_short"] = " → ".join(_short(c["data"]["leading_vritti"]) for c in cons)
     out["counter_reading"] = "Liberation chain: " + " → ".join(_short(c["data"]["counter_vritti"]) for c in cons)
     return out
 
@@ -177,10 +185,18 @@ def format_reading(word, src, out, warnings):
             d = a["data"]
             L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['positive']} / (shadow) {d['negative']}"
                      f"   ·  {d['bridge']}")
+    if out.get("pairs"):
+        L.append("")
+        L.append(f"  overlapping pairs (R2):  {out.get('pairs_short','')}")
+        for p in out["pairs"]:
+            pd = "" if p["plus_pol"] == "created" else " (destroyed)"
+            md = "" if p["minus_pol"] == "created" else " (destroyed)"
+            L.append(f"    «{p['plus']['iast']}»(+){pd} {p['plus']['leading_vritti']}"
+                     f"  →  «{p['minus']['iast']}»(−){md} {p['minus']['leading_vritti']}")
     L += ["", f"  ESSENCE: {out['essence']}"]
     if "counter_reading" in out:
         L.append(f"  {out['counter_reading']}")
-    L.append(f"  (short: {out.get('essence_short','')})")
+    L.append(f"  (chain: {out.get('essence_short','')})")
     if warnings:
         L.append(f"  ⚠ {warnings}")
     L.append("  — interpretive lens; not a universal claim; not part of C×R×S —")
