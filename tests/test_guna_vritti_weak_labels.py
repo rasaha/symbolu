@@ -55,6 +55,41 @@ def test_derive_row_schema_and_weak_marking():
     assert "bhava" not in str(row).lower()                             # Bhava not labelled
 
 
+# ---- audit-derived path (prompt+response+audit fields) ------------------------------------------
+def test_audit_derived_viparyaya_from_factuality_finding():
+    row = {"query": "Is the earth flat?",
+           "answer": "Yes, the earth is completely flat and rests on a turtle, for sure.",
+           "expected_findings": ["factuality_suspected"], "expected_needs_rewrite": True}
+    out = D.derive_row(row)
+    assert out["label_meta"]["source"] == "audit_derived"
+    assert out["labels"]["vritti"] == "viparyaya"                       # audit flagged factuality
+    assert "factuality_suspected" in out["label_meta"]["audit_findings_used"]
+
+
+def test_audit_derived_tamas_from_generic_and_sattva_from_frame_ok():
+    generic = D.derive_row({"query": "q?", "answer": "It depends on many various general factors overall here.",
+                            "expected_findings": ["answer_too_generic"], "expected_needs_rewrite": True})
+    assert generic["labels"]["guna"][2] == 1                            # tamas from answer_too_generic
+    clean = D.derive_row({"query": "What is a doctor?",
+                          "answer": "A doctor is a medical professional who diagnoses and treats illness.",
+                          "expected_findings": ["frame_compliant"], "expected_needs_rewrite": False})
+    assert clean["labels"]["vritti"] == "pramana" and clean["labels"]["guna"][0] == 1   # sattva
+    for out in (generic, clean):
+        assert out["labels"]["guna"][3] is None and out["labels"]["guna"][5] is None    # dims 4-6 masked
+
+
+def test_audit_row_normalizes_prompt_response_for_baseline():
+    out = D.derive_row({"query": "q?", "answer": "a grounded factual answer about medicine here",
+                        "expected_findings": ["frame_compliant"]})
+    assert out["prompt"] == "q?" and out["response"].startswith("a grounded")
+    assert "bhava" not in str(out).lower()
+
+
+def test_no_audit_fields_falls_back_to_weak_heuristic():
+    out = D.derive_row({"prompt": "q?", "response": "A doctor treats illness and keeps people healthy."})
+    assert out["label_meta"]["source"] == "weak_heuristic"              # unchanged legacy path
+
+
 def test_deterministic():
     a = D.derive_row({"prompt": "p", "response": "Compare A and B; however the tradeoff is cost here."})
     b = D.derive_row({"prompt": "p", "response": "Compare A and B; however the tradeoff is cost here."})

@@ -183,6 +183,21 @@ def test_four_arm_flatten_hides_arm_in_prompt(tmp_path):
         assert R.prompt_hides_identity(prompt, r)
 
 
+def test_per_arm_screen_breaks_out_by_arm():
+    # two arms with clearly different answers -> per-arm rates differ and are readable
+    clean = _rec(rid="d_clean", arm="B", answer="A doctor is a medical professional who can diagnose and "
+                 "treat illness in patients with attentive care.")
+    leak = _rec(rid="d_leak", arm="C", answer="Honestly this is about finance and investing your money.")
+    recs = [E.normalize_record(clean, allow_missing_optional=False, idx=0),
+            E.normalize_record(leak, allow_missing_optional=False, idx=1)]
+    rep = E.run(recs, ["llama"], {"llama": E.MockProvider("llama")}, mock_only=True,
+                allow_missing_optional=False)
+    pa = rep["per_arm_screen"]
+    assert set(pa) == {"B", "C"} and pa["B"]["n"] == 1 and pa["C"]["n"] == 1
+    assert pa["C"]["rejected_domain_leak_rate"] == 1.0 and pa["B"]["rejected_domain_leak_rate"] == 0.0
+    assert "Per-arm screen" in E.to_markdown(rep)
+
+
 def test_missing_required_fails_loud():
     with pytest.raises(ValueError, match="missing required"):
         E.normalize_record({"id": "x", "query": "q?"}, allow_missing_optional=True, idx=0)

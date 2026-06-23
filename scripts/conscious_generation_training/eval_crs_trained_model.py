@@ -213,6 +213,10 @@ def _generate_and_score(test_path, eval_data_path, base_model, lora_dir, seed=0,
               for arm, ans in (("A", a_ans), ("B", b_ans), ("C", c_ans), ("D", d_ans))}
         per.append({"id": t["id"], "slice": t.get("slice", "high_conf_primary"),
                     "primary_domain": t.get("primary_domain"), "scores": sc,
+                    "query": ex.get("query"), "must_include": ex.get("must_include"),
+                    "secondary_domains": ex.get("expected_secondary"),
+                    "rejected_domains": ex.get("expected_rejected"),
+                    "answers": {"A": a_ans, "B": b_ans, "C": c_ans, "D": d_ans},
                     "answer_len": {"A": len(a_ans.split()), "B": len(b_ans.split()),
                                    "C": len(c_ans.split()), "D": len(d_ans.split())}})
     return per, sem

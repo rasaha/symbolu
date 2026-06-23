@@ -58,3 +58,15 @@ semantic-framing mechanism; whether that behavior can be internalized into Mistr
 fine-tuning remains unvalidated.* T1 showed a **promising but non-significant** internalization signal
 (plain-prompt LoRA ≈ wrapper on primary-frame correctness) and a clear negative (LoRA+wrapper degrades);
 the wrapper remains the best deployment path.
+
+## 7. Post-run LLM-judge cross-check (weak; does NOT change the decision)
+A two-family LLM-judge screen (Llama 3.1 + Qwen 2.5, forced JSON; full results in
+`docs/RESULTS_CG_LLM_JUDGE.md`) showed high inter-judge agreement and matched the deterministic rubric on
+arms **A/B/C**, but **failed to detect the D-arm collapse**: the judges rated LoRA+wrapper as clean
+(frame_correct 1.0, rejected_domain_leak 0.0, acceptable 1.0) despite the deterministic rubric's failures
+in primary-frame correctness (0.60), rejected-domain avoidance (0.65), and factuality (0.80). Therefore the
+LLM judge is useful only as a **weak screening tool**; it does **not** override the deterministic rubric,
+and the T1 decision remains **`CG_TRAINING_WRAPPER_STILL_BEST`**. This is also concrete evidence of the
+judge's fluency bias (it rewards a fluent wrapper-framed answer that is actually frame-broken), reinforcing
+that strong validation requires human labels, not an LLM judge.
+
