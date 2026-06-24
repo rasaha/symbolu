@@ -332,8 +332,15 @@ def read_op(phonemes):
             v = d["positive"]                # vowel's WORLDLY active essence
             iast = d["iast"].split(" ")[0]
         sign = "+" if pos else "−"
-        parts.append(f"«{iast}»({sign}) {_short(v)}")
-        shorts.append(sign + _short(v))
+        if typ == "C" and not pos:
+            # a DISSOLVING consonant resolves its worldly pole INTO its spiritual counter-pole
+            # (e.g. Ha− Darkness ⤳ Parā-vidyā; the = Ḍa− Shyness ⤳ Fearlessness)
+            counter = _short(d["counter_vritti"])
+            parts.append(f"«{iast}»({sign}) {_short(v)}  ⤳ {counter}")
+            shorts.append(f"{sign}{_short(v)}⤳{counter}")
+        else:
+            parts.append(f"«{iast}»({sign}) {_short(v)}")
+            shorts.append(sign + _short(v))
     out["rule"] = "worldly-reference order-polarity (+ affirmed / − dissolving; final vowel = whole-word essence)"
     out["essence"] = "  →  ".join(parts) if parts else "(none)"
     short = " → ".join(shorts)
