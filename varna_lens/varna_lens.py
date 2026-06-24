@@ -31,8 +31,15 @@ from datetime import datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-LEX = json.loads((_HERE / "lexicon.json").read_text())
-CONS, VOW = LEX["consonants"], LEX["vowels"]
+# Authoritative set (verbatim from Sanskrit_letters_full.docx). Normalize consonant field names to the
+# ones the reader expects: leading_vritti = NEGATIVE/binding pole, counter_vritti = POSITIVE/balance pole.
+LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
+VOW = LEX["vowels"]
+CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative_vritti"],
+            "counter_vritti": d["positive_vritti"], "felt_negative": d.get("felt_negative"),
+            "felt_positive": d.get("felt_positive"), "contextual_flow": d.get("contextual_flow"),
+            "varga": d.get("varga")}
+        for k, d in LEX["consonants"].items()}
 
 # surface → lexicon key (longest match first). ASCII read as IAST-ish (ch=cha, c=ca, sh=śa).
 _CONS = [("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
@@ -216,11 +223,59 @@ def read_vp(phonemes):
     return out
 
 
+def read_op(phonemes):
+    """THE single rule (order-polarity) + final-vowel summary.
+    A FINAL vowel is REMOVED from the stitched chain and reported as the whole-word essence; removing it
+    turns the preceding consonant into a coda (negative). Then on the remaining sounds:
+      consonant POSITIVE if a vowel FOLLOWS it (else negative/coda);
+      vowel POSITIVE if a consonant PRECEDES it (else negative/leading)."""
+    seq = list(phonemes)
+    summary = None
+    if seq and seq[-1][0] == "V":
+        vt = seq.pop()
+        vd = VOW.get(vt[1])
+        prev = seq[-1] if seq else None
+        spos = bool(prev and prev[0] == "C")
+        if vd:
+            summary = {"iast": vd["iast"].split(" ")[0], "sign": "+" if spos else "−",
+                       "essence": vd["positive"] if spos else vd["negative"]}
+    out = {"sequence": annotate(phonemes), "model": "order_polarity", "whole_word_essence": summary}
+    parts, shorts = [], []
+    n = len(seq)
+    for i, (typ, key, surf) in enumerate(seq):
+        if typ == "C":
+            d = CONS.get(key)
+            if not d:
+                continue
+            nxt = seq[i + 1] if i + 1 < n else None
+            pos = bool(nxt and nxt[0] == "V")
+            v = d["counter_vritti"] if pos else d["leading_vritti"]
+            iast = d["iast"]
+        else:
+            d = VOW.get(key)
+            prev = seq[i - 1] if i > 0 else None
+            pos = bool(prev and prev[0] == "C")
+            v = d["positive"] if pos else d["negative"]
+            iast = d["iast"].split(" ")[0]
+        sign = "+" if pos else "−"
+        parts.append(f"«{iast}»({sign}) {_short(v)}")
+        shorts.append(sign + _short(v))
+    out["rule"] = "order-polarity (final vowel = whole-word essence)"
+    out["essence"] = "  →  ".join(parts) if parts else "(none)"
+    short = " → ".join(shorts)
+    if summary:
+        short += f"   ⟹ [{summary['sign']}{_short(summary['essence'])}]"
+    out["essence_short"] = short
+    return out
+
+
 def read(phonemes, reverse=False, model="pair"):
     if model == "db":
         return read_db(phonemes)
     if model == "vp":
         return read_vp(phonemes)
+    if model == "op":
+        return read_op(phonemes)
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
     out = {"sequence": ann, "n_consonants": len(cons), "reverse": reverse}
@@ -287,6 +342,9 @@ def format_reading(word, src, out, warnings):
             L.append(f"    «{p['plus']['iast']}»(+){pd} {p['plus']['leading_vritti']}"
                      f"  →  «{p['minus']['iast']}»(−){md} {p['minus']['leading_vritti']}")
     L += ["", f"  ESSENCE: {out['essence']}"]
+    if out.get("whole_word_essence"):
+        ws = out["whole_word_essence"]
+        L.append(f"  WHOLE-WORD ESSENCE (final vowel {ws['iast']}): {ws['sign']} {ws['essence']}")
     if "counter_reading" in out:
         L.append(f"  {out['counter_reading']}")
     L.append(f"  (chain: {out.get('essence_short','')})")
@@ -408,7 +466,8 @@ def main(argv=None):
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
     ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
     ap.add_argument("--db", action="store_true", help="Distortion-Balance model: first syllable=negative(distortion), rest=positive(balance)")
-    ap.add_argument("--vp", action="store_true", help="Vowel-pole model: CV consonant=positive pole, coda consonant=negative pole (no free knobs)")
+    ap.add_argument("--pairs", action="store_true", help="(legacy) overlapping-pairs model")
+    ap.add_argument("--vp-consonly", action="store_true", help="(legacy) vowel-pole on consonants only (no vowel meanings)")
     ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
     ap.add_argument("--log", default=None, help="predict/check CSV (default for --batch: varna_predict_check_log.csv)")
     ap.add_argument("--actual", default="", help="actual meaning (for --log)")
@@ -419,7 +478,7 @@ def main(argv=None):
         tally_csv(Path(args.tally)); return 0
     if args.batch:
         log = Path(args.log or "varna_predict_check_log.csv")
-        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse, model=("db" if args.db else "pair"))
+        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
         return 0
 
     if not args.word and not args.varnas:
@@ -432,7 +491,7 @@ def main(argv=None):
         ph, warn = phonemes_roman(args.word); src = "roman/IAST"
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
-    out = read(ph, reverse=args.reverse, model=("vp" if args.vp else "db" if args.db else "pair"))
+    out = read(ph, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
     print(format_reading(args.word or args.varnas, src, out, warn))
     if args.log:
         if not args.verdict:
