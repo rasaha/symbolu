@@ -25,9 +25,12 @@ mirror, not a decoder of truth.
    is **−**.
 4. **Doubled consonant.** Two of the same consonant in a row (happy *pp*, kill *ll*): the **1st takes the
    spiritual pole (+)**, the **2nd the worldly pole (−)**.
-5. **Dissolution.** A **−** consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
+5. **Clustered consonant.** A vowel-less consonant sitting **beside another consonant** (karma *rm*, world
+   *rld*) is **clubbed to its neighbour → spiritual pole (+)**, instead of staying negative. A **standalone
+   coda** (vowel before, no consonant beside it) stays worldly **−** (war *Ra⁻*, kāla *La⁻* preserved).
+6. **Dissolution.** A **−** consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
    *the* = Ḍa⁻ Shyness ⤳ Fearlessness).
-6. **Final vowel = whole-word essence** (removed from the stitched chain, reported as the word's summary).
+7. **Final vowel = whole-word essence** (removed from the stitched chain, reported as the word's summary).
 
 *Explored variants (discussed, not the default):* letter-based English; syllable-group reset; sign-selects-
 which-pole. The lexicon was also corrected for Sanskrit acoustic-root source fidelity on 8 letters (Ca, Ja,

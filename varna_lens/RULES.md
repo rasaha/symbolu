@@ -33,6 +33,12 @@ this is automatic (nothing precedes); for a leading consonant it is an explicit 
 takes the **spiritual (counter) pole (+)** and the **2nd** takes the **worldly pole (−)**. e.g.
 *kill* = … La⁺ **Compassion** → La⁻ **Cruelty** ; *happy* = … Pa⁺ **Affection** → Pa⁻ **Revulsion**.)
 
+(**Clustered consonant** — a **vowel-less consonant sitting beside another consonant** (a cluster like
+*karma* rm, *world* rld) is **clubbed to its neighbour and takes the spiritual (counter) pole (+)**, instead
+of staying negative. A **standalone coda** (a vowel before it, **no** consonant beside it) stays worldly
+**−**, so *war* = … Ra⁻ **Annihilation** and *kāla* = … La⁻ **Cruelty** are preserved. e.g.
+*karma* = Ka⁻ → a⁺ → Ra⁺ **Vitality** → Ma⁺ **Discipline** ; *world* = …Ra⁺ Vitality → La⁺ Compassion → Da⁺ Patience.)
+
 (A consonant looks **forward** for its vowel; a vowel looks **backward** for its consonant — mirror images,
 "and vice versa".)
 

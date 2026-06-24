@@ -300,7 +300,12 @@ def read_op(phonemes):
     turns the preceding consonant into a coda (−, dissolving).
 
     DOUBLED consonant (two of the same in a row — happy pp, kill ll): the 1st occurrence takes the
-    spiritual (counter) pole (+), the 2nd takes the worldly pole (−)."""
+    spiritual (counter) pole (+), the 2nd takes the worldly pole (−).
+
+    CLUSTERED consonant (a vowel-less consonant sitting beside another consonant — karma rm, world rld):
+    it is "clubbed" to its neighbour and takes the spiritual (counter) pole (+) instead of staying negative.
+    A STANDALONE coda (vowel before it, no consonant beside it) stays worldly (−) — so war = …Ra⁻ and
+    kāla = …La⁻ are preserved."""
     seq = list(phonemes)
     summary = None
     if seq and seq[-1][0] == "V":
@@ -322,19 +327,27 @@ def read_op(phonemes):
                 continue
             nxt = seq[i + 1] if i + 1 < n else None
             prev = seq[i - 1] if i > 0 else None
-            if prev and prev[0] == "C" and prev[1] == key:
+            nxt_v = bool(nxt and nxt[0] == "V")
+            nxt_c = bool(nxt and nxt[0] == "C")
+            prev_c = bool(prev and prev[0] == "C")
+            if prev_c and prev[1] == key:
                 # DOUBLED consonant (e.g. happy pp, kill ll): 2nd occurrence takes the WORLDLY pole
                 pos = False; v = d["leading_vritti"]; iast = d["iast"]
-            elif nxt and nxt[0] == "C" and nxt[1] == key:
+            elif nxt_c and nxt[1] == key and i != 0:
                 # DOUBLED consonant: 1st occurrence takes the SPIRITUAL (counter) pole — e.g. kill =
                 # …La⁺ Compassion → La⁻ Cruelty ; happy = …Pa⁺ Affection → Pa⁻ Revulsion
                 pos = True; v = d["counter_vritti"]; iast = d["iast"]
+            elif i != 0 and not nxt_v and (nxt_c or prev_c):
+                # CLUSTERED consonant: a vowel-less consonant that sits beside ANOTHER consonant is
+                # "clubbed" to its neighbour and takes the SPIRITUAL (counter) pole (+), instead of staying
+                # negative. (A *standalone* coda — vowel before, no consonant beside it — stays worldly −,
+                # so war = …Ra⁻ Annihilation and kāla = …La⁻ Cruelty are preserved.)
+                pos = True; v = d["counter_vritti"]; iast = d["iast"]
             else:
                 # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
-                # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed): for a vowel this is
-                # automatic (no consonant precedes); for a consonant it is this explicit i==0 override.
-                # Worldly pole shown either way. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
-                pos = bool(nxt and nxt[0] == "V") and i != 0
+                # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed); a standalone coda is − too.
+                # Worldly pole shown. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
+                pos = nxt_v and i != 0
                 v = d["leading_vritti"]          # the WORLDLY (bīja) propensity
                 iast = d["iast"]
         else:
