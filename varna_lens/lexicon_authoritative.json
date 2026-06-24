@@ -3,7 +3,8 @@
   "_legend": {
     "positive": "positive pole — liberating/balance (consonant) or positive acoustic essence (vowel)",
     "negative": "negative pole — binding/distortion (consonant) or negative meaning (vowel)",
-    "_worldly_reference_note": "Option 1 (worldly reference): the lens reads the WORLDLY (bīja) propensity of every varṇa. For a CONSONANT the worldly pole is the 'negative' field (binding vṛtti, e.g. Ka=Hope, La=Cruelty); for a VOWEL the worldly pole is the 'positive' field (active essence, e.g. a=Birth, ai=Welfare). This field asymmetry is intentional. The +/− SIGN in a reading is affirmed(+)/dissolving(−) from sound-order, NOT a field swap; the spiritual pole is the dissolved worldly one (the consonant's 'positive' counter-field)."
+    "_worldly_reference_note": "Option 1 (worldly reference): the lens reads the WORLDLY (bīja) propensity of every varṇa. For a CONSONANT the worldly pole is the 'negative' field (binding vṛtti, e.g. Ka=Hope, La=Cruelty); for a VOWEL the worldly pole is the 'positive' field (active essence, e.g. a=Birth, ai=Welfare). This field asymmetry is intentional. The +/− SIGN in a reading is affirmed(+)/dissolving(−) from sound-order, NOT a field swap; the spiritual pole is the dissolved worldly one (the consonant's 'positive' counter-field).",
+    "_source_corrected": "Entries Ca, Ja, Ma, Ra, Va, Śa(sha), Ṣa(ssa), Sa were later corrected for Sanskrit acoustic-root source fidelity (see each entry's source_vritti/source_notes). NOTE: the NO_SIGNAL result in RESULTS_ACOUSTIC_SIGNAL.md was produced on the PRIOR lexicon; any claim about this corrected lexicon requires re-running the pre-registered signal test."
   },
   "consonants": {
     "ka": {
@@ -33,8 +34,10 @@
     },
     "ca": {
       "iast": "Ca",
-      "positive": "Ekāgratā (single-pointed)",
-      "negative": "Vikṣepa (Scatter)"
+      "positive": "Viveka (conscience / discriminative clarity)",
+      "negative": "Aviveka (lack of discrimination / confused discernment)",
+      "source_vritti": "Viveka (conscience / discrimination)",
+      "source_notes": "Acoustic root of viveka. Negative pole Aviveka is the derived worldly distortion (source corrected from Ekāgratā/Vikṣepa)."
     },
     "cha": {
       "iast": "Cha",
@@ -43,8 +46,10 @@
     },
     "ja": {
       "iast": "Ja",
-      "positive": "Vinaya (Humility)",
-      "negative": "Dambha (Vanity)"
+      "positive": "Vinaya (humility / ego-softening)",
+      "negative": "Ahaṁkāra (ego inflation / I-centeredness)",
+      "source_vritti": "Ahaṁkāra (ego / inflated I-feeling)",
+      "source_notes": "Acoustic root of ahaṁkāra vṛtti. Worldly pole = ego inflation; remedial counter-pole = humility (source corrected from Dambha/vanity, which duplicated Ṅa)."
     },
     "jha": {
       "iast": "Jha",
@@ -128,8 +133,10 @@
     },
     "ma": {
       "iast": "Ma",
-      "positive": "Anuśāsana (strictness / disciplined restraint)",
-      "negative": "Praśraya (Indulgence)"
+      "positive": "Anuśāsana (disciplined restraint / containment)",
+      "negative": "Praśraya / Praṇāśa (indulgence / annihilating collapse)",
+      "source_vritti": "Praṇāśa (annihilation) + Praśraya (indulgence / giving latitude)",
+      "source_notes": "Source carries both praṇāśa and praśraya; praṇāśa added explicitly. Counter-pole Anuśāsana is the derived remedial restraint."
     },
     "ya": {
       "iast": "Ya",
@@ -138,8 +145,10 @@
     },
     "ra": {
       "iast": "Ra",
-      "positive": "Prāṇaśakti (Creation)",
-      "negative": "Sarvanāśa / Agnitattva (Annihilation / Darkness / Destructive thought)"
+      "positive": "Prāṇaśakti / Agnitattva (vitality / creative fire)",
+      "negative": "Sarvanāśa (annihilation-thought / defeatist destruction)",
+      "source_vritti": "Agnitattva / Prāṇaśakti (vitality / fire) + Sarvanāśa (annihilation-thought)",
+      "source_notes": "Corrected: agnitattva/fire moved to the positive (vitality) pole; only Sarvanāśa (destructive annihilation-thought) remains negative."
     },
     "la": {
       "iast": "La",
@@ -148,23 +157,31 @@
     },
     "va": {
       "iast": "Va",
-      "positive": "Satya (Truth / righteousness inside)",
-      "negative": "Dharma (righteousness outside)"
+      "positive": "Dharma / Jalatattva (original stance, sustaining righteousness / liquid coherence)",
+      "negative": "Adharma (deviation from original stance / loss of sustaining order)",
+      "source_vritti": "Dharma (ensconcement in original stance) + Jalatattva (liquid / water factor)",
+      "source_notes": "Corrected: Dharma is the sustaining (positive) pole, NOT a binding pole; worldly distortion = Adharma. Satya removed (was prior positive)."
     },
     "sha": {
       "iast": "Śa",
-      "positive": "Directed energy for success",
-      "negative": "Material greed"
+      "positive": "Directed energy / purposeful material pursuit (dynamic accomplishment)",
+      "negative": "Restless acquisition / material greed (rajasic overdrive)",
+      "source_vritti": "Rajoguṇa + Artha (psychic longing / material pursuit)",
+      "source_notes": "Greed is the distorted form, not the whole source; positive pole = purposeful dynamic accomplishment (rajasic energy)."
     },
     "ssa": {
       "iast": "Ṣa",
-      "positive": "Transmutation of desire, inner grounding",
-      "negative": "Lust, confusion, inertia"
+      "positive": "Transmutation of desire / grounded containment",
+      "negative": "Kāma / Tamoguṇa (physical desire / inertia / confusion)",
+      "source_vritti": "Tamoguṇa + Kāma (physical / worldly desire)",
+      "source_notes": "Worldly pole = kāma / tamoguṇa; counter-pole = transmutation of desire. Source alignment made explicit."
     },
     "sa": {
       "iast": "Sa",
-      "positive": "Liberation, clarity, surrender",
-      "negative": "Escapism, static detachment"
+      "positive": "Mokṣa / Sattvaguṇa (liberation / clarity)",
+      "negative": "Escapism (premature detachment / static withdrawal)",
+      "source_vritti": "Mokṣa + Sattvaguṇa",
+      "source_notes": "Liberation / sattva is the source root (positive); negative pole = escapist / static withdrawal."
     },
     "ha": {
       "iast": "Ha",

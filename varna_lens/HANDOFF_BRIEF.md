@@ -67,3 +67,26 @@ Given a clean NO_SIGNAL, what's the honest, useful path? Candidates to pressure-
 > Reproduce: `python varna_lens/signal_test.py --judge random` (null → chance, Δ=0);
 > `--judge wordnet|llm` for the semantic arms (needs corpus/API). Verdict is computed by the
 > pre-registered rule, not by hand.
+
+## Changelog — lexicon source correction (after the NO_SIGNAL test)
+Several varṇa entries were later corrected for Sanskrit acoustic-root source fidelity: **Ca, Ja, Ma, Ra, Va,
+Śa, Ṣa, Sa** (see each entry's `source_vritti` / `source_notes` in `lexicon_authoritative.json`, and the
+"Source fidelity" note in `LEXICON.md`). Notable: Ra's *agnitattva/fire* moved to the vitality (positive)
+pole; Va's worldly pole is now *Adharma* (Dharma is the positive/sustaining pole); Ja's worldly pole is
+*ahaṁkāra* (ego), not *dambha*.
+
+**Important:** the **NO_SIGNAL** result in `RESULTS_ACOUSTIC_SIGNAL.md` (and the INCONCLUSIVE utility result
+in `RESULTS_UTILITY_SIGNAL.md`) were produced on the **prior, pre-correction lexicon**. Any claim about the
+**corrected, source-aligned lexicon** requires **re-running the pre-registered tests**. The prior null
+result must **not** be used as proof against the corrected lexicon — nor as proof *for* it. Until a re-run,
+no signal/utility claim attaches to the corrected lexicon either way.
+
+**Corrected-lexicon re-run completed on `38e38d3`** (same harness/thresholds/wordlists/judges/templates):
+- acoustic → **NO_SIGNAL** (acc real 0.173 ≈ chance; Δ = −0.106, CI −0.185…−0.028 — real *below* scrambled)
+  → `RESULTS_ACOUSTIC_SIGNAL_CORRECTED_LEXICON.md`
+- utility → **NO_UTILITY_SIGNAL** (Δ = +0.067, CI −0.007…+0.140; far below MIN_EFFECT 0.30; position-biased)
+  → `RESULTS_UTILITY_SIGNAL_CORRECTED_LEXICON.md`
+
+Prior pre-correction results remain archived and must not be merged with corrected-lexicon results. Bottom
+line: the corrected lexicon improved source fidelity but produced **no measurable acoustic or utility
+signal** — empirical signal remains unproven on either lexicon version.
