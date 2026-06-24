@@ -31,8 +31,15 @@ from datetime import datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-LEX = json.loads((_HERE / "lexicon.json").read_text())
-CONS, VOW = LEX["consonants"], LEX["vowels"]
+# Authoritative set (verbatim from Sanskrit_letters_full.docx). Normalize consonant field names to the
+# ones the reader expects: leading_vritti = NEGATIVE/binding pole, counter_vritti = POSITIVE/balance pole.
+LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
+VOW = LEX["vowels"]
+CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative_vritti"],
+            "counter_vritti": d["positive_vritti"], "felt_negative": d.get("felt_negative"),
+            "felt_positive": d.get("felt_positive"), "contextual_flow": d.get("contextual_flow"),
+            "varga": d.get("varga")}
+        for k, d in LEX["consonants"].items()}
 
 # surface → lexicon key (longest match first). ASCII read as IAST-ish (ch=cha, c=ca, sh=śa).
 _CONS = [("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
