@@ -117,6 +117,33 @@ def phonemes_explicit(spec: str):
     return out, warn
 
 
+_IAST_CHARS = set("āīūṛṝḷṅñṭḍṇśṣṁṃḥĀĪŪṚṜṄÑṬḌṆŚṢṀḤ")
+_CMUDICT = None
+
+def _in_cmudict(word):
+    """True if the (ascii) word is a real English word in cmudict."""
+    global _CMUDICT
+    if _CMUDICT is None:
+        try:
+            from nltk.corpus import cmudict
+            try:
+                _CMUDICT = cmudict.dict()
+            except LookupError:
+                import nltk; nltk.download("cmudict", quiet=True); _CMUDICT = cmudict.dict()
+        except Exception:
+            _CMUDICT = {}
+    return word.lower() in _CMUDICT
+
+def auto_phonemes(word):
+    """Route automatically: IAST diacritics -> literal Sanskrit; else a real English/other word in the
+    pronunciation dictionary -> g2p (pronunciation); else literal fallback. Returns (phonemes, warn, src)."""
+    if any(ch in word for ch in _IAST_CHARS):
+        ph, w = phonemes_roman(word); return ph, w, "roman/IAST (auto: diacritics)"
+    if _in_cmudict(word):
+        ph, w = phonemes_cmudict(word); return ph, w, "g2p (auto: dictionary word)"
+    ph, w = phonemes_roman(word); return ph, w, "roman (auto: fallback)"
+
+
 def annotate(phonemes):
     """Tag each consonant with R1 polarity: 'created' if the NEXT phoneme is a vowel, else 'destroyed'."""
     ann = []
@@ -245,7 +272,9 @@ def read_op(phonemes):
             if not d:
                 continue
             nxt = seq[i + 1] if i + 1 < n else None
-            pos = bool(nxt and nxt[0] == "V")
+            # consonant is POSITIVE if a vowel follows it, OR it is word-initial (no vowel before it —
+            # so the final-vowel rule never flips a leading consonant to a coda). e.g. the = Ḍa⁺ ⟹ [a]
+            pos = bool(nxt and nxt[0] == "V") or i == 0
             v = d["counter_vritti"] if pos else d["leading_vritti"]
             iast = d["iast"]
         else:
@@ -364,14 +393,16 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None, reverse=False, model="pair"):
-    """Segment + read one word. Returns (out|None, src, warnings)."""
+def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="pair"):
+    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown)."""
     if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
     elif g2p:
-        ph, warn = phonemes_cmudict(word); src = "cmudict(English)"
+        ph, warn = phonemes_cmudict(word); src = "g2p (forced)"
+    elif roman:
+        ph, warn = phonemes_roman(word); src = "roman (forced)"
     else:
-        ph, warn = phonemes_roman(word); src = "roman/IAST"
+        ph, warn, src = auto_phonemes(word)
     if not ph:
         return None, src, warn
     return read(ph, reverse=reverse, model=model), src, warn
@@ -456,7 +487,8 @@ def tally_csv(path: Path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Personal varna-essence lens (frozen lexicon + acoustic rules).")
     ap.add_argument("word", nargs="?", help="romanized word, e.g. kala / kāla / ak")
-    ap.add_argument("--g2p", action="store_true", help="English acoustic breakdown via nltk-cmudict (approx)")
+    ap.add_argument("--g2p", action="store_true", help="force g2p pronunciation (English/any language)")
+    ap.add_argument("--roman", action="store_true", help="force literal IAST/roman reading (skip auto g2p)")
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
@@ -482,9 +514,11 @@ def main(argv=None):
     if args.varnas:
         ph, warn = phonemes_explicit(args.varnas); src = "explicit"
     elif args.g2p:
-        ph, warn = phonemes_cmudict(args.word); src = "cmudict(English)"
+        ph, warn = phonemes_cmudict(args.word); src = "g2p (forced)"
+    elif args.roman:
+        ph, warn = phonemes_roman(args.word); src = "roman (forced)"
     else:
-        ph, warn = phonemes_roman(args.word); src = "roman/IAST"
+        ph, warn, src = auto_phonemes(args.word)
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
     out = read(ph, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
