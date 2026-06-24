@@ -157,7 +157,9 @@ def judge_surface(text, use_case, seed):
 
 
 def judge_random(text, use_case, seed):
-    return 1.0 + 4.0 * _rnd.Random(hash((text[:12], seed)) & 0xffffffff).random()
+    # NULL judge: ignores content, depends only on the (deterministic) per-item seed — so `--judge random`
+    # is reproducible as the pre-registration states (Python's hash() is per-process randomized; avoid it).
+    return 1.0 + 4.0 * _rnd.Random(seed).random()
 
 
 JUDGES = {"surface": judge_surface, "random": judge_random}
