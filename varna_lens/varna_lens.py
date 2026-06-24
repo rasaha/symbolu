@@ -38,8 +38,40 @@ VOW = LEX["vowels"]
 CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative"], "counter_vritti": d["positive"]}
         for k, d in LEX["consonants"].items()}
 
+# Varga (place-of-articulation family) + Devanāgarī, for DISPLAY clarity only — keeps the frozen meaning
+# lexicon (iast/positive/negative) clean while making the retroflex Ṭa-varga vs dental ta-varga obvious.
+_VARGA = {
+    "ka": ("guttural · ka-varga", "क"), "kha": ("guttural · ka-varga", "ख"),
+    "ga": ("guttural · ka-varga", "ग"), "gha": ("guttural · ka-varga", "घ"),
+    "nga": ("guttural · ka-varga", "ङ"),
+    "ca": ("palatal · ca-varga", "च"), "cha": ("palatal · ca-varga", "छ"),
+    "ja": ("palatal · ca-varga", "ज"), "jha": ("palatal · ca-varga", "झ"),
+    "nya": ("palatal · ca-varga", "ञ"),
+    "tta": ("RETROFLEX · Ṭa-varga", "ट"), "ttha": ("RETROFLEX · Ṭa-varga", "ठ"),
+    "dda": ("RETROFLEX · Ṭa-varga", "ड"), "ddha": ("RETROFLEX · Ṭa-varga", "ढ"),
+    "nna": ("RETROFLEX · Ṭa-varga", "ण"),
+    "ta": ("dental · ta-varga", "त"), "tha": ("dental · ta-varga", "थ"),
+    "da": ("dental · ta-varga", "द"), "dha": ("dental · ta-varga", "ध"),
+    "na": ("dental · ta-varga", "न"),
+    "pa": ("labial · pa-varga", "प"), "pha": ("labial · pa-varga", "फ"),
+    "ba": ("labial · pa-varga", "ब"), "bha": ("labial · pa-varga", "भ"),
+    "ma": ("labial · pa-varga", "म"),
+    "ya": ("semivowel · antaḥstha", "य"), "ra": ("semivowel · antaḥstha", "र"),
+    "la": ("semivowel · antaḥstha", "ल"), "va": ("semivowel · antaḥstha", "व"),
+    "sha": ("sibilant palatal · ūṣma", "श"), "ssa": ("sibilant RETROFLEX · ūṣma", "ष"),
+    "sa": ("sibilant dental · ūṣma", "स"), "ha": ("aspirate · ūṣma", "ह"),
+    "ksha": ("compound", "क्ष"),
+}
+
+# ITRANS-style ASCII for the retroflex (Ṭa-varga) letters, so you can WRITE them distinctly without
+# diacritics: CAPITAL T D N (and Th Dh, Sh=ṣa) = retroflex; lowercase t d n (th dh, sh=śa) = dental/palatal.
+# (These hit only the manual roman / --varnas path — English words still route through g2p.)
+_RETRO_ASCII = [("Th", "ttha"), ("Dh", "ddha"), ("Sh", "ssa"),
+                ("T", "tta"), ("D", "dda"), ("N", "nna")]
+
 # surface → lexicon key (longest match first). ASCII read as IAST-ish (ch=cha, c=ca, sh=śa).
-_CONS = [("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
+_CONS = _RETRO_ASCII + [
+         ("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
          ("ḍh", "ddha"), ("th", "tha"), ("dh", "dha"), ("ph", "pha"), ("bh", "bha"), ("ṅ", "nga"),
          ("ñ", "nya"), ("ṇ", "nna"), ("ṭ", "tta"), ("ḍ", "dda"), ("ś", "sha"), ("ṣ", "ssa"), ("x", "ksha"),
          ("k", "ka"), ("g", "ga"), ("c", "ca"), ("j", "ja"), ("t", "ta"), ("d", "da"), ("n", "na"),
@@ -361,7 +393,8 @@ def format_reading(word, src, out, warnings):
         if a["type"] == "C":
             d = a["data"]
             if d:
-                L.append(f"    {a['surface']:<4} C  {a['key']:<5} {d['iast']:<4}  "
+                vg, dv = _VARGA.get(a["key"], ("", ""))
+                L.append(f"    {a['surface']:<4} C  {dv} {d['iast']:<4} [{vg}]  "
                          f"[{a['polarity'].upper()}{(' / ' + a.get('role','')) if a.get('role') else ''}]  "
                          f"{d['leading_vritti']}   (counter: {d['counter_vritti']})")
             else:

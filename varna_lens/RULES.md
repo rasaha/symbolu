@@ -66,6 +66,17 @@ You must read the **sounds**, not the spelling. So the lens auto-routes:
 English↔Sanskrit sound notes: English **f** = **Pha** (p stays Pa); English voiced **th** (the/this) = **Ḍa**.
 Overrides: `--g2p` force pronunciation · `--roman` force literal · `--varnas "va,a,ra"` pin exact varṇas.
 
+### Retroflex vs dental — writing the two T/D/N families unambiguously
+The **retroflex Ṭa-varga** (ṭ ṭh ḍ ḍh ṇ) and the **dental ta-varga** (t th d dh n) are different sounds with
+different vṛttis (e.g. ḍa = *Lajjā/Shyness*, but da = *Krodha/Peevishness*). To write the **retroflex** in
+manual/`--varnas` input, use **either**:
+- **diacritics:** `ṭ ṭh ḍ ḍh ṇ ṣ` (e.g. `ḍa`), or
+- **ITRANS capitals:** `T Th D Dh N` and `Sh` (=ṣa) — e.g. `Da` = **Ḍa** (Shyness); lowercase `da` = dental
+  **Da** (Peevishness); `sh` stays palatal **Śa**.
+
+English words go through g2p and are disambiguated automatically (voiced *th*→Ḍa, plain *d*→Da). Every
+reading prints the **Devanāgarī + varga** (e.g. `ड Ḍa [RETROFLEX · Ṭa-varga]`) so you can confirm the sound.
+
 ## What's FIXED vs a CHOICE
 - **Fixed:** the lexicon (each letter's two poles + vowel essences), the segmentation, and the rule above.
 - **Choice (only):** how to break a word into sounds when ambiguous (use `--varnas` to pin it).
