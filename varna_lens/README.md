@@ -8,6 +8,20 @@
 > firewalls sound→meaning on purpose; this lives **outside** it, clearly labeled as an interpretive lens.
 > It needs no external validation to be a useful personal instrument — its only discipline is *consistency*.
 
+## Falsification record (pre-registered, computed by rule)
+Three independent pre-registered blind tests, each with a scrambled-lexicon control:
+- **Lexical meaning recovery** → **NO_SIGNAL** (real ≈ chance ≈ scrambled). `PREREG_ACOUSTIC_SIGNAL.md` /
+  `RESULTS_ACOUSTIC_SIGNAL*.md`.
+- **Non-lexical utility** → **NO_UTILITY_SIGNAL / INCONCLUSIVE** (Δ ≈ 0.07, far below threshold).
+  `PREREG_UTILITY_SIGNAL.md` / `RESULTS_UTILITY_SIGNAL*.md`.
+- **Archetypal-function fit (the "missing middle")** → **NO_ARCHETYPE_SIGNAL** (real ≈ scrambled;
+  both beat only a neutral-noun lexicon — a vocabulary effect, not an acoustic one).
+  `PREREG_ARCHETYPE_SIGNAL.md` / `RESULTS_ARCHETYPE_SIGNAL.md` / `archetype_test.py`.
+
+Bottom line: the lens does **not** decode meaning, utility, or archetype from the specific
+sound→propensity attachment. Its value is **consistency for reflection**, not truth — and it stays
+firewalled from C×R×S (`phoneme_overreach`).
+
 ## The frozen lexicon (`lexicon_authoritative.json`)
 - **Consonants:** each carries its **worldly (bīja) binding vṛtti** (`negative` field — the propensity the
   sound activates) + a **dissolved/spiritual counter-pole** (`positive` field).
