@@ -29,6 +29,10 @@ The **displayed meaning is always the worldly propensity**. Sound order only set
 this is automatic (nothing precedes); for a leading consonant it is an explicit override. e.g.
 *the* = Ḍa⁻ **Shyness** ⟹ [a]; *kāla* = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.)
 
+(**Doubled consonant** (two of the same consonant in a row — *happy* pp, *kill* ll): the **1st** occurrence
+takes the **spiritual (counter) pole (+)** and the **2nd** takes the **worldly pole (−)**. e.g.
+*kill* = … La⁺ **Compassion** → La⁻ **Cruelty** ; *happy* = … Pa⁺ **Affection** → Pa⁻ **Revulsion**.)
+
 (A consonant looks **forward** for its vowel; a vowel looks **backward** for its consonant — mirror images,
 "and vice versa".)
 

@@ -297,7 +297,10 @@ def read_op(phonemes):
     the per-letter dissolved/spiritual pole is still shown as "(counter: …)" in the full sequence view.)
 
     A FINAL vowel is REMOVED from the stitched chain and reported as the whole-word essence; removing it
-    turns the preceding consonant into a coda (−, dissolving)."""
+    turns the preceding consonant into a coda (−, dissolving).
+
+    DOUBLED consonant (two of the same in a row — happy pp, kill ll): the 1st occurrence takes the
+    spiritual (counter) pole (+), the 2nd takes the worldly pole (−)."""
     seq = list(phonemes)
     summary = None
     if seq and seq[-1][0] == "V":
@@ -318,13 +321,22 @@ def read_op(phonemes):
             if not d:
                 continue
             nxt = seq[i + 1] if i + 1 < n else None
-            # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
-            # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed): for a vowel this is automatic
-            # (no consonant precedes); for a consonant it is this explicit i==0 override. Worldly pole shown
-            # either way. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
-            pos = bool(nxt and nxt[0] == "V") and i != 0
-            v = d["leading_vritti"]          # always the WORLDLY (bīja) propensity
-            iast = d["iast"]
+            prev = seq[i - 1] if i > 0 else None
+            if prev and prev[0] == "C" and prev[1] == key:
+                # DOUBLED consonant (e.g. happy pp, kill ll): 2nd occurrence takes the WORLDLY pole
+                pos = False; v = d["leading_vritti"]; iast = d["iast"]
+            elif nxt and nxt[0] == "C" and nxt[1] == key:
+                # DOUBLED consonant: 1st occurrence takes the SPIRITUAL (counter) pole — e.g. kill =
+                # …La⁺ Compassion → La⁻ Cruelty ; happy = …Pa⁺ Affection → Pa⁻ Revulsion
+                pos = True; v = d["counter_vritti"]; iast = d["iast"]
+            else:
+                # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
+                # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed): for a vowel this is
+                # automatic (no consonant precedes); for a consonant it is this explicit i==0 override.
+                # Worldly pole shown either way. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
+                pos = bool(nxt and nxt[0] == "V") and i != 0
+                v = d["leading_vritti"]          # the WORLDLY (bīja) propensity
+                iast = d["iast"]
         else:
             d = VOW.get(key)
             prev = seq[i - 1] if i > 0 else None
