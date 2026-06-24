@@ -1,0 +1,69 @@
+# Varṇa Lens — handoff brief (for an external collaborator)
+
+A personal, interpretive tool that abstracts a word's "hidden essence" from a frozen lexicon of Sanskrit
+varṇa (acoustic-root / bīja-akṣara) meanings. **Explicitly NOT a universal claim; deliberately OUTSIDE the
+C×R×S engine** (which firewalls sound→meaning). One frozen lexicon, fixed rules, applied identically every
+time. Files: `RULES.md`, `LEXICON.md`, `lexicon_authoritative.json`, `varna_lens.py`; falsification in
+`PREREG_ACOUSTIC_SIGNAL.md` + `signal_test.py` + `RESULTS_ACOUSTIC_SIGNAL.md`.
+
+## A. THE RULES
+
+**1. Sound, not spelling (segmentation).** Read a word by its *native pronunciation*, not its letters.
+- English → g2p (ARPAbet). Key maps: /ʌ/ ("cut") → **a** (अ, not u); voiced *th* ("the") → **Ḍa**
+  (retroflex); *f* → **Pha**.
+- Sanskrit/IAST → literal (every vowel is written).
+- Other languages → pin the true phonetics. Same letter ≠ same sound across languages (pinyin `q` =
+  /tɕʰ/ ≈ *ch*, **not** k).
+- Retroflex Ṭa-varga (ṭ ṭh ḍ ḍh ṇ) vs dental ta-varga (t th d dh n) written distinctly: diacritics, **or**
+  ITRANS capitals `T Th D Dh N` (retroflex) vs lowercase (dental); `sh`=Śa, `Sh`=Ṣa.
+
+**2. Worldly reference (which pole shows).** Every varṇa is read by its **worldly (bīja) propensity**.
+Consonant worldly = its *binding* pole; vowel worldly = its *active* pole. The displayed meaning is
+**always** worldly. The spiritual pole is what you reach by *dissolving* it (not printed as its own word).
+
+**3. Polarity (the sign).** Set purely by sound-order:
+- **First sound of the word is always `−`** (vowel or consonant) — a bare, un-anchored seed.
+- A **consonant** is `+` (affirmed) iff a vowel follows it **and** it isn't first; else `−` (coda/leading).
+- A **vowel** is `+` iff a consonant precedes it; else `−`.
+- `+` = the bīja **activates** the worldly propensity; `−` = it **dissolves** (toward spiritual).
+
+**4. Dissolution target.** A `−` consonant prints `worldly ⤳ spiritual-counter`
+(e.g. `the` = Ḍa⁻ Shyness ⤳ Fearlessness).
+
+**5. Final vowel = whole-word essence.** A word-final vowel is removed from the stitched chain and reported
+separately as the word's summary (this turns the preceding consonant into a coda).
+
+*Example:* kāla → −Hope⤳Detachment · +Expansion · −Cruelty⤳Compassion ⟹ [Birth].
+
+## B. THE LEXICON (frozen)
+~46 varṇas (consonants + 12 vowels). Each has two poles: **positive** (liberating/spiritual) and
+**negative** (binding/worldly). For consonants the worldly pole = the negative field; for vowels the worldly
+pole = the positive field (intentional asymmetry). Never edited to fit a word after the fact — that's the
+whole discipline.
+
+## C. WHAT WE TESTED & FOUND (decisive)
+Pre-registered **blind falsification**: mechanical essence (no human) → blind judge picks the true meaning
+among 5 valence-matched distractors → repeated on a **scrambled-lexicon** control. 127 words (73 Sanskrit,
+36 English, 18 cross-lingual).
+- **NO_SIGNAL.** acc(real) = **0.205** ≈ chance (0.20); acc(scrambled) = 0.260; Δ = −0.055
+  (95% CI −0.142 … +0.031, straddles 0). **Scrambling the sound→meaning map changed nothing.** Even
+  Sanskrit (home turf) was at chance.
+- **Conclusion:** the lens does **not** decode meaning. Apparent coherence in use is *interpreter-supplied*
+  (pronunciation choice + narrative fit), consistent with same-sound→same-essence and valence-matching seen
+  in manual testing. It stays a **contemplative instrument, firewalled from conscious generation** (feeding
+  it in = the `phoneme_overreach` taboo).
+
+## D. OPEN STRATEGY QUESTIONS (for the collaborator)
+Given a clean NO_SIGNAL, what's the honest, useful path? Candidates to pressure-test:
+1. **Reframe as generative, not veridical** — a structured *creativity / meditation prompt* (value = the
+   contemplative act, not truth). Is there a real use-case there?
+2. **Narrow the hypothesis** — test only where sound↔meaning is *plausibly* real (sound-symbolism /
+   phonaesthemes like English *gl-* "light", *sn-* "nose"; ideophones; within one language), instead of
+   universal varṇa claims.
+3. **Decouple from CG entirely** — keep it personal; spend C×R×S effort elsewhere.
+4. **If anyone wants to revive H1** — the only thing that counts is real ≫ scrambled on a blind test (the
+   bar it just failed), then a generation ablation vs. a scrambled-essence control.
+
+> Reproduce: `python varna_lens/signal_test.py --judge random` (null → chance, Δ=0);
+> `--judge wordnet|llm` for the semantic arms (needs corpus/API). Verdict is computed by the
+> pre-registered rule, not by hand.
