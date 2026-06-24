@@ -72,11 +72,13 @@ _RETRO_ASCII = [("Th", "ttha"), ("Dh", "ddha"), ("Sh", "ssa"),
 # surface → lexicon key (longest match first). ASCII read as IAST-ish (ch=cha, c=ca, sh=śa).
 _CONS = _RETRO_ASCII + [
          ("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
-         ("ḍh", "ddha"), ("th", "tha"), ("dh", "dha"), ("ph", "pha"), ("bh", "bha"), ("ṅ", "nga"),
-         ("ñ", "nya"), ("ṇ", "nna"), ("ṭ", "tta"), ("ḍ", "dda"), ("ś", "sha"), ("ṣ", "ssa"), ("x", "ksha"),
-         ("k", "ka"), ("g", "ga"), ("c", "ca"), ("j", "ja"), ("t", "ta"), ("d", "da"), ("n", "na"),
-         ("p", "pa"), ("b", "ba"), ("m", "ma"), ("y", "ya"), ("r", "ra"), ("l", "la"), ("v", "va"),
-         ("w", "va"), ("s", "sa"), ("h", "ha"), ("f", "pha")]   # English f = Sanskrit Pha (p stays Pa)
+         ("ḍh", "ddha"), ("th", "tha"), ("dh", "dha"), ("ph", "pha"), ("bh", "bha"), ("sh", "sha"),
+         ("ṅ", "nga"), ("ñ", "nya"), ("ṇ", "nna"), ("ṭ", "tta"), ("ḍ", "dda"), ("ś", "sha"),
+         ("ṣ", "ssa"), ("x", "ksha"),
+         ("k", "ka"), ("q", "ka"), ("g", "ga"), ("c", "ca"), ("j", "ja"), ("t", "ta"), ("d", "da"),
+         ("n", "na"), ("p", "pa"), ("b", "ba"), ("m", "ma"), ("y", "ya"), ("r", "ra"), ("l", "la"),
+         ("v", "va"), ("w", "va"), ("s", "sa"), ("h", "ha"), ("f", "pha")]
+         # lowercase sh = Śa (palatal), Sh = Ṣa (retroflex); q = Ka (qāf→guttural); English f = Pha (p stays Pa)
 _VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ii", "ii"), ("ī", "ii"), ("uu", "uu"),
         ("ū", "uu"), ("ṁ", "am"), ("ṃ", "am"), ("ḥ", "ah"), ("a", "a"), ("i", "i"), ("u", "u"),
         ("e", "e"), ("o", "o")]
