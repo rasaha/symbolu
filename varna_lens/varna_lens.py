@@ -51,7 +51,7 @@ _VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ii", "ii"), ("
 
 # ARPAbet (cmudict) → varṇa key, for --g2p English words (approximate: English phonology ≠ varṇas).
 _ARPA_C = {"P": "pa", "B": "ba", "T": "ta", "D": "da", "K": "ka", "G": "ga", "M": "ma", "N": "na",
-           "NG": "nga", "F": "pha", "V": "va", "TH": "tha", "DH": "dha", "S": "sa", "Z": "sa",
+           "NG": "nga", "F": "pha", "V": "va", "TH": "tha", "DH": "dda", "S": "sa", "Z": "sa",
            "SH": "sha", "ZH": "sha", "CH": "ca", "JH": "ja", "HH": "ha", "R": "ra", "L": "la",
            "W": "va", "Y": "ya", "DX": "da"}
 _ARPA_V = {"AA": "aa", "AE": "a", "AH": "a", "AO": "o", "AW": "au", "AY": "ai", "EH": "e", "ER": "a",
