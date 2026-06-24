@@ -31,30 +31,61 @@ from datetime import datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-# Authoritative set (verbatim from Sanskrit_letters_full.docx). Normalize consonant field names to the
-# ones the reader expects: leading_vritti = NEGATIVE/binding pole, counter_vritti = POSITIVE/balance pole.
+# Authoritative set (verbatim from Sanskrit_letters_full.docx). Map the file's positive/negative to the
+# names the readers use internally: leading_vritti = NEGATIVE pole, counter_vritti = POSITIVE pole.
 LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
 VOW = LEX["vowels"]
-CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative_vritti"],
-            "counter_vritti": d["positive_vritti"], "felt_negative": d.get("felt_negative"),
-            "felt_positive": d.get("felt_positive"), "contextual_flow": d.get("contextual_flow"),
-            "varga": d.get("varga")}
+CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative"], "counter_vritti": d["positive"]}
         for k, d in LEX["consonants"].items()}
 
+# Varga (place-of-articulation family) + Devanāgarī, for DISPLAY clarity only — keeps the frozen meaning
+# lexicon (iast/positive/negative) clean while making the retroflex Ṭa-varga vs dental ta-varga obvious.
+_VARGA = {
+    "ka": ("guttural · ka-varga", "क"), "kha": ("guttural · ka-varga", "ख"),
+    "ga": ("guttural · ka-varga", "ग"), "gha": ("guttural · ka-varga", "घ"),
+    "nga": ("guttural · ka-varga", "ङ"),
+    "ca": ("palatal · ca-varga", "च"), "cha": ("palatal · ca-varga", "छ"),
+    "ja": ("palatal · ca-varga", "ज"), "jha": ("palatal · ca-varga", "झ"),
+    "nya": ("palatal · ca-varga", "ञ"),
+    "tta": ("RETROFLEX · Ṭa-varga", "ट"), "ttha": ("RETROFLEX · Ṭa-varga", "ठ"),
+    "dda": ("RETROFLEX · Ṭa-varga", "ड"), "ddha": ("RETROFLEX · Ṭa-varga", "ढ"),
+    "nna": ("RETROFLEX · Ṭa-varga", "ण"),
+    "ta": ("dental · ta-varga", "त"), "tha": ("dental · ta-varga", "थ"),
+    "da": ("dental · ta-varga", "द"), "dha": ("dental · ta-varga", "ध"),
+    "na": ("dental · ta-varga", "न"),
+    "pa": ("labial · pa-varga", "प"), "pha": ("labial · pa-varga", "फ"),
+    "ba": ("labial · pa-varga", "ब"), "bha": ("labial · pa-varga", "भ"),
+    "ma": ("labial · pa-varga", "म"),
+    "ya": ("semivowel · antaḥstha", "य"), "ra": ("semivowel · antaḥstha", "र"),
+    "la": ("semivowel · antaḥstha", "ल"), "va": ("semivowel · antaḥstha", "व"),
+    "sha": ("sibilant palatal · ūṣma", "श"), "ssa": ("sibilant RETROFLEX · ūṣma", "ष"),
+    "sa": ("sibilant dental · ūṣma", "स"), "ha": ("aspirate · ūṣma", "ह"),
+    "ksha": ("compound", "क्ष"),
+}
+
+# ITRANS-style ASCII for the retroflex (Ṭa-varga) letters, so you can WRITE them distinctly without
+# diacritics: CAPITAL T D N (and Th Dh, Sh=ṣa) = retroflex; lowercase t d n (th dh, sh=śa) = dental/palatal.
+# (These hit only the manual roman / --varnas path — English words still route through g2p.)
+_RETRO_ASCII = [("Th", "ttha"), ("Dh", "ddha"), ("Sh", "ssa"),
+                ("T", "tta"), ("D", "dda"), ("N", "nna")]
+
 # surface → lexicon key (longest match first). ASCII read as IAST-ish (ch=cha, c=ca, sh=śa).
-_CONS = [("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
-         ("ḍh", "ddha"), ("th", "tha"), ("dh", "dha"), ("ph", "pha"), ("bh", "bha"), ("ṅ", "nga"),
-         ("ñ", "nya"), ("ṇ", "nna"), ("ṭ", "tta"), ("ḍ", "dda"), ("ś", "sha"), ("ṣ", "ssa"), ("x", "ksha"),
-         ("k", "ka"), ("g", "ga"), ("c", "ca"), ("j", "ja"), ("t", "ta"), ("d", "da"), ("n", "na"),
-         ("p", "pa"), ("b", "ba"), ("m", "ma"), ("y", "ya"), ("r", "ra"), ("l", "la"), ("v", "va"),
-         ("w", "va"), ("s", "sa"), ("h", "ha")]
+_CONS = _RETRO_ASCII + [
+         ("kṣ", "ksha"), ("kh", "kha"), ("gh", "gha"), ("ch", "cha"), ("jh", "jha"), ("ṭh", "ttha"),
+         ("ḍh", "ddha"), ("th", "tha"), ("dh", "dha"), ("ph", "pha"), ("bh", "bha"), ("sh", "sha"),
+         ("ṅ", "nga"), ("ñ", "nya"), ("ṇ", "nna"), ("ṭ", "tta"), ("ḍ", "dda"), ("ś", "sha"),
+         ("ṣ", "ssa"), ("x", "ksha"),
+         ("k", "ka"), ("q", "ka"), ("g", "ga"), ("c", "ca"), ("j", "ja"), ("t", "ta"), ("d", "da"),
+         ("n", "na"), ("p", "pa"), ("b", "ba"), ("m", "ma"), ("y", "ya"), ("r", "ra"), ("l", "la"),
+         ("v", "va"), ("w", "va"), ("s", "sa"), ("h", "ha"), ("f", "pha")]
+         # lowercase sh = Śa (palatal), Sh = Ṣa (retroflex); q = Ka (qāf→guttural); English f = Pha (p stays Pa)
 _VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ii", "ii"), ("ī", "ii"), ("uu", "uu"),
         ("ū", "uu"), ("ṁ", "am"), ("ṃ", "am"), ("ḥ", "ah"), ("a", "a"), ("i", "i"), ("u", "u"),
         ("e", "e"), ("o", "o")]
 
 # ARPAbet (cmudict) → varṇa key, for --g2p English words (approximate: English phonology ≠ varṇas).
 _ARPA_C = {"P": "pa", "B": "ba", "T": "ta", "D": "da", "K": "ka", "G": "ga", "M": "ma", "N": "na",
-           "NG": "nga", "F": "pha", "V": "va", "TH": "tha", "DH": "dha", "S": "sa", "Z": "sa",
+           "NG": "nga", "F": "pha", "V": "va", "TH": "tha", "DH": "dda", "S": "sa", "Z": "sa",
            "SH": "sha", "ZH": "sha", "CH": "ca", "JH": "ja", "HH": "ha", "R": "ra", "L": "la",
            "W": "va", "Y": "ya", "DX": "da"}
 _ARPA_V = {"AA": "aa", "AE": "a", "AH": "a", "AO": "o", "AW": "au", "AY": "ai", "EH": "e", "ER": "a",
@@ -118,6 +149,33 @@ def phonemes_explicit(spec: str):
         seg, w = phonemes_roman(tok)
         out.extend(seg); warn.extend(w)
     return out, warn
+
+
+_IAST_CHARS = set("āīūṛṝḷṅñṭḍṇśṣṁṃḥĀĪŪṚṜṄÑṬḌṆŚṢṀḤ")
+_CMUDICT = None
+
+def _in_cmudict(word):
+    """True if the (ascii) word is a real English word in cmudict."""
+    global _CMUDICT
+    if _CMUDICT is None:
+        try:
+            from nltk.corpus import cmudict
+            try:
+                _CMUDICT = cmudict.dict()
+            except LookupError:
+                import nltk; nltk.download("cmudict", quiet=True); _CMUDICT = cmudict.dict()
+        except Exception:
+            _CMUDICT = {}
+    return word.lower() in _CMUDICT
+
+def auto_phonemes(word):
+    """Route automatically: IAST diacritics -> literal Sanskrit; else a real English/other word in the
+    pronunciation dictionary -> g2p (pronunciation); else literal fallback. Returns (phonemes, warn, src)."""
+    if any(ch in word for ch in _IAST_CHARS):
+        ph, w = phonemes_roman(word); return ph, w, "roman/IAST (auto: diacritics)"
+    if _in_cmudict(word):
+        ph, w = phonemes_cmudict(word); return ph, w, "g2p (auto: dictionary word)"
+    ph, w = phonemes_roman(word); return ph, w, "roman (auto: fallback)"
 
 
 def annotate(phonemes):
@@ -224,11 +282,22 @@ def read_vp(phonemes):
 
 
 def read_op(phonemes):
-    """THE single rule (order-polarity) + final-vowel summary.
+    """THE single rule — WORLDLY-REFERENCE order-polarity (Option 1) + final-vowel summary.
+
+    Every varṇa is read by its ONE worldly (bīja) propensity — the consonant's `leading_vritti`
+    (the binding/manifest pole) and the vowel's worldly `positive` essence. The displayed meaning is
+    ALWAYS that worldly propensity; the +/− sign only marks how the word's sound-order treats it:
+      +  AFFIRMED  — the bīja activates the propensity (consonant has a vowel after it AND is not the
+                     word's first sound; vowel has a consonant before it = anchored);
+      −  DISSOLVING — the sound LEADS the word (the bare un-anchored first varṇa, vowel OR consonant) or
+                     sits at a coda, so the structure is *eliminating* that worldly propensity (its
+                     dissolution is what the reader reads as the spiritual pole — e.g. aim = ai
+                     welfare-materialization, then m eliminates it).
+    (Spiritual meaning is therefore DERIVED by dissolving the worldly pole, not printed as its own word —
+    the per-letter dissolved/spiritual pole is still shown as "(counter: …)" in the full sequence view.)
+
     A FINAL vowel is REMOVED from the stitched chain and reported as the whole-word essence; removing it
-    turns the preceding consonant into a coda (negative). Then on the remaining sounds:
-      consonant POSITIVE if a vowel FOLLOWS it (else negative/coda);
-      vowel POSITIVE if a consonant PRECEDES it (else negative/leading)."""
+    turns the preceding consonant into a coda (−, dissolving)."""
     seq = list(phonemes)
     summary = None
     if seq and seq[-1][0] == "V":
@@ -237,9 +306,10 @@ def read_op(phonemes):
         prev = seq[-1] if seq else None
         spos = bool(prev and prev[0] == "C")
         if vd:
+            # whole-word essence = the final vowel's WORLDLY essence (always); sign = anchored/dissolving.
             summary = {"iast": vd["iast"].split(" ")[0], "sign": "+" if spos else "−",
-                       "essence": vd["positive"] if spos else vd["negative"]}
-    out = {"sequence": annotate(phonemes), "model": "order_polarity", "whole_word_essence": summary}
+                       "essence": vd["positive"]}
+    out = {"sequence": annotate(phonemes), "model": "order_polarity_worldly", "whole_word_essence": summary}
     parts, shorts = [], []
     n = len(seq)
     for i, (typ, key, surf) in enumerate(seq):
@@ -248,19 +318,30 @@ def read_op(phonemes):
             if not d:
                 continue
             nxt = seq[i + 1] if i + 1 < n else None
-            pos = bool(nxt and nxt[0] == "V")
-            v = d["counter_vritti"] if pos else d["leading_vritti"]
+            # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
+            # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed): for a vowel this is automatic
+            # (no consonant precedes); for a consonant it is this explicit i==0 override. Worldly pole shown
+            # either way. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
+            pos = bool(nxt and nxt[0] == "V") and i != 0
+            v = d["leading_vritti"]          # always the WORLDLY (bīja) propensity
             iast = d["iast"]
         else:
             d = VOW.get(key)
             prev = seq[i - 1] if i > 0 else None
-            pos = bool(prev and prev[0] == "C")
-            v = d["positive"] if pos else d["negative"]
+            pos = bool(prev and prev[0] == "C")    # anchored by a preceding consonant
+            v = d["positive"]                # vowel's WORLDLY active essence
             iast = d["iast"].split(" ")[0]
         sign = "+" if pos else "−"
-        parts.append(f"«{iast}»({sign}) {_short(v)}")
-        shorts.append(sign + _short(v))
-    out["rule"] = "order-polarity (final vowel = whole-word essence)"
+        if typ == "C" and not pos:
+            # a DISSOLVING consonant resolves its worldly pole INTO its spiritual counter-pole
+            # (e.g. Ha− Darkness ⤳ Parā-vidyā; the = Ḍa− Shyness ⤳ Fearlessness)
+            counter = _short(d["counter_vritti"])
+            parts.append(f"«{iast}»({sign}) {_short(v)}  ⤳ {counter}")
+            shorts.append(f"{sign}{_short(v)}⤳{counter}")
+        else:
+            parts.append(f"«{iast}»({sign}) {_short(v)}")
+            shorts.append(sign + _short(v))
+    out["rule"] = "worldly-reference order-polarity (+ affirmed / − dissolving; final vowel = whole-word essence)"
     out["essence"] = "  →  ".join(parts) if parts else "(none)"
     short = " → ".join(shorts)
     if summary:
@@ -324,15 +405,15 @@ def format_reading(word, src, out, warnings):
         if a["type"] == "C":
             d = a["data"]
             if d:
-                L.append(f"    {a['surface']:<4} C  {a['key']:<5} {d['iast']:<4}  "
+                vg, dv = _VARGA.get(a["key"], ("", ""))
+                L.append(f"    {a['surface']:<4} C  {dv} {d['iast']:<4} [{vg}]  "
                          f"[{a['polarity'].upper()}{(' / ' + a.get('role','')) if a.get('role') else ''}]  "
                          f"{d['leading_vritti']}   (counter: {d['counter_vritti']})")
             else:
                 L.append(f"    {a['surface']:<4} C  (no lexicon entry for {a['key']})")
         else:
             d = a["data"]
-            L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['positive']} / (shadow) {d['negative']}"
-                     f"   ·  {d['bridge']}")
+            L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['positive']} / (shadow) {d['negative']}")
     if out.get("pairs"):
         L.append("")
         L.append(f"  overlapping pairs (R2):  {out.get('pairs_short','')}")
@@ -368,14 +449,16 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None, reverse=False, model="pair"):
-    """Segment + read one word. Returns (out|None, src, warnings)."""
+def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="pair"):
+    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown)."""
     if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
     elif g2p:
-        ph, warn = phonemes_cmudict(word); src = "cmudict(English)"
+        ph, warn = phonemes_cmudict(word); src = "g2p (forced)"
+    elif roman:
+        ph, warn = phonemes_roman(word); src = "roman (forced)"
     else:
-        ph, warn = phonemes_roman(word); src = "roman/IAST"
+        ph, warn, src = auto_phonemes(word)
     if not ph:
         return None, src, warn
     return read(ph, reverse=reverse, model=model), src, warn
@@ -460,7 +543,8 @@ def tally_csv(path: Path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Personal varna-essence lens (frozen lexicon + acoustic rules).")
     ap.add_argument("word", nargs="?", help="romanized word, e.g. kala / kāla / ak")
-    ap.add_argument("--g2p", action="store_true", help="English acoustic breakdown via nltk-cmudict (approx)")
+    ap.add_argument("--g2p", action="store_true", help="force g2p pronunciation (English/any language)")
+    ap.add_argument("--roman", action="store_true", help="force literal IAST/roman reading (skip auto g2p)")
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
@@ -486,9 +570,11 @@ def main(argv=None):
     if args.varnas:
         ph, warn = phonemes_explicit(args.varnas); src = "explicit"
     elif args.g2p:
-        ph, warn = phonemes_cmudict(args.word); src = "cmudict(English)"
+        ph, warn = phonemes_cmudict(args.word); src = "g2p (forced)"
+    elif args.roman:
+        ph, warn = phonemes_roman(args.word); src = "roman (forced)"
     else:
-        ph, warn = phonemes_roman(args.word); src = "roman/IAST"
+        ph, warn, src = auto_phonemes(args.word)
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
     out = read(ph, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))

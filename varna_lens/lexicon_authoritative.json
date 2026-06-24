@@ -1,61 +1,243 @@
 {
   "_source": "Sanskrit_letters_full.docx (user-confirmed AUTHORITATIVE set, this version supersedes earlier ones)",
   "_legend": {
-    "positive_vritti": "liberating / balance pole",
-    "negative_vritti": "binding / distortion pole (the canonical acoustic root / Sarkar bīja)",
-    "felt_negative": "spiritual-hierarchy layer where the NEGATIVE pole is felt",
-    "felt_positive": "spiritual-hierarchy layer where the POSITIVE pole is felt",
-    "contextual_flow": "rajasic / flow layer — how the consonant behaves woven into words (position-dependent)"
+    "positive": "positive pole — liberating/balance (consonant) or positive acoustic essence (vowel)",
+    "negative": "negative pole — binding/distortion (consonant) or negative meaning (vowel)",
+    "_worldly_reference_note": "Option 1 (worldly reference): the lens reads the WORLDLY (bīja) propensity of every varṇa. For a CONSONANT the worldly pole is the 'negative' field (binding vṛtti, e.g. Ka=Hope, La=Cruelty); for a VOWEL the worldly pole is the 'positive' field (active essence, e.g. a=Birth, ai=Welfare). This field asymmetry is intentional. The +/− SIGN in a reading is affirmed(+)/dissolving(−) from sound-order, NOT a field swap; the spiritual pole is the dissolved worldly one (the consonant's 'positive' counter-field)."
   },
   "consonants": {
-    "ka":   {"iast": "Ka",  "positive_vritti": "Nirāśā (Detachment)",                              "negative_vritti": "Āśā (Hope)",                                          "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ka-varga (Creation/Assertion)", "contextual_flow": "Pushes outward, projects hope/aim into the field"},
-    "kha":  {"iast": "Kha", "positive_vritti": "Viśvāsa (Trust)",                                   "negative_vritti": "Cintā (Worry)",                                       "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ka-varga (Creation/Assertion)", "contextual_flow": "Expands space, makes room (aspirated openness)"},
-    "ga":   {"iast": "Ga",  "positive_vritti": "Sthiti (Stillness)",                                "negative_vritti": "Ceṣṭā (Action)",                                      "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ka-varga (Creation/Assertion)", "contextual_flow": "Grounds, stabilizes action; in middle → resistance / weight"},
-    "gha":  {"iast": "Gha", "positive_vritti": "Anāsakti (Non-attachment)",                         "negative_vritti": "Mamatā (Attachment)",                                 "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ka-varga (Creation/Assertion)", "contextual_flow": "Over-assertion, loud projection, often distorts flow"},
-    "nga":  {"iast": "Ṅa",  "positive_vritti": "Vinaya (Humility)",                                 "negative_vritti": "Dambha (Vanity)",                                     "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ka-varga (Creation/Assertion)", "contextual_flow": "Absorption, interiorization, muffling effect"},
-    "ca":   {"iast": "Ca",  "positive_vritti": "Ekāgratā (single-pointed)",                         "negative_vritti": "Vikṣepa (Scatter)",                                   "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ca-varga (Reflection/Interaction)", "contextual_flow": "Sharp cut, initiates comparison, analysis"},
-    "cha":  {"iast": "Cha", "positive_vritti": "Dhṛti (Emotional firmness)",                        "negative_vritti": "Vikalatā (Nervous breakdown)",                        "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ca-varga (Reflection/Interaction)", "contextual_flow": "Playful push, exaggeration, exploration"},
-    "ja":   {"iast": "Ja",  "positive_vritti": "Vinaya (Humility)",                                 "negative_vritti": "Dambha (Vanity)",                                     "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ca-varga (Reflection/Interaction)", "contextual_flow": "Emergence, manifestation of vanity or distinctness"},
-    "jha":  {"iast": "Jha", "positive_vritti": "Santoṣa / Aparigraha (Contentment / Non-possession)", "negative_vritti": "Lolupatā / Lobha (Greed / Avarice)",                 "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ca-varga (Reflection/Interaction)", "contextual_flow": "Heavy grasp, greed/attachment when context dominates"},
-    "nya":  {"iast": "Ña",  "positive_vritti": "Ārjavatā (Straightforwardness / Integrity)",        "negative_vritti": "Kapaṭatā (Hypocrisy)",                                "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ca-varga (Reflection/Interaction)", "contextual_flow": "Assimilation, blending with softness"},
-    "tta":  {"iast": "Ṭa",  "positive_vritti": "Maunam / Yathārthatā (Silence / Objectivity)",      "negative_vritti": "Vitarka (Overstatement)",                             "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ṭa-varga (Firmness/Structure)", "contextual_flow": "Hard stop, immovable determination"},
-    "ttha": {"iast": "Ṭha", "positive_vritti": "Kṣamā / Ātmaprasāda (Forgiveness / Self-acceptance)", "negative_vritti": "Anutāpa (Repentance)",                               "felt_negative": "Ego",      "felt_positive": "Intellect", "varga": "Ṭa-varga (Firmness/Structure)", "contextual_flow": "Shock or burst, forcing openness"},
-    "dda":  {"iast": "Ḍa",  "positive_vritti": "Nirbhayatā / Svīkāra (Fearlessness / Self-acceptance)", "negative_vritti": "Lajjā (Shyness)",                                  "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ṭa-varga (Firmness/Structure)", "contextual_flow": "Roll, continuity, movement through inertia"},
-    "ddha": {"iast": "Ḍha", "positive_vritti": "Karuṇā (Compassion)",                               "negative_vritti": "Piśunatā (Sadistic cruelty)",                         "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ṭa-varga (Firmness/Structure)", "contextual_flow": "Surging projection, sometimes violent"},
-    "nna":  {"iast": "Ṇa",  "positive_vritti": "Muditā (Sympathetic joy)",                          "negative_vritti": "Īrṣyā (Envy)",                                        "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ṭa-varga (Firmness/Structure)", "contextual_flow": "Interior weight, hidden stubbornness"},
-    "ta":   {"iast": "Ta",  "positive_vritti": "Jāgaraṇa (Awakening / Alertness)",                  "negative_vritti": "Jāḍya / Nidrā (Inertia, deep sleep)",                 "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ta-varga (Relational/Flow in Society)", "contextual_flow": "Order, sequencing, procedural energy"},
-    "tha":  {"iast": "Tha", "positive_vritti": "Harṣa / Prīti (Joy / Affection)",                   "negative_vritti": "Viṣāda (Melancholy)",                                 "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ta-varga (Relational/Flow in Society)", "contextual_flow": "Breath-push, effortful striving"},
-    "da":   {"iast": "Da",  "positive_vritti": "Kṣamā / Dhairya (Patience / Forgiveness)",          "negative_vritti": "Krodha / Karkaśatā (Peevishness / Irritability)",      "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ta-varga (Relational/Flow in Society)", "contextual_flow": "Granting, giving structure, social binding"},
-    "dha":  {"iast": "Dha", "positive_vritti": "Nivṛtti / Tuṣṭi (Renunciation / Contentment)",      "negative_vritti": "Tṛṣṇā (Craving)",                                     "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ta-varga (Relational/Flow in Society)", "contextual_flow": "Holding, sustaining, carrying forward"},
-    "na":   {"iast": "Na",  "positive_vritti": "Viveka (Discriminative detachment)",                "negative_vritti": "Moha (Blind attachment)",                             "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Ta-varga (Relational/Flow in Society)", "contextual_flow": "Humanizing, relational grounding"},
-    "pa":   {"iast": "Pa",  "positive_vritti": "Maitrī / Sneha (Friendliness / Affection)",         "negative_vritti": "Ghṛṇā (Hatred / Revulsion)",                          "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Pa-varga (Desire/Manifestation)", "contextual_flow": "Repulsion, pushing away / denying"},
-    "pha":  {"iast": "Pha", "positive_vritti": "Abhaya (Fearlessness)",                             "negative_vritti": "Bhaya (Fear)",                                        "felt_negative": "Mind",     "felt_positive": "Soul",      "varga": "Pa-varga (Desire/Manifestation)", "contextual_flow": "Expansion outward, dispersal, extravagance"},
-    "ba":   {"iast": "Ba",  "positive_vritti": "Ādara / Mānya (Respect / Reverence)",               "negative_vritti": "Avajñā (Indifference)",                               "felt_negative": "Body",     "felt_positive": "Witness",   "varga": "Pa-varga (Desire/Manifestation)", "contextual_flow": "Drawing in, binding, bringing together"},
-    "bha":  {"iast": "Bha", "positive_vritti": "Jāgaraṇa (Awareness / awakening)",                  "negative_vritti": "Mūrcchā (Deluded obsession)",                         "felt_negative": "Body",     "felt_positive": "Witness",   "varga": "Pa-varga (Desire/Manifestation)", "contextual_flow": "Shining forth, expressive release"},
-    "ma":   {"iast": "Ma",  "positive_vritti": "Anuśāsana (strictness / disciplined restraint)",    "negative_vritti": "Praśraya (Indulgence)",                               "felt_negative": "Body",     "felt_positive": "Witness",   "varga": "Pa-varga (Desire/Manifestation)", "contextual_flow": "Containment, restraint, disciplined closure"},
-    "ya":   {"iast": "Ya",  "positive_vritti": "Viśvāsa (Confidence)",                              "negative_vritti": "Aviśvāsa (Lack of confidence)",                       "felt_negative": "Body",     "felt_positive": "Witness",   "varga": "Semi-vowel (Connecting Principle)", "contextual_flow": "Channeling, joining, linking states"},
-    "ra":   {"iast": "Ra",  "positive_vritti": "Prāṇaśakti (Creation)",                             "negative_vritti": "Sarvanāśa / Agnitattva (Annihilation / Darkness / Destructive thought)", "felt_negative": "Body", "felt_positive": "Witness", "varga": "Semi-vowel (Connecting Principle)", "contextual_flow": "Turning, transformation, active movement"},
-    "la":   {"iast": "La",  "positive_vritti": "Karuṇā / Sneha (Compassion / Gentleness)",          "negative_vritti": "Krūratā (Cruelty)",                                   "felt_negative": "Body",     "felt_positive": "Witness",   "varga": "Semi-vowel (Connecting Principle)", "contextual_flow": "Dissolution, soft release, adaptability"},
-    "va":   {"iast": "Va",  "positive_vritti": "Satya (Truth / righteousness inside)",              "negative_vritti": "Dharma (righteousness outside)",                      "felt_negative": "Identity", "felt_positive": "Atman",     "varga": "Semi-vowel (Connecting Principle)", "contextual_flow": "Truth principle → manifests as softening/uplift when after another"},
-    "sha":  {"iast": "Śa",  "positive_vritti": "Directed energy for success",                       "negative_vritti": "Material greed",                                      "felt_negative": "Identity", "felt_positive": "Atman",     "varga": "Sibilant", "contextual_flow": "Refinement, beautification, elegance"},
-    "ssa":  {"iast": "Ṣa",  "positive_vritti": "Transmutation of desire, inner grounding",          "negative_vritti": "Lust, confusion, inertia",                            "felt_negative": "Identity", "felt_positive": "Atman",     "varga": "Sibilant", "contextual_flow": "Forceful distinction, separation, contraction"},
-    "sa":   {"iast": "Sa",  "positive_vritti": "Liberation, clarity, surrender",                    "negative_vritti": "Escapism, static detachment",                         "felt_negative": "Identity", "felt_positive": "Atman",     "varga": "Sibilant", "contextual_flow": "Surrender/escape, contextual flow = dissolving tension"},
-    "ha":   {"iast": "Ha",  "positive_vritti": "Parā-vidyā (Spiritual knowledge)",                  "negative_vritti": "Avidyā / Rātri (Darkness / Night / Inertia)",         "felt_negative": "Karma",    "felt_positive": "Brahman",   "varga": "Aspirate", "contextual_flow": "Breath release, compulsion, closure"},
-    "ksha": {"iast": "Kṣa", "positive_vritti": "Aparā-vidyā (Mundane knowledge)",                   "negative_vritti": "Mithyā-jñāna (False knowledge, Dogma)",               "felt_negative": "Karma",    "felt_positive": "Brahman",   "varga": "Conjunct", "contextual_flow": "(compound kṣa)"}
+    "ka": {
+      "iast": "Ka",
+      "positive": "Nirāśā (Detachment)",
+      "negative": "Āśā (Hope)"
+    },
+    "kha": {
+      "iast": "Kha",
+      "positive": "Viśvāsa (Trust)",
+      "negative": "Cintā (Worry)"
+    },
+    "ga": {
+      "iast": "Ga",
+      "positive": "Sthiti (Stillness)",
+      "negative": "Ceṣṭā (Action)"
+    },
+    "gha": {
+      "iast": "Gha",
+      "positive": "Anāsakti (Non-attachment)",
+      "negative": "Mamatā (Attachment)"
+    },
+    "nga": {
+      "iast": "Ṅa",
+      "positive": "Vinaya (Humility)",
+      "negative": "Dambha (Vanity)"
+    },
+    "ca": {
+      "iast": "Ca",
+      "positive": "Ekāgratā (single-pointed)",
+      "negative": "Vikṣepa (Scatter)"
+    },
+    "cha": {
+      "iast": "Cha",
+      "positive": "Dhṛti (Emotional firmness)",
+      "negative": "Vikalatā (Nervous breakdown)"
+    },
+    "ja": {
+      "iast": "Ja",
+      "positive": "Vinaya (Humility)",
+      "negative": "Dambha (Vanity)"
+    },
+    "jha": {
+      "iast": "Jha",
+      "positive": "Santoṣa / Aparigraha (Contentment / Non-possession)",
+      "negative": "Lolupatā / Lobha (Greed / Avarice)"
+    },
+    "nya": {
+      "iast": "Ña",
+      "positive": "Ārjavatā (Straightforwardness / Integrity)",
+      "negative": "Kapaṭatā (Hypocrisy)"
+    },
+    "tta": {
+      "iast": "Ṭa",
+      "positive": "Maunam / Yathārthatā (Silence / Objectivity)",
+      "negative": "Vitarka (Overstatement)"
+    },
+    "ttha": {
+      "iast": "Ṭha",
+      "positive": "Kṣamā / Ātmaprasāda (Forgiveness / Self-acceptance)",
+      "negative": "Anutāpa (Repentance)"
+    },
+    "dda": {
+      "iast": "Ḍa",
+      "positive": "Nirbhayatā / Svīkāra (Fearlessness / Self-acceptance)",
+      "negative": "Lajjā (Shyness)"
+    },
+    "ddha": {
+      "iast": "Ḍha",
+      "positive": "Karuṇā (Compassion)",
+      "negative": "Piśunatā (Sadistic cruelty)"
+    },
+    "nna": {
+      "iast": "Ṇa",
+      "positive": "Muditā (Sympathetic joy)",
+      "negative": "Īrṣyā (Envy)"
+    },
+    "ta": {
+      "iast": "Ta",
+      "positive": "Jāgaraṇa (Awakening / Alertness)",
+      "negative": "Jāḍya / Nidrā (Inertia, deep sleep)"
+    },
+    "tha": {
+      "iast": "Tha",
+      "positive": "Harṣa / Prīti (Joy / Affection)",
+      "negative": "Viṣāda (Melancholy)"
+    },
+    "da": {
+      "iast": "Da",
+      "positive": "Kṣamā / Dhairya (Patience / Forgiveness)",
+      "negative": "Krodha / Karkaśatā (Peevishness / Irritability)"
+    },
+    "dha": {
+      "iast": "Dha",
+      "positive": "Nivṛtti / Tuṣṭi (Renunciation / Contentment)",
+      "negative": "Tṛṣṇā (Craving)"
+    },
+    "na": {
+      "iast": "Na",
+      "positive": "Viveka (Discriminative detachment)",
+      "negative": "Moha (Blind attachment)"
+    },
+    "pa": {
+      "iast": "Pa",
+      "positive": "Maitrī / Sneha (Friendliness / Affection)",
+      "negative": "Ghṛṇā (Hatred / Revulsion)"
+    },
+    "pha": {
+      "iast": "Pha",
+      "positive": "Abhaya (Fearlessness)",
+      "negative": "Bhaya (Fear)"
+    },
+    "ba": {
+      "iast": "Ba",
+      "positive": "Ādara / Mānya (Respect / Reverence)",
+      "negative": "Avajñā (Indifference)"
+    },
+    "bha": {
+      "iast": "Bha",
+      "positive": "Jāgaraṇa (Awareness / awakening)",
+      "negative": "Mūrcchā (Deluded obsession)"
+    },
+    "ma": {
+      "iast": "Ma",
+      "positive": "Anuśāsana (strictness / disciplined restraint)",
+      "negative": "Praśraya (Indulgence)"
+    },
+    "ya": {
+      "iast": "Ya",
+      "positive": "Viśvāsa (Confidence)",
+      "negative": "Aviśvāsa (Lack of confidence)"
+    },
+    "ra": {
+      "iast": "Ra",
+      "positive": "Prāṇaśakti (Creation)",
+      "negative": "Sarvanāśa / Agnitattva (Annihilation / Darkness / Destructive thought)"
+    },
+    "la": {
+      "iast": "La",
+      "positive": "Karuṇā / Sneha (Compassion / Gentleness)",
+      "negative": "Krūratā (Cruelty)"
+    },
+    "va": {
+      "iast": "Va",
+      "positive": "Satya (Truth / righteousness inside)",
+      "negative": "Dharma (righteousness outside)"
+    },
+    "sha": {
+      "iast": "Śa",
+      "positive": "Directed energy for success",
+      "negative": "Material greed"
+    },
+    "ssa": {
+      "iast": "Ṣa",
+      "positive": "Transmutation of desire, inner grounding",
+      "negative": "Lust, confusion, inertia"
+    },
+    "sa": {
+      "iast": "Sa",
+      "positive": "Liberation, clarity, surrender",
+      "negative": "Escapism, static detachment"
+    },
+    "ha": {
+      "iast": "Ha",
+      "positive": "Parā-vidyā (Spiritual knowledge)",
+      "negative": "Avidyā / Rātri (Darkness / Night / Inertia)"
+    },
+    "ksha": {
+      "iast": "Kṣa",
+      "positive": "Aparā-vidyā (Mundane knowledge)",
+      "negative": "Mithyā-jñāna (False knowledge, Dogma)"
+    }
   },
   "vowels": {
-    "a":  {"iast": "a (अ)",  "bridge": "Unmanifested ↔ Manifested Self", "positive": "Birth of cognition / raw potential", "negative": "restless starting without sustaining",            "movement": "First pulse of Being"},
-    "aa": {"iast": "ā (आ)",  "bridge": "Karma → Manifested Self",        "positive": "Ongoing thought / expansion",        "negative": "overextension, inflation",                        "movement": "Movement of intention"},
-    "i":  {"iast": "i (इ)",  "bridge": "Identity → Karma",               "positive": "I-ness, doing self",                 "negative": "self-absorption, ego-centric doing",              "movement": "Subjectivity enters action"},
-    "ii": {"iast": "ī (ई)",  "bridge": "Body → Identity",                "positive": "Specialization of self",            "negative": "over-specialization, isolation",                  "movement": "Sense of self in form"},
-    "u":  {"iast": "u (उ)",  "bridge": "Mind → Body",                    "positive": "Zoom, contraction",                 "negative": "tunnel vision, missing the whole picture",        "movement": "Localized awareness"},
-    "uu": {"iast": "ū (ऊ)",  "bridge": "Ego → Mind",                     "positive": "Sustained attention, holding",      "negative": "fixation, obsessive holding",                     "movement": "From will to mental focus"},
-    "e":  {"iast": "e (ए)",  "bridge": "Intellect → Ego",                "positive": "Practical thought, benefit",        "negative": "overthinking, nitpicking",                        "movement": "Mind asserts self-usefulness"},
-    "ai": {"iast": "ai (ऐ)", "bridge": "Soul → Intellect",               "positive": "Welfare, materialization",          "negative": "paternalism, overcontrol 'for your own good'",    "movement": "Soul intention seeking form"},
-    "o":  {"iast": "o (ओ)",  "bridge": "Witness → Soul",                 "positive": "Completion, closure",               "negative": "premature closure, stagnation",                   "movement": "From observer to inner belonging"},
-    "au": {"iast": "au (औ)", "bridge": "Atman → Witness",                "positive": "Surrender, Letting-go",             "negative": "abandonment, cutting off prematurely",            "movement": "From selfhood to seer"},
-    "am": {"iast": "aṁ (अं)","bridge": "Brahman → Atman",                "positive": "Repulsion, Detox",                  "negative": "purging without integration, loss of vital essence", "movement": "Purging distortions blocking unity"},
-    "ah": {"iast": "aḥ (अः)","bridge": "Post-Brahman → Dissolution",     "positive": "Attraction, Nectar-pull",           "negative": "compulsion, clinging pull",                       "movement": "Dissolution into silence (beyond Brahman)"}
+    "a": {
+      "iast": "a (अ)",
+      "positive": "Birth of cognition / raw potential",
+      "negative": "restless starting without sustaining"
+    },
+    "aa": {
+      "iast": "ā (आ)",
+      "positive": "Ongoing thought / expansion",
+      "negative": "overextension, inflation"
+    },
+    "i": {
+      "iast": "i (इ)",
+      "positive": "I-ness, doing self",
+      "negative": "self-absorption, ego-centric doing"
+    },
+    "ii": {
+      "iast": "ī (ई)",
+      "positive": "Specialization of self",
+      "negative": "over-specialization, isolation"
+    },
+    "u": {
+      "iast": "u (उ)",
+      "positive": "Zoom, contraction",
+      "negative": "tunnel vision, missing the whole picture"
+    },
+    "uu": {
+      "iast": "ū (ऊ)",
+      "positive": "Sustained attention, holding",
+      "negative": "fixation, obsessive holding"
+    },
+    "e": {
+      "iast": "e (ए)",
+      "positive": "Practical thought, benefit",
+      "negative": "overthinking, nitpicking"
+    },
+    "ai": {
+      "iast": "ai (ऐ)",
+      "positive": "Welfare, materialization",
+      "negative": "paternalism, overcontrol 'for your own good'"
+    },
+    "o": {
+      "iast": "o (ओ)",
+      "positive": "Completion, closure",
+      "negative": "premature closure, stagnation"
+    },
+    "au": {
+      "iast": "au (औ)",
+      "positive": "Surrender, Letting-go",
+      "negative": "abandonment, cutting off prematurely"
+    },
+    "am": {
+      "iast": "aṁ (अं)",
+      "positive": "Repulsion, Detox",
+      "negative": "purging without integration, loss of vital essence"
+    },
+    "ah": {
+      "iast": "aḥ (अः)",
+      "positive": "Attraction, Nectar-pull",
+      "negative": "compulsion, clinging pull"
+    }
   },
   "contextual_usage": {
     "word_start": "consonant acts more strongly in its assertive projection (outer call)",
