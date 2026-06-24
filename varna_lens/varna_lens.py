@@ -35,8 +35,8 @@ _HERE = Path(__file__).resolve().parent
 # ones the reader expects: leading_vritti = NEGATIVE/binding pole, counter_vritti = POSITIVE/balance pole.
 LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
 VOW = LEX["vowels"]
-CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative_vritti"],
-            "counter_vritti": d["positive_vritti"], "felt_negative": d.get("felt_negative"),
+CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative"],
+            "counter_vritti": d["positive"], "felt_negative": d.get("felt_negative"),
             "felt_positive": d.get("felt_positive"), "contextual_flow": d.get("contextual_flow"),
             "varga": d.get("varga")}
         for k, d in LEX["consonants"].items()}
@@ -331,8 +331,7 @@ def format_reading(word, src, out, warnings):
                 L.append(f"    {a['surface']:<4} C  (no lexicon entry for {a['key']})")
         else:
             d = a["data"]
-            L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['positive']} / (shadow) {d['negative']}"
-                     f"   ·  {d['bridge']}")
+            L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['positive']} / (shadow) {d['negative']}")
     if out.get("pairs"):
         L.append("")
         L.append(f"  overlapping pairs (R2):  {out.get('pairs_short','')}")
