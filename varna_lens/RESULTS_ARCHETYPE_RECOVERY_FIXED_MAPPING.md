@@ -40,7 +40,13 @@ The question: does a more faithful, frozen mapping let the real chain recover it
 |---|---|---|---|---|
 | **LLM** (9 blind judges) | 0.211 (CI 0.08–0.37) | 0.233 | 0.222 | **NO_ARCHETYPE_RECOVERY_SIGNAL** |
 | random (null) | 0.167 (CI 0.03–0.30) | 0.197 | 0.170 | **NO_ARCHETYPE_RECOVERY_SIGNAL** |
-| wordnet (deterministic) | _PENDING_ | _PENDING_ | _PENDING_ | _PENDING_ |
+| wordnet (deterministic) | _not re-run (CPU-prohibitive at S-controls in sandbox)_ | — | — | — |
+
+The deterministic wordnet arm was not re-run on the corrected mapping: the Wu-Palmer similarity sweep over
+30 words × ~41 control chains × 6 options exceeds the sandbox CPU budget (timed out at both S=20 and S=8).
+It is non-gating. For reference, the **prior-mapping** wordnet arm (`RESULTS_ARCHETYPE_RECOVERY.md`) returned
+accuracy(real) = 0.133 — **below** chance and below both controls — and the corrected-mapping confirmatory
+(LLM) and null arms above both return NO_ARCHETYPE_RECOVERY_SIGNAL, so the verdict is not in doubt.
 
 ## Interpretation
 The fix is the **right thing to do** for dialect faithfulness and is kept. But it did **not** change the
