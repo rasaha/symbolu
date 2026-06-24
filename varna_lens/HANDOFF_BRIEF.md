@@ -80,3 +80,13 @@ in `RESULTS_UTILITY_SIGNAL.md`) were produced on the **prior, pre-correction lex
 **corrected, source-aligned lexicon** requires **re-running the pre-registered tests**. The prior null
 result must **not** be used as proof against the corrected lexicon — nor as proof *for* it. Until a re-run,
 no signal/utility claim attaches to the corrected lexicon either way.
+
+**Corrected-lexicon re-run completed on `38e38d3`** (same harness/thresholds/wordlists/judges/templates):
+- acoustic → **NO_SIGNAL** (acc real 0.173 ≈ chance; Δ = −0.106, CI −0.185…−0.028 — real *below* scrambled)
+  → `RESULTS_ACOUSTIC_SIGNAL_CORRECTED_LEXICON.md`
+- utility → **NO_UTILITY_SIGNAL** (Δ = +0.067, CI −0.007…+0.140; far below MIN_EFFECT 0.30; position-biased)
+  → `RESULTS_UTILITY_SIGNAL_CORRECTED_LEXICON.md`
+
+Prior pre-correction results remain archived and must not be merged with corrected-lexicon results. Bottom
+line: the corrected lexicon improved source fidelity but produced **no measurable acoustic or utility
+signal** — empirical signal remains unproven on either lexicon version.

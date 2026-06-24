@@ -3,6 +3,10 @@
 > Pre-registration: `PREREG_UTILITY_SIGNAL.md`. Verdict computed by the registered rule, not by hand. This
 > is a separate hypothesis from the lexical NO_SIGNAL result (`RESULTS_ACOUSTIC_SIGNAL.md`), and a positive
 > result here would **not** revive the lexical claim. Interpretive lens — **not** part of C×R×S.
+>
+> **Lexicon-version note:** this INCONCLUSIVE result was produced on the **pre-correction** lexicon. The
+> corrected-lexicon re-run is done (commit `38e38d3`) and returned **NO_UTILITY_SIGNAL** — see
+> `RESULTS_UTILITY_SIGNAL_CORRECTED_LEXICON.md`. Keep the two archived separately; do not merge.
 
 N = 124 words (one `use_case` each), K=2 paired comparison, scramble preserves antonym pairing / +/− field /
 gloss multiset / output length. Practical threshold **MIN_EFFECT = 0.30** on the 1–5 utility scale.
