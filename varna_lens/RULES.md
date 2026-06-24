@@ -36,25 +36,30 @@ consonant**, so that consonant stays an *onset* (→ spiritual), not a coda. e.g
 | **kala** (art) | Ka⁻ **Hope** (first) → a Birth → **La⁺ Compassion** (onset) | a⁺ Birth |
 | **kāla** | Ka⁻ **Hope** (first) → ā Expansion → **La⁺ Compassion** (onset) | a⁺ Birth |
 | **war** | Va⁻ **Adharma** (first) → a Birth → **Ra⁻ Annihilation** (bare) | — |
-| **the** | Ḍa⁻ **Shyness** (first) | a⁺ Birth |
+| **the** | Da⁻ **Peevishness** ⤳ Patience (first) | a⁺ Birth |
 | **kill** | Ka⁻ Hope (first) → i I-ness → **La⁺ Compassion** (1st) → **La⁻ Cruelty** (2nd) | — |
 
 (The driver is the **vowel**: the *same* consonant reads spiritual when a vowel attaches to it and worldly
 when it is left bare — La⁺ Compassion in *kala* vs La⁻ Cruelty in *kaal*.)
 
-> **Discrepancy noted (Option 1 supersedes an earlier note):** under worldly reference *the* = Ḍa =
-> **Lajjā / Shyness** (Ḍa's worldly pole), **not** *Fearlessness*. Fearlessness (*Nirbhayatā*) is Ḍa's
-> *dissolved/spiritual* counter-pole — you reach it by dissolving the Shyness, it is not the printed
-> reading. The earlier "*the* = Fearless creation" note used the spiritual pole and is retired here.
+> **English g2p mapping — corrected (dialect fix).** English alveolar **stops/flap t d n** now map to the
+> **retroflex** Ṭa/Ḍa/Ṇa (how a Sanskrit-trained / Indian-English ear realizes them), and the **dental
+> fricatives** voiced *th* (*the*) → dental **Da**, voiceless *th* (*thin*) → dental **ta**. The prior
+> table had this inverted (stop /d/→dental, /ð/→retroflex). Consequence: *the* now reads **Da⁻ Peevishness
+> ⤳ Patience** (was *Ḍa Shyness ⤳ Fearlessness*), while words like *guide*/*doctor* now carry **Ḍa
+> Fearlessness** on their stop-d. This is a frozen, uniform rule set before any outcome; it improves
+> dialect faithfulness but did **not** change the falsification verdicts (real still ≈ scrambled).
 
 ## Segmentation (how a word → varṇas) — **AUTO by default**
 You must read the **sounds**, not the spelling. So the lens auto-routes:
 - **Has IAST diacritics** (ā, ī, ṛ, ṅ, ṭ, ḍ, ś, ṣ …) → **literal** Sanskrit reading (the letters *are* the sounds).
 - **A real dictionary word** (English/other) → **g2p**: word → pronunciation → varṇas
-  (e.g. *phone* → F OW N → Pha·o·Na; *knee* → N IY → Na·ī; *the* → DH AH → Ḍa·a).
+  (e.g. *phone* → F OW N → Pha·o·Ṇa; *knee* → N IY → Ṇa·ī; *the* → DH AH → Da·a).
 - **Otherwise** → literal fallback.
 
-English↔Sanskrit sound notes: English **f** = **Pha** (p stays Pa); English voiced **th** (the/this) = **Ḍa**.
+English↔Sanskrit sound notes: English **f** = **Pha** (p stays Pa). **Dialect mapping (frozen):** English
+alveolar **stops/flap t d n → retroflex Ṭa/Ḍa/Ṇa**; **dental fricatives** voiced **th** (the/this) → **Da**,
+voiceless **th** (thin) → **ta**.
 Overrides: `--g2p` force pronunciation · `--roman` force literal · `--varnas "va,a,ra"` pin exact varṇas.
 
 ### Retroflex vs dental — writing the two T/D/N families unambiguously
@@ -65,7 +70,8 @@ manual/`--varnas` input, use **either**:
 - **ITRANS capitals:** `T Th D Dh N` and `Sh` (=ṣa) — e.g. `Da` = **Ḍa** (Shyness); lowercase `da` = dental
   **Da** (Peevishness); `sh` stays palatal **Śa**.
 
-English words go through g2p and are disambiguated automatically (voiced *th*→Ḍa, plain *d*→Da). Every
+English words go through g2p and are disambiguated automatically (stops *t/d/n*→retroflex *Ṭa/Ḍa/Ṇa*;
+voiced *th*→dental *Da*, voiceless *th*→dental *ta*). Every
 reading prints the **Devanāgarī + varga** (e.g. `ड Ḍa [RETROFLEX · Ṭa-varga]`) so you can confirm the sound.
 
 ## What's FIXED vs a CHOICE

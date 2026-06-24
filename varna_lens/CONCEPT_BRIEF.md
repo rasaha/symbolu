@@ -16,7 +16,7 @@ mirror, not a decoder of truth.
 
 1. **Segmentation — sound first, not spelling.** English → g2p (pronunciation); other languages → native
    phonetics mapped to varṇas; Sanskrit/IAST → literal (its letters *are* its sounds). Sound notes:
-   `f`=Pha, voiced *th*=Ḍa, /ʌ/ ("cut")=a; retroflex (Ṭa-varga: ṭ ḍ ṇ, or ITRANS caps T D N) vs dental
+   `f`=Pha, stops t/d/n=retroflex Ṭa/Ḍa/Ṇa, voiced *th*=Da (dental), /ʌ/ ("cut")=a; retroflex (Ṭa-varga: ṭ ḍ ṇ, or ITRANS caps T D N) vs dental
    (ta-varga); `sh`=Śa / `Sh`=Ṣa; `q`=Ka.
 2. **Vowel-attachment polarity (the core rule).** Each consonant: a **vowel immediately follows** it (onset)
    → its **spiritual pole (+)**; **bare** — no vowel after it (word-final, or before another consonant) → its
@@ -28,7 +28,7 @@ mirror, not a decoder of truth.
    K IH1 L, a single /l/), so the doubled rule does not apply to English words read by pronunciation.)
 4. **Vowels.** A vowel takes its active essence; **+** when a consonant precedes it, **−** when it leads.
 5. **Dissolution.** A **−** (worldly) consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
-   *the* = Ḍa⁻ Shyness ⤳ Fearlessness).
+   *the* = Da⁻ Peevishness ⤳ Patience).
 6. **Final vowel = whole-word essence** (reported as the word's summary; it still counts as the vowel that
    follows the preceding consonant, so that consonant stays an onset → spiritual).
 

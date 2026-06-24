@@ -10,7 +10,7 @@ tongue on teeth) are different sounds with different vṛttis. Three unambiguous
 - **Diacritic (IAST):** `ṭ ṭh ḍ ḍh ṇ ṣ` — e.g. `ḍa`.
 - **ITRANS capitals:** `T Th D Dh N` and `Sh` (=ṣa) — e.g. `Da` = Ḍa. **lowercase** `t th d dh n` and `sh`
   (=śa) stay **dental/palatal** — e.g. `da` = dental Da.
-- **English words:** just type them — g2p picks the sound (voiced *th* in *the/this* → Ḍa; plain *d* → Da).
+- **English words:** just type them — g2p picks the sound (stops *t/d/n* → retroflex *Ṭa/Ḍa/Ṇa*; voiced *th* in *the/this* → dental *Da*).
 
 So `Da` = ड Ḍa (Shyness), but `da` = द Da (Peevishness). The reading always prints the Devanāgarī + varga so
 you can see which one you got.

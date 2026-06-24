@@ -84,10 +84,14 @@ _VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ii", "ii"), ("
         ("e", "e"), ("o", "o")]
 
 # ARPAbet (cmudict) → varṇa key, for --g2p English words (approximate: English phonology ≠ varṇas).
-_ARPA_C = {"P": "pa", "B": "ba", "T": "ta", "D": "da", "K": "ka", "G": "ga", "M": "ma", "N": "na",
-           "NG": "nga", "F": "pha", "V": "va", "TH": "tha", "DH": "dda", "S": "sa", "Z": "sa",
+# Dialect rule (frozen, Indian-English realization): English ALVEOLAR STOPS/FLAP T D N DX → RETROFLEX
+# Ṭa/Ḍa/Ṇa (tta/dda/nna), because a Sanskrit-trained ear hears English t/d/n as retroflex; the DENTAL
+# FRICATIVES TH/DH (/θ/ "thin", /ð/ "the") → DENTAL ta/da. (Prior table had this inverted: stop /d/→dental
+# but /ð/→retroflex.) Applied uniformly to every word, set before any outcome was seen.
+_ARPA_C = {"P": "pa", "B": "ba", "T": "tta", "D": "dda", "K": "ka", "G": "ga", "M": "ma", "N": "nna",
+           "NG": "nga", "F": "pha", "V": "va", "TH": "ta", "DH": "da", "S": "sa", "Z": "sa",
            "SH": "sha", "ZH": "sha", "CH": "ca", "JH": "ja", "HH": "ha", "R": "ra", "L": "la",
-           "W": "va", "Y": "ya", "DX": "da"}
+           "W": "va", "Y": "ya", "DX": "dda"}
 _ARPA_V = {"AA": "aa", "AE": "a", "AH": "a", "AO": "o", "AW": "au", "AY": "ai", "EH": "e", "ER": "a",
            "EY": "e", "IH": "i", "IY": "ii", "OW": "o", "OY": "o", "UH": "u", "UW": "uu", "AX": "a"}
 
