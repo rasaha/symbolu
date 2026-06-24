@@ -67,3 +67,16 @@ Given a clean NO_SIGNAL, what's the honest, useful path? Candidates to pressure-
 > Reproduce: `python varna_lens/signal_test.py --judge random` (null → chance, Δ=0);
 > `--judge wordnet|llm` for the semantic arms (needs corpus/API). Verdict is computed by the
 > pre-registered rule, not by hand.
+
+## Changelog — lexicon source correction (after the NO_SIGNAL test)
+Several varṇa entries were later corrected for Sanskrit acoustic-root source fidelity: **Ca, Ja, Ma, Ra, Va,
+Śa, Ṣa, Sa** (see each entry's `source_vritti` / `source_notes` in `lexicon_authoritative.json`, and the
+"Source fidelity" note in `LEXICON.md`). Notable: Ra's *agnitattva/fire* moved to the vitality (positive)
+pole; Va's worldly pole is now *Adharma* (Dharma is the positive/sustaining pole); Ja's worldly pole is
+*ahaṁkāra* (ego), not *dambha*.
+
+**Important:** the **NO_SIGNAL** result in `RESULTS_ACOUSTIC_SIGNAL.md` (and the INCONCLUSIVE utility result
+in `RESULTS_UTILITY_SIGNAL.md`) were produced on the **prior, pre-correction lexicon**. Any claim about the
+**corrected, source-aligned lexicon** requires **re-running the pre-registered tests**. The prior null
+result must **not** be used as proof against the corrected lexicon — nor as proof *for* it. Until a re-run,
+no signal/utility claim attaches to the corrected lexicon either way.

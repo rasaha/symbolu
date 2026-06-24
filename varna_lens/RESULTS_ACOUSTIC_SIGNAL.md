@@ -2,6 +2,12 @@
 
 > Pre-registration: `PREREG_ACOUSTIC_SIGNAL.md`. Verdict computed by the registered rule, not by hand.
 > Interpretive lens — **not** part of C×R×S. This was the gate that would have to be passed first.
+>
+> **Lexicon-version note:** this NO_SIGNAL result was produced on the **pre-correction** lexicon. Eight
+> entries (Ca, Ja, Ma, Ra, Va, Śa, Ṣa, Sa) were later corrected for source fidelity (see
+> `LEXICON.md` → "Source fidelity" and `HANDOFF_BRIEF.md` changelog). This result stands for that prior
+> lexicon and is **not** evidence for or against the corrected one — re-run the test to claim anything
+> about the corrected lexicon.
 
 ## Confirmatory run — blind LLM judges (sub-agents)
 6 blind sub-agents, each shown only **essence + 5 candidate meanings** (never the word, never which arm).

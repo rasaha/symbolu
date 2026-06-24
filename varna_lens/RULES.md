@@ -45,9 +45,9 @@ counter-pole is still shown as `(counter: …)` in the full sequence view, for r
 | word | reading | whole-word essence (final vowel) |
 |---|---|---|
 | **lobha** | La⁻ Cruelty (leads) → o⁺ Closure → **Bha⁻ Deluded obsession** | a⁺ Birth |
-| **love** | La⁻ Cruelty (leads) → a⁺ Birth → **Va⁻ Dharma (outer righteousness)** | (ends on Va) |
+| **love** | La⁻ Cruelty (leads) → a⁺ Birth → **Va⁻ Adharma (deviation from stance)** | (ends on Va) |
 | **kāla** | Ka⁻ **Hope** (leads) → ā⁺ Expansion → **La⁻ Cruelty** | a⁺ Birth |
-| **war** | Va⁻ **Dharma** (leads) → a⁺ Birth → **Ra⁻ Annihilation** | — (ends in consonant) |
+| **war** | Va⁻ **Adharma** (leads) → a⁺ Birth → **Ra⁻ Annihilation** | — (ends in consonant) |
 | **the** | Ḍa⁻ **Shyness** (leads) | a⁺ Birth |
 | **aim** | ai⁻ Welfare/materialization (leads) → **Ma⁻ Indulgence** (m eliminates it) | — |
 | **ak** | a⁻ Birth (leads) → Ka⁻ **Hope** (coda) | — |
