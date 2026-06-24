@@ -223,11 +223,48 @@ def read_vp(phonemes):
     return out
 
 
+def read_op(phonemes):
+    """THE single rule (order-polarity), vowels included:
+       consonant POSITIVE if a vowel FOLLOWS it (else negative/coda);
+       vowel POSITIVE if a consonant PRECEDES it (else negative/leading).  (consonant looks forward,
+       vowel looks backward — mirror images, the 'and vice versa')."""
+    out = {"sequence": annotate(phonemes), "model": "order_polarity"}
+    parts, shorts = [], []
+    n = len(phonemes)
+    for i, (typ, key, surf) in enumerate(phonemes):
+        if typ == "C":
+            d = CONS.get(key)
+            if not d:
+                continue
+            nxt = phonemes[i + 1] if i + 1 < n else None
+            pos = bool(nxt and nxt[0] == "V")
+            v = d["counter_vritti"] if pos else d["leading_vritti"]
+            iast = d["iast"]
+        else:
+            d = VOW.get(key)
+            prev = phonemes[i - 1] if i > 0 else None
+            pos = bool(prev and prev[0] == "C")
+            v = d["positive"] if pos else d["negative"]
+            iast = d["iast"].split(" ")[0]
+        sign = "+" if pos else "\u2212"
+        parts.append(f"\u00ab{iast}\u00bb({sign}) {_short(v)}")
+        shorts.append(sign + _short(v))
+    if not parts:
+        out.update(rule="order-polarity (empty)", essence="(none)", essence_short="")
+        return out
+    out["rule"] = "order-polarity (C:+if vowel-after | V:+if consonant-before)"
+    out["essence"] = "  \u2192  ".join(parts)
+    out["essence_short"] = " \u2192 ".join(shorts)
+    return out
+
+
 def read(phonemes, reverse=False, model="pair"):
     if model == "db":
         return read_db(phonemes)
     if model == "vp":
         return read_vp(phonemes)
+    if model == "op":
+        return read_op(phonemes)
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
     out = {"sequence": ann, "n_consonants": len(cons), "reverse": reverse}
@@ -415,7 +452,8 @@ def main(argv=None):
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
     ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
     ap.add_argument("--db", action="store_true", help="Distortion-Balance model: first syllable=negative(distortion), rest=positive(balance)")
-    ap.add_argument("--vp", action="store_true", help="Vowel-pole model: CV consonant=positive pole, coda consonant=negative pole (no free knobs)")
+    ap.add_argument("--pairs", action="store_true", help="(legacy) overlapping-pairs model")
+    ap.add_argument("--vp-consonly", action="store_true", help="(legacy) vowel-pole on consonants only (no vowel meanings)")
     ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
     ap.add_argument("--log", default=None, help="predict/check CSV (default for --batch: varna_predict_check_log.csv)")
     ap.add_argument("--actual", default="", help="actual meaning (for --log)")
@@ -426,7 +464,7 @@ def main(argv=None):
         tally_csv(Path(args.tally)); return 0
     if args.batch:
         log = Path(args.log or "varna_predict_check_log.csv")
-        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse, model=("db" if args.db else "pair"))
+        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
         return 0
 
     if not args.word and not args.varnas:
@@ -439,7 +477,7 @@ def main(argv=None):
         ph, warn = phonemes_roman(args.word); src = "roman/IAST"
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
-    out = read(ph, reverse=args.reverse, model=("vp" if args.vp else "db" if args.db else "pair"))
+    out = read(ph, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
     print(format_reading(args.word or args.varnas, src, out, warn))
     if args.log:
         if not args.verdict:
