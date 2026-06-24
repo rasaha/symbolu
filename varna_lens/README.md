@@ -8,22 +8,28 @@
 > firewalls sound→meaning on purpose; this lives **outside** it, clearly labeled as an interpretive lens.
 > It needs no external validation to be a useful personal instrument — its only discipline is *consistency*.
 
-## The frozen lexicon (`lexicon.json`)
-- **Consonants:** each carries a *leading binding vṛtti* (the manifest essence) + a *liberating
-  counter-pole*. From your `Sanskrit_Varna_Mala.pdf`.
-- **Vowels:** each is a *layer-bridge* (Body → Identity → … → Brahman) with a positive and shadow pole.
-  From your `Sanskrit_letters.docx` + the PDF.
+## The frozen lexicon (`lexicon_authoritative.json`)
+- **Consonants:** each carries its **worldly (bīja) binding vṛtti** (`negative` field — the propensity the
+  sound activates) + a **dissolved/spiritual counter-pole** (`positive` field).
+- **Vowels:** each carries a **worldly active essence** (`positive` field) + a **distortion pole**
+  (`negative` field).
 
 The lexicon is **frozen**: you never adjust an essence to fit a word after the fact. That's the whole game.
 
-## The fixed rules
-- **R1 — Order / polarity.** A consonant **followed by a vowel** (C→V, e.g. *ka*) **CREATES** its vṛtti (+).
-  A consonant **not** followed by a vowel (e.g. *ak*, coda) **DESTROYS / negates** it (−).
-- **R2 — Position (two-consonant word).** The **1st** consonant exerts a **positive / forward** influence;
-  the **2nd** exerts a **negative / reactive** influence (rebounding on the first).
-- *kāla* = Ka(+Āśā, forward) → La(+Krūratā, reactive) = "hope projected, rebounds as cruelty."
-- *ak* = k destroyed = "hope destroyed."
-- (>2 consonants: only R1 is applied as a provisional chain — give the >2 position rule to finalize R2.)
+## The one rule — worldly-reference order-polarity (Option 1)
+Every varṇa is read by its **worldly propensity** (consonant `negative` field; vowel `positive` field). The
+displayed meaning is **always** that worldly pole — the spiritual pole is what you get by **dissolving** it.
+Sound order sets only the **sign**:
+
+- **+ AFFIRMED** — consonant has a **vowel after** it *or is word-initial*; vowel has a **consonant before**
+  it (anchored). The bīja **activates** the propensity.
+- **− DISSOLVING** — consonant is a **coda**; vowel **leads** un-anchored. The structure is **eliminating**
+  that worldly propensity (→ spiritual).
+
+Examples: *kāla* = Ka⁺ **Hope** → ā⁺ Expansion → La⁻ **Cruelty** ⟹ [a Birth] ("hope, rebounding as cruelty");
+*war* = Va⁺ **Dharma** → o⁺ Closure → Ra⁻ **Annihilation** ("righteous annihilation"); *aim* = ai⁻
+Welfare/materialization → Ma⁻ Indulgence (the **m** eliminates the worldly aim). Full rule + worked table in
+`RULES.md`.
 
 ## Segmentation into acoustic varṇas
 - **Default (roman/IAST):** literal tokenization, faithful for transliterated Sanskrit (IAST writes every

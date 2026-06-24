@@ -2,13 +2,14 @@
   "_source": "Sanskrit_letters_full.docx (user-confirmed AUTHORITATIVE set, this version supersedes earlier ones)",
   "_legend": {
     "positive": "positive pole — liberating/balance (consonant) or positive acoustic essence (vowel)",
-    "negative": "negative pole — binding/distortion (consonant) or negative meaning (vowel)"
+    "negative": "negative pole — binding/distortion (consonant) or negative meaning (vowel)",
+    "_worldly_reference_note": "Option 1 (worldly reference): the lens reads the WORLDLY (bīja) propensity of every varṇa. For a CONSONANT the worldly pole is the 'negative' field (binding vṛtti, e.g. Ka=Hope, La=Cruelty); for a VOWEL the worldly pole is the 'positive' field (active essence, e.g. a=Birth, ai=Welfare). This field asymmetry is intentional. The +/− SIGN in a reading is affirmed(+)/dissolving(−) from sound-order, NOT a field swap; the spiritual pole is the dissolved worldly one (the consonant's 'positive' counter-field)."
   },
   "consonants": {
     "ka": {
       "iast": "Ka",
-      "positive": "Āśā (Hope)",
-      "negative": "Nirāśā (Detachment)"
+      "positive": "Nirāśā (Detachment)",
+      "negative": "Āśā (Hope)"
     },
     "kha": {
       "iast": "Kha",

@@ -248,11 +248,21 @@ def read_vp(phonemes):
 
 
 def read_op(phonemes):
-    """THE single rule (order-polarity) + final-vowel summary.
+    """THE single rule — WORLDLY-REFERENCE order-polarity (Option 1) + final-vowel summary.
+
+    Every varṇa is read by its ONE worldly (bīja) propensity — the consonant's `leading_vritti`
+    (the binding/manifest pole) and the vowel's worldly `positive` essence. The displayed meaning is
+    ALWAYS that worldly propensity; the +/− sign only marks how the word's sound-order treats it:
+      +  AFFIRMED  — the bīja activates the propensity (consonant has a vowel after it, or is word-initial;
+                     vowel has a consonant before it = anchored);
+      −  DISSOLVING — the sound sits at a coda / leads un-anchored, so the structure is *eliminating* that
+                     worldly propensity (its dissolution is what the reader reads as the spiritual pole —
+                     e.g. aim = ai welfare-materialization, then m eliminates it).
+    (Spiritual meaning is therefore DERIVED by dissolving the worldly pole, not printed as its own word —
+    the per-letter dissolved/spiritual pole is still shown as "(counter: …)" in the full sequence view.)
+
     A FINAL vowel is REMOVED from the stitched chain and reported as the whole-word essence; removing it
-    turns the preceding consonant into a coda (negative). Then on the remaining sounds:
-      consonant POSITIVE if a vowel FOLLOWS it (else negative/coda);
-      vowel POSITIVE if a consonant PRECEDES it (else negative/leading)."""
+    turns the preceding consonant into a coda (−, dissolving)."""
     seq = list(phonemes)
     summary = None
     if seq and seq[-1][0] == "V":
@@ -261,9 +271,10 @@ def read_op(phonemes):
         prev = seq[-1] if seq else None
         spos = bool(prev and prev[0] == "C")
         if vd:
+            # whole-word essence = the final vowel's WORLDLY essence (always); sign = anchored/dissolving.
             summary = {"iast": vd["iast"].split(" ")[0], "sign": "+" if spos else "−",
-                       "essence": vd["positive"] if spos else vd["negative"]}
-    out = {"sequence": annotate(phonemes), "model": "order_polarity", "whole_word_essence": summary}
+                       "essence": vd["positive"]}
+    out = {"sequence": annotate(phonemes), "model": "order_polarity_worldly", "whole_word_essence": summary}
     parts, shorts = [], []
     n = len(seq)
     for i, (typ, key, surf) in enumerate(seq):
@@ -272,21 +283,21 @@ def read_op(phonemes):
             if not d:
                 continue
             nxt = seq[i + 1] if i + 1 < n else None
-            # consonant is POSITIVE if a vowel follows it, OR it is word-initial (no vowel before it —
-            # so the final-vowel rule never flips a leading consonant to a coda). e.g. the = Ḍa⁺ ⟹ [a]
+            # AFFIRMED if a vowel follows it, OR it is word-initial (no vowel before it — so the final-vowel
+            # rule never flips a leading consonant to a coda). Worldly pole shown either way. e.g. the = Ḍa⁺.
             pos = bool(nxt and nxt[0] == "V") or i == 0
-            v = d["counter_vritti"] if pos else d["leading_vritti"]
+            v = d["leading_vritti"]          # always the WORLDLY (bīja) propensity
             iast = d["iast"]
         else:
             d = VOW.get(key)
             prev = seq[i - 1] if i > 0 else None
-            pos = bool(prev and prev[0] == "C")
-            v = d["positive"] if pos else d["negative"]
+            pos = bool(prev and prev[0] == "C")    # anchored by a preceding consonant
+            v = d["positive"]                # vowel's WORLDLY active essence
             iast = d["iast"].split(" ")[0]
         sign = "+" if pos else "−"
         parts.append(f"«{iast}»({sign}) {_short(v)}")
         shorts.append(sign + _short(v))
-    out["rule"] = "order-polarity (final vowel = whole-word essence)"
+    out["rule"] = "worldly-reference order-polarity (+ affirmed / − dissolving; final vowel = whole-word essence)"
     out["essence"] = "  →  ".join(parts) if parts else "(none)"
     short = " → ".join(shorts)
     if summary:
