@@ -28,10 +28,12 @@ mirror, not a decoder of truth.
 5. **Dissolution.** A **−** consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
    *the* = Ḍa⁻ Shyness ⤳ Fearlessness).
 6. **Final vowel = whole-word essence** (removed from the stitched chain, reported as the word's summary).
+7. **Pronounceable-group mode (opt-in).** Break the word into syllable-like groups first; then the first
+   sound of *each* group (not just the word's first) is a leading negative seed. `--groups "exam,ple"` pins
+   the groups; `--syllable` auto-syllabifies. Linear (default) = one group = the whole word.
 
-*Explored variants (discussed, not the default):* letter-based English; syllable-group reset; sign-selects-
-which-pole. The lexicon was also corrected for Sanskrit acoustic-root source fidelity on 8 letters (Ca, Ja,
-Ma, Ra, Va, Śa, Ṣa, Sa).
+*Explored variants (discussed, not the default):* letter-based English; sign-selects-which-pole. The lexicon
+was also corrected for Sanskrit acoustic-root source fidelity on 8 letters (Ca, Ja, Ma, Ra, Va, Śa, Ṣa, Sa).
 
 ## 3. Project stage
 

@@ -33,6 +33,11 @@ this is automatic (nothing precedes); for a leading consonant it is an explicit 
 takes the **spiritual (counter) pole (+)** and the **2nd** takes the **worldly pole (−)**. e.g.
 *kill* = … La⁺ **Compassion** → La⁻ **Cruelty** ; *happy* = … Pa⁺ **Affection** → Pa⁻ **Revulsion**.)
 
+(**Pronounceable-group mode** (opt-in) — break the word into syllable-like groups first, then the
+**first sound of *each* group** is a leading negative seed (not just the word's first sound). Use
+`--groups "exam,ple"` to pin the groups, or `--syllable` to auto-syllabify. Default is linear = one group =
+the whole word. e.g. *banana* linear = …+Na… ; *banana* as `ba·na·na` = …−Na⤳Viveka… (each *na* onset leads).)
+
 (A consonant looks **forward** for its vowel; a vowel looks **backward** for its consonant — mirror images,
 "and vice versa".)
 
