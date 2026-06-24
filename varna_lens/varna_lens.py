@@ -191,9 +191,36 @@ def read_db(phonemes):
     return out
 
 
+def read_vp(phonemes):
+    """Vowel-pole model (fully phonology-determined, zero free choices): a consonant FOLLOWED by a vowel
+    (CV) takes its POSITIVE pole; a consonant with no vowel of its own (coda) takes its NEGATIVE pole."""
+    ann = annotate(phonemes)
+    out = {"sequence": ann, "model": "vowel_pole"}
+    parts, shorts = [], []
+    for a in ann:
+        if a["type"] != "C" or not a["data"]:
+            continue
+        if a["polarity"] == "created":
+            v, sign = a["data"]["counter_vritti"], "+"
+        else:
+            v, sign = a["data"]["leading_vritti"], "\u2212"
+        a["vp"], a["vritti"] = sign, v
+        parts.append(f"\u00ab{a['data']['iast']}\u00bb({sign}) {v}")
+        shorts.append(sign + _short(v))
+    if not parts:
+        out.update(rule="vp (no consonants)", essence="(none)", essence_short="")
+        return out
+    out["rule"] = "vowel-pole (CV=+positive, coda=\u2212negative)"
+    out["essence"] = " \u2192 ".join(parts)
+    out["essence_short"] = " \u2192 ".join(shorts)
+    return out
+
+
 def read(phonemes, reverse=False, model="pair"):
     if model == "db":
         return read_db(phonemes)
+    if model == "vp":
+        return read_vp(phonemes)
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
     out = {"sequence": ann, "n_consonants": len(cons), "reverse": reverse}
@@ -381,6 +408,7 @@ def main(argv=None):
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
     ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
     ap.add_argument("--db", action="store_true", help="Distortion-Balance model: first syllable=negative(distortion), rest=positive(balance)")
+    ap.add_argument("--vp", action="store_true", help="Vowel-pole model: CV consonant=positive pole, coda consonant=negative pole (no free knobs)")
     ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
     ap.add_argument("--log", default=None, help="predict/check CSV (default for --batch: varna_predict_check_log.csv)")
     ap.add_argument("--actual", default="", help="actual meaning (for --log)")
@@ -404,7 +432,7 @@ def main(argv=None):
         ph, warn = phonemes_roman(args.word); src = "roman/IAST"
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
-    out = read(ph, reverse=args.reverse, model=("db" if args.db else "pair"))
+    out = read(ph, reverse=args.reverse, model=("vp" if args.vp else "db" if args.db else "pair"))
     print(format_reading(args.word or args.varnas, src, out, warn))
     if args.log:
         if not args.verdict:
