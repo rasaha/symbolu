@@ -23,16 +23,23 @@ mirror, not a decoder of truth.
    **worldly pole (−)**; the **word's first consonant** → **worldly (−)**, the leading seed. (So *art* kala →
    La⁺ Compassion; *time* kaal → La⁻ Cruelty; the same La flips on whether a vowel attaches.)
 3. **Doubled consonant.** Two of the same in a row (kill *ll*, happy *pp*): **1st → spiritual (+)**, **2nd →
-   worldly (−)**.
+   worldly (−)**. (Note: this fires only when both occurrences survive segmentation — i.e. letter-based,
+   IAST, or pinned `--varnas` input. The default English **g2p collapses geminates to one sound** (*kill* →
+   K IH1 L, a single /l/), so the doubled rule does not apply to English words read by pronunciation.)
 4. **Vowels.** A vowel takes its active essence; **+** when a consonant precedes it, **−** when it leads.
 5. **Dissolution.** A **−** (worldly) consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
    *the* = Ḍa⁻ Shyness ⤳ Fearlessness).
 6. **Final vowel = whole-word essence** (reported as the word's summary; it still counts as the vowel that
    follows the preceding consonant, so that consonant stays an onset → spiritual).
 
-*Explored variants (discussed, not the default):* letter-based English; syllable-group reset; sign-selects-
-which-pole. The lexicon was also corrected for Sanskrit acoustic-root source fidelity on 8 letters (Ca, Ja,
-Ma, Ra, Va, Śa, Ṣa, Sa).
+*Explored variants (discussed, not the default):* letter-based English; syllable-group reset; cluster-
+clubbing (vowel-less clustered consonant → spiritual — the immediate predecessor, superseded by vowel-
+attachment); sign-selects-which-pole. The lexicon was also corrected for Sanskrit acoustic-root source
+fidelity on 8 letters (Ca, Ja, Ma, Ra, Va, Śa, Ṣa, Sa).
+
+*Known segmentation scope:* input is read as **sound** — IAST diacritics (`kāla`), English/other dictionary
+words via g2p, and a roman literal fallback. **Raw Devanāgarī script is not segmented** (use IAST/romanized
+forms, e.g. `kala`/`kāla`, or pin with `--varnas`).
 
 ## 3. Project stage
 
