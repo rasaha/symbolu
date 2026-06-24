@@ -287,11 +287,12 @@ def read_op(phonemes):
     Every varṇa is read by its ONE worldly (bīja) propensity — the consonant's `leading_vritti`
     (the binding/manifest pole) and the vowel's worldly `positive` essence. The displayed meaning is
     ALWAYS that worldly propensity; the +/− sign only marks how the word's sound-order treats it:
-      +  AFFIRMED  — the bīja activates the propensity (consonant has a vowel after it, or is word-initial;
-                     vowel has a consonant before it = anchored);
-      −  DISSOLVING — the sound sits at a coda / leads un-anchored, so the structure is *eliminating* that
-                     worldly propensity (its dissolution is what the reader reads as the spiritual pole —
-                     e.g. aim = ai welfare-materialization, then m eliminates it).
+      +  AFFIRMED  — the bīja activates the propensity (consonant has a vowel after it AND is not the
+                     word's first sound; vowel has a consonant before it = anchored);
+      −  DISSOLVING — the sound LEADS the word (the bare un-anchored first varṇa, vowel OR consonant) or
+                     sits at a coda, so the structure is *eliminating* that worldly propensity (its
+                     dissolution is what the reader reads as the spiritual pole — e.g. aim = ai
+                     welfare-materialization, then m eliminates it).
     (Spiritual meaning is therefore DERIVED by dissolving the worldly pole, not printed as its own word —
     the per-letter dissolved/spiritual pole is still shown as "(counter: …)" in the full sequence view.)
 
@@ -317,9 +318,11 @@ def read_op(phonemes):
             if not d:
                 continue
             nxt = seq[i + 1] if i + 1 < n else None
-            # AFFIRMED if a vowel follows it, OR it is word-initial (no vowel before it — so the final-vowel
-            # rule never flips a leading consonant to a coda). Worldly pole shown either way. e.g. the = Ḍa⁺.
-            pos = bool(nxt and nxt[0] == "V") or i == 0
+            # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
+            # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed): for a vowel this is automatic
+            # (no consonant precedes); for a consonant it is this explicit i==0 override. Worldly pole shown
+            # either way. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
+            pos = bool(nxt and nxt[0] == "V") and i != 0
             v = d["leading_vritti"]          # always the WORLDLY (bīja) propensity
             iast = d["iast"]
         else:
