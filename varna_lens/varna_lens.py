@@ -281,31 +281,7 @@ def read_vp(phonemes):
     return out
 
 
-def syllable_starts(phonemes):
-    """Indices that begin a pronounceable group (syllable), via the maximal-onset syllabifier. Used by
-    --syllable mode so each group's first sound becomes a leading (negative) seed."""
-    smap = consonant_syllable_index(phonemes)
-    firsts = {}
-    for i in sorted(smap):
-        firsts.setdefault(smap[i], i)
-    return set(firsts.values()) or {0}
-
-
-def phonemes_groups(spec):
-    """Pinned pronounceable groups, e.g. 'exam,ple' → (phonemes, group_starts). Each comma-separated group
-    is segmented literally (IAST/roman); the first sound of each group is marked as a leading seed."""
-    out, starts, warn = [], set(), []
-    for g in spec.split(","):
-        g = g.strip()
-        if not g:
-            continue
-        starts.add(len(out))
-        seg, w = phonemes_roman(g)
-        out.extend(seg); warn.extend(w)
-    return out, starts, warn
-
-
-def read_op(phonemes, group_starts=None):
+def read_op(phonemes):
     """THE single rule — WORLDLY-REFERENCE order-polarity (Option 1) + final-vowel summary.
 
     Every varṇa is read by its ONE worldly (bīja) propensity — the consonant's `leading_vritti`
@@ -339,9 +315,6 @@ def read_op(phonemes, group_starts=None):
     out = {"sequence": annotate(phonemes), "model": "order_polarity_worldly", "whole_word_essence": summary}
     parts, shorts = [], []
     n = len(seq)
-    # a sound is "leading" (a negative, un-anchored seed) if it begins the word OR begins a pronounceable
-    # group (in --syllable/--groups mode). Default linear mode = one group = the whole word, so leads={0}.
-    leads = group_starts if group_starts is not None else {0}
     for i, (typ, key, surf) in enumerate(seq):
         if typ == "C":
             d = CONS.get(key)
@@ -352,21 +325,22 @@ def read_op(phonemes, group_starts=None):
             if prev and prev[0] == "C" and prev[1] == key:
                 # DOUBLED consonant (e.g. happy pp, kill ll): 2nd occurrence takes the WORLDLY pole
                 pos = False; v = d["leading_vritti"]; iast = d["iast"]
-            elif (nxt and nxt[0] == "C" and nxt[1] == key) and i not in leads:
+            elif nxt and nxt[0] == "C" and nxt[1] == key:
                 # DOUBLED consonant: 1st occurrence takes the SPIRITUAL (counter) pole — e.g. kill =
                 # …La⁺ Compassion → La⁻ Cruelty ; happy = …Pa⁺ Affection → Pa⁻ Revulsion
                 pos = True; v = d["counter_vritti"]; iast = d["iast"]
             else:
-                # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not a leading sound. A leading varṇa
-                # (word-initial, or group-initial in --syllable/--groups mode) is NEGATIVE/dissolving — a
-                # bare un-anchored seed. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
-                pos = bool(nxt and nxt[0] == "V") and i not in leads
+                # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
+                # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed): for a vowel this is
+                # automatic (no consonant precedes); for a consonant it is this explicit i==0 override.
+                # Worldly pole shown either way. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
+                pos = bool(nxt and nxt[0] == "V") and i != 0
                 v = d["leading_vritti"]          # the WORLDLY (bīja) propensity
                 iast = d["iast"]
         else:
             d = VOW.get(key)
             prev = seq[i - 1] if i > 0 else None
-            pos = bool(prev and prev[0] == "C") and i not in leads   # anchored, and not a group lead
+            pos = bool(prev and prev[0] == "C")    # anchored by a preceding consonant
             v = d["positive"]                # vowel's WORLDLY active essence
             iast = d["iast"].split(" ")[0]
         sign = "+" if pos else "−"
@@ -388,13 +362,13 @@ def read_op(phonemes, group_starts=None):
     return out
 
 
-def read(phonemes, reverse=False, model="pair", group_starts=None):
+def read(phonemes, reverse=False, model="pair"):
     if model == "db":
         return read_db(phonemes)
     if model == "vp":
         return read_vp(phonemes)
     if model == "op":
-        return read_op(phonemes, group_starts=group_starts)
+        return read_op(phonemes)
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
     out = {"sequence": ann, "n_consonants": len(cons), "reverse": reverse}
@@ -487,15 +461,9 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="pair",
-            syllable=False, groups=None):
-    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown).
-    --groups pins pronounceable groups ('exam,ple'); --syllable auto-syllabifies. Both make each group's
-    first sound a leading (negative) seed (only affects model='op')."""
-    group_starts = None
-    if groups:
-        ph, group_starts, warn = phonemes_groups(groups); src = "groups (pinned)"
-    elif varnas:
+def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="pair"):
+    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown)."""
+    if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
     elif g2p:
         ph, warn = phonemes_cmudict(word); src = "g2p (forced)"
@@ -505,9 +473,7 @@ def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="
         ph, warn, src = auto_phonemes(word)
     if not ph:
         return None, src, warn
-    if syllable and group_starts is None:
-        group_starts = syllable_starts(ph); src += " +syllable"
-    return read(ph, reverse=reverse, model=model, group_starts=group_starts), src, warn
+    return read(ph, reverse=reverse, model=model), src, warn
 
 
 def _norm_verdict(v):
@@ -592,8 +558,6 @@ def main(argv=None):
     ap.add_argument("--g2p", action="store_true", help="force g2p pronunciation (English/any language)")
     ap.add_argument("--roman", action="store_true", help="force literal IAST/roman reading (skip auto g2p)")
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
-    ap.add_argument("--syllable", action="store_true", help="syllable-group mode: each pronounceable group's first sound is a leading (negative) seed")
-    ap.add_argument("--groups", help="pin pronounceable groups, e.g. 'exam,ple' (each group's first sound leads)")
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
     ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
@@ -613,12 +577,9 @@ def main(argv=None):
         run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
         return 0
 
-    if not args.word and not args.varnas and not args.groups:
-        ap.error("give a word, --varnas, --groups, --batch, or --tally")
-    group_starts = None
-    if args.groups:
-        ph, group_starts, warn = phonemes_groups(args.groups); src = "groups (pinned)"
-    elif args.varnas:
+    if not args.word and not args.varnas:
+        ap.error("give a word, --varnas, --batch, or --tally")
+    if args.varnas:
         ph, warn = phonemes_explicit(args.varnas); src = "explicit"
     elif args.g2p:
         ph, warn = phonemes_cmudict(args.word); src = "g2p (forced)"
@@ -628,9 +589,7 @@ def main(argv=None):
         ph, warn, src = auto_phonemes(args.word)
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
-    if args.syllable and group_starts is None:
-        group_starts = syllable_starts(ph); src += " +syllable"
-    out = read(ph, reverse=args.reverse, group_starts=group_starts, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
+    out = read(ph, reverse=args.reverse, model=("pair" if (args.pairs or args.reverse) else "db" if args.db else "vp" if args.vp_consonly else "op"))
     print(format_reading(args.word or args.varnas, src, out, warn))
     if args.log:
         if not args.verdict:
