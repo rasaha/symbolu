@@ -14,9 +14,17 @@
 - **(A) Acoustic-affective features** — the felt qualities of the *sound itself*: sonority, vowel
   height/backness, sharpness, brightness, tempo (the word's "music"). A chord's atmosphere lives here.
   **This is a coherent, real, measurable object, distinct from dictionary meaning.**
-- **(B) Varṇa propensity glosses** — "Hope, Cruelty, Envy…" concatenated. These are *denotational
-  semantic labels*. A profile made of emotion-nouns **is a semantic representation by construction.**
-  Building "atmosphere" from them does not escape meaning — it *is* meaning, rendered in word-labels.
+- **(B) Varṇa propensity glosses** — "Hope, Cruelty, Envy, agnitattva…" concatenated. **Correction (a
+  reader rightly pushed back):** these are *not* dry dictionary tokens. They denote **felt and energetic
+  qualities** — vṛttis (mental modifications: envy, hope, anger are *cittavṛttis*, actual felt states)
+  and tattvas (elemental principles: *agnitattva* = the fire-principle, an energetic quality, not an
+  emotion and not a definition). So a varṇa profile is best read as a sequence of **affective/energetic
+  qualia**, i.e. it already lives in *atmosphere space*, not in dictionary-meaning space. My earlier
+  "semantic object by construction" was wrong on the category. **What stays open is different:** these
+  qualities are **asserted** to attach to these sounds by the lexicon; the chord-substrate (A) qualities
+  are **measured** from the form. *Measured vs asserted attachment* — not *meaning vs feeling* — is the
+  real gap, and it is exactly what the scramble tests (which is indifferent to whether the labels denote
+  feelings or definitions).
 
 The proposal mixes these: it invokes (A)'s intuition (the chord) but computes (B)'s object (the glosses).
 That mix is exactly where the confusion has lived.
