@@ -39,9 +39,11 @@ archetype any better than a scrambled or neutral one.
 |---|---|---|---|---|
 | **LLM** (9 blind judges) | 0.233 (CI 0.11–0.38) | 0.300 | 0.200 | **NO_ARCHETYPE_RECOVERY_SIGNAL** |
 | random (null) | 0.167 (CI 0.03–0.30) | 0.197 | 0.170 | **NO_ARCHETYPE_RECOVERY_SIGNAL** |
-| wordnet (deterministic) | _(re-runnable via `--judge wordnet`; CPU-heavy)_ | | | _expected NO_ARCHETYPE_RECOVERY_SIGNAL_ |
+| wordnet (deterministic) | 0.133 (CI 0.033–0.267) | 0.197 | 0.155 | **NO_ARCHETYPE_RECOVERY_SIGNAL** |
 
-The random-null arm lands exactly at chance (0.167), confirming the pipeline is unbiased.
+The random-null arm lands exactly at chance (0.167), confirming the pipeline is unbiased. The
+deterministic wordnet arm is even harsher on the real lexicon — real (0.133) falls **below** chance and
+**below both controls** — independently corroborating the confirmatory result with no LLM in the loop.
 
 ## Why the stricter test makes the result *cleaner*, not weaker
 
