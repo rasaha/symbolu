@@ -1,0 +1,260 @@
+{
+"note": "H1 interpretive-convergence: 5 blind readers x 27 items (8 words x {real,scrambled,random} + 3 free). key maps id -> {word,cond}. Score: convergence_test.score(readers,key).",
+"readers": [
+{
+"2:real": "From a still, almost self-erasing quiet, something in them suddenly wakes—a hunger to act, to be the one who does it, that pulls them off their first true line. Yet even mid-stray they feel the old steadiness call them back, and they return to a firmer, more righteous footing than the one they left.",
+"0:real": "They hold back at first, cheeks warming under any direct gaze, their mind circling a single hope long after others have moved on, until the wanting spills out into words a size too large for the moment. Then, as if catching their own reflection, they fall into a fearless, wanting-nothing silence that suits them far better than the bluster ever did.",
+"0:random": "There is a magnetic pull to them, the way iron filings drift toward warmth, yet underneath runs something glacial and contained, a held cold that never quite spills. They move through rooms like vapor finding the open window, settling at last into the wide flat calm of someone who has stopped needing to be anywhere in particular.",
+"6:real": "They give in too easily to every pleasure within reach, and from that overflow comes a feverish, racing drive that sharpens into a need to be singular, special, the one who outshines—curdling, finally, into a green ache at anyone who does. But there is a leash they keep learning to hold, and on their better days the envy softens into a strange, generous gladness at others' good fortune.",
+"free:1": "They keep their coat buttoned to the throat in any weather, as though the world might be talked out of touching them if they simply present no opening. Yet they remember the birthdays of people who have forgotten theirs, leaving small unsigned kindnesses that everyone suspects and no one can prove.",
+"0:scrambled": "Shy to the point of vanishing, they hold a thought past all reason, nursing a fragile hope and then flinching from a fear that the hope invites. In their best moments the shyness hardens into a quiet fearlessness and the hope loosens into letting-go, though the self that wants and worries is never far beneath.",
+"5:random": "There is a banked heat in them, glowing low, that someone could blow back into flame with a single word, though long silences leave them gone glacial and far. They hold their shape like set stone, returning always to that first ember, the warm coal at the center they never quite let go cold.",
+"3:random": "They draw things to themselves and then go slack, pulled by tides they don't name, rising like scaffolding only to drift loose again. Something in them keeps thinning toward vapor, as if the marrow of who they are were always quietly leaving the room.",
+"2:scrambled": "They perform a virtue they don't quite own, building a self that insists on its own specialness while losing the thread of what actually matters. On the days they soften, the pretense gives way to a plain straightforwardness and the muddle resolves into something like conscience—yet the doer, the one who must be seen doing, lingers.",
+"7:real": "They throw themselves into motion, then into thought, then into a strange wish to undo it all, shrinking shy before circling back to a fresh-minted clarity that curdles, at the edges, into envy. But the action knows how to become stillness, the undoing-wish turns toward life, and on a good day the envy ripens into honest gladness for another's joy.",
+"free:0": "They speak in the cadence of someone always half-listening for an interruption that rarely comes, leaving sentences open like doors. Their hands betray them—forever tidying the edges of things, aligning a fork, a stack of papers, the hem of a stranger's untucked thought.",
+"1:scrambled": "They live much of their life in a dimmed inner room, heavy-lidded, the doing-self insisting on its weight while a deep drowsiness pulls them under again and again. But the darkness in them is the kind that can turn to knowing, and the heavy sleep keeps trembling, always, on the verge of waking.",
+"5:real": "They let go of things before they are ready, calling it freedom, then swing into a fierce will to build and provide that can sharpen, on bad days, into a hardness toward the weak and a sour envy of the lucky. Still, the letting-go keeps reaching toward something more like true release, and the envy, when they tend it, can soften into gladness at another's good.",
+"4:random": "They come in like a tide, generous and overflowing, then fasten down hard, riveted in place, before thinning toward the vague and vaporous. What lasts is the cobble of them—plain, set, underfoot—a stone that still remembers, faintly, the warmth it once held.",
+"7:random": "They fasten onto a thing the way a rivet bites, then drift glacial and remote, raising tall ambitions like girders before scattering loose again. But the fixing instinct keeps wanting to become a beacon, and beneath all the wandering they stay cobbled and solid, a banked warmth waiting just under the cold.",
+"2:random": "They lock onto a single point until it pixelates into too much detail, then snap shut around it like a socket gripping its plug. Whatever they hold keeps thinning toward vapor, slipping out through the marrow even as their grip tightens.",
+"3:scrambled": "They lose the thread of what matters while busying themselves with provision and gain, performing a goodness they don't feel and clenching tighter the more uncertain they grow. On their clearer days the confusion resolves toward conscience—but the one who must be the doer, the maker, the self in charge, is always there underneath.",
+"free:2": "They laugh a beat before the joke lands, as if they've heard it all in some earlier life and are only being polite. Strangers tell them secrets in elevators, drawn by a face that promises to forget everything kindly the moment the doors open.",
+"3:real": "They drift off their truest line, reaching for a tidy closure that isn't theirs to give, then sink into a wish to undo what they've made even as they insist on being someone uniquely set apart. Yet the straying carries its own correction, a slow magnetic pull back toward the upright footing they abandoned, where a clearer cognition can finally be born.",
+"1:real": "They surrender too readily to comfort and appetite, and from that softness a sharper awareness keeps trying to surface, edged with a quick, snappish irritability at every small friction. But the indulgence knows it must learn restraint, and the peevishness keeps being coaxed, breath by breath, toward patience.",
+"7:scrambled": "They let go too soon, then hold attention with a clenched, dogged grip, dressing a borrowed virtue over a deep shyness and an insistent need to be the one who does. The pose keeps wanting to become honesty, the early surrender to become real release, and the short temper to ease into patience—though the doing-self never fully quiets.",
+"5:scrambled": "There is a cruel streak in them that can wound for the pleasure of it, even as a fresh clarity keeps surfacing alongside a strange wish to annihilate the very self that wants and snaps. The cruelty, when they let it, keeps trying to turn into compassion, and the sharp temper into patience—but the hardness is a loop they keep circling back into.",
+"4:scrambled": "They mean to provide and to do good, yet a hardness toward the vulnerable keeps creeping in, propped up by a self that insists on its own central importance and frays into quick irritation. On their better days that irritation eases toward patience, though the edge is never quite gone.",
+"4:real": "They are forever closing things off, sealing the chapter, driven by a restless overdrive that, in its rare quiet, lets a clearer awareness rise—an awareness that too often curls into envy of those who seem to have arrived. Still, that envy keeps being turned, gently, into a real gladness at another's good fortune.",
+"6:random": "They run cold and far at first, glacial and thinning toward vapor, then fasten down with sudden conviction before drifting loose again. The glacier in them keeps wanting to soften into open tundra, and what endures is the cobblestone solidity underfoot, plain and warm at the core.",
+"1:random": "They move with the slow cold of something vast and unhurried, thinning at the edges into mist, yet humming with a buried engine that never quite stops turning. Both the chill and the churn keep wanting to settle into a wide, snow-quiet calm, even as they go on quietly evaporating into the air around them.",
+"6:scrambled": "They carry a darkness they half-believe is just how they are, the doing-self crowding out the light, with a cruel edge and a tendency to clamp down tight when threatened, fraying into irritability. Yet the darkness keeps reaching toward knowledge, and the short temper toward patience, as if some better self were waiting just behind the clench."
+},
+{
+"2:real": "Before any word leaves them, a whole self is quietly dismantled and remade, so that what finally surfaces feels less like opinion than like a first dawn breaking inside them. They stray, catch themselves, and bend back toward the principle they began with, carrying their convictions like something newly born and fiercely tended.",
+"0:real": "They hover at the edge of every room, blushing and turning a single thought over and over until it swells into a bright hope they cannot help overstating to anyone who listens. Yet when the moment truly counts they find an unexpected steadiness, loosen their grip on the longed-for outcome, and fall into a calm, almost luminous silence.",
+"0:random": "There is something polarized and pulling about them, drawing loose things into a slow, cold orbit before they harden into a single quiet alignment. They hollow out to receive whatever connects to them, then dissolve into a wide, level openness, more mist than mineral.",
+"6:real": "Appetite drives them first, a hunger that flares into restless, overdriven motion as they carve out a self too sharply and resent whatever others hold. In time the craving is reined into a clean discipline, and the old bitterness turns, almost miraculously, into genuine gladness at another's good fortune.",
+"free:1": "They keep a tidy ledger of every kindness ever done to them and pay each one back twice over, as though warmth were a debt that could be settled. People mistake their generosity for ease, never guessing how carefully it is counted out.",
+"0:scrambled": "Shy to the point of vanishing, they hold a single thought with patient attention until it blooms into hope, then teeter at the brink of fear. But something braver lives underneath, and they keep loosening their hold on outcomes until even dread softens into an unafraid, settled poise.",
+"5:random": "A banked heat lives in them, cooling to ice and stiffening into hard upright shapes before thinning to vapor and settling like scattered stone. Always, though, the warmth returns, the loose ground gathering itself back into a low, steady glow.",
+"3:random": "They draw the world toward them and let it pull away in turns, like a tide rising and falling around some tall, fixed scaffolding inside. Beneath the motion runs a deep marrow-steadiness that finally lets them drift, dissolving softly into open air.",
+"2:scrambled": "They wear a borrowed face, sharpening a self they only half believe in while blurring every line between true and false. Pressed hard enough, the mask slips into plain honesty, and the fog clears into a quiet, insistent conscience.",
+"7:real": "They move and think in restless succession, undoing themselves between thoughts, flushing with shyness even as fresh awareness keeps being born in them, all shadowed by a low envy. Yet their activity keeps settling into stillness, the unmaking turns back into vitality, and the envy ripens, against expectation, into shared delight at others' joy.",
+"free:0": "They speak slowly, as if each sentence were a stone they were setting carefully into a wall only they can see. Strangers find them aloof; the few who stay discover a patience that has simply been waiting, all along, to be trusted.",
+"1:scrambled": "A heaviness sits over them like a closed room, the self pressing forward even as a deep drowsy inertia keeps pulling them under. But the dark in them is the kind that yearns toward light, and the long sleep is only the held breath before an awakening they can already sense.",
+"5:real": "They let go of things too soon, mistaking flight for freedom, swinging between a will to provide and a streak of coldness, while new understanding and a thread of envy rise together in them. Each time the bitterness keeps turning to gladness and each premature surrender keeps ripening toward a truer release, as though they were rehearsing liberation over and over.",
+"4:random": "They surge and recede like water around small fixed points, thinning to mist before settling into scattered, modest stone. Even cooled and broken, a low heat waits in them, ready to glow.",
+"7:random": "Fixed and clenched at first, they cool and harden into rigid spans, then pull magnetically at the world before thinning to vapor and settling as humble stone. Yet a beacon flickers where the tension was, the rigid edges pixelate into something finer, and the cold ground keeps warming back toward an ember's glow.",
+"2:random": "They build themselves out of fine bright fragments, gridded and exact, hollowing into a socket made to receive. Beneath the precision lies a deep marrow-quiet that finally lets the sharp lines blur and lift into open mist.",
+"3:scrambled": "They blur distinctions even as they labor toward someone's welfare, a generosity laced with a face that is not quite their own and a tendency to draw inward and shrink. The self insists on itself throughout, yet beneath the haze a steady conscience keeps clarifying, refusing to let the lines stay smudged.",
+"free:2": "They collect other people's unfinished sentences and finish them silently in their head, always a half-step ahead and never saying so. It makes them seem effortlessly knowing, when really they are just terrified of the pause.",
+"3:real": "They drift from where they began, reach a sense of closure, then quietly unmake themselves and sharpen the self anew, all under the sign of something just being born. Through every swerve they keep bending back toward their first true stance, sustaining a quiet righteousness like a thread they refuse to drop.",
+"1:real": "Hunger leads them, but each craving keeps giving birth to fresh awareness, flaring now and then into a thin, irritable edge. They have learned to rein the wanting into discipline and to let the peevishness dissolve into a wide, unhurried patience.",
+"7:scrambled": "They release things prematurely, then hold a single point with stubborn attention, masking themselves, blushing, insisting on the self, prickling into irritation. Yet each letting-go keeps turning toward true freedom, the mask keeps slipping into honesty, and the short temper keeps softening into patience.",
+"5:scrambled": "A cruel streak runs under them, looping back on itself, even as new awareness is born and the self keeps undoing and reasserting itself in flashes of irritation. But the cruelty keeps converting into compassion and the temper into patience, as if some deep mechanism in them were forever bending harm back toward tenderness.",
+"4:scrambled": "They mean well, laboring toward others' good, yet a hard cold edge surfaces and the self pushes forward into peevish irritation. Underneath, though, the short fuse keeps lengthening into patience, the warmth outlasting the chill.",
+"4:real": "They reach for closure and then overshoot it, charging into a restless, overdriven momentum out of which fresh awareness is born, shadowed by a quiet envy. Yet that envy keeps transmuting, almost against their will, into honest gladness at what others have won.",
+"6:random": "Cool and remote, they thin to vapor and stiffen into small fixed points before loosening into aimless drift and settling as scattered stone. The chill in them always thaws toward a wide tundra calm, the broken ground warming slowly back toward an ember.",
+"1:random": "Cold and still at the core, they thin into mist and then spin up into restless mechanical motion. The chill keeps widening into a level, frozen calm, and even the whirring settles back toward that same vast quiet, more vapor than machine.",
+"6:scrambled": "A darkness weighs on them and the self presses forward with a cruel, contracting pull that keeps shrinking their world into irritation. Yet the dark is the kind that strains toward knowing, and the short temper keeps yielding into patience, light pressing in at the edges of the heaviness."
+},
+{
+"2:real": "Where there was once an urge to dissolve into nothing, a quiet new awareness of self has taken root and begun, tentatively, to act in the world. Each time they stray from who they truly are, something pulls them gently back toward a steadier rightness, turning the death-wish into a low, persistent flame of life.",
+"0:real": "They flush and hesitate at the edge of every room, yet beneath the timidity a fearlessness is quietly forming, ready to carry them past their own held breath. Their hopes run large and loud until they learn to loosen their grip, and the words that once spilled over now settle, more and more, into a knowing silence.",
+"0:random": "There is a pull to them you feel before you understand it, a cold patient density that draws things close and holds them in stillness. They keep their charge sheathed in soft copper warmth, and where you expect a wall you find instead an open plain that simply lets you pass.",
+"6:real": "Appetite is their first language, but they have learned to bridle it into a clean, deliberate discipline that sharpens rather than starves them. They came into a hard-won self-knowledge through fire, and even the envy that still flickers in them is slowly being transmuted into honest gladness at another's good fortune.",
+"free:1": "They carry a battered notebook into which they copy other people's overheard sentences, never their own thoughts, as if borrowing the world's voices were safer than risking one. When they finally do speak, it lands with the startling precision of someone who has been listening far longer than anyone guessed.",
+"0:scrambled": "Shyness keeps them at the threshold, but the steady attention they pay to everything softens, over time, into something closer to courage. Their large hopes loosen into a graceful detachment, and even their flares of fear keep dissolving back into a calm, level-eyed fearlessness, all in service of a self quietly learning to act.",
+"5:random": "There is a banked heat in them that flares, cools to ice, and flares again in a restless cycle no one can quite predict. Stone-steady one moment and crackling the next, they always return to that first ember, the warm core that outlasts every freeze.",
+"3:random": "They move with a docking precision, a sense of being securely plugged into wherever they stand, and then the tide of feeling carries them somewhere unmapped. Beneath the scaffolding of their composure runs a quiet drift, a softness in the marrow that no structure ever fully holds.",
+"2:scrambled": "They wear agreeable masks so smoothly that even they sometimes forget which face is true, though a stubborn honesty keeps pressing up from underneath. What looks like carelessness about right and wrong is really a conscience still under construction, anchoring a self only now learning to say I.",
+"7:real": "They act first and think second, then think too long, and somewhere in that churn a hunger to undo themselves keeps surfacing alongside an old, blushing shyness. Out of all that motion a clearer self-knowledge is being born, and the envy that once cramped them keeps softening toward genuine joy at the fortunes of others, even as they reach, at last, for stillness.",
+"free:0": "They keep three clocks set to cities they have never visited, watering the plants of an absent neighbor as tenderly as their own. Strangers tell them everything within minutes, and they hold each confidence like a smooth stone in a coat pocket, warmed and never shown.",
+"1:scrambled": "A heaviness sits in them like the pull of deep sleep, a darkness they keep mistaking for rest. Yet that very dark is turning, slowly, toward a hard-won knowing, and the drowsiness keeps breaking open into small, startled awakenings of a self learning its own name.",
+"5:real": "They let go of things too soon, calling it freedom while it is really flight, then plunge back into building, into a sharp-edged hardness, and out the other side toward real release. A cruel streak once ran through them, but it has been refined into self-knowledge, and even their envy is being remade into gladness, the whole circling endlessly back to that bittersweet, premature letting-go.",
+"4:random": "They rise and fall like water, riveted briefly to one purpose before evaporating into the next restless idea. Yet they always come back down to the rough, dependable cobble of themselves, a worn warmth waiting to be sparked again.",
+"7:random": "They fasten hard to a plan, then cool, then build, then magnetize others to them before thinning into mist and settling once more on solid ground. Each fixed thing in them eventually flares into signal, into light, into a low warm glow, but it is the plain paving-stone underfoot they keep returning to.",
+"2:random": "They are all framework and fine pixels, a mind that builds scaffolds and then resolves the world into bright, exact little points of focus. Yet for all that structure there is a docked tenderness in them, a soft marrow under the lattice that softens whatever they hold.",
+"3:scrambled": "Their grip on right and wrong is still forming, blurred at the edges, even as a conscience keeps quietly sharpening underneath. They reach toward grand acts of good, slip into easy masks, and pull their whole world into a tight contraction, all while a self only now learning to say I steadies at the center.",
+"free:2": "They reorganize the spice rack of every house they enter, leaving small order behind like a signature no one asked for. Beneath the fussing is a vast, unspoken tenderness, the kind that would walk miles in the rain and never mention it.",
+"3:real": "They keep drifting from who they were meant to be, then feeling a pull back toward an upright, sustaining rightness. There is a hunger in them to finish things, to close every loop, even as a quiet wish to undo themselves and a sharpening sense of their own singularity give birth to a clearer cognition.",
+"1:real": "Appetite leads them first, but they keep folding it into a clean discipline that gives shape to their days. From that struggle a fresh self-awareness is born, and the prickly irritation that once flared in them is slowly being smoothed into patience.",
+"7:scrambled": "They let go before they should, then hold their attention tight, then slip behind an agreeable mask that a deeper honesty keeps stripping away. Shyness and a budding sense of self braid together in them, and the small irritations that flare are being patiently, repeatedly, talked down into calm.",
+"5:scrambled": "There is a hard edge in them that once cut to wound, now being tempered toward compassion through long, deliberate effort. A new self-knowledge keeps surfacing alongside an old urge to vanish and a stubborn I-ness, while their flashes of irritation soften into patience, the whole cycling back to the cruelty they are still learning to unmake.",
+"4:scrambled": "They mean well and act for others' good, yet a cruel streak surfaces unbidden, knotting up the self they are only beginning to claim. The peevish flares come often, but each one is being met, patiently and again, until patience itself becomes the shape they are growing into.",
+"4:real": "They are forever closing loops, finishing what others abandon, driven by a restless overdrive that rarely lets them rest. Out of that churn a clearer self-knowledge keeps being born, and the envy that flickers when others succeed is slowly turning into a warmer, gladder thing.",
+"6:random": "There is an icy stillness to them that thaws into mist, then fastens onto something, then drifts loose again in a slow weather of moods. For all that wandering they keep coming back to the rough warmth of plain ground, a worn stone that holds its heat.",
+"1:random": "They cool a room with their composure, a glacial calm that quietly evaporates into something lighter the longer you stay. There is a turning, generative hum beneath the stillness, energy that keeps resolving back into clear, open quiet.",
+"6:scrambled": "A heaviness sits in them like a drawn curtain, and a cruelty surfaces that they are still learning to name, even as a self begins to assert its I. That darkness is slowly turning toward knowing, their tight inward contraction loosening, and the irritation that flares is being met, again and again, with patience."
+},
+{
+"2:real": "Before a thought can even form, something in them dies away to make room, and out of that small annihilation springs the trembling, electric sense of being a self that acts. They stray from who they were only to circle back, righteousness intact, having learned that every departure from one's ground is just the long way home to vitality.",
+"0:real": "They flinch at being seen, yet beneath the blush runs an endless current of inward deliberation that swells into hope and, too eager, spills over into claims larger than the moment can hold. With age the shyness has tempered into a quiet fearlessness, the hoping loosened into something serene, and the old habit of saying too much has finally settled into a knowing silence.",
+"0:random": "There is a pull to them that draws iron and warms into something soft and conductive, a cool vastness in their gaze that opens, unexpectedly, into the carved patience of a long-eroded place. They are made for connection and yet rest in wide, level calm, a person who holds charge without ever needing to discharge it.",
+"6:real": "They began in appetite, all indulgence until awareness flickered on and tipped them into a feverish, grasping overdrive, hoarding their own specialness until it curdled into resentment of everyone else's shine. But the indulgence has since been bridled into discipline, and the envy, slowly, has turned into a genuine gladness at another's good fortune.",
+"free:1": "They keep a small notebook of other people's offhand kindnesses, things no one else remembers saying, and produce them years later like pressed flowers. Forgetful of their own birthday, they have never once missed yours.",
+"0:scrambled": "Shy to the point of vanishing, they hold a single thought in steady focus until it brightens into hope, only for a cold edge of fear to slide in beneath it. Yet underneath sits a stubborn architect of self, one who keeps reaching for fearlessness and a cooler distance, certain they are the doer of their own quiet life.",
+"5:random": "There is a banked heat in them, glowing then cooling to ice then rising again as steam, the same warmth cycling through frost and stone and back to flame. Built to fit and to connect, they are forever rekindling, a person who never truly goes out.",
+"3:random": "Something in them slots cleanly into others and then pulls back into a private tidal rhythm, structured and rising, before drifting loose entirely. There is a deep marrow-warmth waiting inside the socket of their reserve, and over it all hangs a fine, unsettled mist.",
+"2:scrambled": "They perform a self they don't quite believe, polishing their own specialness while losing the thread of what actually matters. Yet a corrective honesty keeps tugging at them, straightening the performance into candor and waking a conscience that knows the difference.",
+"7:real": "They move first and think second, and somewhere between the deed and the endless afterthought a small part of them quietly dies, leaving a shy hush from which a new clarity is born. The old reflex toward envy has been turning, lately, into stillness and a generous joy at others' luck, as if every impulse in them were learning to come to rest.",
+"free:0": "They listen with their whole body tilted forward, asking the second question most people never think to ask, then go home and worry they talked too much. There is a lamp left on in them for anyone running late.",
+"1:scrambled": "They drift through a private dimness, sure of themselves as the one steering even as a heavy drowsiness keeps pulling them under. But the darkness in them is quietly metabolizing into understanding, and the long sleep is, slowly, becoming an awakening.",
+"5:real": "They let go of things too soon, then throw themselves into building and tending the world, a generosity that can curdle into a hard, cutting edge before awareness dawns and resentment creeps in. Each premature surrender, though, keeps resolving toward a truer release, and the envy keeps softening into shared delight, as if leaving early were just their roundabout path to freedom.",
+"4:random": "They rise and recede like water, then fix themselves down with a single sharp rivet only to dissolve into mist and settle, finally, as plain worn stone. Underneath the cobbled calm an old ember waits, ready to catch.",
+"7:random": "Fastened tight, then frozen, then framed in girders, magnetic and then vaporous before settling into worn stone, they are a study in shifting states held together by structure. The rivet in them flares into a beacon, the scaffolding resolves to something pixel-fine and clear, and beneath the cobbles an ember still glows.",
+"2:random": "They lock into a clean framework, resolve to something fine-grained and exact, then click into place where they belong. There is marrow-warmth deep in that fitting, and over the whole precise machinery drifts a soft, dissolving haze.",
+"3:scrambled": "They keep mistaking noise for meaning even as they work earnestly for others' good, hiding a performed face over a self that contracts and zooms anxiously inward. Still, a slow conscience is forming, straightening their blur into discernment, while they cling to the belief that they are the one doing it all.",
+"free:2": "They name their houseplants and apologize to furniture they bump into, carrying a tenderness so wide it spills onto inanimate things. Behind the gentleness is a spine of iron that shows only when someone weaker is being wronged.",
+"3:real": "They wandered off their own path, reached a kind of closure, then felt a quiet thing in them die before sharpening into a fierce sense of their own distinct calling. Even the straying bends back toward their original ground, righteousness reasserting itself, as a new way of understanding is born from the detour.",
+"1:real": "Appetite governs them until awareness flickers awake and a thin irritability frays the edges of their days. But the indulgence is being reined into discipline and the peevishness coaxed toward patience, and from that effort a clearer mind is quietly being born.",
+"7:scrambled": "They release things before their time, hold a careful attention, then mask themselves, shrink shyly, and reassert a stubborn doer's pride before snapping into small irritations. Yet they keep moving toward true letting-go, toward candor over pretense, and toward a patience that softens every fray.",
+"5:scrambled": "There is a hard streak in them that can take a grim satisfaction in another's pain, but awareness keeps interrupting it, a small death of the old impulse that leaves a chastened, self-asserting irritability behind. Again and again the cruelty turns back toward compassion and the peevishness toward patience, as if their whole nature were a wound insisting on becoming mercy.",
+"4:scrambled": "They pour themselves into making good things real, yet a cutting edge surfaces when they're crossed, sharpened by the unshakable conviction that they are the one in charge. The irritability, at least, keeps bending toward patience, smoothing the hard edges they'd rather not own.",
+"4:real": "They reach completion and then, instead of resting, surge into a restless overdrive that wakes a sharper awareness and, with it, a sting of envy at what others have. That envy keeps converting, though, into a clean gladness for them, as if finishing one thing only taught them to celebrate the wins of everyone else.",
+"6:random": "They begin glacial, thaw into mist, fix down to a single rivet, drift, and settle at last as worn stone, the cold in them always loosening toward open tundra. Beneath the cobbled surface an ember waits, the one warmth that survives every cooling.",
+"1:random": "Cool and slow as ancient ice, they thaw into drifting vapor and then spin up into restless turning, the chill always relaxing back toward wide open ground. Over all of it hangs a soft mist, the haze of someone perpetually between solid and gone.",
+"6:scrambled": "They carry a private darkness and a sure sense of themselves as the doer, with a cruel edge that surfaces when they contract inward under pressure into small irritations. Yet the darkness keeps turning toward spiritual light and the peevishness toward patience, a person slowly converting their own shadow into something that can see."
+},
+{
+"2:real": "She moves through the world as if some inner emptiness keeps trying to swallow her, yet each time it does she surfaces wakened, vivid, more alive than before. Headstrong and quick to insist on her own way, she nonetheless feels the tug back toward the principles she started from, and that returning—not the straying—is what marks her as upright.",
+"0:real": "He hovers at the edge of every room, blushing before he speaks, his thoughts running on and on in private rehearsal until they curdle into wild claims he half-believes. Push him, though, and the timidity burns off into a startling courage; teach him patience, and his loud hopes settle into a quiet that asks for nothing.",
+"0:random": "She has the pull of a thing that draws others without trying, cool and immovable as old ice, yet hollowed out somewhere central like a container waiting to be filled. There is a current running through her that she carries softly, the way a wide stillness holds onto a single rising thread of mist.",
+"6:real": "He swings between appetite and clarity, his mind catching fire with insight only to overheat into restless craving and the sharp specialness that turns a neighbor's good fortune into a private wound. Yet you can see him reining himself in, and on his best days the bitterness he feels at another's joy dissolves, almost against his will, into genuine gladness for them.",
+"free:1": "He keeps a small notebook of other people's birthdays and the names of their pets, remembering kindnesses no one expected him to track. There is a deliberate gentleness in how he closes doors and sets down cups, as though the world were a sleeper he is anxious not to wake.",
+"0:scrambled": "She is shy in the way of someone whose attention burns steady and long, holding to a single thought, a single hope, far past the point where others would let go. When the dread comes—and it does—she meets it and walks straight into it, and the wanting that gripped her loosens into a calm, unbothered detachment.",
+"5:random": "There is a banked heat in him that never quite goes out, even through stretches of cold remove and the rigid, load-bearing patience of someone holding up more than he should. He circles back, always, to that first warmth, the dim coal at the center that brightens whenever he lets something connect to it.",
+"3:random": "He has a socketed, waiting quality, made to be plugged into something larger, and he moves with the slow inevitability of a tide that comes whether or not you watch. Beneath the rigid scaffolding he shows the world, he is quietly drifting, dissolving softly into something lighter than he lets on.",
+"2:scrambled": "He says the agreeable thing while meaning another, certain of his own exceptional case, blurred in his sense of what is truly right from what merely suits him. Yet press him and a plain honesty breaks through the performance, and his muddle resolves, almost shamefacedly, into the clean tug of conscience.",
+"7:real": "She is all motion and rumination, her busy hands and busier mind shadowed by a thought that keeps whispering of endings, of being undone, until even her shyness feels like a kind of vanishing. But the more she understands, the more the despair turns to plain vitality, and the envy that once soured her warms into a steady, surprised delight at the wins of others.",
+"free:0": "She laughs a beat before everyone else, catching the joke in the air like it belongs to her, and just as quickly turns grave when someone needs her to be. People mistake her ease for shallowness until they notice how little she forgets and how long she stays.",
+"1:scrambled": "He carries a heaviness, a dullness that pulls him toward not-seeing, toward the thick comfort of sleep and the small fortress of his own importance. And yet the very darkness in him seems built to be turned, as though all that density were only knowledge waiting to ignite, all that drowsiness an awakening he has not yet had.",
+"5:real": "She lets go of things too soon and calls it freedom, this woman who can be tender and provisioning one moment and startlingly cruel the next, her sharp understanding curdling into envy before she catches it. But each premature renunciation keeps bending, almost despite her, toward a truer release, and the bitterness toward others' joy keeps softening into something that can finally be glad for them.",
+"4:random": "There is a tidal give-and-take to her, a coming and going, riveted to a few fixed points even as the rest of her thins into vapor and quiet drift. She is mostly cobbled together from rough, ordinary stones, but warmth keeps trying to wake in her, an ember nursing itself toward flame.",
+"7:random": "He is fastened tight to his purposes, cold and rigid as a frozen scaffold, his life a span of girders and small bright signals flashing across the distance. Underneath the hard machinery he is plainer than he seems, paved with common stone, and a low heat keeps stirring there, a coal that wants to catch.",
+"2:random": "He has a built quality, a fitted precision, every part of him keyed to slot into the next like a small mechanism that knows its own diagram. And yet at the deepest socket of him there is something soft and living, a marrow-warmth that all the engineering only exists to protect.",
+"3:scrambled": "She blurs the lines between what is right and what is convenient, generous in word but two-faced in deed, forever narrowing the world down to her own contracted view. Still, something in her keeps reaching back toward the plain truth, her confusion struggling, against the grain of her vanity, to resolve into conscience.",
+"free:2": "He measures twice and speaks once, a man whose silences feel earned rather than empty, who would rather be right slowly than clever fast. Children trust him instantly and he is never quite sure why, though it has something to do with how completely he listens.",
+"3:real": "He drifts from where he began, reaching prematurely for closure, haunted by a thought of being annihilated even as he insists on his own special exemption from the common rules. But beneath the wandering there is a homing instinct, a pull back to his first ground, where the straying resolves into a quiet renewal of doing right.",
+"1:real": "She is hungry for experience and quick to insight, her mind catching light easily, but the same heat makes her irritable, snappish at small frictions. Show her restraint and the appetite steadies; give her time and the peevishness mellows into a patience that wears the world more lightly.",
+"7:scrambled": "He renounces things too early and clings, in the same breath, to a held and watchful attention, performing virtue while privately abashed, ringed by a faint self-importance and a low simmer of irritation. Yet his hollow letting-go keeps maturing toward a real one, his two-faced manner keeps cracking open into candor, and his short temper keeps lengthening, slowly, into patience.",
+"5:scrambled": "There is a hardness in him that can take pleasure in another's pain, a coldness that flickers through his moments of clarity and self-undoing and bristling self-regard. But that very cruelty keeps turning under pressure into its opposite, a startled tenderness, his irritation softening to patience, his hard edges yielding again and again to compassion he did not plan to feel.",
+"4:scrambled": "She gives and provides, then turns unexpectedly sharp, capable of small cruelties, walled in by a stubborn sense of her own centrality. And yet the prickliness in her keeps wanting to become patience, as though her hardest moods were only patience that had not yet learned how.",
+"4:real": "He reaches for endings, for the satisfaction of the closed door, his energy spilling over into restless overdrive even as his mind keeps striking fresh sparks of understanding. The one knot in him is envy, the wince at another's good fortune—but it keeps loosening, turning by degrees into an honest, sympathetic joy.",
+"6:random": "There is a glacial stillness to her that thins, at the edges, into vapor and aimless drift, held together by a few stubborn rivets of resolve. She is built mostly of plain, weathered stone, but something keeps trying to kindle in her, a low coal nosing toward warmth.",
+"1:random": "He has a cool, frozen patience and a tendency to dissolve into thought, to thin out into something formless—and then, abruptly, to spin into motion like a wheel catching the wind. He moves between melting and turning, dissolution and drive, and somewhere in the middle of it he is simply a quiet rising mist.",
+"6:scrambled": "He carries a darkness, a thick self-importance shot through with a capacity for cruelty and a habit of shrinking the world to fit his own small frame, all of it edged with quick irritation. Yet the very gloom in him seems made to be turned into understanding, and the short fuse keeps lengthening, against his expectations, into patience."
+}
+],
+"key": {
+"0:real": {
+"word": "doctor",
+"cond": "real"
+},
+"0:scrambled": {
+"word": "doctor",
+"cond": "scrambled"
+},
+"0:random": {
+"word": "doctor",
+"cond": "random"
+},
+"1:real": {
+"word": "mother",
+"cond": "real"
+},
+"1:scrambled": {
+"word": "mother",
+"cond": "scrambled"
+},
+"1:random": {
+"word": "mother",
+"cond": "random"
+},
+"2:real": {
+"word": "river",
+"cond": "real"
+},
+"2:scrambled": {
+"word": "river",
+"cond": "scrambled"
+},
+"2:random": {
+"word": "river",
+"cond": "random"
+},
+"3:real": {
+"word": "warrior",
+"cond": "real"
+},
+"3:scrambled": {
+"word": "warrior",
+"cond": "scrambled"
+},
+"3:random": {
+"word": "warrior",
+"cond": "random"
+},
+"4:real": {
+"word": "ocean",
+"cond": "real"
+},
+"4:scrambled": {
+"word": "ocean",
+"cond": "scrambled"
+},
+"4:random": {
+"word": "ocean",
+"cond": "random"
+},
+"5:real": {
+"word": "silence",
+"cond": "real"
+},
+"5:scrambled": {
+"word": "silence",
+"cond": "scrambled"
+},
+"5:random": {
+"word": "silence",
+"cond": "random"
+},
+"6:real": {
+"word": "machine",
+"cond": "real"
+},
+"6:scrambled": {
+"word": "machine",
+"cond": "scrambled"
+},
+"6:random": {
+"word": "machine",
+"cond": "random"
+},
+"7:real": {
+"word": "garden",
+"cond": "real"
+},
+"7:scrambled": {
+"word": "garden",
+"cond": "scrambled"
+},
+"7:random": {
+"word": "garden",
+"cond": "random"
+},
+"free:0": {
+"word": null,
+"cond": "free"
+},
+"free:1": {
+"word": null,
+"cond": "free"
+},
+"free:2": {
+"word": null,
+"cond": "free"
+}
+}
+}
