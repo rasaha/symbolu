@@ -135,10 +135,10 @@ def _verb(pol):
     return "CREATES" if pol == "created" else "DESTROYS"
 
 
-def read(phonemes):
+def read(phonemes, reverse=False):
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
-    out = {"sequence": ann, "n_consonants": len(cons)}
+    out = {"sequence": ann, "n_consonants": len(cons), "reverse": reverse}
     if not cons:
         out.update(rule="none", essence="(no lexicon consonants)", essence_short="")
         return out
@@ -149,25 +149,31 @@ def read(phonemes):
         out["essence_short"] = ("+" if c["polarity"] == "created" else "−") + _short(c["data"]["leading_vritti"])
         out["counter_reading"] = f"Liberation pole: {c['data']['counter_vritti']}"
         return out
-    # n>=2: OVERLAPPING PAIRS (R2). Each adjacent pair: 1st = +(giver/source), 2nd = −(receiver/result).
-    # A middle consonant is the − of the pair on its left and the + of the pair on its right.
-    # R1 (create/destroy from vowel order) is a SEPARATE tag shown per consonant.
+    # n>=2: OVERLAPPING PAIRS (R2). Default: 1st = +(giver), 2nd = −(receiver). --reverse flips it so the
+    # 2nd is +(giver) and causation runs backward (source = last letter). R1 polarity is a separate tag.
     n = len(cons)
-    for i, c in enumerate(cons):
-        c["role"] = "giver(+)" if i == 0 else ("receiver(−)" if i == n - 1 else "receiver(−) / giver(+)")
     pairs = []
     for i in range(n - 1):
         a, b = cons[i], cons[i + 1]
-        pairs.append({"plus": a["data"], "plus_pol": a["polarity"],
-                      "minus": b["data"], "minus_pol": b["polarity"]})
+        plus, minus = (b, a) if reverse else (a, b)
+        pairs.append({"plus": plus["data"], "plus_pol": plus["polarity"],
+                      "minus": minus["data"], "minus_pol": minus["polarity"]})
+    if reverse:
+        for i, c in enumerate(cons):
+            c["role"] = "receiver(−)" if i == 0 else ("giver(+)" if i == n - 1 else "giver(+) / receiver(−)")
+    else:
+        for i, c in enumerate(cons):
+            c["role"] = "giver(+)" if i == 0 else ("receiver(−)" if i == n - 1 else "receiver(−) / giver(+)")
     out["pairs"] = pairs
-    out["rule"] = f"R2 overlapping pairs ({n} consonants → {n - 1} pair{'s' if n > 2 else ''}); R1 per consonant"
+    direction = "2nd→1st (reverse)" if reverse else "1st→2nd"
+    out["rule"] = f"R2 overlapping pairs ({n} cons → {n - 1} pair{'s' if n > 2 else ''}); dir={direction}"
     out["essence"] = "   ,   ".join(
         f"«{p['plus']['iast']}»(+ {_short(p['plus']['leading_vritti'])}) → "
         f"«{p['minus']['iast']}»(− {_short(p['minus']['leading_vritti'])})" for p in pairs)
     out["pairs_short"] = " , ".join(f"{p['plus']['iast']}⁺→{p['minus']['iast']}⁻" for p in pairs)
-    out["essence_short"] = " → ".join(_short(c["data"]["leading_vritti"]) for c in cons)
-    out["counter_reading"] = "Liberation chain: " + " → ".join(_short(c["data"]["counter_vritti"]) for c in cons)
+    chain = list(reversed(cons)) if reverse else cons          # causal order: source → result
+    out["essence_short"] = " → ".join(_short(c["data"]["leading_vritti"]) for c in chain)
+    out["counter_reading"] = "Liberation chain: " + " → ".join(_short(c["data"]["counter_vritti"]) for c in chain)
     return out
 
 
@@ -219,7 +225,7 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None):
+def analyze(word, *, g2p=False, varnas=None, reverse=False):
     """Segment + read one word. Returns (out|None, src, warnings)."""
     if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
@@ -229,7 +235,7 @@ def analyze(word, *, g2p=False, varnas=None):
         ph, warn = phonemes_roman(word); src = "roman/IAST"
     if not ph:
         return None, src, warn
-    return read(ph), src, warn
+    return read(ph, reverse=reverse), src, warn
 
 
 def _norm_verdict(v):
@@ -243,7 +249,7 @@ def _norm_verdict(v):
     return ""
 
 
-def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=True):
+def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=True, reverse=False):
     """Run a word list (one per line; '#' comments; optional 'word<TAB/,/|>actual_meaning'). Appends a
     predict/check row per word to log_path. With --interactive it prompts for actual + verdict in one pass;
     otherwise it leaves verdict BLANK so you fill it offline WITHOUT bias (predict-then-check)."""
@@ -263,7 +269,7 @@ def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=
         if new:
             w.writerow(LOG_HEADER)
         for word, actual in words:
-            out, src, warn = analyze(word, g2p=g2p)
+            out, src, warn = analyze(word, g2p=g2p, reverse=reverse)
             pred = out.get("essence_short", "") if out else "(unparseable)"
             verdict = ""
             if interactive:
@@ -315,6 +321,7 @@ def main(argv=None):
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
+    ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
     ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
     ap.add_argument("--log", default=None, help="predict/check CSV (default for --batch: varna_predict_check_log.csv)")
     ap.add_argument("--actual", default="", help="actual meaning (for --log)")
@@ -325,7 +332,7 @@ def main(argv=None):
         tally_csv(Path(args.tally)); return 0
     if args.batch:
         log = Path(args.log or "varna_predict_check_log.csv")
-        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive)
+        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse)
         return 0
 
     if not args.word and not args.varnas:
@@ -338,7 +345,7 @@ def main(argv=None):
         ph, warn = phonemes_roman(args.word); src = "roman/IAST"
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
-    out = read(ph)
+    out = read(ph, reverse=args.reverse)
     print(format_reading(args.word or args.varnas, src, out, warn))
     if args.log:
         if not args.verdict:
