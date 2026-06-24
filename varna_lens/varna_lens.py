@@ -224,37 +224,48 @@ def read_vp(phonemes):
 
 
 def read_op(phonemes):
-    """THE single rule (order-polarity), vowels included:
-       consonant POSITIVE if a vowel FOLLOWS it (else negative/coda);
-       vowel POSITIVE if a consonant PRECEDES it (else negative/leading).  (consonant looks forward,
-       vowel looks backward — mirror images, the 'and vice versa')."""
-    out = {"sequence": annotate(phonemes), "model": "order_polarity"}
+    """THE single rule (order-polarity) + final-vowel summary.
+    A FINAL vowel is REMOVED from the stitched chain and reported as the whole-word essence; removing it
+    turns the preceding consonant into a coda (negative). Then on the remaining sounds:
+      consonant POSITIVE if a vowel FOLLOWS it (else negative/coda);
+      vowel POSITIVE if a consonant PRECEDES it (else negative/leading)."""
+    seq = list(phonemes)
+    summary = None
+    if seq and seq[-1][0] == "V":
+        vt = seq.pop()
+        vd = VOW.get(vt[1])
+        prev = seq[-1] if seq else None
+        spos = bool(prev and prev[0] == "C")
+        if vd:
+            summary = {"iast": vd["iast"].split(" ")[0], "sign": "+" if spos else "−",
+                       "essence": vd["positive"] if spos else vd["negative"]}
+    out = {"sequence": annotate(phonemes), "model": "order_polarity", "whole_word_essence": summary}
     parts, shorts = [], []
-    n = len(phonemes)
-    for i, (typ, key, surf) in enumerate(phonemes):
+    n = len(seq)
+    for i, (typ, key, surf) in enumerate(seq):
         if typ == "C":
             d = CONS.get(key)
             if not d:
                 continue
-            nxt = phonemes[i + 1] if i + 1 < n else None
+            nxt = seq[i + 1] if i + 1 < n else None
             pos = bool(nxt and nxt[0] == "V")
             v = d["counter_vritti"] if pos else d["leading_vritti"]
             iast = d["iast"]
         else:
             d = VOW.get(key)
-            prev = phonemes[i - 1] if i > 0 else None
+            prev = seq[i - 1] if i > 0 else None
             pos = bool(prev and prev[0] == "C")
             v = d["positive"] if pos else d["negative"]
             iast = d["iast"].split(" ")[0]
-        sign = "+" if pos else "\u2212"
-        parts.append(f"\u00ab{iast}\u00bb({sign}) {_short(v)}")
+        sign = "+" if pos else "−"
+        parts.append(f"«{iast}»({sign}) {_short(v)}")
         shorts.append(sign + _short(v))
-    if not parts:
-        out.update(rule="order-polarity (empty)", essence="(none)", essence_short="")
-        return out
-    out["rule"] = "order-polarity (C:+if vowel-after | V:+if consonant-before)"
-    out["essence"] = "  \u2192  ".join(parts)
-    out["essence_short"] = " \u2192 ".join(shorts)
+    out["rule"] = "order-polarity (final vowel = whole-word essence)"
+    out["essence"] = "  →  ".join(parts) if parts else "(none)"
+    short = " → ".join(shorts)
+    if summary:
+        short += f"   ⟹ [{summary['sign']}{_short(summary['essence'])}]"
+    out["essence_short"] = short
     return out
 
 
@@ -331,6 +342,9 @@ def format_reading(word, src, out, warnings):
             L.append(f"    «{p['plus']['iast']}»(+){pd} {p['plus']['leading_vritti']}"
                      f"  →  «{p['minus']['iast']}»(−){md} {p['minus']['leading_vritti']}")
     L += ["", f"  ESSENCE: {out['essence']}"]
+    if out.get("whole_word_essence"):
+        ws = out["whole_word_essence"]
+        L.append(f"  WHOLE-WORD ESSENCE (final vowel {ws['iast']}): {ws['sign']} {ws['essence']}")
     if "counter_reading" in out:
         L.append(f"  {out['counter_reading']}")
     L.append(f"  (chain: {out.get('essence_short','')})")
