@@ -135,7 +135,65 @@ def _verb(pol):
     return "CREATES" if pol == "created" else "DESTROYS"
 
 
-def read(phonemes, reverse=False):
+def consonant_syllable_index(phonemes):
+    """Map each phoneme index → its syllable index (pronounceable unit). Intervocalic single C = onset of
+    the NEXT syllable; a cluster keeps the last C as the next onset and the rest as the current coda. So
+    'karma' (k a r m a) → syllable 0 = 'kar' (k, r), syllable 1 = 'ma'."""
+    vow = [i for i, (t, _, _) in enumerate(phonemes) if t == "V"]
+    res = {}
+    if not vow:
+        for i, (t, _, _) in enumerate(phonemes):
+            if t == "C":
+                res[i] = 0
+        return res
+    for i in range(vow[0]):
+        res[i] = 0                                            # leading onset → syllable 0
+    for s, vi in enumerate(vow):
+        res[vi] = s
+    for s in range(len(vow) - 1):
+        between = list(range(vow[s] + 1, vow[s + 1]))
+        if len(between) == 1:
+            res[between[0]] = s + 1                           # single intervocalic C → next onset
+        elif len(between) > 1:
+            for i in between[:-1]:
+                res[i] = s                                    # cluster: coda of current
+            res[between[-1]] = s + 1                          # last → next onset
+    for i in range(vow[-1] + 1, len(phonemes)):
+        res[i] = len(vow) - 1                                 # trailing coda → last syllable
+    return res
+
+
+def read_db(phonemes):
+    """Distortion–Balance model: consonants in the FIRST pronounceable unit (syllable 0) take their
+    NEGATIVE vṛtti (distortion seed); all later consonants take their POSITIVE vṛtti (balance)."""
+    ann = annotate(phonemes)
+    smap = consonant_syllable_index(phonemes)
+    out = {"sequence": ann, "model": "distortion_balance"}
+    dist, bal = [], []
+    for i, a in enumerate(ann):
+        if a["type"] != "C" or not a["data"]:
+            continue
+        if smap.get(i, 0) == 0:
+            a["db"] = "distortion(−)"; a["vritti"] = a["data"]["leading_vritti"]; dist.append(a)
+        else:
+            a["db"] = "balance(+)"; a["vritti"] = a["data"]["counter_vritti"]; bal.append(a)
+    if not dist:
+        out.update(rule="db (no consonants)", essence="(none)", essence_short="")
+        return out
+    out["rule"] = f"distortion–balance ({len(dist)} distortion · {len(bal)} balance)"
+    d = " · ".join(f"«{a['data']['iast']}» {a['vritti']}" for a in dist)
+    b = " · ".join(f"«{a['data']['iast']}» {a['vritti']}" for a in bal) or "(none — monosyllable, all distortion)"
+    out["essence"] = f"DISTORTION seed: {d}    →    BALANCE: {b}"
+    out["essence_short"] = (" · ".join(_short(a["vritti"]) for a in dist) +
+                            (" → " + " · ".join(_short(a["vritti"]) for a in bal) if bal else ""))
+    out["distortion"] = [a["data"]["iast"] for a in dist]
+    out["balance"] = [a["data"]["iast"] for a in bal]
+    return out
+
+
+def read(phonemes, reverse=False, model="pair"):
+    if model == "db":
+        return read_db(phonemes)
     ann = annotate(phonemes)
     cons = [a for a in ann if a["type"] == "C" and a["data"]]
     out = {"sequence": ann, "n_consonants": len(cons), "reverse": reverse}
@@ -225,7 +283,7 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None, reverse=False):
+def analyze(word, *, g2p=False, varnas=None, reverse=False, model="pair"):
     """Segment + read one word. Returns (out|None, src, warnings)."""
     if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
@@ -235,7 +293,7 @@ def analyze(word, *, g2p=False, varnas=None, reverse=False):
         ph, warn = phonemes_roman(word); src = "roman/IAST"
     if not ph:
         return None, src, warn
-    return read(ph, reverse=reverse), src, warn
+    return read(ph, reverse=reverse, model=model), src, warn
 
 
 def _norm_verdict(v):
@@ -249,7 +307,7 @@ def _norm_verdict(v):
     return ""
 
 
-def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=True, reverse=False):
+def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=True, reverse=False, model="pair"):
     """Run a word list (one per line; '#' comments; optional 'word<TAB/,/|>actual_meaning'). Appends a
     predict/check row per word to log_path. With --interactive it prompts for actual + verdict in one pass;
     otherwise it leaves verdict BLANK so you fill it offline WITHOUT bias (predict-then-check)."""
@@ -269,7 +327,7 @@ def run_batch(path: Path, log_path: Path, *, g2p=False, interactive=False, show=
         if new:
             w.writerow(LOG_HEADER)
         for word, actual in words:
-            out, src, warn = analyze(word, g2p=g2p, reverse=reverse)
+            out, src, warn = analyze(word, g2p=g2p, reverse=reverse, model=model)
             pred = out.get("essence_short", "") if out else "(unparseable)"
             verdict = ""
             if interactive:
@@ -322,6 +380,7 @@ def main(argv=None):
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
     ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
+    ap.add_argument("--db", action="store_true", help="Distortion-Balance model: first syllable=negative(distortion), rest=positive(balance)")
     ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
     ap.add_argument("--log", default=None, help="predict/check CSV (default for --batch: varna_predict_check_log.csv)")
     ap.add_argument("--actual", default="", help="actual meaning (for --log)")
@@ -332,7 +391,7 @@ def main(argv=None):
         tally_csv(Path(args.tally)); return 0
     if args.batch:
         log = Path(args.log or "varna_predict_check_log.csv")
-        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse)
+        run_batch(Path(args.batch), log, g2p=args.g2p, interactive=args.interactive, reverse=args.reverse, model=("db" if args.db else "pair"))
         return 0
 
     if not args.word and not args.varnas:
@@ -345,7 +404,7 @@ def main(argv=None):
         ph, warn = phonemes_roman(args.word); src = "roman/IAST"
     if not ph:
         print(f"could not segment {args.word!r}: {warn}"); return 2
-    out = read(ph, reverse=args.reverse)
+    out = read(ph, reverse=args.reverse, model=("db" if args.db else "pair"))
     print(format_reading(args.word or args.varnas, src, out, warn))
     if args.log:
         if not args.verdict:
