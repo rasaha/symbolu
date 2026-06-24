@@ -282,91 +282,73 @@ def read_vp(phonemes):
 
 
 def read_op(phonemes):
-    """THE single rule — WORLDLY-REFERENCE order-polarity (Option 1) + final-vowel summary.
+    """THE single rule — VOWEL-ATTACHMENT polarity + final-vowel summary.
 
-    Every varṇa is read by its ONE worldly (bīja) propensity — the consonant's `leading_vritti`
-    (the binding/manifest pole) and the vowel's worldly `positive` essence. The displayed meaning is
-    ALWAYS that worldly propensity; the +/− sign only marks how the word's sound-order treats it:
-      +  AFFIRMED  — the bīja activates the propensity (consonant has a vowel after it AND is not the
-                     word's first sound; vowel has a consonant before it = anchored);
-      −  DISSOLVING — the sound LEADS the word (the bare un-anchored first varṇa, vowel OR consonant) or
-                     sits at a coda, so the structure is *eliminating* that worldly propensity (its
-                     dissolution is what the reader reads as the spiritual pole — e.g. aim = ai
-                     welfare-materialization, then m eliminates it).
-    (Spiritual meaning is therefore DERIVED by dissolving the worldly pole, not printed as its own word —
-    the per-letter dissolved/spiritual pole is still shown as "(counter: …)" in the full sequence view.)
+    Each consonant takes its pole from whether a vowel attaches to it:
+      • a VOWEL immediately FOLLOWS it (an onset, CV) → its SPIRITUAL (counter) pole (+);
+      • it is BARE — no vowel after it (word-final, or before another consonant) → its WORLDLY pole (−);
+      • the WORD'S FIRST consonant → its WORLDLY pole (−), the leading seed.
+    A vowel takes its active essence (+ when a consonant precedes it). A WORLDLY (−) consonant is shown
+    easing into its spiritual counter (worldly ⤳ counter).
 
-    A FINAL vowel is REMOVED from the stitched chain and reported as the whole-word essence; removing it
-    turns the preceding consonant into a coda (−, dissolving).
+    e.g.  kala = Ka⁻ Hope → a Birth → La⁺ Compassion ⟹ [Birth]   (art ≈ compassion: la has a vowel → +)
+          kaal = Ka⁻ Hope → ā Expansion → La⁻ Cruelty             (time ≈ cruelty: L is bare → −)
+          war  = Va⁻ Adharma → a Birth → Ra⁻ Annihilation         (R is bare → worldly, preserved)
 
-    DOUBLED consonant (two of the same in a row — happy pp, kill ll): the 1st occurrence takes the
-    spiritual (counter) pole (+), the 2nd takes the worldly pole (−).
+    A FINAL vowel is reported separately as the whole-word essence (⟹ […]) but STILL counts as the vowel
+    that follows the preceding consonant — so kala's La is an onset (→ spiritual), not a coda.
 
-    CLUSTERED consonant (a vowel-less consonant sitting beside another consonant — karma rm, world rld):
-    it is "clubbed" to its neighbour and takes the spiritual (counter) pole (+) instead of staying negative.
-    A STANDALONE coda (vowel before it, no consonant beside it) stays worldly (−) — so war = …Ra⁻ and
-    kāla = …La⁻ are preserved."""
-    seq = list(phonemes)
+    DOUBLED consonant (kill ll, happy pp): 1st occurrence → spiritual (counter) pole (+), 2nd → worldly (−)."""
+    full = list(phonemes)
+    n = len(full)
     summary = None
-    if seq and seq[-1][0] == "V":
-        vt = seq.pop()
+    last_v = n - 1 if (full and full[-1][0] == "V") else None
+    if last_v is not None:
+        vt = full[last_v]
         vd = VOW.get(vt[1])
-        prev = seq[-1] if seq else None
+        prev = full[last_v - 1] if last_v >= 1 else None
         spos = bool(prev and prev[0] == "C")
         if vd:
-            # whole-word essence = the final vowel's WORLDLY essence (always); sign = anchored/dissolving.
+            # whole-word essence = the final vowel's active essence; sign = anchored (+) / leading (−).
             summary = {"iast": vd["iast"].split(" ")[0], "sign": "+" if spos else "−",
                        "essence": vd["positive"]}
-    out = {"sequence": annotate(phonemes), "model": "order_polarity_worldly", "whole_word_essence": summary}
+    out = {"sequence": annotate(phonemes), "model": "vowel_attachment", "whole_word_essence": summary}
     parts, shorts = [], []
-    n = len(seq)
-    for i, (typ, key, surf) in enumerate(seq):
+    for i, (typ, key, surf) in enumerate(full):
+        if i == last_v:
+            continue                                      # final vowel reported as whole-word essence
+        nxt = full[i + 1] if i + 1 < n else None
+        prev = full[i - 1] if i > 0 else None
         if typ == "C":
             d = CONS.get(key)
             if not d:
                 continue
-            nxt = seq[i + 1] if i + 1 < n else None
-            prev = seq[i - 1] if i > 0 else None
-            nxt_v = bool(nxt and nxt[0] == "V")
-            nxt_c = bool(nxt and nxt[0] == "C")
-            prev_c = bool(prev and prev[0] == "C")
-            if prev_c and prev[1] == key:
-                # DOUBLED consonant (e.g. happy pp, kill ll): 2nd occurrence takes the WORLDLY pole
-                pos = False; v = d["leading_vritti"]; iast = d["iast"]
-            elif nxt_c and nxt[1] == key and i != 0:
-                # DOUBLED consonant: 1st occurrence takes the SPIRITUAL (counter) pole — e.g. kill =
-                # …La⁺ Compassion → La⁻ Cruelty ; happy = …Pa⁺ Affection → Pa⁻ Revulsion
-                pos = True; v = d["counter_vritti"]; iast = d["iast"]
-            elif i != 0 and not nxt_v and (nxt_c or prev_c):
-                # CLUSTERED consonant: a vowel-less consonant that sits beside ANOTHER consonant is
-                # "clubbed" to its neighbour and takes the SPIRITUAL (counter) pole (+), instead of staying
-                # negative. (A *standalone* coda — vowel before, no consonant beside it — stays worldly −,
-                # so war = …Ra⁻ Annihilation and kāla = …La⁻ Cruelty are preserved.)
-                pos = True; v = d["counter_vritti"]; iast = d["iast"]
+            if prev and prev[0] == "C" and prev[1] == key:
+                pos = False; v = d["leading_vritti"]      # 2nd of a doubled pair → WORLDLY
+            elif nxt and nxt[0] == "C" and nxt[1] == key and i != 0:
+                pos = True; v = d["counter_vritti"]       # 1st of a doubled pair → SPIRITUAL
+            elif i == 0:
+                pos = False; v = d["leading_vritti"]      # word's FIRST consonant → WORLDLY (leading seed)
+            elif nxt and nxt[0] == "V":
+                pos = True; v = d["counter_vritti"]       # a VOWEL follows (onset) → SPIRITUAL pole
             else:
-                # AFFIRMED (+) only if a vowel FOLLOWS it AND it is not the word's first sound. The leading
-                # varṇa is always NEGATIVE/dissolving (a bare un-anchored seed); a standalone coda is − too.
-                # Worldly pole shown. e.g. the = Ḍa⁻ ; kāla = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.
-                pos = nxt_v and i != 0
-                v = d["leading_vritti"]          # the WORLDLY (bīja) propensity
-                iast = d["iast"]
+                pos = False; v = d["leading_vritti"]      # BARE (word-final / before a consonant) → WORLDLY
+            iast = d["iast"]
         else:
             d = VOW.get(key)
-            prev = seq[i - 1] if i > 0 else None
-            pos = bool(prev and prev[0] == "C")    # anchored by a preceding consonant
-            v = d["positive"]                # vowel's WORLDLY active essence
+            pos = bool(prev and prev[0] == "C")           # vowel anchored by a preceding consonant
+            v = d["positive"]
             iast = d["iast"].split(" ")[0]
         sign = "+" if pos else "−"
         if typ == "C" and not pos:
-            # a DISSOLVING consonant resolves its worldly pole INTO its spiritual counter-pole
-            # (e.g. Ha− Darkness ⤳ Parā-vidyā; the = Ḍa− Shyness ⤳ Fearlessness)
+            # a WORLDLY (−) consonant shows its worldly pole easing INTO its spiritual counter-pole
             counter = _short(d["counter_vritti"])
             parts.append(f"«{iast}»({sign}) {_short(v)}  ⤳ {counter}")
             shorts.append(f"{sign}{_short(v)}⤳{counter}")
         else:
             parts.append(f"«{iast}»({sign}) {_short(v)}")
             shorts.append(sign + _short(v))
-    out["rule"] = "worldly-reference order-polarity (+ affirmed / − dissolving; final vowel = whole-word essence)"
+    out["rule"] = "vowel-attachment (vowel-follows→spiritual+, bare/first→worldly−; final vowel = whole-word essence)"
     out["essence"] = "  →  ".join(parts) if parts else "(none)"
     short = " → ".join(shorts)
     if summary:

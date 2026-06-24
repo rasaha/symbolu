@@ -18,19 +18,17 @@ mirror, not a decoder of truth.
    phonetics mapped to varṇas; Sanskrit/IAST → literal (its letters *are* its sounds). Sound notes:
    `f`=Pha, voiced *th*=Ḍa, /ʌ/ ("cut")=a; retroflex (Ṭa-varga: ṭ ḍ ṇ, or ITRANS caps T D N) vs dental
    (ta-varga); `sh`=Śa / `Sh`=Ṣa; `q`=Ka.
-2. **Worldly reference.** Every varṇa is read by its **worldly (bīja) pole** — the consonant's binding field,
-   the vowel's active field.
-3. **Order-polarity sign.** The word's **first sound is negative** (a bare, un-anchored seed). A consonant is
-   **+** only if a vowel follows it *and* it is not first; a vowel is **+** if a consonant precedes it; a coda
-   is **−**.
-4. **Doubled consonant.** Two of the same consonant in a row (happy *pp*, kill *ll*): the **1st takes the
-   spiritual pole (+)**, the **2nd the worldly pole (−)**.
-5. **Clustered consonant.** A vowel-less consonant sitting **beside another consonant** (karma *rm*, world
-   *rld*) is **clubbed to its neighbour → spiritual pole (+)**, instead of staying negative. A **standalone
-   coda** (vowel before, no consonant beside it) stays worldly **−** (war *Ra⁻*, kāla *La⁻* preserved).
-6. **Dissolution.** A **−** consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
+2. **Vowel-attachment polarity (the core rule).** Each consonant: a **vowel immediately follows** it (onset)
+   → its **spiritual pole (+)**; **bare** — no vowel after it (word-final, or before another consonant) → its
+   **worldly pole (−)**; the **word's first consonant** → **worldly (−)**, the leading seed. (So *art* kala →
+   La⁺ Compassion; *time* kaal → La⁻ Cruelty; the same La flips on whether a vowel attaches.)
+3. **Doubled consonant.** Two of the same in a row (kill *ll*, happy *pp*): **1st → spiritual (+)**, **2nd →
+   worldly (−)**.
+4. **Vowels.** A vowel takes its active essence; **+** when a consonant precedes it, **−** when it leads.
+5. **Dissolution.** A **−** (worldly) consonant prints its worldly pole **⤳ its spiritual counter** (e.g.
    *the* = Ḍa⁻ Shyness ⤳ Fearlessness).
-7. **Final vowel = whole-word essence** (removed from the stitched chain, reported as the word's summary).
+6. **Final vowel = whole-word essence** (reported as the word's summary; it still counts as the vowel that
+   follows the preceding consonant, so that consonant stays an onset → spiritual).
 
 *Explored variants (discussed, not the default):* letter-based English; syllable-group reset; sign-selects-
 which-pole. The lexicon was also corrected for Sanskrit acoustic-root source fidelity on 8 letters (Ca, Ja,

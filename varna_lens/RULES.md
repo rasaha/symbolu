@@ -1,69 +1,46 @@
-# Varṇa Lens — The Rule (single, worldly-reference order-polarity)
+# Varṇa Lens — The Rule (single, vowel-attachment polarity)
 
 > Interpretive lens — not a universal claim, not part of C×R×S. One frozen lexicon
 > (`lexicon_authoritative.json`), one rule, applied identically every time.
 
-## The reference: the WORLDLY (bīja) propensity
-Every varṇa is read by its **one worldly (bīja-akshara) propensity** — the thing the sound *activates* in
-the world. We never print the spiritual word directly: **the spiritual pole is what you get by dissolving
-the worldly one**, and the rule below tells you, position by position, whether the word's sound-order is
-**affirming** that worldly propensity or **eliminating** it.
+## The reference: each letter's two poles
+Every consonant has two poles in the lexicon: a **worldly** (binding) vṛtti and a **spiritual** (liberating)
+counter — Ka = *Āśā* (Hope) ↔ *Nirāśā* (Detachment); La = *Krūratā* (Cruelty) ↔ *Karuṇā* (Compassion); … A
+vowel has one **active essence** — a = *Birth of cognition*, ā = *Expansion*, o = *Closure*, …
 
-- For a **consonant** the worldly propensity is its **binding (`negative`-field) vṛtti** — Ka = *Āśā* (Hope),
-  La = *Krūratā* (Cruelty), Ra = *Annihilation*, Ḍa = *Lajjā* (Shyness), …
-- For a **vowel** the worldly propensity is its **active (`positive`-field) essence** — a = *Birth of
-  cognition*, ai = *Welfare / materialization*, … (the lexicon stores the vowel's worldly pole in the
-  opposite field from the consonant's — this asymmetry is real, not a bug; the rule reads each from the
-  correct field.)
+## The one rule (vowel-attachment polarity)
+Each **consonant** takes its pole from whether a **vowel attaches** to it:
 
-## The one rule (worldly-reference order-polarity)
-The **displayed meaning is always the worldly propensity**. Sound order only sets the **sign**:
+- **Onset** — a **vowel immediately follows** the consonant (CV) → its **spiritual (counter) pole (+)**.
+- **Bare** — **no vowel after** it (word-final, or before another consonant) → its **worldly pole (−)**.
+- The **word's first consonant** → its **worldly pole (−)** (the leading seed) — e.g. Ka = *Hope*.
+- A **−** (worldly) consonant is shown easing into its spiritual counter: `worldly ⤳ counter`.
 
-- **+ AFFIRMED** — the bīja activates the propensity. A **consonant** has a **vowel after it** *and is not
-  the word's first sound*; a **vowel** has a **consonant before it** (anchored).
-- **− DISSOLVING** — the structure is *eliminating* that worldly propensity (→ its spiritual pole, which
-  you derive). The varṇa **LEADS the word** (the bare first sound, **vowel or consonant**) or a **consonant**
-  sits as a **coda** (vowel before, none after).
+This is why **art ≈ compassion** and **time ≈ cruelty**: in *kala* (कला, art) the `la` has a vowel → La⁺
+**Compassion**; in *kaal* (काल, time, schwa-dropped) the final `L` is bare → La⁻ **Cruelty**.
 
-(The **first varṇa of the word is always −**, whether vowel or consonant — symmetric. For a leading vowel
-this is automatic (nothing precedes); for a leading consonant it is an explicit override. e.g.
-*the* = Ḍa⁻ **Shyness** ⟹ [a]; *kāla* = Ka⁻ Hope → ā⁺ → La⁻ Cruelty.)
+(**Doubled consonant** — *happy* pp, *kill* ll: the **1st** occurrence → **spiritual (+)**, the **2nd** →
+**worldly (−)**. e.g. *kill* = … La⁺ **Compassion** → La⁻ **Cruelty**.)
 
-(**Doubled consonant** (two of the same consonant in a row — *happy* pp, *kill* ll): the **1st** occurrence
-takes the **spiritual (counter) pole (+)** and the **2nd** takes the **worldly pole (−)**. e.g.
-*kill* = … La⁺ **Compassion** → La⁻ **Cruelty** ; *happy* = … Pa⁺ **Affection** → Pa⁻ **Revulsion**.)
+(**Vowels:** a vowel takes its active essence; **+** when a consonant precedes it, **−** when it leads.)
 
-(**Clustered consonant** — a **vowel-less consonant sitting beside another consonant** (a cluster like
-*karma* rm, *world* rld) is **clubbed to its neighbour and takes the spiritual (counter) pole (+)**, instead
-of staying negative. A **standalone coda** (a vowel before it, **no** consonant beside it) stays worldly
-**−**, so *war* = … Ra⁻ **Annihilation** and *kāla* = … La⁻ **Cruelty** are preserved. e.g.
-*karma* = Ka⁻ → a⁺ → Ra⁺ **Vitality** → Ma⁺ **Discipline** ; *world* = …Ra⁺ Vitality → La⁺ Compassion → Da⁺ Patience.)
+**Final-vowel rule:** a vowel at the **end** of the word is reported separately as the **whole-word essence**
+(⟹ […]) and removed from the stitched chain — **but it still counts as the vowel that follows the preceding
+consonant**, so that consonant stays an *onset* (→ spiritual), not a coda. e.g. *kala* → … La⁺ **Compassion**
+⟹ [a⁺ Birth]; the dropped *a* is the summary essence.
 
-(A consonant looks **forward** for its vowel; a vowel looks **backward** for its consonant — mirror images,
-"and vice versa".)
-
-**Final-vowel rule:** a vowel at the **end** of the word is **removed from the stitched chain** and reported
-separately as the **whole-word essence** (it summarizes the word). Removing it turns the **preceding
-consonant into a coda → −/dissolving.** (e.g. *lobha* → drop final *a* → *bh* becomes a coda → −*Deluded
-obsession*; the dropped *a* = the word's summary essence.)
-
-So: **consonant ⟶ worldly `negative`-field vṛtti**, **vowel ⟶ worldly `positive`-field essence**, every
-varṇa in order with its **+/−** sign, **⟹ [whole-word essence]**. The per-letter *dissolved/spiritual*
-counter-pole is still shown as `(counter: …)` in the full sequence view, for reading the dissolution.
-
-### Worked examples (worldly reference)
-| word | reading | whole-word essence (final vowel) |
+### Worked examples (vowel-attachment)
+| word | reading | whole-word essence |
 |---|---|---|
-| **lobha** | La⁻ Cruelty (leads) → o⁺ Closure → **Bha⁻ Deluded obsession** | a⁺ Birth |
-| **love** | La⁻ Cruelty (leads) → a⁺ Birth → **Va⁻ Adharma (deviation from stance)** | (ends on Va) |
-| **kāla** | Ka⁻ **Hope** (leads) → ā⁺ Expansion → **La⁻ Cruelty** | a⁺ Birth |
-| **war** | Va⁻ **Adharma** (leads) → a⁺ Birth → **Ra⁻ Annihilation** | — (ends in consonant) |
-| **the** | Ḍa⁻ **Shyness** (leads) | a⁺ Birth |
-| **aim** | ai⁻ Welfare/materialization (leads) → **Ma⁻ Indulgence** (m eliminates it) | — |
-| **ak** | a⁻ Birth (leads) → Ka⁻ **Hope** (coda) | — |
+| **kaal** (time) | Ka⁻ **Hope** (first) → ā Expansion → **La⁻ Cruelty** (bare) | — (ends in consonant) |
+| **kala** (art) | Ka⁻ **Hope** (first) → a Birth → **La⁺ Compassion** (onset) | a⁺ Birth |
+| **kāla** | Ka⁻ **Hope** (first) → ā Expansion → **La⁺ Compassion** (onset) | a⁺ Birth |
+| **war** | Va⁻ **Adharma** (first) → a Birth → **Ra⁻ Annihilation** (bare) | — |
+| **the** | Ḍa⁻ **Shyness** (first) | a⁺ Birth |
+| **kill** | Ka⁻ Hope (first) → i I-ness → **La⁺ Compassion** (1st) → **La⁻ Cruelty** (2nd) | — |
 
-(Note the worldly *word* still reads the same — *kāla* is still "Hope … Cruelty" — only the leading sound's
-**sign** is now − instead of +, marking the seed as un-anchored/dissolving rather than projected.)
+(The driver is the **vowel**: the *same* consonant reads spiritual when a vowel attaches to it and worldly
+when it is left bare — La⁺ Compassion in *kala* vs La⁻ Cruelty in *kaal*.)
 
 > **Discrepancy noted (Option 1 supersedes an earlier note):** under worldly reference *the* = Ḍa =
 > **Lajjā / Shyness** (Ḍa's worldly pole), **not** *Fearlessness*. Fearlessness (*Nirbhayatā*) is Ḍa's
