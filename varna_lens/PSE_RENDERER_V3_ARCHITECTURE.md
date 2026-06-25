@@ -1,11 +1,11 @@
-# ASG Renderer v3 — decoupling the renderer from polarity
+# PSE Renderer v3 — decoupling the renderer from polarity
 
 > **Status:** architecture / design document. **Date:** 2026-06-25.
 > **Scope:** architectural refactor only. **No engine, ontology, decoding, or experiment changes; no
 > implementation.** This document specifies an abstraction boundary so the renderer stops depending on the
 > polarity model (`+`, `−`, `⤳`) and instead consumes a neutral, deterministic **Trajectory** object.
 > Aligns with `CONCLUSION_MODEL_SELECTION.md` (varṇas = sound-binding units; polarity is not the long-term
-> ontology) and supersedes the engine-coupled assembly in `ASG_RENDERER_V2_DESIGN.md`.
+> ontology) and supersedes the engine-coupled assembly in `PSE_RENDERER_V2_DESIGN.md`.
 
 ## 0. The problem in one line
 
@@ -189,7 +189,7 @@ This is the dependency-inversion principle made concrete: the renderer and the e
 Strictly additive, behaviour-preserving, reversible at each step:
 
 1. **Freeze the schema** (§2) as the contract; version it (`schema_version: 1`).
-2. **Extract the builder.** Move the polarity-touching half of today's `asg_renderer.trajectory()` —
+2. **Extract the builder.** Move the polarity-touching half of today's `pse_renderer.trajectory()` —
    role assignment, controlling-element selection, tone, coherence, imagery resolution — into a new
    `PolarityTrajectoryBuilder` that emits the schema. (Renames INTEGRATION/TENSION → FORMATION/INTERACTION.)
 3. **Slim the renderer.** Reduce the renderer to `Trajectory → prose`: modes, prompt, honesty filter,

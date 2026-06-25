@@ -1,45 +1,45 @@
-# ASG — Investor Brief
+# PSE — Investor Brief
 
-> **ASG:** the deterministic, governable **control layer for naming and verbal identity** — the
+> **PSE:** the deterministic, governable **control layer for naming and verbal identity** — the
 > infrastructure every product, brand, and AI agent uses to generate, validate, and explain the forms it
 > ships. Series-A facing. Positioning below is authoritative and supersedes any earlier framing (and
 > `CONCEPT_BRIEF.md`; see Changelog, §13).
 
 ## 0. Positioning (authoritative)
 
-**Company description.** ASG is the deterministic control layer for naming and verbal identity. It turns
+**Company description.** PSE is the deterministic control layer for naming and verbal identity. It turns
 intent and hard constraints — sound shape, length, multilingual safety, and real-world availability
 (trademark, domain, handle) — into reproducible, explainable name and sound-form candidates, backed by a
 proprietary database of how those forms actually land with people, by market and language. The AI that
 writes the rationale is a replaceable component; the durable system is the deterministic engine, the
 availability-grounded constraint solver, and the compounding observation graph that no language model
-contains. ASG is built to be the **system of record** every product, company, and AI agent runs its naming
+contains. PSE is built to be the **system of record** every product, company, and AI agent runs its naming
 and verbal-identity decisions through.
 
-**One-sentence pitch.** ASG is the deterministic, governable control layer for naming and verbal identity —
+**One-sentence pitch.** PSE is the deterministic, governable control layer for naming and verbal identity —
 the infrastructure every product, brand, and AI agent uses to generate, validate, and explain the forms it
 ships.
 
 **Three-sentence elevator.** Every product, company, feature — and now every AI agent — needs names and
 verbal identity, but today that happens in chatbots and spreadsheets: non-reproducible, unconstrained,
-unaudited, and blind to whether a name is even *available* or how it actually lands. ASG is a deterministic
+unaudited, and blind to whether a name is even *available* or how it actually lands. PSE is a deterministic
 engine that turns intent plus hard constraints — sound shape, multilingual safety, trademark/domain/handle
 availability — into reproducible, explainable candidates, with a thin AI layer for authoring and a
 proprietary observation graph measuring how forms perform by market and language. As AI commoditizes the
 *writing* of names, the durable value moves to what models can't provide — determinism, guaranteed
-availability and constraints, governance, and compounding outcome data — and ASG owns that layer.
+availability and constraints, governance, and compounding outcome data — and PSE owns that layer.
 
-**Market positioning.** ASG is not a naming app or a creative tool; it is the **control, governance, and data
+**Market positioning.** PSE is not a naming app or a creative tool; it is the **control, governance, and data
 infrastructure** for naming and verbal/sonic identity. Buyers are brand and product teams, agencies, and —
 increasingly — AI-agent platforms that must name and brand at machine scale via API. Against prompting, LLMs,
-embeddings, and vector search, ASG is the deterministic, constraint-guaranteeing, availability-grounded,
+embeddings, and vector search, PSE is the deterministic, constraint-guaranteeing, availability-grounded,
 auditable layer those approaches structurally lack and increasingly need to call. Go-to-market is a wedge —
 governed naming and verbal identity for enterprises and agencies — expanding into the standard layer every
 sound-form decision runs through.
 
 **Long-term vision.** To become the **naming and verbal-identity infrastructure**: the deterministic,
 governed, evidence-backed layer that every product, company, and AI agent runs its naming and sound-form
-decisions through. As software increasingly names and brands itself at machine scale, ASG is the control
+decisions through. As software increasingly names and brands itself at machine scale, PSE is the control
 plane that makes those decisions reproducible, *ownable* (available), explainable, and measurably effective —
 with our trajectory schema as the interchange standard the ecosystem builds on. The model that writes the
 words will keep changing; the layer that guarantees, governs, and learns from the forms that actually ship is
@@ -54,9 +54,9 @@ AI agent's identity, a mantra, a character language — with no controllable, re
 options are a creative's intuition, a thesaurus, or a chatbot prompt: none is deterministic, none is
 explainable, none improves with evidence.
 
-**ASG is a control system for sound-form design, built on three pillars:**
+**PSE is a control system for sound-form design, built on three pillars:**
 
-1. **Deterministic symbolic control.** ASG parses any word or coined form into a structured **profile** — a
+1. **Deterministic symbolic control.** PSE parses any word or coined form into a structured **profile** — a
    *trajectory* of sound interactions — using a frozen, versioned engine. Same input always yields the same
    profile. You can specify constraints ("opens grounded, resolves open; four syllables; avoids harsh
    onsets; available as a domain") and the engine **generates forms that satisfy them**, deterministically.
@@ -71,7 +71,7 @@ explainable, none improves with evidence.
    controls. The product gets sharper with use; the data is proprietary and compounding.
 
 **Why now / why us.** Generative AI gave everyone fluent text but no *control, reproducibility, or
-explainability* — the top unmet needs in enterprise creative tooling. ASG occupies exactly that gap: a
+explainability* — the top unmet needs in enterprise creative tooling. PSE occupies exactly that gap: a
 deterministic, inspectable control plane that composes with LLMs and embeddings rather than competing with
 them. The symbolic vocabulary is an **editable, versioned engineering vocabulary** — the architecture holds
 regardless of how the vocabulary evolves.
@@ -98,11 +98,11 @@ toolchain is broken in three ways:
 
 ## 3. Product definition
 
-**ASG is an intermediate representation (IR) / domain-specific language (DSL) for sound-form design.** It
+**PSE is an intermediate representation (IR) / domain-specific language (DSL) for sound-form design.** It
 sits between human intent and finished output as a controllable, inspectable layer:
 
 ```
-intent + constraints ──► ASG profile (trajectory) ──► generated forms ──► authored rationale + measured evidence
+intent + constraints ──► PSE profile (trajectory) ──► generated forms ──► authored rationale + measured evidence
 ```
 
 **Applications (one engine, many surfaces):** naming · sonic branding · product names · AI-agent identities ·
@@ -143,10 +143,10 @@ vocabulary**, because no downstream layer depends on its specifics.
 
 ## 5. Competitive positioning
 
-ASG is not an alternative to LLMs or embeddings — it is the **deterministic, inspectable control plane** they
+PSE is not an alternative to LLMs or embeddings — it is the **deterministic, inspectable control plane** they
 lack, and it composes with both.
 
-| Capability | **ASG** | Prompting / LLM-only | Embeddings / vector search |
+| Capability | **PSE** | Prompting / LLM-only | Embeddings / vector search |
 |---|---|---|---|
 | Deterministic, reproducible outputs | **yes** | no | no |
 | Hard-constraint satisfaction (sounds, length, rhyme, availability) | **yes** | violates constraints | weak |
@@ -155,7 +155,7 @@ lack, and it composes with both.
 | Inverse design (intent → conforming forms) | **yes** | unreliable | hard |
 | Cost / latency at scale | low (deterministic core) | API-bound | index-bound |
 
-LLMs give fluency; embeddings give similarity; **neither gives control + explanation + reproducibility.** ASG
+LLMs give fluency; embeddings give similarity; **neither gives control + explanation + reproducibility.** PSE
 provides those and uses LLMs for authoring and embeddings for retrieval inside its pipeline.
 
 ## 6. Observation platform
@@ -223,15 +223,15 @@ The deterministic engine, the trajectory/rendering architecture (analysis → tr
 the honesty filter, and the observation-capture design are specified and in working form. The commercial
 product surfaces (studio UI, observation platform, enterprise APIs) are the build ahead.
 
-## 12. What ASG does not claim
+## 12. What PSE does not claim
 
-In the interest of defensible positioning, ASG makes only claims it can support with a reproducible
+In the interest of defensible positioning, PSE makes only claims it can support with a reproducible
 computation or a controlled measurement:
 
-- **ASG does not claim intrinsic sound meaning.** It does not assert that sounds carry objective meaning.
-- **ASG does not claim scientific validation of its vocabulary.** The symbolic vocabulary is an **engineered,
+- **PSE does not claim intrinsic sound meaning.** It does not assert that sounds carry objective meaning.
+- **PSE does not claim scientific validation of its vocabulary.** The symbolic vocabulary is an **engineered,
   editable, versioned vocabulary**, not a validated natural ontology.
-- **ASG provides an engineered symbolic language** for controlling and explaining sound-form generation —
+- **PSE provides an engineered symbolic language** for controlling and explaining sound-form generation —
   deterministic, reproducible, constraint-satisfying, and inspectable.
 - **Empirical observations are reported as measured associations**, segmented by context and language, with
   confidence and controls — **not as universal truths**, and never as decoded meaning.
@@ -248,10 +248,10 @@ observations are measured; the prose is authored and clearly downstream).
 | 2 | **Symbolic vocabulary reframed from "frozen lexicon of mental propensities" → an editable, versioned engineering vocabulary** behind a stable schema. | Makes the architecture survive any vocabulary change; removes ontology dependence. |
 | 3 | **Executive summary rebuilt around three pillars** (deterministic symbolic control · AI-assisted authoring · observation-driven improvement). | Leads with commercial value, not theory. |
 | 4 | **Architecture formalized as five layers** (parser → trajectory builder → neutral schema → observation → rendering), with the **Trajectory schema named as the stable interface**. | Communicates durability and decoupling to a technical investor. |
-| 5 | **Added competitive positioning vs. prompting / LLMs / embeddings / vector search** (determinism, constraints, explainability, reproducibility, editable control). | Establishes the category and the gap ASG fills; no scientific comparisons. |
+| 5 | **Added competitive positioning vs. prompting / LLMs / embeddings / vector search** (determinism, constraints, explainability, reproducibility, editable control). | Establishes the category and the gap PSE fills; no scientific comparisons. |
 | 6 | **Moat reframed away from ontology** → deterministic DSL + authoring workflow + empirical observation graph + enterprise reproducibility + versioned trajectory standard. | Durable, data- and standard-based defensibility. |
 | 7 | **Observation platform described as a measurement system** producing *measured associations / context-specific observations / confidence estimates / empirical evidence* — never "proves / validates ontology / decodes meaning." | Honest, sellable, and the compounding data moat. |
-| 8 | **Added a dedicated "What ASG does not claim" section.** | Pre-empts the indefensible claims and turns honesty into a buyer-trust asset. |
+| 8 | **Added a dedicated "What PSE does not claim" section.** | Pre-empts the indefensible claims and turns honesty into a buyer-trust asset. |
 | 9 | **Roadmap re-centered on the commercial build** (engine · renderer · observation platform · SDK · enterprise APIs · trajectory standard · marketplace · multimodal) and **ontology/scientific discovery removed from the commercial roadmap.** | Keeps the brief about shippable product. |
 | 10 | **Language audit applied throughout** — *meaning/decodes/true/ontology/discovered* replaced with *profile / trajectory / symbolic representation / control language / engineered vocabulary / measured association / sound-form design*. | Consistent, defensible, investor-facing voice. |
 | 11 | **Preserved (still valid):** the deterministic-scaffold + LLM-authoring architecture, the honesty contract (authored, never decoded), and the determinism-as-moat thesis from the prior brief. | These engineering claims hold and are core to the product. |

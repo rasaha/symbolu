@@ -186,7 +186,7 @@ def main(argv=None):
     pr = sub.add_parser("reflect"); pr.add_argument("word"); pr.add_argument("--by", **BY)
     pr.add_argument("--rich", action="store_true", help="include source acoustic imagery (expanded_properties)")
     pn = sub.add_parser("name"); pn.add_argument("names", nargs="+"); pn.add_argument("--by", **BY)
-    pg = sub.add_parser("render", help="ASG Renderer v2: deterministic trajectory → authored reflection")
+    pg = sub.add_parser("render", help="PSE Renderer v2: deterministic trajectory → authored reflection")
     pg.add_argument("word"); pg.add_argument("--by", **BY)
     pg.add_argument("--mode", dest="rmode", default="essence_line",
                     help="essence_line | reflection | brand_persona | name_description | mantra | "
@@ -195,7 +195,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     if a.mode == "render":
-        import asg_renderer as R
+        import pse_renderer as R
         for i, m in enumerate(R.MODES if a.all else [a.rmode]):
             res = R.render(a.word, mode=m, by=a.by)
             if i:

@@ -1,7 +1,7 @@
-# ASG Reflection Renderer v2 — design
+# PSE Reflection Renderer v2 — design
 
 > **Status:** product-design document. **Date:** 2026-06-25.
-> **Scope:** the *rendering layer only* — deterministic ASG output → authored reflection. **No engine
+> **Scope:** the *rendering layer only* — deterministic PSE output → authored reflection. **No engine
 > changes, no decoding-rule changes, no ontology changes, no experiments.** The deterministic engine is
 > treated as complete and frozen; this document specifies only how its output becomes readable prose.
 > Aligns with `CONCLUSION_MODEL_SELECTION.md`: varṇas are sound-binding units; the LLM authors over a
@@ -10,7 +10,7 @@
 ## 0. Architecture in one line
 
 ```
-Deterministic Engine ──▶ Acoustic Trajectory ──▶ LLM Authoring ──▶ Readable Reflection
+Deterministic Engine ──▶ Phoneme Trajectory ──▶ LLM Authoring ──▶ Readable Reflection
    (Layer 1: frozen)      (Layer 2: deterministic)   (Layer 3: authored, visibly downstream)
 ```
 
@@ -33,7 +33,7 @@ beat exactly one **role** by a deterministic rule — nothing invented:
 | final-vowel essence (`⟹ …`) | **RESOLUTION** |
 | (no final vowel) the last consonant beat | relabel as **RESOLUTION** (its pole) |
 
-The **Acoustic Trajectory** is the ordered role list, always opening on SOURCE and closing on RESOLUTION,
+The **Phoneme Trajectory** is the ordered role list, always opening on SOURCE and closing on RESOLUTION,
 e.g. `SOURCE → TRANSFORMATION → INTEGRATION → RESOLUTION`. This is the compact structured narrative shown as
 Layer 2. It is 100% determined by the chain; the LLM may not add, drop, or reorder stages.
 
@@ -123,7 +123,7 @@ small passages.
 4. Select controlling element (§2d)                                               [deterministic]
 5. Derive tone tag (§2e)                                                           [deterministic]
 6. Build per-beat image (§2c) within the controlling register                     [deterministic]
-7. Assemble the Acoustic Trajectory + image beats                                  [Layer 2]
+7. Assemble the Phoneme Trajectory + image beats                                  [Layer 2]
 8. Author Layer 3 via the prompt template (§5) under mode + tone + honesty rules   [LLM]
 9. Emit three-layer output (§7)                                                    [assembly]
 ```
@@ -134,7 +134,7 @@ Steps 2–7 require no model and are reproducible. Step 8 is the only generative
 ## 5. Prompt template (Layer 3 authoring)
 
 ```
-You are the authoring voice of ASG (Acoustic Symbol Generation). You render a DETERMINISTIC acoustic
+You are the authoring voice of PSE (Phoneme Symbolic Engine). You render a DETERMINISTIC acoustic
 trajectory into prose. You are a rendering layer, not an interpreter: you narrate the MOVEMENT given to you.
 You never claim the word's true or hidden meaning.
 
@@ -145,7 +145,7 @@ HONESTY RULES (hard):
 
 FIXED INPUTS (do not add, drop, or reorder stages):
 - Word / form: {word}
-- Acoustic Trajectory (roles, in order): {role_sequence}
+- Phoneme Trajectory (roles, in order): {role_sequence}
 - Beats (role · sign · image): 
     {beat_1: ROLE · sign · image}
     {beat_2 …}
@@ -183,7 +183,7 @@ LAYER 1 — Deterministic Engine
   interaction:{per-beat sign + pole}
   essence:    {whole_word_essence}        valence: {lean (lib/bind)}
 
-LAYER 2 — Acoustic Trajectory
+LAYER 2 — Phoneme Trajectory
   {SOURCE → … → RESOLUTION}
   controlling element: {element}   tone: {tone}
   beats: {role · image}
@@ -248,7 +248,7 @@ LAYER 3 — Reflection ({mode})
 
 ## 9. Product positioning
 
-ASG Reflection Renderer v2 should read as **"a deterministic acoustic-symbolic composition engine with an AI
+PSE Reflection Renderer v2 should read as **"a deterministic phonological-symbolic composition engine with an AI
 authoring layer."** The three-layer output makes the determinism visible (Layers 1–2) and the prose clearly
 authored (Layer 3). It must not read as mystical decoding, hidden-semantic discovery, or free LLM
 improvisation — the trajectory is fixed, the metaphor and tone are selected deterministically, and the

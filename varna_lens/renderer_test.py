@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for ASG Reflection Renderer v2 (asg_renderer.py).
+"""Tests for PSE Reflection Renderer v2 (pse_renderer.py).
 
 Verifies the renderer is deterministic, honest, and read-only with respect to the engine:
   1. trajectory roles are deterministic (stable across runs)
@@ -14,7 +14,7 @@ Run: python renderer_test.py   (non-zero exit on any failure)
 import sys
 
 import varna_lens as V
-import asg_renderer as R
+import pse_renderer as R
 
 
 def _check(cond, msg, fails):
