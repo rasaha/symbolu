@@ -29,6 +29,13 @@ DV = {
 }
 
 
+def _disp(p):
+    if isinstance(p, dict):
+        skt, eng = p.get("sanskrit", ""), p.get("english", "")
+        return f"{skt} ({eng})" if skt else eng
+    return p
+
+
 def main():
     data = json.loads(JPATH.read_text(encoding="utf-8"))
     cons = data["consonants"]
@@ -55,7 +62,7 @@ def main():
          "|---|---|---|---|---|"]
     for k, v in cons.items():
         deva, varga = v.get("deva", ""), v.get("varga", "")
-        L.append(f"| {deva} | {v['iast']} | {varga} | {v['positive']} | {v['negative']} |")
+        L.append(f"| {deva} | {v['iast']} | {varga} | {_disp(v['positive'])} | {_disp(v['negative'])} |")
 
     L += ["", "## Vowels", "| Vowel | positive | negative |", "|---|---|---|"]
     for k, v in data["vowels"].items():

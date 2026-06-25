@@ -9,8 +9,14 @@
   "consonants": {
     "ka": {
       "iast": "Ka",
-      "positive": "Nirāśā (Detachment)",
-      "negative": "Āśā (Hope)",
+      "positive": {
+        "sanskrit": "Nirāśā",
+        "english": "Detachment"
+      },
+      "negative": {
+        "sanskrit": "Āśā",
+        "english": "Hope"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Āśā",
@@ -54,8 +60,14 @@
     },
     "kha": {
       "iast": "Kha",
-      "positive": "Viśvāsa (Trust)",
-      "negative": "Cintā (Worry)",
+      "positive": {
+        "sanskrit": "Viśvāsa",
+        "english": "Trust"
+      },
+      "negative": {
+        "sanskrit": "Cintā",
+        "english": "Worry"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Cintā",
@@ -78,8 +90,14 @@
     },
     "ga": {
       "iast": "Ga",
-      "positive": "Sthiti (Stillness)",
-      "negative": "Ceṣṭā (Action)",
+      "positive": {
+        "sanskrit": "Sthiti",
+        "english": "Stillness"
+      },
+      "negative": {
+        "sanskrit": "Ceṣṭā",
+        "english": "Action"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Ceṣṭā",
@@ -99,8 +117,14 @@
     },
     "gha": {
       "iast": "Gha",
-      "positive": "Anāsakti (Non-attachment)",
-      "negative": "Mamatā (Attachment)",
+      "positive": {
+        "sanskrit": "Anāsakti",
+        "english": "Non-attachment"
+      },
+      "negative": {
+        "sanskrit": "Mamatā",
+        "english": "Attachment"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Mamatā",
@@ -120,8 +144,14 @@
     },
     "nga": {
       "iast": "Ṅa",
-      "positive": "Vinaya (Humility)",
-      "negative": "Dambha (Vanity)",
+      "positive": {
+        "sanskrit": "Vinaya",
+        "english": "Humility"
+      },
+      "negative": {
+        "sanskrit": "Dambha",
+        "english": "Vanity"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Dambha",
@@ -139,8 +169,14 @@
     },
     "ca": {
       "iast": "Ca",
-      "positive": "Viveka (conscience / discriminative clarity)",
-      "negative": "Aviveka (lack of discrimination / confused discernment)",
+      "positive": {
+        "sanskrit": "Viveka",
+        "english": "conscience / discriminative clarity"
+      },
+      "negative": {
+        "sanskrit": "Aviveka",
+        "english": "lack of discrimination / confused discernment"
+      },
       "source_vritti": "Viveka (conscience / discrimination)",
       "source_notes": "Acoustic root of viveka. Negative pole Aviveka is the derived worldly distortion (source corrected from Ekāgratā/Vikṣepa).",
       "expanded_properties": {
@@ -159,8 +195,14 @@
     },
     "cha": {
       "iast": "Cha",
-      "positive": "Dhṛti (Emotional firmness)",
-      "negative": "Vikalatā (Nervous breakdown)",
+      "positive": {
+        "sanskrit": "Dhṛti",
+        "english": "Emotional firmness"
+      },
+      "negative": {
+        "sanskrit": "Vikalatā",
+        "english": "Nervous breakdown"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Vikalatā",
@@ -178,8 +220,14 @@
     },
     "ja": {
       "iast": "Ja",
-      "positive": "Vinaya (humility / ego-softening)",
-      "negative": "Ahaṁkāra (ego inflation / I-centeredness)",
+      "positive": {
+        "sanskrit": "Vinaya",
+        "english": "humility / ego-softening"
+      },
+      "negative": {
+        "sanskrit": "Ahaṁkāra",
+        "english": "ego inflation / I-centeredness"
+      },
       "source_vritti": "Ahaṁkāra (ego / inflated I-feeling)",
       "source_notes": "Acoustic root of ahaṁkāra vṛtti. Worldly pole = ego inflation; remedial counter-pole = humility (source corrected from Dambha/vanity, which duplicated Ṅa).",
       "expanded_properties": {
@@ -200,8 +248,14 @@
     },
     "jha": {
       "iast": "Jha",
-      "positive": "Santoṣa / Aparigraha (Contentment / Non-possession)",
-      "negative": "Lolupatā / Lobha (Greed / Avarice)",
+      "positive": {
+        "sanskrit": "Santoṣa / Aparigraha",
+        "english": "Contentment / Non-possession"
+      },
+      "negative": {
+        "sanskrit": "Lolupatā / Lobha",
+        "english": "Greed / Avarice"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Lolupatā / Lobha / Lolatā",
@@ -220,8 +274,14 @@
     },
     "nya": {
       "iast": "Ña",
-      "positive": "Ārjavatā (Straightforwardness / Integrity)",
-      "negative": "Kapaṭatā (Hypocrisy)",
+      "positive": {
+        "sanskrit": "Ārjavatā",
+        "english": "Straightforwardness / Integrity"
+      },
+      "negative": {
+        "sanskrit": "Kapaṭatā",
+        "english": "Hypocrisy"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Kapaṭatā",
@@ -239,8 +299,14 @@
     },
     "tta": {
       "iast": "Ṭa",
-      "positive": "Maunam / Yathārthatā (Silence / Objectivity)",
-      "negative": "Vitarka (Overstatement)",
+      "positive": {
+        "sanskrit": "Maunam / Yathārthatā",
+        "english": "Silence / Objectivity"
+      },
+      "negative": {
+        "sanskrit": "Vitarka",
+        "english": "Overstatement"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Vitarka",
@@ -259,8 +325,14 @@
     },
     "ttha": {
       "iast": "Ṭha",
-      "positive": "Kṣamā / Ātmaprasāda (Forgiveness / Self-acceptance)",
-      "negative": "Anutāpa (Repentance)",
+      "positive": {
+        "sanskrit": "Kṣamā / Ātmaprasāda",
+        "english": "Forgiveness / Self-acceptance"
+      },
+      "negative": {
+        "sanskrit": "Anutāpa",
+        "english": "Repentance"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Anutāpa",
@@ -278,8 +350,14 @@
     },
     "dda": {
       "iast": "Ḍa",
-      "positive": "Nirbhayatā / Svīkāra (Fearlessness / Self-acceptance)",
-      "negative": "Lajjā (Shyness)",
+      "positive": {
+        "sanskrit": "Nirbhayatā / Svīkāra",
+        "english": "Fearlessness / Self-acceptance"
+      },
+      "negative": {
+        "sanskrit": "Lajjā",
+        "english": "Shyness"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Lajjā",
@@ -295,8 +373,14 @@
     },
     "ddha": {
       "iast": "Ḍha",
-      "positive": "Karuṇā (Compassion)",
-      "negative": "Piśunatā (Sadistic cruelty)",
+      "positive": {
+        "sanskrit": "Karuṇā",
+        "english": "Compassion"
+      },
+      "negative": {
+        "sanskrit": "Piśunatā",
+        "english": "Sadistic cruelty"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Piśunatā",
@@ -314,8 +398,14 @@
     },
     "nna": {
       "iast": "Ṇa",
-      "positive": "Muditā (Sympathetic joy)",
-      "negative": "Īrṣyā (Envy)",
+      "positive": {
+        "sanskrit": "Muditā",
+        "english": "Sympathetic joy"
+      },
+      "negative": {
+        "sanskrit": "Īrṣyā",
+        "english": "Envy"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Īrṣyā",
@@ -331,8 +421,14 @@
     },
     "ta": {
       "iast": "Ta",
-      "positive": "Jāgaraṇa (Awakening / Alertness)",
-      "negative": "Jāḍya / Nidrā (Inertia, deep sleep)",
+      "positive": {
+        "sanskrit": "Jāgaraṇa",
+        "english": "Awakening / Alertness"
+      },
+      "negative": {
+        "sanskrit": "Jāḍya / Nidrā",
+        "english": "Inertia, deep sleep"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Jāḍya / Nidrā",
@@ -352,8 +448,14 @@
     },
     "tha": {
       "iast": "Tha",
-      "positive": "Harṣa / Prīti (Joy / Affection)",
-      "negative": "Viṣāda (Melancholy)",
+      "positive": {
+        "sanskrit": "Harṣa / Prīti",
+        "english": "Joy / Affection"
+      },
+      "negative": {
+        "sanskrit": "Viṣāda",
+        "english": "Melancholy"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Viṣāda",
@@ -370,8 +472,14 @@
     },
     "da": {
       "iast": "Da",
-      "positive": "Kṣamā / Dhairya (Patience / Forgiveness)",
-      "negative": "Krodha / Karkaśatā (Peevishness / Irritability)",
+      "positive": {
+        "sanskrit": "Kṣamā / Dhairya",
+        "english": "Patience / Forgiveness"
+      },
+      "negative": {
+        "sanskrit": "Krodha / Karkaśatā",
+        "english": "Peevishness / Irritability"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Krodha / Karkaśatā",
@@ -389,8 +497,14 @@
     },
     "dha": {
       "iast": "Dha",
-      "positive": "Nivṛtti / Tuṣṭi (Renunciation / Contentment)",
-      "negative": "Tṛṣṇā (Craving)",
+      "positive": {
+        "sanskrit": "Nivṛtti / Tuṣṭi",
+        "english": "Renunciation / Contentment"
+      },
+      "negative": {
+        "sanskrit": "Tṛṣṇā",
+        "english": "Craving"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Tṛṣṇā",
@@ -409,8 +523,14 @@
     },
     "na": {
       "iast": "Na",
-      "positive": "Viveka (Discriminative detachment)",
-      "negative": "Moha (Blind attachment)",
+      "positive": {
+        "sanskrit": "Viveka",
+        "english": "Discriminative detachment"
+      },
+      "negative": {
+        "sanskrit": "Moha",
+        "english": "Blind attachment"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Moha",
@@ -429,8 +549,14 @@
     },
     "pa": {
       "iast": "Pa",
-      "positive": "Maitrī / Sneha (Friendliness / Affection)",
-      "negative": "Ghṛṇā (Hatred / Revulsion)",
+      "positive": {
+        "sanskrit": "Maitrī / Sneha",
+        "english": "Friendliness / Affection"
+      },
+      "negative": {
+        "sanskrit": "Ghṛṇā",
+        "english": "Hatred / Revulsion"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Ghṛṇā",
@@ -450,8 +576,14 @@
     },
     "pha": {
       "iast": "Pha",
-      "positive": "Abhaya (Fearlessness)",
-      "negative": "Bhaya (Fear)",
+      "positive": {
+        "sanskrit": "Abhaya",
+        "english": "Fearlessness"
+      },
+      "negative": {
+        "sanskrit": "Bhaya",
+        "english": "Fear"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Bhaya",
@@ -468,8 +600,14 @@
     },
     "ba": {
       "iast": "Ba",
-      "positive": "Ādara / Mānya (Respect / Reverence)",
-      "negative": "Avajñā (Indifference)",
+      "positive": {
+        "sanskrit": "Ādara / Mānya",
+        "english": "Respect / Reverence"
+      },
+      "negative": {
+        "sanskrit": "Avajñā",
+        "english": "Indifference"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Avajñā",
@@ -487,8 +625,14 @@
     },
     "bha": {
       "iast": "Bha",
-      "positive": "Jāgaraṇa (Awareness / awakening)",
-      "negative": "Mūrcchā (Deluded obsession)",
+      "positive": {
+        "sanskrit": "Jāgaraṇa",
+        "english": "Awareness / awakening"
+      },
+      "negative": {
+        "sanskrit": "Mūrcchā",
+        "english": "Deluded obsession"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Mūrcchā",
@@ -506,8 +650,14 @@
     },
     "ma": {
       "iast": "Ma",
-      "positive": "Anuśāsana (disciplined restraint / containment)",
-      "negative": "Praśraya / Praṇāśa (indulgence / annihilating collapse)",
+      "positive": {
+        "sanskrit": "Anuśāsana",
+        "english": "disciplined restraint / containment"
+      },
+      "negative": {
+        "sanskrit": "Praśraya / Praṇāśa",
+        "english": "indulgence / annihilating collapse"
+      },
       "source_vritti": "Praṇāśa (annihilation) + Praśraya (indulgence / giving latitude)",
       "source_notes": "Source carries both praṇāśa and praśraya; praṇāśa added explicitly. Counter-pole Anuśāsana is the derived remedial restraint.",
       "expanded_properties": {
@@ -527,8 +677,14 @@
     },
     "ya": {
       "iast": "Ya",
-      "positive": "Viśvāsa (Confidence)",
-      "negative": "Aviśvāsa (Lack of confidence)",
+      "positive": {
+        "sanskrit": "Viśvāsa",
+        "english": "Confidence"
+      },
+      "negative": {
+        "sanskrit": "Aviśvāsa",
+        "english": "Lack of confidence"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Aviśvāsa",
@@ -548,8 +704,14 @@
     },
     "ra": {
       "iast": "Ra",
-      "positive": "Prāṇaśakti / Agnitattva (vitality / creative fire)",
-      "negative": "Sarvanāśa (annihilation-thought / defeatist destruction)",
+      "positive": {
+        "sanskrit": "Prāṇaśakti / Agnitattva",
+        "english": "vitality / creative fire"
+      },
+      "negative": {
+        "sanskrit": "Sarvanāśa",
+        "english": "annihilation-thought / defeatist destruction"
+      },
       "source_vritti": "Agnitattva / Prāṇaśakti (vitality / fire) + Sarvanāśa (annihilation-thought)",
       "source_notes": "Corrected: agnitattva/fire moved to the positive (vitality) pole; only Sarvanāśa (destructive annihilation-thought) remains negative.",
       "expanded_properties": {
@@ -575,8 +737,14 @@
     },
     "la": {
       "iast": "La",
-      "positive": "Karuṇā / Sneha (Compassion / Gentleness)",
-      "negative": "Krūratā (Cruelty)",
+      "positive": {
+        "sanskrit": "Karuṇā / Sneha",
+        "english": "Compassion / Gentleness"
+      },
+      "negative": {
+        "sanskrit": "Krūratā",
+        "english": "Cruelty"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Krūratā",
@@ -596,8 +764,14 @@
     },
     "va": {
       "iast": "Va",
-      "positive": "Dharma / Jalatattva (original stance, sustaining righteousness / liquid coherence)",
-      "negative": "Adharma (deviation from original stance / loss of sustaining order)",
+      "positive": {
+        "sanskrit": "Dharma / Jalatattva",
+        "english": "original stance, sustaining righteousness / liquid coherence"
+      },
+      "negative": {
+        "sanskrit": "Adharma",
+        "english": "deviation from original stance / loss of sustaining order"
+      },
       "source_vritti": "Dharma (ensconcement in original stance) + Jalatattva (liquid / water factor)",
       "source_notes": "Corrected: Dharma is the sustaining (positive) pole, NOT a binding pole; worldly distortion = Adharma. Satya removed (was prior positive).",
       "expanded_properties": {
@@ -624,8 +798,14 @@
     },
     "sha": {
       "iast": "Śa",
-      "positive": "Directed energy / purposeful material pursuit (dynamic accomplishment)",
-      "negative": "Restless acquisition / material greed (rajasic overdrive)",
+      "positive": {
+        "sanskrit": "",
+        "english": "Directed energy / purposeful material pursuit (dynamic accomplishment)"
+      },
+      "negative": {
+        "sanskrit": "",
+        "english": "Restless acquisition / material greed (rajasic overdrive)"
+      },
       "source_vritti": "Rajoguṇa + Artha (psychic longing / material pursuit)",
       "source_notes": "Greed is the distorted form, not the whole source; positive pole = purposeful dynamic accomplishment (rajasic energy).",
       "expanded_properties": {
@@ -647,8 +827,14 @@
     },
     "ssa": {
       "iast": "Ṣa",
-      "positive": "Transmutation of desire / grounded containment",
-      "negative": "Kāma / Tamoguṇa (physical desire / inertia / confusion)",
+      "positive": {
+        "sanskrit": "",
+        "english": "Transmutation of desire / grounded containment"
+      },
+      "negative": {
+        "sanskrit": "Kāma / Tamoguṇa",
+        "english": "physical desire / inertia / confusion"
+      },
       "source_vritti": "Tamoguṇa + Kāma (physical / worldly desire)",
       "source_notes": "Worldly pole = kāma / tamoguṇa; counter-pole = transmutation of desire. Source alignment made explicit.",
       "expanded_properties": {
@@ -670,8 +856,14 @@
     },
     "sa": {
       "iast": "Sa",
-      "positive": "Mokṣa / Sattvaguṇa (liberation / clarity)",
-      "negative": "Escapism (premature detachment / static withdrawal)",
+      "positive": {
+        "sanskrit": "Mokṣa / Sattvaguṇa",
+        "english": "liberation / clarity"
+      },
+      "negative": {
+        "sanskrit": "",
+        "english": "Escapism (premature detachment / static withdrawal)"
+      },
       "source_vritti": "Mokṣa + Sattvaguṇa",
       "source_notes": "Liberation / sattva is the source root (positive); negative pole = escapist / static withdrawal.",
       "expanded_properties": {
@@ -693,8 +885,14 @@
     },
     "ha": {
       "iast": "Ha",
-      "positive": "Parā-vidyā (Spiritual knowledge)",
-      "negative": "Avidyā / Rātri (Darkness / Night / Inertia)",
+      "positive": {
+        "sanskrit": "Parā-vidyā",
+        "english": "Spiritual knowledge"
+      },
+      "negative": {
+        "sanskrit": "Avidyā / Rātri",
+        "english": "Darkness / Night / Inertia"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Parā-vidyā",
@@ -716,8 +914,14 @@
     },
     "ksha": {
       "iast": "Kṣa",
-      "positive": "Aparā-vidyā (Mundane knowledge)",
-      "negative": "Mithyā-jñāna (False knowledge, Dogma)",
+      "positive": {
+        "sanskrit": "Aparā-vidyā",
+        "english": "Mundane knowledge"
+      },
+      "negative": {
+        "sanskrit": "Mithyā-jñāna",
+        "english": "False knowledge, Dogma"
+      },
       "expanded_properties": {
         "vrtti": {
           "name": "Aparā-vidyā",

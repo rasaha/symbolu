@@ -34,8 +34,21 @@ _HERE = Path(__file__).resolve().parent
 # Authoritative set (verbatim from Sanskrit_letters_full.docx). Map the file's positive/negative to the
 # names the readers use internally: leading_vritti = NEGATIVE pole, counter_vritti = POSITIVE pole.
 LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
-VOW = LEX["vowels"]
-CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative"], "counter_vritti": d["positive"]}
+
+
+def _pole_disp(p):
+    """A pole may be a plain string or a {sanskrit, english} dict; render the canonical display string
+    ('Sanskrit (English)', or just English when there is no Sanskrit term). Keeps the engine identical."""
+    if isinstance(p, dict):
+        skt, eng = p.get("sanskrit", ""), p.get("english", "")
+        return f"{skt} ({eng})" if skt else eng
+    return p
+
+
+VOW = {k: {**d, "positive": _pole_disp(d["positive"]), "negative": _pole_disp(d["negative"])}
+       for k, d in LEX["vowels"].items()}
+CONS = {k: {"iast": d["iast"], "leading_vritti": _pole_disp(d["negative"]),
+            "counter_vritti": _pole_disp(d["positive"])}
         for k, d in LEX["consonants"].items()}
 
 # Varga (place-of-articulation family) + Devanāgarī, for DISPLAY clarity only — keeps the frozen meaning
