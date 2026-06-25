@@ -1005,5 +1005,284 @@
     "word_middle": "consonant often takes relational / softening roles, blending into neighbors",
     "word_end": "consonant acts as closure / return signal (anchoring the energy)"
   },
-  "_expanded_properties_note": "expanded_properties = source acoustic-root literature (P.R. Sarkar, Varṇa Vijñāna) as INTERPRETIVE METADATA only. It enriches reading/authoring but does NOT affect the polarity score, which uses ONLY positive/negative. Scoring fields: positive, negative. Metadata fields: expanded_properties, source_vritti, source_notes."
+  "_expanded_properties_note": "expanded_properties = source acoustic-root literature (P.R. Sarkar, Varṇa Vijñāna) as INTERPRETIVE METADATA only. It enriches reading/authoring but does NOT affect the polarity score, which uses ONLY positive/negative. Scoring fields: positive, negative. Metadata fields: expanded_properties, source_vritti, source_notes.",
+  "_romanization": {
+    "a": {
+      "deva": "अ",
+      "iast": "a",
+      "itrans": "a",
+      "english": "a"
+    },
+    "aa": {
+      "deva": "आ",
+      "iast": "ā",
+      "itrans": "aa / A",
+      "english": "aa"
+    },
+    "i": {
+      "deva": "इ",
+      "iast": "i",
+      "itrans": "i",
+      "english": "i"
+    },
+    "ii": {
+      "deva": "ई",
+      "iast": "ī",
+      "itrans": "ii / I",
+      "english": "ee"
+    },
+    "u": {
+      "deva": "उ",
+      "iast": "u",
+      "itrans": "u",
+      "english": "u"
+    },
+    "uu": {
+      "deva": "ऊ",
+      "iast": "ū",
+      "itrans": "uu / U",
+      "english": "oo"
+    },
+    "e": {
+      "deva": "ए",
+      "iast": "e",
+      "itrans": "e",
+      "english": "e / ay"
+    },
+    "ai": {
+      "deva": "ऐ",
+      "iast": "ai",
+      "itrans": "ai",
+      "english": "ai"
+    },
+    "o": {
+      "deva": "ओ",
+      "iast": "o",
+      "itrans": "o",
+      "english": "o"
+    },
+    "au": {
+      "deva": "औ",
+      "iast": "au",
+      "itrans": "au",
+      "english": "au / ow"
+    },
+    "am": {
+      "deva": "अं",
+      "iast": "aṁ",
+      "itrans": "M / .m",
+      "english": "ṁ (nasal)"
+    },
+    "ah": {
+      "deva": "अः",
+      "iast": "aḥ",
+      "itrans": "H / .h",
+      "english": "ḥ (breath)"
+    },
+    "ka": {
+      "deva": "क",
+      "iast": "Ka",
+      "itrans": "k",
+      "english": "k (skate)"
+    },
+    "kha": {
+      "deva": "ख",
+      "iast": "Kha",
+      "itrans": "kh",
+      "english": "kh (aspirated k)"
+    },
+    "ga": {
+      "deva": "ग",
+      "iast": "Ga",
+      "itrans": "g",
+      "english": "g (go)"
+    },
+    "gha": {
+      "deva": "घ",
+      "iast": "Gha",
+      "itrans": "gh",
+      "english": "gh (aspirated g)"
+    },
+    "nga": {
+      "deva": "ङ",
+      "iast": "Ṅa",
+      "itrans": "~N / N^",
+      "english": "ng (sing)"
+    },
+    "ca": {
+      "deva": "च",
+      "iast": "Ca",
+      "itrans": "ch / c",
+      "english": "ch (church)"
+    },
+    "cha": {
+      "deva": "छ",
+      "iast": "Cha",
+      "itrans": "Ch / chh",
+      "english": "chh (aspirated ch)"
+    },
+    "ja": {
+      "deva": "ज",
+      "iast": "Ja",
+      "itrans": "j",
+      "english": "j (jam)"
+    },
+    "jha": {
+      "deva": "झ",
+      "iast": "Jha",
+      "itrans": "jh",
+      "english": "jh (aspirated j)"
+    },
+    "nya": {
+      "deva": "ञ",
+      "iast": "Ña",
+      "itrans": "~n / GY",
+      "english": "ny (canyon)"
+    },
+    "tta": {
+      "deva": "ट",
+      "iast": "Ṭa",
+      "itrans": "T",
+      "english": "ṭ (retroflex t — curl tongue)"
+    },
+    "ttha": {
+      "deva": "ठ",
+      "iast": "Ṭha",
+      "itrans": "Th",
+      "english": "ṭh (aspirated retroflex t)"
+    },
+    "dda": {
+      "deva": "ड",
+      "iast": "Ḍa",
+      "itrans": "D",
+      "english": "ḍ (retroflex d)"
+    },
+    "ddha": {
+      "deva": "ढ",
+      "iast": "Ḍha",
+      "itrans": "Dh",
+      "english": "ḍh (aspirated retroflex d)"
+    },
+    "nna": {
+      "deva": "ण",
+      "iast": "Ṇa",
+      "itrans": "N",
+      "english": "ṇ (retroflex n)"
+    },
+    "ta": {
+      "deva": "त",
+      "iast": "Ta",
+      "itrans": "t",
+      "english": "t (dental — tongue on teeth)"
+    },
+    "tha": {
+      "deva": "थ",
+      "iast": "Tha",
+      "itrans": "th",
+      "english": "th (aspirated dental t)"
+    },
+    "da": {
+      "deva": "द",
+      "iast": "Da",
+      "itrans": "d",
+      "english": "d (dental)"
+    },
+    "dha": {
+      "deva": "ध",
+      "iast": "Dha",
+      "itrans": "dh",
+      "english": "dh (aspirated dental d)"
+    },
+    "na": {
+      "deva": "न",
+      "iast": "Na",
+      "itrans": "n",
+      "english": "n (dental)"
+    },
+    "pa": {
+      "deva": "प",
+      "iast": "Pa",
+      "itrans": "p",
+      "english": "p (spin)"
+    },
+    "pha": {
+      "deva": "फ",
+      "iast": "Pha",
+      "itrans": "ph / f",
+      "english": "ph / f (aspirated p)"
+    },
+    "ba": {
+      "deva": "ब",
+      "iast": "Ba",
+      "itrans": "b",
+      "english": "b (bin)"
+    },
+    "bha": {
+      "deva": "भ",
+      "iast": "Bha",
+      "itrans": "bh",
+      "english": "bh (aspirated b)"
+    },
+    "ma": {
+      "deva": "म",
+      "iast": "Ma",
+      "itrans": "m",
+      "english": "m (man)"
+    },
+    "ya": {
+      "deva": "य",
+      "iast": "Ya",
+      "itrans": "y",
+      "english": "y (yes)"
+    },
+    "ra": {
+      "deva": "र",
+      "iast": "Ra",
+      "itrans": "r",
+      "english": "r (rolled/tap)"
+    },
+    "la": {
+      "deva": "ल",
+      "iast": "La",
+      "itrans": "l",
+      "english": "l (let)"
+    },
+    "va": {
+      "deva": "व",
+      "iast": "Va",
+      "itrans": "v / w",
+      "english": "v / w"
+    },
+    "sha": {
+      "deva": "श",
+      "iast": "Śa",
+      "itrans": "sh / z",
+      "english": "ś (sh — palatal, as in 'sheet')"
+    },
+    "ssa": {
+      "deva": "ष",
+      "iast": "Ṣa",
+      "itrans": "Sh / S",
+      "english": "ṣ (retroflex sh)"
+    },
+    "sa": {
+      "deva": "स",
+      "iast": "Sa",
+      "itrans": "s",
+      "english": "s (sit)"
+    },
+    "ha": {
+      "deva": "ह",
+      "iast": "Ha",
+      "itrans": "h",
+      "english": "h (hat)"
+    },
+    "ksha": {
+      "deva": "क्ष",
+      "iast": "Kṣa",
+      "itrans": "kSh / x",
+      "english": "kṣ (ksh)"
+    }
+  },
+  "_romanization_note": "Canonical varṇa ↔ Devanāgarī / IAST / ITRANS-ascii / English spelling. Reference for deterministic romanized input; English words use g2p. Long-vowel digraphs ee→ī, oo→ū are honored by the parser."
 }

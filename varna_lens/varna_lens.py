@@ -92,9 +92,12 @@ _CONS = _RETRO_ASCII + [
          ("n", "na"), ("p", "pa"), ("b", "ba"), ("m", "ma"), ("y", "ya"), ("r", "ra"), ("l", "la"),
          ("v", "va"), ("w", "va"), ("s", "sa"), ("h", "ha"), ("f", "pha")]
          # lowercase sh = Śa (palatal), Sh = Ṣa (retroflex); q = Ka (qāf→guttural); English f = Pha (p stays Pa)
-_VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ii", "ii"), ("ī", "ii"), ("uu", "uu"),
-        ("ū", "uu"), ("ṁ", "am"), ("ṃ", "am"), ("ḥ", "ah"), ("a", "a"), ("i", "i"), ("u", "u"),
-        ("e", "e"), ("o", "o")]
+_VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ee", "ii"), ("ii", "ii"), ("ī", "ii"),
+        ("oo", "uu"), ("uu", "uu"), ("ū", "uu"), ("ṁ", "am"), ("ṃ", "am"), ("ḥ", "ah"),
+        ("a", "a"), ("i", "i"), ("u", "u"), ("e", "e"), ("o", "o")]
+# English long-vowel digraphs are mapped to their Sanskrit long vowel so they don't split into two
+# arbitrary vowels: ee → ī (as in 'see'), oo → ū (as in 'moon'). Other English vowel spellings are
+# ambiguous (ai/ay, ow/au, ea…) — for those use g2p (pronunciation) or pin with --varnas.
 
 # ARPAbet (cmudict) → varṇa key, for --g2p English words (approximate: English phonology ≠ varṇas).
 # Dialect rule (frozen, Indian-English realization): English ALVEOLAR STOPS/FLAP T D N DX → RETROFLEX
