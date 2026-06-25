@@ -1,8 +1,49 @@
 # ASG — Investor Brief
 
-> **Acoustic Symbol Generation (ASG):** a deterministic symbolic control language for designing, analyzing,
-> and generating sound forms — paired with an AI authoring layer and an empirical observation platform.
-> Series-A facing. Supersedes the positioning in `CONCEPT_BRIEF.md` (see Changelog, §13).
+> **ASG:** the deterministic, governable **control layer for naming and verbal identity** — the
+> infrastructure every product, brand, and AI agent uses to generate, validate, and explain the forms it
+> ships. Series-A facing. Positioning below is authoritative and supersedes any earlier framing (and
+> `CONCEPT_BRIEF.md`; see Changelog, §13).
+
+## 0. Positioning (authoritative)
+
+**Company description.** ASG is the deterministic control layer for naming and verbal identity. It turns
+intent and hard constraints — sound shape, length, multilingual safety, and real-world availability
+(trademark, domain, handle) — into reproducible, explainable name and sound-form candidates, backed by a
+proprietary database of how those forms actually land with people, by market and language. The AI that
+writes the rationale is a replaceable component; the durable system is the deterministic engine, the
+availability-grounded constraint solver, and the compounding observation graph that no language model
+contains. ASG is built to be the **system of record** every product, company, and AI agent runs its naming
+and verbal-identity decisions through.
+
+**One-sentence pitch.** ASG is the deterministic, governable control layer for naming and verbal identity —
+the infrastructure every product, brand, and AI agent uses to generate, validate, and explain the forms it
+ships.
+
+**Three-sentence elevator.** Every product, company, feature — and now every AI agent — needs names and
+verbal identity, but today that happens in chatbots and spreadsheets: non-reproducible, unconstrained,
+unaudited, and blind to whether a name is even *available* or how it actually lands. ASG is a deterministic
+engine that turns intent plus hard constraints — sound shape, multilingual safety, trademark/domain/handle
+availability — into reproducible, explainable candidates, with a thin AI layer for authoring and a
+proprietary observation graph measuring how forms perform by market and language. As AI commoditizes the
+*writing* of names, the durable value moves to what models can't provide — determinism, guaranteed
+availability and constraints, governance, and compounding outcome data — and ASG owns that layer.
+
+**Market positioning.** ASG is not a naming app or a creative tool; it is the **control, governance, and data
+infrastructure** for naming and verbal/sonic identity. Buyers are brand and product teams, agencies, and —
+increasingly — AI-agent platforms that must name and brand at machine scale via API. Against prompting, LLMs,
+embeddings, and vector search, ASG is the deterministic, constraint-guaranteeing, availability-grounded,
+auditable layer those approaches structurally lack and increasingly need to call. Go-to-market is a wedge —
+governed naming and verbal identity for enterprises and agencies — expanding into the standard layer every
+sound-form decision runs through.
+
+**Long-term vision.** To become the **naming and verbal-identity infrastructure**: the deterministic,
+governed, evidence-backed layer that every product, company, and AI agent runs its naming and sound-form
+decisions through. As software increasingly names and brands itself at machine scale, ASG is the control
+plane that makes those decisions reproducible, *ownable* (available), explainable, and measurably effective —
+with our trajectory schema as the interchange standard the ecosystem builds on. The model that writes the
+words will keep changing; the layer that guarantees, governs, and learns from the forms that actually ship is
+the durable, compounding business.
 
 ---
 
@@ -132,18 +173,22 @@ forms (blind, context-tagged, multi-language) and reports:
 It is explicitly a record of *what observers report*, reported as **measured associations**, not universal
 truths.
 
-## 7. Moat
+## 7. Moat (ranked by defensibility — honest)
 
-1. **Deterministic symbolic DSL** — a controllable, inspectable IR that is hard to replicate and that LLM/
-   embedding stacks structurally lack.
-2. **Authoring workflow** — the studio + rendering layer that turns profiles into on-brand output, with
-   per-customer brand-voice configuration (switching cost).
-3. **Empirical observation graph** — proprietary, controlled, compounding data on how sound forms land by
-   context and language. The only dataset measuring response *net of confounds*.
-4. **Enterprise reproducibility** — versioned, auditable, deterministic outputs deployable on-prem/VPC; a
-   trust and compliance advantage incumbents (and chatbots) cannot match.
-5. **Versioned trajectory standard** — owning the schema others build against creates an ecosystem and
-   network effects as vocabularies, renderers, and integrations accrue to it.
+1. **Proprietary observation graph** — compounding, model-independent outcome data (with controls) on how
+   sound forms land by context and language. The only true data-network-effect moat; in no language model.
+2. **Governance & reproducibility** — deterministic, auditable, on-prem/VPC outputs; the enterprise/
+   compliance lock-in that LLMs and chatbots structurally cannot match.
+3. **Availability-grounded constraint engine** — deterministic constraint solving plus real-world
+   trademark/domain/handle/multilingual-safety verification; hard to build, must-have, durable (it is
+   verification + data, not generation).
+4. **Hybrid workflow & switching costs** — brand-voice configuration and decision history per customer.
+5. **Trajectory schema as an interchange standard** — a high-variance bet: a network-effect moat *if and
+   when* an ecosystem adopts it; today an enabling interface, not yet a moat. Standards are earned by owning
+   the engine + data first, not declared.
+
+*Explicitly NOT moats (features, not defensibility): the AI **renderer** — commoditized by better models;
+the **SDK** — distribution, not a barrier. Build them; do not price the company on them.*
 
 ## 8. Business model
 
