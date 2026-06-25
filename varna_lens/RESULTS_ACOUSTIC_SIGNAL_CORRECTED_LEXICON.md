@@ -49,3 +49,36 @@ worse, than random reassignments). **trend: none toward signal.**
 The corrected source-aligned lexicon improved textual fidelity but did **not** produce measurable acoustic
 signal under the pre-registered test. The lexical sound→meaning claim remains unsupported for the corrected
 lexicon, just as for the old one — each result attached to its own lexicon version.
+
+---
+
+## Deterministic-judge re-run (post binding/liberating rename) — 2026-06-25
+
+> Reproducible re-run of the **same** pre-registered harness (`signal_test.py`, K=5, 127 words, valence-
+> matched forced choice, N_SCRAMBLE=20 seeded scrambles, N_BOOT=10000) on the current lexicon after the
+> `positive/negative → liberating_state/binding_state` ontology rename. The rename was byte-identical to the
+> engine reading (0/42 golden mismatches), so this also confirms the rename did not perturb the test. Uses
+> the **deterministic CPU judges** (`random`, `wordnet`) — fully reproducible, no API/sub-agent needed — and
+> so is a distinct, independently-checkable judge arm from the LLM-sub-agent run above.
+
+- **Lexicon / commit:** `c326bc1` (corrected entries Ca, Ja, Ma, Ra, Va, Śa, Ṣa, Sa; states renamed). 34 consonants + 12 vowels.
+- **Confirmatory LLM judge:** not run here (no `ANTHROPIC_API_KEY` in this environment); covered by the sub-agent arm above.
+
+| judge | accuracy(real) | accuracy(scrambled, 20 seeds) | order-shuffled | Δ = real − scrambled (95% CI) | rule verdict |
+|---|---|---|---|---|---|
+| `random` (null baseline) | 0.181 (CI 0.118–0.252) | 0.181 | 0.181 | −0.000 (−0.000 … −0.000) | null behaves: real ≡ scrambled, at chance |
+| **`wordnet`** (deterministic semantic) | **0.213** (CI 0.142–0.283) | 0.215 | 0.213 | **−0.003 (−0.067 … +0.062)** | **NO_SIGNAL** |
+
+acc(real) by language (wordnet): en 0.250, sa 0.233, ja 0.167, ur 0.000, zh 0.000. Sanskrit (home turf) sits at chance.
+
+### VERDICT: **NO_SIGNAL** (reproduced)
+The SIGNAL_DETECTED gate (`CI_lower(Δ) > 0` **and** `CI_lower(acc_real) > 0.20`) fails on both clauses: real
+sits at chance and Δ's CI brackets 0. The `random` null arm confirms no machinery leakage (real ≡ scrambled,
+Δ = 0 to floating-point). **acc(real) ≈ acc(scrambled) ≈ acc(order-shuffled) ≈ chance** — neither the lexicon
+mapping nor phoneme order recovers meaning.
+
+This is exactly the **relabeling-invariance** prediction: a gloss-blind / token-identity recovery score is
+invariant under permuting the lexicon, so real ≡ scrambled is the degenerate expectation, and only true
+gloss-semantics could break the tie — which it does not. The corrected, source-aligned, renamed lexicon
+remains **without recoverable sound→meaning signal**; the falsification stands across both the LLM-sub-agent
+and the deterministic-judge arms.
