@@ -1,5 +1,9 @@
 # Varṇa Lens — handoff brief (for an external collaborator)
 
+> **Layer boundary note** (see `LAYERS_ONTOLOGY_THEORY_IMPLEMENTATION.md`): automata / minimization claims
+> classify the current ρ implementation only. They do not classify the completed acoustic ontology or future
+> reading-theory variants.
+
 A personal, interpretive tool that abstracts a word's "hidden essence" from a frozen lexicon of Sanskrit
 varṇa (acoustic-root / bīja-akṣara) meanings. **Explicitly NOT a universal claim; deliberately OUTSIDE the
 C×R×S engine** (which firewalls sound→meaning). One frozen lexicon, fixed rules, applied identically every

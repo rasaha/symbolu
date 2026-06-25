@@ -2,6 +2,10 @@
 
 > Interpretive lens — not a universal claim, not part of C×R×S. One frozen lexicon
 > (`lexicon_authoritative.json`), one rule, applied identically every time.
+>
+> **Layer boundary note** (see `LAYERS_ONTOLOGY_THEORY_IMPLEMENTATION.md`): automata / minimization claims
+> classify the current ρ implementation only. They do not classify the completed acoustic ontology or future
+> reading-theory variants.
 
 ## The reference: each letter's two poles
 Every consonant has two poles in the lexicon: a **worldly** (binding) vṛtti and a **spiritual** (liberating)

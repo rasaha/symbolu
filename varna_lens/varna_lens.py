@@ -31,13 +31,16 @@ from datetime import datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-# Authoritative set (verbatim from Sanskrit_letters_full.docx). Map the file's positive/negative to the
-# names the readers use internally: leading_vritti = NEGATIVE pole, counter_vritti = POSITIVE pole.
+# Authoritative set (verbatim from Sanskrit_letters_full.docx). Each varṇa has two STATES of expression
+# (never moral poles, never chosen from external good/bad/useful/auspicious labels):
+#   binding_state    = worldly, contractive, attachment-forming, bondage-producing expression
+#   liberating_state = sublimated, unbinding, expansive, dharma/mokṣa-oriented expression
+# Readers use internally: leading_vritti = binding_state, counter_vritti = liberating_state.
 LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
 
 
 def _pole_disp(p):
-    """A pole may be a plain string or a {sanskrit, english} dict; render the canonical display string
+    """A state may be a plain string or a {sanskrit, english} dict; render the canonical display string
     ('Sanskrit (English)', or just English when there is no Sanskrit term). Keeps the engine identical."""
     if isinstance(p, dict):
         skt, eng = p.get("sanskrit", ""), p.get("english", "")
@@ -45,14 +48,15 @@ def _pole_disp(p):
     return p
 
 
-VOW = {k: {**d, "positive": _pole_disp(d["positive"]), "negative": _pole_disp(d["negative"])}
+VOW = {k: {**d, "liberating_state": _pole_disp(d["liberating_state"]),
+           "binding_state": _pole_disp(d["binding_state"])}
        for k, d in LEX["vowels"].items()}
-CONS = {k: {"iast": d["iast"], "leading_vritti": _pole_disp(d["negative"]),
-            "counter_vritti": _pole_disp(d["positive"])}
+CONS = {k: {"iast": d["iast"], "leading_vritti": _pole_disp(d["binding_state"]),
+            "counter_vritti": _pole_disp(d["liberating_state"])}
         for k, d in LEX["consonants"].items()}
 
 # Varga (place-of-articulation family) + Devanāgarī, for DISPLAY clarity only — keeps the frozen meaning
-# lexicon (iast/positive/negative) clean while making the retroflex Ṭa-varga vs dental ta-varga obvious.
+# lexicon (iast/binding_state/liberating_state) clean while making retroflex Ṭa-varga vs dental ta-varga obvious.
 _VARGA = {
     "ka": ("guttural · ka-varga", "क"), "kha": ("guttural · ka-varga", "ख"),
     "ga": ("guttural · ka-varga", "ग"), "gha": ("guttural · ka-varga", "घ"),
@@ -198,6 +202,42 @@ def auto_phonemes(word):
     ph, w = phonemes_roman(word); return ph, w, "roman (auto: fallback)"
 
 
+_VOWEL_LETTERS = "aeiouAEIOU" + "".join(c for c in _IAST_CHARS if c.lower() in "āīūṛṝḷ")
+
+
+def _group_vowel_key(group):
+    """Map a run of vowel letters (e.g. 'ea', 'oo') to ONE vowel key via the roman table; take the first
+    vowel it yields (longest-match handles ee->ī, oo->ū, ai, au)."""
+    seg, _w = phonemes_roman(group.lower())
+    for typ, key, _surf in seg:
+        if typ == "V":
+            return key
+    return None
+
+
+def phonemes_hybrid(word):
+    """HYBRID reading: consonants + attachment/polarity from SOUND (g2p); vowel IDENTITY from SPELLING.
+
+    The load-bearing structure (which consonants, and whether a vowel attaches → onset(+)/coda(−)) is
+    taken from pronunciation, so ambiguous letters resolve correctly (camera→Ka, not Ca) and silent
+    written vowels do NOT invent a phantom attachment. The vowel IDENTITIES are then overlaid from the
+    spelling, paired to the sound's vowel slots in order — so homophones spelled differently stay
+    distinct (sun: …u… vs son: …o…). Extra (silent) written vowels with no sound slot are dropped.
+    Falls back to roman if there is no pronunciation. Returns (phonemes, warn, src)."""
+    snd, warn = phonemes_cmudict(word)
+    if not snd:
+        ph, w = phonemes_roman(word); return ph, w, "roman (hybrid fallback: no pronunciation)"
+    spell = [k for k in (_group_vowel_key(g) for g in re.findall("[" + _VOWEL_LETTERS + "]+", word)) if k]
+    out, vi = [], 0
+    for typ, key, surf in snd:
+        if typ == "V":
+            out.append(("V", spell[vi] if vi < len(spell) else key, surf))
+            vi += 1
+        else:
+            out.append((typ, key, surf))
+    return out, warn, "hybrid (consonants by sound, vowels by spelling)"
+
+
 def annotate(phonemes):
     """Tag each consonant with R1 polarity: 'created' if the NEXT phoneme is a vowel, else 'destroyed'."""
     ann = []
@@ -295,7 +335,7 @@ def read_vp(phonemes):
     if not parts:
         out.update(rule="vp (no consonants)", essence="(none)", essence_short="")
         return out
-    out["rule"] = "vowel-pole (CV=+positive, coda=\u2212negative)"
+    out["rule"] = "vowel-pole (CV=+liberating, coda=\u2212binding)"
     out["essence"] = " \u2192 ".join(parts)
     out["essence_short"] = " \u2192 ".join(shorts)
     return out
@@ -331,9 +371,9 @@ def read_op(phonemes):
         if vd:
             # whole-word essence = the final vowel's active essence; sign = anchored (+) / leading (−).
             summary = {"iast": vd["iast"].split(" ")[0], "sign": "+" if spos else "−",
-                       "essence": vd["positive"]}
+                       "essence": vd["liberating_state"]}
     out = {"sequence": annotate(phonemes), "model": "vowel_attachment", "whole_word_essence": summary}
-    parts, shorts = [], []
+    parts, shorts, signs = [], [], []
     for i, (typ, key, surf) in enumerate(full):
         if i == last_v:
             continue                                      # final vowel reported as whole-word essence
@@ -357,9 +397,10 @@ def read_op(phonemes):
         else:
             d = VOW.get(key)
             pos = bool(prev and prev[0] == "C")           # vowel anchored by a preceding consonant
-            v = d["positive"]
+            v = d["liberating_state"]
             iast = d["iast"].split(" ")[0]
         sign = "+" if pos else "−"
+        signs.append(sign)
         if typ == "C" and not pos:
             # a WORLDLY (−) consonant shows its worldly pole easing INTO its spiritual counter-pole
             counter = _short(d["counter_vritti"])
@@ -374,7 +415,28 @@ def read_op(phonemes):
     if summary:
         short += f"   ⟹ [{summary['sign']}{_short(summary['essence'])}]"
     out["essence_short"] = short
+    out["emergent_valence"] = _emergent_valence(signs, summary)
     return out
+
+
+def _emergent_valence(signs, summary):
+    """Whole-word lean DERIVED from the phoneme chain — never supplied from a semantic label.
+
+    Each expressed state contributes a vote: '+' = liberating_state expressed (a vowel-anchored/onset
+    varṇa), '−' = binding_state expressed (a bare/leading varṇa). The final-vowel whole-word essence, when
+    present, casts one extra vote by its own sign. The lean is the majority of those votes:
+      liberating  — liberating votes outnumber binding
+      binding     — binding votes outnumber liberating
+      mixed       — a tie (or no scorable varṇa)
+    This is structural: it reads which states the SOUNDS express, with zero input about the referent."""
+    votes = list(signs) + ([summary["sign"]] if summary else [])
+    lib = votes.count("+")
+    bind = votes.count("−")
+    lean = "liberating" if lib > bind else "binding" if bind > lib else "mixed"
+    return {"lean": lean,
+            "basis": (f"derived from the varṇa chain, not supplied from semantic labels "
+                      f"(liberating-state votes={lib}, binding-state votes={bind})"),
+            "liberating_votes": lib, "binding_votes": bind}
 
 
 def read(phonemes, reverse=False, model="pair"):
@@ -440,7 +502,7 @@ def format_reading(word, src, out, warnings):
                 L.append(f"    {a['surface']:<4} C  (no lexicon entry for {a['key']})")
         else:
             d = a["data"]
-            L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['positive']} / (shadow) {d['negative']}")
+            L.append(f"    {a['surface']:<4} V  {d['iast']:<7} {d['liberating_state']} / (shadow) {d['binding_state']}")
     if out.get("pairs"):
         L.append("")
         L.append(f"  overlapping pairs (R2):  {out.get('pairs_short','')}")
@@ -476,10 +538,13 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="pair"):
-    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown)."""
+def analyze(word, *, g2p=False, varnas=None, roman=False, hybrid=False, reverse=False, model="pair"):
+    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown).
+    hybrid = consonants/polarity by sound + vowel identity by spelling (see phonemes_hybrid)."""
     if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
+    elif hybrid:
+        ph, warn, src = phonemes_hybrid(word)
     elif g2p:
         ph, warn = phonemes_cmudict(word); src = "g2p (forced)"
     elif roman:
@@ -572,11 +637,12 @@ def main(argv=None):
     ap.add_argument("word", nargs="?", help="romanized word, e.g. kala / kāla / ak")
     ap.add_argument("--g2p", action="store_true", help="force g2p pronunciation (English/any language)")
     ap.add_argument("--roman", action="store_true", help="force literal IAST/roman reading (skip auto g2p)")
+    ap.add_argument("--hybrid", action="store_true", help="consonants/polarity by sound + vowel identity by spelling")
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
     ap.add_argument("--reverse", action="store_true", help="flip R2: 2nd consonant is +(giver); causation runs backward")
-    ap.add_argument("--db", action="store_true", help="Distortion-Balance model: first syllable=negative(distortion), rest=positive(balance)")
+    ap.add_argument("--db", action="store_true", help="Distortion-Balance model: first syllable=binding(distortion), rest=liberating(balance)")
     ap.add_argument("--pairs", action="store_true", help="(legacy) overlapping-pairs model")
     ap.add_argument("--vp-consonly", action="store_true", help="(legacy) vowel-pole on consonants only (no vowel meanings)")
     ap.add_argument("--tally", help="read a filled log CSV and print the flowed/stretched/missed tally")
@@ -596,6 +662,8 @@ def main(argv=None):
         ap.error("give a word, --varnas, --batch, or --tally")
     if args.varnas:
         ph, warn = phonemes_explicit(args.varnas); src = "explicit"
+    elif args.hybrid:
+        ph, warn, src = phonemes_hybrid(args.word)
     elif args.g2p:
         ph, warn = phonemes_cmudict(args.word); src = "g2p (forced)"
     elif args.roman:

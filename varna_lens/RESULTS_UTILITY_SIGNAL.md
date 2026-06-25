@@ -1,5 +1,9 @@
 # Results — non-lexical UTILITY test (pre-registered)
 
+> **Layer boundary note** (see `LAYERS_ONTOLOGY_THEORY_IMPLEMENTATION.md`): automata / minimization claims
+> classify the current ρ implementation only. They do not classify the completed acoustic ontology or future
+> reading-theory variants. This result is an empirical falsification outcome and is untouched by that scoping.
+
 > Pre-registration: `PREREG_UTILITY_SIGNAL.md`. Verdict computed by the registered rule, not by hand. This
 > is a separate hypothesis from the lexical NO_SIGNAL result (`RESULTS_ACOUSTIC_SIGNAL.md`), and a positive
 > result here would **not** revive the lexical claim. Interpretive lens — **not** part of C×R×S.

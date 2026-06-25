@@ -23,17 +23,21 @@ sound→propensity attachment. Its value is **consistency for reflection**, not 
 firewalled from C×R×S (`phoneme_overreach`).
 
 ## The frozen lexicon (`lexicon_authoritative.json`)
-- **Consonants:** each carries its **worldly (bīja) binding vṛtti** (`negative` field — the propensity the
-  sound activates) + a **dissolved/spiritual counter-pole** (`positive` field).
-- **Vowels:** each carries a **worldly active essence** (`positive` field) + a **distortion pole**
-  (`negative` field).
+Every varṇa has two **states of expression** — not moral poles, and **never** chosen from any external
+label about the referent (good/bad, useful/useless, auspicious/inauspicious). The only question the
+framework asks of an acoustic tendency is whether it **binds** consciousness or **releases** it:
+- **`binding_state`** — worldly, contractive, attachment-forming, bondage-producing (the bīja propensity
+  the sound activates).
+- **`liberating_state`** — sublimated, unbinding, expansive, dharma/mokṣa-oriented (its dissolved counter).
+- For a **consonant** the worldly default is its `binding_state`; for a **vowel** the worldly active
+  essence sits in its `liberating_state` field (an intentional field asymmetry).
 
 The lexicon is **frozen**: you never adjust an essence to fit a word after the fact. That's the whole game.
 
 ## The one rule — worldly-reference order-polarity (Option 1)
-Every varṇa is read by its **worldly propensity** (consonant `negative` field; vowel `positive` field). The
-displayed meaning is **always** that worldly pole — the spiritual pole is what you get by **dissolving** it.
-Sound order sets only the **sign**:
+Every varṇa is read by its **worldly propensity** (consonant `binding_state`; vowel `liberating_state`). The
+displayed meaning is **always** that worldly state — the liberating state is what you get by **dissolving**
+it. Sound order sets only the **sign** — never a semantic judgment about the word:
 
 - **+ AFFIRMED** — consonant has a **vowel after** it *or is word-initial*; vowel has a **consonant before**
   it (anchored). The bīja **activates** the propensity.
@@ -44,6 +48,15 @@ Examples: *kāla* = Ka⁺ **Hope** → ā⁺ Expansion → La⁻ **Cruelty** ⟹
 *war* = Va⁺ **Dharma** → o⁺ Closure → Ra⁻ **Annihilation** ("righteous annihilation"); *aim* = ai⁻
 Welfare/materialization → Ma⁻ Indulgence (the **m** eliminates the worldly aim). Full rule + worked table in
 `RULES.md`.
+
+## Emergent valence (derived, never supplied)
+A whole word is **never** stamped binding or liberating from a judgment about what it denotes. Instead the
+chain is decoded first, then summarised: `emergent_valence.lean` ∈ `binding | liberating | mixed` is the
+majority of the per-varṇa signs the structure already produced (its `basis` records the vote counts and
+states it is *derived from the chain, not supplied from semantic labels*). So *river* reads
+**liberating** and *kill* reads **binding** because of their **sounds**, not because anyone called a river
+good or killing bad — and *poison* reads **liberating**, exactly the point: the lens does not moralise.
+Proven structurally by `ontology_test.py`.
 
 ## Segmentation into acoustic varṇas
 - **Default (roman/IAST):** literal tokenization, faithful for transliterated Sanskrit (IAST writes every
