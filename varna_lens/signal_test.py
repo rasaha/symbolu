@@ -53,9 +53,9 @@ def keys_for(rows):
 
 
 def real_maps():
-    """key -> worldly short-gloss.  consonant = leading_vritti (worldly);  vowel = positive (worldly)."""
+    """key -> worldly short-gloss.  consonant = leading_vritti (binding);  vowel = liberating_state (worldly)."""
     cons = {k: V._short(d["leading_vritti"]) for k, d in V.CONS.items()}
-    vow = {k: V._short(d["positive"]) for k, d in V.VOW.items()}
+    vow = {k: V._short(d["liberating_state"]) for k, d in V.VOW.items()}
     return cons, vow
 
 

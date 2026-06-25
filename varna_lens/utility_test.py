@@ -57,7 +57,7 @@ def _gloss(v):
 
 def real_maps():
     cons = {k: (_gloss(d["leading_vritti"]), _gloss(d["counter_vritti"])) for k, d in V.CONS.items()}
-    vow = {k: _gloss(d["positive"]) for k, d in V.VOW.items()}
+    vow = {k: _gloss(d["liberating_state"]) for k, d in V.VOW.items()}
     return cons, vow
 
 

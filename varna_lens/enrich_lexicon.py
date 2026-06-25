@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Enrich lexicon_authoritative.json with source literature as NON-SCORING metadata.
 
-Design (per the agreed contract): keep `positive`/`negative` as the ONLY scoring axis (the deterministic
-engine reads negative=worldly→leading_vritti, positive=counter→counter_vritti — untouched here). Add an
+NOTE (schema migration): the two reading fields were later renamed `positive`→`liberating_state` and
+`negative`→`binding_state` by `migrate_ontology.py`. This historical script still references the old
+names; the design below is unchanged in spirit (the expanded_properties metadata never affects the reading).
+
+Design (per the agreed contract): keep the two reading states as the ONLY reading axis (the deterministic
+engine reads binding_state=worldly→leading_vritti, liberating_state=counter→counter_vritti — untouched here). Add an
 `expanded_properties` block per consonant carrying the authoritative acoustic-root literature (vṛtti,
 cosmic/elemental functions, imagery, etymology, semantic extensions, deity links, source quote). These
 ENRICH interpretation only; they must NOT change the polarity score. Re-runnable: merges idempotently.

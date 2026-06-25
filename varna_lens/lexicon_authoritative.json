@@ -1,19 +1,20 @@
 {
   "_source": "Sanskrit_letters_full.docx (user-confirmed AUTHORITATIVE set, this version supersedes earlier ones)",
   "_legend": {
-    "positive": "positive pole — liberating/balance (consonant) or positive acoustic essence (vowel)",
-    "negative": "negative pole — binding/distortion (consonant) or negative meaning (vowel)",
-    "_worldly_reference_note": "Option 1 (worldly reference): the lens reads the WORLDLY (bīja) propensity of every varṇa. For a CONSONANT the worldly pole is the 'negative' field (binding vṛtti, e.g. Ka=Hope, La=Cruelty); for a VOWEL the worldly pole is the 'positive' field (active essence, e.g. a=Birth, ai=Welfare). This field asymmetry is intentional. The +/− SIGN in a reading is affirmed(+)/dissolving(−) from sound-order, NOT a field swap; the spiritual pole is the dissolved worldly one (the consonant's 'positive' counter-field).",
+    "liberating_state": "liberating expression of the varṇa — sublimated, unbinding, expansive, dharma/mokṣa-oriented (consonant), or the active acoustic essence (vowel)",
+    "binding_state": "binding expression of the varṇa — worldly, contractive, attachment-forming, bondage-producing (consonant), or the worldly acoustic essence (vowel)",
+    "_ontology_note": "The framework asks ONE question of every acoustic tendency: does it BIND consciousness (contractive, attachment-forming) or RELEASE it (expansive, unbinding)? These are states of expression, NOT moral judgements. Poles are never selected from external labels about the referent (good/bad, useful/useless, auspicious/inauspicious). The phoneme chain determines the expressed state; the whole-word reading is then labelled binding-dominant, liberating-dominant, or mixed — derived, never supplied.",
+    "_state_reference_note": "The lens reads the WORLDLY (bīja) tendency of every varṇa by default. For a CONSONANT the worldly tendency is its binding_state (e.g. Ka=Hope, La=Cruelty); for a VOWEL the worldly tendency is its liberating_state (active essence, e.g. a=Birth, ai=Welfare). This field asymmetry is intentional. The +/− SIGN in a reading is affirmed(+)/dissolving(−) from sound-order, NOT a field swap; the dissolved worldly tendency eases toward the consonant's liberating_state counter-field.",
     "_source_corrected": "Entries Ca, Ja, Ma, Ra, Va, Śa(sha), Ṣa(ssa), Sa were later corrected for Sanskrit acoustic-root source fidelity (see each entry's source_vritti/source_notes). NOTE: the NO_SIGNAL result in RESULTS_ACOUSTIC_SIGNAL.md was produced on the PRIOR lexicon; any claim about this corrected lexicon requires re-running the pre-registered signal test."
   },
   "consonants": {
     "ka": {
       "iast": "Ka",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Nirāśā",
         "english": "Detachment"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Āśā",
         "english": "Hope"
       },
@@ -60,11 +61,11 @@
     },
     "kha": {
       "iast": "Kha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Viśvāsa",
         "english": "Trust"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Cintā",
         "english": "Worry"
       },
@@ -90,11 +91,11 @@
     },
     "ga": {
       "iast": "Ga",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Sthiti",
         "english": "Stillness"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Ceṣṭā",
         "english": "Action"
       },
@@ -117,11 +118,11 @@
     },
     "gha": {
       "iast": "Gha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Anāsakti",
         "english": "Non-attachment"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Mamatā",
         "english": "Attachment"
       },
@@ -144,11 +145,11 @@
     },
     "nga": {
       "iast": "Ṅa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Vinaya",
         "english": "Humility"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Dambha",
         "english": "Vanity"
       },
@@ -169,11 +170,11 @@
     },
     "ca": {
       "iast": "Ca",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Viveka",
         "english": "conscience / discriminative clarity"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Aviveka",
         "english": "lack of discrimination / confused discernment"
       },
@@ -195,11 +196,11 @@
     },
     "cha": {
       "iast": "Cha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Dhṛti",
         "english": "Emotional firmness"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Vikalatā",
         "english": "Nervous breakdown"
       },
@@ -220,11 +221,11 @@
     },
     "ja": {
       "iast": "Ja",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Vinaya",
         "english": "humility / ego-softening"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Ahaṁkāra",
         "english": "ego inflation / I-centeredness"
       },
@@ -248,11 +249,11 @@
     },
     "jha": {
       "iast": "Jha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Santoṣa / Aparigraha",
         "english": "Contentment / Non-possession"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Lolupatā / Lobha",
         "english": "Greed / Avarice"
       },
@@ -274,11 +275,11 @@
     },
     "nya": {
       "iast": "Ña",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Ārjavatā",
         "english": "Straightforwardness / Integrity"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Kapaṭatā",
         "english": "Hypocrisy"
       },
@@ -299,11 +300,11 @@
     },
     "tta": {
       "iast": "Ṭa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Maunam / Yathārthatā",
         "english": "Silence / Objectivity"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Vitarka",
         "english": "Overstatement"
       },
@@ -325,11 +326,11 @@
     },
     "ttha": {
       "iast": "Ṭha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Kṣamā / Ātmaprasāda",
         "english": "Forgiveness / Self-acceptance"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Anutāpa",
         "english": "Repentance"
       },
@@ -350,11 +351,11 @@
     },
     "dda": {
       "iast": "Ḍa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Nirbhayatā / Svīkāra",
         "english": "Fearlessness / Self-acceptance"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Lajjā",
         "english": "Shyness"
       },
@@ -373,11 +374,11 @@
     },
     "ddha": {
       "iast": "Ḍha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Karuṇā",
         "english": "Compassion"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Piśunatā",
         "english": "Sadistic cruelty"
       },
@@ -398,11 +399,11 @@
     },
     "nna": {
       "iast": "Ṇa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Muditā",
         "english": "Sympathetic joy"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Īrṣyā",
         "english": "Envy"
       },
@@ -421,11 +422,11 @@
     },
     "ta": {
       "iast": "Ta",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Jāgaraṇa",
         "english": "Awakening / Alertness"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Jāḍya / Nidrā",
         "english": "Inertia, deep sleep"
       },
@@ -448,11 +449,11 @@
     },
     "tha": {
       "iast": "Tha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Harṣa / Prīti",
         "english": "Joy / Affection"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Viṣāda",
         "english": "Melancholy"
       },
@@ -472,11 +473,11 @@
     },
     "da": {
       "iast": "Da",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Kṣamā / Dhairya",
         "english": "Patience / Forgiveness"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Krodha / Karkaśatā",
         "english": "Peevishness / Irritability"
       },
@@ -497,11 +498,11 @@
     },
     "dha": {
       "iast": "Dha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Nivṛtti / Tuṣṭi",
         "english": "Renunciation / Contentment"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Tṛṣṇā",
         "english": "Craving"
       },
@@ -523,11 +524,11 @@
     },
     "na": {
       "iast": "Na",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Viveka",
         "english": "Discriminative detachment"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Moha",
         "english": "Blind attachment"
       },
@@ -549,11 +550,11 @@
     },
     "pa": {
       "iast": "Pa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Maitrī / Sneha",
         "english": "Friendliness / Affection"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Ghṛṇā",
         "english": "Hatred / Revulsion"
       },
@@ -576,11 +577,11 @@
     },
     "pha": {
       "iast": "Pha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Abhaya",
         "english": "Fearlessness"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Bhaya",
         "english": "Fear"
       },
@@ -600,11 +601,11 @@
     },
     "ba": {
       "iast": "Ba",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Ādara / Mānya",
         "english": "Respect / Reverence"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Avajñā",
         "english": "Indifference"
       },
@@ -625,11 +626,11 @@
     },
     "bha": {
       "iast": "Bha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Jāgaraṇa",
         "english": "Awareness / awakening"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Mūrcchā",
         "english": "Deluded obsession"
       },
@@ -650,11 +651,11 @@
     },
     "ma": {
       "iast": "Ma",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Anuśāsana",
         "english": "disciplined restraint / containment"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Praśraya / Praṇāśa",
         "english": "indulgence / annihilating collapse"
       },
@@ -677,11 +678,11 @@
     },
     "ya": {
       "iast": "Ya",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Viśvāsa",
         "english": "Confidence"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Aviśvāsa",
         "english": "Lack of confidence"
       },
@@ -704,11 +705,11 @@
     },
     "ra": {
       "iast": "Ra",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Prāṇaśakti / Agnitattva",
         "english": "vitality / creative fire"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Sarvanāśa",
         "english": "annihilation-thought / defeatist destruction"
       },
@@ -737,11 +738,11 @@
     },
     "la": {
       "iast": "La",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Karuṇā / Sneha",
         "english": "Compassion / Gentleness"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Krūratā",
         "english": "Cruelty"
       },
@@ -764,11 +765,11 @@
     },
     "va": {
       "iast": "Va",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Dharma / Jalatattva",
         "english": "original stance, sustaining righteousness / liquid coherence"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Adharma",
         "english": "deviation from original stance / loss of sustaining order"
       },
@@ -798,11 +799,11 @@
     },
     "sha": {
       "iast": "Śa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "",
         "english": "Directed energy / purposeful material pursuit (dynamic accomplishment)"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "",
         "english": "Restless acquisition / material greed (rajasic overdrive)"
       },
@@ -827,11 +828,11 @@
     },
     "ssa": {
       "iast": "Ṣa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "",
         "english": "Transmutation of desire / grounded containment"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Kāma / Tamoguṇa",
         "english": "physical desire / inertia / confusion"
       },
@@ -856,11 +857,11 @@
     },
     "sa": {
       "iast": "Sa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Mokṣa / Sattvaguṇa",
         "english": "liberation / clarity"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "",
         "english": "Escapism (premature detachment / static withdrawal)"
       },
@@ -885,11 +886,11 @@
     },
     "ha": {
       "iast": "Ha",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Parā-vidyā",
         "english": "Spiritual knowledge"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Avidyā / Rātri",
         "english": "Darkness / Night / Inertia"
       },
@@ -914,11 +915,11 @@
     },
     "ksha": {
       "iast": "Kṣa",
-      "positive": {
+      "liberating_state": {
         "sanskrit": "Aparā-vidyā",
         "english": "Mundane knowledge"
       },
-      "negative": {
+      "binding_state": {
         "sanskrit": "Mithyā-jñāna",
         "english": "False knowledge, Dogma"
       },
@@ -941,63 +942,63 @@
   "vowels": {
     "a": {
       "iast": "a (अ)",
-      "positive": "Birth of cognition / raw potential",
-      "negative": "restless starting without sustaining"
+      "liberating_state": "Birth of cognition / raw potential",
+      "binding_state": "restless starting without sustaining"
     },
     "aa": {
       "iast": "ā (आ)",
-      "positive": "Ongoing thought / expansion",
-      "negative": "overextension, inflation"
+      "liberating_state": "Ongoing thought / expansion",
+      "binding_state": "overextension, inflation"
     },
     "i": {
       "iast": "i (इ)",
-      "positive": "I-ness, doing self",
-      "negative": "self-absorption, ego-centric doing"
+      "liberating_state": "I-ness, doing self",
+      "binding_state": "self-absorption, ego-centric doing"
     },
     "ii": {
       "iast": "ī (ई)",
-      "positive": "Specialization of self",
-      "negative": "over-specialization, isolation"
+      "liberating_state": "Specialization of self",
+      "binding_state": "over-specialization, isolation"
     },
     "u": {
       "iast": "u (उ)",
-      "positive": "Zoom, contraction",
-      "negative": "tunnel vision, missing the whole picture"
+      "liberating_state": "Zoom, contraction",
+      "binding_state": "tunnel vision, missing the whole picture"
     },
     "uu": {
       "iast": "ū (ऊ)",
-      "positive": "Sustained attention, holding",
-      "negative": "fixation, obsessive holding"
+      "liberating_state": "Sustained attention, holding",
+      "binding_state": "fixation, obsessive holding"
     },
     "e": {
       "iast": "e (ए)",
-      "positive": "Practical thought, benefit",
-      "negative": "overthinking, nitpicking"
+      "liberating_state": "Practical thought, benefit",
+      "binding_state": "overthinking, nitpicking"
     },
     "ai": {
       "iast": "ai (ऐ)",
-      "positive": "Welfare, materialization",
-      "negative": "paternalism, overcontrol 'for your own good'"
+      "liberating_state": "Welfare, materialization",
+      "binding_state": "paternalism, overcontrol 'for your own good'"
     },
     "o": {
       "iast": "o (ओ)",
-      "positive": "Completion, closure",
-      "negative": "premature closure, stagnation"
+      "liberating_state": "Completion, closure",
+      "binding_state": "premature closure, stagnation"
     },
     "au": {
       "iast": "au (औ)",
-      "positive": "Surrender, Letting-go",
-      "negative": "abandonment, cutting off prematurely"
+      "liberating_state": "Surrender, Letting-go",
+      "binding_state": "abandonment, cutting off prematurely"
     },
     "am": {
       "iast": "aṁ (अं)",
-      "positive": "Repulsion, Detox",
-      "negative": "purging without integration, loss of vital essence"
+      "liberating_state": "Repulsion, Detox",
+      "binding_state": "purging without integration, loss of vital essence"
     },
     "ah": {
       "iast": "aḥ (अः)",
-      "positive": "Attraction, Nectar-pull",
-      "negative": "compulsion, clinging pull"
+      "liberating_state": "Attraction, Nectar-pull",
+      "binding_state": "compulsion, clinging pull"
     }
   },
   "contextual_usage": {
@@ -1005,7 +1006,7 @@
     "word_middle": "consonant often takes relational / softening roles, blending into neighbors",
     "word_end": "consonant acts as closure / return signal (anchoring the energy)"
   },
-  "_expanded_properties_note": "expanded_properties = source acoustic-root literature (P.R. Sarkar, Varṇa Vijñāna) as INTERPRETIVE METADATA only. It enriches reading/authoring but does NOT affect the polarity score, which uses ONLY positive/negative. Scoring fields: positive, negative. Metadata fields: expanded_properties, source_vritti, source_notes.",
+  "_expanded_properties_note": "expanded_properties = source acoustic-root literature (P.R. Sarkar, Varṇa Vijñāna) as INTERPRETIVE METADATA only. It enriches reading/authoring but does NOT affect the reading, which uses ONLY binding_state/liberating_state. Reading fields: binding_state, liberating_state. Metadata fields: expanded_properties, source_vritti, source_notes.",
   "_romanization": {
     "a": {
       "deva": "अ",

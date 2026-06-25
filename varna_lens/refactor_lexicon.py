@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Refactor consonant poles from "Sanskrit (English)" strings into explicit {sanskrit, english} subfields.
+"""SUPERSEDED one-shot (historical record). It operated on the OLD schema where the two states were named
+`positive`/`negative`; that schema was migrated to `liberating_state`/`binding_state` by
+`migrate_ontology.py`. Do NOT re-run against the current lexicon — kept only to document the dual-language
+split. The `positive`/`negative` tokens below refer to the pre-migration field names.
+
+Refactor consonant poles from "Sanskrit (English)" strings into explicit {sanskrit, english} subfields.
 
 Keeps the dual-language content but makes the structure unambiguous. CRITICAL: the split is verified to
 reconstruct the original string byte-for-byte via display() (the same reconstruction the engine uses), so

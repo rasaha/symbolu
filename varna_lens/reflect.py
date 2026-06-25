@@ -30,14 +30,14 @@ def _expanded(key):
 
 
 def _pole_text(p):
-    """(sanskrit, english) from a pole that may be a {sanskrit,english} dict or a plain string."""
+    """(sanskrit, english) from a state that may be a {sanskrit,english} dict or a plain string."""
     if isinstance(p, dict):
         return p.get("sanskrit", ""), p.get("english", "")
     return "", (p or "")
 
 
 def term_glossary(word):
-    """Ordered {Sanskrit term: English} for every Sanskrit-named pole of the word's consonants — lets the
+    """Ordered {Sanskrit term: English} for every Sanskrit-named state of the word's consonants — lets the
     chain carry Sanskrit texture while keeping the author grounded in the precise English meaning."""
     phon, _w, _src = V.auto_phonemes(word)
     gl = {}
@@ -47,8 +47,8 @@ def term_glossary(word):
         c = _lex().get(key)
         if not c:
             continue
-        for pole in ("negative", "positive"):
-            skt, eng = _pole_text(c.get(pole))
+        for state in ("binding_state", "liberating_state"):
+            skt, eng = _pole_text(c.get(state))
             if skt:
                 gl.setdefault(skt, eng)
     return gl
@@ -103,6 +103,7 @@ def scaffold(word, by="hybrid"):
     whole = d.get("whole_word_essence") or {}
     return {"word": word, "reading_mode": by, "source": src, "chain": d.get("essence_short"),
             "chain_detail": d.get("essence"), "whole_word_essence": whole.get("essence"),
+            "emergent_valence": d.get("emergent_valence"),   # binding/liberating/mixed — DERIVED from the chain
             "glossary": term_glossary(word)}
 
 
