@@ -34,8 +34,21 @@ _HERE = Path(__file__).resolve().parent
 # Authoritative set (verbatim from Sanskrit_letters_full.docx). Map the file's positive/negative to the
 # names the readers use internally: leading_vritti = NEGATIVE pole, counter_vritti = POSITIVE pole.
 LEX = json.loads((_HERE / "lexicon_authoritative.json").read_text())
-VOW = LEX["vowels"]
-CONS = {k: {"iast": d["iast"], "leading_vritti": d["negative"], "counter_vritti": d["positive"]}
+
+
+def _pole_disp(p):
+    """A pole may be a plain string or a {sanskrit, english} dict; render the canonical display string
+    ('Sanskrit (English)', or just English when there is no Sanskrit term). Keeps the engine identical."""
+    if isinstance(p, dict):
+        skt, eng = p.get("sanskrit", ""), p.get("english", "")
+        return f"{skt} ({eng})" if skt else eng
+    return p
+
+
+VOW = {k: {**d, "positive": _pole_disp(d["positive"]), "negative": _pole_disp(d["negative"])}
+       for k, d in LEX["vowels"].items()}
+CONS = {k: {"iast": d["iast"], "leading_vritti": _pole_disp(d["negative"]),
+            "counter_vritti": _pole_disp(d["positive"])}
         for k, d in LEX["consonants"].items()}
 
 # Varga (place-of-articulation family) + Devanāgarī, for DISPLAY clarity only — keeps the frozen meaning
@@ -79,15 +92,22 @@ _CONS = _RETRO_ASCII + [
          ("n", "na"), ("p", "pa"), ("b", "ba"), ("m", "ma"), ("y", "ya"), ("r", "ra"), ("l", "la"),
          ("v", "va"), ("w", "va"), ("s", "sa"), ("h", "ha"), ("f", "pha")]
          # lowercase sh = Śa (palatal), Sh = Ṣa (retroflex); q = Ka (qāf→guttural); English f = Pha (p stays Pa)
-_VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ii", "ii"), ("ī", "ii"), ("uu", "uu"),
-        ("ū", "uu"), ("ṁ", "am"), ("ṃ", "am"), ("ḥ", "ah"), ("a", "a"), ("i", "i"), ("u", "u"),
-        ("e", "e"), ("o", "o")]
+_VOW = [("ai", "ai"), ("au", "au"), ("aa", "aa"), ("ā", "aa"), ("ee", "ii"), ("ii", "ii"), ("ī", "ii"),
+        ("oo", "uu"), ("uu", "uu"), ("ū", "uu"), ("ṁ", "am"), ("ṃ", "am"), ("ḥ", "ah"),
+        ("a", "a"), ("i", "i"), ("u", "u"), ("e", "e"), ("o", "o")]
+# English long-vowel digraphs are mapped to their Sanskrit long vowel so they don't split into two
+# arbitrary vowels: ee → ī (as in 'see'), oo → ū (as in 'moon'). Other English vowel spellings are
+# ambiguous (ai/ay, ow/au, ea…) — for those use g2p (pronunciation) or pin with --varnas.
 
 # ARPAbet (cmudict) → varṇa key, for --g2p English words (approximate: English phonology ≠ varṇas).
-_ARPA_C = {"P": "pa", "B": "ba", "T": "ta", "D": "da", "K": "ka", "G": "ga", "M": "ma", "N": "na",
-           "NG": "nga", "F": "pha", "V": "va", "TH": "tha", "DH": "dda", "S": "sa", "Z": "sa",
+# Dialect rule (frozen, Indian-English realization): English ALVEOLAR STOPS/FLAP T D N DX → RETROFLEX
+# Ṭa/Ḍa/Ṇa (tta/dda/nna), because a Sanskrit-trained ear hears English t/d/n as retroflex; the DENTAL
+# FRICATIVES TH/DH (/θ/ "thin", /ð/ "the") → DENTAL ta/da. (Prior table had this inverted: stop /d/→dental
+# but /ð/→retroflex.) Applied uniformly to every word, set before any outcome was seen.
+_ARPA_C = {"P": "pa", "B": "ba", "T": "tta", "D": "dda", "K": "ka", "G": "ga", "M": "ma", "N": "nna",
+           "NG": "nga", "F": "pha", "V": "va", "TH": "ta", "DH": "da", "S": "sa", "Z": "sa",
            "SH": "sha", "ZH": "sha", "CH": "ca", "JH": "ja", "HH": "ha", "R": "ra", "L": "la",
-           "W": "va", "Y": "ya", "DX": "da"}
+           "W": "va", "Y": "ya", "DX": "dda"}
 _ARPA_V = {"AA": "aa", "AE": "a", "AH": "a", "AO": "o", "AW": "au", "AY": "ai", "EH": "e", "ER": "a",
            "EY": "e", "IH": "i", "IY": "ii", "OW": "o", "OY": "o", "UH": "u", "UW": "uu", "AX": "a"}
 

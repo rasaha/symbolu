@@ -139,10 +139,10 @@ This reading invites reflection on:
 There are no right answers. Write whatever the images stir; the meaning is the one you bring.
 ```
 
-**Worked example — `the` (Ḍa⁻ Shyness ⤳ Fearlessness):**
-> The mirror for "the" carries an image of **shyness easing toward fearlessness.** This reading invites
-> reflection on: *Where does a held-back, self-conscious feeling show up for you right now — and what would
-> one step toward fearlessness look like?* — There are no right answers.
+**Worked example — `the` (Da⁻ Peevishness ⤳ Patience):**
+> The mirror for "the" carries an image of **peevishness easing toward patience.** This reading invites
+> reflection on: *Where does an irritable, easily-chafed feeling show up for you right now — and what would
+> one step toward patience look like?* — There are no right answers.
 
 Note how every sentence is hypothetical and reflective; nothing asserts that "the" *is* about shyness.
 

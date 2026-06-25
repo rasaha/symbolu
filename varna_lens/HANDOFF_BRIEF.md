@@ -9,7 +9,7 @@ time. Files: `RULES.md`, `LEXICON.md`, `lexicon_authoritative.json`, `varna_lens
 ## A. THE RULES
 
 **1. Sound, not spelling (segmentation).** Read a word by its *native pronunciation*, not its letters.
-- English → g2p (ARPAbet). Key maps: /ʌ/ ("cut") → **a** (अ, not u); voiced *th* ("the") → **Ḍa**
+- English → g2p (ARPAbet). Key maps: /ʌ/ ("cut") → **a** (अ, not u); stops t/d/n → retroflex **Ṭa/Ḍa/Ṇa**; voiced *th* ("the") → dental **Da**
   (retroflex); *f* → **Pha**.
 - Sanskrit/IAST → literal (every vowel is written).
 - Other languages → pin the true phonetics. Same letter ≠ same sound across languages (pinyin `q` =
@@ -28,7 +28,7 @@ Consonant worldly = its *binding* pole; vowel worldly = its *active* pole. The d
 - `+` = the bīja **activates** the worldly propensity; `−` = it **dissolves** (toward spiritual).
 
 **4. Dissolution target.** A `−` consonant prints `worldly ⤳ spiritual-counter`
-(e.g. `the` = Ḍa⁻ Shyness ⤳ Fearlessness).
+(e.g. `the` = Da⁻ Peevishness ⤳ Patience).
 
 **5. Final vowel = whole-word essence.** A word-final vowel is removed from the stitched chain and reported
 separately as the word's summary (this turns the preceding consonant into a coda).

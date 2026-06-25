@@ -9,189 +9,933 @@
   "consonants": {
     "ka": {
       "iast": "Ka",
-      "positive": "Nirāśā (Detachment)",
-      "negative": "Āśā (Hope)"
+      "positive": {
+        "sanskrit": "Nirāśā",
+        "english": "Detachment"
+      },
+      "negative": {
+        "sanskrit": "Āśā",
+        "english": "Hope"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Āśā",
+          "english": "hope / forward-seeking desire",
+          "type": "abhiipśātmaka"
+        },
+        "acoustic_roots": [
+          "Kārya Brahma (the expressed/manifested universe; controller of the living world)",
+          "creation / expression",
+          "Saṃvṛtti Bodhicitta (Buddhist name for the created world)"
+        ],
+        "elemental": "flowing water (ka = water; va = water in general)",
+        "etymology": "kae + ḍa = 'that which produces sound'; the roar of rivers/springs inspired the hope of survival",
+        "semantic_extensions": [
+          "kac = glossy",
+          "ka / keśa = hair grown on the head",
+          "keśa = ka + īśa = hair, also Nārāyaṇa",
+          "kāpālika = 'kaṃ saṃvṛtti bodhicittaṃ pālayati' = one who serves the living & non-living world"
+        ],
+        "deity_links": [
+          "Śiva (Vyomakeśa / Khakuntala — hair toward the sky; Dhurjaṭī)",
+          "Nārāyaṇa (via keśa)"
+        ],
+        "mantra_note": "kriiṃ = ka (Kārya Brahma) + ra (luminous factor); bīja of Kālī / Bhrāmarī Tārā",
+        "domain_tags": [
+          "hope",
+          "manifestation",
+          "creation",
+          "expression",
+          "flowing_water",
+          "survival_signal",
+          "sound",
+          "hair",
+          "gloss",
+          "karya_brahma"
+        ],
+        "source_quote": "Ka is the acoustic root of the abhiipśātmaka áshá vrtti. It is also the acoustic root of Kárya Brahma [the expressed universe]. … Ka (kae + d́a) etymologically means 'that which produces sound'. It also means 'water'."
+      },
+      "deva": "क",
+      "varga": "guttural · ka-varga"
     },
     "kha": {
       "iast": "Kha",
-      "positive": "Viśvāsa (Trust)",
-      "negative": "Cintā (Worry)"
+      "positive": {
+        "sanskrit": "Viśvāsa",
+        "english": "Trust"
+      },
+      "negative": {
+        "sanskrit": "Cintā",
+        "english": "Worry"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Cintā",
+          "english": "worry / impersonal, objective thought",
+          "type": "vishuddha saṃvedanātmaka"
+        },
+        "acoustic_roots": [
+          "the crude aspects of heaven (the transcendent sphere of heaven is kṣa)"
+        ],
+        "note": "kha means 'sky' but is NOT the acoustic root of sky (that is ha); ka + ha = kha, so kha follows ka",
+        "domain_tags": [
+          "worry",
+          "impersonal_thought",
+          "crude_heaven"
+        ],
+        "source_quote": "The acoustic root of áshá vrtti is ka, and that of cintá vrtti [the propensity of worry] is kha. … Impersonal thoughts are symbolized by the acoustic root kha."
+      },
+      "deva": "ख",
+      "varga": "guttural · ka-varga"
     },
     "ga": {
       "iast": "Ga",
-      "positive": "Sthiti (Stillness)",
-      "negative": "Ceṣṭā (Action)"
+      "positive": {
+        "sanskrit": "Sthiti",
+        "english": "Stillness"
+      },
+      "negative": {
+        "sanskrit": "Ceṣṭā",
+        "english": "Action"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Ceṣṭā",
+          "english": "effort / striving to arouse dormant potential"
+        },
+        "note": "the main cause of mundane development and spiritual elevation; acts in physical, psychic and spiritual spheres",
+        "domain_tags": [
+          "effort",
+          "striving",
+          "development",
+          "elevation"
+        ],
+        "source_quote": "The effort made to arouse one's dormant potentiality is called ceśt́á. … Ga, being the acoustic root of ceśt́á vrtti, plays an important role in the physical, psychic and spiritual spheres."
+      },
+      "deva": "ग",
+      "varga": "guttural · ka-varga"
     },
     "gha": {
       "iast": "Gha",
-      "positive": "Anāsakti (Non-attachment)",
-      "negative": "Mamatā (Attachment)"
+      "positive": {
+        "sanskrit": "Anāsakti",
+        "english": "Non-attachment"
+      },
+      "negative": {
+        "sanskrit": "Mamatā",
+        "english": "Attachment"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Mamatā",
+          "english": "love / attachment (bound by time, space, individuality)"
+        },
+        "imagery": "the mother who sacrifices for her child yet slices kai fish without feeling; the cow who suckles then later kicks her calf — mamatā limited by relative factors; only humans can transcend it",
+        "domain_tags": [
+          "attachment",
+          "love",
+          "mine-ness",
+          "relativity"
+        ],
+        "source_quote": "Mamatá, the vrtti of love and attachment …, is related to time, space and individuality. … Gha is the acoustic root of mamatá vrtti."
+      },
+      "deva": "घ",
+      "varga": "guttural · ka-varga"
     },
     "nga": {
       "iast": "Ṅa",
-      "positive": "Vinaya (Humility)",
-      "negative": "Dambha (Vanity)"
+      "positive": {
+        "sanskrit": "Vinaya",
+        "english": "Humility"
+      },
+      "negative": {
+        "sanskrit": "Dambha",
+        "english": "Vanity"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Dambha",
+          "english": "vanity"
+        },
+        "history": "Vashiṣṭha is said to have learned uṋa (and the Tārā cult of Vāmācāra Tantra) from China; uṋa is used across Indo-Chinese languages",
+        "domain_tags": [
+          "vanity",
+          "pride"
+        ],
+        "source_quote": "Uṋa is the acoustic root of dambha vrtti [the propensity of vanity]."
+      },
+      "deva": "ङ",
+      "varga": "guttural · ka-varga"
     },
     "ca": {
       "iast": "Ca",
-      "positive": "Viveka (conscience / discriminative clarity)",
-      "negative": "Aviveka (lack of discrimination / confused discernment)",
+      "positive": {
+        "sanskrit": "Viveka",
+        "english": "conscience / discriminative clarity"
+      },
+      "negative": {
+        "sanskrit": "Aviveka",
+        "english": "lack of discrimination / confused discernment"
+      },
       "source_vritti": "Viveka (conscience / discrimination)",
-      "source_notes": "Acoustic root of viveka. Negative pole Aviveka is the derived worldly distortion (source corrected from Ekāgratā/Vikṣepa)."
+      "source_notes": "Acoustic root of viveka. Negative pole Aviveka is the derived worldly distortion (source corrected from Ekāgratā/Vikṣepa).",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Viveka",
+          "english": "conscience / discrimination"
+        },
+        "domain_tags": [
+          "conscience",
+          "discrimination"
+        ],
+        "source_quote": "Ca is the acoustic root of viveka [conscience]."
+      },
+      "deva": "च",
+      "varga": "palatal · ca-varga"
     },
     "cha": {
       "iast": "Cha",
-      "positive": "Dhṛti (Emotional firmness)",
-      "negative": "Vikalatā (Nervous breakdown)"
+      "positive": {
+        "sanskrit": "Dhṛti",
+        "english": "Emotional firmness"
+      },
+      "negative": {
+        "sanskrit": "Vikalatā",
+        "english": "Nervous breakdown"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Vikalatā",
+          "english": "nervous breakdown"
+        },
+        "note": "a mind that had been functioning properly starts malfunctioning or stops altogether",
+        "domain_tags": [
+          "nervous_breakdown",
+          "collapse"
+        ],
+        "source_quote": "Cha is the acoustic root of vikalatáh vrtti [nervous breakdown]."
+      },
+      "deva": "छ",
+      "varga": "palatal · ca-varga"
     },
     "ja": {
       "iast": "Ja",
-      "positive": "Vinaya (humility / ego-softening)",
-      "negative": "Ahaṁkāra (ego inflation / I-centeredness)",
+      "positive": {
+        "sanskrit": "Vinaya",
+        "english": "humility / ego-softening"
+      },
+      "negative": {
+        "sanskrit": "Ahaṁkāra",
+        "english": "ego inflation / I-centeredness"
+      },
       "source_vritti": "Ahaṁkāra (ego / inflated I-feeling)",
-      "source_notes": "Acoustic root of ahaṁkāra vṛtti. Worldly pole = ego inflation; remedial counter-pole = humility (source corrected from Dambha/vanity, which duplicated Ṅa)."
+      "source_notes": "Acoustic root of ahaṁkāra vṛtti. Worldly pole = ego inflation; remedial counter-pole = humility (source corrected from Dambha/vanity, which duplicated Ṅa).",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Ahaṃkāra",
+          "english": "ego / inflated I-feeling"
+        },
+        "imagery": "Aurangzeb: 'Since I was there, I controlled the situation … had I not been there the world would have met its destruction' — an expression of ahaṃkāra",
+        "domain_tags": [
+          "ego",
+          "I-feeling",
+          "inflation"
+        ],
+        "source_quote": "Ja is the acoustic root of ahaḿkára vrtti (ego). The ego becomes inflated when one allows one's 'I' feeling to take a predominant role."
+      },
+      "deva": "ज",
+      "varga": "palatal · ca-varga"
     },
     "jha": {
       "iast": "Jha",
-      "positive": "Santoṣa / Aparigraha (Contentment / Non-possession)",
-      "negative": "Lolupatā / Lobha (Greed / Avarice)"
+      "positive": {
+        "sanskrit": "Santoṣa / Aparigraha",
+        "english": "Contentment / Non-possession"
+      },
+      "negative": {
+        "sanskrit": "Lolupatā / Lobha",
+        "english": "Greed / Avarice"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Lolupatā / Lobha / Lolatā",
+          "english": "greed / avarice"
+        },
+        "etymology": "Bengali nolá (greedy fascination of a cat/dog) derives from lola / lolatā",
+        "domain_tags": [
+          "greed",
+          "avarice",
+          "craving_fascination"
+        ],
+        "source_quote": "Jha is the acoustic root of lolupatá, lobha [greed] and lolatá [avarice] vrttis."
+      },
+      "deva": "झ",
+      "varga": "palatal · ca-varga"
     },
     "nya": {
       "iast": "Ña",
-      "positive": "Ārjavatā (Straightforwardness / Integrity)",
-      "negative": "Kapaṭatā (Hypocrisy)"
+      "positive": {
+        "sanskrit": "Ārjavatā",
+        "english": "Straightforwardness / Integrity"
+      },
+      "negative": {
+        "sanskrit": "Kapaṭatā",
+        "english": "Hypocrisy"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Kapaṭatā",
+          "english": "hypocrisy"
+        },
+        "note": "Sanskrit pāṣaṇḍa / Hindi pākhaṇḍī = hypocrite; three forms: (1) cheating to serve one's purpose, (2) dominating to hide one's ignorance, (3) condemning sins one secretly commits",
+        "domain_tags": [
+          "hypocrisy",
+          "deceit"
+        ],
+        "source_quote": "Ina is the acoustic root of kapat́atá vrtti [hypocrisy]."
+      },
+      "deva": "ञ",
+      "varga": "palatal · ca-varga"
     },
     "tta": {
       "iast": "Ṭa",
-      "positive": "Maunam / Yathārthatā (Silence / Objectivity)",
-      "negative": "Vitarka (Overstatement)"
+      "positive": {
+        "sanskrit": "Maunam / Yathārthatā",
+        "english": "Silence / Objectivity"
+      },
+      "negative": {
+        "sanskrit": "Vitarka",
+        "english": "Overstatement"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Vitarka",
+          "english": "overstating one's case (garrulousness + bad temper)"
+        },
+        "note": "NOT mere debating, and NOT kaṣāya (harsh speech to hurt); its opposite is pramita vāk (balanced, only-relevant speech). Howrah-station example.",
+        "domain_tags": [
+          "overstatement",
+          "garrulousness",
+          "bad_temper"
+        ],
+        "source_quote": "T́a is the acoustic root of vitarka vrtti [overstating one's case]. … Vitarka is a combination of a bad temper and garrulousness."
+      },
+      "deva": "ट",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "ttha": {
       "iast": "Ṭha",
-      "positive": "Kṣamā / Ātmaprasāda (Forgiveness / Self-acceptance)",
-      "negative": "Anutāpa (Repentance)"
+      "positive": {
+        "sanskrit": "Kṣamā / Ātmaprasāda",
+        "english": "Forgiveness / Self-acceptance"
+      },
+      "negative": {
+        "sanskrit": "Anutāpa",
+        "english": "Repentance"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Anutāpa",
+          "english": "repentance"
+        },
+        "etymology": "N. India paschāttāpa; anu / paschāt = 'later/after', tāpa = 'heat'",
+        "domain_tags": [
+          "repentance",
+          "remorse"
+        ],
+        "source_quote": "T́ha is the acoustic root of anutápa vrtti [repentance]."
+      },
+      "deva": "ठ",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "dda": {
       "iast": "Ḍa",
-      "positive": "Nirbhayatā / Svīkāra (Fearlessness / Self-acceptance)",
-      "negative": "Lajjā (Shyness)"
+      "positive": {
+        "sanskrit": "Nirbhayatā / Svīkāra",
+        "english": "Fearlessness / Self-acceptance"
+      },
+      "negative": {
+        "sanskrit": "Lajjā",
+        "english": "Shyness"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Lajjā",
+          "english": "shyness"
+        },
+        "domain_tags": [
+          "shyness"
+        ],
+        "source_quote": "D́a is the acoustic root of lajjá vrtti [the propensity of shyness]."
+      },
+      "deva": "ड",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "ddha": {
       "iast": "Ḍha",
-      "positive": "Karuṇā (Compassion)",
-      "negative": "Piśunatā (Sadistic cruelty)"
+      "positive": {
+        "sanskrit": "Karuṇā",
+        "english": "Compassion"
+      },
+      "negative": {
+        "sanskrit": "Piśunatā",
+        "english": "Sadistic cruelty"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Piśunatā",
+          "english": "senseless / sadistic cruelty"
+        },
+        "imagery": "slow, cruel killing (chopping legs, then tail, then head); the half-chopped live tortoise crawling away — contrary to Neohumanism",
+        "domain_tags": [
+          "sadistic_cruelty",
+          "torture"
+        ],
+        "source_quote": "Senseless, sadistic killing is called pishunatá vrtti."
+      },
+      "deva": "ढ",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "nna": {
       "iast": "Ṇa",
-      "positive": "Muditā (Sympathetic joy)",
-      "negative": "Īrṣyā (Envy)"
+      "positive": {
+        "sanskrit": "Muditā",
+        "english": "Sympathetic joy"
+      },
+      "negative": {
+        "sanskrit": "Īrṣyā",
+        "english": "Envy"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Īrṣyā",
+          "english": "envy"
+        },
+        "domain_tags": [
+          "envy"
+        ],
+        "source_quote": "Ńa is the acoustic root of iirśá vrtti [the propensity of envy]."
+      },
+      "deva": "ण",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "ta": {
       "iast": "Ta",
-      "positive": "Jāgaraṇa (Awakening / Alertness)",
-      "negative": "Jāḍya / Nidrā (Inertia, deep sleep)"
+      "positive": {
+        "sanskrit": "Jāgaraṇa",
+        "english": "Awakening / Alertness"
+      },
+      "negative": {
+        "sanskrit": "Jāḍya / Nidrā",
+        "english": "Inertia, deep sleep"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Jāḍya / Nidrā",
+          "english": "staticity, long/deep sleep, intellectual dullness, spiritual inertness"
+        },
+        "etymology": "Tantra = 'taṃ jāḍyāt tārayet' (liberates from staticity); root tan = 'to expand' (taṃ vistāreṇa tārayet)",
+        "domain_tags": [
+          "inertia",
+          "sleep",
+          "dullness",
+          "staticity"
+        ],
+        "source_quote": "Ta is the acoustic root of staticity, long sleep and deep sleep. … That which brings about the cessation of dullness and staticity is called Tantra."
+      },
+      "deva": "त",
+      "varga": "dental · ta-varga"
     },
     "tha": {
       "iast": "Tha",
-      "positive": "Harṣa / Prīti (Joy / Affection)",
-      "negative": "Viṣāda (Melancholy)"
+      "positive": {
+        "sanskrit": "Harṣa / Prīti",
+        "english": "Joy / Affection"
+      },
+      "negative": {
+        "sanskrit": "Viṣāda",
+        "english": "Melancholy"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Viṣāda",
+          "english": "melancholy"
+        },
+        "domain_tags": [
+          "melancholy",
+          "dejection"
+        ],
+        "source_quote": "Tha is the acoustic root of viśada vrtti, of melancholy."
+      },
+      "deva": "थ",
+      "varga": "dental · ta-varga"
     },
     "da": {
       "iast": "Da",
-      "positive": "Kṣamā / Dhairya (Patience / Forgiveness)",
-      "negative": "Krodha / Karkaśatā (Peevishness / Irritability)"
+      "positive": {
+        "sanskrit": "Kṣamā / Dhairya",
+        "english": "Patience / Forgiveness"
+      },
+      "negative": {
+        "sanskrit": "Krodha / Karkaśatā",
+        "english": "Peevishness / Irritability"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Krodha / Karkaśatā",
+          "english": "peevishness / irritability"
+        },
+        "note": "speak nicely to a peevish person and they react adversely; speak harshly and they take it calmly",
+        "domain_tags": [
+          "peevishness",
+          "irritability"
+        ],
+        "source_quote": "Da is the acoustic root of peevishness."
+      },
+      "deva": "द",
+      "varga": "dental · ta-varga"
     },
     "dha": {
       "iast": "Dha",
-      "positive": "Nivṛtti / Tuṣṭi (Renunciation / Contentment)",
-      "negative": "Tṛṣṇā (Craving)"
+      "positive": {
+        "sanskrit": "Nivṛtti / Tuṣṭi",
+        "english": "Renunciation / Contentment"
+      },
+      "negative": {
+        "sanskrit": "Tṛṣṇā",
+        "english": "Craving"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Tṛṣṇā",
+          "english": "thirst for acquisition (wealth, name, fame, power, prestige)"
+        },
+        "note": "not thirst for water; cure = divert all thought toward Parama Puruṣa",
+        "domain_tags": [
+          "craving",
+          "acquisition",
+          "ambition"
+        ],
+        "source_quote": "Dha is the acoustic root of thirst for acquisition. This limitless craving … is called trśńa in Sanskrit."
+      },
+      "deva": "ध",
+      "varga": "dental · ta-varga"
     },
     "na": {
       "iast": "Na",
-      "positive": "Viveka (Discriminative detachment)",
-      "negative": "Moha (Blind attachment)"
+      "positive": {
+        "sanskrit": "Viveka",
+        "english": "Discriminative detachment"
+      },
+      "negative": {
+        "sanskrit": "Moha",
+        "english": "Blind attachment"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Moha",
+          "english": "blind attachment / infatuation"
+        },
+        "note": "four types: deśagata (geo-sentiment), kālagata (time), idea-bound, ādhāragata (object); cure = ideation of indifference + Parama Puruṣa",
+        "domain_tags": [
+          "blind_attachment",
+          "infatuation",
+          "delusion"
+        ],
+        "source_quote": "Na is the acoustic root of moha vrtti [blind attachment or infatuation]."
+      },
+      "deva": "न",
+      "varga": "dental · ta-varga"
     },
     "pa": {
       "iast": "Pa",
-      "positive": "Maitrī / Sneha (Friendliness / Affection)",
-      "negative": "Ghṛṇā (Hatred / Revulsion)"
+      "positive": {
+        "sanskrit": "Maitrī / Sneha",
+        "english": "Friendliness / Affection"
+      },
+      "negative": {
+        "sanskrit": "Ghṛṇā",
+        "english": "Hatred / Revulsion"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Ghṛṇā",
+          "english": "hatred / revulsion (a fetter / pāśa)"
+        },
+        "note": "one of 8 pāśas (ghṛṇā, śaṅkā, bhaya, lajjā, jugupsā, kula, śīla, māna); mainly tied to the moha ripu; root pat/patati = downward fall vs ūrdhva-gati / anurakti (devotion). The 6 ripus: kāma, krodha, lobha, mada, moha, mātsarya.",
+        "domain_tags": [
+          "hatred",
+          "revulsion",
+          "fetter",
+          "downfall"
+        ],
+        "source_quote": "Pa is the acoustic root of ghrńá vrtti [the propensity of hatred or revulsion]. … Pa is the acoustic root of the fetter of hatred."
+      },
+      "deva": "प",
+      "varga": "labial · pa-varga"
     },
     "pha": {
       "iast": "Pha",
-      "positive": "Abhaya (Fearlessness)",
-      "negative": "Bhaya (Fear)"
+      "positive": {
+        "sanskrit": "Abhaya",
+        "english": "Fearlessness"
+      },
+      "negative": {
+        "sanskrit": "Bhaya",
+        "english": "Fear"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Bhaya",
+          "english": "fear"
+        },
+        "note": "generally born of more than one factor, but mainly from the moha ripu",
+        "domain_tags": [
+          "fear"
+        ],
+        "source_quote": "Pha is the acoustic root of bhaya vrtti [the propensity of fear]."
+      },
+      "deva": "फ",
+      "varga": "labial · pa-varga"
     },
     "ba": {
       "iast": "Ba",
-      "positive": "Ādara / Mānya (Respect / Reverence)",
-      "negative": "Avajñā (Indifference)"
+      "positive": {
+        "sanskrit": "Ādara / Mānya",
+        "english": "Respect / Reverence"
+      },
+      "negative": {
+        "sanskrit": "Avajñā",
+        "english": "Indifference"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Avajñā",
+          "english": "indifference (neglecting something of value)"
+        },
+        "note": "distinguished from upekṣā (ignoring the truly unacceptable); related to avahelā; maitrī–karuṇā–muditā–upekṣā verse on the four attitudes",
+        "domain_tags": [
+          "indifference",
+          "neglect"
+        ],
+        "source_quote": "Ba is the acoustic root of avajiṋá vrtti [indifference]. … when one neglects something which may actually have some value, that is called avajiṋá."
+      },
+      "deva": "ब",
+      "varga": "labial · pa-varga"
     },
     "bha": {
       "iast": "Bha",
-      "positive": "Jāgaraṇa (Awareness / awakening)",
-      "negative": "Mūrcchā (Deluded obsession)"
+      "positive": {
+        "sanskrit": "Jāgaraṇa",
+        "english": "Awareness / awakening"
+      },
+      "negative": {
+        "sanskrit": "Mūrcchā",
+        "english": "Deluded obsession"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Mūrcchā",
+          "english": "deluded obsession (loss of common sense under a ripu's spell)"
+        },
+        "note": "NOT senselessness; cure = pratyāhāra yoga, or kīrtana / devotional song",
+        "domain_tags": [
+          "deluded_obsession",
+          "hypnotic_spell"
+        ],
+        "source_quote": "Bha is the acoustic root of the múrcchá vrtti. … it means to lose one's common sense under the hypnotic spell of a particular ripu."
+      },
+      "deva": "भ",
+      "varga": "labial · pa-varga"
     },
     "ma": {
       "iast": "Ma",
-      "positive": "Anuśāsana (disciplined restraint / containment)",
-      "negative": "Praśraya / Praṇāśa (indulgence / annihilating collapse)",
+      "positive": {
+        "sanskrit": "Anuśāsana",
+        "english": "disciplined restraint / containment"
+      },
+      "negative": {
+        "sanskrit": "Praśraya / Praṇāśa",
+        "english": "indulgence / annihilating collapse"
+      },
       "source_vritti": "Praṇāśa (annihilation) + Praśraya (indulgence / giving latitude)",
-      "source_notes": "Source carries both praṇāśa and praśraya; praṇāśa added explicitly. Counter-pole Anuśāsana is the derived remedial restraint."
+      "source_notes": "Source carries both praṇāśa and praśraya; praṇāśa added explicitly. Counter-pole Anuśāsana is the derived remedial restraint.",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Praṇāśa + Praśraya",
+          "english": "annihilation; and giving latitude / indulgence (Hindi baṛhvā denā)"
+        },
+        "domain_tags": [
+          "annihilation",
+          "indulgence",
+          "latitude"
+        ],
+        "source_quote": "Ma is the acoustic root of prańásha [annihilation]. It is also the acoustic root of prashraya vrtti – giving latitude [indulgence]."
+      },
+      "deva": "म",
+      "varga": "labial · pa-varga"
     },
     "ya": {
       "iast": "Ya",
-      "positive": "Viśvāsa (Confidence)",
-      "negative": "Aviśvāsa (Lack of confidence)"
+      "positive": {
+        "sanskrit": "Viśvāsa",
+        "english": "Confidence"
+      },
+      "negative": {
+        "sanskrit": "Aviśvāsa",
+        "english": "Lack of confidence"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Aviśvāsa",
+          "english": "lack of confidence (in oneself and others)"
+        },
+        "elemental": "constant movement (like the movement of air)",
+        "note": "such people say to the end 'Shall I be able to do it?' and can accomplish nothing great",
+        "domain_tags": [
+          "lack_of_confidence",
+          "movement",
+          "air"
+        ],
+        "source_quote": "Ya is the acoustic root of avishvása vrtti [lack of confidence], and is also the acoustic root of constant movement (like the movement of air)."
+      },
+      "deva": "य",
+      "varga": "semivowel · antaḥstha"
     },
     "ra": {
       "iast": "Ra",
-      "positive": "Prāṇaśakti / Agnitattva (vitality / creative fire)",
-      "negative": "Sarvanāśa (annihilation-thought / defeatist destruction)",
+      "positive": {
+        "sanskrit": "Prāṇaśakti / Agnitattva",
+        "english": "vitality / creative fire"
+      },
+      "negative": {
+        "sanskrit": "Sarvanāśa",
+        "english": "annihilation-thought / defeatist destruction"
+      },
       "source_vritti": "Agnitattva / Prāṇaśakti (vitality / fire) + Sarvanāśa (annihilation-thought)",
-      "source_notes": "Corrected: agnitattva/fire moved to the positive (vitality) pole; only Sarvanāśa (destructive annihilation-thought) remains negative."
+      "source_notes": "Corrected: agnitattva/fire moved to the positive (vitality) pole; only Sarvanāśa (destructive annihilation-thought) remains negative.",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Agnitattva / Prāṇaśakti (vitality) + Sarvanāśa (annihilation-thought)",
+          "english": "vitality / fire; and the defeatist thought 'everything is gone, I am undone'"
+        },
+        "elemental": "agnitattva (fire); the monosyllable 'ra' means fire",
+        "note": "sarvanāśa cured by guru mantra auto-suggestion 'Parama Puruṣa is mine / I am destined to win'",
+        "mantra_note": "Raṃ bījaṃ shikhinaṃ dhyāyet, trikoṇam-aruṇaprabham (meditate on the bīja Raṃ, triangular, fire-red)",
+        "domain_tags": [
+          "vitality",
+          "fire",
+          "agnitattva",
+          "annihilation_thought",
+          "defeat",
+          "luminous_factor"
+        ],
+        "source_quote": "Ra is the acoustic root of agnitattva or práńashakti – vitality. … It is also the acoustic root of sarvanásha [the thought of annihilation]. … the monosyllabic word ra means 'fire'."
+      },
+      "deva": "र",
+      "varga": "semivowel · antaḥstha"
     },
     "la": {
       "iast": "La",
-      "positive": "Karuṇā / Sneha (Compassion / Gentleness)",
-      "negative": "Krūratā (Cruelty)"
+      "positive": {
+        "sanskrit": "Karuṇā / Sneha",
+        "english": "Compassion / Gentleness"
+      },
+      "negative": {
+        "sanskrit": "Krūratā",
+        "english": "Cruelty"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Krūratā",
+          "english": "cruelty (countered by compassion)"
+        },
+        "elemental": "kṣititattva (the solid factor)",
+        "mantra_note": "Laṃ bījaṃ dharaṇīṃ dhyāyet, caturāsrāṃ supītābhām (meditate on bīja Laṃ, square, golden — the earth factor)",
+        "domain_tags": [
+          "cruelty",
+          "solid_factor",
+          "earth"
+        ],
+        "source_quote": "La is the acoustic root of kruratá vrtti [cruelty]. … La is also the acoustic root of kśititattva, the solid factor."
+      },
+      "deva": "ल",
+      "varga": "semivowel · antaḥstha"
     },
     "va": {
       "iast": "Va",
-      "positive": "Dharma / Jalatattva (original stance, sustaining righteousness / liquid coherence)",
-      "negative": "Adharma (deviation from original stance / loss of sustaining order)",
+      "positive": {
+        "sanskrit": "Dharma / Jalatattva",
+        "english": "original stance, sustaining righteousness / liquid coherence"
+      },
+      "negative": {
+        "sanskrit": "Adharma",
+        "english": "deviation from original stance / loss of sustaining order"
+      },
       "source_vritti": "Dharma (ensconcement in original stance) + Jalatattva (liquid / water factor)",
-      "source_notes": "Corrected: Dharma is the sustaining (positive) pole, NOT a binding pole; worldly distortion = Adharma. Satya removed (was prior positive)."
+      "source_notes": "Corrected: Dharma is the sustaining (positive) pole, NOT a binding pole; worldly distortion = Adharma. Satya removed (was prior positive).",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Dharma",
+          "english": "ensconcement in one's original stance; movement toward Parama Puruṣa"
+        },
+        "elemental": "jalatattva (the liquid factor — any liquid, not only water)",
+        "deity_links": [
+          "Varuṇa Deva (the mythological rain-god)"
+        ],
+        "note": "Dhriyate dharma ityāhuḥ — 'dharma is that which sustains'; humanity cannot sprout except in the soil of dharma",
+        "domain_tags": [
+          "dharma",
+          "original_stance",
+          "liquid_factor",
+          "water",
+          "sustaining"
+        ],
+        "source_quote": "Va is the acoustic root of dharma. … Va is also the acoustic root of jalatattva [the liquid factor], and the acoustic root of the rain-god Varuńa Deva."
+      },
+      "deva": "व",
+      "varga": "semivowel · antaḥstha"
     },
     "sha": {
       "iast": "Śa",
-      "positive": "Directed energy / purposeful material pursuit (dynamic accomplishment)",
-      "negative": "Restless acquisition / material greed (rajasic overdrive)",
+      "positive": {
+        "sanskrit": "",
+        "english": "Directed energy / purposeful material pursuit (dynamic accomplishment)"
+      },
+      "negative": {
+        "sanskrit": "",
+        "english": "Restless acquisition / material greed (rajasic overdrive)"
+      },
       "source_vritti": "Rajoguṇa + Artha (psychic longing / material pursuit)",
-      "source_notes": "Greed is the distorted form, not the whole source; positive pole = purposeful dynamic accomplishment (rajasic energy)."
+      "source_notes": "Greed is the distorted form, not the whole source; positive pole = purposeful dynamic accomplishment (rajasic energy).",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Rajoguṇa + Artha",
+          "english": "the mutative principle; and artha (psychic longing — temporary cessation of worldly wants)"
+        },
+        "note": "shra = mutative principle + vitality (ra); shra + ṅīṣ = shrii (hence 'Śrī' before a name, a blessing on dynamism)",
+        "domain_tags": [
+          "rajoguna",
+          "mutative",
+          "artha",
+          "dynamism"
+        ],
+        "source_quote": "Sha is the acoustic root of rajoguńa [the mutative principle]. It is also the acoustic root of artha [psychic longing]."
+      },
+      "deva": "श",
+      "varga": "sibilant palatal · ūṣma"
     },
     "ssa": {
       "iast": "Ṣa",
-      "positive": "Transmutation of desire / grounded containment",
-      "negative": "Kāma / Tamoguṇa (physical desire / inertia / confusion)",
+      "positive": {
+        "sanskrit": "",
+        "english": "Transmutation of desire / grounded containment"
+      },
+      "negative": {
+        "sanskrit": "Kāma / Tamoguṇa",
+        "english": "physical desire / inertia / confusion"
+      },
       "source_vritti": "Tamoguṇa + Kāma (physical / worldly desire)",
-      "source_notes": "Worldly pole = kāma / tamoguṇa; counter-pole = transmutation of desire. Source alignment made explicit."
+      "source_notes": "Worldly pole = kāma / tamoguṇa; counter-pole = transmutation of desire. Source alignment made explicit.",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Tamoguṇa + Kāma",
+          "english": "the static principle; and kāma (all physical/worldly desires — wealth, fame, position)"
+        },
+        "note": "one of the four vargas (dharma=va, artha=sha, kāma=ṣa, mokṣa=sa)",
+        "domain_tags": [
+          "tamoguna",
+          "static",
+          "kama",
+          "worldly_desire"
+        ],
+        "source_quote": "Śa is the acoustic root of tamoguńa [the static principle], and is also the acoustic root of all kinds of worldly desires … káma."
+      },
+      "deva": "ष",
+      "varga": "sibilant RETROFLEX · ūṣma"
     },
     "sa": {
       "iast": "Sa",
-      "positive": "Mokṣa / Sattvaguṇa (liberation / clarity)",
-      "negative": "Escapism (premature detachment / static withdrawal)",
+      "positive": {
+        "sanskrit": "Mokṣa / Sattvaguṇa",
+        "english": "liberation / clarity"
+      },
+      "negative": {
+        "sanskrit": "",
+        "english": "Escapism (premature detachment / static withdrawal)"
+      },
       "source_vritti": "Mokṣa + Sattvaguṇa",
-      "source_notes": "Liberation / sattva is the source root (positive); negative pole = escapist / static withdrawal."
+      "source_notes": "Liberation / sattva is the source root (positive); negative pole = escapist / static withdrawal.",
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Mokṣa + Sattvaguṇa",
+          "english": "liberation (unqualified); and the sentient principle"
+        },
+        "note": "completes the four vargas: va=dharma, sha=artha, ṣa=kāma, sa=mokṣa; and the three guṇas: sha=rajas, ṣa=tamas, sa=sattva",
+        "domain_tags": [
+          "moksa",
+          "liberation",
+          "sattvaguna",
+          "sentient"
+        ],
+        "source_quote": "Sa is the acoustic root of mokśa [salvation, unqualified liberation]. … sa is the acoustic root of sattvaguńa [the sentient principle]."
+      },
+      "deva": "स",
+      "varga": "sibilant dental · ūṣma"
     },
     "ha": {
       "iast": "Ha",
-      "positive": "Parā-vidyā (Spiritual knowledge)",
-      "negative": "Avidyā / Rātri (Darkness / Night / Inertia)"
+      "positive": {
+        "sanskrit": "Parā-vidyā",
+        "english": "Spiritual knowledge"
+      },
+      "negative": {
+        "sanskrit": "Avidyā / Rātri",
+        "english": "Darkness / Night / Inertia"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Parā-vidyā",
+          "english": "intuitional science; ethereal factor, daytime, the sun, svarloka"
+        },
+        "note": "opposite of ṭha (night, moon, bhūvarloka, kāmamaya kośa); ha + ao = hao (Śiva in tāṇḍava dance); Śiva as preceptor = aeṃ (also bīja of the guru and of Sarasvatī)",
+        "domain_tags": [
+          "ether",
+          "day",
+          "sun",
+          "svarloka",
+          "para_vidya",
+          "intuition"
+        ],
+        "source_quote": "Ha is the acoustic root of the ethereal factor, of daytime, of the sun, of svarloka, and of parávidyá [intuitional science]."
+      },
+      "deva": "ह",
+      "varga": "aspirate · ūṣma"
     },
     "ksha": {
       "iast": "Kṣa",
-      "positive": "Aparā-vidyā (Mundane knowledge)",
-      "negative": "Mithyā-jñāna (False knowledge, Dogma)"
+      "positive": {
+        "sanskrit": "Aparā-vidyā",
+        "english": "Mundane knowledge"
+      },
+      "negative": {
+        "sanskrit": "Mithyā-jñāna",
+        "english": "False knowledge, Dogma"
+      },
+      "expanded_properties": {
+        "vrtti": {
+          "name": "Aparā-vidyā",
+          "english": "mundane knowledge / material science"
+        },
+        "note": "also the acoustic root of the transcendent sphere of heaven (vs kha = crude heaven)",
+        "domain_tags": [
+          "mundane_knowledge",
+          "material_science"
+        ],
+        "source_quote": "Kśa is the acoustic root of mundane knowledge, and is also the acoustic root of material science."
+      },
+      "deva": "क्ष",
+      "varga": "compound"
     }
   },
   "vowels": {
@@ -260,5 +1004,285 @@
     "word_start": "consonant acts more strongly in its assertive projection (outer call)",
     "word_middle": "consonant often takes relational / softening roles, blending into neighbors",
     "word_end": "consonant acts as closure / return signal (anchoring the energy)"
-  }
+  },
+  "_expanded_properties_note": "expanded_properties = source acoustic-root literature (P.R. Sarkar, Varṇa Vijñāna) as INTERPRETIVE METADATA only. It enriches reading/authoring but does NOT affect the polarity score, which uses ONLY positive/negative. Scoring fields: positive, negative. Metadata fields: expanded_properties, source_vritti, source_notes.",
+  "_romanization": {
+    "a": {
+      "deva": "अ",
+      "iast": "a",
+      "itrans": "a",
+      "english": "a"
+    },
+    "aa": {
+      "deva": "आ",
+      "iast": "ā",
+      "itrans": "aa / A",
+      "english": "aa"
+    },
+    "i": {
+      "deva": "इ",
+      "iast": "i",
+      "itrans": "i",
+      "english": "i"
+    },
+    "ii": {
+      "deva": "ई",
+      "iast": "ī",
+      "itrans": "ii / I",
+      "english": "ee"
+    },
+    "u": {
+      "deva": "उ",
+      "iast": "u",
+      "itrans": "u",
+      "english": "u"
+    },
+    "uu": {
+      "deva": "ऊ",
+      "iast": "ū",
+      "itrans": "uu / U",
+      "english": "oo"
+    },
+    "e": {
+      "deva": "ए",
+      "iast": "e",
+      "itrans": "e",
+      "english": "e / ay"
+    },
+    "ai": {
+      "deva": "ऐ",
+      "iast": "ai",
+      "itrans": "ai",
+      "english": "ai"
+    },
+    "o": {
+      "deva": "ओ",
+      "iast": "o",
+      "itrans": "o",
+      "english": "o"
+    },
+    "au": {
+      "deva": "औ",
+      "iast": "au",
+      "itrans": "au",
+      "english": "au / ow"
+    },
+    "am": {
+      "deva": "अं",
+      "iast": "aṁ",
+      "itrans": "M / .m",
+      "english": "ṁ (nasal)"
+    },
+    "ah": {
+      "deva": "अः",
+      "iast": "aḥ",
+      "itrans": "H / .h",
+      "english": "ḥ (breath)"
+    },
+    "ka": {
+      "deva": "क",
+      "iast": "Ka",
+      "itrans": "k",
+      "english": "k (skate)"
+    },
+    "kha": {
+      "deva": "ख",
+      "iast": "Kha",
+      "itrans": "kh",
+      "english": "kh (aspirated k)"
+    },
+    "ga": {
+      "deva": "ग",
+      "iast": "Ga",
+      "itrans": "g",
+      "english": "g (go)"
+    },
+    "gha": {
+      "deva": "घ",
+      "iast": "Gha",
+      "itrans": "gh",
+      "english": "gh (aspirated g)"
+    },
+    "nga": {
+      "deva": "ङ",
+      "iast": "Ṅa",
+      "itrans": "~N / N^",
+      "english": "ng (sing)"
+    },
+    "ca": {
+      "deva": "च",
+      "iast": "Ca",
+      "itrans": "ch / c",
+      "english": "ch (church)"
+    },
+    "cha": {
+      "deva": "छ",
+      "iast": "Cha",
+      "itrans": "Ch / chh",
+      "english": "chh (aspirated ch)"
+    },
+    "ja": {
+      "deva": "ज",
+      "iast": "Ja",
+      "itrans": "j",
+      "english": "j (jam)"
+    },
+    "jha": {
+      "deva": "झ",
+      "iast": "Jha",
+      "itrans": "jh",
+      "english": "jh (aspirated j)"
+    },
+    "nya": {
+      "deva": "ञ",
+      "iast": "Ña",
+      "itrans": "~n / GY",
+      "english": "ny (canyon)"
+    },
+    "tta": {
+      "deva": "ट",
+      "iast": "Ṭa",
+      "itrans": "T",
+      "english": "ṭ (retroflex t — curl tongue)"
+    },
+    "ttha": {
+      "deva": "ठ",
+      "iast": "Ṭha",
+      "itrans": "Th",
+      "english": "ṭh (aspirated retroflex t)"
+    },
+    "dda": {
+      "deva": "ड",
+      "iast": "Ḍa",
+      "itrans": "D",
+      "english": "ḍ (retroflex d)"
+    },
+    "ddha": {
+      "deva": "ढ",
+      "iast": "Ḍha",
+      "itrans": "Dh",
+      "english": "ḍh (aspirated retroflex d)"
+    },
+    "nna": {
+      "deva": "ण",
+      "iast": "Ṇa",
+      "itrans": "N",
+      "english": "ṇ (retroflex n)"
+    },
+    "ta": {
+      "deva": "त",
+      "iast": "Ta",
+      "itrans": "t",
+      "english": "t (dental — tongue on teeth)"
+    },
+    "tha": {
+      "deva": "थ",
+      "iast": "Tha",
+      "itrans": "th",
+      "english": "th (aspirated dental t)"
+    },
+    "da": {
+      "deva": "द",
+      "iast": "Da",
+      "itrans": "d",
+      "english": "d (dental)"
+    },
+    "dha": {
+      "deva": "ध",
+      "iast": "Dha",
+      "itrans": "dh",
+      "english": "dh (aspirated dental d)"
+    },
+    "na": {
+      "deva": "न",
+      "iast": "Na",
+      "itrans": "n",
+      "english": "n (dental)"
+    },
+    "pa": {
+      "deva": "प",
+      "iast": "Pa",
+      "itrans": "p",
+      "english": "p (spin)"
+    },
+    "pha": {
+      "deva": "फ",
+      "iast": "Pha",
+      "itrans": "ph / f",
+      "english": "ph / f (aspirated p)"
+    },
+    "ba": {
+      "deva": "ब",
+      "iast": "Ba",
+      "itrans": "b",
+      "english": "b (bin)"
+    },
+    "bha": {
+      "deva": "भ",
+      "iast": "Bha",
+      "itrans": "bh",
+      "english": "bh (aspirated b)"
+    },
+    "ma": {
+      "deva": "म",
+      "iast": "Ma",
+      "itrans": "m",
+      "english": "m (man)"
+    },
+    "ya": {
+      "deva": "य",
+      "iast": "Ya",
+      "itrans": "y",
+      "english": "y (yes)"
+    },
+    "ra": {
+      "deva": "र",
+      "iast": "Ra",
+      "itrans": "r",
+      "english": "r (rolled/tap)"
+    },
+    "la": {
+      "deva": "ल",
+      "iast": "La",
+      "itrans": "l",
+      "english": "l (let)"
+    },
+    "va": {
+      "deva": "व",
+      "iast": "Va",
+      "itrans": "v / w",
+      "english": "v / w"
+    },
+    "sha": {
+      "deva": "श",
+      "iast": "Śa",
+      "itrans": "sh / z",
+      "english": "ś (sh — palatal, as in 'sheet')"
+    },
+    "ssa": {
+      "deva": "ष",
+      "iast": "Ṣa",
+      "itrans": "Sh / S",
+      "english": "ṣ (retroflex sh)"
+    },
+    "sa": {
+      "deva": "स",
+      "iast": "Sa",
+      "itrans": "s",
+      "english": "s (sit)"
+    },
+    "ha": {
+      "deva": "ह",
+      "iast": "Ha",
+      "itrans": "h",
+      "english": "h (hat)"
+    },
+    "ksha": {
+      "deva": "क्ष",
+      "iast": "Kṣa",
+      "itrans": "kSh / x",
+      "english": "kṣ (ksh)"
+    }
+  },
+  "_romanization_note": "Canonical varṇa ↔ Devanāgarī / IAST / ITRANS-ascii / English spelling. Reference for deterministic romanized input; English words use g2p. Long-vowel digraphs ee→ī, oo→ū are honored by the parser."
 }
