@@ -1,5 +1,9 @@
 # Results — acoustic-signal test (pre-registered)
 
+> **Layer boundary note** (see `LAYERS_ONTOLOGY_THEORY_IMPLEMENTATION.md`): automata / minimization claims
+> classify the current ρ implementation only. They do not classify the completed acoustic ontology or future
+> reading-theory variants. This result is an empirical falsification outcome and is untouched by that scoping.
+
 > Pre-registration: `PREREG_ACOUSTIC_SIGNAL.md`. Verdict computed by the registered rule, not by hand.
 > Interpretive lens — **not** part of C×R×S. This was the gate that would have to be passed first.
 >
