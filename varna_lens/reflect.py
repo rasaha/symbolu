@@ -16,13 +16,50 @@ import argparse, json, os, pathlib
 import varna_lens as V
 
 _LEX = None
-def _expanded(key):
-    """expanded_properties for a consonant key, from the lexicon JSON (cached)."""
+def _lex():
+    """Lexicon consonants dict (cached)."""
     global _LEX
     if _LEX is None:
         p = pathlib.Path(__file__).with_name("lexicon_authoritative.json")
         _LEX = json.loads(p.read_text(encoding="utf-8"))["consonants"]
-    return (_LEX.get(key) or {}).get("expanded_properties")
+    return _LEX
+
+
+def _expanded(key):
+    return (_lex().get(key) or {}).get("expanded_properties")
+
+
+def _pole_text(p):
+    """(sanskrit, english) from a pole that may be a {sanskrit,english} dict or a plain string."""
+    if isinstance(p, dict):
+        return p.get("sanskrit", ""), p.get("english", "")
+    return "", (p or "")
+
+
+def term_glossary(word):
+    """Ordered {Sanskrit term: English} for every Sanskrit-named pole of the word's consonants — lets the
+    chain carry Sanskrit texture while keeping the author grounded in the precise English meaning."""
+    phon, _w, _src = V.auto_phonemes(word)
+    gl = {}
+    for typ, key, _surf in phon:
+        if typ != "C":
+            continue
+        c = _lex().get(key)
+        if not c:
+            continue
+        for pole in ("negative", "positive"):
+            skt, eng = _pole_text(c.get(pole))
+            if skt:
+                gl.setdefault(skt, eng)
+    return gl
+
+
+def _glossary_block(word):
+    gl = term_glossary(word)
+    if not gl:
+        return ""
+    return ("\nGlossary (Sanskrit term = English grounding): "
+            + "; ".join(f"{k} = {v}" for k, v in gl.items()))
 
 
 def acoustic_imagery(word):
@@ -41,7 +78,7 @@ def acoustic_imagery(word):
             bits.append(ep["elemental"])
         if ep.get("acoustic_roots"):
             bits.append(ep["acoustic_roots"][0])
-        iast = (_LEX.get(key) or {}).get("iast", key)
+        iast = (_lex().get(key) or {}).get("iast", key)
         lines.append(f"  {iast}: " + " · ".join(b for b in bits if b))
     return lines
 
@@ -54,12 +91,17 @@ HONESTY_RULES = """LANGUAGE RULES (hard — this is what keeps it honest):
 - Keep the vivid Sanskrit images and the worldly→dissolution (⤳) motion; strip only the truth claim.
 - A reflection ends in a question to the user, never a verdict."""
 
+DUAL_LANGUAGE = ("DUAL-LANGUAGE: the chain names each propensity by its Sanskrit term (e.g. Āśā, Karuṇā) "
+                 "— use those for evocative texture, and lean on the English glossary below for accurate "
+                 "grounding. Name the Sanskrit term, let its English meaning steer the sense.")
+
 
 def scaffold(word):
     d, src, _warn = V.analyze(word, model="op")          # model="op" = the vowel-attachment rule
     whole = d.get("whole_word_essence") or {}
     return {"word": word, "source": src, "chain": d.get("essence_short"),
-            "chain_detail": d.get("essence"), "whole_word_essence": whole.get("essence")}
+            "chain_detail": d.get("essence"), "whole_word_essence": whole.get("essence"),
+            "glossary": term_glossary(word)}
 
 
 def reflect_prompt(s, rich=False):
@@ -70,14 +112,16 @@ def reflect_prompt(s, rich=False):
         if lines:
             imagery = ("\nOptional source imagery for each sound (traditional acoustic-root associations — "
                        "use sparingly, as evocative texture, never as claims):\n" + "\n".join(lines))
+    glossary = _glossary_block(s["word"])
     return f"""You are the authoring voice of "Varṇa Lens", a contemplative reflection tool.
 {HONESTY_RULES}
+{DUAL_LANGUAGE}
 
 THE MIRROR FOR "{s['word']}"  (read by sound: {s['source']})
 A consistent symbolic reflection — NOT a claim about this word.
 Its sounds carry this fixed propensity chain (each − worldly pole shown easing ⤳ toward its spiritual
 counter; + = an active/anchored pole):
-  {s['chain']}{note}{imagery}
+  {s['chain']}{note}{glossary}{imagery}
 
 Write the reflection:
 1. One opening line naming the chain's images (as images, not claims).
@@ -90,8 +134,14 @@ Close with: "There are no right answers — the meaning is the one you bring."
 
 def name_prompt(scaffolds):
     blocks = "\n".join(f'  "{s["word"]}" → {s["chain"]}' for s in scaffolds)
+    merged = {}
+    for s in scaffolds:
+        merged.update(s.get("glossary") or term_glossary(s["word"]))
+    glossary = ("\nGlossary (Sanskrit term = English grounding): "
+                + "; ".join(f"{k} = {v}" for k, v in merged.items())) if merged else ""
     return f"""You are the authoring voice of "Varṇa Lens" naming mode.
 {HONESTY_RULES}
+{DUAL_LANGUAGE}
 
 For each candidate name you are given its deterministic varṇa propensity chain. Produce:
 1. Per name: a SYMBOLIC MOOD PALETTE — 3–5 theme tags (e.g. "drive / activation", "release / letting-go",
@@ -101,7 +151,7 @@ For each candidate name you are given its deterministic varṇa propensity chain
 This is a mood board — decoration and conversation-fuel for a subjective choice, not a meaning claim.
 
 Profiles:
-{blocks}
+{blocks}{glossary}
 """
 
 
