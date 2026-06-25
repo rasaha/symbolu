@@ -198,6 +198,42 @@ def auto_phonemes(word):
     ph, w = phonemes_roman(word); return ph, w, "roman (auto: fallback)"
 
 
+_VOWEL_LETTERS = "aeiouAEIOU" + "".join(c for c in _IAST_CHARS if c.lower() in "āīūṛṝḷ")
+
+
+def _group_vowel_key(group):
+    """Map a run of vowel letters (e.g. 'ea', 'oo') to ONE vowel key via the roman table; take the first
+    vowel it yields (longest-match handles ee->ī, oo->ū, ai, au)."""
+    seg, _w = phonemes_roman(group.lower())
+    for typ, key, _surf in seg:
+        if typ == "V":
+            return key
+    return None
+
+
+def phonemes_hybrid(word):
+    """HYBRID reading: consonants + attachment/polarity from SOUND (g2p); vowel IDENTITY from SPELLING.
+
+    The load-bearing structure (which consonants, and whether a vowel attaches → onset(+)/coda(−)) is
+    taken from pronunciation, so ambiguous letters resolve correctly (camera→Ka, not Ca) and silent
+    written vowels do NOT invent a phantom attachment. The vowel IDENTITIES are then overlaid from the
+    spelling, paired to the sound's vowel slots in order — so homophones spelled differently stay
+    distinct (sun: …u… vs son: …o…). Extra (silent) written vowels with no sound slot are dropped.
+    Falls back to roman if there is no pronunciation. Returns (phonemes, warn, src)."""
+    snd, warn = phonemes_cmudict(word)
+    if not snd:
+        ph, w = phonemes_roman(word); return ph, w, "roman (hybrid fallback: no pronunciation)"
+    spell = [k for k in (_group_vowel_key(g) for g in re.findall("[" + _VOWEL_LETTERS + "]+", word)) if k]
+    out, vi = [], 0
+    for typ, key, surf in snd:
+        if typ == "V":
+            out.append(("V", spell[vi] if vi < len(spell) else key, surf))
+            vi += 1
+        else:
+            out.append((typ, key, surf))
+    return out, warn, "hybrid (consonants by sound, vowels by spelling)"
+
+
 def annotate(phonemes):
     """Tag each consonant with R1 polarity: 'created' if the NEXT phoneme is a vowel, else 'destroyed'."""
     ann = []
@@ -476,10 +512,13 @@ def log_row(log_path: Path, word, out, actual, verdict):
                     out.get("essence_short", "") if out else "(unparseable)", actual, verdict])
 
 
-def analyze(word, *, g2p=False, varnas=None, roman=False, reverse=False, model="pair"):
-    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown)."""
+def analyze(word, *, g2p=False, varnas=None, roman=False, hybrid=False, reverse=False, model="pair"):
+    """Segment + read one word. Default = AUTO (g2p for dictionary words, literal for IAST/unknown).
+    hybrid = consonants/polarity by sound + vowel identity by spelling (see phonemes_hybrid)."""
     if varnas:
         ph, warn = phonemes_explicit(varnas); src = "explicit"
+    elif hybrid:
+        ph, warn, src = phonemes_hybrid(word)
     elif g2p:
         ph, warn = phonemes_cmudict(word); src = "g2p (forced)"
     elif roman:
@@ -572,6 +611,7 @@ def main(argv=None):
     ap.add_argument("word", nargs="?", help="romanized word, e.g. kala / kāla / ak")
     ap.add_argument("--g2p", action="store_true", help="force g2p pronunciation (English/any language)")
     ap.add_argument("--roman", action="store_true", help="force literal IAST/roman reading (skip auto g2p)")
+    ap.add_argument("--hybrid", action="store_true", help="consonants/polarity by sound + vowel identity by spelling")
     ap.add_argument("--varnas", help="explicit acoustic order, e.g. 'k,a,l,a' or 'ka,la' (authoritative)")
     ap.add_argument("--batch", help="run a word-list file (one word per line) through the lens in one pass")
     ap.add_argument("--interactive", action="store_true", help="with --batch: prompt actual+verdict per word")
@@ -596,6 +636,8 @@ def main(argv=None):
         ap.error("give a word, --varnas, --batch, or --tally")
     if args.varnas:
         ph, warn = phonemes_explicit(args.varnas); src = "explicit"
+    elif args.hybrid:
+        ph, warn, src = phonemes_hybrid(args.word)
     elif args.g2p:
         ph, warn = phonemes_cmudict(args.word); src = "g2p (forced)"
     elif args.roman:

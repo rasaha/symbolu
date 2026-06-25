@@ -96,10 +96,12 @@ DUAL_LANGUAGE = ("DUAL-LANGUAGE: the chain names each propensity by its Sanskrit
                  "grounding. Name the Sanskrit term, let its English meaning steer the sense.")
 
 
-def scaffold(word):
-    d, src, _warn = V.analyze(word, model="op")          # model="op" = the vowel-attachment rule
+def scaffold(word, by="hybrid"):
+    # by: hybrid (consonants by sound + vowels by spelling) | sound (g2p/auto) | spelling (literal roman)
+    kw = {"hybrid": {"hybrid": True}, "sound": {}, "spelling": {"roman": True}}.get(by, {"hybrid": True})
+    d, src, _warn = V.analyze(word, model="op", **kw)          # model="op" = the vowel-attachment rule
     whole = d.get("whole_word_essence") or {}
-    return {"word": word, "source": src, "chain": d.get("essence_short"),
+    return {"word": word, "reading_mode": by, "source": src, "chain": d.get("essence_short"),
             "chain_detail": d.get("essence"), "whole_word_essence": whole.get("essence"),
             "glossary": term_glossary(word)}
 
@@ -176,19 +178,22 @@ def call_llm(prompt):
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Varṇa Lens reflection / naming tool (authoring on a deterministic scaffold).")
     sub = ap.add_subparsers(dest="mode", required=True)
-    sub.add_parser("scaffold").add_argument("word")
-    pr = sub.add_parser("reflect"); pr.add_argument("word")
+    BY = dict(choices=["hybrid", "sound", "spelling"], default="hybrid",
+              help="reading mode: hybrid=consonants by sound + vowels by spelling (default); "
+                   "sound=pronunciation (g2p); spelling=literal letters")
+    ps = sub.add_parser("scaffold"); ps.add_argument("word"); ps.add_argument("--by", **BY)
+    pr = sub.add_parser("reflect"); pr.add_argument("word"); pr.add_argument("--by", **BY)
     pr.add_argument("--rich", action="store_true", help="include source acoustic imagery (expanded_properties)")
-    pn = sub.add_parser("name"); pn.add_argument("names", nargs="+")
+    pn = sub.add_parser("name"); pn.add_argument("names", nargs="+"); pn.add_argument("--by", **BY)
     a = ap.parse_args(argv)
 
     if a.mode == "scaffold":
-        s = scaffold(a.word); s["acoustic_imagery"] = acoustic_imagery(a.word)
+        s = scaffold(a.word, by=a.by); s["acoustic_imagery"] = acoustic_imagery(a.word)
         print(json.dumps(s, ensure_ascii=False, indent=2)); return 0
     if a.mode == "reflect":
-        s = scaffold(a.word); prompt = reflect_prompt(s, rich=a.rich); scaf = s
+        s = scaffold(a.word, by=a.by); prompt = reflect_prompt(s, rich=a.rich); scaf = s
     else:
-        scafs = [scaffold(n) for n in a.names]; prompt = name_prompt(scafs); scaf = scafs
+        scafs = [scaffold(n, by=a.by) for n in a.names]; prompt = name_prompt(scafs); scaf = scafs
 
     out = call_llm(prompt)
     if out:
