@@ -1010,279 +1010,388 @@
     "a": {
       "deva": "अ",
       "iast": "a",
-      "itrans": "a",
-      "english": "a"
+      "plain_input": [
+        "a"
+      ],
+      "pronunciation_note": "short a, as in 'about'"
     },
     "aa": {
       "deva": "आ",
       "iast": "ā",
-      "itrans": "aa / A",
-      "english": "aa"
+      "plain_input": [
+        "aa",
+        "ā"
+      ],
+      "pronunciation_note": "long ā, as in 'father'"
     },
     "i": {
       "deva": "इ",
       "iast": "i",
-      "itrans": "i",
-      "english": "i"
+      "plain_input": [
+        "i"
+      ],
+      "pronunciation_note": "short i, as in 'sit'"
     },
     "ii": {
       "deva": "ई",
       "iast": "ī",
-      "itrans": "ii / I",
-      "english": "ee"
+      "plain_input": [
+        "ee",
+        "ii",
+        "ī"
+      ],
+      "pronunciation_note": "long ī, as in 'see'"
     },
     "u": {
       "deva": "उ",
       "iast": "u",
-      "itrans": "u",
-      "english": "u"
+      "plain_input": [
+        "u"
+      ],
+      "pronunciation_note": "short u, as in 'put'"
     },
     "uu": {
       "deva": "ऊ",
       "iast": "ū",
-      "itrans": "uu / U",
-      "english": "oo"
+      "plain_input": [
+        "oo",
+        "uu",
+        "ū"
+      ],
+      "pronunciation_note": "long ū, as in 'moon' (distinct from o)"
     },
     "e": {
       "deva": "ए",
       "iast": "e",
-      "itrans": "e",
-      "english": "e / ay"
+      "plain_input": [
+        "e"
+      ],
+      "pronunciation_note": "long ē, as in 'play' (monophthong)"
     },
     "ai": {
       "deva": "ऐ",
       "iast": "ai",
-      "itrans": "ai",
-      "english": "ai"
+      "plain_input": [
+        "ai"
+      ],
+      "pronunciation_note": "diphthong ai, as in 'aisle'"
     },
     "o": {
       "deva": "ओ",
       "iast": "o",
-      "itrans": "o",
-      "english": "o"
+      "plain_input": [
+        "o"
+      ],
+      "pronunciation_note": "long ō, as in 'go'"
     },
     "au": {
       "deva": "औ",
       "iast": "au",
-      "itrans": "au",
-      "english": "au / ow"
+      "plain_input": [
+        "au"
+      ],
+      "pronunciation_note": "diphthong au, as in 'cow'"
     },
     "am": {
       "deva": "अं",
       "iast": "aṁ",
-      "itrans": "M / .m",
-      "english": "ṁ (nasal)"
+      "plain_input": [
+        "ṁ",
+        "ṃ"
+      ],
+      "pronunciation_note": "anusvāra — nasalization (ṁ)"
     },
     "ah": {
       "deva": "अः",
       "iast": "aḥ",
-      "itrans": "H / .h",
-      "english": "ḥ (breath)"
+      "plain_input": [
+        "ḥ"
+      ],
+      "pronunciation_note": "visarga — soft breath (ḥ)"
     },
     "ka": {
       "deva": "क",
       "iast": "Ka",
-      "itrans": "k",
-      "english": "k (skate)"
+      "plain_input": [
+        "k",
+        "q"
+      ],
+      "pronunciation_note": "unaspirated k (guttural)"
     },
     "kha": {
       "deva": "ख",
       "iast": "Kha",
-      "itrans": "kh",
-      "english": "kh (aspirated k)"
+      "plain_input": [
+        "kh"
+      ],
+      "pronunciation_note": "aspirated kh"
     },
     "ga": {
       "deva": "ग",
       "iast": "Ga",
-      "itrans": "g",
-      "english": "g (go)"
+      "plain_input": [
+        "g"
+      ],
+      "pronunciation_note": "unaspirated g"
     },
     "gha": {
       "deva": "घ",
       "iast": "Gha",
-      "itrans": "gh",
-      "english": "gh (aspirated g)"
+      "plain_input": [
+        "gh"
+      ],
+      "pronunciation_note": "aspirated gh"
     },
     "nga": {
       "deva": "ङ",
       "iast": "Ṅa",
-      "itrans": "~N / N^",
-      "english": "ng (sing)"
+      "plain_input": [
+        "ṅ"
+      ],
+      "pronunciation_note": "ṅ — guttural nasal, as in 'sing'"
     },
     "ca": {
       "deva": "च",
       "iast": "Ca",
-      "itrans": "ch / c",
-      "english": "ch (church)"
+      "plain_input": [
+        "c"
+      ],
+      "pronunciation_note": "ch as in 'church' (unaspirated, palatal)"
     },
     "cha": {
       "deva": "छ",
       "iast": "Cha",
-      "itrans": "Ch / chh",
-      "english": "chh (aspirated ch)"
+      "plain_input": [
+        "ch"
+      ],
+      "pronunciation_note": "aspirated chh"
     },
     "ja": {
       "deva": "ज",
       "iast": "Ja",
-      "itrans": "j",
-      "english": "j (jam)"
+      "plain_input": [
+        "j"
+      ],
+      "pronunciation_note": "j as in 'jam'"
     },
     "jha": {
       "deva": "झ",
       "iast": "Jha",
-      "itrans": "jh",
-      "english": "jh (aspirated j)"
+      "plain_input": [
+        "jh"
+      ],
+      "pronunciation_note": "aspirated jh"
     },
     "nya": {
       "deva": "ञ",
       "iast": "Ña",
-      "itrans": "~n / GY",
-      "english": "ny (canyon)"
+      "plain_input": [
+        "ñ"
+      ],
+      "pronunciation_note": "ñ — palatal nasal, as in 'canyon'"
     },
     "tta": {
       "deva": "ट",
       "iast": "Ṭa",
-      "itrans": "T",
-      "english": "ṭ (retroflex t — curl tongue)"
+      "plain_input": [
+        "T",
+        "ṭ"
+      ],
+      "pronunciation_note": "retroflex ṭ — tongue curled back to the ridge (hard t)"
     },
     "ttha": {
       "deva": "ठ",
       "iast": "Ṭha",
-      "itrans": "Th",
-      "english": "ṭh (aspirated retroflex t)"
+      "plain_input": [
+        "Th",
+        "ṭh"
+      ],
+      "pronunciation_note": "aspirated retroflex ṭh"
     },
     "dda": {
       "deva": "ड",
       "iast": "Ḍa",
-      "itrans": "D",
-      "english": "ḍ (retroflex d)"
+      "plain_input": [
+        "D",
+        "ḍ"
+      ],
+      "pronunciation_note": "retroflex ḍ — tongue curled back (hard d)"
     },
     "ddha": {
       "deva": "ढ",
       "iast": "Ḍha",
-      "itrans": "Dh",
-      "english": "ḍh (aspirated retroflex d)"
+      "plain_input": [
+        "Dh",
+        "ḍh"
+      ],
+      "pronunciation_note": "aspirated retroflex ḍh"
     },
     "nna": {
       "deva": "ण",
       "iast": "Ṇa",
-      "itrans": "N",
-      "english": "ṇ (retroflex n)"
+      "plain_input": [
+        "N",
+        "ṇ"
+      ],
+      "pronunciation_note": "retroflex ṇ"
     },
     "ta": {
       "deva": "त",
       "iast": "Ta",
-      "itrans": "t",
-      "english": "t (dental — tongue on teeth)"
+      "plain_input": [
+        "t"
+      ],
+      "pronunciation_note": "dental t — tongue touches the teeth (soft t)"
     },
     "tha": {
       "deva": "थ",
       "iast": "Tha",
-      "itrans": "th",
-      "english": "th (aspirated dental t)"
+      "plain_input": [
+        "th"
+      ],
+      "pronunciation_note": "aspirated dental th"
     },
     "da": {
       "deva": "द",
       "iast": "Da",
-      "itrans": "d",
-      "english": "d (dental)"
+      "plain_input": [
+        "d"
+      ],
+      "pronunciation_note": "dental d — tongue on the teeth"
     },
     "dha": {
       "deva": "ध",
       "iast": "Dha",
-      "itrans": "dh",
-      "english": "dh (aspirated dental d)"
+      "plain_input": [
+        "dh"
+      ],
+      "pronunciation_note": "aspirated dental dh"
     },
     "na": {
       "deva": "न",
       "iast": "Na",
-      "itrans": "n",
-      "english": "n (dental)"
+      "plain_input": [
+        "n"
+      ],
+      "pronunciation_note": "dental n"
     },
     "pa": {
       "deva": "प",
       "iast": "Pa",
-      "itrans": "p",
-      "english": "p (spin)"
+      "plain_input": [
+        "p"
+      ],
+      "pronunciation_note": "unaspirated p"
     },
     "pha": {
       "deva": "फ",
       "iast": "Pha",
-      "itrans": "ph / f",
-      "english": "ph / f (aspirated p)"
+      "plain_input": [
+        "ph",
+        "f"
+      ],
+      "pronunciation_note": "aspirated ph (also used for English f)"
     },
     "ba": {
       "deva": "ब",
       "iast": "Ba",
-      "itrans": "b",
-      "english": "b (bin)"
+      "plain_input": [
+        "b"
+      ],
+      "pronunciation_note": "b"
     },
     "bha": {
       "deva": "भ",
       "iast": "Bha",
-      "itrans": "bh",
-      "english": "bh (aspirated b)"
+      "plain_input": [
+        "bh"
+      ],
+      "pronunciation_note": "aspirated bh"
     },
     "ma": {
       "deva": "म",
       "iast": "Ma",
-      "itrans": "m",
-      "english": "m (man)"
+      "plain_input": [
+        "m"
+      ],
+      "pronunciation_note": "m"
     },
     "ya": {
       "deva": "य",
       "iast": "Ya",
-      "itrans": "y",
-      "english": "y (yes)"
+      "plain_input": [
+        "y"
+      ],
+      "pronunciation_note": "y as in 'yes'"
     },
     "ra": {
       "deva": "र",
       "iast": "Ra",
-      "itrans": "r",
-      "english": "r (rolled/tap)"
+      "plain_input": [
+        "r"
+      ],
+      "pronunciation_note": "r — rolled / tapped"
     },
     "la": {
       "deva": "ल",
       "iast": "La",
-      "itrans": "l",
-      "english": "l (let)"
+      "plain_input": [
+        "l"
+      ],
+      "pronunciation_note": "l"
     },
     "va": {
       "deva": "व",
       "iast": "Va",
-      "itrans": "v / w",
-      "english": "v / w"
+      "plain_input": [
+        "v",
+        "w"
+      ],
+      "pronunciation_note": "v / w"
     },
     "sha": {
       "deva": "श",
       "iast": "Śa",
-      "itrans": "sh / z",
-      "english": "ś (sh — palatal, as in 'sheet')"
+      "plain_input": [
+        "sh",
+        "ś"
+      ],
+      "pronunciation_note": "palatal śa — soft 'sh' as in 'sheet'"
     },
     "ssa": {
       "deva": "ष",
       "iast": "Ṣa",
-      "itrans": "Sh / S",
-      "english": "ṣ (retroflex sh)"
+      "plain_input": [
+        "Sh",
+        "ṣ"
+      ],
+      "pronunciation_note": "retroflex ṣa — 'sh' with the tongue curled back (informally 'shha')"
     },
     "sa": {
       "deva": "स",
       "iast": "Sa",
-      "itrans": "s",
-      "english": "s (sit)"
+      "plain_input": [
+        "s"
+      ],
+      "pronunciation_note": "dental s, as in 'sit'"
     },
     "ha": {
       "deva": "ह",
       "iast": "Ha",
-      "itrans": "h",
-      "english": "h (hat)"
+      "plain_input": [
+        "h"
+      ],
+      "pronunciation_note": "h"
     },
     "ksha": {
       "deva": "क्ष",
       "iast": "Kṣa",
-      "itrans": "kSh / x",
-      "english": "kṣ (ksh)"
+      "plain_input": [
+        "kṣ",
+        "x"
+      ],
+      "pronunciation_note": "kṣ — compound k+ṣ"
     }
   },
-  "_romanization_note": "Canonical varṇa ↔ Devanāgarī / IAST / ITRANS-ascii / English spelling. Reference for deterministic romanized input; English words use g2p. Long-vowel digraphs ee→ī, oo→ū are honored by the parser."
+  "_romanization_note": "IAST is canonical; plain_input = ASCII/English aliases the parser accepts (derived from the engine tables); pronunciation_note describes the sound (dental/retroflex/aspirated). English words use g2p."
 }
