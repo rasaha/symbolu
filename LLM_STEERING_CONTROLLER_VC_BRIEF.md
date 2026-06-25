@@ -24,6 +24,26 @@ way it did.
 
 ---
 
+## What It Does — and What It Does NOT Do (read this first)
+
+For an enterprise buyer and an investor, the boundary *is* the product. We are precise about it on purpose:
+the credibility comes from what we refuse to claim.
+
+| ✅ What it DOES | ❌ What it does NOT do |
+|---|---|
+| Fixes **which meaning-frame** the model answers in, **deterministically** — same input → same frame, every run | **Not** a quality upgrade — does **not** make the model smarter, more accurate, or more "coherent" (that stays the model's job) |
+| Produces a **logged, auditable reason** for every steering decision | Does **not** decode or reveal meaning — firewalled from any "meaning" claim |
+| Runs on **any model, open or closed, with no weight changes** | Does **not** modify model weights or require training |
+| Gives **one consistent control + audit layer across vendors** — no lock-in | Does **not** make a *rented* (closed-API) model's raw output deterministic — only the **control** is deterministic |
+| Is **cheap** and runs inline | Does **not** claim the internal C×R×S signal adds predictive value — that track is **parked, in writing** (Page 4) |
+
+**The one sentence to take away:** the Steering Controller sells **control and trust** (consistency,
+auditability, portability), **never intelligence or decoded meaning.** Every benefit above is true *by
+construction* — it does not depend on any contested research signal, which is why none of the parked tracks
+on Page 4 weaken it.
+
+---
+
 ## Page 1 — The Problem
 
 LLMs fail less often because they can't write fluently, and more often because they answer under the
@@ -91,6 +111,33 @@ guarantee. They are the product.
 ---
 
 ## Page 3 — Open-Weight vs Closed-API (two honest deployment modes)
+
+### In plain terms (the same tool, two buyers)
+
+Think of an LLM as an engine and the Steering Controller as a steering system bolted on. If you **own** the
+engine you can wire the steering deep inside; if you **rent** it you steer from the outside — but you still
+steer. Either way the promise is the same three words: **consistent, explainable, switchable** — not "smarter."
+
+**Open-source models (Mistral, Llama, Qwen) — you *own* the engine.** You have the keys to the hood, so the
+Controller reaches *inside* the model.
+- Deep, built-in steering — the frame is applied at the source, so the model holds its lane more reliably.
+- Runs entirely on your own servers — nothing leaves the building (banks, hospitals, government).
+- Survives upgrades cheaply — clips back on after a model update, no retraining.
+- Full end-to-end consistency — you control both engine and steering.
+- *Best buyer:* self-hosting, privacy/compliance shops (especially European/regulated — Mistral's home turf).
+
+**Closed-source models (Claude, GPT, Gemini) — you *rent* the engine.** You can't open the hood, so the
+Controller steers from outside: it standardizes *how you ask* and *which answer you keep*, by a fixed rulebook.
+- A universal remote across vendors — one set of controls that behaves the same on Claude, GPT, or Gemini, so
+  you are **not locked in**.
+- Consistency without babysitting — the whole team's AI answers to one standard, not a flavor per person.
+- One audit trail across all of them — the same "here's why" record regardless of which model answered.
+- Switch providers anytime — prices and models change; your behavior layer stays put.
+- **Honest limit:** it makes your *control* consistent, but **cannot** make the rented model's *raw output*
+  perfectly predictable — those vendors change their models under you. It is the steady layer on a shifting base.
+- *Best buyer:* teams already on proprietary APIs who want consistency, an audit trail, and vendor freedom.
+
+### The technical view
 
 The Controller computes the frame **locally and model-free** (text in → deterministic frame), so the *frame*
 is always reproducible. How the frame is **applied** depends on model access:
