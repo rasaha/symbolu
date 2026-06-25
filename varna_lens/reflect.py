@@ -12,8 +12,38 @@ Usage:
     python reflect.py reflect  "courage"             # authored reflection (needs ANTHROPIC_API_KEY,
     python reflect.py name "Lyra" "Veda" "Soma"      #   else prints scaffold + ready-to-paste prompt)
 """
-import argparse, json, os
+import argparse, json, os, pathlib
 import varna_lens as V
+
+_LEX = None
+def _expanded(key):
+    """expanded_properties for a consonant key, from the lexicon JSON (cached)."""
+    global _LEX
+    if _LEX is None:
+        p = pathlib.Path(__file__).with_name("lexicon_authoritative.json")
+        _LEX = json.loads(p.read_text(encoding="utf-8"))["consonants"]
+    return (_LEX.get(key) or {}).get("expanded_properties")
+
+
+def acoustic_imagery(word):
+    """Per-consonant source imagery for the word's sounds (vṛtti · elemental · first acoustic root)."""
+    phon, _w, _src = V.auto_phonemes(word)
+    lines = []
+    for typ, key, _surf in phon:
+        if typ != "C":
+            continue
+        ep = _expanded(key)
+        if not ep:
+            continue
+        vr = ep.get("vrtti", {})
+        bits = [f"{vr.get('name','')} ({vr.get('english','')})"] if vr else []
+        if ep.get("elemental"):
+            bits.append(ep["elemental"])
+        if ep.get("acoustic_roots"):
+            bits.append(ep["acoustic_roots"][0])
+        iast = (_LEX.get(key) or {}).get("iast", key)
+        lines.append(f"  {iast}: " + " · ".join(b for b in bits if b))
+    return lines
 
 HONESTY_RULES = """LANGUAGE RULES (hard — this is what keeps it honest):
 - NEVER use: "means", "represents", "reveals", "signifies", "your word is", "this shows you are",
@@ -32,8 +62,14 @@ def scaffold(word):
             "chain_detail": d.get("essence"), "whole_word_essence": whole.get("essence")}
 
 
-def reflect_prompt(s):
+def reflect_prompt(s, rich=False):
     note = f"\nWhole-word note: {s['whole_word_essence']}" if s["whole_word_essence"] else ""
+    imagery = ""
+    if rich:
+        lines = acoustic_imagery(s["word"])
+        if lines:
+            imagery = ("\nOptional source imagery for each sound (traditional acoustic-root associations — "
+                       "use sparingly, as evocative texture, never as claims):\n" + "\n".join(lines))
     return f"""You are the authoring voice of "Varṇa Lens", a contemplative reflection tool.
 {HONESTY_RULES}
 
@@ -41,7 +77,7 @@ THE MIRROR FOR "{s['word']}"  (read by sound: {s['source']})
 A consistent symbolic reflection — NOT a claim about this word.
 Its sounds carry this fixed propensity chain (each − worldly pole shown easing ⤳ toward its spiritual
 counter; + = an active/anchored pole):
-  {s['chain']}{note}
+  {s['chain']}{note}{imagery}
 
 Write the reflection:
 1. One opening line naming the chain's images (as images, not claims).
@@ -91,14 +127,16 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Varṇa Lens reflection / naming tool (authoring on a deterministic scaffold).")
     sub = ap.add_subparsers(dest="mode", required=True)
     sub.add_parser("scaffold").add_argument("word")
-    sub.add_parser("reflect").add_argument("word")
+    pr = sub.add_parser("reflect"); pr.add_argument("word")
+    pr.add_argument("--rich", action="store_true", help="include source acoustic imagery (expanded_properties)")
     pn = sub.add_parser("name"); pn.add_argument("names", nargs="+")
     a = ap.parse_args(argv)
 
     if a.mode == "scaffold":
-        print(json.dumps(scaffold(a.word), ensure_ascii=False, indent=2)); return 0
+        s = scaffold(a.word); s["acoustic_imagery"] = acoustic_imagery(a.word)
+        print(json.dumps(s, ensure_ascii=False, indent=2)); return 0
     if a.mode == "reflect":
-        s = scaffold(a.word); prompt = reflect_prompt(s); scaf = s
+        s = scaffold(a.word); prompt = reflect_prompt(s, rich=a.rich); scaf = s
     else:
         scafs = [scaffold(n) for n in a.names]; prompt = name_prompt(scafs); scaf = scafs
 

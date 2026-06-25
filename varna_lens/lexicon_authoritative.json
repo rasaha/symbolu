@@ -48,7 +48,9 @@
           "karya_brahma"
         ],
         "source_quote": "Ka is the acoustic root of the abhiipśātmaka áshá vrtti. It is also the acoustic root of Kárya Brahma [the expressed universe]. … Ka (kae + d́a) etymologically means 'that which produces sound'. It also means 'water'."
-      }
+      },
+      "deva": "क",
+      "varga": "guttural · ka-varga"
     },
     "kha": {
       "iast": "Kha",
@@ -70,7 +72,9 @@
           "crude_heaven"
         ],
         "source_quote": "The acoustic root of áshá vrtti is ka, and that of cintá vrtti [the propensity of worry] is kha. … Impersonal thoughts are symbolized by the acoustic root kha."
-      }
+      },
+      "deva": "ख",
+      "varga": "guttural · ka-varga"
     },
     "ga": {
       "iast": "Ga",
@@ -89,7 +93,9 @@
           "elevation"
         ],
         "source_quote": "The effort made to arouse one's dormant potentiality is called ceśt́á. … Ga, being the acoustic root of ceśt́á vrtti, plays an important role in the physical, psychic and spiritual spheres."
-      }
+      },
+      "deva": "ग",
+      "varga": "guttural · ka-varga"
     },
     "gha": {
       "iast": "Gha",
@@ -108,7 +114,9 @@
           "relativity"
         ],
         "source_quote": "Mamatá, the vrtti of love and attachment …, is related to time, space and individuality. … Gha is the acoustic root of mamatá vrtti."
-      }
+      },
+      "deva": "घ",
+      "varga": "guttural · ka-varga"
     },
     "nga": {
       "iast": "Ṅa",
@@ -125,7 +133,9 @@
           "pride"
         ],
         "source_quote": "Uṋa is the acoustic root of dambha vrtti [the propensity of vanity]."
-      }
+      },
+      "deva": "ङ",
+      "varga": "guttural · ka-varga"
     },
     "ca": {
       "iast": "Ca",
@@ -143,7 +153,9 @@
           "discrimination"
         ],
         "source_quote": "Ca is the acoustic root of viveka [conscience]."
-      }
+      },
+      "deva": "च",
+      "varga": "palatal · ca-varga"
     },
     "cha": {
       "iast": "Cha",
@@ -160,7 +172,9 @@
           "collapse"
         ],
         "source_quote": "Cha is the acoustic root of vikalatáh vrtti [nervous breakdown]."
-      }
+      },
+      "deva": "छ",
+      "varga": "palatal · ca-varga"
     },
     "ja": {
       "iast": "Ja",
@@ -180,7 +194,9 @@
           "inflation"
         ],
         "source_quote": "Ja is the acoustic root of ahaḿkára vrtti (ego). The ego becomes inflated when one allows one's 'I' feeling to take a predominant role."
-      }
+      },
+      "deva": "ज",
+      "varga": "palatal · ca-varga"
     },
     "jha": {
       "iast": "Jha",
@@ -198,7 +214,9 @@
           "craving_fascination"
         ],
         "source_quote": "Jha is the acoustic root of lolupatá, lobha [greed] and lolatá [avarice] vrttis."
-      }
+      },
+      "deva": "झ",
+      "varga": "palatal · ca-varga"
     },
     "nya": {
       "iast": "Ña",
@@ -215,7 +233,9 @@
           "deceit"
         ],
         "source_quote": "Ina is the acoustic root of kapat́atá vrtti [hypocrisy]."
-      }
+      },
+      "deva": "ञ",
+      "varga": "palatal · ca-varga"
     },
     "tta": {
       "iast": "Ṭa",
@@ -233,7 +253,9 @@
           "bad_temper"
         ],
         "source_quote": "T́a is the acoustic root of vitarka vrtti [overstating one's case]. … Vitarka is a combination of a bad temper and garrulousness."
-      }
+      },
+      "deva": "ट",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "ttha": {
       "iast": "Ṭha",
@@ -250,7 +272,9 @@
           "remorse"
         ],
         "source_quote": "T́ha is the acoustic root of anutápa vrtti [repentance]."
-      }
+      },
+      "deva": "ठ",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "dda": {
       "iast": "Ḍa",
@@ -265,7 +289,9 @@
           "shyness"
         ],
         "source_quote": "D́a is the acoustic root of lajjá vrtti [the propensity of shyness]."
-      }
+      },
+      "deva": "ड",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "ddha": {
       "iast": "Ḍha",
@@ -282,7 +308,9 @@
           "torture"
         ],
         "source_quote": "Senseless, sadistic killing is called pishunatá vrtti."
-      }
+      },
+      "deva": "ढ",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "nna": {
       "iast": "Ṇa",
@@ -297,7 +325,9 @@
           "envy"
         ],
         "source_quote": "Ńa is the acoustic root of iirśá vrtti [the propensity of envy]."
-      }
+      },
+      "deva": "ण",
+      "varga": "RETROFLEX · Ṭa-varga"
     },
     "ta": {
       "iast": "Ta",
@@ -316,7 +346,9 @@
           "staticity"
         ],
         "source_quote": "Ta is the acoustic root of staticity, long sleep and deep sleep. … That which brings about the cessation of dullness and staticity is called Tantra."
-      }
+      },
+      "deva": "त",
+      "varga": "dental · ta-varga"
     },
     "tha": {
       "iast": "Tha",
@@ -332,7 +364,9 @@
           "dejection"
         ],
         "source_quote": "Tha is the acoustic root of viśada vrtti, of melancholy."
-      }
+      },
+      "deva": "थ",
+      "varga": "dental · ta-varga"
     },
     "da": {
       "iast": "Da",
@@ -349,7 +383,9 @@
           "irritability"
         ],
         "source_quote": "Da is the acoustic root of peevishness."
-      }
+      },
+      "deva": "द",
+      "varga": "dental · ta-varga"
     },
     "dha": {
       "iast": "Dha",
@@ -367,7 +403,9 @@
           "ambition"
         ],
         "source_quote": "Dha is the acoustic root of thirst for acquisition. This limitless craving … is called trśńa in Sanskrit."
-      }
+      },
+      "deva": "ध",
+      "varga": "dental · ta-varga"
     },
     "na": {
       "iast": "Na",
@@ -385,7 +423,9 @@
           "delusion"
         ],
         "source_quote": "Na is the acoustic root of moha vrtti [blind attachment or infatuation]."
-      }
+      },
+      "deva": "न",
+      "varga": "dental · ta-varga"
     },
     "pa": {
       "iast": "Pa",
@@ -404,7 +444,9 @@
           "downfall"
         ],
         "source_quote": "Pa is the acoustic root of ghrńá vrtti [the propensity of hatred or revulsion]. … Pa is the acoustic root of the fetter of hatred."
-      }
+      },
+      "deva": "प",
+      "varga": "labial · pa-varga"
     },
     "pha": {
       "iast": "Pha",
@@ -420,7 +462,9 @@
           "fear"
         ],
         "source_quote": "Pha is the acoustic root of bhaya vrtti [the propensity of fear]."
-      }
+      },
+      "deva": "फ",
+      "varga": "labial · pa-varga"
     },
     "ba": {
       "iast": "Ba",
@@ -437,7 +481,9 @@
           "neglect"
         ],
         "source_quote": "Ba is the acoustic root of avajiṋá vrtti [indifference]. … when one neglects something which may actually have some value, that is called avajiṋá."
-      }
+      },
+      "deva": "ब",
+      "varga": "labial · pa-varga"
     },
     "bha": {
       "iast": "Bha",
@@ -454,7 +500,9 @@
           "hypnotic_spell"
         ],
         "source_quote": "Bha is the acoustic root of the múrcchá vrtti. … it means to lose one's common sense under the hypnotic spell of a particular ripu."
-      }
+      },
+      "deva": "भ",
+      "varga": "labial · pa-varga"
     },
     "ma": {
       "iast": "Ma",
@@ -473,7 +521,9 @@
           "latitude"
         ],
         "source_quote": "Ma is the acoustic root of prańásha [annihilation]. It is also the acoustic root of prashraya vrtti – giving latitude [indulgence]."
-      }
+      },
+      "deva": "म",
+      "varga": "labial · pa-varga"
     },
     "ya": {
       "iast": "Ya",
@@ -492,7 +542,9 @@
           "air"
         ],
         "source_quote": "Ya is the acoustic root of avishvása vrtti [lack of confidence], and is also the acoustic root of constant movement (like the movement of air)."
-      }
+      },
+      "deva": "य",
+      "varga": "semivowel · antaḥstha"
     },
     "ra": {
       "iast": "Ra",
@@ -517,7 +569,9 @@
           "luminous_factor"
         ],
         "source_quote": "Ra is the acoustic root of agnitattva or práńashakti – vitality. … It is also the acoustic root of sarvanásha [the thought of annihilation]. … the monosyllabic word ra means 'fire'."
-      }
+      },
+      "deva": "र",
+      "varga": "semivowel · antaḥstha"
     },
     "la": {
       "iast": "La",
@@ -536,7 +590,9 @@
           "earth"
         ],
         "source_quote": "La is the acoustic root of kruratá vrtti [cruelty]. … La is also the acoustic root of kśititattva, the solid factor."
-      }
+      },
+      "deva": "ल",
+      "varga": "semivowel · antaḥstha"
     },
     "va": {
       "iast": "Va",
@@ -562,7 +618,9 @@
           "sustaining"
         ],
         "source_quote": "Va is the acoustic root of dharma. … Va is also the acoustic root of jalatattva [the liquid factor], and the acoustic root of the rain-god Varuńa Deva."
-      }
+      },
+      "deva": "व",
+      "varga": "semivowel · antaḥstha"
     },
     "sha": {
       "iast": "Śa",
@@ -583,7 +641,9 @@
           "dynamism"
         ],
         "source_quote": "Sha is the acoustic root of rajoguńa [the mutative principle]. It is also the acoustic root of artha [psychic longing]."
-      }
+      },
+      "deva": "श",
+      "varga": "sibilant palatal · ūṣma"
     },
     "ssa": {
       "iast": "Ṣa",
@@ -604,7 +664,9 @@
           "worldly_desire"
         ],
         "source_quote": "Śa is the acoustic root of tamoguńa [the static principle], and is also the acoustic root of all kinds of worldly desires … káma."
-      }
+      },
+      "deva": "ष",
+      "varga": "sibilant RETROFLEX · ūṣma"
     },
     "sa": {
       "iast": "Sa",
@@ -625,7 +687,9 @@
           "sentient"
         ],
         "source_quote": "Sa is the acoustic root of mokśa [salvation, unqualified liberation]. … sa is the acoustic root of sattvaguńa [the sentient principle]."
-      }
+      },
+      "deva": "स",
+      "varga": "sibilant dental · ūṣma"
     },
     "ha": {
       "iast": "Ha",
@@ -646,7 +710,9 @@
           "intuition"
         ],
         "source_quote": "Ha is the acoustic root of the ethereal factor, of daytime, of the sun, of svarloka, and of parávidyá [intuitional science]."
-      }
+      },
+      "deva": "ह",
+      "varga": "aspirate · ūṣma"
     },
     "ksha": {
       "iast": "Kṣa",
@@ -663,7 +729,9 @@
           "material_science"
         ],
         "source_quote": "Kśa is the acoustic root of mundane knowledge, and is also the acoustic root of material science."
-      }
+      },
+      "deva": "क्ष",
+      "varga": "compound"
     }
   },
   "vowels": {
