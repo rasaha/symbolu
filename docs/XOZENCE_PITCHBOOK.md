@@ -11,7 +11,7 @@ Xozence Labs is building an **AI infrastructure platform** — the decision-qual
 
 Our thesis is that the next wave of value in AI infrastructure comes not from bigger models or faster hardware, but from **smarter decisions at the seams** — where an autoscaler decides whether to scale, where an inference engine decides which cache block to evict, where an agent decides whether to execute a tool call, and where a language model decides which token to emit next. Each of those seams is currently handled by a shallow heuristic, a single-signal policy, or no policy at all. We build the multi-signal, feedback-aware, governance-ready layers that fill those gaps.
 
-**One platform, five modules** — each independently deployable, with initial commercialization focused on the three most mature modules. Final wedge sequencing will be guided by design-partner demand and pilot traction, though the **Cloud Scaling Controller** has the most straightforward proof-of-value motion today (zero-risk shadow mode, direct FinOps pain point, auto-generated savings reports). The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front:
+**One platform, five modules** — each independently deployable, with initial commercialization focused on the three most mature modules. Final wedge sequencing will be guided by design-partner demand and pilot traction, though the **Cloud Scaling Controller** has the most straightforward proof-of-value motion today (zero-risk read-only shadow mode, a reliability/safety pain — runaway scale-outs — and auto-generated proof-of-value reports; it is a safety interlock, not a FinOps tool). The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front:
 
 | # | Module | Layer | One-line summary | Readiness |
 |---|---|---|---|---|
@@ -44,11 +44,13 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 # 1. Neural Cloud Scaling Controller
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
+**Positioning: an Autoscaling Safety Interlock — read-only first.** A zero-write engine that emits a **causal verdict for every scale-out** — *HELPING / NEUTRAL / NOT_HELPING / futile-runaway* — answering the one question the autoscaling stack never does: *after we scaled, did it actually help?* This is a **reliability / safety play, not a cost-optimization one.** We are **explicitly not a FinOps company**: we don't rightsize, bin-pack, or buy spot, and our only *measured* savings (offline, modeled dynamics) is **marginal and near-SLO-neutral** — we do not lead with it. The pitch is **0 harmful false positives, 0 SLO regressions, read-only by construction**.
+
 **Current validation state:** the Cloud Scaling Controller is validated in **simulation** (19 synthetic adversarial scenarios — synthetic workload and simulated system dynamics) and by **offline replay of real workload traces** (Azure Public Dataset LLM/LMM inference traces), in which the request timing and distribution are real but the demand→metrics mapping, replica-optimum estimation, efficiency scoring, and SLO calculation remain modeled (**simulated system dynamics**); the **live-shadow-self-run** harness is built, integration-tested, and wiring-proven against a real Prometheus API but **has not yet been executed on a real Kubernetes cluster**, and **independent third-party telemetry has not started**. Shadow mode and recommend mode are built and tested. See the validation maturity ladder in §1.4.
 
 ## 1.1 The Problem
 
-### Autoscalers have a blind spot, and it's costing everyone money
+### Autoscalers have a blind spot: they can't tell whether a scale-out actually helped
 
 Here's something almost nobody outside of SRE teams talks about: every cloud autoscaler in production — Kubernetes HPA, AWS Auto Scaling, Karpenter, Cast AI — has the same blind spot. They can't tell the difference between two very different situations:
 
@@ -58,9 +60,9 @@ Here's something almost nobody outside of SRE teams talks about: every cloud aut
 
 To the autoscaler, both look identical. And so when latency rises, it scales out. If the real cause was an upstream service failing, or a flaky metric, or backpressure bleeding in from somewhere else entirely, adding replicas doesn't help. The latency stays elevated. The controller sees that and scales out again. And again. Until somebody gets paged because the bill crossed a threshold, or the cluster hits a hard limit. We've all seen this incident. Most of us have been the one on-call when it happened.
 
-### Three ways this quietly burns money every day
+### Three ways the autoscaler quietly runs away
 
-| What goes wrong | How it plays out | What it costs |
+| What goes wrong | How it plays out | Futile overshoot |
 |---|---|---|
 | **A cascading failure upstream** | An upstream service breaks. Latency climbs across everything downstream — no matter how many replicas you add. The controller scales from 4 replicas to 46 before any signal finally reverses. | **4.47x** what was actually needed |
 | **Noisy metrics** | Random CPU spikes on ~15% of cycles each nudge the controller to add a replica. Every individual decision looks reasonable. Cumulatively, you end up at 31 replicas when 5 would have been plenty. | **4.37x** what was actually needed |
@@ -79,9 +81,9 @@ And the big tools in the market each solve a different part of the puzzle:
 
 Nobody in the market is asking the one question that would fix this: *"Did that last scale-out actually help — and if not, should we really be doing it again right now?"*
 
-### Why this matters to the market right now
+### Why this matters right now
 
-FinOps has become a boardroom conversation. Every cloud-native company we talk to has the same complaint in some form: *"We're paying three to five times what we should for scale-outs that don't even improve our SLOs."* The pain has shifted from "how do we scale?" to "why are we wasting so much when we do?" — and the Layer 4 decision-quality gap is exactly where that money is being left on the table.
+Runaway scale-outs under futile conditions are a **reliability incident**, not just a line item: they page on-call, exhaust quotas and hard limits, and bleed capacity churn downstream — and nothing in the stack today can tell the autoscaler it's wrong. We deliberately frame this as a **safety / reliability** problem, **not** a FinOps one. The cost angle is real but **marginal and not measured under live actuation** (§1.4), and leading with savings would drop us into a savings bake-off against rightsizing / spot vendors we are explicitly not trying to be (§1.3).
 
 ## 1.2 Architecture: Teaching Autoscalers to Know When They're Wrong
 
@@ -125,7 +127,7 @@ After the window closes, it classifies the event as **HELPING**, **NEUTRAL**, or
 
 ### Layer 3 — The ScaleOutFutilityGuard (Execution Filter)
 
-This is the part that actually saves money, and it's intentionally conservative. It only blocks a scale-out when the evidence is overwhelming:
+This is the part that actually stops the runaway, and it's intentionally conservative. It only blocks a scale-out when the evidence is overwhelming:
 
 1. The estimator has reported NOT_HELPING for **at least 5 cycles in a row**.
 2. There are already **at least 20 replicas** running.
@@ -174,7 +176,7 @@ The table below places us against the tools we get compared to in technical eval
 |---|---|---|---|
 | **Reactive autoscalers** | Kubernetes HPA, KEDA, AWS Auto Scaling | Threshold- or event-driven rules that compute a scaling action from current metrics. Clean, fast, built-in. | HPA and KEDA are brilliant at computing *intent to scale*. Neither one ever looks back to ask whether the last action helped. **Better because:** we are the feedback loop they don't have. HPA keeps producing `raw_delta`; we observe whether the last `raw_delta` did any good and filter the next one if the evidence says no. A cluster running HPA can turn us on in shadow mode with zero configuration changes to HPA itself. |
 | **Node provisioning** | Karpenter (AWS), Cluster Autoscaler, Azure AKS autoscaler | Just-in-time node materialization, bin-packing, instance-type selection. The part that turns a replica-count delta into actual compute. | Karpenter answers *"how do we materialize the scale decision?"*. We answer *"should the scale decision be made at all?"*. Different layers, different questions. **Better because:** every futile scale-out we catch is a Karpenter provisioning event that never needs to run. The savings compound: no extra replica cost, no extra node cost, no extra provisioning churn, no extra scheduling noise downstream. We make Karpenter's job smaller, not harder. |
-| **Cost optimization / FinOps** | Cast AI, Kubecost, Spot.io (NetApp Spot), StormForge | Pick cheaper instance types, surface overprovisioning, right-size requests/limits, negotiate spot and reserved pricing. | These tools make the decisions you already made *cheaper*. We question whether the decision should have been made. **Better because:** a scale-out that never happens is 100% cheaper than any rightsizing can make it. Our savings stack on top of Cast AI / Kubecost / Spot — a cluster running all four sees the L4 decision-quality cut *first*, then the L2 cost optimization applied to whatever is left. The economics compose; they don't conflict. |
+| **Cost optimization / FinOps** | Cast AI, Kubecost, Spot.io (NetApp Spot), StormForge, Sedai | Pick cheaper instance types, surface overprovisioning, right-size requests/limits, negotiate spot and reserved pricing — **real, recurring $ savings, real customers.** | **We do not compete here, and we say so.** These win on savings on their home turf; we are **not** a FinOps tool and would lose a savings bake-off against any of them. We are a **read-only verdict layer in front of actuation** — they make the action cheaper; we judge whether the action should happen at all. **Relationship, not rivalry:** our verdict composes on top of their actuation, and **Cast AI is our closest neighbor and most likely acquirer**. |
 | **Predictive autoscaling** | ScaleOps, Google Vertical Pod Autoscaler's predictive mode | ML-driven load forecasting. Pre-scales for known diurnal, seasonal, and bursty workloads. | Prediction answers *"what will the load be?"*. We answer *"given the signal we're seeing, should we take the action the controller wants?"*. Prediction is excellent when the problem is a load problem — but when the root cause isn't load (upstream failure, noisy metrics, flaky probe, conflicting signals), a confident prediction makes things worse, not better. **Better because:** we compose with prediction cleanly. ScaleOps tells the controller what's coming; we verify whether the actions taken in response actually helped. Prediction + feedback is strictly stronger than prediction alone. |
 | **Observability / AIOps** | Datadog, New Relic, Dynatrace, Grafana Cloud | Anomaly detection, alert correlation, incident summarization, dashboards. Some early "suggest an action" surfaces. | Observability vendors watch the system and *tell humans* what's wrong. We sit *inside* the control loop and stop bad actions before they ship. **Better because:** we are a closed-loop controller, not an alerting surface. Observability tools make incidents legible after the fact; we prevent one of the specific incidents — runaway scale-out under futile conditions — from happening in the first place. An SRE team using Datadog for visibility and us for control is using each tool for what it's actually good at. |
 | **In-house SRE tooling** | Bespoke Slack bots, on-call runbooks, custom HPA wrappers each team writes in-house | *"When HPA fires five times in a row and nothing's improving, page me and we'll look at it."* Every mature SRE team has eventually written some version of this. | We are that runbook — minus the human in the middle, minus the ambiguity about exactly when to fire, minus the 228+ unit tests each team rewrites from scratch. **Better because:** the product is off-the-shelf, ablation-validated, safety-constrained by construction, and production-grade today. SRE teams get back the time they were spending babysitting the autoscaler, and they get to spend it on actual incidents instead. The bespoke runbook stops being a bus factor. |
@@ -184,8 +186,8 @@ The table below places us against the tools we get compared to in technical eval
 - **We occupy a layer nobody else is in.** Every competitor in the table above operates at L0–L3 (sensing, provisioning, cost, prediction) or at L5–L7 (safety bounds, observability, governance). **Layer 4 — decision quality — is empty in the market.** We are the first tool in this space whose entire purpose is to ask *"did the last action actually work, and if not, should we really do it again?"*.
 - **We wrap, we don't replace.** HPA stays. Karpenter stays. Cast AI stays. ScaleOps stays. Datadog stays. The platform team installs us in shadow mode with zero write permissions — no configuration changes to any other tool in the stack, no midnight cutover, no vendor migration. This is a strictly additive product, which is the opposite of how every other FinOps vendor enters a new customer.
 - **Safety by construction.** Across 19 adversarial scenarios *in simulation*, **zero catastrophic failures, zero severe failures, zero SLO regressions, zero false positives** — and on *real-trace replay* the guard likewise caused no meaningful SLO regression (see §1.4). The guard can only say "no" to a scale-out — it can never say "yes" to an action the controller wasn't already going to take. That's a property no learned AIOps system can claim, and it's why we can ship on a Tuesday without a change-management committee and a six-week pilot.
-- **Proof-of-value is free.** Shadow mode runs read-only, auto-generates proof-of-value reports, and costs the customer nothing to try. A platform team can turn us on, watch for two weeks, and see exactly what we *would* have saved them — without adopting any dependency, signing any contract, or taking any production risk. No other tool in this space offers that kind of zero-commitment trial, because no other tool can: they all have to write something to work.
-- **The economics compose.** Every other vendor in the table saves money by making the thing you're already doing cheaper or faster. We save money by *not doing the thing*. A scale-out that doesn't happen is 100% cheaper than any rightsizing, spot-instance swap, or bin-packing optimization can ever make it — and those savings are additive to whatever the rest of your stack is already doing.
+- **Proof-of-value is free and read-only.** Shadow mode runs zero-write, auto-generates a proof-of-value report, and costs the customer nothing to try. A platform team can turn us on, watch for two weeks, and see exactly which futile scale-outs it *would* have caught — without adopting any dependency, signing any contract, or taking any production risk. No other tool in this space offers that kind of zero-commitment trial, because no other tool can: they all have to write something to work.
+- **We are explicitly not a FinOps company.** We don't rightsize, bin-pack, buy spot, or allocate cost, and our only *measured* savings is marginal and near-SLO-neutral (§1.4). Positioning this as FinOps would put us in a savings bake-off we lose; the durable wedge is the **safety verdict** — catching the futile-runaway incident no savings tool is even looking at — which composes *on top of* whatever FinOps stack the customer already runs.
 
 ### In one sentence
 
@@ -209,9 +211,9 @@ We didn't benchmark this on a friendly load test. We built 19 deliberately nasty
 
 This is the headline we're proudest of. We built a system that can only make things better or leave them alone — and it held that line across every single scenario we threw at it. When the guard isn't needed, it's invisible. When it is needed, it fires. That's the whole product promise, and it held.
 
-#### The money story
+#### The overshoot story *(simulated — not a measured-savings claim)*
 
-| Scenario | Before the Guard | After the Guard | What we saved |
+| Scenario | Before the Guard | After the Guard | Futile overshoot removed |
 |---|---|---|---|
 | cascading_failure | 4.47x optimal | **3.36x optimal** | −1.11x |
 | noisy_spikes | 4.37x optimal | **3.60x optimal** | −0.77x |
@@ -230,7 +232,7 @@ This is the headline we're proudest of. We built a system that can only make thi
 | Scenarios where the guard intervened | 5 of 19 |
 | Scenarios where the guard stayed out of the way | 14 of 19 |
 
-**The one-line version (simulated):** we cut waste from 4.5x to 3.4x of optimal cost with **zero SLO regressions** — and that's something none of the incumbents can do today, because they don't have the feedback loop to know when they're wrong.
+**The one-line version (simulated):** the headline is **zero SLO regressions**; secondarily, on simulated dynamics, futile overshoot fell from 4.5x to 3.4x of optimal (**not** a measured-savings claim). That safety property is something none of the incumbents can offer today, because they don't have the feedback loop to know when the autoscaler is wrong.
 
 ### Validation maturity ladder — where the evidence actually stands
 
@@ -271,14 +273,14 @@ This isn't a research prototype. It's been staged, tested, and written to be dep
 
 | Stage | What we're building | Why it matters |
 |---|---|---|
-| **Stage 5** | Active mode — bounded autonomous control, scaling without waiting for human approval | Unlocks the first paid deployments and lets customers see real FinOps savings on live workloads |
+| **Stage 5** | Active mode — bounded autonomous control, scaling without waiting for human approval | Unlocks the first paid deployments and lets the safety verdict act on live workloads (bounded, still safety-first) |
 | **Stage 6** | Learning loop and multi-service support — auto-tune the 12 parameters from outcome data via the L6 → L4 feedback path | Every customer makes the controller smarter, and the system starts recognizing cross-service patterns |
 | **Layer 3** | Prediction module — proactive scaling driven by the replay buffer and historical data | Puts us head-to-head with ScaleOps on seasonal and bursty workloads |
 | **Layer 2** | Cost optimization integration — pull Cast AI / Kubecost constraints directly into the decision equation | A single decision surface that balances FinOps and reliability together |
 
 ### What's next to validate commercially
 
-We are the **decision-quality layer** for cloud autoscaling — the missing piece between "what's happening" and "what should we do about it." The product is validated, production-grade, and genuinely easy to try today: shadow mode has zero write permissions and auto-generates proof-of-value reports, which means any platform team can turn it on, watch for two weeks, and see exactly what it would have saved them without taking on any risk.
+We are the **decision-quality layer** for cloud autoscaling — the missing piece between "what's happening" and "what should we do about it." The product is validated in simulation and real-trace replay (the live-cluster run is built but not yet executed, §1.4), and genuinely easy to try: shadow mode has zero write permissions and auto-generates a proof-of-value report, which means any platform team can turn it on, watch for two weeks, and see exactly which futile scale-outs it would have caught — without taking on any risk.
 
 The near-term path is Stage 5 (active mode), first design-partner deployments, and the learning loop that turns every customer into a self-improving control surface. This module is one of Xozence's most commercially ready wedges.
 
@@ -1743,7 +1745,7 @@ Xozence Labs is not five unrelated projects — it is **one AI infrastructure pl
 - **CTM+/PCAM** ensures the KV-cache that serves both models evicts intelligently, not blindly.
 - The **Cloud Scaling Controller** ensures the underlying compute scales only when scaling actually helps.
 
-Each module is independently deployable and independently valuable. Initial commercialization focuses on the three most mature modules, with the **Cloud Scaling Controller** as the most legible first entry point — it offers a zero-risk shadow mode, targets a well-understood FinOps pain, and auto-generates proof-of-value reports that make the first commercial conversation straightforward. CTM+/PCAM and the Agentic Framework are close behind, each addressing a distinct buyer. Final wedge selection will be guided by design-partner demand and pilot conversion. The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front.
+Each module is independently deployable and independently valuable. Initial commercialization focuses on the three most mature modules, with the **Cloud Scaling Controller** as the most legible first entry point — it offers a zero-risk read-only shadow mode, targets a reliability/safety pain (runaway scale-outs, not FinOps), and auto-generates proof-of-value reports that make the first commercial conversation straightforward. CTM+/PCAM and the Agentic Framework are close behind, each addressing a distinct buyer. Final wedge selection will be guided by design-partner demand and pilot conversion. The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front.
 
 ## Aggregate Evidence
 
@@ -1780,14 +1782,14 @@ Each module is independently deployable and independently valuable. Initial comm
 
 **The timing is right.** FinOps, KV-cache pressure, agent governance, and long-context attention are all active pain points in production AI infrastructure *right now*. Each module addresses a gap that is growing, not shrinking, as models get larger, contexts get longer, and agents get more autonomous. The window to establish credible defaults in these layers is the next 12–18 months.
 
-**The commercial entry points are identified.** The Cloud Scaling Controller has the most straightforward proof-of-value motion — zero-risk shadow mode, direct FinOps pain, auto-generated savings reports — making it the easiest first commercial conversation. CTM+/PCAM targets inference operators with a similar shadow-mode trial. The Agentic Framework is pilot-ready with a tested governance contract that regulated enterprises need. Which module leads depends on design-partner pull; all three are near-term viable. The research-stage modules strengthen the platform moat behind them.
+**The commercial entry points are identified.** The Cloud Scaling Controller has the most straightforward proof-of-value motion — zero-risk read-only shadow mode, a reliability/safety pain (runaway scale-outs, not FinOps), auto-generated proof-of-value reports — making it the easiest first commercial conversation. CTM+/PCAM targets inference operators with a similar shadow-mode trial. The Agentic Framework is pilot-ready with a tested governance contract that regulated enterprises need. Which module leads depends on design-partner pull; all three are near-term viable. The research-stage modules strengthen the platform moat behind them.
 
 ## What We Need From the Accelerator
 
 | Area | What it would unlock |
 |---|---|
 | **Enterprise design-partner access** | The three production-ready modules need real workloads to validate against. Introductions to platform teams running Kubernetes autoscaling, LLM inference at scale, or autonomous agent pilots would convert shadow-mode data into paid deployments. |
-| **GTM and wedge refinement** | Mentorship on sequencing the three commercial-ready modules — confirming whether the Cloud Scaling Controller's FinOps motion is the right lead, how to position a multi-module platform credibly, and how to price shadow-mode-to-active-mode conversion. |
+| **GTM and wedge refinement** | Mentorship on sequencing the three commercial-ready modules — confirming whether the Cloud Scaling Controller's read-only safety-interlock motion is the right lead, how to position a multi-module platform credibly, and how to price shadow-mode-to-active-mode conversion. |
 | **Pilot validation support** | Structured feedback on how to run and measure design-partner pilots — what metrics matter, what contract structures work, how to convert a two-week proof-of-value into a procurement conversation. |
 | **Cloud and infrastructure credits** | GPU time for the Hybrid LLM's 7B training run and external benchmarks, and general compute for the CTM+/PCAM serving-tier benchmark. These are the two highest-leverage experiments that convert research-stage modules into benchmark-validated assets. For the verticals: **robotics target-hardware samples** (Orin / TDA4VH / EPYC) for production-substrate latency numbers plus a real dataset (nuScenes-class), and infrastructure to stand up **PSE's observation platform**. |
 | **Technical and commercial mentorship** | Access to mentors with experience in infrastructure-layer B2B startups, FinOps, LLM serving, and enterprise AI governance — the domains where our modules compete. |
