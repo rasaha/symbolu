@@ -332,6 +332,28 @@
 
 ---
 
+## What It Does — and What It Does NOT Do (read this first)
+
+For a safety-critical product the scope boundary *is* the credibility. We state it before the pitch, because
+the honesty about where the runtime does **not** apply is exactly what makes the part that does apply
+certifiable.
+
+| ✅ What it DOES | ❌ What it does NOT do |
+|---|---|
+| Arbitrates between **disagreeing predictors** — identifies *which* predictor is failing (per-predictor BCVF cost attribution), not which a heuristic prefers | **Not** a replacement for perception, prediction, fusion, or planning — it arbitrates between predictors, it does not produce them |
+| Fires **only on genuine failure** — Lemma 1 invariance: constant + linear-drift disagreement → exactly **zero** trust signal; only acceleration above the noise floor moves a weight | Does **not** cover failures that don't show up as predictor *disagreement* (e.g. a camera degradation that drops a dimension all predictors share — S4); inapplicable there, documented explicitly |
+| Produces an **auditable trace** — frame-by-frame `TrustShapedEpisodeRecord` showing why a predictor was down-weighted | Does **not** transfer to **LLM** trust / hallucination routing — internal probe returned a clean null (AUC ≈ 0.48–0.53); not positioned as a hallucination detector |
+| **Tunable without retraining** predictors or rewiring the planner (planner-agnostic `TrustWeightComputer`) | Does **not** catch a stealth-bias spoof below the kernel threshold *by itself* (the Lemma-1 trapdoor) — that needs the sensor-attestation defence-in-depth layer |
+| **Composes** with the existing stack — sits between predictors and planner; keep your fusion, perception, planning | Is **not** a full-AV platform, and has **no production deployment yet** — validated on synthetic + realistic-noise-adapter predictors; real-sensor pilot pending |
+| Pure NumPy, CPU, **ms/tick**; evaluable on synthetic predictors **before any procurement** | Does **not** rely on third-party benchmarks — every number is from internal CI; external validation is the next scheduled step |
+
+**The one sentence to take away:** BCVF is the **missing predictor-trust arbitration layer** — narrow by
+design, with a stated mathematical invariance a safety case can point to. It sells **a certifiable
+arbitration property**, not a smarter predictor and not a universal failure detector. Where failure doesn't
+manifest as predictor disagreement, we say so.
+
+---
+
 ## Page 1 — The Problem
 
 ### Modern autonomy stacks disagree internally. The planner has no principled way to decide who to trust.
