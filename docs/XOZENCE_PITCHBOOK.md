@@ -15,7 +15,7 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 
 | # | Module | Layer | One-line summary | Readiness |
 |---|---|---|---|---|
-| 1 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
+| 1 | **KV Pro** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
 | 2 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios; further checked on *real workload traces* (simulated system dynamics) | **Shadow + recommend mode** (built/tested); validated in simulation + real-workload-trace replay; live-shadow harness built but **not yet run on a cluster**; third-party pending |
 | 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.10.0, 1,550+ tests, 2 internal pilots |
 | 4 | **LLM Steering Controller** | Token / frame selection | Deterministic C×R×S frame-control + answer audit (validated near-term); multi-field token evaluation on frozen Mistral-7B as the research moat | **Mixed** — frame-control + audit validated on one open model; field-integration research-stage |
@@ -23,13 +23,13 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 | 6 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
 | 7 | **Autonomous Robotics (BCVF)** *(standalone vertical)* | Predictor-trust arbitration | Predictor-trust runtime between a robotics stack's predictors and its planner — Lemma-1 invariance a safety case can point to | **Research prototype** — validated on synthetic + realistic-noise predictors; no production deployment; **does not compose with the LLM stack** |
 
-The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **LLM Steering Controller** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
+The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **LLM Steering Controller** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **KV Pro** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
 
 ---
 
 ## Table of Contents
 
-1. [CTM+ / PCAM — Intelligent KV-Cache Eviction](#1-ctm--pcam--intelligent-kv-cache-eviction)
+1. [KV Pro — Intelligent KV-Cache Eviction](#1-kv-pro--intelligent-kv-cache-eviction)
 2. [Neural Cloud Scaling Controller](#2-neural-cloud-scaling-controller)
 3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
 4. [LLM Steering Controller](#4-llm-steering-controller)
@@ -41,10 +41,12 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# 1. CTM+ / PCAM — Intelligent KV-Cache Eviction
+# 1. KV Pro — Intelligent KV-Cache Eviction
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Intelligent KV-Cache Eviction for LLM Inference**
+**KV Pro — intelligent KV-cache optimization for LLM inference.** Built on the **CTM+** eviction spec and its bit-parity **PCAM** runtime.
+
+> **Scope note.** *KV Pro* is the KV-cache product line. This section details its **eviction engine** — CTM+ (the canonical scoring spec) and PCAM (its vLLM runtime), attention-aware block eviction. KV Pro's **protected-compression codec** (`int4_protected`) and **WarmTier** disk snapshot/restore are part of the same product line but are a *distinct technology* (compressing what you keep, vs. choosing what to evict) and are covered in their own brief — `INT4_PROTECTED_VC_BRIEF.md` — not duplicated here.
 
 ## 1.1 The Problem
 
@@ -104,7 +106,7 @@ eviction policy that reasons about block value directly.
 
 ## 1.2 The Architecture
 
-### CTM+ / PCAM — one specification, one runtime, seven scoring signals
+### KV Pro — one specification, one runtime, seven scoring signals
 
 CTM+ is a **canonical KV-cache eviction policy specification** —
 the scoring math, the classification semantics, and the
@@ -198,13 +200,13 @@ standalone attention modifications:
   unstable regions will be re-read with full attention within a few
   steps, making their eviction costly
 
-These observations were implemented as CTM+/PCAM scoring signals
+These observations were implemented as KV Pro scoring signals
 (not as transformer modifications) and validated end-to-end on real
 Mistral-7B KV-cache data.
 
 ## 1.3 Competitive Landscape
 
-CTM+/PCAM sits at an unusual seam in the LLM serving stack — **below
+KV Pro sits at an unusual seam in the LLM serving stack — **below
 the model**, **above the hardware**, and **inside the runtime** — so
 "competition" is better understood as a set of adjacent categories
 that each address KV-cache pressure in a different way. The table
@@ -212,30 +214,30 @@ below places us against each of them, stating for every row both
 *how* we differ and *why* that difference is an advantage for a
 production operator who cares about throughput, p99 latency, and TCO.
 
-| Category | Representative players | What they ship | How CTM+/PCAM differs — and why it is better |
+| Category | Representative players | What they ship | How KV Pro differs — and why it is better |
 |---|---|---|---|
 | **Production inference engines** | vLLM, TGI, TensorRT-LLM, SGLang, LMDeploy, NVIDIA Triton | High-performance serving runtimes that own batching, paged attention, continuous batching, and KV-cache allocation. Their eviction story is typically LRU-shaped or fixed-size paging. | We do not replace vLLM — we plug into it. PCAM ships as a drop-in `KVCachePolicy` / `PCAMEvictor` adapter that makes the engine's block-pool decisions **attention-aware** instead of recency-only. **Better because:** the operator keeps every other optimization the serving engine already ships (paged attention, continuous batching, CUDA graphs) and simply upgrades the one decision that determines whether a good batch is sustained under pressure or destroyed by a bad eviction. |
-| **KV-cache compression research** | H2O (Heavy-Hitter Oracle), StreamingLLM, Scissorhands, SnapKV, FastGen, PyramidKV, KIVI (KV quantization) | Academic projects that drop, quantize, or compress KV entries using a single attention-derived heuristic (heavy-hitters, sink tokens, head-level pruning). | Research methods typically pick **one** signal — usually attention mass over a window — and apply it uniformly. CTM+ is a **seven-signal** scored policy (recency · frequency · attention EMA · importance · boundary · band class · instability) with phase-aware weights and a bit-parity-enforced spec. **Better because:** a single-signal heuristic overfits to its validation workload and silently fails on adjacent ones, whereas a multi-signal scored policy degrades gracefully and can be tuned per-signal against operator telemetry. Many of these methods also require a model-side change; CTM+/PCAM does not. |
-| **Provider-side prompt caching** | Anthropic prompt caching, OpenAI prompt caching, Google Gemini context caching, DeepSeek context caching | API-level features that let callers mark a prompt prefix as cacheable so the provider can reuse its KV state across requests at a billing discount. | Prompt caching answers *"can I reuse this exact prefix?"* — a hit/miss question on whole prefixes. It does not answer *"which blocks inside the live cache should I evict when memory is full?"* **Better because:** we are complementary, not competitive — an operator who runs CTM+/PCAM *under* a provider's prompt cache gets both effects (free prefix reuse at the API boundary *and* intelligent block-level eviction at the runtime). For self-hosted inference where no provider cache exists, CTM+/PCAM is the only layer that reasons about block value at all. |
-| **Context-management strategies** | Chunked prefill, sliding-window truncation, RAG-instead-of-long-context, context summarization, ring attention | Avoid KV-cache pressure by shortening the context the model sees or distributing it across devices. | These approaches *sidestep* the eviction problem by making the context smaller or spread thinner. That works until the workload needs the full context — agentic tool chains, long chat histories, large retrieved corpora — at which point the eviction decision comes right back. **Better because:** CTM+/PCAM lets the operator keep the full context *and* run more concurrent requests, instead of forcing a quality trade-off at the application layer. Chunked prefill in particular is complementary — a chunked-prefill scheduler on top of CTM+ gets the benefit of both optimizations. |
-| **Attention-mechanism modifications** | Sliding-window attention (Mistral), StreamingLLM attention sinks, sparse/local attention, MQA/GQA, Longformer-style dilated attention | Model-architecture changes that reduce the KV footprint or attention pattern to make long context tractable at training time. | These require a **training-time or model-level change**, so they only help workloads that happen to run on a model built around them. CTM+/PCAM is a **runtime-only policy** that works on a frozen, unmodified model. **Better because:** an operator can turn CTM+ on tomorrow for any model they already serve — no retraining, no re-export, no weight rewrite — and every new model added to the fleet inherits the optimization for free. |
+| **KV-cache compression research** | H2O (Heavy-Hitter Oracle), StreamingLLM, Scissorhands, SnapKV, FastGen, PyramidKV, KIVI (KV quantization) | Academic projects that drop, quantize, or compress KV entries using a single attention-derived heuristic (heavy-hitters, sink tokens, head-level pruning). | Research methods typically pick **one** signal — usually attention mass over a window — and apply it uniformly. CTM+ is a **seven-signal** scored policy (recency · frequency · attention EMA · importance · boundary · band class · instability) with phase-aware weights and a bit-parity-enforced spec. **Better because:** a single-signal heuristic overfits to its validation workload and silently fails on adjacent ones, whereas a multi-signal scored policy degrades gracefully and can be tuned per-signal against operator telemetry. Many of these methods also require a model-side change; KV Pro does not. |
+| **Provider-side prompt caching** | Anthropic prompt caching, OpenAI prompt caching, Google Gemini context caching, DeepSeek context caching | API-level features that let callers mark a prompt prefix as cacheable so the provider can reuse its KV state across requests at a billing discount. | Prompt caching answers *"can I reuse this exact prefix?"* — a hit/miss question on whole prefixes. It does not answer *"which blocks inside the live cache should I evict when memory is full?"* **Better because:** we are complementary, not competitive — an operator who runs KV Pro *under* a provider's prompt cache gets both effects (free prefix reuse at the API boundary *and* intelligent block-level eviction at the runtime). For self-hosted inference where no provider cache exists, KV Pro is the only layer that reasons about block value at all. |
+| **Context-management strategies** | Chunked prefill, sliding-window truncation, RAG-instead-of-long-context, context summarization, ring attention | Avoid KV-cache pressure by shortening the context the model sees or distributing it across devices. | These approaches *sidestep* the eviction problem by making the context smaller or spread thinner. That works until the workload needs the full context — agentic tool chains, long chat histories, large retrieved corpora — at which point the eviction decision comes right back. **Better because:** KV Pro lets the operator keep the full context *and* run more concurrent requests, instead of forcing a quality trade-off at the application layer. Chunked prefill in particular is complementary — a chunked-prefill scheduler on top of CTM+ gets the benefit of both optimizations. |
+| **Attention-mechanism modifications** | Sliding-window attention (Mistral), StreamingLLM attention sinks, sparse/local attention, MQA/GQA, Longformer-style dilated attention | Model-architecture changes that reduce the KV footprint or attention pattern to make long context tractable at training time. | These require a **training-time or model-level change**, so they only help workloads that happen to run on a model built around them. KV Pro is a **runtime-only policy** that works on a frozen, unmodified model. **Better because:** an operator can turn CTM+ on tomorrow for any model they already serve — no retraining, no re-export, no weight rewrite — and every new model added to the fleet inherits the optimization for free. |
 | **Hardware / memory-tiering approaches** | CXL memory expanders, FlexGen (CPU/SSD offload), DeepSpeed-Inference ZeRO-Inference, NVIDIA Grace-Hopper unified memory | Increase effective KV capacity by paging to tiered memory or adding physical DRAM behind the GPU. | Hardware tiering makes the cache *bigger*; it does not make it *smarter*. Evicting the wrong block is still expensive, and moving the wrong block to a slower tier is often worse than evicting it outright. **Better because:** CTM+ emits `HOT / WARM / COLD` tier hints alongside eviction decisions, so a memory-tiered system driven by CTM+ scores gets the right blocks in the right tier — and our FPGA/ASIC path means the policy can eventually move into the memory controller itself, where a pure-software LRU cannot. |
 | **Classic OS / DB cache-replacement policies** | LRU, LFU, ARC, 2Q, LIRS, CLOCK-Pro, W-TinyLFU | General-purpose cache-replacement policies from the systems and database literature, often embedded in inference engines "because that's what every cache uses." | These policies treat every cache block as fungible. A transformer KV-cache block is not fungible — a sink block is irreplaceable, a late-layer local-syntax block is nearly free, and a block adjacent to an unstable attention region will be re-read with full attention within a few steps. **Better because:** CTM+ is the first eviction policy that knows the difference, and its scoring math is a strict superset of the classical ones (you recover LRU or LFU as a degenerate case by zeroing all other weights). |
 
 ### Why the overall bet is better, not just different
 
 - **Multi-signal is a superset of single-signal.** Every incumbent in this table bets on one axis — recency for LRU, heavy-hitters for H2O, prefix equality for prompt caching, more DRAM for CXL. CTM+ is a scored composition of seven signals with phase-aware weights, so it *contains* those bets as special cases and adds the ones they are missing (boundary, band class, instability). An operator does not lose anything by switching to CTM+; they strictly gain signals.
-- **Runtime-only, model-agnostic.** No retraining, no attention-pattern change, no weight rewrite. An operator running Mistral, Llama, Qwen, or DeepSeek can adopt CTM+/PCAM without touching the model or the tokenizer — which is exactly why we ship into an existing vLLM deployment as a `KVCachePolicy` adapter and nothing else.
+- **Runtime-only, model-agnostic.** No retraining, no attention-pattern change, no weight rewrite. An operator running Mistral, Llama, Qwen, or DeepSeek can adopt KV Pro without touching the model or the tokenizer — which is exactly why we ship into an existing vLLM deployment as a `KVCachePolicy` adapter and nothing else.
 - **Spec-and-runtime separation is the moat.** CTM+ is a spec locked by an ADR and enforced by a 20-test bit-parity harness; PCAM is the runtime that implements it bit-for-bit. That discipline is what makes the policy trustworthy enough for a production SRE to turn on — and it is the thing research-paper methods on this list structurally cannot match, because they ship a single code artifact rather than a spec with independently testable consumers.
 - **Software today, silicon tomorrow.** Because the policy is a scored math object (not a learned model, not a trained heuristic), it has a credible path from a PCAM software runtime → an FPGA prototype → a memory-controller ASIC or CXL expander. None of the other categories in this table — eviction, compression, prompt caching, attention modification — has a scored math spec that maps cleanly into RTL, and we already have SystemVerilog RTL with a cocotb parity harness as evidence of that path.
-- **Composes with, rather than replaces, the rest of the stack.** CTM+/PCAM is additive to paged attention, chunked prefill, prompt caching, CXL tiering, and KV quantization. The competitive question is never *"CTM+ or vLLM?"* or *"CTM+ or prompt caching?"* — it is *"with or without the scored eviction layer underneath?"*
+- **Composes with, rather than replaces, the rest of the stack.** KV Pro is additive to paged attention, chunked prefill, prompt caching, CXL tiering, and KV quantization. The competitive question is never *"CTM+ or vLLM?"* or *"CTM+ or prompt caching?"* — it is *"with or without the scored eviction layer underneath?"*
 
 ### In one sentence
 
 Classical cache policies treat every block as fungible, research KV
 compressors pick one attention-derived signal, provider prompt caches
 answer hit/miss on whole prefixes, and hardware tiering makes the
-cache bigger. **CTM+/PCAM is the only policy that knows a transformer
+cache bigger. **KV Pro is the only policy that knows a transformer
 KV-block is not fungible** — that a sink is irreplaceable, a
 late-layer local-syntax block is nearly free, and a boundary-anchoring
 block must not be evicted a moment before it is re-read — and it is
@@ -1735,23 +1737,23 @@ Xozence Labs is not five unrelated projects — it is **one AI infrastructure pl
 │  6. Hybrid LLM              Long-context attention substrate            │
 │     └──► 4. Steering Ctrl   Multi-field token evaluation + 32D state   │
 │           └──► 3. Agentic    Governed runtime reading model internals   │
-│  1. CTM+/PCAM               KV-cache eviction for inference serving    │
+│  1. KV Pro               KV-cache eviction for inference serving    │
 │  2. Cloud Scaling Controller Decision-quality layer for infrastructure  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 - The **Hybrid LLM** provides efficient long-context attention; the **LLM Steering Controller** adds interpretable multi-field generation on top of it.
 - The **Agentic Framework** consumes CG's 32D state for signal-enriched governance — a capability no wrapper around a closed API can replicate.
-- **CTM+/PCAM** ensures the KV-cache that serves both models evicts intelligently, not blindly.
+- **KV Pro** ensures the KV-cache that serves both models evicts intelligently, not blindly.
 - The **Cloud Scaling Controller** ensures the underlying compute scales only when scaling actually helps.
 
-Each module is independently deployable and independently valuable. Initial commercialization focuses on the three most mature modules, with the **Cloud Scaling Controller** as the most legible first entry point — it offers a zero-risk read-only shadow mode, targets a reliability/safety pain (runaway scale-outs, not FinOps), and auto-generates proof-of-value reports that make the first commercial conversation straightforward. CTM+/PCAM and the Agentic Framework are close behind, each addressing a distinct buyer. Final wedge selection will be guided by design-partner demand and pilot conversion. The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front.
+Each module is independently deployable and independently valuable. Initial commercialization focuses on the three most mature modules, with the **Cloud Scaling Controller** as the most legible first entry point — it offers a zero-risk read-only shadow mode, targets a reliability/safety pain (runaway scale-outs, not FinOps), and auto-generates proof-of-value reports that make the first commercial conversation straightforward. KV Pro and the Agentic Framework are close behind, each addressing a distinct buyer. Final wedge selection will be guided by design-partner demand and pilot conversion. The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front.
 
 ## Aggregate Evidence
 
 | Metric | Value |
 |---|---|
-| Total tests across all products | **4,300+** — composing platform **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) **+ 1,117** standalone Robotics (BCVF) + PSE falsification harnesses |
+| Total tests across all products | **4,300+** — composing platform **3,200+** (228 scaling + 276 KV Pro + 1,550 agentic + CG smoke + hybrid training) **+ 1,117** standalone Robotics (BCVF) + PSE falsification harnesses |
 | Adversarial safety scenarios (scaling) | 19 scenarios *(simulated)*, **0 catastrophic / severe failures, 0 SLO regressions**; further validated by real-trace replay + a live-shadow harness (§2.4) |
 | FSCS signal validation (CTM+) | **100% eviction rounds changed** with enhanced signals on real Mistral-7B trace |
 | Agentic governance invariant | `cancel → budget → approve → execute` — **pinned by test suite** |
@@ -1767,7 +1769,7 @@ Each module is independently deployable and independently valuable. Initial comm
 | Module | Readiness | Near-term commercial path |
 |---|---|---|
 | **Cloud Scaling Controller** | Shadow + recommend mode built and tested; validated in simulation + real-workload-trace replay (simulated system dynamics); live-shadow harness built but not yet run on a cluster; third-party pending | First design-partner deployments (the live-shadow + third-party rungs); Stage 5 active mode |
-| **CTM+/PCAM** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
+| **KV Pro** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
 | **Agentic Framework** | Pilot-ready (v1.10.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
 | **LLM Steering Controller** | Mixed — frame-control + audit validated on one open model; field-integration research-stage | Human validation; control-vector benchmark; ship open-weight + closed-API control plane |
 | **Hybrid LLM** | Research-stage (training stack built) | External benchmarks (LRA, retrieval); 7B training run |
@@ -1782,7 +1784,7 @@ Each module is independently deployable and independently valuable. Initial comm
 
 **The timing is right.** FinOps, KV-cache pressure, agent governance, and long-context attention are all active pain points in production AI infrastructure *right now*. Each module addresses a gap that is growing, not shrinking, as models get larger, contexts get longer, and agents get more autonomous. The window to establish credible defaults in these layers is the next 12–18 months.
 
-**The commercial entry points are identified.** The Cloud Scaling Controller has the most straightforward proof-of-value motion — zero-risk read-only shadow mode, a reliability/safety pain (runaway scale-outs, not FinOps), auto-generated proof-of-value reports — making it the easiest first commercial conversation. CTM+/PCAM targets inference operators with a similar shadow-mode trial. The Agentic Framework is pilot-ready with a tested governance contract that regulated enterprises need. Which module leads depends on design-partner pull; all three are near-term viable. The research-stage modules strengthen the platform moat behind them.
+**The commercial entry points are identified.** The Cloud Scaling Controller has the most straightforward proof-of-value motion — zero-risk read-only shadow mode, a reliability/safety pain (runaway scale-outs, not FinOps), auto-generated proof-of-value reports — making it the easiest first commercial conversation. KV Pro targets inference operators with a similar shadow-mode trial. The Agentic Framework is pilot-ready with a tested governance contract that regulated enterprises need. Which module leads depends on design-partner pull; all three are near-term viable. The research-stage modules strengthen the platform moat behind them.
 
 ## What We Need From the Accelerator
 
@@ -1791,7 +1793,7 @@ Each module is independently deployable and independently valuable. Initial comm
 | **Enterprise design-partner access** | The three production-ready modules need real workloads to validate against. Introductions to platform teams running Kubernetes autoscaling, LLM inference at scale, or autonomous agent pilots would convert shadow-mode data into paid deployments. |
 | **GTM and wedge refinement** | Mentorship on sequencing the three commercial-ready modules — confirming whether the Cloud Scaling Controller's read-only safety-interlock motion is the right lead, how to position a multi-module platform credibly, and how to price shadow-mode-to-active-mode conversion. |
 | **Pilot validation support** | Structured feedback on how to run and measure design-partner pilots — what metrics matter, what contract structures work, how to convert a two-week proof-of-value into a procurement conversation. |
-| **Cloud and infrastructure credits** | GPU time for the Hybrid LLM's 7B training run and external benchmarks, and general compute for the CTM+/PCAM serving-tier benchmark. These are the two highest-leverage experiments that convert research-stage modules into benchmark-validated assets. For the verticals: **robotics target-hardware samples** (Orin / TDA4VH / EPYC) for production-substrate latency numbers plus a real dataset (nuScenes-class), and infrastructure to stand up **PSE's observation platform**. |
+| **Cloud and infrastructure credits** | GPU time for the Hybrid LLM's 7B training run and external benchmarks, and general compute for the KV Pro serving-tier benchmark. These are the two highest-leverage experiments that convert research-stage modules into benchmark-validated assets. For the verticals: **robotics target-hardware samples** (Orin / TDA4VH / EPYC) for production-substrate latency numbers plus a real dataset (nuScenes-class), and infrastructure to stand up **PSE's observation platform**. |
 | **Technical and commercial mentorship** | Access to mentors with experience in infrastructure-layer B2B startups, FinOps, LLM serving, and enterprise AI governance — the domains where our modules compete. |
 | **Strategic introductions** | Connections to inference-serving operators, cloud-native platform teams, and regulated enterprise buyers (BFSI, healthcare) who are actively blocked on the problems our modules solve. |
 | **Standalone-vertical design partners** | Each standalone vertical needs its first external partner. **Robotics (BCVF):** an AV / drone / warehouse-robot team to run the runtime against a real predictor stack — plus a real dataset and, later, a TÜV-class safety auditor; this is the **Series-A gate**. **PSE:** a brand / agency / AI-agent-platform partner to exercise the naming & verbal-identity engine and seed the **observation graph**. |
@@ -1806,8 +1808,8 @@ Each module is independently deployable and independently valuable. Initial comm
 
 **Concrete 6–12 month goals:**
 
-- **Month 1–3:** Land 2–3 design-partner pilots on the Cloud Scaling Controller and/or CTM+/PCAM (shadow mode, zero-risk). Begin the Agentic Framework's first external pilot with a regulated enterprise buyer. Use pilot feedback to confirm initial wedge sequencing. In parallel on the standalone verticals: run the Robotics (BCVF) **nuScenes pilot** and open the first robotics design-partner and first PSE naming-wedge conversations.
-- **Month 3–6:** Convert at least one shadow-mode pilot to active mode (first revenue). Complete the CTM+/PCAM serving-tier benchmark and the Hybrid LLM's LRA/retrieval results. Ship the Agentic Framework's managed runtime preview.
+- **Month 1–3:** Land 2–3 design-partner pilots on the Cloud Scaling Controller and/or KV Pro (shadow mode, zero-risk). Begin the Agentic Framework's first external pilot with a regulated enterprise buyer. Use pilot feedback to confirm initial wedge sequencing. In parallel on the standalone verticals: run the Robotics (BCVF) **nuScenes pilot** and open the first robotics design-partner and first PSE naming-wedge conversations.
+- **Month 3–6:** Convert at least one shadow-mode pilot to active mode (first revenue). Complete the KV Pro serving-tier benchmark and the Hybrid LLM's LRA/retrieval results. Ship the Agentic Framework's managed runtime preview.
 - **Month 6–12:** Establish the first paid recurring customer. Complete the Hybrid LLM's 7B training run. Begin the LLM Steering Controller's first external design-partner integration through the Agentic Framework. On the standalone verticals: land a robotics design-partner pilot (the path to the Series-A production-reference gate) and a first PSE naming / branding pilot that seeds the observation graph. Optionally, submit a paper on the phase-attention mechanism, the multi-field token-evaluation architecture, or the robotics predictor-trust invariance — but customer validation and recurring revenue are the primary milestones.
 
 ---
