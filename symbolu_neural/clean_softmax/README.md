@@ -114,6 +114,27 @@ that dominate the corpus. Greedy (`--temperature 0`) collapses into a repeat loo
 model generates tokens autoregressively under temperature / top-k / top-p / greedy.
 Output quality is not evaluated and not claimed.
 
+## Which patent algorithms are actually active? (`inspect_generation.py`)
+
+`inspect_generation.py` instruments the generation graph and ablates one module at
+a time (same prompt/seed/temp/top-k/top-p) to determine, per patent algorithm,
+whether it is connected, executed, changes hidden states/logits/tokens, or is an
+effective no-op. Full results and the dependency graph are in
+[`GENERATION_ACTIVITY_REPORT.md`](GENERATION_ACTIVITY_REPORT.md).
+
+```bash
+python -m symbolu_neural.clean_softmax.inspect_generation \
+    --ckpt runs/clean/full/ckpt.pt --prompt "The model " --n 120 \
+    --temperature 0.8 --top-k 40 --seed 0 --json-out runs/clean/inspect.json
+```
+
+**Headline finding (tiny `full` checkpoint):** of 19 patent algorithms inspected,
+7 are wired into this pipeline and execute; only **2 independent mechanisms truly
+move the generated tokens** — the entropy signal (from the 4 Vritti/Aspect/Guna/
+Kosha heads) and the deferred-insight memory it gates. **Recursive refinement is a
+wired no-op** (hidden Δ≈2e-6; 0/130 tokens change), **mirror logic is a
+placeholder**, and the other **11** algorithms are **not connected**.
+
 ## PASS / FAIL criteria
 
 The formula is credited **only** if a **trained** Symbol-U ablation
