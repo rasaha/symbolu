@@ -32,6 +32,13 @@ class SymbolUSoftmaxModel(nn.Module):
                 min_strength=cfg.refine_min_strength,
                 residual_scale=cfg.refine_residual_scale,
                 fixed_steps=cfg.refine_fixed_steps)
+        if cfg.recur_plain:                                 # refine control
+            from .controls import RecurrentPlainRefine
+            self.recur = RecurrentPlainRefine(
+                bb.d_model, bb.n_heads, bb.d_ff, cfg.recur_plain_steps)
+        if cfg.mem_control:                                 # memory control
+            from .controls import PointwiseMemoryControl
+            self.memctrl = PointwiseMemoryControl(bb.d_model)
         if cfg.memory:
             self.memory = CausalPrefixMemory(bb.d_model)
         if cfg.freeze_aug:                                  # random-aug control
@@ -76,6 +83,10 @@ class SymbolUSoftmaxModel(nn.Module):
             aux["mem_residual_norm"] = minfo["residual_norm"]
             aux["mem_readiness_grad"] = minfo["readiness_grad"]
             aux["mem_resid_grad"] = minfo["resid_grad"]
+        if cfg.recur_plain and "recur" not in disabled:     # control path
+            h = self.recur(h)
+        if cfg.mem_control and "mem_control" not in disabled:
+            h = self.memctrl(h)
         aux["logits"] = self.lm.logits(h)
         return aux
 

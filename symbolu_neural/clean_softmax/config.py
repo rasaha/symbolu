@@ -16,6 +16,10 @@ class ExpConfig:
     memory: bool = False                # causal prefix memory on LM path
     extra_plain_block: bool = False     # FAIR-COMPUTE control: +1 plain causal block
     freeze_aug: bool = False            # random (untrained) augmentation control
+    # capacity-/FLOP-matched controls (controls.py)
+    recur_plain: bool = False           # shared plain block applied recur_plain_steps times
+    recur_plain_steps: int = 3
+    mem_control: bool = False           # pointwise FFN control (params ~ memory)
     refine_steps: int = 3
     refine_min_strength: float = 0.1    # gate floor: refinement cannot collapse to 0
     refine_residual_scale: float = 1.0  # fixed scale on the refinement delta
@@ -55,7 +59,36 @@ ABLATIONS: Dict[str, Callable[[], ExpConfig]] = {
     "memory": lambda: _base(typed_heads=True, entropy_refine=True, memory=True),
     # A5 — full Symbol-U-on-softmax (everything on the LM path)
     "full": lambda: _base(typed_heads=True, entropy_refine=True, memory=True),
+    # --- isolated Symbol-U mechanisms (for capacity-matched comparison) ---
+    "mem_only": lambda: _base(typed_heads=True, memory=True),
+    # --- capacity-/FLOP-matched CONTROLS (controls.py) ---
+    "recur_plain": lambda: _base(recur_plain=True),                 # refine control
+    "mem_control": lambda: _base(mem_control=True),                 # memory control
+    "full_control": lambda: _base(recur_plain=True, mem_control=True),
 }
+
+
+def approx_flops_per_token(cfg: ExpConfig, L: int) -> float:
+    """Rough forward FLOPs/token (approximate is fine — for matched comparison)."""
+    d, dff = cfg.backbone.d_model, cfg.backbone.d_ff
+    V = cfg.backbone.vocab_size
+    def block(L):
+        return 4 * d * d + 3 * d * dff + 2 * L * d        # qkv+proj, swiglu, attn
+    f = cfg.backbone.n_layers * block(L)
+    if cfg.extra_plain_block:
+        f += block(L)
+    if cfg.typed_heads:
+        f += d * (5 + 10 + 3 + 5)                         # tiny typed heads
+    if cfg.entropy_refine:
+        f += cfg.refine_steps * block(L)                  # refinement = steps × block
+    if cfg.memory:
+        f += d * d                                        # value projection
+    if cfg.recur_plain:
+        f += cfg.recur_plain_steps * block(L)             # control = steps × block
+    if cfg.mem_control:
+        f += d * d                                        # pointwise FFN ≈ d^2
+    f += d * V                                            # lm head
+    return f
 
 
 def get_ablation(name: str) -> ExpConfig:

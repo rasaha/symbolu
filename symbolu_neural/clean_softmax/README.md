@@ -194,6 +194,26 @@ refR/act = 1.06 → 0.54 with reg). Caveat: the win over the +1-block capacity
 control is partly effective-depth (refinement runs its block 3×), and generation is
 still incoherent at this scale.
 
+### Capacity-matched controls (does any mechanism beat equal compute?)
+
+`run_capacity_study.py` trains each Symbol-U mechanism against a control of ≈equal
+params **and** FLOPs: refinement vs a shared plain block applied 3× (recurrent
+depth), memory vs a pointwise FFN, full vs both. Full analysis (2 seeds) in
+[`CAPACITY_MATCHED_CONTROL_REPORT.md`](CAPACITY_MATCHED_CONTROL_REPORT.md).
+
+```bash
+python -m symbolu_neural.clean_softmax.run_capacity_study --steps 300 --block 96            # seed 0
+python -m symbolu_neural.clean_softmax.run_capacity_study --steps 300 --block 96 --seed 1   # seed 1
+```
+
+**Result (extremely adversarial, 2 seeds): NO mechanism beats its capacity-/FLOP-
+matched control.** Recursive refinement is *worse* than a plain recurrent block on
+both seeds (+0.08, +0.11 nats) despite engaging (halt≈1, "helps" 94% of batches by
+its own per-batch measure — which does not generalize). Memory is tie-to-worse vs a
+pointwise FFN. Full Symbol-U is high-variance (one seed +0.026, the other −0.273)
+and less stable than the control. The mechanisms behave like "just more Transformer
+capacity"; refinement behaves like a *worse-tuned* extra layer.
+
 ### Pass / fail for this study (participation & stability, NOT quality)
 - **PASS** if: training is stable (monotone val), no module overpowers the hidden
   state (ratio < 1.0), entropy heads don't collapse, and the active mechanisms
