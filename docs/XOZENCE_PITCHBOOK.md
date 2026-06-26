@@ -15,7 +15,7 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 
 | # | Module | Layer | One-line summary | Readiness |
 |---|---|---|---|---|
-| 1 | **KV Pro** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
+| 1 | **KV Pro** | KV-cache optimization (eviction + compression) | Two engines: CTM+/PCAM eviction (+50% concurrent, −29% p99 vs LRU) and int4_protected/WarmTier compression (~1.8× net density, quality-safe where measured; decode throughput still < FP) — **measured independently, not yet combined** | **Eviction: production-ready (software). Compression: shipped via vLLM; throughput recovery active work** |
 | 2 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios; further checked on *real workload traces* (simulated system dynamics) | **Shadow + recommend mode** (built/tested); validated in simulation + real-workload-trace replay; live-shadow harness built but **not yet run on a cluster**; third-party pending |
 | 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.10.0, 1,550+ tests, 2 internal pilots |
 | 4 | **LLM Steering Controller** | Token / frame selection | Deterministic C×R×S frame-control + answer audit (validated near-term); multi-field token evaluation on frozen Mistral-7B as the research moat | **Mixed** — frame-control + audit validated on one open model; field-integration research-stage |
@@ -23,13 +23,13 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 | 6 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
 | 7 | **Autonomous Robotics (BCVF)** *(standalone vertical)* | Predictor-trust arbitration | Predictor-trust runtime between a robotics stack's predictors and its planner — Lemma-1 invariance a safety case can point to | **Research prototype** — validated on synthetic + realistic-noise predictors; no production deployment; **does not compose with the LLM stack** |
 
-The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **LLM Steering Controller** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **KV Pro** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
+The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **LLM Steering Controller** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **KV Pro** keeps long context affordable on the same GPU — choosing what to keep (CTM+/PCAM eviction) and compressing what's kept (int4_protected/WarmTier) — and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
 
 ---
 
 ## Table of Contents
 
-1. [KV Pro — Intelligent KV-Cache Eviction](#1-kv-pro--intelligent-kv-cache-eviction)
+1. [KV Pro — Quality-Safe KV-Cache Optimization](#1-kv-pro--quality-safe-kv-cache-optimization-for-long-context-llm-serving)
 2. [Neural Cloud Scaling Controller](#2-neural-cloud-scaling-controller)
 3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
 4. [LLM Steering Controller](#4-llm-steering-controller)
@@ -41,16 +41,16 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# 1. KV Pro — Intelligent KV-Cache Eviction
+# 1. KV Pro — Quality-Safe KV-Cache Optimization for Long-Context LLM Serving
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**KV Pro — intelligent KV-cache optimization for LLM inference.** Built on the **CTM+** eviction spec and its bit-parity **PCAM** runtime.
+**KV Pro is Xozence Labs' KV-cache optimization product line for long-context LLM serving.** It attacks the KV bottleneck from two sides with two complementary engines: **CTM+/PCAM** for intelligent eviction (*choose what to keep*), and **int4_protected / WarmTier** for protected compression and tiering (*store what you keep more efficiently*). PCAM decides which KV entries remain valuable; int4_protected/WarmTier reduces the footprint of retained KV and enables reuse/tiering.
 
-> **Scope note.** *KV Pro* is the KV-cache product line. This section details its **eviction engine** — CTM+ (the canonical scoring spec) and PCAM (its vLLM runtime), attention-aware block eviction. KV Pro's **protected-compression codec** (`int4_protected`) and **WarmTier** disk snapshot/restore are part of the same product line but are a *distinct technology* (compressing what you keep, vs. choosing what to evict) and are covered in their own brief — `INT4_PROTECTED_VC_BRIEF.md` — not duplicated here.
+> **Reading note.** *KV Pro* is the **product line**; it wraps **two complementary engines**, covered together in this section: the **eviction engine** (CTM+ scoring spec + PCAM vLLM runtime) and the **compression / tiering engine** (int4_protected codec + WarmTier snapshot/restore). The two are **measured independently** today and are **architecturally complementary but not yet benchmarked as a single integrated stack** (§1.4). Full per-engine detail: `docs/CTM_PLUS_VC_BRIEF.md` (eviction) · `INT4_PROTECTED_VC_BRIEF.md` (compression).
 
 ## 1.1 The Problem
 
-### LLM inference is becoming memory-bound, and today's eviction heuristics are too shallow.
+### LLM inference is becoming memory-bound — and today's KV-cache handling leaves capacity and quality on the table.
 
 As context windows grow, the dominant serving bottleneck shifts from
 pure matrix math toward KV-cache pressure. The **KV-cache** — the
@@ -103,6 +103,28 @@ through pricing (OpenAI's long-context tiers), prompt caching
 (Anthropic), context management (chunked prefill), or paging
 (vLLM's paged attention) — rather than through a multi-signal
 eviction policy that reasons about block value directly.
+
+### KV Pro attacks the KV bottleneck from two sides
+
+KV Pro is a **long-context KV-cache optimization product line** with two complementary engines:
+
+- **Eviction engine — CTM+/PCAM** *(choose what to keep)*: CTM+ is the canonical scoring spec; PCAM is its bit-parity vLLM runtime that decides which KV blocks stay in HBM and which are evicted.
+- **Compression / tiering engine — int4_protected / WarmTier** *(store what you keep more efficiently)*: int4_protected compresses retained KV near-losslessly (protected channels); WarmTier adds byte-faithful snapshot/restore for reuse and GPU→CPU→NVMe tiering.
+
+```
+KV Pro  (long-context KV-cache optimization)
+├── CTM+/PCAM               eviction engine        — choose what to keep
+└── int4_protected/WarmTier compression + tiering  — store what you keep efficiently
+```
+
+Flow through a request:
+
+```
+prompt / context → KV-cache growth → CTM+/PCAM retention-vs-eviction decision
+                 → int4_protected storage / compression → WarmTier reuse / tiering
+```
+
+The two engines are **architecturally complementary** and are **measured independently** today (see §1.4). The architecture and evidence for the eviction engine follow first; the compression / tiering engine is covered in §1.2 (architecture) and §1.4 (evidence).
 
 ## 1.2 The Architecture
 
@@ -204,6 +226,17 @@ These observations were implemented as KV Pro scoring signals
 (not as transformer modifications) and validated end-to-end on real
 Mistral-7B KV-cache data.
 
+### Compression / tiering engine — int4_protected / WarmTier
+
+Where CTM+/PCAM decides *which* KV blocks survive, the compression engine reduces the cost of the ones that
+do. **int4_protected** ships as a vLLM KV-cache backend (registered `kv_cache_dtype = "int4_protected"`): it
+keeps the **~4% highest-attention K channels at bf16** and quantizes the remainder to int4 ("protected
+channels"), restoring **near-bf16 fidelity at ~2× raw KV density**. **WarmTier** adds **byte-faithful** KV
+snapshot/restore — the substrate for KV reuse and GPU→CPU→NVMe tiering as serving moves to memory
+hierarchies. The two engines share one goal — more usable long context per GPU — from opposite directions:
+**retention** (eviction) vs. **footprint** (compression). They are independent today: each can ship alone, and
+they have not yet been run as one stack (§1.4). *(Full detail: `INT4_PROTECTED_VC_BRIEF.md`.)*
+
 ## 1.3 Competitive Landscape
 
 KV Pro sits at an unusual seam in the LLM serving stack — **below
@@ -246,7 +279,14 @@ policy today to a memory-controller ASIC tomorrow.
 
 ## 1.4 What Is Proven and What Is Next
 
-### Benchmark evidence (CTM+ core, across representative cache-sensitive workloads)
+**KV Pro has two independent evidence streams today.** Eviction (CTM+/PCAM) and compression
+(int4_protected / WarmTier) are **measured independently** and reported separately — we make **no combined or
+stacked claim** (we do not, for example, multiply +50% concurrency by ~1.8× density). The integrated stack is
+**not yet benchmarked** (see *Integrated stack* below).
+
+### Eviction engine evidence — CTM+/PCAM *(measured independently)*
+
+#### Benchmark evidence (CTM+ core, across representative cache-sensitive workloads)
 
 | Workload | LRU baseline | CTM+ | Delta |
 |---|---|---|---|
@@ -315,6 +355,35 @@ pass with zero regressions.
 | **FPGA prototype** (Xilinx Alveo) | RTL at 250MHz, <50ns latency | 2–3 months |
 | **Design-partner pilot** | Real inference workload with real quality/latency metrics | Quarters |
 | **ASIC controller** | CXL memory expander or GPU-side HBM controller | 12–18 months |
+
+### Compression / tiering engine evidence — int4_protected / WarmTier *(measured independently)*
+
+The compression engine ships as a vLLM KV-cache backend (`kv_cache_dtype = "int4_protected"`): keep the
+~4% highest-attention K channels at bf16, quantize the rest to int4.
+
+| Metric | Result | Note |
+|---|---|---|
+| **KV density** | **2.0× raw KV slots, ~1.8× net** of the sidecar tax (1.83× Qwen / 1.75× Llama, util 0.5) | shipped via vLLM |
+| **Quality — needle** | **15/15 == bf16**, replicated 2-of-2 seeds on **Mistral-7B and Llama-3.1-8B** (Qwen at-the-margin) | protected channels |
+| **Quality — benchmarks** | MMLU / ARC / TruthfulQA **~0.0-pt delta + 100% per-question agreement** where measured | |
+| **Quality — fidelity** | token-agreement **0.737 (+20.4 pt over naive int4's 0.533)**; hard-needle **0.964** vs naive 0.915 (bf16 1.000) | the wedge over naive low-bit |
+| **WarmTier** | **byte-faithful** snapshot/restore (Phase-0, measured) | serving integration scoped-but-open |
+
+> **Honest cost (stated, not hidden).** Compression improves memory **density**, but **current decode
+> throughput remains below FP** (≈0.13–0.67× bf16; 0.22× worst case, ~0.54× typical serving), there is a
+> **sidecar tax** (~4.38 GB at 8K, measured), and **WarmTier serving integration is incomplete**.
+> Decode-throughput recovery (read-skip, decode-kernel work, tensor parallelism) is **active work**. The
+> realized win today is **fidelity-at-density**, not throughput. Quality-safe **where measured**; we do not
+> claim lossless compression.
+
+### Integrated stack — not yet benchmarked
+
+The eviction engine (CTM+/PCAM) and the compression engine (int4_protected / WarmTier) are
+**architecturally complementary** — PCAM decides which KV entries remain valuable; int4_protected/WarmTier
+reduces the footprint of what is retained and enables reuse/tiering — but they have **not yet been
+benchmarked as a single integrated serving stack.** We therefore report the eviction and compression results
+**separately** and make **no combined or stacked gain claim.** Integrated-stack benchmarking is a future
+validation step.
 
 ### What's next to validate commercially
 
@@ -1737,14 +1806,14 @@ Xozence Labs is not five unrelated projects — it is **one AI infrastructure pl
 │  6. Hybrid LLM              Long-context attention substrate            │
 │     └──► 4. Steering Ctrl   Multi-field token evaluation + 32D state   │
 │           └──► 3. Agentic    Governed runtime reading model internals   │
-│  1. KV Pro               KV-cache eviction for inference serving    │
+│  1. KV Pro               KV-cache optimization (eviction + compression) │
 │  2. Cloud Scaling Controller Decision-quality layer for infrastructure  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 - The **Hybrid LLM** provides efficient long-context attention; the **LLM Steering Controller** adds interpretable multi-field generation on top of it.
 - The **Agentic Framework** consumes CG's 32D state for signal-enriched governance — a capability no wrapper around a closed API can replicate.
-- **KV Pro** ensures the KV-cache that serves both models evicts intelligently, not blindly.
+- **KV Pro** keeps the KV-cache that serves both models small and high-quality — CTM+/PCAM evicts intelligently, and int4_protected/WarmTier compresses quality-safely (two engines, measured independently).
 - The **Cloud Scaling Controller** ensures the underlying compute scales only when scaling actually helps.
 
 Each module is independently deployable and independently valuable. Initial commercialization focuses on the three most mature modules, with the **Cloud Scaling Controller** as the most legible first entry point — it offers a zero-risk read-only shadow mode, targets a reliability/safety pain (runaway scale-outs, not FinOps), and auto-generates proof-of-value reports that make the first commercial conversation straightforward. KV Pro and the Agentic Framework are close behind, each addressing a distinct buyer. Final wedge selection will be guided by design-partner demand and pilot conversion. The research-stage work (the LLM Steering Controller's research layer, and the Hybrid LLM) matures toward benchmark validation and product coupling behind the commercial front.
@@ -1759,7 +1828,9 @@ Each module is independently deployable and independently valuable. Initial comm
 | Agentic governance invariant | `cancel → budget → approve → execute` — **pinned by test suite** |
 | CG trainable parameters | **~5M** on frozen Mistral-7B (4-bit: ~14GB VRAM) |
 | Phase-attention retrieval | **100% needle-in-haystack at 10K tokens** (240K-param pilot) |
-| LLM inference improvement (CTM+) | **+50% concurrent requests, −29% p99 latency** vs. LRU |
+| LLM inference improvement (KV Pro eviction / CTM+) | **+50% concurrent requests, −29% p99 latency** vs. LRU |
+| KV Pro compression (int4_protected) | **~1.8× net KV density, quality-safe where measured** (15/15 needle == bf16 on Mistral/Llama; MMLU/ARC ~0.0-pt; +20.4 pt token-agreement vs naive int4) — *measured independently of eviction; decode throughput still < FP* |
+| KV Pro WarmTier | **byte-faithful** KV snapshot/restore (Phase-0, measured); serving integration open |
 | Robotics (BCVF) — characterization *(standalone)* | **0% FPR / 0% FNR** across a certification-grade grid (1,560 cells, Wilson 95% CI floor 0.90, min ≈ 0.940) |
 | Robotics (BCVF) — baseline shootout *(standalone)* | BCVF **0.000** false-attribution on Lemma-1-invariant disagreement vs Majority-Vote **16.7** / EKF **1.1**; **8–19× faster** per tick |
 | PSE — rigor *(standalone)* | Deterministic engine (same input → same profile; byte-identity regression) + a **pre-registered, blind falsification** program (9 harnesses) — engineering rigor and honesty discipline, not a capability claim |
@@ -1769,7 +1840,7 @@ Each module is independently deployable and independently valuable. Initial comm
 | Module | Readiness | Near-term commercial path |
 |---|---|---|
 | **Cloud Scaling Controller** | Shadow + recommend mode built and tested; validated in simulation + real-workload-trace replay (simulated system dynamics); live-shadow harness built but not yet run on a cluster; third-party pending | First design-partner deployments (the live-shadow + third-party rungs); Stage 5 active mode |
-| **KV Pro** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
+| **KV Pro** | Eviction (CTM+/PCAM): production-ready software. Compression (int4_protected/WarmTier): shipped via vLLM, throughput recovery active work | Serving-tier benchmark (both engines) + integrated-stack benchmark; design-partner pilots with inference operators |
 | **Agentic Framework** | Pilot-ready (v1.10.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
 | **LLM Steering Controller** | Mixed — frame-control + audit validated on one open model; field-integration research-stage | Human validation; control-vector benchmark; ship open-weight + closed-API control plane |
 | **Hybrid LLM** | Research-stage (training stack built) | External benchmarks (LRA, retrieval); 7B training run |
