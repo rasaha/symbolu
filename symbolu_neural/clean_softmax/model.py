@@ -41,31 +41,41 @@ class SymbolUSoftmaxModel(nn.Module):
                     for p in mod.parameters():
                         p.requires_grad_(False)
 
-    def forward(self, ids: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, ids: torch.Tensor, disabled=frozenset()) -> Dict[str, torch.Tensor]:
+        """`disabled` ablates modules at inference for contribution measurement:
+        {'typed_heads'} or {'entropy'} zero the entropy signal; {'refine'} /
+        {'memory'} skip that actuator (h passes through unchanged)."""
         cfg = self.cfg
         h = self.lm.hidden(ids)                             # [B,L,d] causal
         aux: Dict[str, torch.Tensor] = {}
         if cfg.extra_plain_block:
             h = self.extra_block(h)
         aux["act_norm"] = h.norm().detach()                 # backbone activation norm
+        aux["act_norm_grad"] = h.norm()                     # (for residual-ratio reg)
         ent = None
         if cfg.typed_heads:
             tout = self.heads(h)
             aux.update(tout)
             ent = TypedHeadBank.entropies(tout)             # [B,L,3]
+            if "typed_heads" in disabled or "entropy" in disabled:
+                ent = torch.zeros_like(ent)
             aux["entropy_vec"] = ent
             aux["entropy_mean"] = ent.mean().detach()
             aux["entropy_std"] = ent.std().detach()         # ~0 => heads collapsed
-        if cfg.entropy_refine and ent is not None:
+        if cfg.entropy_refine and ent is not None and "refine" not in disabled:
             h, info = self.refine(h, ent)
             aux["ponder_cost"] = info["ponder_cost"]
             aux["refine_residual_norm"] = info["residual_post_gate_norm"]
             aux["refine_gate_mean"] = info["gate_mean"]
             aux["refine_halt_p"] = info["halt_p_mean"]
-        if cfg.memory and ent is not None:
+            aux["refine_halt_p_grad"] = info["halt_p_grad"]
+            aux["refine_resid_grad"] = info["resid_grad"]
+        if cfg.memory and ent is not None and "memory" not in disabled:
             h, minfo = self.memory(h, ent)
             aux["mem_readiness"] = minfo["readiness"]
             aux["mem_residual_norm"] = minfo["residual_norm"]
+            aux["mem_readiness_grad"] = minfo["readiness_grad"]
+            aux["mem_resid_grad"] = minfo["resid_grad"]
         aux["logits"] = self.lm.logits(h)
         return aux
 

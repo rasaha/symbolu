@@ -174,6 +174,26 @@ are written under `runs/study/<ablation>/`.
 - **entropy_std (Hstd)**: near 0 = typed heads **collapsed** (all positions same).
 - **longest_run / distinct_char_ratio** in samples: repetition / collapse signals.
 
+### Contribution-aware training (can the modules *earn* their place?)
+
+`run_contribution_study.py` adds an objective that rewards a module's gate only on
+batches where enabling it **lowers** the LM loss (measured enabled-vs-disabled),
+plus optional residual regularization and entropy calibration. Modes:
+`normal | contribution | entropy_cal | residual_reg | combined` (see `with_mode`).
+
+```bash
+python -m symbolu_neural.clean_softmax.run_contribution_study --steps 400 --block 96
+```
+
+Result (see report §"Can active modules earn their contribution?"): under the
+contribution objective the refinement halt prob rises **0.008 → 0.999** (it is
+*earned*, not floored), the modules lower LM loss on 90–99 % of batches, and on
+identical architecture val loss improves 2.834 → 2.746. **Residual regularization
+is required** (contribution-only makes refinement overpower the hidden state,
+refR/act = 1.06 → 0.54 with reg). Caveat: the win over the +1-block capacity
+control is partly effective-depth (refinement runs its block 3×), and generation is
+still incoherent at this scale.
+
 ### Pass / fail for this study (participation & stability, NOT quality)
 - **PASS** if: training is stable (monotone val), no module overpowers the hidden
   state (ratio < 1.0), entropy heads don't collapse, and the active mechanisms

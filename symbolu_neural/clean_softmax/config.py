@@ -23,6 +23,13 @@ class ExpConfig:
     # aux-loss weights
     ponder_weight: float = 1e-3
     entropy_cal_weight: float = 0.0     # off by default (it shapes calibration)
+    # contribution-aware training: reward a module's gate only when it lowers LM
+    # loss on the batch (measured enabled-vs-disabled). 0 = off.
+    contribution_weight: float = 0.0
+    contrib_eval_every: int = 1         # do the extra disabled forwards every N steps
+    # residual regularization: penalize residual norm above target_ratio * act_norm.
+    residual_reg_weight: float = 0.0
+    residual_target_ratio: float = 0.5
     # synthetic head-supervision (ONLY for the shuffled-label control; OFF for LM)
     synthetic_head_labels: bool = False
     shuffle_head_labels: bool = False
@@ -55,3 +62,19 @@ def get_ablation(name: str) -> ExpConfig:
     if name not in ABLATIONS:
         raise KeyError(f"unknown ablation '{name}'; choices={list(ABLATIONS)}")
     return ABLATIONS[name]()
+
+
+# Training modes apply auxiliary-loss weights on top of an ablation config.
+TRAIN_MODES = ("normal", "contribution", "entropy_cal", "residual_reg", "combined")
+
+
+def with_mode(cfg: ExpConfig, mode: str) -> ExpConfig:
+    if mode not in TRAIN_MODES:
+        raise KeyError(f"unknown mode '{mode}'; choices={TRAIN_MODES}")
+    if mode in ("contribution", "combined"):
+        cfg.contribution_weight = 0.5
+    if mode in ("entropy_cal", "combined"):
+        cfg.entropy_cal_weight = 0.1
+    if mode in ("residual_reg", "combined"):
+        cfg.residual_reg_weight = 0.1
+    return cfg

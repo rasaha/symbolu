@@ -23,6 +23,13 @@ def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
         [p for p in model.parameters() if p.requires_grad], lr=lr, weight_decay=0.01)
     it = make_batches(train_ids, block, batch, generator=gen)
     history = []                                            # per-log-point diagnostics
+    helps = {"refine": 0, "memory": 0}
+    seen = {"refine": 0, "memory": 0}
+    contrib_keys = {"refine": "refine_halt_p_grad", "memory": "mem_readiness_grad"}
+
+    def ce(logits):
+        return F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
+
     model.train()
     t0 = time.time()
     for step in range(steps):
@@ -30,7 +37,8 @@ def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
         x, y = x.to(device), y.to(device)
         aux = model(x)
         logits = aux["logits"]
-        loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
+        lm_loss = ce(logits)
+        loss = lm_loss
         if cfg.entropy_refine and "ponder_cost" in aux:
             loss = loss + cfg.ponder_weight * aux["ponder_cost"]
         if cfg.entropy_cal_weight > 0 and "entropy_vec" in aux:
@@ -41,6 +49,41 @@ def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
             Hn = H - H.mean(); en = nll - nll.mean()
             corr = (Hn * en).mean() / (Hn.std().clamp_min(1e-6) * en.std().clamp_min(1e-6))
             loss = loss + cfg.entropy_cal_weight * (1 - corr)
+
+        # ---- contribution-aware loss: gate earns only when the module helps ----
+        contrib_rec = {}
+        if cfg.contribution_weight > 0 and (step % max(1, cfg.contrib_eval_every) == 0):
+            contrib = logits.new_zeros(())
+            for m, gkey in contrib_keys.items():
+                if gkey not in aux:
+                    continue
+                with torch.no_grad():
+                    dis = model(x, disabled={m})["logits"]
+                    L_dis = ce(dis)
+                delta = (L_dis - lm_loss).detach()         # >0 => module helped
+                contrib_rec[f"{m}_delta_loss"] = float(delta)
+                contrib_rec[f"{m}_logit_delta"] = float((logits - dis).norm())
+                seen[m] += 1
+                helped = delta.item() > 0
+                contrib_rec[f"{m}_helps"] = helped
+                if helped:
+                    helps[m] += 1
+                if abs(delta.item()) < 1e-3:               # deadband: near-neutral
+                    continue
+                p = aux[gkey].clamp(1e-4, 1 - 1e-4)
+                target = p.new_tensor(1.0 if helped else 0.0)
+                contrib = contrib + F.binary_cross_entropy(p, target)
+            loss = loss + cfg.contribution_weight * contrib
+
+        # ---- residual regularization: don't overpower the hidden state ----
+        if cfg.residual_reg_weight > 0:
+            rr = loss.new_zeros(())
+            actg = aux["act_norm_grad"].detach()
+            for rk in ("refine_resid_grad", "mem_resid_grad"):
+                if rk in aux:
+                    rr = rr + torch.relu(aux[rk] / actg - cfg.residual_target_ratio)
+            loss = loss + cfg.residual_reg_weight * rr
+
         opt.zero_grad(); loss.backward()
         gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0).item()
         opt.step()
@@ -54,6 +97,7 @@ def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
                       "mem_readiness"):
                 if k in aux:
                     rec[k] = float(aux[k])
+            rec.update(contrib_rec)
             if do_val:
                 model.eval()
                 rec["val_loss"] = val_loss_ppl(
@@ -74,6 +118,17 @@ def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
     m["train_time_s"] = round(train_time, 1)
     m["ms_per_step"] = round(1000 * train_time / steps, 1)
     m["device"] = device
+    for mod in ("refine", "memory"):
+        if seen[mod]:
+            m[f"{mod}_help_frac"] = round(helps[mod] / seen[mod], 3)
+    if history:
+        last = history[-1]
+        m["final_halt_p"] = last.get("refine_halt_p")
+        m["final_refine_gate"] = last.get("refine_gate_mean")
+        m["refine_residual_final"] = last.get("refine_residual_norm")
+        m["mem_residual_final"] = last.get("mem_residual_norm")
+        m["act_norm_final"] = last.get("act_norm")
+        m["entropy_std_final"] = last.get("entropy_std")
     if collect:
         return m, model, history
     return m, model

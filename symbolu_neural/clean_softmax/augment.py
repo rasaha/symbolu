@@ -97,7 +97,8 @@ class CausalEntropyRefinement(nn.Module):
             gates.append(g)
             gated = gated + g.unsqueeze(-1) * delta
             state = new
-        refined = h + self.residual_scale * gated
+        injected = self.residual_scale * gated
+        refined = h + injected
         gate_mean = torch.stack(gates).mean()
         halt_p_mean = (torch.stack(halt_ps).mean() if halt_ps
                        else h.new_tensor(1.0))
@@ -107,8 +108,11 @@ class CausalEntropyRefinement(nn.Module):
             "halt_p_mean": halt_p_mean.detach(),
             "gate_mean": gate_mean.detach(),
             "residual_pre_gate_norm": raw.norm().detach(),
-            "residual_post_gate_norm": (self.residual_scale * gated).norm().detach(),
+            "residual_post_gate_norm": injected.norm().detach(),
             "entropy_gate_mean": entropy_vec.mean().detach(),
+            # differentiable handles for contribution / residual-reg losses:
+            "halt_p_grad": halt_p_mean,                # mean halting prob (keeps grad)
+            "resid_grad": injected.norm(),             # residual norm (keeps grad)
         }
         return refined, diag
 
@@ -145,4 +149,7 @@ class CausalPrefixMemory(nn.Module):
         R = torch.sigmoid(self.readiness(entropy_vec))     # [B,L,1]
         injected = R * mem
         return h + injected, {"readiness": R.mean().detach(),
-                              "residual_norm": injected.norm().detach()}
+                              "residual_norm": injected.norm().detach(),
+                              # differentiable handles for contribution / residual-reg:
+                              "readiness_grad": R.mean(),
+                              "resid_grad": injected.norm()}

@@ -135,6 +135,86 @@ plain baseline; (3) **latency is ~2.2×** — cut refinement steps/strength. No
 failure mode is catastrophic; the model is trainable, but there is **no evidence
 yet that the Symbol-U mechanisms help beyond the parameters they add**.
 
+## Can active modules earn their contribution?
+
+The previous section's concern was that refinement is *forced-on* (optimizer
+drives the halting prob to ~0; only the `min_strength` floor keeps it alive). This
+section adds a **contribution-aware objective** and asks whether the modules can be
+*earned* instead. Mechanism (no new patent algorithms): each step, measure the LM
+loss with a module enabled vs **disabled** (an extra ablated forward); the module's
+gate (refinement halt prob / memory readiness) is pushed up via BCE only on batches
+where it **lowers** the LM loss. Plus optional residual regularization (penalize
+residual norm above 0.5·activation norm) and entropy calibration.
+
+Run: `python -m symbolu_neural.clean_softmax.run_contribution_study --steps 400
+--block 96` (CPU, seed 0, d=128, 2 layers).
+
+| run | val_loss | ppl | final halt_p | refine helps | mem helps | refR/act | memR/act | ms/step |
+|---|---|---|---|---|---|---|---|---|
+| baseline | 2.899 | 18.16 | — | — | — | — | — | 41 |
+| capacity_control (+1 plain block) | 2.874 | 17.71 | — | — | — | — | — | 58 |
+| full (normal) | 2.834 | 17.01 | **0.008** | — | — | 0.40 | 0.33 | 101 |
+| full (contribution-aware) | 2.746 | 15.59 | **0.9996** | **0.99** | **0.90** | **1.06** | 0.48 | 137 |
+| full (combined: contrib+resid+entcal) | **2.703** | **14.93** | **0.999** | 0.98 | 0.96 | **0.54** | 0.40 | 158 |
+
+**Halt-probability trend (refinement):** normal collapses `0.88→0.022→0.008`;
+contribution rises `0.88→0.999→1.0` and *stays*. **The optimizer now drives the
+gate up on its own** — the previous "only the floor keeps it alive" problem is
+resolved under this objective.
+
+**Measured per-batch contribution (delta = L_disabled − L_enabled, >0 = helps):**
+refinement grows from −0.02 (step 1, before it learns) to **+0.2…+0.5** nats;
+memory **+0.03…+0.10**. So when actually engaged, both modules genuinely lower the
+LM loss — refinement substantially, memory modestly. refine helps on ~99% of
+batches, memory ~90%.
+
+### Honest interpretation (with the caveats)
+
+1. **The mechanisms can be earned, not just forced.** Under the contribution
+   objective the refinement gate rises to ~1.0 because the module measurably helps;
+   it is no longer propped up by the floor. *This directly answers the prior
+   concern.*
+2. **The objective — not capacity — drives the gain.** `full (normal)` and
+   `full (contribution)` are the **same architecture/FLOPs** (both run refinement's
+   3 ACT steps); the only difference is the training objective, yet val loss drops
+   2.834 → 2.746. The plain LM objective *suppresses* refinement (gate 0.008,
+   block wasted); the contribution objective *uses* it (gate ~1.0). So the
+   improvement is the objective un-suppressing existing capacity.
+3. **Residual regularization is necessary.** Contribution-only makes refinement
+   **overpower** the hidden state (refR/act = **1.06** — residual ≈ activation
+   norm, a failure mode). Adding residual reg (combined) tames it to 0.54 **and**
+   yields the best val loss (2.703). Recommended config = combined.
+4. **Compute caveat — the win over the capacity control is partly effective depth.**
+   Refinement applies its shared block 3× (`refine_steps=3`); with the gate now ~1.0
+   that is ≈3 block-applications of depth vs the capacity control's single plain
+   block. So "beats `baseline_plus_block`" is real but **compute-confounded**. The
+   fair next control is `baseline + 3 plain blocks` (or `refine_steps=1`).
+5. **No quality/coherence gain yet.** Generation stays incoherent across all runs
+   at this scale (char-level, 400 steps) — markdown-fragment soup; contribution runs
+   show a mild repetition run (`-----------`). The val-loss improvement does **not**
+   translate to visibly better samples here.
+
+### Updated mechanism table (post-contribution objective)
+
+| Mechanism | Active? | Stable? | Earned? | Helpful? | Recommended Fix |
+|---|---|---|---|---|---|
+| Typed heads → entropy | Yes | Yes (Hstd~0.5) | n/a (gates the others) | Indirect; entropy-cal didn't hurt | keep; entropy-cal optional |
+| Recursive refinement | Yes | Yes **with residual reg** (overpowers without it) | **Yes** — halt 0.008→0.999, helps 99% of batches | Net-positive on val under the objective, but compute-confounded vs control | use **combined** mode; add 3-block fair-compute control; consider `refine_steps=1` |
+| Deferred-insight memory | Yes | Yes | **Yes** — readiness earns, helps 90% | Modest positive (delta +0.03–0.10) | keep with combined mode |
+
+### Answer
+
+**Can the active Symbol-U mechanisms become naturally useful during training, or do
+they only work when forced on?** — **They can be earned, not merely forced.** With a
+contribution-aware objective the refinement gate rises to ~1.0 *because the module
+genuinely lowers the LM loss* (99% of batches), and on identical architecture this
+objective improves val loss (2.834 → 2.746) by un-suppressing refinement; residual
+regularization is required to stop it overpowering, and combined mode gives the best
+result (2.703). **Caveats kept honest:** the advantage over the +1-block capacity
+control is partly effective-depth (refinement runs its block 3×), and there is no
+visible generation-quality gain at this scale. So: *earned — yes; net-useful beyond
+fair-compute — still to be confirmed with a 3-block control.*
+
 ## GPU / RunPod
 
 No CUDA was available in this environment; the study ran on CPU. The runner
