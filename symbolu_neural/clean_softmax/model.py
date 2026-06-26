@@ -53,15 +53,24 @@ class SymbolUSoftmaxModel(nn.Module):
         {'typed_heads'} or {'entropy'} zero the entropy signal; {'refine'} /
         {'memory'} skip that actuator (h passes through unchanged)."""
         cfg = self.cfg
-        h = self.lm.hidden(ids)                             # [B,L,d] causal
+        # layer-aware tap (additive; control_layer == -1 -> current behavior)
+        if getattr(cfg, "control_layer", -1) is not None and cfg.control_layer >= 0:
+            layers = self.lm.hidden_all_layers(ids)
+            h = layers[-1]                                  # LM path uses final
+            h_tap = layers[cfg.control_layer]               # heads read this zone
+        else:
+            h = self.lm.hidden(ids)                         # [B,L,d] causal
+            h_tap = h
         aux: Dict[str, torch.Tensor] = {}
         if cfg.extra_plain_block:
             h = self.extra_block(h)
+            h_tap = h_tap if cfg.control_layer >= 0 else h
         aux["act_norm"] = h.norm().detach()                 # backbone activation norm
         aux["act_norm_grad"] = h.norm()                     # (for residual-ratio reg)
         ent = None
         if cfg.typed_heads:
-            tout = self.heads(h)
+            head_in = h_tap.detach() if getattr(cfg, "stopgrad_heads", False) else h_tap
+            tout = self.heads(head_in)
             aux.update(tout)
             ent = TypedHeadBank.entropies(tout)             # [B,L,3]
             if "typed_heads" in disabled or "entropy" in disabled:

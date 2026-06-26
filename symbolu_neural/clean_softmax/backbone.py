@@ -116,6 +116,20 @@ class SoftmaxTransformerLM(nn.Module):
             x = blk(x)
         return self.norm(x)                                # [B,L,d]
 
+    def hidden_all_layers(self, ids: torch.Tensor):
+        """Additive accessor (no behavior change): returns per-layer hidden states
+        [post-block-1, ..., post-block-N, final-normed]. Index -1 == hidden().
+        Used by the layer-wise probe and the optional control-layer tap."""
+        B, L = ids.shape
+        pos = torch.arange(L, device=ids.device).unsqueeze(0)
+        x = self.tok(ids) + self.pos(pos)
+        outs = []
+        for blk in self.blocks:
+            x = blk(x)
+            outs.append(x)
+        outs.append(self.norm(x))                          # final-normed == hidden()
+        return outs                                        # len = n_layers + 1
+
     def logits(self, h: torch.Tensor) -> torch.Tensor:
         return self.head(h)
 

@@ -70,6 +70,31 @@ python -m symbolu_neural.clean_softmax.run_ablations \
 python -m symbolu_neural.clean_softmax.test_clean    # correctness incl. causality
 ```
 
+## Layer-aware, validation-first strategy + layer probing
+
+[`LAYER_AWARE_TRAINING_STRATEGY.md`](LAYER_AWARE_TRAINING_STRATEGY.md) is a
+first-principles, adversarial analysis of **where** the typed signals should live in
+a decoder Transformer (early=untouched, middle=probe-only, late=control) and **when**
+they may influence generation (validation-first, control-later), with a staged
+activation policy and per-signal recommendations.
+
+`run_layer_probe.py` runs the supporting experiment: freeze a backbone, attach
+identical probes to every layer, train only the probes, and measure per-layer
+accuracy / F1 / ECE / entropy-error correlation / confidence with a **shuffled-label
+control**.
+
+```bash
+python -m symbolu_neural.clean_softmax.run_layer_probe --layers 6 --backbone-steps 250
+```
+
+Key finding (synthetic stand-in labels — no real Vritti labels exist): a probe
+decodes *something* confidently at **every** layer, and the shuffled control sits at
+the **majority-class baseline, not uniform chance** — so only `acc(real) −
+acc(shuffled)` separates structure from an arbitrary cluster. Additive support added
+without redesigning the model: `hidden_all_layers` (probe accessor), `control_layer`
+(layer tap), `stopgrad_heads` (diagnostic/validation-only heads). Defaults preserve
+current behavior.
+
 ## GPU run (RunPod) — one command
 
 The implementation is frozen; `train_gpu.py` is a pure GPU training wrapper (AMP,

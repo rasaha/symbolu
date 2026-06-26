@@ -24,6 +24,12 @@ class ExpConfig:
     refine_min_strength: float = 0.1    # gate floor: refinement cannot collapse to 0
     refine_residual_scale: float = 1.0  # fixed scale on the refinement delta
     refine_fixed_steps: bool = False    # smoke mode: bypass ACT halting entirely
+    # --- layer-aware staged control (additive; defaults = current behavior) ---
+    control_layer: int = -1             # which layer feeds the typed heads/entropy;
+                                        # -1 = final-normed (current). >=0 taps that
+                                        # block output (0..n_layers).
+    stopgrad_heads: bool = False        # True = typed heads are diagnostic/validation
+                                        # only (no gradient into the backbone)
     # aux-loss weights
     ponder_weight: float = 1e-3
     entropy_cal_weight: float = 0.0     # off by default (it shapes calibration)
