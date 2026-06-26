@@ -70,6 +70,24 @@ python -m symbolu_neural.clean_softmax.run_ablations \
 python -m symbolu_neural.clean_softmax.test_clean    # correctness incl. causality
 ```
 
+## GPU run (RunPod) — one command
+
+The implementation is frozen; `train_gpu.py` is a pure GPU training wrapper (AMP,
+gradient accumulation, periodic checkpoint/eval, all diagnostics, auto-generation).
+See [`GPU_RUN_REPORT.md`](GPU_RUN_REPORT.md) for hardware/throughput/checkpoint sizes.
+
+```bash
+bash scripts/run_gpu_training.sh          # verifies CUDA, trains, ckpts, generates
+# override: STEPS=10000 BATCH=96 DMODEL=768 LAYERS=12 bash scripts/run_gpu_training.sh
+```
+
+Outputs under `runs/<exp>/`: `config.json`, `train_log.jsonl` (val loss, ppl,
+entropy, halt prob, refine/memory residuals, contribution delta + help-fractions,
+grad/activation norms, throughput), `ckpt.pt` + `ckpt_step*.pt`, `metrics.json`,
+`samples.txt` (fixed-prompt generations), `activity.txt` (token-change
+instrumentation). Validated end-to-end on CPU (no GPU in this env); same code path
+runs with AMP on a GPU pod.
+
 ## Generation smoke test (`generate.py`)
 
 **This is only a generation smoke test** — it answers one question: *can the clean
