@@ -866,12 +866,60 @@ Framework a defensible position in it.
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# 4. Conscious Generation LLM
+# 4. LLM Steering Controller
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**`mistral_cg` — Multi-Field Token Evaluation on a Frozen Mistral-7B Backbone**
+**Deterministic, model-agnostic frame-control + audit layer for LLM generation — internal engine: CRS Controller (C×R×S). A deeper multi-field token-evaluation research architecture (`mistral_cg`) sits behind it as the long-term moat.**
 
-## 4.1 The Problem
+> **Name (locked).** Ships as the **LLM Steering Controller**; the umbrella formerly called "Conscious
+> Generation" is retained only as the **research-program label** for the deeper `mistral_cg` architecture
+> (§4.4). "Steering" is the honest verb: the layer influences the meaning-**frame** a model generates within;
+> it does **not** decode meaning and does **not**, by itself, make the model smarter. Standalone brief:
+> `LLM_STEERING_CONTROLLER_VC_BRIEF.md`.
+
+This section is deliberately **two-layer**, and keeps the layers separate on purpose:
+
+| | **Near-term product (validated)** | **Long-term architecture (research / moat)** |
+|---|---|---|
+| What | Deterministic C×R×S frame-matching · framed generation · answer audit · traceable diagnostics | Multi-field token evaluation (`mistral_cg`): 32-D state, phase adapter, field-integrated generation |
+| State | Model-agnostic, **no weight changes**; metrics validated on one open model (§4.1) | Partial implementation; honestly bounded; **parked** signal tracks recorded (§4.4) |
+| Claim | Control, consistency, auditability — **not** improved intelligence or decoded meaning | A bet on *how* a next-gen model should generate |
+
+## 4.1 The Validated Product — Deterministic Frame-Control + Audit
+
+### What ships today (model-agnostic, zero weight changes)
+
+```
+Input → C×R×S frame matching (primary / secondary / weak / rejected domains, frozen thresholds)
+      → framed generation (the answer is produced inside the chosen frame)
+      → answer-audit gate (pass · rewrite · escalate)
+      → traceable diagnostics (a logged reason for every steering decision)
+```
+
+The frame decision is made **before** the LLM answers; the audit gate is a deterministic layer *after* it.
+Nothing in this runtime requires hidden-state access or weight modification — so it runs over **open-weight
+models** (deep, activation-level) or **closed APIs** (as a vendor-agnostic prompt-shaping + output-selection
+control plane that gives one consistent, auditable control layer across Claude / GPT / Gemini).
+
+**Measured results** — single open model (Mistral-7B-Instruct-v0.3), 110-item polysemy set, deterministic rubric:
+
+| Metric | Base | Steered | Δ |
+|---|---|---|---|
+| Primary-frame correctness | 0.609 | **0.736** | +0.127 |
+| Rejected-domain avoidance | 0.855 | **0.909** | +0.054 |
+| Factuality preserved | 0.945 | **0.964** | +0.018 |
+
+> Scope (stated up front): internal, **one** open model, **110** items, **deterministic rubric** (not human
+> raters); reproducible (`production_valid=True`), **not** an external benchmark. Human validation is the
+> supervised-observation track.
+
+**What it does / does NOT do.** **Does:** deterministic frame-control (same input → same frame); an auditable
+reason per decision; model-agnostic; no retraining; cheap. **Does NOT:** make the model smarter or "more
+coherent" (quality stays the model's job); decode meaning; modify weights; or make a *rented* closed-API
+model's raw output deterministic (only the **control** is deterministic). Every benefit is true **by
+construction** — independent of the parked research signals in §4.4.
+
+## 4.2 The Problem the research bet addresses
 
 ### Standard LLMs ultimately rank candidate tokens through a single projection bottleneck.
 
@@ -923,7 +971,11 @@ mechanism (the phase adapter) are in place, and the next 12 months are
 about closing the remaining gap between the training-time signal stack
 and the generation path.
 
-## 4.2 The Architecture
+## 4.3 The Research Architecture (the long-term moat — `mistral_cg`)
+
+> Everything from here through §4.4 describes the **research layer** — the deeper bet, partially implemented
+> and honestly bounded. It is the moat we fund toward, **not** the validated product of §4.1. The shippable
+> product depends on **none** of the speculative signal claims below.
 
 ### `mistral_cg` — frozen Mistral-7B backbone + trainable Conscious Generation modules
 
@@ -1011,7 +1063,12 @@ is the tight loop between our research stack and our developer product:
 `mistral_cg` is the first adapter where those signals are actually
 available.
 
-## 4.3 Competitive Landscape
+## 4.4 Competitive Landscape (research layer)
+
+> The comparisons below are for the **research bet** (`mistral_cg`, the field-integrated generation path).
+> They describe what the architecture is *designed* to do; the "replace the softmax / strictly stronger"
+> claims are the **thesis, not a validated result** — the parked-signal ledger in §4.5 is the honest current
+> status. The *validated* competitive story (deterministic frame-control + audit) is §4.1.
 
 `mistral_cg` occupies an unusual position in the current LLM tooling
 stack. It is neither a foundation-model company trying to outspend
@@ -1052,7 +1109,24 @@ that both the model and a governance layer can read — and that this
 bet is winnable at seed-stage cost, because the backbone is free and
 the trainable surface is small.
 
-## 4.4 Evidence, Honest Status & Roadmap
+## 4.5 Evidence, Honest Status & Roadmap
+
+### Parked-signal ledger (latest — what the probes actually returned)
+
+We ran the deeper symbolic-signal tracks under pre-registration + kill criteria and **parked** them when
+they did not clear the bar. Recording this is what makes the *validated* §4.1 product credible to diligence:
+
+| Track | Verdict |
+|---|---|
+| Does the C×R×S decomposition carry signal beyond the hidden state? | **`CSR_REDUNDANT` → PARK** — parts decode, but the combination adds nothing over `hidden`; the apparent "Resonance" signal (AUROC 0.832) is a **text-difficulty confound**, not phoneme meaning |
+| Does the inference-time wrapper move generation? | **`ACTIVE_NO_EFFECT`** (ΔBhava = 0) — parked |
+| Does a CSR-diagnostic policy gate beat the existing audit gate? | **`PB_POLICY_NO_INCREMENTAL_VALUE`** (F1 0.341 vs 0.526) — diagnostics stay explanation-only |
+
+**What this means:** the validated product (§4.1) depends on **none** of these. We do **not** sell "Resonance
+decodes meaning," "Bhava is a runtime signal," or "the wrapper makes the model smarter" — all parked, in
+writing. The **match-filter** `MATCH = C×R×S` (multiplicative veto vs external domain templates) was **not**
+tested by the static probe and **remains untested** — recorded as deferred IP, not a claim. Sources:
+`scripts/cg_wrapper_ablation/RESULTS_STL_CSR_PROBE.md`, `docs/RESULTS_CSR_POLICY_PB.md`.
 
 ### What is built and running today
 
@@ -1118,7 +1192,13 @@ in diligence.
 | Lambda starting weights | Ont 0.01 · Kosha 0.01 · Bliss 0.01 · Plausibility 0.005 · CSR/Vritti/Guna 0.005 |
 | Diagnostics | Embedding diagnostics every 200 steps |
 
-### Roadmap — next 12 months
+### Roadmap — near-term product (the LLM Steering Controller, §4.1)
+
+- **Human validation** of the answer-audit gate + diagnostics (supervised-observation track) — no runtime-policy claim ships on an offline number alone.
+- **Ship the model-agnostic controller**: open-weight deep mode + the closed-API control plane (prompt-shaping + output-selection), with design-partner integrations.
+- **Run the head-to-head benchmark** vs activation steering / control vectors — the experiment that converts the closed-API "deterministic, auditable, no-lock-in" story from a narrative into a proof.
+
+### Roadmap — research moat (`mistral_cg`, next 12 months)
 
 **Quarter 1 — Close the inference-path gap**
 - Wire the four dormant per-token scorers (CSR · Vritti · Guna · Ontological) into the generation path behind a clean flag, so the contribution of each field to token selection is measurable at inference, not just at training.
@@ -1150,8 +1230,9 @@ is concentrated in well-identified places we can show progress against.
 This module is a longer-horizon platform asset that strengthens the
 Agentic Framework's differentiation once benchmark validation is complete.
 
-*Modules: `symbolu_training/training/unified/mistral_wrapper.py`, `symbolu_training/training/conscious_generation/`, `agentic/agentic_framework/inference_mistral.py`*
-*Design: `docs/design/CONSCIOUS_GENERATION_DESIGN.md`, `docs/design/LEVEL_DISCIPLINE_SCORER_DESIGN.md` · Audit: `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md`*
+*Validated product: `scripts/cg_wrapper_ablation/csr_match_filter/` · Standalone brief: `LLM_STEERING_CONTROLLER_VC_BRIEF.md`*
+*Research moat (`mistral_cg`): `symbolu_training/training/unified/mistral_wrapper.py`, `symbolu_training/training/conscious_generation/`, `agentic/agentic_framework/inference_mistral.py`*
+*Design: `docs/design/CONSCIOUS_GENERATION_DESIGN.md`, `docs/design/LEVEL_DISCIPLINE_SCORER_DESIGN.md` · Audit: `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md` · Parked-signal results: `scripts/cg_wrapper_ablation/RESULTS_STL_CSR_PROBE.md`, `docs/RESULTS_CSR_POLICY_PB.md`*
 
 ---
 
