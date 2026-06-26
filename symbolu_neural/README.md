@@ -163,3 +163,90 @@ ids = torch.randint(0, 256, (2, 16))
 aux = model(ids)                              # returns dict of logits + latents
 print(aux["log_p_v"].shape, aux["H_D"].shape)  # [2,8,5] [2]
 ```
+
+---
+
+## 8. Stage-1 grounding validation (`stage1/`)
+
+Stage 1 answers the **single highest-priority question** before any further
+investment (kill-criteria K1/K2): *with a **frozen** backbone, do the Vritti and
+Aspect heads learn signal above chance/majority baselines, and does predictive
+entropy track error?* It trains **only the typed heads** — no other Symbol-U
+module, no backbone fine-tuning.
+
+### Files
+| File | Role |
+|---|---|
+| `stage1/make_toy_grounding_dataset.py` | generate a **synthetic** toy dataset (disjoint train/val vocab) |
+| `stage1/train_stage1_grounding.py` | train Vritti/Aspect(/Guna/Kosha) heads on a frozen backbone |
+| `stage1/eval_stage1_grounding.py` | metrics + baselines + **kill-criteria verdict** |
+| `stage1/data.py` | JSONL loader, tokenization, per-unit label alignment |
+| `stage1/metrics.py` | accuracy, macro-F1, chance, majority, entropy↔error corr, ECE |
+| `stage1/test_stage1.py` | fast CPU smoke checks |
+
+### Dataset format (JSONL, one object per line)
+```json
+{"text": "the world feels chaotic",
+ "units": ["the","world","feels","chaotic"],
+ "vritti": ["memory","misperception","valid_cognition","imagination"],
+ "aspect": ["thinking","forming","reasoning","purposing"]}
+```
+- `units` are **syllables** if you provide them, else **words** (word-level
+  fallback per requirement). Omit `units` to whitespace-split `text`.
+- Label lists are per-unit; missing/unknown labels map to `IGNORE (-100)` and are
+  excluded from loss and metrics. `guna`/`kosha` are optional.
+
+### A. Toy smoke test (CPU, no downloads)
+```bash
+python -m symbolu_neural.stage1.make_toy_grounding_dataset --out-dir data/toy_grounding
+python -m symbolu_neural.stage1.train_stage1_grounding \
+    --train data/toy_grounding/train.jsonl --val data/toy_grounding/val.jsonl \
+    --backbone dummy --heads vritti,aspect --epochs 10 --pool sum --out runs/toy
+python -m symbolu_neural.stage1.eval_stage1_grounding \
+    --val data/toy_grounding/val.jsonl --train data/toy_grounding/train.jsonl \
+    --ckpt runs/toy/stage1_heads.pt --backbone dummy --pool sum
+# control that SHOULD fail (proves the kill-criteria bite):
+python -m symbolu_neural.stage1.train_stage1_grounding ... --shuffle-labels --out runs/shuf
+```
+`pytest symbolu_neural/stage1/test_stage1.py` runs the same checks in seconds.
+
+### B. Real dataset training
+```bash
+python -m symbolu_neural.stage1.train_stage1_grounding \
+    --train your_train.jsonl --val your_val.jsonl \
+    --backbone hf:gpt2 --heads vritti,aspect --pool mean --epochs 20 --out runs/real
+python -m symbolu_neural.stage1.eval_stage1_grounding \
+    --val your_val.jsonl --train your_train.jsonl \
+    --ckpt runs/real/stage1_heads.pt --backbone hf:gpt2 --pool mean
+```
+Use `--pool mean` for a real subword backbone; `--pool sum` is only for the toy
+featurizer (it recovers length/vowel-count). Requires `transformers`.
+
+### Metrics & kill criteria
+The evaluator prints, per head: accuracy, macro-F1, **chance** (1/K), **majority**
+baseline, **entropy↔error correlation**, **ECE**, and train accuracy (for the
+memorization gap). It then emits **PASS / FAIL** against:
+
+- **K1 grounding** — FAIL if Vritti/Aspect val accuracy ≤ `max(chance, majority) + margin`.
+- **K2 uncertainty** — FAIL if entropy↔error correlation ≤ `corr_min` (should be > 0;
+  uncertainty should be higher when the head is wrong).
+- **Memorization** — FAIL if `train_acc − val_acc > gap` *and* val accuracy sits at
+  the baseline (the head memorized train words instead of learning a rule).
+
+### Interpreting pass/fail — **honesty contract**
+> The bundled toy data is **SYNTHETIC**: labels are a deterministic function of
+> **surface features** (vowel count, word length), and the toy "backbone" is a
+> deterministic featurizer. The evaluator prints a loud banner whenever
+> `meta.json` marks the data synthetic. A toy **PASS only proves the harness works
+> and that a learnable signal flows through the heads — it is NOT evidence that
+> real Vritti/Guna/Kosha structure exists in language.** Real validation of the
+> grounding hypothesis requires (a) a genuine pretrained LM backbone and (b)
+> **human-labeled** syllable/word Vritti+aspect data. Until then, treat every
+> green result as a plumbing check, not a scientific finding.
+
+**Observed on the bundled toy (synthetic, frozen featurizer, 10 epochs, CPU):**
+Vritti acc ≈ 0.74 vs chance 0.20 / majority 0.38; Aspect acc ≈ 0.40 vs chance
+0.10 / majority 0.20; positive entropy↔error correlation → harness **PASS**. The
+global `--shuffle-labels` control collapses to ≈ majority and is correctly flagged
+**FAIL** on both grounding and uncertainty — confirming the criteria discriminate
+signal from leakage.
