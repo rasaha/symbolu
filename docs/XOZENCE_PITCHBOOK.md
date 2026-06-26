@@ -1709,13 +1709,16 @@ Each module is independently deployable and independently valuable. Initial comm
 
 | Metric | Value |
 |---|---|
-| Total tests across all modules | **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) |
+| Total tests across all products | **4,300+** — composing platform **3,200+** (228 scaling + 276 CTM+/PCAM + 1,550 agentic + CG smoke + hybrid training) **+ 1,117** standalone Robotics (BCVF) + PSE falsification harnesses |
 | Adversarial safety scenarios (scaling) | 19 scenarios *(simulated)*, **0 catastrophic / severe failures, 0 SLO regressions**; further validated by real-trace replay + a live-shadow harness (§1.4) |
 | FSCS signal validation (CTM+) | **100% eviction rounds changed** with enhanced signals on real Mistral-7B trace |
 | Agentic governance invariant | `cancel → budget → approve → execute` — **pinned by test suite** |
 | CG trainable parameters | **~5M** on frozen Mistral-7B (4-bit: ~14GB VRAM) |
 | Phase-attention retrieval | **100% needle-in-haystack at 10K tokens** (240K-param pilot) |
 | LLM inference improvement (CTM+) | **+50% concurrent requests, −29% p99 latency** vs. LRU |
+| Robotics (BCVF) — characterization *(standalone)* | **0% FPR / 0% FNR** across a certification-grade grid (1,560 cells, Wilson 95% CI floor 0.90, min ≈ 0.940) |
+| Robotics (BCVF) — baseline shootout *(standalone)* | BCVF **0.000** false-attribution on Lemma-1-invariant disagreement vs Majority-Vote **16.7** / EKF **1.1**; **8–19× faster** per tick |
+| PSE — rigor *(standalone)* | Deterministic engine (same input → same profile; byte-identity regression) + a **pre-registered, blind falsification** program (9 harnesses) — engineering rigor and honesty discipline, not a capability claim |
 
 ## Module Readiness Summary
 
@@ -1733,7 +1736,7 @@ Each module is independently deployable and independently valuable. Initial comm
 
 **The platform thesis is coherent.** The five modules compose into a single vertical stack, share common architectural patterns (multi-signal scoring, phase-aware state, spec-and-runtime separation), and reinforce each other's competitive position. They are one thesis — smarter decisions at the seams — applied at five layers of the AI infrastructure stack, not five independent bets. Two further products — **PSE** (naming / verbal-identity control) and **Autonomous Robotics** (predictor-trust) — extend the same determinism / trust-at-a-seam thesis into adjacent domains, pitched as standalone verticals rather than part of the LLM-stack composition.
 
-**The technology is built, not pitched.** 3,200+ tests across the platform. 228+ unit tests on the scaling controller. 276 on the KV-cache policy. 1,550+ on the agentic runtime. Production-grade code with adversarial safety validation, not slideware. Every module has a working implementation, a test suite, and an honest assessment of what is validated versus what remains to be proven.
+**The technology is built, not pitched.** 3,200+ tests across the platform. 228+ unit tests on the scaling controller. 276 on the KV-cache policy. 1,550+ on the agentic runtime. Production-grade code with adversarial safety validation, not slideware. The two standalone verticals add to this: the **robotics runtime (BCVF)** ships **1,117 tests** with a certification-grade characterization grid (0% FPR / 0% FNR) and a baseline shootout that beats EKF and majority-vote on false-attribution under a published Lemma-1 invariance; **PSE** ships a deterministic engine with byte-identity regression and a pre-registered, blind falsification program — rigor and honest nulls, not overclaim. Every module has a working implementation, a test suite, and an honest assessment of what is validated versus what remains to be proven.
 
 **The timing is right.** FinOps, KV-cache pressure, agent governance, and long-context attention are all active pain points in production AI infrastructure *right now*. Each module addresses a gap that is growing, not shrinking, as models get larger, contexts get longer, and agents get more autonomous. The window to establish credible defaults in these layers is the next 12–18 months.
 
