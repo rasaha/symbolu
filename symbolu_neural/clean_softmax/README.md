@@ -70,6 +70,50 @@ python -m symbolu_neural.clean_softmax.run_ablations \
 python -m symbolu_neural.clean_softmax.test_clean    # correctness incl. causality
 ```
 
+## Generation smoke test (`generate.py`)
+
+**This is only a generation smoke test** — it answers one question: *can the clean
+softmax Symbol-U model load a checkpoint and emit tokens autoregressively, end to
+end?* It is **not a quality benchmark** and makes **no claim of improvement** over
+any baseline.
+
+`generate.py` supports: `--prompt`, `--max-new-tokens`, `--temperature` (0 = greedy),
+`--top-k`, `--top-p`, `--seed`, and `--ckpt` (any ablation's checkpoint). It builds
+the tokenizer from the checkpoint's saved vocab (no corpus needed).
+
+```bash
+# 1) train a tiny checkpoint (checkpoints are gitignored; regenerate locally)
+python -m symbolu_neural.clean_softmax.prepare_data --out data/clean_lm/corpus.txt
+python -m symbolu_neural.clean_softmax.train --corpus data/clean_lm/corpus.txt \
+    --ablation full --steps 300 --d-model 128 --layers 2 --block 128 \
+    --out runs/clean/full          # -> runs/clean/full/ckpt.pt
+
+# 2) generate
+python -m symbolu_neural.clean_softmax.generate --ckpt runs/clean/full/ckpt.pt \
+    --prompt "The model " --max-new-tokens 200 --temperature 0.8 --top-k 40 --seed 0
+```
+
+**Observed output (honest, full ablation, 300 CPU steps, char-level, val ppl≈17.5):**
+
+```
+prompt    : 'The model '
+generated : 'trute; patededethse, aithhererisinathe me ticour, s llllios areis |
+             — | | | | | |# | fd | | |-| | (1 |-| |-| |-| | R14 pr-1;-Dat | Rensy
+             D1 Tlontetrencherlancee | bindatindecteandinthinde preal p_ri'
+```
+
+It is **incoherent** — as expected for a tiny char-level model trained for 300 CPU
+steps. But it is unmistakably autoregressive: it emits English-like character
+fragments (`are`, `pr`, `preal`) and reproduces the markdown table pipes (`| | |`)
+that dominate the corpus. Greedy (`--temperature 0`) collapses into a repeat loop
+(`ate (at (at …`), and `--top-p 0.9` produces different but equally incoherent text
+— all three sampling paths run end to end without error.
+
+**Answer to the only question asked — can it load and generate tokens end-to-end?**
+**Yes.** The checkpoint loads, the tokenizer rebuilds from saved vocab, and the
+model generates tokens autoregressively under temperature / top-k / top-p / greedy.
+Output quality is not evaluated and not claimed.
+
 ## PASS / FAIL criteria
 
 The formula is credited **only** if a **trained** Symbol-U ablation
