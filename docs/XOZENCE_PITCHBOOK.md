@@ -1,6 +1,6 @@
 # Xozence Labs — Platform Overview
 
-**AI Infrastructure Platform | Five Modules | Prepared April 2026**
+**AI Infrastructure Platform | Five Composing Modules + One Adjacent Robotics Vertical | Prepared April 2026**
 *Contact: Rakesh Mohan — Xozence Labs*
 
 ---
@@ -18,10 +18,11 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 | 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios; further checked on *real workload traces* (simulated system dynamics) | **Shadow + recommend mode** (built/tested); validated in simulation + real-workload-trace replay; live-shadow harness built but **not yet run on a cluster**; third-party pending |
 | 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
 | 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.9.0, 1,550+ tests, 2 internal pilots |
-| 4 | **Conscious Generation LLM** | Token selection | Multi-field token evaluation on frozen Mistral-7B — ~5M trainable params, interpretable 32D state | **Research-stage** — phase adapter live; full field integration Q1–Q2 |
+| 4 | **LLM Steering Controller** | Token / frame selection | Deterministic C×R×S frame-control + answer audit (validated near-term); multi-field token evaluation on frozen Mistral-7B as the research moat | **Mixed** — frame-control + audit validated on one open model; field-integration research-stage |
 | 5 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
+| 6 | **Autonomous Robotics (BCVF)** *(adjacent vertical)* | Predictor-trust arbitration | Predictor-trust runtime between a robotics stack's predictors and its planner — Lemma-1 invariance a safety case can point to | **Research prototype** — validated on synthetic + realistic-noise predictors; no production deployment; **does not compose with modules 1–5** |
 
-The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
+The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. A sixth module — **Autonomous Robotics (BCVF)** — is an **adjacent vertical**, not part of this vertical composition: it applies the same "multi-signal trust at a decision seam" thesis to a robotics planner's predictor-arbitration problem, but it targets safety-critical autonomy, does **not** compose with the LLM stack above, and is pitched standalone (its predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials). Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
 
 ---
 
@@ -30,9 +31,10 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 1. [Neural Cloud Scaling Controller](#1-neural-cloud-scaling-controller)
 2. [CTM+ / PCAM — Intelligent KV-Cache Eviction](#2-ctm--pcam--intelligent-kv-cache-eviction)
 3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
-4. [Conscious Generation LLM](#4-conscious-generation-llm)
+4. [LLM Steering Controller](#4-llm-steering-controller)
 5. [Hybrid LLM — Algorithmic Fusion of Attention Mechanisms](#5-hybrid-llm--algorithmic-fusion-of-attention-mechanisms)
-6. [Company Summary & Accelerator Fit](#company-summary)
+6. [Autonomous Robotics — Predictor-Trust Runtime (BCVF) — *adjacent vertical*](#6-autonomous-robotics--predictor-trust-runtime-bcvf)
+7. [Company Summary & Accelerator Fit](#company-summary)
 
 ---
 
@@ -1563,12 +1565,72 @@ accelerators for this work.
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
+# 6. Autonomous Robotics — Predictor-Trust Runtime (BCVF)
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+**Adjacent vertical — a portable predictor-trust layer between a robotics stack's predictors and its planner. Pitched standalone; it shares the platform's "multi-signal trust at a decision seam" thesis but does not compose with the LLM modules above.**
+
+> **Scope note (read first).** This is a **separate vertical** from modules 1–5: it targets **safety-critical
+> autonomy** (AV / drone / mobile-robot / humanoid), not LLM serving. It does **not** compose with the LLM
+> stack — and an internal probe found the math does **not** transfer to LLM trust routing (clean null,
+> AUC ≈ 0.48–0.53). The predictor-trust "BCVF" here is unrelated to the LLM-coherence "BCVF" used elsewhere in
+> Xozence materials. Full brief: `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`; dependency map:
+> `AUTONOMOUS_ROBOTICS_DEPENDENCY_MAP.md`.
+
+## 6.1 The Problem
+
+Every modern AV / drone / mobile-robot stack runs **multiple predictors feeding one planner** (HD-map prior,
+learned trajectory predictor, classical kinematic model, redundant sensors). When they agree, planning is
+routine. **When they disagree, the planner has no principled way to decide which predictor to trust** — and
+that is exactly the regime where disengagements and safety-case escalations concentrate. Today that
+arbitration is bespoke glue code, rebuilt per stack, with no stated invariance a safety case can point to.
+
+## 6.2 What It Does — and What It Does NOT Do
+
+| ✅ DOES | ❌ Does NOT |
+|---|---|
+| Arbitrates disagreeing predictors — *which* one is failing (per-predictor BCVF attribution), not which a heuristic prefers | Not a replacement for perception / prediction / fusion / planning — it arbitrates, it doesn't produce predictors |
+| Fires **only on genuine failure** — Lemma 1 invariance: constant + linear-drift disagreement → exactly **zero** signal; only acceleration above the noise floor moves a weight | Doesn't cover failures that aren't predictor *disagreement* (e.g. a shared-dimension camera degradation) — inapplicable there, documented |
+| Auditable per-tick trace (`TrustShapedEpisodeRecord`) of why a predictor was down-weighted | Does **not** transfer to LLM trust / hallucination routing (clean null) |
+| Tunable without retraining predictors or rewiring the planner; pure NumPy, CPU, ms/tick | Is **not** a full-AV platform, and has **no production deployment yet** |
+
+**In one sentence:** the missing predictor-trust **arbitration layer** — narrow by design, with a mathematical
+invariance a safety case can point to. It sells a *certifiable arbitration property*, not a smarter predictor.
+
+## 6.3 Evidence & Honest Status
+
+| Area | State |
+|---|---|
+| Detection kernel (Lemma 1: constant + linear-drift disagreement → zero cost) | Proven + regression-tested |
+| Seven-family characterization sweep | 0% FPR / 0% FNR; certification-grade grid (1560 cells, Wilson 95% CI floor 0.90, min ≈ 0.940) |
+| Apples-to-apples baseline shootout | BCVF **0.000** false-attribution on Lemma-1-invariant disagreement vs Majority-Vote **16.7** / EKF **1.1**; 8–19× faster per tick |
+| Real-sensor pilot runner | Executed on a realistic-noise adapter (N=21, win rate 1.000, p=0.0312); **real automotive data still pending** |
+| Safety-case scaffold | SOTIF / ISO 26262 traceability matrix (machine-checked snapshot); 1117 internal tests; 0.4.0 public-API stability policy |
+| Production deployment | **None yet** — Series-A-gated on one production reference |
+
+> Honest caveats: validated on **synthetic + realistic-noise** predictors only; applicable **only where
+> failure manifests as predictor disagreement**; the deep feature stack (ROS 2 / SBOM / attestation /
+> calibration / replay) is **built but customer-data-gated**. `AUTONOMOUS_ROBOTICS_DEPENDENCY_MAP.md` shows the
+> 77-symbol provisional surface graduates on **1–3 design partners + one auditor + one fleet**.
+
+## 6.4 The Ask
+
+Seed capital to convert a CI-validated research prototype with one statistically-significant companion result
+into a portable, multi-platform predictor-trust runtime that at least one external operator runs in production
+(the Series-A gate). The remaining roadmap is **execution against known dependencies** — dataset access,
+ROS 2 install, target hardware, design-partner engagement — not open research.
+
+*Module: `symbolu_robotics/bcvf_autonomous/` · Brief: `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md` · Dependency map: `AUTONOMOUS_ROBOTICS_DEPENDENCY_MAP.md`*
+
+---
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
 # Company Summary & Accelerator Fit
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## How the Platform Composes
 
-Xozence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others:
+Xozence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others (module 6, Autonomous Robotics, is an **adjacent safety-critical vertical** pitched standalone — it shares the trust-at-a-seam thesis but sits outside this LLM-stack composition):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
