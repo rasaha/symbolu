@@ -17,7 +17,7 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 |---|---|---|---|---|
 | 1 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios; further checked on *real workload traces* (simulated system dynamics) | **Shadow + recommend mode** (built/tested); validated in simulation + real-workload-trace replay; live-shadow harness built but **not yet run on a cluster**; third-party pending |
 | 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
-| 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.9.0, 1,550+ tests, 2 internal pilots |
+| 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.10.0, 1,550+ tests, 2 internal pilots |
 | 4 | **LLM Steering Controller** | Token / frame selection | Deterministic C×R×S frame-control + answer audit (validated near-term); multi-field token evaluation on frozen Mistral-7B as the research moat | **Mixed** — frame-control + audit validated on one open model; field-integration research-stage |
 | 5 | **PSE — Phoneme Symbolic Engine** *(standalone vertical)* | Naming / verbal identity | Deterministic naming & verbal-identity control layer — intent + constraints → reproducible, explainable, *available* name/sound-form candidates; AI authoring over the scaffold; compounding observation graph | **Engine + architecture built**; commercial surfaces (studio, observation platform, enterprise APIs) the build ahead; **standalone, does not compose with the LLM stack** |
 | 6 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
@@ -581,7 +581,7 @@ specification into a silicon-credible artifact.
 # 3. Agentic Framework — Governed Runtime for Autonomous AI Agents
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Governed Runtime for Autonomous AI Agents** — v1.9.0
+**Governed Runtime for Autonomous AI Agents** — v1.10.0
 
 ## 3.1 The Problem
 
@@ -779,7 +779,7 @@ comparison against the two most common competitor families:
 
 - **Governance *is* the execution path, not a wrapper around it.** The `cancel → budget → approve → execute` invariant is a tested runtime contract. No other framework in this landscape makes that a first-class, diff-testable property of the library itself — which is exactly what an enterprise risk team needs in order to sign off an autonomous agent.
 - **Portable across LLM providers by construction.** `BaseLLMAdapter` lets a customer start on OpenAI or Anthropic today and move to a self-hosted or CG-enabled model later with no application rewrite. Managed platforms on the list lock the buyer into a single cloud; open-source frameworks leave portability to the user.
-- **Signal enrichment from model internals is a category of one.** Because we ship our own CG-capable adapter (`MistralCGAdapter`) alongside the framework, governance can read entropy and vritti signals straight from the model's 32D state rather than trusting a text-level self-reported confidence. No wrapper on top of a closed API can reproduce this, and no closed API currently exposes it.
+- **A model-internal signal path, honestly bounded.** Because we ship our own CG-capable adapter (`MistralCGAdapter`), governance can read **raw next-token entropy** — the strongest *measured* uncertainty signal in our experiments — directly from the model, first-class and on by default, rather than trusting a text-level self-reported confidence. The deeper 32-D CG sovereign-state projection (vritti, JEPA) is **experimental research, off by default**: in our own pilots it did **not** beat raw entropy, and the company does not depend on it succeeding (see *Internal Signal Research Status*). No wrapper on a closed API exposes even the raw-entropy path the same way.
 - **Composes with, rather than replaces, the rest of the stack.** A customer can keep LangChain for its ecosystem, Temporal for durability, LangSmith for observability, NeMo Guardrails for content filtering — and still put Agentic Framework at the tool-execution boundary. We are the missing layer, not a rival to every layer.
 - **Honest scope on where we do not compete (year one).** We are not trying to win on ecosystem breadth, managed infrastructure, or multi-agent orchestration in the first twelve months. We are trying to win on the governance properties that regulated enterprises often cannot ship without: pinned action-loop ordering, per-tool risk classification, runtime approvals, hard budget caps, replayable traces, and — where customers adopt the CG path — signal enrichment from model-internal state.
 
@@ -794,7 +794,7 @@ in this table are building for.
 
 ## 3.4 Evidence & Roadmap
 
-### What is proved today (v1.9.0, internal evidence)
+### What is proved today (v1.10.0, internal evidence)
 
 | Area | Current state |
 |---|---|
@@ -806,11 +806,51 @@ in this table are building for.
 | **Realistic-mock regression** | 60/60 checks across 5 LLM output-format variations |
 | **Adoption pilots shipped** | 2 internal pilots — Research Assistant (tool composition + governance) and Internal Copilot (per-action-type approval boundary) |
 | **Known fragility points** | 3 of 4 surfaced in real-LLM pilots resolved (goal-alignment gate, action vocabulary normalization, usage accounting). The 4th is low-risk and tracked. |
-| **Signal-enriched governance (CG path)** | Operator-validated on `MistralCGAdapter` in a torch/GPU environment; not yet repo-validated end-to-end. |
+| **Raw-entropy escalation (confidence-risk gap)** | Wired into the gateway + the provider-agnostic adapter path; end-to-end validated in repo (gateway escalation + structured audit, with a negative control). First-class, on by default. |
+| **CG sovereign-state signals (experimental)** | Real CG checkpoint trained + three internal experiments completed. Raw entropy out-performed the 32-D CG-state projection; CG is **OFF by default**. See *Internal Signal Research Status*. |
 | **LLM adapters shipped** | OpenAI · Anthropic · Mistral (CG) · Mock — all behind a common `BaseLLMAdapter` |
 
 All numbers above are from our own repository and CI — not third-party
 benchmarks. An external benchmark is planned (see roadmap).
+
+### Internal Signal Research Status
+
+We ran a disciplined program to test whether model-internal signals improve governance beyond cheap
+baselines. Four experiments are complete:
+
+- **Real CG checkpoint pilot — completed.** A real CG head (Mistral-7B backbone + a trained sovereign-state
+  head) was trained and run through the signal harness. The 32-D state's vritti component was
+  non-discriminative (standalone AUROC 0.500).
+- **Fair-baseline pilot — completed.** With a *real* verbalized-confidence baseline (not a placeholder), the
+  full internal-signal config did **not** significantly beat verbalized confidence (ΔAUROC ≈ +0.02, p ≈ 0.18,
+  N=30). The model's own verbalized safety judgment captured most of the available signal.
+- **Fastest-falsification — completed.** On a confident-but-unsafe fabrication probe, scored on the subset
+  where verbalized confidence is fooled, **raw next-token entropy was the strongest signal (AUROC 0.857)**,
+  while the 32-D CG-state entropy was anti-predictive (0.457). Verdict: deprioritize the CG projection.
+- **C×R×S semantic-frame governance signal — completed (pre-registered, real engine).** Tested whether the §4
+  C×R×S frame signal adds value as an agent/tool-domain *governance* signal on a 60-scenario independent
+  benchmark. It carries real ranking signal (wrong-tool-domain F1 0→1.0, `unsafe_allow` 30→7) **but every
+  variant over-gates benign traffic** and **failed the pre-registered gate**
+  (`AGENTIC_CRS_INCREASES_FALSE_BLOCKS`). Verdict: **not validated for agentic governance; off the product
+  path; not wired into runtime.**
+
+**Net:** raw next-token entropy currently emerges as the strongest *measured* model-internal uncertainty
+signal. The CG sovereign-state projection and the C×R×S frame signal both remain experimental research, off
+the product path, until they beat the cheap baseline on a held-out benchmark without increasing false
+blocks/escalations.
+
+| Signal | Evidence | Status |
+|---|---|---|
+| **Risk taxonomy** | Strongest single feature across pilots (standalone AUROC ≈ 0.82) | **MEASURED** — shipped, default |
+| **Raw next-token entropy** | Strongest measured uncertainty signal; fooled-subset AUROC 0.857 | **MEASURED** — shipped, first-class default |
+| **Confidence-risk gap** | End-to-end validated wiring (escalation + audit + negative control) | **MEASURED** (wiring) / **DIRECTIONAL** (governance value) — shipped |
+| **CG entropy (32-D state)** | Fooled-subset AUROC 0.457 (anti-predictive); beaten by raw entropy | **RESEARCH** — off by default |
+| **C×R×S semantic-frame (agentic governance)** | Real ranking signal but over-gates benign; fails the pre-registered gate | **RESEARCH** — off the product path, not wired |
+| **JEPA / coherence** | Pilot standalone AUROC ≈ 0.70 / 0.68; no demonstrated value *over* raw entropy | **RESEARCH** — off by default |
+| **Vritti** | Standalone AUROC 0.500 (non-discriminative in every run) | **RESEARCH** — candidate for removal |
+
+*Classification key: **MEASURED** = supported by repo/CI or our own experiments; **DIRECTIONAL** = plausible
+but not yet established at statistical power; **RESEARCH** = open question, off the product path.*
 
 ### Developer-surface improvements (v1.7 → v1.9)
 
@@ -865,7 +905,7 @@ surface, and a path to model-internal signal enrichment gives Agentic
 Framework a defensible position in it.
 
 *Module: `agentic/agentic_framework/`*
-*v1.9.0 · 1,550+ internal tests · 2 internal pilots · live-adapter validated*
+*v1.10.0 · 1,550+ internal tests · 2 internal pilots · live-adapter validated · raw-entropy escalation validated end-to-end*
 
 ---
 
@@ -1726,7 +1766,7 @@ Each module is independently deployable and independently valuable. Initial comm
 |---|---|---|
 | **Cloud Scaling Controller** | Shadow + recommend mode built and tested; validated in simulation + real-workload-trace replay (simulated system dynamics); live-shadow harness built but not yet run on a cluster; third-party pending | First design-partner deployments (the live-shadow + third-party rungs); Stage 5 active mode |
 | **CTM+/PCAM** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
-| **Agentic Framework** | Pilot-ready (v1.9.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
+| **Agentic Framework** | Pilot-ready (v1.10.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
 | **LLM Steering Controller** | Mixed — frame-control + audit validated on one open model; field-integration research-stage | Human validation; control-vector benchmark; ship open-weight + closed-API control plane |
 | **Hybrid LLM** | Research-stage (training stack built) | External benchmarks (LRA, retrieval); 7B training run |
 | **PSE — Phoneme Symbolic Engine** *(standalone vertical)* | Engine + architecture built; commercial surfaces pending | Naming / sonic-branding wedge; observation platform; trajectory-schema standard |
