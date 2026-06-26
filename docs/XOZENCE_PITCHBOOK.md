@@ -1,6 +1,6 @@
 # Xozence Labs — Platform Overview
 
-**AI Infrastructure Platform | Five Composing Modules + One Adjacent Robotics Vertical | Prepared April 2026**
+**AI Infrastructure Platform | Five Composing Modules + Two Standalone Verticals (PSE · Robotics) | Prepared April 2026**
 *Contact: Rakesh Mohan — Xozence Labs*
 
 ---
@@ -19,10 +19,11 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 | 2 | **CTM+ / PCAM** | KV-cache eviction | Seven-signal scored eviction policy for LLM inference — +50% concurrent requests, −29% p99 latency vs. LRU | **Production-ready** (software); FPGA path started |
 | 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.9.0, 1,550+ tests, 2 internal pilots |
 | 4 | **LLM Steering Controller** | Token / frame selection | Deterministic C×R×S frame-control + answer audit (validated near-term); multi-field token evaluation on frozen Mistral-7B as the research moat | **Mixed** — frame-control + audit validated on one open model; field-integration research-stage |
-| 5 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
-| 6 | **Autonomous Robotics (BCVF)** *(adjacent vertical)* | Predictor-trust arbitration | Predictor-trust runtime between a robotics stack's predictors and its planner — Lemma-1 invariance a safety case can point to | **Research prototype** — validated on synthetic + realistic-noise predictors; no production deployment; **does not compose with modules 1–5** |
+| 5 | **PSE — Phoneme Symbolic Engine** *(standalone vertical)* | Naming / verbal identity | Deterministic naming & verbal-identity control layer — intent + constraints → reproducible, explainable, *available* name/sound-form candidates; AI authoring over the scaffold; compounding observation graph | **Engine + architecture built**; commercial surfaces (studio, observation platform, enterprise APIs) the build ahead; **standalone, does not compose with the LLM stack** |
+| 6 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
+| 7 | **Autonomous Robotics (BCVF)** *(standalone vertical)* | Predictor-trust arbitration | Predictor-trust runtime between a robotics stack's predictors and its planner — Lemma-1 invariance a safety case can point to | **Research prototype** — validated on synthetic + realistic-noise predictors; no production deployment; **does not compose with the LLM stack** |
 
-The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. A sixth module — **Autonomous Robotics (BCVF)** — is an **adjacent vertical**, not part of this vertical composition: it applies the same "multi-signal trust at a decision seam" thesis to a robotics planner's predictor-arbitration problem, but it targets safety-critical autonomy, does **not** compose with the LLM stack above, and is pitched standalone (its predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials). Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
+The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **CG LLM** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **CTM+/PCAM** manages the KV-cache that makes inference affordable, and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
 
 ---
 
@@ -32,9 +33,10 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 2. [CTM+ / PCAM — Intelligent KV-Cache Eviction](#2-ctm--pcam--intelligent-kv-cache-eviction)
 3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
 4. [LLM Steering Controller](#4-llm-steering-controller)
-5. [Hybrid LLM — Algorithmic Fusion of Attention Mechanisms](#5-hybrid-llm--algorithmic-fusion-of-attention-mechanisms)
-6. [Autonomous Robotics — Predictor-Trust Runtime (BCVF) — *adjacent vertical*](#6-autonomous-robotics--predictor-trust-runtime-bcvf)
-7. [Company Summary & Accelerator Fit](#company-summary)
+5. [PSE — Phoneme Symbolic Engine (Naming / Verbal-Identity Control) — *standalone vertical*](#5-pse--phoneme-symbolic-engine)
+6. [Hybrid LLM — Algorithmic Fusion of Attention Mechanisms](#6-hybrid-llm--algorithmic-fusion-of-attention-mechanisms)
+7. [Autonomous Robotics — Predictor-Trust Runtime (BCVF) — *standalone vertical*](#7-autonomous-robotics--predictor-trust-runtime-bcvf)
+8. [Company Summary & Accelerator Fit](#company-summary)
 
 ---
 
@@ -1239,7 +1241,61 @@ Agentic Framework's differentiation once benchmark validation is complete.
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# 5. Hybrid LLM — Algorithmic Fusion of Attention Mechanisms
+# 5. PSE — Phoneme Symbolic Engine
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+**The deterministic, governable control layer for naming and verbal identity. Standalone vertical — it shares the platform's determinism-as-control thesis but does not compose with the LLM serving stack.**
+
+> **Scope note (read first).** PSE is a **separate product** from the LLM-stack modules: it controls **naming
+> and verbal / sonic identity**, not token generation. It is deliberately **firewalled** from the LLM Steering
+> Controller (§4) — PSE's symbolic profile is never used as a meaning or score signal inside generation. Full
+> brief: `varna_lens/PSE_VC_BRIEF.md`.
+
+## 5.1 The Problem
+
+Every product, company, feature — and now every AI agent — needs names and verbal identity, but today that
+happens in chatbots and spreadsheets: **non-reproducible, unconstrained, unaudited, and blind** to whether a
+name is even *available* (trademark / domain / handle) or how it actually lands by market and language. There
+is no controllable, repeatable instrument for sound-form decisions.
+
+## 5.2 What It Does — and What It Does NOT Do
+
+| ✅ DOES | ❌ Does NOT |
+|---|---|
+| Deterministic symbolic control — a word / coined form → a structured **trajectory** profile (same input → same profile); specify constraints (sound shape, length, multilingual safety, availability) → it **generates conforming forms** | Does **not** claim **intrinsic sound meaning** — sounds are not asserted to carry objective meaning |
+| AI-assisted **authoring** over the deterministic scaffold (name rationales, mood palettes, mantras) under a hard honesty filter | Does **not** claim **scientific validation** of its vocabulary — it is an engineered, editable, versioned vocabulary, not a natural ontology |
+| Observation-driven improvement — logs forms + human reactions as **measured associations** with controls and confidence, compounding by market and language | Reports **measured associations**, segmented and controlled — **never universal truths**, and **never decoded meaning** |
+| Deterministic, auditable, on-prem / VPC outputs — the enterprise governance LLMs structurally lack | Is **not** a creative toy or a chatbot, and is **not** wired into the §4 Steering Controller |
+
+**In one sentence:** the deterministic, governable **control plane for naming and verbal identity** — every
+product, brand, and AI agent's name and sound-form decision made reproducible, explainable, *available*, and
+measurably effective.
+
+## 5.3 Architecture & Moat
+
+**Five layers:** deterministic sound parser → trajectory builder → **neutral trajectory schema** (the stable
+interface everything else depends on) → observation layer → AI rendering layer. The symbolic vocabulary is an
+editable component *behind* the schema, so the product survives any change to it.
+
+**Moat (ranked, honest):** (1) proprietary **observation graph** — compounding, model-independent outcome data
+on how forms land, in no language model; (2) **governance & reproducibility** — deterministic, auditable,
+on-prem outputs; (3) **availability-grounded constraint engine** (trademark / domain / handle / multilingual
+safety); (4) the **trajectory schema** as a candidate interchange standard. The AI renderer is explicitly
+*not* a moat (commoditized by better models).
+
+## 5.4 Honest Status & Ask
+
+The deterministic engine, the trajectory / rendering architecture, the honesty filter, and the
+observation-capture design are specified and in working form. The commercial surfaces — studio UI, observation
+platform, enterprise APIs — are the build ahead. Seed-to-A capital ships the naming / sonic-branding wedge,
+builds the observation platform, and establishes the trajectory schema as a reusable standard.
+
+*Engine: `varna_lens/` · Brief: `varna_lens/PSE_VC_BRIEF.md` · Architecture: `varna_lens/PSE_RENDERER_V3_ARCHITECTURE.md`*
+
+---
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+# 6. Hybrid LLM — Algorithmic Fusion of Attention Mechanisms
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
 **`HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
@@ -1565,13 +1621,13 @@ accelerators for this work.
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# 6. Autonomous Robotics — Predictor-Trust Runtime (BCVF)
+# 7. Autonomous Robotics — Predictor-Trust Runtime (BCVF)
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Adjacent vertical — a portable predictor-trust layer between a robotics stack's predictors and its planner. Pitched standalone; it shares the platform's "multi-signal trust at a decision seam" thesis but does not compose with the LLM modules above.**
+**Standalone vertical — a portable predictor-trust layer between a robotics stack's predictors and its planner. Pitched standalone; it shares the platform's "multi-signal trust at a decision seam" thesis but does not compose with the LLM modules above.**
 
-> **Scope note (read first).** This is a **separate vertical** from modules 1–5: it targets **safety-critical
-> autonomy** (AV / drone / mobile-robot / humanoid), not LLM serving. It does **not** compose with the LLM
+> **Scope note (read first).** This is a **separate vertical**, outside the LLM-stack composition: it targets
+> **safety-critical autonomy** (AV / drone / mobile-robot / humanoid), not LLM serving. It does **not** compose with the LLM
 > stack — and an internal probe found the math does **not** transfer to LLM trust routing (clean null,
 > AUC ≈ 0.48–0.53). The predictor-trust "BCVF" here is unrelated to the LLM-coherence "BCVF" used elsewhere in
 > Xozence materials. Full brief: `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`; dependency map:
@@ -1630,12 +1686,12 @@ ROS 2 install, target hardware, design-partner engagement — not open research.
 
 ## How the Platform Composes
 
-Xozence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others (module 6, Autonomous Robotics, is an **adjacent safety-critical vertical** pitched standalone — it shares the trust-at-a-seam thesis but sits outside this LLM-stack composition):
+Xozence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others (modules 5 (PSE) and 7 (Autonomous Robotics) are **standalone verticals** pitched separately — they share the determinism / trust-at-a-seam thesis but sit outside this LLM-stack composition):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  5. Hybrid LLM              Long-context attention substrate            │
-│     └──► 4. CG LLM          Multi-field token evaluation + 32D state   │
+│  6. Hybrid LLM              Long-context attention substrate            │
+│     └──► 4. Steering Ctrl   Multi-field token evaluation + 32D state   │
 │           └──► 3. Agentic    Governed runtime reading model internals   │
 │  2. CTM+/PCAM               KV-cache eviction for inference serving    │
 │  1. Cloud Scaling Controller Decision-quality layer for infrastructure  │
@@ -1668,12 +1724,14 @@ Each module is independently deployable and independently valuable. Initial comm
 | **Cloud Scaling Controller** | Shadow + recommend mode built and tested; validated in simulation + real-workload-trace replay (simulated system dynamics); live-shadow harness built but not yet run on a cluster; third-party pending | First design-partner deployments (the live-shadow + third-party rungs); Stage 5 active mode |
 | **CTM+/PCAM** | Production-ready (software); FPGA path started | Serving-tier benchmark closure; design-partner pilots with inference operators |
 | **Agentic Framework** | Pilot-ready (v1.9.0, 2 internal pilots) | External design-partner pilots (BFSI, healthcare); managed runtime |
-| **Conscious Generation LLM** | Research-stage (phase adapter live) | Benchmark validation; adapter maturation for Agentic Framework |
+| **LLM Steering Controller** | Mixed — frame-control + audit validated on one open model; field-integration research-stage | Human validation; control-vector benchmark; ship open-weight + closed-API control plane |
 | **Hybrid LLM** | Research-stage (training stack built) | External benchmarks (LRA, retrieval); 7B training run |
+| **PSE — Phoneme Symbolic Engine** *(standalone vertical)* | Engine + architecture built; commercial surfaces pending | Naming / sonic-branding wedge; observation platform; trajectory-schema standard |
+| **Autonomous Robotics (BCVF)** *(standalone vertical)* | Research prototype; validated on synthetic + realistic-noise; no production deployment | nuScenes pilot + first design partner; Series-A gate = one production reference |
 
 ## Why Xozence for This Accelerator
 
-**The platform thesis is coherent.** The five modules compose into a single vertical stack, share common architectural patterns (multi-signal scoring, phase-aware state, spec-and-runtime separation), and reinforce each other's competitive position. They are one thesis — smarter decisions at the seams — applied at five layers of the AI infrastructure stack, not five independent bets.
+**The platform thesis is coherent.** The five modules compose into a single vertical stack, share common architectural patterns (multi-signal scoring, phase-aware state, spec-and-runtime separation), and reinforce each other's competitive position. They are one thesis — smarter decisions at the seams — applied at five layers of the AI infrastructure stack, not five independent bets. Two further products — **PSE** (naming / verbal-identity control) and **Autonomous Robotics** (predictor-trust) — extend the same determinism / trust-at-a-seam thesis into adjacent domains, pitched as standalone verticals rather than part of the LLM-stack composition.
 
 **The technology is built, not pitched.** 3,200+ tests across the platform. 228+ unit tests on the scaling controller. 276 on the KV-cache policy. 1,550+ on the agentic runtime. Production-grade code with adversarial safety validation, not slideware. Every module has a working implementation, a test suite, and an honest assessment of what is validated versus what remains to be proven.
 
