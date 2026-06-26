@@ -70,6 +70,15 @@ def main() -> None:
     ap.add_argument("--gen-tokens", type=int, default=400)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="runs/symbolu_gpu")
+    # head-role policy (validation-first / control-later)
+    ap.add_argument("--control-heads", default="",
+                    help="comma list of heads allowed to drive control entropy, e.g. "
+                         "'vritti,aspect' (staged policy). empty = default (aspect,guna,kosha)")
+    ap.add_argument("--control-layer", type=int, default=-1,
+                    help="layer whose hidden feeds the typed heads (-1=final/current; "
+                         "use a late layer for staged control)")
+    ap.add_argument("--stopgrad-heads", action="store_true",
+                    help="typed heads diagnostic/validation-only (no grad into backbone)")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -88,6 +97,11 @@ def main() -> None:
     cfg.backbone.n_heads = args.heads
     cfg.backbone.max_seq = args.block
     cfg.contrib_eval_every = args.contrib_every
+    # apply head-role policy
+    if args.control_heads.strip():
+        cfg.control_heads = tuple(h.strip() for h in args.control_heads.split(",") if h.strip())
+    cfg.control_layer = args.control_layer
+    cfg.stopgrad_heads = args.stopgrad_heads
 
     model = SymbolUSoftmaxModel(cfg).to(device)
     opt = torch.optim.AdamW(
@@ -192,7 +206,8 @@ def main() -> None:
                    "act_norm": float(aux.get("act_norm", 0.0)),
                    "tokens": tok_count,
                    "tok_per_s": round(tok_count / (time.time() - t0), 1)}
-            for k in ("entropy_mean", "entropy_std", "refine_residual_norm",
+            for k in ("entropy_mean", "entropy_std", "H_vritti", "H_aspect",
+                      "H_guna", "H_kosha", "refine_residual_norm",
                       "refine_gate_mean", "refine_halt_p", "mem_residual_norm",
                       "mem_readiness"):
                 if k in aux:

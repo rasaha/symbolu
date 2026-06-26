@@ -72,12 +72,14 @@ class SymbolUSoftmaxModel(nn.Module):
             head_in = h_tap.detach() if getattr(cfg, "stopgrad_heads", False) else h_tap
             tout = self.heads(head_in)
             aux.update(tout)
-            ent = TypedHeadBank.entropies(tout)             # [B,L,3]
+            # CONTROL entropy honors the head-role policy (cfg.control_heads).
+            ent = TypedHeadBank.entropies(tout, getattr(cfg, "control_heads", None))
             if "typed_heads" in disabled or "entropy" in disabled:
                 ent = torch.zeros_like(ent)
             aux["entropy_vec"] = ent
             aux["entropy_mean"] = ent.mean().detach()
             aux["entropy_std"] = ent.std().detach()         # ~0 => heads collapsed
+            aux.update(TypedHeadBank.per_head_entropy(tout))  # diagnostics for ALL heads
         if cfg.entropy_refine and ent is not None and "refine" not in disabled:
             h, info = self.refine(h, ent)
             aux["ponder_cost"] = info["ponder_cost"]

@@ -211,6 +211,42 @@ policy refinement/memory would remain at Stage-2/diagnostic, not control.
   (no gradient into the backbone): this *is* Design B / Stages 1–2.
 - `run_layer_probe.py` — the layer-wise probing harness with shuffled-label controls.
 
+### Adopted head-role policy (now enforced in code)
+
+The following split is adopted and **enforced at the control boundary** (not just
+documented): only Vritti & Aspect may drive the control entropy that gates
+refinement/memory; Guna/Kosha are computed for supervision/diagnostics but excluded
+from control; DHA is preference-only.
+
+| Component | Initial role | Enforcement |
+|---|---|---|
+| Vritti head | control-later (first control candidate) | included in `control_heads` |
+| Aspect head | control-later (first control candidate) | included in `control_heads` |
+| Guna head | supervised-only / diagnostic first | computed + logged (`H_guna`), **excluded** from control entropy |
+| Kosha head | supervised-only / diagnostic first | computed + logged (`H_kosha`), **excluded** from control entropy |
+| Entropy from heads | control signal, calibrated carefully | built **only** from `control_heads` (`TypedHeadBank.entropies`) |
+| Recursive refinement | control module | gated by contribution + residual-reg; demote if it fails the capacity control |
+| Deferred memory | control module | same |
+| DHA | supervised / preference-only first | not wired into the LM-loss path (generation-time only) |
+
+Encoded as `config.HEAD_ROLES` and `config.with_staged_roles(cfg)` (sets
+`control_heads=("vritti","aspect")`). Default (`control_heads=None`) preserves the
+original behavior exactly. Rationale (matches the analysis above): weakly-grounded
+heads that directly move logits inject noise; Guna/Kosha are too abstract to trust as
+direct controls before grounding, so they stay diagnostic.
+
+**Staged GPU run honoring the policy** (only Vritti+Aspect control; late-layer tap):
+
+```bash
+CONTROL_HEADS="vritti,aspect" CONTROL_LAYER=-1 bash scripts/run_gpu_training.sh
+# or, to also tap a late layer and keep heads diagnostic-only (Stage 1/2):
+CONTROL_HEADS="vritti,aspect" CONTROL_LAYER=6 STOPGRAD_HEADS=1 \
+  DMODEL=512 LAYERS=8 bash scripts/run_gpu_training.sh
+```
+
+`train_log.jsonl` records all four head entropies (`H_vritti/H_aspect/H_guna/H_kosha`)
+so Guna/Kosha are observable as diagnostics while only Vritti+Aspect drive control.
+
 ### Proposed (not built — small, additive) to complete the strategy
 - **Per-head layer assignment** (extend `control_layer` from one int to a per-signal
   map) so Aspect can be probed mid while refinement/DHA read late — a few lines in

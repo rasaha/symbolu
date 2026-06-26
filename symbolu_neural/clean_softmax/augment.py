@@ -37,13 +37,34 @@ class TypedHeadBank(nn.Module):
         return {"log_p_v": self.vritti(h), "log_p_w": self.aspect(h),
                 "log_p_g": self.guna(h), "log_p_k": self.kosha(h)}
 
+    _HEAD_KEY = {"vritti": "log_p_v", "aspect": "log_p_w",
+                 "guna": "log_p_g", "kosha": "log_p_k"}
+
     @staticmethod
-    def entropies(out: Dict[str, torch.Tensor]) -> torch.Tensor:
-        """Per-position [B,L,3] entropy vector (H_D over aspect, H_G, H_K)."""
-        H_D = shannon_entropy(out["log_p_w"])
-        H_G = shannon_entropy(out["log_p_g"])
-        H_K = shannon_entropy(out["log_p_k"])
-        return torch.stack([H_D, H_G, H_K], dim=-1)        # [B,L,3]
+    def entropies(out: Dict[str, torch.Tensor], control_heads=None) -> torch.Tensor:
+        """Per-position [B,L,3] CONTROL entropy vector that gates refine/memory.
+
+        control_heads selects which typed heads are allowed to drive control
+        (head-role policy). None reproduces the original behavior exactly:
+        [H_aspect, H_guna, H_kosha]. A staged policy of ("vritti","aspect") yields
+        [H_vritti, H_aspect, 0] — Guna/Kosha are still computed (for supervision /
+        diagnostics) but excluded from the control signal. Width is fixed at 3 so the
+        gate layers are unchanged."""
+        if control_heads is None:
+            order = ["aspect", "guna", "kosha"]            # backward-compatible default
+        else:
+            order = [h for h in ("vritti", "aspect", "guna", "kosha")
+                     if h in control_heads]
+        zero = shannon_entropy(out["log_p_w"]) * 0.0
+        slots = [shannon_entropy(out[TypedHeadBank._HEAD_KEY[h]]) for h in order[:3]]
+        while len(slots) < 3:
+            slots.append(zero)
+        return torch.stack(slots, dim=-1)                  # [B,L,3]
+
+    @staticmethod
+    def per_head_entropy(out: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        return {f"H_{h}": shannon_entropy(out[k]).mean().detach()
+                for h, k in TypedHeadBank._HEAD_KEY.items()}
 
 
 class CausalEntropyRefinement(nn.Module):

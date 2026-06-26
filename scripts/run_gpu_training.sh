@@ -32,6 +32,11 @@ LOG_EVERY="${LOG_EVERY:-50}"
 CONTRIB_EVERY="${CONTRIB_EVERY:-4}"
 GEN_TOKENS="${GEN_TOKENS:-400}"
 SEED="${SEED:-0}"
+# head-role policy (validation-first / control-later). Default empty = current
+# behavior (aspect,guna,kosha drive control). Adopted staged policy: "vritti,aspect".
+CONTROL_HEADS="${CONTROL_HEADS:-}"
+CONTROL_LAYER="${CONTROL_LAYER:--1}"
+STOPGRAD_HEADS="${STOPGRAD_HEADS:-0}"
 
 echo "=================================================================="
 echo " Symbol-U clean-softmax GPU training :: experiment=$EXP"
@@ -69,6 +74,8 @@ python -m symbolu_neural.clean_softmax.train_gpu \
   --block "$BLOCK" --d-model "$DMODEL" --layers "$LAYERS" --heads "$HEADS" \
   --amp --ckpt-every "$CKPT_EVERY" --eval-every "$EVAL_EVERY" --log-every "$LOG_EVERY" \
   --contrib-every "$CONTRIB_EVERY" --gen-tokens "$GEN_TOKENS" --seed "$SEED" \
+  --control-heads "$CONTROL_HEADS" --control-layer "$CONTROL_LAYER" \
+  $( [ "$STOPGRAD_HEADS" = "1" ] && echo --stopgrad-heads ) \
   --out "$OUT" 2>&1 | tee "$OUT/train_console.log"
 
 # ---- 5) explicitly run generate.py on the final checkpoint (validates loading) ----

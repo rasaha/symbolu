@@ -37,6 +37,12 @@ python -m symbolu_neural.clean_softmax.train_gpu \
 - `--mode combined` keeps the contribution + residual-reg + entropy-cal objectives
   so the contribution diagnostics are produced; `--contrib-every 4` runs the extra
   enabled-vs-disabled forwards every 4 steps to bound overhead.
+- **head-role policy** (validation-first): add `--control-heads vritti,aspect` (or
+  `CONTROL_HEADS="vritti,aspect" bash scripts/run_gpu_training.sh`) so only Vritti &
+  Aspect drive the control entropy; Guna/Kosha stay diagnostic (still logged as
+  `H_guna`/`H_kosha`). Optional `--control-layer <late idx>` taps a late zone and
+  `--stopgrad-heads` makes the heads validation-only (Stages 1–2). Default
+  (`--control-heads ""`) preserves the original behavior.
 
 ## Hardware / GPU recommendations
 

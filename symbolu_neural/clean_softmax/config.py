@@ -30,6 +30,10 @@ class ExpConfig:
                                         # block output (0..n_layers).
     stopgrad_heads: bool = False        # True = typed heads are diagnostic/validation
                                         # only (no gradient into the backbone)
+    # head-role policy: which typed heads may drive the CONTROL entropy that gates
+    # refinement/memory. None = original behavior (aspect,guna,kosha). The adopted
+    # staged policy is ("vritti","aspect"); Guna/Kosha stay supervised/diagnostic.
+    control_heads: tuple = None
     # aux-loss weights
     ponder_weight: float = 1e-3
     entropy_cal_weight: float = 0.0     # off by default (it shapes calibration)
@@ -101,6 +105,29 @@ def get_ablation(name: str) -> ExpConfig:
     if name not in ABLATIONS:
         raise KeyError(f"unknown ablation '{name}'; choices={list(ABLATIONS)}")
     return ABLATIONS[name]()
+
+
+# Adopted head-role policy (validation-first / control-later). Vritti & Aspect are
+# the first control candidates; Guna/Kosha & DHA stay supervised/diagnostic until
+# they prove they improve generation or controllability.
+HEAD_ROLES = {
+    "vritti":     "control-later (first control candidate)",
+    "aspect":     "control-later (first control candidate)",
+    "guna":       "supervised-only / diagnostic first",
+    "kosha":      "supervised-only / diagnostic first",
+    "entropy":    "control signal — calibrated carefully (only over validated heads)",
+    "refinement": "control module",
+    "memory":     "control module",
+    "dha":        "supervised / preference-only first",
+}
+
+
+def with_staged_roles(cfg: ExpConfig) -> ExpConfig:
+    """Enforce the adopted policy at the control boundary: only Vritti & Aspect feed
+    the control entropy that gates refinement/memory. Guna/Kosha heads are still
+    computed (for supervision/diagnostics) but excluded from control."""
+    cfg.control_heads = ("vritti", "aspect")
+    return cfg
 
 
 # Training modes apply auxiliary-loss weights on top of an ablation config.
