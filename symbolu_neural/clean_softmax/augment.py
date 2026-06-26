@@ -130,13 +130,19 @@ class CausalPrefixMemory(nn.Module):
         self.readiness = nn.Linear(3, 1)
 
     def forward(self, h: torch.Tensor, entropy_vec: torch.Tensor):
+        """Vectorized causal decayed prefix mean (same computation as the old
+        O(L) python loop, no semantic change). mem[t] = sum_{s<t} (1-decay)
+        decay^{t-1-s} v[s], strictly causal (excludes current position). Stable
+        for L up to a few hundred (decay^{-t} stays bounded)."""
         B, L, d = h.shape
         v = self.val(h)
-        # causal decayed prefix mean (exclusive of current pos to be safe)
-        mem = torch.zeros_like(v)
-        run = h.new_zeros(B, d)
-        for t in range(L):
-            mem[:, t] = run
-            run = self.decay * run + (1 - self.decay) * v[:, t]
+        t = torch.arange(L, device=h.device, dtype=h.dtype)
+        dp = self.decay ** t                               # decay^t        [L]
+        inv = self.decay ** (-t)                           # decay^{-t}     [L]
+        run = (1.0 - self.decay) * dp.view(1, L, 1) * (v * inv.view(1, L, 1)).cumsum(1)
+        mem = torch.zeros_like(run)
+        mem[:, 1:] = run[:, :-1]                            # exclusive (strictly < t)
         R = torch.sigmoid(self.readiness(entropy_vec))     # [B,L,1]
-        return h + R * mem, {"readiness": R.mean()}
+        injected = R * mem
+        return h + injected, {"readiness": R.mean().detach(),
+                              "residual_norm": injected.norm().detach()}

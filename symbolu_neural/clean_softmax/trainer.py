@@ -14,24 +14,26 @@ from .metrics import val_loss_ppl, ece_and_entropy_corr
 
 
 def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
-                   steps=250, lr=3e-3, seed=0, log_every=0) -> Dict[str, float]:
+                   steps=250, lr=3e-3, seed=0, log_every=0, device="cpu",
+                   val_every=0, collect=False):
     torch.manual_seed(seed)
     gen = torch.Generator().manual_seed(seed)
-    model = SymbolUSoftmaxModel(cfg)
+    model = SymbolUSoftmaxModel(cfg).to(device)
     opt = torch.optim.AdamW(
         [p for p in model.parameters() if p.requires_grad], lr=lr, weight_decay=0.01)
     it = make_batches(train_ids, block, batch, generator=gen)
+    history = []                                            # per-log-point diagnostics
     model.train()
     t0 = time.time()
     for step in range(steps):
         x, y = next(it)
+        x, y = x.to(device), y.to(device)
         aux = model(x)
         logits = aux["logits"]
         loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), y.reshape(-1))
         if cfg.entropy_refine and "ponder_cost" in aux:
             loss = loss + cfg.ponder_weight * aux["ponder_cost"]
         if cfg.entropy_cal_weight > 0 and "entropy_vec" in aux:
-            # correlate symbolic H_D with per-position LM NLL (calibration shaping)
             with torch.no_grad():
                 nll = F.cross_entropy(logits.reshape(-1, logits.size(-1)),
                                       y.reshape(-1), reduction="none").reshape(y.shape)
@@ -40,20 +42,40 @@ def train_and_eval(cfg: ExpConfig, train_ids, val_ids, block=128, batch=24,
             corr = (Hn * en).mean() / (Hn.std().clamp_min(1e-6) * en.std().clamp_min(1e-6))
             loss = loss + cfg.entropy_cal_weight * (1 - corr)
         opt.zero_grad(); loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0).item()
         opt.step()
-        if log_every and (step + 1) % log_every == 0:
-            print(f"    step {step+1}/{steps} loss={loss.item():.3f}")
+        do_log = (log_every and (step + 1) % log_every == 0)
+        do_val = (val_every and (step + 1) % val_every == 0)
+        if collect and (do_log or do_val or step == 0):
+            rec = {"step": step + 1, "train_loss": loss.item(), "grad_norm": gnorm,
+                   "act_norm": float(aux.get("act_norm", 0.0))}
+            for k in ("entropy_mean", "entropy_std", "refine_residual_norm",
+                      "refine_gate_mean", "refine_halt_p", "mem_residual_norm",
+                      "mem_readiness"):
+                if k in aux:
+                    rec[k] = float(aux[k])
+            if do_val:
+                model.eval()
+                rec["val_loss"] = val_loss_ppl(
+                    lambda z: model(z.to(device))["logits"], val_ids, block, batch
+                )["val_loss"]
+                model.train()
+            history.append(rec)
+        if do_log:
+            print(f"    step {step+1}/{steps} loss={loss.item():.3f} gnorm={gnorm:.2f}")
     train_time = time.time() - t0
 
     model.eval()
-    fwd = lambda x: model(x)["logits"]
+    fwd = lambda z: model(z.to(device))["logits"]
     m = val_loss_ppl(fwd, val_ids, block, batch)
     m.update(ece_and_entropy_corr(fwd, val_ids, block, batch))
     m["params"] = model.num_params()
     m["trainable_params"] = model.num_params(trainable_only=True)
     m["train_time_s"] = round(train_time, 1)
     m["ms_per_step"] = round(1000 * train_time / steps, 1)
+    m["device"] = device
+    if collect:
+        return m, model, history
     return m, model
 
 

@@ -47,18 +47,25 @@ class SymbolUSoftmaxModel(nn.Module):
         aux: Dict[str, torch.Tensor] = {}
         if cfg.extra_plain_block:
             h = self.extra_block(h)
+        aux["act_norm"] = h.norm().detach()                 # backbone activation norm
         ent = None
         if cfg.typed_heads:
             tout = self.heads(h)
             aux.update(tout)
             ent = TypedHeadBank.entropies(tout)             # [B,L,3]
             aux["entropy_vec"] = ent
+            aux["entropy_mean"] = ent.mean().detach()
+            aux["entropy_std"] = ent.std().detach()         # ~0 => heads collapsed
         if cfg.entropy_refine and ent is not None:
             h, info = self.refine(h, ent)
             aux["ponder_cost"] = info["ponder_cost"]
+            aux["refine_residual_norm"] = info["residual_post_gate_norm"]
+            aux["refine_gate_mean"] = info["gate_mean"]
+            aux["refine_halt_p"] = info["halt_p_mean"]
         if cfg.memory and ent is not None:
             h, minfo = self.memory(h, ent)
             aux["mem_readiness"] = minfo["readiness"]
+            aux["mem_residual_norm"] = minfo["residual_norm"]
         aux["logits"] = self.lm.logits(h)
         return aux
 

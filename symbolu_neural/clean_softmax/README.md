@@ -139,6 +139,51 @@ is a placeholder**, and the other **11** algorithms are **not connected**.
 > residual scale; no new algorithms) and is now **ACTIVE** — ablating it changes
 > **106/130** tokens. See the "Update" section of the report for before/after.
 
+## Training & diagnostics study (`run_training_study.py`)
+
+Trains the ablations longer, logs training/validation curves + per-module
+diagnostics (grad norm, activation norm, refinement/memory residual norms, gate
+stats, entropy), generates fixed-prompt samples, and flags failure modes. Full
+results and the improvement plan are in
+[`TRAINING_DIAGNOSTICS_REPORT.md`](TRAINING_DIAGNOSTICS_REPORT.md).
+
+```bash
+# CPU (small, reproducible)
+python -m symbolu_neural.clean_softmax.prepare_data --out data/clean_lm/corpus.txt
+python -m symbolu_neural.clean_softmax.run_training_study --steps 600 --block 96 --batch 16
+
+# GPU (auto-detects CUDA; larger model)
+python -m symbolu_neural.clean_softmax.run_training_study \
+    --steps 4000 --block 256 --batch 64 --d-model 384 --layers 6 --val-every 200
+
+# generate from a saved study checkpoint
+python -m symbolu_neural.clean_softmax.generate \
+    --ckpt runs/study/full/ckpt.pt --prompt "The model " --max-new-tokens 300 \
+    --temperature 0.8 --top-k 40
+```
+
+Per-ablation checkpoints, configs, and `log.json` (curves + samples + failures)
+are written under `runs/study/<ablation>/`.
+
+### How to interpret the diagnostics
+- **val curve** should decrease monotonically (instability = it rises or NaNs).
+- **refineR / actN** and **memR / actN**: residual-to-activation ratios. `< ~0.5`
+  = healthy; `> 1.0` = the module is **overpowering** the hidden state.
+- **refine_halt_p**: if it falls to ~0 while the gate sits at `min_strength`, the
+  optimizer is **rejecting** the module (it's forced-on by the floor, not earned).
+- **entropy_std (Hstd)**: near 0 = typed heads **collapsed** (all positions same).
+- **longest_run / distinct_char_ratio** in samples: repetition / collapse signals.
+
+### Pass / fail for this study (participation & stability, NOT quality)
+- **PASS** if: training is stable (monotone val), no module overpowers the hidden
+  state (ratio < 1.0), entropy heads don't collapse, and the active mechanisms
+  measurably participate (per `inspect_generation.py`).
+- **FAIL** if: loss diverges/NaNs, a residual ratio exceeds 1.0, entropy collapses,
+  or a "active" mechanism changes 0 tokens under ablation.
+- **Current status: PASS on stability/participation; INCONCLUSIVE on usefulness** —
+  generation is incoherent at this scale and the val gains over the plain baseline
+  are explained by added capacity (see report). No quality claim is made.
+
 ## PASS / FAIL criteria
 
 The formula is credited **only** if a **trained** Symbol-U ablation
