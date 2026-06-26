@@ -56,6 +56,30 @@ def test_causality_no_future_leak():
         print(f"PASS causality [{name}] (max pre-p logit diff {max_diff:.1e})")
 
 
+def test_refinement_active():
+    """Refinement must measurably change the hidden state, and disabling it (same
+    seed) must change the logits. Guards against the no-op regression."""
+    from .augment import TypedHeadBank
+    V, L = 40, 16
+    torch.manual_seed(0)
+    model = SymbolUSoftmaxModel(_cfg("entropy_refine", V, 32, L)).eval()
+    ids = torch.randint(0, V, (2, L))
+    with torch.no_grad():
+        h = model.lm.hidden(ids)
+        ent = TypedHeadBank.entropies(model.heads(h))
+        refined, diag = model.refine(h, ent)
+        dh = (refined - h).norm().item()
+        # logits with refinement on vs off (refinement skipped)
+        on = model.lm.logits(refined)
+        off = model.lm.logits(h)
+        dlogit = (on - off).abs().max().item()
+    assert dh > 1e-2, f"refinement hidden delta {dh:.2e} too small (no-op regression)"
+    assert dlogit > 1e-3, f"disabling refinement barely changes logits ({dlogit:.2e})"
+    assert diag["residual_post_gate_norm"] > 1e-2
+    print(f"PASS refinement active (Δhidden {dh:.3f}, Δlogit {dlogit:.3f}, "
+          f"gate_mean {float(diag['gate_mean']):.3f})")
+
+
 def test_param_overhead_positive():
     base = SymbolUSoftmaxModel(_cfg("baseline")).num_params()
     full = SymbolUSoftmaxModel(_cfg("full")).num_params()
@@ -66,6 +90,7 @@ def test_param_overhead_positive():
 def _run_all():
     test_shapes_and_backward()
     test_causality_no_future_leak()
+    test_refinement_active()
     test_param_overhead_positive()
     print("ALL CLEAN-SOFTMAX CHECKS PASSED")
 

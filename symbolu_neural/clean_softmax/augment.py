@@ -57,28 +57,60 @@ class CausalEntropyRefinement(nn.Module):
     (it diverges as H->0); a ponder cost regularizes compute instead.
     """
 
-    def __init__(self, d: int, n_heads: int, d_ff: int, max_steps: int = 3):
+    def __init__(self, d: int, n_heads: int, d_ff: int, max_steps: int = 3,
+                 min_strength: float = 0.1, residual_scale: float = 1.0,
+                 fixed_steps: bool = False):
         super().__init__()
         self.max_steps = max_steps
+        self.min_strength = float(min_strength)       # gate floor (cannot collapse to 0)
+        self.residual_scale = float(residual_scale)   # fixed scale on the refinement delta
+        self.fixed_steps = bool(fixed_steps)          # smoke mode: bypass ACT halting
         self.block = CausalBlock(d, n_heads, d_ff)
-        self.halt = nn.Linear(d + 3, 1)                    # entropy-conditioned
+        self.halt = nn.Linear(d + 3, 1)               # entropy-conditioned
+        nn.init.zeros_(self.halt.weight)              # start engaged: sigmoid(2)≈0.88
+        nn.init.constant_(self.halt.bias, 2.0)
 
     def forward(self, h: torch.Tensor, entropy_vec: torch.Tensor):
+        """Why the old version was a no-op: it accumulated the ABSOLUTE refined
+        state gated by a halting prob, and `refined = h + out`. Training drove the
+        gate -> 0 to suppress that ill-scaled perturbation, so Δh collapsed to ~0.
+
+        Fix: accumulate gated *deltas* (block(state) - state) with a minimum-
+        strength floor on the gate and a fixed residual scale, so the contribution
+        cannot be optimized away to zero."""
         B, L, d = h.shape
-        acc = h.new_zeros(B, L)
-        out = h.new_zeros(B, L, d)
-        n_upd = h.new_zeros(B, L)
         state = h
+        gated = h.new_zeros(B, L, d)                  # accumulated gated delta
+        raw = h.new_zeros(B, L, d)                     # ungated delta (diagnostic)
+        halt_ps, gates = [], []
         for _ in range(self.max_steps):
-            state = self.block(state)
-            p = torch.sigmoid(self.halt(torch.cat([state, entropy_vec], -1))).squeeze(-1)
-            still = (acc < 0.99).float()
-            contrib = p * still
-            out = out + contrib.unsqueeze(-1) * state
-            acc = acc + contrib
-            n_upd = n_upd + still
-        refined = h + out                                  # residual
-        return refined, {"ponder_cost": n_upd.mean()}
+            new = self.block(state)
+            delta = new - state                        # refinement DELTA (residual)
+            raw = raw + delta
+            if self.fixed_steps:
+                g = h.new_ones(B, L)
+            else:
+                p = torch.sigmoid(
+                    self.halt(torch.cat([new, entropy_vec], -1))).squeeze(-1)
+                g = self.min_strength + (1.0 - self.min_strength) * p   # floor
+                halt_ps.append(p)
+            gates.append(g)
+            gated = gated + g.unsqueeze(-1) * delta
+            state = new
+        refined = h + self.residual_scale * gated
+        gate_mean = torch.stack(gates).mean()
+        halt_p_mean = (torch.stack(halt_ps).mean() if halt_ps
+                       else h.new_tensor(1.0))
+        diag = {
+            "ponder_cost": gate_mean,                  # mild compute penalty (keeps grad)
+            "steps_used": float(self.max_steps),
+            "halt_p_mean": halt_p_mean.detach(),
+            "gate_mean": gate_mean.detach(),
+            "residual_pre_gate_norm": raw.norm().detach(),
+            "residual_post_gate_norm": (self.residual_scale * gated).norm().detach(),
+            "entropy_gate_mean": entropy_vec.mean().detach(),
+        }
+        return refined, diag
 
 
 class CausalPrefixMemory(nn.Module):

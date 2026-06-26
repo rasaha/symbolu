@@ -129,11 +129,15 @@ python -m symbolu_neural.clean_softmax.inspect_generation \
 ```
 
 **Headline finding (tiny `full` checkpoint):** of 19 patent algorithms inspected,
-7 are wired into this pipeline and execute; only **2 independent mechanisms truly
-move the generated tokens** — the entropy signal (from the 4 Vritti/Aspect/Guna/
-Kosha heads) and the deferred-insight memory it gates. **Recursive refinement is a
-wired no-op** (hidden Δ≈2e-6; 0/130 tokens change), **mirror logic is a
-placeholder**, and the other **11** algorithms are **not connected**.
+7 are wired into this pipeline and execute; **3 independent mechanisms truly move
+the generated tokens** — the entropy signal (from the 4 Vritti/Aspect/Guna/Kosha
+heads), **recursive refinement**, and the deferred-insight memory. **Mirror logic
+is a placeholder**, and the other **11** algorithms are **not connected**.
+
+> Recursive refinement was originally a wired no-op (hidden Δ≈2e-6; 0/130 tokens).
+> It was fixed (gated-delta accumulation + minimum-strength gate floor + fixed
+> residual scale; no new algorithms) and is now **ACTIVE** — ablating it changes
+> **106/130** tokens. See the "Update" section of the report for before/after.
 
 ## PASS / FAIL criteria
 

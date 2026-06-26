@@ -160,6 +160,18 @@ def main() -> None:
               f"{str(t['in_shape']):>16} {str(t['out_shape']):>16} "
               f"{('' if t['hidden_change_l2'] is None else t['hidden_change_l2']):>11}")
 
+    # ---- refinement diagnostics (halting prob, steps, residual norms, gate) ----
+    if getattr(model.cfg, "entropy_refine", False) and hasattr(model, "refine"):
+        with torch.no_grad():
+            h0 = model.lm.hidden(ids)
+            ent0 = TypedHeadBank.entropies(model.heads(h0))
+            _, diag = model.refine(h0, ent0)
+        print("\n--- recursive refinement diagnostics ---")
+        for k in ("steps_used", "halt_p_mean", "gate_mean", "residual_pre_gate_norm",
+                  "residual_post_gate_norm", "entropy_gate_mean"):
+            v = diag[k]
+            print(f"  {k:26s} = {float(v):.6f}")
+
     # thresholds: deltas below these are numerical noise / effective no-ops.
     HID_THRESH = 1e-3
     LOG_THRESH = 1e-4

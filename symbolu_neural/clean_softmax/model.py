@@ -28,7 +28,10 @@ class SymbolUSoftmaxModel(nn.Module):
             self.heads = TypedHeadBank(bb.d_model)
         if cfg.entropy_refine:
             self.refine = CausalEntropyRefinement(
-                bb.d_model, bb.n_heads, bb.d_ff, cfg.refine_steps)
+                bb.d_model, bb.n_heads, bb.d_ff, cfg.refine_steps,
+                min_strength=cfg.refine_min_strength,
+                residual_scale=cfg.refine_residual_scale,
+                fixed_steps=cfg.refine_fixed_steps)
         if cfg.memory:
             self.memory = CausalPrefixMemory(bb.d_model)
         if cfg.freeze_aug:                                  # random-aug control

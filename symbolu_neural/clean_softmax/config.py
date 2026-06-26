@@ -17,6 +17,9 @@ class ExpConfig:
     extra_plain_block: bool = False     # FAIR-COMPUTE control: +1 plain causal block
     freeze_aug: bool = False            # random (untrained) augmentation control
     refine_steps: int = 3
+    refine_min_strength: float = 0.1    # gate floor: refinement cannot collapse to 0
+    refine_residual_scale: float = 1.0  # fixed scale on the refinement delta
+    refine_fixed_steps: bool = False    # smoke mode: bypass ACT halting entirely
     # aux-loss weights
     ponder_weight: float = 1e-3
     entropy_cal_weight: float = 0.0     # off by default (it shapes calibration)
