@@ -21,10 +21,15 @@ from .policy import ARMS, AXES, policy_for_arm, translate, policy_divergence
 # Field-influence self-check (the v2-defect guardrail)
 # --------------------------------------------------------------------------- #
 def field_influence_check() -> Dict[str, bool]:
+    """Proves each POLICY-DRIVING variable independently changes the policy — incl.
+    classical_vritti and dynamic_state SEPARATELY (the terminology-fix invariant)."""
     base = compute_state("explain how a transformer neural network works")
     ref = translate(base).as_dict()
     muts = {
-        "vritti": lambda s: s.vritti.update({k: (1.0 if k == "INERTIA" else 0.0) for k in s.vritti}),
+        "classical_vritti": lambda s: setattr(s, "classical_vritti",
+            {k: (1.0 if k == "nidra" else 0.0) for k in s.classical_vritti}),
+        "dynamic_state": lambda s: setattr(s, "dynamic_state",
+            {k: (1.0 if k == "INERTIA" else 0.0) for k in s.dynamic_state}),
         "guna": lambda s: setattr(s, "guna", {"sattva": 0.0, "rajas": 0.0, "tamas": 1.0}),
         "kosha": lambda s: setattr(s, "kosha", {k: (1.0 if k == "vijnanamaya" else 0.0) for k in s.kosha}),
         "aspect_balance": lambda s: setattr(s, "aspect_balance", -1.0),
@@ -37,6 +42,28 @@ def field_influence_check() -> Dict[str, bool]:
         muts[f](s)
         out[f] = translate(s).as_dict() != ref
     return out
+
+
+def field_influence_by_family() -> Dict[str, Dict[str, bool]]:
+    """Which AXES each of the two vritti senses changes — proves classical_vritti hits
+    a COGNITIVE axis and dynamic_state hits a DELIVERY axis (separable roles)."""
+    from .policy import COGNITIVE_AXES, DELIVERY_AXES
+    base = compute_state("explain how a transformer neural network works")
+    ref = translate(base).as_dict()
+    res = {}
+    for fld, mut in {
+        "classical_vritti": lambda s: setattr(s, "classical_vritti",
+            {k: (1.0 if k == "nidra" else 0.0) for k in s.classical_vritti}),
+        "dynamic_state": lambda s: setattr(s, "dynamic_state",
+            {k: (1.0 if k == "INERTIA" else 0.0) for k in s.dynamic_state}),
+    }.items():
+        s = copy.deepcopy(base); mut(s)
+        d = translate(s).as_dict()
+        changed = [a for a in AXES if d[a] != ref[a]]
+        res[fld] = {"changed_axes": changed,
+                    "hits_cognitive": any(a in COGNITIVE_AXES for a in changed),
+                    "hits_delivery": any(a in DELIVERY_AXES for a in changed)}
+    return res
 
 
 def structural_report(seed=0) -> dict:
@@ -68,26 +95,35 @@ def coverage_report() -> dict:
     nominal value observed' (one value — RELEASE/anandamaya/'holistic' — is
     structurally near-unreachable on natural English text)."""
     ps = prompts()
-    state_vals = {"vritti_top": set(), "guna_top": set(), "kosha_top": set(), "valence": set()}
+    state_vals = {"classical_vritti_top": set(), "dynamic_state_top": set(),
+                  "guna_top": set(), "kosha_top": set(), "valence": set()}
+    cont = {"aspect_balance": [], "guna_resonance": []}
     axis_vals = {a: set() for a in AXES}
     for p, _, _ in ps:
         s = compute_state(p)
         sm = s.summary()
         for k in state_vals:
             state_vals[k].add(sm[k])
+        cont["aspect_balance"].append(s.aspect_balance)
+        cont["guna_resonance"].append(s.guna_resonance)
         d = translate(s).as_dict()
         for a in AXES:
             axis_vals[a].add(d[a])
-    nominal_state = {"vritti_top": 5, "guna_top": 3, "kosha_top": 5, "valence": 3}
-    nominal_axis = {"tone": 3, "directness": 3, "reasoning_style": 5, "caution": 3,
-                    "uncertainty_handling": 2, "speculation_reduction": 3, "clarity": 1}
+    nominal_state = {"classical_vritti_top": 5, "dynamic_state_top": 5,
+                     "guna_top": 3, "kosha_top": 5, "valence": 3}
+    nominal_axis = {"tone": 3, "delivery_pace": 5, "epistemic_stance": 5,
+                    "reasoning_style": 5, "caution": 3, "uncertainty_handling": 2,
+                    "speculation_reduction": 3, "clarity": 1}
     return {
         "n_prompts": len(ps),
         "state": {k: {"seen": sorted(v), "n": len(v), "nominal": nominal_state[k]}
                   for k, v in state_vals.items()},
+        "continuous": {k: {"min": round(min(v), 3), "max": round(max(v), 3)}
+                       for k, v in cont.items()},
         "axes": {a: {"seen": sorted(v), "n": len(v), "nominal": nominal_axis[a]}
                  for a, v in axis_vals.items()},
         "field_influence": field_influence_check(),
+        "field_influence_by_family": field_influence_by_family(),
     }
 
 

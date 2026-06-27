@@ -6,12 +6,21 @@ LLM rewrite → independent judge**, fixing the v2 wiring defects found in
 `data.py` — relocated here from v2 during cleanup so the canonical line no longer
 depends on deprecated code). v1/v2 kept intact only as the audited-defective record.
 
+## Two vritti senses are SEPARATE fields (terminology fix)
+
+- `dynamic_state` (inertia/activation/oscillation/tension/release — canonical motion
+  system) → **delivery** policy (`delivery_pace`).
+- `classical_vritti` (pramana/viparyaya/vikalpa/smrti/nidra — canonical schema
+  `presentation.signals.VrittiDistribution`; values are a **`derived_bridge`**, not
+  the neural canonical computation) → **cognitive** policy (`epistemic_stance`).
+
 ## Key fix: every claimed Symbol-U variable drives a distinct policy axis
 
-`guna→tone`, `vritti→directness`, `kosha→reasoning_style`, `aspect_balance→caution`,
-`guna_resonance→uncertainty`, `valence→speculation_reduction`. A **field-influence
-self-check** (`cli check`) fails if any policy-driving variable is inert — the exact
-defect that invalidated v2. `pse_*`, `kosha_resonance`, `valence_sign` are kept as
+`guna→tone`, `dynamic_state→delivery_pace`, `classical_vritti→epistemic_stance`,
+`kosha→reasoning_style`, `aspect_balance→caution`, `guna_resonance→uncertainty`,
+`valence→speculation_reduction`. A **field-influence self-check** (`cli check`) fails
+if any of the **7** policy-driving variables is inert — the exact defect that
+invalidated v2. `pse_*`, `kosha_resonance`, `valence_sign` are kept as
 **diagnostic-only** (not claimed to drive policy).
 
 ## Commands

@@ -41,30 +41,38 @@ def main() -> None:
         print("ALL PASS:", all(fi.values()))
     elif args.cmd == "coverage":
         c = pilot.coverage_report()
-        print(f"Signal-value coverage across {c['n_prompts']} prompt-states "
-              f"(influences != every value observed):\n")
-        print("STATE signals:")
+        print(f"Signal-value coverage across {c['n_prompts']} prompt-states:\n")
+        print("STATE signals (classical_vritti + dynamic_state SEPARATE):")
         for k, v in c["state"].items():
             flag = "" if v["n"] >= v["nominal"] else "  <- not all values observed"
-            print(f"  {k:12} {v['n']}/{v['nominal']}  {v['seen']}{flag}")
+            print(f"  {k:22} {v['n']}/{v['nominal']}  {v['seen']}{flag}")
+        print("CONTINUOUS signals:")
+        for k, v in c["continuous"].items():
+            print(f"  {k:22} range [{v['min']},{v['max']}]")
         print("POLICY axes:")
         for a, v in c["axes"].items():
             flag = "" if v["n"] >= v["nominal"] else "  <- not all values observed"
             print(f"  {a:22} {v['n']}/{v['nominal']}{flag}")
-        print(f"\nfield-influence (all 6 wired & influencing): {all(c['field_influence'].values())}")
-        print("NOTE: RELEASE/anandamaya ('holistic' reasoning_style) is structurally "
-              "near-unreachable\n      on natural English text — a phonological-mapper "
-              "property, not a wiring defect.\n      Quality run uses DRAFT-states "
-              "(model output) x seeds, which broaden coverage further.")
+        print(f"\nfield-influence (all {len(c['field_influence'])} wired & influencing): "
+              f"{all(c['field_influence'].values())}")
+        fam = c["field_influence_by_family"]
+        print("separable roles:")
+        for fld, r in fam.items():
+            print(f"  {fld:16} -> changed {r['changed_axes']}  "
+                  f"(cognitive={r['hits_cognitive']}, delivery={r['hits_delivery']})")
+        print("\nNOTE: RELEASE/anandamaya ('holistic') is structurally near-unreachable on")
+        print("      natural English text (phonological-mapper property, not a wiring defect).")
+        print("      classical_vritti values are a DERIVED_BRIDGE (schema canonical, values not).")
     elif args.cmd == "state":
         for p, _para, cat in prompts():
             s = compute_state(p)
             d = translate(s).as_dict()
             print(f"\n[{cat}] {p[:62]}")
             print(f"   state: {s.summary()}  warnings={s.warnings}")
-            print(f"   policy: tone={d['tone']} direct={d['directness']} "
+            print(f"   cognitive: stance={d['epistemic_stance'][:24]} "
                   f"reason={d['reasoning_style']} caution={d['caution']} "
-                  f"unc={d['uncertainty_handling']} spec={d['speculation_reduction']}")
+                  f"spec={d['speculation_reduction']}")
+            print(f"   delivery : tone={d['tone']} pace={d['delivery_pace']}")
 
 
 if __name__ == "__main__":

@@ -1,13 +1,24 @@
-"""v3 Symbol-U state — full state with Aspect, and an honest policy/diagnostic split.
+"""v3 Symbol-U state — separates DYNAMIC STATE from CLASSICAL VRITTI (+ full state).
 
-Fixes vs v2:
-- ASPECT is computed (varna_lens varnas -> symbolu.ontology.phase4a.lookup), as an
-  aspect_balance scalar in [-1, 1] (sublimate-leaning .. distortion-leaning).
-- Vritti->Guna mapping makes ALL THREE gunas reachable (v2's sattva was unreachable).
-- No silent valence fallback: failures are COUNTED and surfaced (state.warnings).
-- Fields are split into POLICY-DRIVING (vritti, guna, kosha, aspect_balance,
-  guna_resonance, valence) and DIAGNOSTIC-ONLY (kosha_resonance, valence_sign,
-  pse_meaning, pse_resonance) — the report claims only what is actually wired.
+TERMINOLOGY FIX (this update): v3 previously called the 5-state DYNAMIC/MOTION
+system "vritti". That is NOT the classical Yoga/Patañjali vrittis. They are now two
+separate fields:
+
+  dynamic_state   : inertia/activation/oscillation/tension/release  (motion system,
+                    canonical: symbolu_core.formulas.vritti_mapper.VrittiType)
+                    -> ENERGY/DELIVERY policy.
+  classical_vritti: pramana/viparyaya/vikalpa/smrti/nidra  (Patañjali, canonical
+                    SCHEMA: symbolu_core.presentation.signals.VrittiDistribution)
+                    -> COGNITIVE/EPISTEMIC policy.
+
+PROVENANCE: the classical-vritti *schema* (names/order/meanings) is canonical; its
+*values* are a `derived_bridge` from dynamic_state + valence + aspect + resonance —
+because the canonical computation (ChittaVrittiResult / chitta_vritti) is part of
+the neural Sovereign system, not a torch-free deterministic text mapper. We do NOT
+pretend the bridged values are canonical.
+
+Other fixes retained: Aspect via phase4a; reachable guna; no silent valence
+fallback; POLICY-DRIVING vs DIAGNOSTIC-ONLY split.
 """
 from __future__ import annotations
 
@@ -25,26 +36,31 @@ _PSE = get_backend("pse_meaning")
 _PSE_RES = get_backend("pse_resonance")
 _ASPECT_LAYER = "O5_COGNITION"
 
-# v3 Vritti->Guna: sattva <- RELEASE+OSCILLATION (light/flowing), rajas <- ACTIVATION+
-# TENSION (active/driving), tamas <- INERTIA. All three reachable (empirically verified).
-_VRITTI_TO_GUNA = {
+# Canonical names/order.
+DYNAMIC_STATES = [v.name for v in VrittiType]          # INERTIA/ACTIVATION/OSCILLATION/TENSION/RELEASE
+CLASSICAL_VRITTI = ["pramana", "viparyaya", "vikalpa", "smrti", "nidra"]  # presentation.signals.VrittiDistribution
+
+# dynamic_state -> Guna / Kosha (sattva reachable; see prior audit).
+_DYN_TO_GUNA = {
     VrittiType.RELEASE: "sattva", VrittiType.OSCILLATION: "sattva",
     VrittiType.ACTIVATION: "rajas", VrittiType.TENSION: "rajas",
     VrittiType.INERTIA: "tamas",
 }
-_VRITTI_TO_KOSHA = {
+_DYN_TO_KOSHA = {
     VrittiType.INERTIA: "annamaya", VrittiType.ACTIVATION: "pranamaya",
     VrittiType.OSCILLATION: "manomaya", VrittiType.TENSION: "vijnanamaya",
     VrittiType.RELEASE: "anandamaya",
 }
 
-POLICY_DRIVING = ["vritti", "guna", "kosha", "aspect_balance", "guna_resonance", "valence"]
+POLICY_DRIVING = ["classical_vritti", "dynamic_state", "guna", "kosha",
+                  "aspect_balance", "guna_resonance", "valence"]
 DIAGNOSTIC_ONLY = ["kosha_resonance", "valence_sign", "pse_meaning", "pse_resonance"]
 
 
 @dataclass
 class SymbolUState:
-    vritti: Dict[str, float]
+    dynamic_state: Dict[str, float]      # motion system (was 'vritti') -> delivery policy
+    classical_vritti: Dict[str, float]   # Patañjali 5 (derived_bridge) -> cognitive policy
     guna: Dict[str, float]
     kosha: Dict[str, float]
     aspect_balance: float          # [-1,1] : +sublimate-leaning, -distortion-leaning
@@ -58,7 +74,8 @@ class SymbolUState:
     provenance: Dict[str, str] = field(default_factory=dict)
 
     def summary(self) -> Dict:
-        return {"vritti_top": max(self.vritti, key=self.vritti.get),
+        return {"dynamic_state_top": max(self.dynamic_state, key=self.dynamic_state.get),
+                "classical_vritti_top": max(self.classical_vritti, key=self.classical_vritti.get),
                 "guna_top": max(self.guna, key=self.guna.get),
                 "kosha_top": max(self.kosha, key=self.kosha.get),
                 "aspect_balance": round(self.aspect_balance, 3),
@@ -66,10 +83,38 @@ class SymbolUState:
                 "valence": self.valence}
 
 
-def _vritti_distribution(text: str) -> Dict[VrittiType, float]:
+def _dynamic_distribution(text: str) -> Dict[VrittiType, float]:
     units = map_acoustic_units(text)
     vs = [assign_vritti(u) for u in units]
     return get_vritti_distribution(vs) if vs else {v: 0.0 for v in VrittiType}
+
+
+def _classical_vritti_bridge(dyn: Dict[VrittiType, float], valence: str,
+                             aspect_balance: float, guna_resonance: float) -> Dict[str, float]:
+    """DERIVED BRIDGE (provisional, NOT canonical computation) from dynamic_state +
+    valence + aspect + resonance to the 5 classical Patañjali vrittis. Documented
+    rationale per mode (canonical meanings from presentation.signals.VrittiDistribution):
+      pramana   (valid cognition)      <- clarity: RELEASE motion + high aspect (+liberating)
+      viparyaya (misperception/error)  <- TENSION (distortion) + binding valence
+      vikalpa   (conceptual branching) <- OSCILLATION (fluctuation) + mixed valence
+      smrti     (memory/retention)     <- ACTIVATION (active recall) + low aspect
+      nidra     (dormancy/absence)     <- INERTIA (dullness) + low coherence (1-resonance)
+    Modulated by valence/aspect/resonance so it is NOT a pure relabel of dynamic_state
+    (the relabel/shuffle controls test whether it adds anything beyond that)."""
+    d = {v.name: dyn.get(v, 0.0) for v in VrittiType}
+    ab = max(aspect_balance, 0.0)
+    # each classical vritti primarily tracks a distinct dynamic state (so it inherits
+    # dynamic_state's coverage) + a light epistemic modulation. Small aspect coef on
+    # pramana so it does not swamp the others.
+    scores = {
+        "pramana":   d["RELEASE"] + 0.20 * ab + (0.20 if valence == "liberating" else 0.0),
+        "viparyaya": d["TENSION"] + (0.25 if valence == "binding" else 0.0),
+        "vikalpa":   d["OSCILLATION"] + (0.20 if valence == "mixed" else 0.0),
+        "smrti":     d["ACTIVATION"],
+        "nidra":     d["INERTIA"] + 0.30 * (1.0 - guna_resonance),
+    }
+    tot = sum(scores.values()) or 1.0
+    return {k: scores[k] / tot for k in CLASSICAL_VRITTI}
 
 
 def _aspect_balance(text: str, warnings: List[str]) -> float:
@@ -128,28 +173,32 @@ def _valence(text: str, warnings: List[str]):
 
 def compute_state(text: str) -> SymbolUState:
     warnings: List[str] = []
-    vd = _vritti_distribution(text)
-    vritti = {k.name: float(v) for k, v in vd.items()}
+    vd = _dynamic_distribution(text)
+    dynamic_state = {k.name: float(v) for k, v in vd.items()}
     guna = {g: 0.0 for g in GUNA_NAMES}
     kosha = {k: 0.0 for k in KOSHA_ORDER_5}
     for vt, p in vd.items():
-        guna[_VRITTI_TO_GUNA[vt]] += float(p)
-        kosha[_VRITTI_TO_KOSHA[vt]] += float(p)
+        guna[_DYN_TO_GUNA[vt]] += float(p)
+        kosha[_DYN_TO_KOSHA[vt]] += float(p)
     gs = sum(guna.values()) or 1.0
     ks = sum(kosha.values()) or 1.0
     guna = {k: v / gs for k, v in guna.items()}
     kosha = {k: v / ks for k, v in kosha.items()}
     lean, sign = _valence(text, warnings)
+    aspect = _aspect_balance(text, warnings)
+    g_res = float(compute_guna_resonance(guna))
+    classical = _classical_vritti_bridge(vd, lean, aspect, g_res)
     return SymbolUState(
-        vritti=vritti, guna=guna, kosha=kosha,
-        aspect_balance=_aspect_balance(text, warnings),
-        guna_resonance=float(compute_guna_resonance(guna)),
+        dynamic_state=dynamic_state, classical_vritti=classical, guna=guna, kosha=kosha,
+        aspect_balance=aspect, guna_resonance=g_res,
         kosha_resonance=float(compute_kosha_resonance_index(compute_kosha_activation_vector(kosha))),
         valence=lean, valence_sign=sign,
         pse_meaning=_PSE.encode(text), pse_resonance=_PSE_RES.encode(text),
         warnings=warnings,
-        provenance={"vritti": "canonical", "valence": "canonical", "aspect_balance": "canonical(phase4a)",
-                    "guna": "derived_from_vritti", "kosha": "heuristic_from_vritti",
+        provenance={"dynamic_state": "canonical(vritti_mapper)", "valence": "canonical",
+                    "aspect_balance": "canonical(phase4a)",
+                    "classical_vritti": "derived_bridge(schema=presentation.signals.VrittiDistribution)",
+                    "guna": "derived_from_dynamic_state", "kosha": "heuristic_from_dynamic_state",
                     "guna_resonance": "canonical_fn(derived)",
                     "pse_meaning": "diagnostic_only", "pse_resonance": "diagnostic_only",
                     "kosha_resonance": "diagnostic_only", "valence_sign": "diagnostic_only"})

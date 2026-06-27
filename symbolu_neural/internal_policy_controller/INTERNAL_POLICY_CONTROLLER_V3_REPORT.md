@@ -5,6 +5,34 @@ audited-defective record (nothing deleted). Code: `v3/`. No API key in this sand
 so the **quality verdict still cannot run here**; the mock backend is plumbing-only
 and the pilot refuses a verdict.
 
+## Terminology fix (latest update): classical Vritti vs dynamic state
+
+v3 **previously conflated** the 5-state **dynamic/motion** system
+(inertia/activation/oscillation/tension/release) with the name "vritti". Those are
+**not** the classical Yoga/Patañjali vrittis. They are now **two separate fields**
+with **separate policy roles**:
+
+| field | values | source | policy family | axis |
+|---|---|---|---|---|
+| `dynamic_state` | inertia/activation/oscillation/tension/release | **canonical** `vritti_mapper.VrittiType` | **delivery/energy** | `delivery_pace` |
+| `classical_vritti` | pramana/viparyaya/vikalpa/smrti/nidra | schema **canonical** (`presentation.signals.VrittiDistribution`); values `derived_bridge` | **cognitive/epistemic** | `epistemic_stance` |
+
+**Provenance honesty:** the classical-vritti *schema* (names/order/meanings) is
+canonical, but its *values* are a documented **`derived_bridge`** from
+dynamic_state + valence + aspect + resonance — because the canonical *computation*
+(`ChittaVrittiResult` / `chitta_vritti`) is part of the neural Sovereign system, not
+a torch-free deterministic text mapper. We do **not** pretend the bridged values are
+canonical. **Only the API quality run can decide whether either field improves final
+answers** (and the `shuffled`/`relabeled` controls test whether `classical_vritti`
+adds anything beyond its correlation with `dynamic_state`).
+
+Proof (offline): `cli check` → all **7** fields wired; `field_influence_by_family`
+shows `classical_vritti → epistemic_stance` (cognitive only) and
+`dynamic_state → delivery_pace` (delivery only) — separable roles. Coverage:
+classical_vritti **5/5**, dynamic_state 4/5 (RELEASE rare). Regression tests pin the
+separation (`test_classical_and_dynamic_are_separate_fields`, `…_separate_families`,
+`…_canonical_schema_names`, `…_provenance_is_derived_bridge`).
+
 ## What was fixed from v2 (each defect → resolution, verified)
 
 | v2 defect | v3 resolution | verification |
@@ -17,7 +45,8 @@ and the pilot refuses a verdict.
 | **D7** silent fallbacks | `_valence`/`_aspect` failures are **counted in `state.warnings`**; judge-zero responses counted as `judge_failures` | `test_state_warnings_surface_not_silent` |
 | **D8** relabel permuted only guna | relabel permutes **guna + kosha + valence** (every consumed category) | `test_relabel_permutes_all_consumed_categories` |
 
-Policy wiring (each Symbol-U variable → one axis): `guna→tone`, `vritti→directness`,
+Policy wiring (each Symbol-U variable → one axis): `guna→tone`,
+`dynamic_state→delivery_pace`, `classical_vritti→epistemic_stance`,
 `kosha→reasoning_style`, `aspect_balance→caution`, `guna_resonance→uncertainty`,
 `valence→speculation_reduction`. `pse_meaning/pse_resonance/kosha_resonance/
 valence_sign` are explicitly **diagnostic-only** (kept in state, not claimed to

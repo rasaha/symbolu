@@ -4,11 +4,47 @@ from __future__ import annotations
 import numpy as np
 
 from symbolu_neural.internal_policy_controller.v3.symbolu_state import (
-    compute_state, POLICY_DRIVING, DIAGNOSTIC_ONLY)
+    compute_state, POLICY_DRIVING, DIAGNOSTIC_ONLY, CLASSICAL_VRITTI, DYNAMIC_STATES)
 from symbolu_neural.internal_policy_controller.v3.policy import (
-    ARMS, AXES, translate, policy_for_arm, _relabel_state, policy_divergence)
+    ARMS, AXES, COGNITIVE_AXES, DELIVERY_AXES, translate, policy_for_arm,
+    _relabel_state, policy_divergence)
 from symbolu_neural.internal_policy_controller.v3 import pilot
 from symbolu_neural.internal_policy_controller.v3.data import prompts
+
+
+# ---- terminology-fix regression tests (classical vritti vs dynamic state) ----
+def test_classical_and_dynamic_are_separate_fields():
+    s = compute_state("explain how a transformer works")
+    assert hasattr(s, "classical_vritti") and hasattr(s, "dynamic_state")
+    assert not hasattr(s, "vritti")                       # the ambiguous field is GONE
+    assert set(s.classical_vritti) == set(CLASSICAL_VRITTI)        # pramana.. (canonical)
+    assert set(s.dynamic_state) == set(DYNAMIC_STATES)            # INERTIA.. (motion)
+
+
+def test_classical_vritti_uses_canonical_schema_names():
+    from symbolu_core.presentation.signals import VrittiDistribution
+    import dataclasses
+    canon = [f.name for f in dataclasses.fields(VrittiDistribution)]
+    assert set(CLASSICAL_VRITTI) == set(canon)
+
+
+def test_classical_vritti_provenance_is_derived_bridge_not_canonical():
+    s = compute_state("explain how a transformer works")
+    assert s.provenance["classical_vritti"].startswith("derived_bridge")
+    assert s.provenance["dynamic_state"].startswith("canonical")
+
+
+def test_both_vritti_senses_influence_separate_families():
+    fam = pilot.field_influence_by_family()
+    assert fam["classical_vritti"]["hits_cognitive"]     # classical -> cognitive axis
+    assert fam["dynamic_state"]["hits_delivery"]         # dynamic   -> delivery axis
+
+
+def test_relabel_permutes_both_vritti_senses():
+    s = compute_state("should I quit my stable job to pursue my dream")
+    r = _relabel_state(s, 0)
+    assert list(r.classical_vritti.keys()) != list(s.classical_vritti.keys()) \
+        or list(r.dynamic_state.keys()) != list(s.dynamic_state.keys())
 
 
 def test_full_state_includes_aspect():
@@ -73,12 +109,14 @@ def test_signal_coverage_audit():
     WIRED (influences policy); value-coverage is complete except the structurally
     near-unreachable RELEASE/anandamaya state (vritti & kosha = 4/5)."""
     c = pilot.coverage_report()
-    assert all(c["field_influence"].values())                 # all 6 wired
+    assert all(c["field_influence"].values())                 # all 7 wired
+    assert set(c["field_influence"]) == set(POLICY_DRIVING)    # incl. both vritti senses
     assert c["state"]["guna_top"]["n"] == 3                    # full
     assert c["state"]["valence"]["n"] == 3                     # full
-    assert c["state"]["vritti_top"]["n"] >= 4                  # 4/5 (RELEASE rare)
+    assert c["state"]["dynamic_state_top"]["n"] >= 4           # 4/5 (RELEASE rare)
     assert c["state"]["kosha_top"]["n"] >= 4                   # 4/5 (anandamaya rare)
-    for a in ["tone", "directness", "caution", "speculation_reduction"]:
+    assert c["state"]["classical_vritti_top"]["n"] >= 4        # bridged, all 5 reachable
+    for a in ["tone", "caution", "speculation_reduction"]:
         assert c["axes"][a]["n"] == c["axes"][a]["nominal"]    # full range observed
 
 
