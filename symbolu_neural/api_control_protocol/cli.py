@@ -17,7 +17,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(prog="api_control_protocol")
     sub = ap.add_subparsers(dest="cmd", required=True)
     pr = sub.add_parser("run")
-    pr.add_argument("--backend", default="mock", choices=["mock", "anthropic"])
+    pr.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"])
     pr.add_argument("--model", default=None)
     sub.add_parser("packets")
     sub.add_parser("tokens")

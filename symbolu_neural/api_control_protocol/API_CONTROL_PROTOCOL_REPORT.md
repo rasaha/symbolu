@@ -140,11 +140,19 @@ build it only if §5's results defy these predictions.
 ## 5. Commands to run the decisive arm (needs API access)
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...      # a real key (absent in this sandbox)
 export PYTHONPATH=$(pwd)
 
-# decisive adherence comparison on a real LLM
+# decisive adherence comparison on a real LLM — pick a provider:
+
+# Anthropic
+export ANTHROPIC_API_KEY=sk-ant-...
 python -m symbolu_neural.api_control_protocol.cli run --backend anthropic
+
+# Mistral (hosted API; generation-only, no hidden states — fine for this pilot)
+export MISTRAL_API_KEY=...
+python -m symbolu_neural.api_control_protocol.cli run --backend mistral --model mistral-small-latest
+# MISTRAL_BASE_URL also lets you point --backend mistral at any OpenAI-compatible
+# endpoint (vLLM / Ollama / Together / LM Studio) hosting Mistral OPEN WEIGHTS.
 
 # offline pieces (runnable anywhere)
 python -m symbolu_neural.api_control_protocol.cli tokens     # token-cost table

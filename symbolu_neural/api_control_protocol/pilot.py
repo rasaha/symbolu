@@ -97,7 +97,7 @@ def _verdict(r: dict) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--backend", default="mock", choices=["mock", "anthropic"])
+    ap.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"])
     ap.add_argument("--model", default=None)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()

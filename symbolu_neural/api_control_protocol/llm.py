@@ -77,9 +77,52 @@ class AnthropicLLM:
         return "".join(b.get("text", "") for b in out.get("content", []))
 
 
+class MistralLLM:
+    """Real call to Mistral's chat-completions API. Requires MISTRAL_API_KEY.
+
+    Mistral models are generation-only over the API (no hidden states), so this
+    powers the external-control-protocol and rerank/refine paths — not the
+    internal-neural adapter (which needs open weights run locally).
+    Base URL overridable via MISTRAL_BASE_URL (also works for any OpenAI-compatible
+    endpoint: vLLM / Ollama / Together / LM Studio — just set base + key + model).
+    """
+
+    backend = "mistral"
+    is_real = True
+
+    def __init__(self, model: str = "mistral-small-latest", max_tokens: int = 256):
+        self.model = model
+        self.max_tokens = max_tokens
+        self.key = os.environ.get("MISTRAL_API_KEY")
+        self.base = os.environ.get("MISTRAL_BASE_URL", "https://api.mistral.ai")
+        if not self.key:
+            raise RuntimeError(
+                "MISTRAL_API_KEY not set — the real-LLM arm cannot run here. "
+                "Set it on a machine with Mistral API access (see report §commands).")
+
+    def generate(self, control: str, prompt: str, seed: int = 0) -> str:
+        import json
+        import urllib.request
+
+        user = (control + "\n\n" + prompt) if control else prompt
+        body = json.dumps({
+            "model": self.model, "max_tokens": self.max_tokens, "temperature": 0.7,
+            "messages": [{"role": "user", "content": user}],
+        }).encode()
+        req = urllib.request.Request(
+            f"{self.base}/v1/chat/completions", data=body, method="POST",
+            headers={"content-type": "application/json",
+                     "Authorization": f"Bearer {self.key}"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            out = json.loads(r.read())
+        return out["choices"][0]["message"]["content"]
+
+
 def get_llm(backend: str = "mock", model: Optional[str] = None):
     if backend == "mock":
         return MockLLM()
     if backend == "anthropic":
         return AnthropicLLM(model or "claude-haiku-4-5-20251001")
+    if backend == "mistral":
+        return MistralLLM(model or "mistral-small-latest")
     raise ValueError(f"unknown llm backend {backend!r}")

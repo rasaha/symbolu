@@ -46,9 +46,13 @@ python -m symbolu_neural.api_control_protocol.cli tokens          # token cost (
 python -m symbolu_neural.api_control_protocol.cli packets         # inspect each arm's message
 python -m symbolu_neural.api_control_protocol.cli run --backend mock   # plumbing only
 
-# decisive run — needs a real key (not present here):
+# decisive run — needs a real key (not present here). Pick a provider:
 export ANTHROPIC_API_KEY=sk-ant-...
 python -m symbolu_neural.api_control_protocol.cli run --backend anthropic
+# or Mistral (hosted API = generation-only; or set MISTRAL_BASE_URL to an
+# OpenAI-compatible server hosting Mistral open weights):
+export MISTRAL_API_KEY=...
+python -m symbolu_neural.api_control_protocol.cli run --backend mistral --model mistral-small-latest
 
 python symbolu_neural/api_control_protocol/tests/test_api.py      # machinery tests
 ```
