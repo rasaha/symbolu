@@ -1,0 +1,30 @@
+{"text": "the team celebrated their hard-won victory all night", "label": "positive"}
+{"text": "she beamed with joy at the wonderful surprise", "label": "positive"}
+{"text": "a warm and generous welcome greeted every guest", "label": "positive"}
+{"text": "the children laughed and played in the sunny park", "label": "positive"}
+{"text": "he felt proud and grateful for the kind support", "label": "positive"}
+{"text": "the garden bloomed beautifully in the gentle spring", "label": "positive"}
+{"text": "their friendship grew stronger with each passing day", "label": "positive"}
+{"text": "the award honored years of dedicated brilliant work", "label": "positive"}
+{"text": "a delicious meal delighted everyone at the table", "label": "positive"}
+{"text": "the rescue brought relief and hope to the village", "label": "positive"}
+{"text": "the storm destroyed the homes and ruined the harvest", "label": "negative"}
+{"text": "he felt lonely and miserable after the bitter loss", "label": "negative"}
+{"text": "the cruel decision left the workers angry and afraid", "label": "negative"}
+{"text": "a terrible accident shattered the quiet morning", "label": "negative"}
+{"text": "she wept in despair at the dreadful news", "label": "negative"}
+{"text": "the betrayal destroyed years of fragile trust", "label": "negative"}
+{"text": "hunger and disease spread through the ravaged city", "label": "negative"}
+{"text": "the failure crushed his fragile remaining confidence", "label": "negative"}
+{"text": "the toxic argument ended a long painful relationship", "label": "negative"}
+{"text": "darkness and fear gripped the abandoned hospital", "label": "negative"}
+{"text": "the committee reviewed the quarterly budget report", "label": "neutral"}
+{"text": "the train departs from platform nine at noon", "label": "neutral"}
+{"text": "water boils at one hundred degrees at sea level", "label": "neutral"}
+{"text": "the document lists the names of all participants", "label": "neutral"}
+{"text": "she placed the folder on the second shelf", "label": "neutral"}
+{"text": "the meeting is scheduled for tuesday afternoon", "label": "neutral"}
+{"text": "the recipe requires two cups of flour and an egg", "label": "neutral"}
+{"text": "the road connects the two towns along the river", "label": "neutral"}
+{"text": "the printer is located near the main entrance", "label": "neutral"}
+{"text": "the form must be submitted before the deadline", "label": "neutral"}
