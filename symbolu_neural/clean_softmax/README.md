@@ -70,6 +70,25 @@ python -m symbolu_neural.clean_softmax.run_ablations \
 python -m symbolu_neural.clean_softmax.test_clean    # correctness incl. causality
 ```
 
+## Grounding (weak labels) + long-range recall — the two "verdict-changing" tests
+
+[`GROUNDING_AND_RECALL_REPORT.md`](GROUNDING_AND_RECALL_REPORT.md) implements and runs
+the two ingredients that could change the capacity-study verdict:
+
+```bash
+python -m symbolu_neural.clean_softmax.run_grounding   --layers 4 --backbone-steps 300 --n-blocks 1500
+python -m symbolu_neural.clean_softmax.run_recall_study --steps 600 --seq 128
+```
+
+- **Grounding** (`lexicon.py` distant supervision + unseen-word & shuffled controls):
+  the char-LM backbone encodes spelling, not meaning — Aspect generalizes at **0.0**
+  to unseen words, Vritti only reaches the majority baseline. Grounding needs a
+  semantically-capable backbone + real human labels; the backbone is the bottleneck.
+- **Long-range recall** (memory vs FFN with attention removed): memory **beats** the
+  pointwise FFN on cross-time aggregation (0.73 vs 0.53, matched params) — a genuine
+  structural advantage — but is far weaker than attention (0.99), so it is redundant
+  on a full-attention LM. Explains why memory tied an FFN on the LM task.
+
 ## Layer-aware, validation-first strategy + layer probing
 
 [`LAYER_AWARE_TRAINING_STRATEGY.md`](LAYER_AWARE_TRAINING_STRATEGY.md) is a
