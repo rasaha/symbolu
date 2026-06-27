@@ -1,19 +1,22 @@
-"""Experiment 1 — Synonym invariance of Symbol-U (no LLM, fully offline).
+"""Experiment 1 — Synonym invariance of Symbol-U, per backend (no LLM, offline).
 
 The cheapest kill switch (SYMBOL_U_RESEARCH_STRATEGY.md §8.1). The patent claims
 Symbol-U is a *semantic* coordinate system. If so, synonyms (same meaning,
 different sound) should map to SIMILAR `U` vectors. If `U` is really phonological
-(a function of sound), synonyms will scatter.
+(a function of sound), synonyms scatter.
 
-We measure the between-vs-within invariance index over curated synonym groups,
-with a permutation p-value, and compare the Symbol-U Vritti vector against the
-raw phonological (SoundClass) null. No model, no GPU, no network.
+We compute the between-vs-within invariance index over curated synonym groups,
+with a permutation p-value, for EVERY U backend (vritti_mapper, pse_meaning,
+pse_resonance, combined) plus the raw phonological (SoundClass) null. The whole
+point of adding the PSE backends is to test whether the phoneme->MEANING layer
+makes `U` more synonym-invariant than the vritti_mapper approximation.
 
 Decision (pre-registered):
-  index ≈ 0 (synonyms scatter)  -> FAIL: U is phonological, not semantic. STOP/PIVOT.
+  index ≈ 0 (synonyms scatter)  -> FAIL: U is phonological, not semantic.
   index >> 0 and p small        -> synonyms cluster: U carries meaning-aligned signal.
 
 Run:  python -m symbolu_neural.complementarity_probe.exp1_invariance
+      python -m symbolu_neural.complementarity_probe.exp1_invariance --backends pse_meaning
 """
 from __future__ import annotations
 
@@ -24,14 +27,14 @@ from typing import List
 
 import numpy as np
 
-from .symbolu_engine import SymbolUEngine
+from .backends import get_backend, BACKENDS
 from .nulls import phonological_features
 from .metrics import invariance_index, invariance_permutation_p
 
 DATA = os.path.join(os.path.dirname(__file__), "data", "synonyms.jsonl")
 
 
-def load_groups(path: str = DATA):
+def load_groups(path: str):
     groups = []
     with open(path) as f:
         for line in f:
@@ -41,65 +44,73 @@ def load_groups(path: str = DATA):
     return groups
 
 
-def run(path: str = DATA, n_perm: int = 2000, seed: int = 0) -> dict:
-    eng = SymbolUEngine()
-    groups = load_groups(path)
-
-    # Symbol-U Vritti vector per word, grouped by concept.
-    u_groups: List[np.ndarray] = []
-    ph_groups: List[np.ndarray] = []
+def backend_index(groups, backend_name: str, n_perm: int, seed: int) -> dict:
+    b = get_backend(backend_name)
+    g_vecs: List[np.ndarray] = []
     for g in groups:
-        words = g["words"]
-        u_groups.append(np.stack([np.asarray(eng.vritti_vec(w)) for w in words]))
-        ph_groups.append(phonological_features(words))
+        g_vecs.append(np.stack([np.asarray(b.encode(w)) for w in g["words"]]))
+    idx = invariance_index(g_vecs)
+    perm = invariance_permutation_p(g_vecs, n_perm=n_perm, seed=seed)
+    return {"dim": b.dim, **idx, **perm}
 
-    u_idx = invariance_index(u_groups)
-    u_perm = invariance_permutation_p(u_groups, n_perm=n_perm, seed=seed)
-    ph_idx = invariance_index(ph_groups)
 
-    return {
+def run(path: str = DATA, backends=None, n_perm: int = 1000, seed: int = 0) -> dict:
+    backends = backends or BACKENDS
+    groups = load_groups(path)
+    out = {
         "n_groups": len(groups),
         "n_words": sum(len(g["words"]) for g in groups),
-        "symbolu_vritti": {**u_idx, **u_perm},
-        "phonological_null": ph_idx,
+        "backends": {},
     }
+    for name in backends:
+        out["backends"][name] = backend_index(groups, name, n_perm, seed)
+    # phonological null reference (raw SoundClass histogram, no ontology)
+    ph_groups = [phonological_features(g["words"]) for g in groups]
+    out["phonological_null"] = invariance_index(ph_groups)
+    return out
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default=DATA)
-    ap.add_argument("--n-perm", type=int, default=2000)
+    ap.add_argument("--backends", nargs="*", default=None, choices=BACKENDS)
+    ap.add_argument("--n-perm", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
-    r = run(args.data, n_perm=args.n_perm, seed=args.seed)
-    u = r["symbolu_vritti"]
+    r = run(args.data, backends=args.backends, n_perm=args.n_perm, seed=args.seed)
+
+    print("=" * 70)
+    print("EXP1 — Synonym invariance per U backend  [no LLM, offline]")
+    print("=" * 70)
+    print(f"groups={r['n_groups']}  words={r['n_words']}  "
+          f"(higher index = more meaning-invariant; ~0 = phonological)\n")
+    print(f"{'backend':<16}{'dim':>5}{'within':>9}{'between':>9}{'index':>9}{'p':>9}")
+    print("-" * 66)
+    for name, b in r["backends"].items():
+        print(f"{name:<16}{b['dim']:>5}{b['within']:>9.3f}{b['between']:>9.3f}"
+              f"{b['index']:>+9.3f}{b['p_value']:>9.4f}")
     ph = r["phonological_null"]
+    print(f"{'(phon. null)':<16}{'-':>5}{ph['within']:>9.3f}{ph['between']:>9.3f}"
+          f"{ph['index']:>+9.3f}{'-':>9}")
 
-    print("=" * 64)
-    print("EXP1 — Synonym invariance of Symbol-U (Vritti)  [no LLM, offline]")
-    print("=" * 64)
-    print(f"groups={r['n_groups']}  words={r['n_words']}")
-    print(f"\nSymbol-U Vritti:   within={u['within']:.3f}  between={u['between']:.3f}"
-          f"  index={u['index']:+.3f}  p={u['p_value']:.4f}")
-    print(f"Phonological null: within={ph['within']:.3f}  between={ph['between']:.3f}"
-          f"  index={ph['index']:+.3f}")
-
-    print("\n----------------------------- VERDICT ------------------------------")
-    idx, p = u["index"], u["p_value"]
-    if idx < 0.05 or p > 0.05:
-        print("FAIL (as the strategy memo predicts): synonyms do NOT cluster in")
-        print("Symbol-U space. The Vritti vector is a function of SOUND, not")
-        print("meaning — synonyms with different phonology get different U.")
-        print("Gate-0 (semantic validity) is not cleared on this premise alone.")
-        print("Per SYMBOL_U_RESEARCH_STRATEGY.md this is the cheap, clean negative:")
-        print("U is phonological, not semantic. STOP or PIVOT to phonology.")
+    print("\n------------------------------ VERDICT -------------------------------")
+    best = max(r["backends"].items(), key=lambda kv: kv[1]["index"])
+    vm = r["backends"].get("vritti_mapper", {}).get("index", 0.0)
+    pm = r["backends"].get("pse_meaning", {}).get("index", 0.0)
+    print(f"Most synonym-invariant backend: {best[0]} (index {best[1]['index']:+.3f}, "
+          f"p={best[1]['p_value']:.4f}).")
+    if "pse_meaning" in r["backends"]:
+        delta = pm - vm
+        print(f"PSE meaning vs vritti_mapper: index {pm:+.3f} vs {vm:+.3f} "
+              f"(Δ={delta:+.3f}).")
+    if best[1]["index"] < 0.05 or best[1]["p_value"] > 0.05:
+        print("FAIL: even the best backend does NOT cluster synonyms above chance.")
+        print("U tracks SOUND, not meaning — including the PSE phoneme→meaning layer.")
+        print("Gate-0 (semantic validity) is not cleared. STOP/PIVOT (memo §9).")
     else:
-        print("PASS: synonyms cluster in Symbol-U space above chance — U carries")
-        print("meaning-aligned structure. Proceed to exp2 (incremental info vs E).")
-    print("(Reference: the phonological null's index bounds what pure sound gives;")
-    print(" if Symbol-U ≈ phonological null, the Vritti ontology adds nothing over")
-    print(" raw sound structure.)")
+        print("PASS: synonyms cluster above chance for at least one backend — that")
+        print("backend carries meaning-aligned structure. Proceed to exp2.")
 
 
 if __name__ == "__main__":

@@ -24,12 +24,20 @@ probe, which needs no adapter.
 | | Question | Needs an LLM? |
 |---|---|---|
 | **exp1 — invariance** | Do synonyms (same meaning, different sound) get *similar* `U`? Semantic ⇒ yes; phonological ⇒ no. | **No** (fully offline) |
+| **exp3 — dissociation** | Does `U` cluster *rhymes* (sound) more than *synonyms* (meaning)? Phonological ⇒ yes. | **No** (fully offline) |
 | **exp2 — incremental info** | Does `E + U` decode a semantic label better than `E` — and better than every null? | Yes (`E`) |
 
-`U` is the **real** Symbol-U computation: `symbolu_engine.SymbolUEngine` wraps the
-actual mappers in `symbolu_core.formulas.vritti_mapper` (char → `SoundClass` →
-Vritti energy state). It is *not* the lexicon approximation used by the older
-clean_softmax detector. `U` = Vritti histogram (5) ++ SoundClass histogram (7).
+### U backends (`backends.py`) — swap how `U` is computed
+
+| backend | dim | source |
+|---|---|---|
+| `vritti_mapper` | 12 | original: char → `SoundClass` → Vritti energy state (`symbolu_core.formulas.vritti_mapper`). Phonological. |
+| `pse_meaning` | 131 | **PSE phoneme→meaning**: `varna_lens.analyze` + `lexicon_authoritative.json` semantic `domain_tags`. |
+| `pse_resonance` | 7 | PSE polarity/valence "resonance" (liberating vs binding poles). |
+| `combined` | 150 | concat of all three. |
+
+All wrap the **real** mappers (not the lexicon approximation used by the older
+clean_softmax detector). See `PSE_COMPLEMENTARITY_REPORT.md` for the head-to-head.
 
 ### Null controls (`U` must beat all of them — §7 of the memo)
 
@@ -48,12 +56,15 @@ A real `E+U` win must exceed `E` **and** every `E+null`.
 # fast end-to-end smoke (offline, no model download)
 python -m symbolu_neural.complementarity_probe.cli smoke
 
-# exp1: synonym invariance — the cheapest kill switch (no LLM)
+# exp1: synonym invariance, all U backends — the cheapest kill switch (no LLM)
 python -m symbolu_neural.complementarity_probe.exp1_invariance
 
-# exp2: incremental info. Default backend is a NON-semantic offline stand-in.
-# A real verdict requires a genuine encoder:
-python -m symbolu_neural.complementarity_probe.exp2_incremental --embeddings hf
+# exp3: phonological-vs-semantic dissociation (rhymes vs synonyms, no LLM)
+python -m symbolu_neural.complementarity_probe.exp3_dissociation
+
+# exp2: incremental info. Default E backend is a NON-semantic offline stand-in.
+# Pick the U backend with --u-backend; a real verdict requires a genuine encoder:
+python -m symbolu_neural.complementarity_probe.exp2_incremental --embeddings hf --u-backend pse_meaning
 
 # tests (machinery only, not the hypothesis)
 python symbolu_neural/complementarity_probe/tests/test_probe.py
@@ -76,16 +87,20 @@ python symbolu_neural/complementarity_probe/tests/test_probe.py
 
 | file | role |
 |---|---|
-| `symbolu_engine.py` | deterministic `U` over the **real** mappers (`encode`, `vritti_vec`) |
+| `backends.py` | the four U backends (`vritti_mapper` / `pse_meaning` / `pse_resonance` / `combined`) with a uniform `encode` interface |
+| `symbolu_engine.py` | deterministic `vritti_mapper` `U` over the **real** mappers |
 | `embeddings.py` | `E` — `hf` (real) and `hashing` (offline fallback) backends |
 | `nulls.py` | shuffled-U / random / surface / phonological null streams |
 | `metrics.py` | invariance index + permutation p; CV linear probe (torch, no sklearn) |
-| `exp1_invariance.py` | synonym invariance experiment (offline) |
-| `exp2_incremental.py` | `E` vs `E+U` vs `E+null` incremental-information experiment |
-| `cli.py` | unified entry point (`exp1` / `exp2` / `smoke` / `all`) |
-| `data/synonyms.jsonl` | 32 curated synonym groups (exp1) |
+| `exp1_invariance.py` | synonym invariance, all backends (offline) |
+| `exp3_dissociation.py` | phonological-vs-semantic dissociation: rhymes vs synonyms (offline) |
+| `exp2_incremental.py` | `E` vs `E+U` vs `E+null`, per U backend |
+| `cli.py` | unified entry point (`exp1` / `exp3` / `exp2` / `smoke` / `all`) |
+| `data/synonyms.jsonl` | 32 curated synonym groups (exp1, semantic axis) |
+| `data/rhymes.jsonl` | 15 rhyme groups (exp3, phonological axis) |
 | `data/sentences.jsonl` | 30 labeled sentences, 3-way sentiment (exp2 smoke) |
-| `tests/test_probe.py` | machinery tests (determinism, shapes, controls) |
+| `tests/test_probe.py` | machinery tests (determinism, shapes, controls, backends) |
+| `PSE_COMPLEMENTARITY_REPORT.md` | PSE phoneme→meaning vs vritti_mapper findings |
 | `RESULT_REPORT_TEMPLATE.md` | fill-in report for a real (`hf`) run |
 
 ---
@@ -101,13 +116,16 @@ python symbolu_neural/complementarity_probe/tests/test_probe.py
 
 ### Current offline result (this sandbox)
 
-- **exp1**: invariance index ≈ **+0.01**, p ≈ 0.05 — synonyms do **not** cluster;
-  the Vritti vector (+0.010) barely exceeds the raw phonological null (+0.006).
-  This is the predicted **FAIL**: `U` tracks **sound, not meaning**.
-- **exp2**: run on the offline non-semantic backend → **INCONCLUSIVE by design**;
-  a real verdict needs `--embeddings hf` (blocked here by network policy).
+- **exp1**: best backend is `pse_meaning` (index **+0.012**, p=0.004) — barely
+  above `vritti_mapper` (+0.008) and the phonological null (+0.006). Synonyms
+  still essentially scatter.
+- **exp3**: **every** backend (incl. PSE meaning) clusters **rhymes ≫ synonyms**
+  (pse_meaning +0.169 vs +0.012) → `U` tracks **sound, not meaning**.
+- **exp2**: offline non-semantic backend → **INCONCLUSIVE by design**; a real
+  verdict needs `--embeddings hf` (blocked here by network policy).
 
-See `RESULT_REPORT_TEMPLATE.md` and `MIGRATION_NOTE.md`.
+Full PSE-vs-vritti_mapper head-to-head: **`PSE_COMPLEMENTARITY_REPORT.md`**.
+See also `RESULT_REPORT_TEMPLATE.md` and `MIGRATION_NOTE.md`.
 
 ---
 

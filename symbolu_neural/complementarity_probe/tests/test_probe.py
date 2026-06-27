@@ -10,6 +10,7 @@ import numpy as np
 
 from symbolu_neural.complementarity_probe.symbolu_engine import SymbolUEngine
 from symbolu_neural.complementarity_probe import nulls, metrics, exp1_invariance
+from symbolu_neural.complementarity_probe import backends, exp3_dissociation
 
 
 def test_engine_deterministic_and_real_mappers():
@@ -72,11 +73,45 @@ def test_cv_probe_runs_and_bounded():
     assert acc > 0.6  # separable -> probe should learn it
 
 
+def test_all_backends_construct_and_encode():
+    for name in backends.BACKENDS:
+        b = backends.get_backend(name)
+        v = b.encode("happy")
+        assert len(v) == b.dim
+        assert b.dim > 0
+        # sentence pooling works too
+        vs = b.encode("the team won the game")
+        assert len(vs) == b.dim
+
+
+def test_pse_meaning_uses_real_varna_lens():
+    b = backends.get_backend("pse_meaning")
+    # 'happy' and 'glad' should differ (phoneme-dependent), proving real decomposition
+    import numpy as np
+    a = np.asarray(b.encode("happy"))
+    g = np.asarray(b.encode("glad"))
+    assert a.sum() > 0 and g.sum() > 0
+    assert np.linalg.norm(a - g) > 0.0
+
+
+def test_pse_backend_deterministic():
+    b = backends.get_backend("pse_meaning")
+    assert b.encode("compassion") == b.encode("compassion")
+
+
 def test_exp1_runs_end_to_end():
-    r = exp1_invariance.run(n_perm=100, seed=0)
+    r = exp1_invariance.run(n_perm=50, backends=["vritti_mapper"], seed=0)
     assert r["n_groups"] > 0
-    assert "index" in r["symbolu_vritti"]
-    assert 0.0 <= r["symbolu_vritti"]["p_value"] <= 1.0
+    b = r["backends"]["vritti_mapper"]
+    assert "index" in b
+    assert 0.0 <= b["p_value"] <= 1.0
+
+
+def test_exp3_dissociation_runs():
+    r = exp3_dissociation.run(n_perm=50, backends=["vritti_mapper"], seed=0)
+    b = r["backends"]["vritti_mapper"]
+    assert "semantic_index" in b and "phonological_index" in b
+    assert "dissociation" in b
 
 
 if __name__ == "__main__":

@@ -26,15 +26,15 @@ import numpy as np
 # 1. Invariance index
 # --------------------------------------------------------------------------- #
 def _pairwise_mean_dist(X: np.ndarray) -> float:
-    if len(X) < 2:
+    """Mean Euclidean distance over all unordered pairs (vectorized)."""
+    n = len(X)
+    if n < 2:
         return 0.0
-    d = 0.0
-    k = 0
-    for i in range(len(X)):
-        for j in range(i + 1, len(X)):
-            d += float(np.linalg.norm(X[i] - X[j]))
-            k += 1
-    return d / max(k, 1)
+    sq = (X * X).sum(1)
+    d2 = sq[:, None] + sq[None, :] - 2.0 * (X @ X.T)
+    np.clip(d2, 0.0, None, out=d2)
+    iu = np.triu_indices(n, k=1)
+    return float(np.sqrt(d2[iu]).mean())
 
 
 def invariance_index(group_vectors: Sequence[np.ndarray]) -> Dict[str, float]:

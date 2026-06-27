@@ -29,9 +29,9 @@ from typing import List
 
 import numpy as np
 
-from .symbolu_engine import SymbolUEngine
+from .backends import get_backend, BACKENDS, u_matrix
 from .embeddings import get_embedder
-from .nulls import all_nulls, symbolu_matrix
+from .nulls import all_nulls
 from .metrics import cv_probe_accuracy, concat
 
 DATA = os.path.join(os.path.dirname(__file__), "data", "sentences.jsonl")
@@ -50,15 +50,16 @@ def load_labeled(path: str = DATA):
 
 
 def run(path: str = DATA, backend: str = "hashing", model_name: str | None = None,
-        folds: int = 5, l2: float = 1.0, seed: int = 0) -> dict:
+        u_backend: str = "pse_meaning", folds: int = 5, l2: float = 1.0,
+        seed: int = 0) -> dict:
     texts, labels = load_labeled(path)
     classes = sorted(set(labels))
     y = np.array([classes.index(l) for l in labels])
 
     embedder = get_embedder(backend, model_name)
     E = embedder.encode(texts)
-    eng = SymbolUEngine()
-    U = symbolu_matrix(texts, eng)
+    ub = get_backend(u_backend)
+    U = u_matrix(texts, ub)
     nulls = all_nulls(texts, U, seed=seed)
 
     def acc(X):
@@ -67,6 +68,7 @@ def run(path: str = DATA, backend: str = "hashing", model_name: str | None = Non
     base = acc(E)
     results = {
         "backend": backend,
+        "u_backend": u_backend,
         "is_semantic": embedder.is_semantic,
         "embed_dim": int(E.shape[1]),
         "u_dim": int(U.shape[1]),
@@ -85,6 +87,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default=DATA)
     ap.add_argument("--embeddings", default="hashing", choices=["hashing", "hf"])
+    ap.add_argument("--u-backend", default="pse_meaning", choices=BACKENDS)
     ap.add_argument("--model", default=None)
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--l2", type=float, default=1.0)
@@ -92,12 +95,13 @@ def main() -> None:
     args = ap.parse_args()
 
     r = run(args.data, backend=args.embeddings, model_name=args.model,
-            folds=args.folds, l2=args.l2, seed=args.seed)
+            u_backend=args.u_backend, folds=args.folds, l2=args.l2, seed=args.seed)
 
     print("=" * 64)
     print("EXP2 — Incremental information: E vs E+U vs E+null")
     print("=" * 64)
-    print(f"backend={r['backend']}  semantic={r['is_semantic']}  "
+    print(f"E_backend={r['backend']}  U_backend={r['u_backend']}  "
+          f"semantic={r['is_semantic']}  "
           f"E_dim={r['embed_dim']}  U_dim={r['u_dim']}  n={r['n']}  "
           f"classes={r['classes']}")
     if not r["is_semantic"]:
