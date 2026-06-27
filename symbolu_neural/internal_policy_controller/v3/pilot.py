@@ -62,6 +62,35 @@ def structural_report(seed=0) -> dict:
             "policy_divergence_vs_symbolu": {a: float(np.mean(v)) for a, v in div.items()}}
 
 
+def coverage_report() -> dict:
+    """Offline census: which state-signal and policy-axis VALUES appear across the
+    prompt set. Distinguishes 'wired & influences' (always true here) from 'every
+    nominal value observed' (one value — RELEASE/anandamaya/'holistic' — is
+    structurally near-unreachable on natural English text)."""
+    ps = prompts()
+    state_vals = {"vritti_top": set(), "guna_top": set(), "kosha_top": set(), "valence": set()}
+    axis_vals = {a: set() for a in AXES}
+    for p, _, _ in ps:
+        s = compute_state(p)
+        sm = s.summary()
+        for k in state_vals:
+            state_vals[k].add(sm[k])
+        d = translate(s).as_dict()
+        for a in AXES:
+            axis_vals[a].add(d[a])
+    nominal_state = {"vritti_top": 5, "guna_top": 3, "kosha_top": 5, "valence": 3}
+    nominal_axis = {"tone": 3, "directness": 3, "reasoning_style": 5, "caution": 3,
+                    "uncertainty_handling": 2, "speculation_reduction": 3, "clarity": 1}
+    return {
+        "n_prompts": len(ps),
+        "state": {k: {"seen": sorted(v), "n": len(v), "nominal": nominal_state[k]}
+                  for k, v in state_vals.items()},
+        "axes": {a: {"seen": sorted(v), "n": len(v), "nominal": nominal_axis[a]}
+                 for a, v in axis_vals.items()},
+        "field_influence": field_influence_check(),
+    }
+
+
 def run_quality(backend="mock", model=None, seed=0) -> dict:
     llm = get_llm(backend, model)
     ps = prompts()

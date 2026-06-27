@@ -68,6 +68,20 @@ def test_prompt_set_expanded():
     assert len(prompts()) >= 30          # statistical-validity expansion
 
 
+def test_signal_coverage_audit():
+    """Pins the audited coverage so regressions are caught. Every variable must be
+    WIRED (influences policy); value-coverage is complete except the structurally
+    near-unreachable RELEASE/anandamaya state (vritti & kosha = 4/5)."""
+    c = pilot.coverage_report()
+    assert all(c["field_influence"].values())                 # all 6 wired
+    assert c["state"]["guna_top"]["n"] == 3                    # full
+    assert c["state"]["valence"]["n"] == 3                     # full
+    assert c["state"]["vritti_top"]["n"] >= 4                  # 4/5 (RELEASE rare)
+    assert c["state"]["kosha_top"]["n"] >= 4                   # 4/5 (anandamaya rare)
+    for a in ["tone", "directness", "caution", "speculation_reduction"]:
+        assert c["axes"][a]["n"] == c["axes"][a]["nominal"]    # full range observed
+
+
 def test_multi_seed_ci_structure_and_pairing():
     res = pilot.run_multi(backend="mock", seeds=(0, 1, 2))
     assert res["n_per_arm"] == len(prompts()) * 3        # pooled n = prompts × seeds

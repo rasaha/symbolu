@@ -72,9 +72,18 @@ paraphrase); `--seeds N` pools `0..N-1` so `--seeds 3 ⇒ n ≈ 108 per arm`. Co
 control — `generic_refine`, `nl_policy`, `sentiment_critic`, `random_policy`,
 `shuffled_symbolu`, AND `relabeled_symbolu`. A significant win over all controls
 *except* `relabeled` ⇒ the controller helps but the **specific ontology** does not.
-Coverage caveat: across 36 prompts the `RELEASE`/`anandamaya` state ("holistic"
-reasoning_style) rarely tops natural English text (phonologically rare) — reachable
-in principle (self-check passes) but under-sampled; not a wiring defect.
+**Signal-coverage audit** (`cli coverage`, offline): all 6 policy-driving variables
+are wired & influence the policy; value-coverage on the 36 prompt-states is **full
+for guna(3/3), valence(3/3)** and for the **tone/directness/caution/speculation**
+axes, with continuous `guna_resonance` spanning 0.41–1.0 and `aspect_balance`
+0.79–1.0. The **only** gap: `vritti_top` and `kosha_top` are **4/5** — the
+`RELEASE`→`anandamaya`→"holistic" reasoning_style value is **structurally
+near-unreachable** on natural text (probe: even vowel-saturated strings don't make
+RELEASE the argmax). This is a property of the phonological vritti mapper, **not a
+wiring defect** (the field-influence self-check passes for all 6), and forcing it
+via prompt selection or a re-map would be dishonest. The quality run uses
+**draft**-states × seeds, which broadens coverage beyond this prompt-state proxy.
+A regression test (`test_signal_coverage_audit`) pins this audited coverage.
 
 ## Final answer
 
