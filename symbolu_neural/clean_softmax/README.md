@@ -9,6 +9,16 @@ Symbol-U modules as **optional, causal** augmentations, then runs an ablation
 ladder with **capacity-matched controls**. It is deliberately isolated from the
 Hybrid Phase stack.
 
+> **Read this first: [`SYMBOL_U_RESEARCH_STRATEGY.md`](SYMBOL_U_RESEARCH_STRATEGY.md).**
+> That memo is the current strategic interpretation of these clean-softmax
+> experiments and should be read before treating any code here as an architecture
+> proposal. In short: this work is now **evidence-gathering infrastructure**, not a
+> product; Symbol-U is **not** positioned as a replacement for BPE token-level LLMs;
+> the current first question is whether Symbol-U provides **complementary
+> word/sentence-level semantic signal beyond Transformer embeddings**; and
+> deployment architectures (fusion adapters, retrieval/planning/DHA conditioning)
+> should be built **only after** that signal is validated.
+
 ## Why this is different from the Hybrid Phase LLM
 
 | | Hybrid Phase LLM (`phase_transformer.py`) | This experiment |
