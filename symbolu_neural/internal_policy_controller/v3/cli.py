@@ -21,12 +21,18 @@ def main() -> None:
     pr.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"])
     pr.add_argument("--model", default=None)
     pr.add_argument("--seed", type=int, default=0)
+    pr.add_argument("--seeds", type=int, default=1,
+                    help="number of seeds (0..N-1) to pool with 95%% CIs; >1 => multi-seed report")
     sub.add_parser("state")
     sub.add_parser("check")
     args = ap.parse_args()
 
     if args.cmd == "run":
-        pilot.print_report(args.seed, args.backend, args.model)
+        if args.seeds > 1:
+            pilot.print_multi(pilot.run_multi(args.backend, args.model,
+                                              seeds=tuple(range(args.seeds))))
+        else:
+            pilot.print_report(args.seed, args.backend, args.model)
     elif args.cmd == "check":
         fi = pilot.field_influence_check()
         for f, ok in fi.items():

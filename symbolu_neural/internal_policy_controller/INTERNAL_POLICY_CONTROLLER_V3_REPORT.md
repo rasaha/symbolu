@@ -56,14 +56,25 @@ export PYTHONPATH=$(pwd)
 python -m symbolu_neural.internal_policy_controller.v3.cli check    # gate: must all pass
 python -m symbolu_neural.internal_policy_controller.v3.cli state    # inspect state+policy
 export ANTHROPIC_API_KEY=...    # or MISTRAL_API_KEY
-python -m symbolu_neural.internal_policy_controller.v3.cli run --backend anthropic
+
+# statistically valid run: 36 prompts × 3 seeds = n≈108/arm, with 95% CIs +
+# paired symbolu−control differences (SIG = CI excludes 0)
+python -m symbolu_neural.internal_policy_controller.v3.cli run --backend anthropic --seeds 3
 python symbolu_neural/internal_policy_controller/v3/tests/test_v3.py
 ```
 
-**Pre-registered pass condition:** `symbolu` must beat `generic_refine`,
-`nl_policy`, `sentiment_critic`, `random_policy`, `shuffled_symbolu`, AND
-`relabeled_symbolu` on the judge rubric mean / preference. Beating everything
-except `relabeled` ⇒ the controller helps but the **specific ontology** does not.
+**Sample size:** the prompt set is **36** (6 categories × 6, each with a
+paraphrase); `--seeds N` pools `0..N-1` so `--seeds 3 ⇒ n ≈ 108 per arm`. Cost ≈
+36×16 = 576 LLM calls/seed (~$1–3 on a small model), ~1,700 calls for 3 seeds.
+
+**Pre-registered pass condition (now CI-based):** the **paired** difference
+`symbolu − control` must have a 95% CI **strictly above 0** (SIG) for *every*
+control — `generic_refine`, `nl_policy`, `sentiment_critic`, `random_policy`,
+`shuffled_symbolu`, AND `relabeled_symbolu`. A significant win over all controls
+*except* `relabeled` ⇒ the controller helps but the **specific ontology** does not.
+Coverage caveat: across 36 prompts the `RELEASE`/`anandamaya` state ("holistic"
+reasoning_style) rarely tops natural English text (phonologically rare) — reachable
+in principle (self-check passes) but under-sampled; not a wiring defect.
 
 ## Final answer
 

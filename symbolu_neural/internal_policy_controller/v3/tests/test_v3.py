@@ -61,6 +61,22 @@ def test_mock_pipeline_runs_no_verdict():
     q = pilot.run_quality(backend="mock")
     assert q["is_real"] is False
     assert "judge_failures" in q
+    assert len(q["arms"]["symbolu"]["per_prompt"]) == len(prompts())   # per-prompt scores exposed
+
+
+def test_prompt_set_expanded():
+    assert len(prompts()) >= 30          # statistical-validity expansion
+
+
+def test_multi_seed_ci_structure_and_pairing():
+    res = pilot.run_multi(backend="mock", seeds=(0, 1, 2))
+    assert res["n_per_arm"] == len(prompts()) * 3        # pooled n = prompts × seeds
+    for arm in pilot.ARMS:
+        assert "mean" in res["arms_ci"][arm] and "ci95" in res["arms_ci"][arm]
+    # paired diffs vs every control present, with significance flag
+    for ref in ["generic_refine", "nl_policy", "relabeled_symbolu"]:
+        p = res["paired_vs_symbolu"][ref]
+        assert {"diff", "ci95", "significant"} <= set(p)
 
 
 if __name__ == "__main__":
