@@ -1,4 +1,4 @@
-"""v3 orchestrator. Reuses v2's verified harness (llm/judge/data). Fixes vs v2:
+"""v3 orchestrator. Self-contained harness (local llm/judge/data). Fixes vs v2:
 draft-states everywhere, no silent judge fallback, and a built-in field-influence
 self-check that must pass before any (paid) quality run.
 """
@@ -10,9 +10,9 @@ import copy
 
 import numpy as np
 
-from symbolu_neural.internal_policy_controller.v2.data import prompts
-from symbolu_neural.internal_policy_controller.v2.llm import get_llm
-from symbolu_neural.internal_policy_controller.v2.judge import judge, RUBRIC
+from .data import prompts
+from .llm import get_llm
+from .judge import judge, RUBRIC
 from .symbolu_state import compute_state, POLICY_DRIVING
 from .policy import ARMS, AXES, policy_for_arm, translate, policy_divergence
 

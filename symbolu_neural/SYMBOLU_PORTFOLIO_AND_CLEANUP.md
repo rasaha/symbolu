@@ -24,16 +24,22 @@ internal_policy_controller -> complementarity_probe.backends   (v1 critics, v2, 
 internal_policy_controller -> api_control_protocol.llm         (v1 reviser only)
 ```
 Shared helpers (imported by ≥1 other dir): **`complementarity_probe.backends`**,
-**`modules/`**, **`api_control_protocol.llm`** (v1-only). The skeleton **root**
-files (`backbone.py`, `model.py`, `config.py`, `losses.py`, `ablations.py`,
-`smoke_test.py`) are imported by **nothing**. Nothing outside `symbolu_neural/`
-imports any of this.
+**`modules/`**, **`api_control_protocol.llm`** (v1-only). Nothing outside
+`symbolu_neural/` imports any of this.
+
+> **CORRECTION (verified during cleanup):** an earlier draft called the skeleton
+> **root** files (`backbone/model/config/losses/ablations`) "orphaned." That was
+> **wrong** — `symbolu_neural/__init__.py` does `from .config/.backbone/.model
+> import …` and `from . import losses, ablations`, so they load whenever **any**
+> subpackage (incl. canonical v3, complementarity_probe) is imported. They are
+> **load-bearing via the package `__init__`**, NOT safely deletable. Only
+> `smoke_test.py` is truly standalone.
 
 ## Portfolio inventory & classification
 
 | dir | hypothesis tested | verdict (see its report) | dep role | **status** |
 |---|---|---|---|---|
-| `symbolu_neural/` root (backbone/model/config/losses/ablations/smoke_test) | Symbol-U as trainable nn.Module skeleton | interface-only, never trained | **orphaned** (imported by nothing) | **superseded → deletion candidate (after authorization)** |
+| `symbolu_neural/` root (backbone/model/config/losses/ablations) | Symbol-U as trainable nn.Module skeleton | interface-only, never trained | **load-bearing** (exposed by package `__init__.py`) | **superseded as an experiment, but KEEP** — deleting needs `__init__.py` edits; not a safe deletion target. (`smoke_test.py` alone is standalone.) |
 | `modules/` | per-EQ neural modules (typed heads, memory, refinement) | feeds the skeleton/clean_softmax | **shared helper** (clean_softmax, stage1) | **keep** (live dep) |
 | `stage1/` | frozen-backbone grounding harness | grounding failed to generalize | leaf (uses modules) | **completed experiment — keep for record** |
 | `clean_softmax/` | token/sentence-level heads, fusion, steering, capacity studies | **no advantage at equal compute** (the core negative) | leaf | **completed experiment — keep for record** (bulk of falsification evidence) |
@@ -46,10 +52,12 @@ imports any of this.
 ## What is genuinely deletable (beyond v1/v2) — and what is NOT
 
 **Additional deletion candidates (orphaned, superseded):**
-- The skeleton **root** files `symbolu_neural/{backbone,model,config,losses,ablations,smoke_test}.py`
-  — imported by nothing; superseded by `clean_softmax`. *Candidate only; keep for
-  audit until authorized.* (Note: `modules/` is **not** in this set — clean_softmax
-  and stage1 import it.)
+- **None among the skeleton root** — corrected above: those files are exposed by
+  `symbolu_neural/__init__.py` and load with every subpackage, so they are **not**
+  safe deletion targets (only `smoke_test.py` is standalone). The skeleton is
+  superseded *as an experiment* but stays as a load-bearing package surface.
+- The only clean deletion candidates remain the **internal_policy_controller v1
+  files + v2 defective core** (see that dir's `VERSION_CLEANUP_PLAN.md`).
 
 **NOT deletion targets (do not propose deleting):**
 - `complementarity_probe/` — canonical Symbol-U vector engine (`backends.py`) that

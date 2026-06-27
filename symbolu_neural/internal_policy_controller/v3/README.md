@@ -2,8 +2,9 @@
 
 Corrected implementation of **draft → full Symbol-U state → ontology-driven policy →
 LLM rewrite → independent judge**, fixing the v2 wiring defects found in
-`../V2_AUDIT_AND_V3_PLAN.md`. Reuses v2's verified harness (`llm.py`, `judge.py`,
-`data.py`); v2 kept intact as the audited-defective record.
+`../V2_AUDIT_AND_V3_PLAN.md`. **Self-contained** (local `llm.py`, `judge.py`,
+`data.py` — relocated here from v2 during cleanup so the canonical line no longer
+depends on deprecated code). v1/v2 kept intact only as the audited-defective record.
 
 ## Key fix: every claimed Symbol-U variable drives a distinct policy axis
 

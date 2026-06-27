@@ -8,7 +8,7 @@ from symbolu_neural.internal_policy_controller.v3.symbolu_state import (
 from symbolu_neural.internal_policy_controller.v3.policy import (
     ARMS, AXES, translate, policy_for_arm, _relabel_state, policy_divergence)
 from symbolu_neural.internal_policy_controller.v3 import pilot
-from symbolu_neural.internal_policy_controller.v2.data import prompts
+from symbolu_neural.internal_policy_controller.v3.data import prompts
 
 
 def test_full_state_includes_aspect():

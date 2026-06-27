@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 
 from . import pilot
-from symbolu_neural.internal_policy_controller.v2.data import prompts
+from .data import prompts
 from .symbolu_state import compute_state
 from .policy import translate
 

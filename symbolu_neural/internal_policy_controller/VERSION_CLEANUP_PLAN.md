@@ -62,14 +62,23 @@ breakage, but it is retained as the documented record of the invalid prototype.
 ## Recommended cleanup sequence
 
 ```
-[NOW, non-destructive]   README banner (v3 canonical, v1/v2 historical)
+[DONE, non-destructive]  README banner (v3 canonical, v1/v2 historical)
                          deprecation banners printed by v1 + v2 CLIs
                          deprecation notes in v1/v2 READMEs
         │
-[AFTER v3 real-API run]  relocate v2 shared helpers -> v3/shared; re-test
+[DONE]                   relocate v2 shared helpers (data/llm/judge) INTO v3/
+                         -> v3 is now SELF-CONTAINED; canonical line no longer
+                         depends on deprecated v2. v3 tests 9/9 still pass.
         │
-[ON AUTHORIZATION]       delete v1 + defective v2 modules; archive audit docs
+[ON AUTHORIZATION]       delete v1 files + the defective v2 modules (v2 now fully
+                         decoupled from the canonical line). Reports/audit .md kept
+                         in-tree; deleted code remains in git history.
 ```
+
+**Status update:** the helper-relocation blocker is **resolved** — v3 carries its
+own `data.py`/`llm.py`/`judge.py`. v1 and v2 are now pure orphans w.r.t. the
+canonical line; their code can be deleted on an explicit go (the v3 real-API run is
+no longer a technical prerequisite for deletion, only a recommended checkpoint).
 
 ## Bottom line
 
