@@ -12,39 +12,51 @@ from symbolu_neural.internal_policy_controller.v3 import pilot
 from symbolu_neural.internal_policy_controller.v3.data import prompts
 
 
-# ---- terminology-fix regression tests (classical vritti vs dynamic state) ----
-def test_classical_and_dynamic_are_separate_fields():
+# ---- sentence-level classical Vritti vs phoneme dynamic state ----
+def test_classical_vritti_is_sentence_level_not_phonological():
     s = compute_state("explain how a transformer works")
-    assert hasattr(s, "classical_vritti") and hasattr(s, "dynamic_state")
-    assert not hasattr(s, "vritti")                       # the ambiguous field is GONE
-    assert set(s.classical_vritti) == set(CLASSICAL_VRITTI)        # pramana.. (canonical)
-    assert set(s.dynamic_state) == set(DYNAMIC_STATES)            # INERTIA.. (motion)
+    cv = s.classical_vritti
+    assert set(cv) >= {"primary", "nidra", "smrti"}             # 3+2 structure
+    assert cv["primary"] in {"pramana", "viparyaya", "vikalpa"}
+    assert isinstance(cv["nidra"], bool) and isinstance(cv["smrti"], bool)
+    assert s.provenance["classical_vritti"] == "sentence_semantic_rule_v1"   # NOT phonological
+    assert "bridge" not in s.provenance["classical_vritti"]
+    assert s.provenance["dynamic_state"].startswith("canonical")             # phoneme stays canonical
 
 
-def test_classical_vritti_uses_canonical_schema_names():
+def test_evaluator_detects_each_cognitive_state():
+    from symbolu_neural.internal_policy_controller.v3.cognitive_evaluator import (
+        evaluate_cognitive, PROBE_ANSWERS)
+    e = {k: evaluate_cognitive(v) for k, v in PROBE_ANSWERS.items()}
+    assert e["pramana"]["primary"] == "pramana"
+    assert e["viparyaya"]["primary"] == "viparyaya"
+    assert e["vikalpa"]["primary"] == "vikalpa"
+    assert e["nidra"]["nidra"] is True
+    assert e["smrti"]["smrti"] is True
+
+
+def test_three_cognitive_signals_hit_their_axes_and_dynamic_hits_delivery():
+    fam = pilot.field_influence_by_family()
+    assert fam["classical_primary"]["expected_axis"] == "epistemic_stance" and fam["classical_primary"]["hits_expected"]
+    assert fam["nidra_flag"]["expected_axis"] == "clarification_policy" and fam["nidra_flag"]["hits_expected"]
+    assert fam["smrti_flag"]["expected_axis"] == "memory_policy" and fam["smrti_flag"]["hits_expected"]
+    assert fam["dynamic_state"]["expected_axis"] == "delivery_pace" and fam["dynamic_state"]["hits_expected"]
+
+
+def test_classical_uses_canonical_schema_names():
     from symbolu_core.presentation.signals import VrittiDistribution
     import dataclasses
     canon = [f.name for f in dataclasses.fields(VrittiDistribution)]
     assert set(CLASSICAL_VRITTI) == set(canon)
 
 
-def test_classical_vritti_provenance_is_derived_bridge_not_canonical():
-    s = compute_state("explain how a transformer works")
-    assert s.provenance["classical_vritti"].startswith("derived_bridge")
-    assert s.provenance["dynamic_state"].startswith("canonical")
-
-
-def test_both_vritti_senses_influence_separate_families():
-    fam = pilot.field_influence_by_family()
-    assert fam["classical_vritti"]["hits_cognitive"]     # classical -> cognitive axis
-    assert fam["dynamic_state"]["hits_delivery"]         # dynamic   -> delivery axis
-
-
-def test_relabel_permutes_both_vritti_senses():
-    s = compute_state("should I quit my stable job to pursue my dream")
+def test_relabel_permutes_cognitive_and_dynamic():
+    s = compute_state("It might possibly be a good year; perhaps prices could rise.")
     r = _relabel_state(s, 0)
-    assert list(r.classical_vritti.keys()) != list(s.classical_vritti.keys()) \
-        or list(r.dynamic_state.keys()) != list(s.dynamic_state.keys())
+    # primary remapped OR flags swapped OR dynamic permuted
+    changed = (r.classical_vritti != s.classical_vritti) or \
+              (list(r.dynamic_state.keys()) != list(s.dynamic_state.keys()))
+    assert changed
 
 
 def test_full_state_includes_aspect():
@@ -109,13 +121,15 @@ def test_signal_coverage_audit():
     WIRED (influences policy); value-coverage is complete except the structurally
     near-unreachable RELEASE/anandamaya state (vritti & kosha = 4/5)."""
     c = pilot.coverage_report()
-    assert all(c["field_influence"].values())                 # all 7 wired
-    assert set(c["field_influence"]) == set(POLICY_DRIVING)    # incl. both vritti senses
+    assert all(c["field_influence"].values())                 # all 9 wired
+    assert set(c["field_influence"]) == set(POLICY_DRIVING)    # incl. 3 cognitive + dynamic
     assert c["state"]["guna_top"]["n"] == 3                    # full
     assert c["state"]["valence"]["n"] == 3                     # full
     assert c["state"]["dynamic_state_top"]["n"] >= 4           # 4/5 (RELEASE rare)
     assert c["state"]["kosha_top"]["n"] >= 4                   # 4/5 (anandamaya rare)
-    assert c["state"]["classical_vritti_top"]["n"] >= 4        # bridged, all 5 reachable
+    # classical_vritti is about ANSWERS -> reachability proven on crafted probes
+    assert set(c["evaluator_reachability"]["primary"]) == {"pramana", "viparyaya", "vikalpa"}
+    assert "True" in c["evaluator_reachability"]["nidra"] and "True" in c["evaluator_reachability"]["smrti"]
     for a in ["tone", "caution", "speculation_reduction"]:
         assert c["axes"][a]["n"] == c["axes"][a]["nominal"]    # full range observed
 

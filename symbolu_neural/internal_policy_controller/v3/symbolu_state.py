@@ -1,21 +1,20 @@
 """v3 Symbol-U state — separates DYNAMIC STATE from CLASSICAL VRITTI (+ full state).
 
-TERMINOLOGY FIX (this update): v3 previously called the 5-state DYNAMIC/MOTION
-system "vritti". That is NOT the classical Yoga/Patañjali vrittis. They are now two
-separate fields:
+TWO vritti senses, from TWO DIFFERENT SOURCES:
 
   dynamic_state   : inertia/activation/oscillation/tension/release  (motion system,
                     canonical: symbolu_core.formulas.vritti_mapper.VrittiType)
-                    -> ENERGY/DELIVERY policy.
-  classical_vritti: pramana/viparyaya/vikalpa/smrti/nidra  (Patañjali, canonical
-                    SCHEMA: symbolu_core.presentation.signals.VrittiDistribution)
-                    -> COGNITIVE/EPISTEMIC policy.
+                    PHONEME/PSE-driven -> ENERGY/DELIVERY policy.
+  classical_vritti: SENTENCE-LEVEL cognitive evaluation of the DRAFT ANSWER
+                    (cognitive_evaluator, provenance sentence_semantic_rule_v1):
+                      primary in {pramana, viparyaya, vikalpa}
+                      nidra : bool  (low-information / needs clarification)
+                      smrti : bool  (memory-/prior-context reference)
+                    MEANING-driven -> COGNITIVE/EPISTEMIC policy.
 
-PROVENANCE: the classical-vritti *schema* (names/order/meanings) is canonical; its
-*values* are a `derived_bridge` from dynamic_state + valence + aspect + resonance —
-because the canonical computation (ChittaVrittiResult / chitta_vritti) is part of
-the neural Sovereign system, not a torch-free deterministic text mapper. We do NOT
-pretend the bridged values are canonical.
+This update REPLACES the earlier phonological derived_bridge for classical_vritti
+with a meaning-oriented evaluator (more faithful to the intended architecture:
+classical Vritti = cognitive evaluation, dynamic_state = phonological delivery).
 
 Other fixes retained: Aspect via phase4a; reachable guna; no silent valence
 fallback; POLICY-DRIVING vs DIAGNOSTIC-ONLY split.
@@ -31,6 +30,7 @@ from symbolu_core.formulas.guna_kosha_resonance import (
     compute_guna_resonance, compute_kosha_activation_vector, compute_kosha_resonance_index,
     GUNA_NAMES, KOSHA_ORDER_5)
 from symbolu_neural.complementarity_probe.backends import get_backend
+from .cognitive_evaluator import evaluate_cognitive, PRIMARY_VRITTI, FLAGS
 
 _PSE = get_backend("pse_meaning")
 _PSE_RES = get_backend("pse_resonance")
@@ -52,15 +52,17 @@ _DYN_TO_KOSHA = {
     VrittiType.RELEASE: "anandamaya",
 }
 
-POLICY_DRIVING = ["classical_vritti", "dynamic_state", "guna", "kosha",
-                  "aspect_balance", "guna_resonance", "valence"]
+# Policy-driving signals. classical_vritti is now split into 3 independently-acting
+# cognitive signals: the primary mode + the two flags.
+POLICY_DRIVING = ["classical_primary", "nidra_flag", "smrti_flag", "dynamic_state",
+                  "guna", "kosha", "aspect_balance", "guna_resonance", "valence"]
 DIAGNOSTIC_ONLY = ["kosha_resonance", "valence_sign", "pse_meaning", "pse_resonance"]
 
 
 @dataclass
 class SymbolUState:
-    dynamic_state: Dict[str, float]      # motion system (was 'vritti') -> delivery policy
-    classical_vritti: Dict[str, float]   # Patañjali 5 (derived_bridge) -> cognitive policy
+    dynamic_state: Dict[str, float]      # motion system -> DELIVERY policy (phoneme/PSE)
+    classical_vritti: Dict               # {primary, nidra, smrti} -> COGNITIVE (sentence-level)
     guna: Dict[str, float]
     kosha: Dict[str, float]
     aspect_balance: float          # [-1,1] : +sublimate-leaning, -distortion-leaning
@@ -74,8 +76,9 @@ class SymbolUState:
     provenance: Dict[str, str] = field(default_factory=dict)
 
     def summary(self) -> Dict:
+        cv = self.classical_vritti
         return {"dynamic_state_top": max(self.dynamic_state, key=self.dynamic_state.get),
-                "classical_vritti_top": max(self.classical_vritti, key=self.classical_vritti.get),
+                "classical_primary": cv["primary"], "nidra": cv["nidra"], "smrti": cv["smrti"],
                 "guna_top": max(self.guna, key=self.guna.get),
                 "kosha_top": max(self.kosha, key=self.kosha.get),
                 "aspect_balance": round(self.aspect_balance, 3),
@@ -87,34 +90,6 @@ def _dynamic_distribution(text: str) -> Dict[VrittiType, float]:
     units = map_acoustic_units(text)
     vs = [assign_vritti(u) for u in units]
     return get_vritti_distribution(vs) if vs else {v: 0.0 for v in VrittiType}
-
-
-def _classical_vritti_bridge(dyn: Dict[VrittiType, float], valence: str,
-                             aspect_balance: float, guna_resonance: float) -> Dict[str, float]:
-    """DERIVED BRIDGE (provisional, NOT canonical computation) from dynamic_state +
-    valence + aspect + resonance to the 5 classical Patañjali vrittis. Documented
-    rationale per mode (canonical meanings from presentation.signals.VrittiDistribution):
-      pramana   (valid cognition)      <- clarity: RELEASE motion + high aspect (+liberating)
-      viparyaya (misperception/error)  <- TENSION (distortion) + binding valence
-      vikalpa   (conceptual branching) <- OSCILLATION (fluctuation) + mixed valence
-      smrti     (memory/retention)     <- ACTIVATION (active recall) + low aspect
-      nidra     (dormancy/absence)     <- INERTIA (dullness) + low coherence (1-resonance)
-    Modulated by valence/aspect/resonance so it is NOT a pure relabel of dynamic_state
-    (the relabel/shuffle controls test whether it adds anything beyond that)."""
-    d = {v.name: dyn.get(v, 0.0) for v in VrittiType}
-    ab = max(aspect_balance, 0.0)
-    # each classical vritti primarily tracks a distinct dynamic state (so it inherits
-    # dynamic_state's coverage) + a light epistemic modulation. Small aspect coef on
-    # pramana so it does not swamp the others.
-    scores = {
-        "pramana":   d["RELEASE"] + 0.20 * ab + (0.20 if valence == "liberating" else 0.0),
-        "viparyaya": d["TENSION"] + (0.25 if valence == "binding" else 0.0),
-        "vikalpa":   d["OSCILLATION"] + (0.20 if valence == "mixed" else 0.0),
-        "smrti":     d["ACTIVATION"],
-        "nidra":     d["INERTIA"] + 0.30 * (1.0 - guna_resonance),
-    }
-    tot = sum(scores.values()) or 1.0
-    return {k: scores[k] / tot for k in CLASSICAL_VRITTI}
 
 
 def _aspect_balance(text: str, warnings: List[str]) -> float:
@@ -187,7 +162,7 @@ def compute_state(text: str) -> SymbolUState:
     lean, sign = _valence(text, warnings)
     aspect = _aspect_balance(text, warnings)
     g_res = float(compute_guna_resonance(guna))
-    classical = _classical_vritti_bridge(vd, lean, aspect, g_res)
+    classical = evaluate_cognitive(text)              # SENTENCE-LEVEL, meaning-oriented
     return SymbolUState(
         dynamic_state=dynamic_state, classical_vritti=classical, guna=guna, kosha=kosha,
         aspect_balance=aspect, guna_resonance=g_res,
@@ -197,7 +172,7 @@ def compute_state(text: str) -> SymbolUState:
         warnings=warnings,
         provenance={"dynamic_state": "canonical(vritti_mapper)", "valence": "canonical",
                     "aspect_balance": "canonical(phase4a)",
-                    "classical_vritti": "derived_bridge(schema=presentation.signals.VrittiDistribution)",
+                    "classical_vritti": classical["provenance"],   # sentence_semantic_rule_v1
                     "guna": "derived_from_dynamic_state", "kosha": "heuristic_from_dynamic_state",
                     "guna_resonance": "canonical_fn(derived)",
                     "pse_meaning": "diagnostic_only", "pse_resonance": "diagnostic_only",

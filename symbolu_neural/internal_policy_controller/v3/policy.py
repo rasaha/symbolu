@@ -1,21 +1,19 @@
-"""v3 policy translation — classical_vritti (cognitive) vs dynamic_state (delivery).
+"""v3 policy translation — sentence-level classical Vritti (cognitive) vs phoneme/PSE
+dynamic state (delivery). Each POLICY-DRIVING signal -> a DISTINCT axis (enforced by
+the field-influence self-test).
 
-Each POLICY-DRIVING Symbol-U variable -> a DISTINCT policy axis (enforced by the
-field-influence self-test). The two vritti senses now drive SEPARATE axis families:
-
-  COGNITIVE / epistemic:
-    classical_vritti -> epistemic_stance   (pramana/viparyaya/vikalpa/smrti/nidra)
-    kosha            -> reasoning_style
-    aspect_balance   -> caution
-    guna_resonance   -> uncertainty_handling
-    valence          -> speculation_reduction
-  DELIVERY / energy:
-    guna             -> tone
-    dynamic_state    -> delivery_pace       (inertia/activation/oscillation/tension/release)
+  COGNITIVE / epistemic (from the sentence-level cognitive evaluator + ontology):
+    classical_vritti.primary -> epistemic_stance      (pramana/viparyaya/vikalpa)
+    classical_vritti.nidra   -> clarification_policy   (low-info / ask vs answer)
+    classical_vritti.smrti   -> memory_policy          (memory provenance)
+    kosha                    -> reasoning_style
+    aspect_balance           -> caution
+    guna_resonance           -> uncertainty_handling
+    valence                  -> speculation_reduction
+  DELIVERY / energy (phoneme/PSE):
+    guna                     -> tone
+    dynamic_state            -> delivery_pace
     (clarity is a fixed default, not claimed state-driven)
-
-Controls: relabeled independently permutes the LABELS of classical_vritti,
-dynamic_state, guna, kosha AND valence; shuffled uses a different draft's state.
 """
 from __future__ import annotations
 
@@ -26,14 +24,16 @@ import copy
 import numpy as np
 
 from symbolu_core.formulas.guna_kosha_resonance import GUNA_NAMES, KOSHA_ORDER_5
-from .symbolu_state import SymbolUState, CLASSICAL_VRITTI, DYNAMIC_STATES
+from .symbolu_state import SymbolUState, DYNAMIC_STATES
+from .cognitive_evaluator import PRIMARY_VRITTI
 
 ARMS = ["draft_only", "generic_refine", "nl_policy", "sentiment_critic",
         "random_policy", "shuffled_symbolu", "relabeled_symbolu", "symbolu"]
-AXES = ["tone", "delivery_pace", "epistemic_stance", "reasoning_style", "caution",
-        "uncertainty_handling", "speculation_reduction", "clarity"]
-COGNITIVE_AXES = ["epistemic_stance", "reasoning_style", "caution",
-                  "uncertainty_handling", "speculation_reduction"]
+AXES = ["tone", "delivery_pace", "epistemic_stance", "clarification_policy",
+        "memory_policy", "reasoning_style", "caution", "uncertainty_handling",
+        "speculation_reduction", "clarity"]
+COGNITIVE_AXES = ["epistemic_stance", "clarification_policy", "memory_policy",
+                  "reasoning_style", "caution", "uncertainty_handling", "speculation_reduction"]
 DELIVERY_AXES = ["tone", "delivery_pace", "clarity"]
 
 _TONE = {"sattva": "calm and clear", "rajas": "direct and energetic",
@@ -41,11 +41,13 @@ _TONE = {"sattva": "calm and clear", "rajas": "direct and energetic",
 _PACE = {"INERTIA": "slow, minimal, stabilizing", "ACTIVATION": "elaborative and explanatory",
          "OSCILLATION": "iterative and self-checking", "TENSION": "concise and focused",
          "RELEASE": "closing and integrative"}
-_STANCE = {"pramana": "grounded and direct (assert valid conclusions)",
-           "viparyaya": "corrective and careful (flag likely misperceptions, verify claims)",
-           "vikalpa": "imaginative but clearly labeled as speculation",
-           "smrti": "recall and contextualize prior/known information",
-           "nidra": "low-confidence: keep minimal and ask to clarify"}
+_STANCE = {"pramana": "grounded and direct: assert only verifiable, evidence-based conclusions",
+           "viparyaya": "corrective: flag contradictions/false certainty and avoid overclaiming",
+           "vikalpa": "clearly label speculation as speculation; do not present it as fact"}
+_CLARIFY = {True: "the draft is low-information/evasive — ask a clarifying question instead of pretending to answer",
+            False: "answer directly; no clarification needed"}
+_MEMORY = {True: "the draft relies on remembered/prior context — state that provenance and flag recall uncertainty",
+           False: "no memory reliance; do not invent prior context"}
 _REASONING = {"annamaya": "concrete and practical", "pranamaya": "energetic and brisk",
               "manomaya": "balanced and reflective", "vijnanamaya": "analytical and rigorous",
               "anandamaya": "holistic and integrative"}
@@ -57,6 +59,8 @@ class PolicySpec:
     tone: str
     delivery_pace: str
     epistemic_stance: str
+    clarification_policy: str
+    memory_policy: str
     reasoning_style: str
     caution: str
     uncertainty_handling: str
@@ -69,6 +73,8 @@ class PolicySpec:
                 "factual content and meaning.\n"
                 "Cognitive policy:\n"
                 f"- Epistemic stance: {self.epistemic_stance}.\n"
+                f"- Clarification: {self.clarification_policy}.\n"
+                f"- Memory: {self.memory_policy}.\n"
                 f"- Reasoning style: {self.reasoning_style}.\n"
                 f"- Caution / hedging: {self.caution} (only where genuinely warranted).\n"
                 f"- Uncertainty: {self.uncertainty_handling}.\n"
@@ -82,9 +88,9 @@ class PolicySpec:
 
 
 def translate(state: SymbolUState) -> PolicySpec:
+    cv = state.classical_vritti
     guna_top = max(state.guna, key=state.guna.get)
     dyn_top = max(state.dynamic_state, key=state.dynamic_state.get)
-    cv_top = max(state.classical_vritti, key=state.classical_vritti.get)
     kosha_top = max(state.kosha, key=state.kosha.get)
     caution = ("high" if state.aspect_balance < 0.90 else
                ("medium" if state.aspect_balance < 0.97 else "low"))
@@ -93,7 +99,9 @@ def translate(state: SymbolUState) -> PolicySpec:
     return PolicySpec(
         tone=_TONE[guna_top],
         delivery_pace=_PACE[dyn_top],
-        epistemic_stance=_STANCE[cv_top],
+        epistemic_stance=_STANCE[cv["primary"]],
+        clarification_policy=_CLARIFY[bool(cv["nidra"])],
+        memory_policy=_MEMORY[bool(cv["smrti"])],
         reasoning_style=_REASONING[kosha_top],
         caution=caution,
         uncertainty_handling=uncertainty,
@@ -102,9 +110,9 @@ def translate(state: SymbolUState) -> PolicySpec:
 
 
 def _relabel_state(state: SymbolUState, seed: int = 0) -> SymbolUState:
-    """Independently permute the LABELS of every consumed categorical ontology:
-    classical_vritti, dynamic_state, guna, kosha, valence."""
-    rng = np.random.default_rng(seed + 7)
+    """Independently permute every consumed categorical signal: classical_vritti
+    primary (3-way), the nidra & smrti flags (swap their effects), dynamic_state,
+    guna, kosha, valence."""
     s = copy.copy(state)
 
     def permute(d, keys, salt):
@@ -113,7 +121,15 @@ def _relabel_state(state: SymbolUState, seed: int = 0) -> SymbolUState:
         vals = list(d.values())
         return {p[i]: vals[i] for i in range(len(keys))}
 
-    s.classical_vritti = permute(state.classical_vritti, CLASSICAL_VRITTI, 1)
+    # classical primary: map the real primary to a permuted label
+    r = np.random.default_rng(seed + 1)
+    perm = list(PRIMARY_VRITTI); r.shuffle(perm)
+    primary_map = {PRIMARY_VRITTI[i]: perm[i] for i in range(len(PRIMARY_VRITTI))}
+    cv = dict(state.classical_vritti)
+    cv = {"primary": primary_map[cv["primary"]],
+          "nidra": cv["smrti"], "smrti": cv["nidra"],   # swap the two flags' effects
+          **{k: v for k, v in cv.items() if k not in ("primary", "nidra", "smrti")}}
+    s.classical_vritti = cv
     s.dynamic_state = permute(state.dynamic_state, DYNAMIC_STATES, 2)
     s.guna = permute(state.guna, list(GUNA_NAMES), 3)
     s.kosha = permute(state.kosha, list(KOSHA_ORDER_5), 4)
@@ -126,7 +142,9 @@ def _sentiment_policy(state: SymbolUState) -> PolicySpec:
     binding = state.valence == "binding"
     return PolicySpec(
         tone="calm and clear" if binding else "direct and energetic",
-        delivery_pace="concise and focused", epistemic_stance="grounded and direct",
+        delivery_pace="concise and focused",
+        epistemic_stance=_STANCE["pramana"],
+        clarification_policy=_CLARIFY[False], memory_policy=_MEMORY[False],
         reasoning_style="balanced and reflective",
         caution="high" if binding else "medium",
         uncertainty_handling="acknowledge uncertainty explicitly" if binding else "state conclusions plainly",
@@ -140,6 +158,8 @@ def _random_policy(seed: int) -> PolicySpec:
         tone=rng.choice(list(_TONE.values())),
         delivery_pace=rng.choice(list(_PACE.values())),
         epistemic_stance=rng.choice(list(_STANCE.values())),
+        clarification_policy=rng.choice(list(_CLARIFY.values())),
+        memory_policy=rng.choice(list(_MEMORY.values())),
         reasoning_style=rng.choice(list(_REASONING.values())),
         caution=rng.choice(lv),
         uncertainty_handling=rng.choice(["acknowledge uncertainty explicitly",
@@ -149,7 +169,8 @@ def _random_policy(seed: int) -> PolicySpec:
 
 _FIXED_NL_POLICY = PolicySpec(
     tone="calm and clear", delivery_pace="concise and focused",
-    epistemic_stance="grounded and direct", reasoning_style="balanced and reflective",
+    epistemic_stance=_STANCE["pramana"], clarification_policy=_CLARIFY[False],
+    memory_policy=_MEMORY[False], reasoning_style="balanced and reflective",
     caution="medium", uncertainty_handling="acknowledge uncertainty where warranted",
     speculation_reduction="high", source="fixed_nl")
 

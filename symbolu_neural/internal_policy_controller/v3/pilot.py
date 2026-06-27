@@ -20,49 +20,56 @@ from .policy import ARMS, AXES, policy_for_arm, translate, policy_divergence
 # --------------------------------------------------------------------------- #
 # Field-influence self-check (the v2-defect guardrail)
 # --------------------------------------------------------------------------- #
+def _cv(s, **kw):
+    """helper: copy classical_vritti dict with overrides."""
+    s.classical_vritti = {**s.classical_vritti, **kw}
+
+
+_MUTS = {
+    "classical_primary": lambda s: _cv(s, primary=("vikalpa" if s.classical_vritti["primary"] != "vikalpa" else "viparyaya")),
+    "nidra_flag": lambda s: _cv(s, nidra=not s.classical_vritti["nidra"]),
+    "smrti_flag": lambda s: _cv(s, smrti=not s.classical_vritti["smrti"]),
+    "dynamic_state": lambda s: setattr(s, "dynamic_state",
+        {k: (1.0 if k == "INERTIA" else 0.0) for k in s.dynamic_state}),
+    "guna": lambda s: setattr(s, "guna", {"sattva": 0.0, "rajas": 0.0, "tamas": 1.0}),
+    "kosha": lambda s: setattr(s, "kosha", {k: (1.0 if k == "vijnanamaya" else 0.0) for k in s.kosha}),
+    "aspect_balance": lambda s: setattr(s, "aspect_balance", -1.0),
+    # threshold-crossing (the uncertainty branch flips at 0.85)
+    "guna_resonance": lambda s: setattr(s, "guna_resonance", 0.99 if s.guna_resonance < 0.85 else 0.5),
+    "valence": lambda s: setattr(s, "valence", "liberating" if s.valence != "liberating" else "binding"),
+}
+
+
 def field_influence_check() -> Dict[str, bool]:
-    """Proves each POLICY-DRIVING variable independently changes the policy — incl.
-    classical_vritti and dynamic_state SEPARATELY (the terminology-fix invariant)."""
-    base = compute_state("explain how a transformer neural network works")
+    """Proves each POLICY-DRIVING signal independently changes the policy — incl. the
+    three sentence-level cognitive signals (classical_primary, nidra_flag, smrti_flag)
+    and dynamic_state SEPARATELY."""
+    base = compute_state("It might possibly be a good year; perhaps prices could rise.")
     ref = translate(base).as_dict()
-    muts = {
-        "classical_vritti": lambda s: setattr(s, "classical_vritti",
-            {k: (1.0 if k == "nidra" else 0.0) for k in s.classical_vritti}),
-        "dynamic_state": lambda s: setattr(s, "dynamic_state",
-            {k: (1.0 if k == "INERTIA" else 0.0) for k in s.dynamic_state}),
-        "guna": lambda s: setattr(s, "guna", {"sattva": 0.0, "rajas": 0.0, "tamas": 1.0}),
-        "kosha": lambda s: setattr(s, "kosha", {k: (1.0 if k == "vijnanamaya" else 0.0) for k in s.kosha}),
-        "aspect_balance": lambda s: setattr(s, "aspect_balance", -1.0),
-        "guna_resonance": lambda s: setattr(s, "guna_resonance", 0.5),
-        "valence": lambda s: setattr(s, "valence", "mixed"),
-    }
     out = {}
     for f in POLICY_DRIVING:
         s = copy.deepcopy(base)
-        muts[f](s)
+        _MUTS[f](s)
         out[f] = translate(s).as_dict() != ref
     return out
 
 
-def field_influence_by_family() -> Dict[str, Dict[str, bool]]:
-    """Which AXES each of the two vritti senses changes — proves classical_vritti hits
-    a COGNITIVE axis and dynamic_state hits a DELIVERY axis (separable roles)."""
+def field_influence_by_family() -> Dict[str, Dict]:
+    """Which AXIS each cognitive signal / dynamic_state changes — proves the intended
+    separation: primary->epistemic, nidra->clarification, smrti->memory, dynamic->delivery."""
     from .policy import COGNITIVE_AXES, DELIVERY_AXES
-    base = compute_state("explain how a transformer neural network works")
+    base = compute_state("It might possibly be a good year; perhaps prices could rise.")
     ref = translate(base).as_dict()
+    expect = {"classical_primary": "epistemic_stance", "nidra_flag": "clarification_policy",
+              "smrti_flag": "memory_policy", "dynamic_state": "delivery_pace"}
     res = {}
-    for fld, mut in {
-        "classical_vritti": lambda s: setattr(s, "classical_vritti",
-            {k: (1.0 if k == "nidra" else 0.0) for k in s.classical_vritti}),
-        "dynamic_state": lambda s: setattr(s, "dynamic_state",
-            {k: (1.0 if k == "INERTIA" else 0.0) for k in s.dynamic_state}),
-    }.items():
-        s = copy.deepcopy(base); mut(s)
+    for fld in expect:
+        s = copy.deepcopy(base); _MUTS[fld](s)
         d = translate(s).as_dict()
         changed = [a for a in AXES if d[a] != ref[a]]
-        res[fld] = {"changed_axes": changed,
-                    "hits_cognitive": any(a in COGNITIVE_AXES for a in changed),
-                    "hits_delivery": any(a in DELIVERY_AXES for a in changed)}
+        res[fld] = {"changed_axes": changed, "expected_axis": expect[fld],
+                    "hits_expected": expect[fld] in changed,
+                    "family": "delivery" if fld == "dynamic_state" else "cognitive"}
     return res
 
 
@@ -94,34 +101,47 @@ def coverage_report() -> dict:
     prompt set. Distinguishes 'wired & influences' (always true here) from 'every
     nominal value observed' (one value — RELEASE/anandamaya/'holistic' — is
     structurally near-unreachable on natural English text)."""
+    from .cognitive_evaluator import evaluate_cognitive, PROBE_ANSWERS, PRIMARY_VRITTI
     ps = prompts()
-    state_vals = {"classical_vritti_top": set(), "dynamic_state_top": set(),
-                  "guna_top": set(), "kosha_top": set(), "valence": set()}
+    state_vals = {"primary_vritti": set(), "nidra_flag": set(), "smrti_flag": set(),
+                  "dynamic_state_top": set(), "guna_top": set(), "kosha_top": set(), "valence": set()}
     cont = {"aspect_balance": [], "guna_resonance": []}
     axis_vals = {a: set() for a in AXES}
     for p, _, _ in ps:
         s = compute_state(p)
         sm = s.summary()
-        for k in state_vals:
-            state_vals[k].add(sm[k])
+        state_vals["primary_vritti"].add(sm["classical_primary"])
+        state_vals["nidra_flag"].add(sm["nidra"])
+        state_vals["smrti_flag"].add(sm["smrti"])
+        state_vals["dynamic_state_top"].add(sm["dynamic_state_top"])
+        state_vals["guna_top"].add(sm["guna_top"])
+        state_vals["kosha_top"].add(sm["kosha_top"])
+        state_vals["valence"].add(sm["valence"])
         cont["aspect_balance"].append(s.aspect_balance)
         cont["guna_resonance"].append(s.guna_resonance)
         d = translate(s).as_dict()
         for a in AXES:
             axis_vals[a].add(d[a])
-    nominal_state = {"classical_vritti_top": 5, "dynamic_state_top": 5,
-                     "guna_top": 3, "kosha_top": 5, "valence": 3}
-    nominal_axis = {"tone": 3, "delivery_pace": 5, "epistemic_stance": 5,
-                    "reasoning_style": 5, "caution": 3, "uncertainty_handling": 2,
-                    "speculation_reduction": 3, "clarity": 1}
+    nominal_state = {"primary_vritti": 3, "nidra_flag": 2, "smrti_flag": 2,
+                     "dynamic_state_top": 5, "guna_top": 3, "kosha_top": 5, "valence": 3}
+    nominal_axis = {"tone": 3, "delivery_pace": 5, "epistemic_stance": 3,
+                    "clarification_policy": 2, "memory_policy": 2, "reasoning_style": 5,
+                    "caution": 3, "uncertainty_handling": 2, "speculation_reduction": 3, "clarity": 1}
+    # evaluator reachability: classical_vritti is about ANSWERS, so census crafted probes
+    probe_primary = {evaluate_cognitive(a)["primary"] for a in PROBE_ANSWERS.values()}
+    probe_nidra = {evaluate_cognitive(a)["nidra"] for a in PROBE_ANSWERS.values()}
+    probe_smrti = {evaluate_cognitive(a)["smrti"] for a in PROBE_ANSWERS.values()}
     return {
         "n_prompts": len(ps),
-        "state": {k: {"seen": sorted(v), "n": len(v), "nominal": nominal_state[k]}
+        "state": {k: {"seen": sorted(map(str, v)), "n": len(v), "nominal": nominal_state[k]}
                   for k, v in state_vals.items()},
         "continuous": {k: {"min": round(min(v), 3), "max": round(max(v), 3)}
                        for k, v in cont.items()},
         "axes": {a: {"seen": sorted(v), "n": len(v), "nominal": nominal_axis[a]}
                  for a, v in axis_vals.items()},
+        "evaluator_reachability": {"primary": sorted(probe_primary),
+                                   "nidra": sorted(map(str, probe_nidra)),
+                                   "smrti": sorted(map(str, probe_smrti))},
         "field_influence": field_influence_check(),
         "field_influence_by_family": field_influence_by_family(),
     }
