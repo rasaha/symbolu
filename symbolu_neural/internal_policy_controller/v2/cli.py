@@ -6,14 +6,22 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from . import pilot
 from .data import prompts
 from .symbolu_state import compute_state
 from .policy import translate
 
+_DEPRECATION = (
+    "\n*** DEPRECATED: this is v2 — SUPERSEDED with known wiring defects (only "
+    "Guna+Valence reached policy, Aspect missing, dead branches; see "
+    "V2_WIRING_AUDIT.md). Do NOT use for scientific conclusions. Canonical version "
+    "is v3: python -m symbolu_neural.internal_policy_controller.v3.cli ***\n")
+
 
 def main() -> None:
+    print(_DEPRECATION, file=sys.stderr)
     ap = argparse.ArgumentParser(prog="internal_policy_controller.v2")
     sub = ap.add_subparsers(dest="cmd", required=True)
     pr = sub.add_parser("run")

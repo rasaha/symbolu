@@ -6,12 +6,20 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 from . import pilot
 from .drafts import make_drafts
 
+_DEPRECATION = (
+    "\n*** DEPRECATED: this is v1 — a SUPERSEDED, INVALID prototype (see "
+    "IMPLEMENTATION_FORENSIC_REVIEW.md). Do NOT use for scientific conclusions. "
+    "Canonical version is v3: "
+    "python -m symbolu_neural.internal_policy_controller.v3.cli ***\n")
+
 
 def main() -> None:
+    print(_DEPRECATION, file=sys.stderr)
     ap = argparse.ArgumentParser(prog="internal_policy_controller")
     sub = ap.add_subparsers(dest="cmd", required=True)
     pr = sub.add_parser("run")

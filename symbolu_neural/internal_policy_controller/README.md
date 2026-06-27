@@ -1,10 +1,28 @@
-# Internal Draft→Policy→Final-Answer Symbol-U Controller (experimental / isolated)
+# Internal Draft→Policy→Final-Answer Symbol-U Controller
 
-**Status: EXPERIMENTAL, SMOKE-LEVEL.** A critique-and-revise / self-refinement loop
-whose critic is **Symbol-U/PSE** instead of the LLM itself. No weights changed, no
-Transformer trained, no decoder built.
+> ## ⚠️ CANONICAL VERSION IS **v3** → [`v3/`](v3/)
+> - **v3/** — current canonical implementation. Use this. See
+>   [`INTERNAL_POLICY_CONTROLLER_V3_REPORT.md`](INTERNAL_POLICY_CONTROLLER_V3_REPORT.md)
+>   and [`VERSION_CLEANUP_PLAN.md`](VERSION_CLEANUP_PLAN.md).
+> - **v1** (these top-level files) and **v2/** are retained **only for audit /
+>   history**. They are **superseded and defective** — do **NOT** run them for any
+>   scientific conclusion.
+>   - v1 was an invalid prototype (proxy classifier, regex revision, no real Symbol-U
+>     state) — see `IMPLEMENTATION_FORENSIC_REVIEW.md`.
+>   - v2 had wiring defects (only Guna+Valence reached policy, Aspect missing,
+>     dead branches) — see `V2_WIRING_AUDIT.md` / `V2_AUDIT_AND_V3_PLAN.md`.
+> - Note: v3 currently reuses v2's `data.py`, `llm.py`, `judge.py` as **shared
+>   helpers** (live dependencies — do not delete v2 wholesale; see cleanup plan).
 
-Read the full write-up in **`INTERNAL_POLICY_CONTROLLER_REPORT.md`**.
+---
+
+## v1 (DEPRECATED — audit history only)
+
+**Status: SUPERSEDED by v3. Invalid prototype.** A critique-and-revise loop whose
+critic is **Symbol-U/PSE**. Kept only as the documented record of what not to do.
+
+Read the v1 write-up in **`INTERNAL_POLICY_CONTROLLER_REPORT.md`** and why it is
+invalid in **`IMPLEMENTATION_FORENSIC_REVIEW.md`**.
 
 ## Idea
 

@@ -1,8 +1,20 @@
-# Internal Policy Controller v2 (faithful redo)
+# Internal Policy Controller v2 (DEPRECATED — superseded by v3)
 
-A correct implementation of **draft → full Symbol-U analysis → policy translation →
-LLM rewrite → independent judge**, fixing every defect the forensic audit found in
-v1. No weights changed, no training, no regex editing.
+> ## ⚠️ DEPRECATED — use [`../v3/`](../v3/) instead.
+> v2 has **known wiring defects**: only Guna+Valence reached the policy; Kosha/
+> Aspect/PSE/Resonance were inert or absent; sattva was unreachable; relabel was a
+> no-op. See `../V2_WIRING_AUDIT.md` and `../V2_AUDIT_AND_V3_PLAN.md`. **Do NOT use
+> v2 for scientific conclusions.**
+>
+> **Retention note:** `data.py`, `llm.py`, `judge.py` here are still **live shared
+> helpers imported by v3** — do not delete them until they are relocated into v3
+> (see `../VERSION_CLEANUP_PLAN.md`). The defective core (`symbolu_state.py`,
+> `policy.py`, `pilot.py`, `cli.py`, `tests/test_v2.py`) is a deletion candidate
+> after the v3 real-API run.
+
+A (defective) attempt at **draft → full Symbol-U analysis → policy translation →
+LLM rewrite → independent judge**, fixing v1's defects but introducing its own.
+No weights changed, no training, no regex editing.
 
 See `../INTERNAL_POLICY_CONTROLLER_V2_REPORT.md` for the full write-up and the
 v1→v2 fix table.
