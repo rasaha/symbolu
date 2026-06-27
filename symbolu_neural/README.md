@@ -1,5 +1,26 @@
 # Symbol-U — Trainable Neural Architecture Skeleton
 
+> ## 🗺️ Portfolio index → [`SYMBOLU_PORTFOLIO_AND_CLEANUP.md`](SYMBOLU_PORTFOLIO_AND_CLEANUP.md)
+> This `symbolu_neural/` tree holds **several Symbol-U patent-implementation
+> attempts, each testing a different hypothesis** (representation, discovery,
+> controllability, API control, internal policy controller). They are **not** one
+> chain. See the portfolio map for each dir's hypothesis, verdict, and status.
+>
+> - **Current active line:** `internal_policy_controller/v3/` (structurally sound;
+>   answer-quality UNTESTED pending a real API run).
+> - **Shared canonical helpers (do not delete):** `complementarity_probe/backends.py`,
+>   `modules/`.
+> - **Completed experiments = the scientific record (keep, don't delete):**
+>   `clean_softmax/`, `complementarity_probe/`, `controllability_pilot/`,
+>   `api_control_protocol/`, `stage1/`.
+> - **THIS skeleton (root `backbone/model/config/losses/ablations/smoke_test.py`)
+>   is SUPERSEDED** (by `clean_softmax/`) and imported by nothing — a deletion
+>   candidate kept only for audit history. **Do not use it for conclusions.**
+
+---
+
+## (Superseded) Skeleton design doc
+
 A **module-interface design** that turns the Symbol-U differentiability review
 into concrete PyTorch `nn.Module`s — one per major equation group — assembled
 onto a conventional backbone. This is a *serious interface skeleton*, **not** a
