@@ -49,6 +49,33 @@ the separation (`test_classical_vritti_is_sentence_level_not_phonological`,
 `test_three_cognitive_signals_hit_their_axes_and_dynamic_hits_delivery`,
 `test_classical_uses_canonical_schema_names`).
 
+## First real run (Mistral) + measurement-validity fix
+
+The first real run (`mistral-small`, seed 0, n=36) produced a **preliminary negative
+result and exposed a measurement defect**:
+
+- **Negative direction:** on the absolute 1-5 rubric, `symbolu` (mean 4.809) was the
+  **lowest of all refinement arms** and beat **none** of the controls — including
+  `generic_refine` (4.827), `nl_policy` (4.830), and crucially `relabeled_symbolu`
+  (4.827, i.e. random label scrambles scored *higher*). This matches the
+  pre-registered expectation that the specific ontology adds nothing.
+- **But the measurement was invalid:** every arm scored 4.68-4.86/5 and
+  `prefer_final ≈ 1.0` everywhere — a **ceiling effect**. A judge that rates
+  everything ~4.8 cannot detect a small effect in *either* direction, so the rubric
+  result cannot even confidently establish a *tie*, only rule out a *large* win.
+
+**Fix — pairwise A/B eval** (`cli pairwise`, `judge.judge_pairwise`): forced choice
+between `symbolu` and each control on the same prompt, **position-debiased** (both
+orders judged and averaged so order bias cancels), reported as a preference margin in
+[-1,+1] with 95% CIs and W/L/T counts. A **judge validity gate**
+(`judge_discriminates`) requires the judge to prefer a correct answer over an evasive
+one (margin > 0.5); if it fails, the verdict is declared **invalid** rather than
+reported. Position-debias and gate are pinned by tests
+(`test_pairwise_judge_cancels_position_bias`,
+`test_pairwise_validity_gate_detects_content_aware_judge`). **The pairwise verdict
+supersedes the rubric verdict**; the rubric path is kept as a (saturated) diagnostic.
+Re-run with `cli pairwise --backend mistral --seeds 3` for the formal answer.
+
 ## What was fixed from v2 (each defect → resolution, verified)
 
 | v2 defect | v3 resolution | verification |

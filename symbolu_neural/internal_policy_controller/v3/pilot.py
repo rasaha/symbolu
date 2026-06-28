@@ -14,9 +14,13 @@ import numpy as np
 
 from .data import prompts
 from .llm import get_llm
-from .judge import judge, RUBRIC
+from .judge import judge, judge_pairwise, judge_discriminates, RUBRIC
 from .symbolu_state import compute_state, POLICY_DRIVING
 from .policy import ARMS, AXES, policy_for_arm, translate, policy_divergence
+
+# controls we pit symbolu against in the pairwise A/B eval (everything but symbolu)
+CONTROLS = ["draft_only", "generic_refine", "nl_policy", "sentiment_critic",
+            "random_policy", "shuffled_symbolu", "relabeled_symbolu"]
 
 
 # --------------------------------------------------------------------------- #
@@ -155,20 +159,23 @@ def _max_workers() -> int:
     return max(1, int(os.environ.get("LLM_MAX_WORKERS", 8)))
 
 
-def _arm_prompt_unit(llm, arm, prompt, draft, state, other_state, seed):
-    """One (arm, prompt) unit: produce the final answer (0-1 calls) then judge (1
-    call). Independent across arms and prompts -> safe to run concurrently."""
+def _arm_final(llm, arm, prompt, draft, state, other_state, seed):
+    """Produce one arm's FINAL answer for a prompt (0-1 LLM calls)."""
     pol, mode = policy_for_arm(arm, state, other_state, seed)
     if mode == "none":
-        final = draft
-    elif mode == "self_refine":
-        final = llm.chat("Critique your previous draft for clarity, caution, and "
-                         "directness, then output an improved version. Return only "
-                         "the improved answer.",
-                         f"PROMPT:\n{prompt}\n\nDRAFT:\n{draft}", seed)
-    else:
-        final = llm.chat("You revise answers to follow a response policy.",
-                         f"PROMPT:\n{prompt}\n\nDRAFT:\n{draft}\n\n{pol.render()}", seed)
+        return draft
+    if mode == "self_refine":
+        return llm.chat("Critique your previous draft for clarity, caution, and "
+                        "directness, then output an improved version. Return only "
+                        "the improved answer.",
+                        f"PROMPT:\n{prompt}\n\nDRAFT:\n{draft}", seed)
+    return llm.chat("You revise answers to follow a response policy.",
+                    f"PROMPT:\n{prompt}\n\nDRAFT:\n{draft}\n\n{pol.render()}", seed)
+
+
+def _arm_prompt_unit(llm, arm, prompt, draft, state, other_state, seed):
+    """One (arm, prompt) unit: produce the final answer then judge (rubric path)."""
+    final = _arm_final(llm, arm, prompt, draft, state, other_state, seed)
     v = judge(llm, prompt, draft, final)
     failed = all(v.get(k, 0) == 0 for k in RUBRIC)           # surface judge failures (fix D7)
     return v, failed
@@ -270,6 +277,87 @@ def print_multi(res: dict) -> None:
     print("\nOntology check: symbolu vs relabeled_symbolu "
           f"Δ={rel['diff']:+.3f} ±{rel['ci95']:.3f} -> "
           f"{'specific ontology matters' if rel['significant'] and rel['diff']>0 else 'ontology NOT shown to matter'}")
+
+
+# --------------------------------------------------------------------------- #
+# Pairwise A/B eval (ceiling-effect fix): forced choice + position debias + gate
+# --------------------------------------------------------------------------- #
+def run_pairwise(backend="mock", model=None, seed=0) -> dict:
+    """Generate every arm's final answer, then pit symbolu against each control in a
+    position-debiased pairwise A/B judgment per prompt. Returns per-control margin
+    samples in [-1,1] and the judge-validity-gate margin."""
+    llm = get_llm(backend, model)
+    ps = prompts()
+    with ThreadPoolExecutor(max_workers=_max_workers()) as pool:
+        drafts = list(pool.map(
+            lambda p: llm.chat("You are a helpful assistant. Answer the user.", p, seed),
+            [p for p, _, _ in ps]))
+        states = [compute_state(d) for d in drafts]
+        other = states[1:] + states[:1]
+        finals = {}
+        for arm in ARMS:
+            finals[arm] = list(pool.map(
+                lambda i: _arm_final(llm, arm, ps[i][0], drafts[i], states[i], other[i], seed),
+                range(len(ps))))
+        margins = {}
+        for ctrl in CONTROLS:
+            margins[ctrl] = list(pool.map(
+                lambda i: judge_pairwise(llm, ps[i][0], finals["symbolu"][i], finals[ctrl][i]),
+                range(len(ps))))
+        disc = judge_discriminates(llm)
+    return {"backend": backend, "is_real": llm.is_real, "seed": seed,
+            "margins": margins, "discriminates": disc}
+
+
+def run_pairwise_multi(backend="mock", model=None, seeds=(0, 1, 2)) -> dict:
+    """Pool pairwise margins across seeds; per control report mean margin + 95% CI,
+    win/loss/tie counts, and significance. Includes the judge validity gate."""
+    runs = [run_pairwise(backend, model, s) for s in seeds]
+    is_real = runs[0]["is_real"]
+    pooled = {c: [v for r in runs for v in r["margins"][c]] for c in CONTROLS}
+    out = {}
+    for c in CONTROLS:
+        xs = pooled[c]
+        m, h = _ci95(xs)
+        wins = sum(1 for v in xs if v > 0)
+        losses = sum(1 for v in xs if v < 0)
+        ties = len(xs) - wins - losses
+        out[c] = {"margin": m, "ci95": h,
+                  "significant": bool(not np.isnan(h) and (m - h > 0 or m + h < 0)),
+                  "wins": wins, "losses": losses, "ties": ties, "n": len(xs)}
+    disc = [r["discriminates"] for r in runs]
+    return {"backend": backend, "is_real": is_real, "seeds": list(seeds),
+            "n_per_control": len(pooled[CONTROLS[0]]),
+            "discrimination": {"per_seed": disc, "mean": float(np.mean(disc)) if disc else 0.0},
+            "vs_symbolu": out}
+
+
+def print_pairwise(res: dict) -> None:
+    print("=" * 80)
+    print(f"v3 PAIRWISE A/B EVAL  backend={res['backend']} real_LLM={res['is_real']} "
+          f"seeds={res['seeds']} n/control={res['n_per_control']}")
+    print("=" * 80)
+    if not res["is_real"]:
+        print("*** MOCK: judge cannot compare answers — NO VERDICT (plumbing only).")
+        print("*** Run --backend anthropic|mistral with a key for the real test.")
+        return
+    dm = res["discrimination"]["mean"]
+    gate = dm > 0.5
+    print(f"JUDGE VALIDITY GATE: prefers a correct answer over an evasive one by "
+          f"margin {dm:+.2f}\n  -> {'PASS — the judge discriminates' if gate else 'FAIL — judge cannot discriminate; ALL verdicts below are INVALID'}")
+    print("\nSymbolu vs each control — mean preference margin in [-1,+1]")
+    print("  (+ = symbolu preferred; position-debiased; SIG = 95% CI excludes 0):")
+    print("-" * 74)
+    for c, r in res["vs_symbolu"].items():
+        verdict = ("BEATS" if r["significant"] and r["margin"] > 0 else
+                   "WORSE" if r["significant"] and r["margin"] < 0 else "tie (ns)")
+        print(f"  vs {c:<18} margin={r['margin']:+.3f} ±{r['ci95']:.3f}  "
+              f"W/L/T={r['wins']}/{r['losses']}/{r['ties']:>3}  [{verdict}]")
+    rel = res["vs_symbolu"]["relabeled_symbolu"]
+    print(f"\nOntology check (symbolu vs relabeled): margin={rel['margin']:+.3f} ±{rel['ci95']:.3f}"
+          f" -> {'specific ontology matters' if rel['significant'] and rel['margin'] > 0 else 'ontology NOT shown to matter'}")
+    if not gate:
+        print("\n*** Judge failed the validity gate: treat every verdict above as unreliable.")
 
 
 def print_report(seed=0, backend="mock", model=None) -> None:

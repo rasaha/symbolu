@@ -80,11 +80,30 @@ python -m symbolu_neural.internal_policy_controller.v3.cli check     # self-chec
 python -m symbolu_neural.internal_policy_controller.v3.cli coverage  # signal/axis coverage + reachability
 python -m symbolu_neural.internal_policy_controller.v3.cli state     # state + policy per prompt
 python -m symbolu_neural.internal_policy_controller.v3.cli run --backend mock   # plumbing
-# real verdict (needs a key — absent in this sandbox):
-export ANTHROPIC_API_KEY=...   # or MISTRAL_API_KEY
-python -m symbolu_neural.internal_policy_controller.v3.cli run --backend anthropic --seeds 3
+# real verdict (needs a key):
+export MISTRAL_API_KEY=...   # or ANTHROPIC_API_KEY
+# rubric eval (absolute 1-5 — NOTE: ceiling-saturates on strong models, see report):
+python -m symbolu_neural.internal_policy_controller.v3.cli run --backend mistral --seeds 3
+# pairwise A/B eval (PREFERRED — forced choice, position-debiased, validity-gated):
+python -m symbolu_neural.internal_policy_controller.v3.cli pairwise --backend mistral --seeds 3
 python symbolu_neural/internal_policy_controller/v3/tests/test_v3.py
 ```
+
+Throughput/rate-limit knobs for real runs: `LLM_MAX_WORKERS` (concurrency, default 8),
+`LLM_MIN_INTERVAL` (global seconds/request floor, default 1.1 — the limiter caps the
+GLOBAL rate regardless of workers, so concurrency hides latency without extra 429s),
+`LLM_MAX_RETRIES` (backoff attempts on 429/5xx, default 6).
+
+## Measurement validity (why the pairwise eval exists)
+
+The first real run (Mistral) exposed a **ceiling effect**: the absolute 1-5 rubric
+rated *every* arm ~4.8/5 and `prefer_final ≈ 1.0` everywhere, so it could not detect
+small quality differences — a measurement failure, not a result. The `pairwise`
+command fixes this with (1) **forced A/B choice** between symbolu and each control on
+the same prompt, (2) **position-bias cancellation** (both orders judged and averaged),
+and (3) a **judge validity gate** (`judge_discriminates`): the judge must prefer a
+correct answer over an evasive one, or the whole verdict is declared invalid. Output
+is a per-control preference margin in [-1,+1] with 95% CIs and win/loss/tie counts.
 
 ## Status
 

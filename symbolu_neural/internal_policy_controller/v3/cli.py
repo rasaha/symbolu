@@ -23,6 +23,11 @@ def main() -> None:
     pr.add_argument("--seed", type=int, default=0)
     pr.add_argument("--seeds", type=int, default=1,
                     help="number of seeds (0..N-1) to pool with 95%% CIs; >1 => multi-seed report")
+    pw = sub.add_parser("pairwise",
+                        help="forced-choice A/B eval (ceiling-effect fix) + judge validity gate")
+    pw.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"])
+    pw.add_argument("--model", default=None)
+    pw.add_argument("--seeds", type=int, default=1)
     sub.add_parser("state")
     sub.add_parser("check")
     sub.add_parser("coverage")
@@ -34,6 +39,9 @@ def main() -> None:
                                               seeds=tuple(range(args.seeds))))
         else:
             pilot.print_report(args.seed, args.backend, args.model)
+    elif args.cmd == "pairwise":
+        pilot.print_pairwise(pilot.run_pairwise_multi(
+            args.backend, args.model, seeds=tuple(range(max(1, args.seeds)))))
     elif args.cmd == "check":
         fi = pilot.field_influence_check()
         for f, ok in fi.items():
