@@ -90,17 +90,37 @@ Five separable claims, in increasing ambition:
 |---|---|---|
 | 1 | **Operator framework** — ordered, non-commuting operator product produces order-dependent structure | **SUPPORTED** (G1) |
 | 2 | **Feature-derived initialization** — features carry structure beyond generic non-commutativity, and the specific binding matters | **SUPPORTED** (G2, G3) |
-| 3 | **Factorization refinement** — the inventory factors into independent primitives whose commuting algebra predicts the order-effect pattern | **FAILED** (G4 gap_reliable) |
+| 3 | **Factorization refinement** — the inventory factors into independent primitives whose commuting algebra predicts the order-effect pattern | **NOT VALIDATED** (G4 gap_reliable did not confirm; **not refuted**) |
 | 4 | **Meaning claim** — the order-structure carries semantic content | **UNTESTED** (out of Stage A scope; needs human + semantic data) |
 | 5 | **Sanskrit / varṇa privilege** — the varṇa chart beats IPA / data-derived partitions | **UNTESTED** (no comparative arm in Stage A) |
 
-**Failed: claim 3 (factorization refinement) — specifically the disjoint<shared directional
-prediction.** Claims 1–2 stand (at benchmark level). Claims 4–5 were never in scope and remain
-entirely open.
+**Not validated: claim 3 (factorization refinement) — specifically the disjoint<shared
+directional prediction was not confirmed.** Claims 1–2 stand (at benchmark level). Claims 4–5
+were never in scope and remain entirely open.
 
-The headline "Overall FAIL" is therefore **narrow**: it is a failure of the *factorization
-refinement on feature-derived operators*, not a failure of the operator framework and not a
-verdict on meaning or Sanskrit privilege.
+The headline "Overall FAIL" is therefore **narrow**: it is a *non-validation* of the
+factorization refinement *on feature-derived operators under the frozen metric*, not a failure
+of the operator framework and not a verdict on meaning or Sanskrit privilege.
+
+### 2.1 What "G4 FAIL" does and does not entail (binding language)
+
+This distinction is load-bearing and must not be collapsed:
+
+- **G4 failure does NOT refute factorization.** No result here shows the inventory *cannot*
+  factor into independent primitives. The directional signature was simply not recovered.
+- **G4 failure says exactly this and no more:** the *current feature-derived operator
+  initialization* (`M_σ = exp(Σ f_{σj} G_j)` from the chart) **plus the frozen factorization
+  metric** (linear wedge-OLS gap with bootstrap CI) **did not validate factorization.** It is a
+  statement about *this initialization × this metric*, not about factorization in general.
+- **Therefore factorization is demoted, not deleted.** Its status moves from
+  *validated / load-bearing claim* → **unvalidated architectural hypothesis**. It is **not**
+  abandoned, **not** stranded theory, and **not** refuted. It remains a live hypothesis the
+  architecture may carry — explicitly flagged as unvalidated until a future design validates it.
+- **Stage A.1 remains the benchmark for feature-derived operators.** It is the frozen reference
+  any future operator source must be compared against under the same gate.
+- **Future operator-first or data-estimated designs may still test factorization** under the
+  **same frozen G1–G4 gate.** A non-validation on feature-derived operators leaves that door
+  fully open; it does not close it.
 
 ---
 
@@ -142,6 +162,21 @@ test of the theory's preferred causal claim. The non-circular test must let the 
 project onto phonological features and factorize. Stage A could not do this because it had no
 operator-bearing data — it had to assume the operators. This is the core limitation, and it is
 exactly what the freeze documents flagged ("data-estimated operators are deferred").
+
+### 3.1 Causal-direction note (binding)
+
+> **Stage A.1 tests:** `phonological features → operators → structure`.
+>
+> **The longer-term multi-view theory may instead require:**
+> `latent operators → phonological features as projection`.
+>
+> **Therefore Stage A.1 is a *proxy benchmark*, not a decisive test of the deeper
+> architecture.** A G4 non-validation in the forward (features-first) direction does **not**
+> bear on whether an operators-first / latent-first architecture would validate factorization.
+> The deeper, operators-primary claim is **untested**, not contradicted. Stage A.1's role is to
+> fix a reference point for feature-derived operators under the frozen gate — and to make the
+> direction it tested explicit, so its result is never over-read as a verdict on the
+> latent-operator architecture.
 
 ---
 
