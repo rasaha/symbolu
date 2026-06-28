@@ -16,7 +16,7 @@ from .data import prompts
 from .llm import get_llm
 from .judge import judge, judge_pairwise, judge_discriminates, RUBRIC
 from .symbolu_state import compute_state, POLICY_DRIVING
-from .policy import ARMS, AXES, policy_for_arm, translate, policy_divergence
+from .policy import ARMS, AXES, policy_for_arm, translate, policy_divergence, _relabel_state
 
 # controls we pit symbolu against in the pairwise A/B eval (everything but symbolu)
 CONTROLS = ["draft_only", "generic_refine", "nl_policy", "sentiment_critic",
@@ -77,6 +77,72 @@ def field_influence_by_family() -> Dict[str, Dict]:
                     "hits_expected": expect[fld] in changed,
                     "family": "delivery" if fld == "dynamic_state" else "cognitive"}
     return res
+
+
+def bottleneck_report() -> dict:
+    """Offline information-preservation audit of the state->policy translator.
+
+    Quantifies HOW MUCH of the rich Symbol-U state actually reaches the prompt. The
+    translator reads only argmaxes + 2 thresholds and renders generic English from
+    tiny lookups, so most ontological information is destroyed BEFORE the LLM sees it.
+    This is why a quality null vs. relabeled/generic controls is near-inevitable: it
+    tests the translator, not the ontology."""
+    import math
+    from collections import Counter
+    from .policy import _FIXED_NL_POLICY
+
+    ps = prompts()
+    states = [compute_state(p) for p, _, _ in ps]
+    pols = [translate(s) for s in states]
+    n = len(ps)
+
+    def H(labels):
+        c = Counter(labels)
+        return float(-sum((v / n) * math.log2(v / n) for v in c.values()))
+
+    full = [tuple(round(v, 4) for v in s.dynamic_state.values())
+            + tuple(round(v, 4) for v in s.guna.values())
+            + tuple(round(v, 4) for v in s.kosha.values())
+            + (round(s.aspect_balance, 4), round(s.guna_resonance, 4), s.valence,
+               s.classical_vritti["primary"], bool(s.classical_vritti["nidra"]),
+               bool(s.classical_vritti["smrti"])) for s in states]
+    pol_tuples = [tuple(p.as_dict()[k] for k in AXES) for p in pols]
+
+    looksize = {"tone": 3, "delivery_pace": 5, "epistemic_stance": 3,
+                "clarification_policy": 2, "memory_policy": 2, "reasoning_style": 5,
+                "caution": 3, "uncertainty_handling": 2, "speculation_reduction": 3,
+                "clarity": 1}
+    axes = {a: {"observed": len(set(p.as_dict()[a] for p in pols)),
+                "lookup_size": looksize[a],
+                "entropy_bits": round(H([p.as_dict()[a] for p in pols]), 2)} for a in AXES}
+
+    shape = {}
+    for name, get in [("dynamic_state", lambda s: list(s.dynamic_state.values())),
+                      ("guna", lambda s: list(s.guna.values())),
+                      ("kosha", lambda s: list(s.kosha.values()))]:
+        gaps = []
+        for s in states:
+            v = sorted(get(s), reverse=True)
+            gaps.append(v[0] - (v[1] if len(v) > 1 else 0.0))
+        shape[name] = round(float(np.mean(gaps)), 3)   # mean top1-top2 gap; small => argmax loses a near-tie
+
+    relabel_div = float(np.mean([policy_divergence(translate(s), translate(_relabel_state(s, 0)))
+                                 for s in states]))
+    nl_overlap = float(np.mean([1 - policy_divergence(p, _FIXED_NL_POLICY) for p in pols]))
+
+    return {
+        "n_prompts": n,
+        "distinct_full_states": len(set(full)),
+        "distinct_policies": len(set(pol_tuples)),
+        "distinct_prompts": len(set(p.render() for p in pols)),
+        "total_policy_entropy_bits": round(H(pol_tuples), 2),
+        "max_entropy_bits": round(math.log2(n), 2),
+        "axes": axes,
+        "argmax_top1_top2_gap": shape,
+        "relabel_axis_change_frac": round(relabel_div, 3),
+        "prompt_identical_to_relabel_frac": round(1 - relabel_div, 3),
+        "overlap_with_fixed_generic_policy": round(nl_overlap, 3),
+    }
 
 
 def structural_report(seed=0) -> dict:

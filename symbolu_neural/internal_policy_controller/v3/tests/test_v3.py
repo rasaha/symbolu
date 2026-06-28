@@ -134,6 +134,21 @@ def test_signal_coverage_audit():
         assert c["axes"][a]["n"] == c["axes"][a]["nominal"]    # full range observed
 
 
+def test_bottleneck_audit_quantifies_information_collapse():
+    """Pins the translator information-collapse audit: the rich continuous state is
+    funneled to a few bits of generic English, so a quality null vs relabeled/generic
+    controls tests the TRANSLATOR, not the ontology."""
+    b = pilot.bottleneck_report()
+    assert b["distinct_full_states"] == len(prompts())        # state is fully distinct
+    assert b["distinct_policies"] < b["distinct_full_states"]  # ...but the policy collapses it
+    assert b["total_policy_entropy_bits"] < b["max_entropy_bits"]
+    # the ontology labels move only a minority of the prompt (most is generic/shared)
+    assert b["relabel_axis_change_frac"] < 0.5
+    assert b["overlap_with_fixed_generic_policy"] >= 0.4
+    # distribution shape is discarded: at least one signal's argmax is a near-tie
+    assert min(b["argmax_top1_top2_gap"].values()) < 0.25
+
+
 def test_pairwise_judge_cancels_position_bias():
     """A judge that ALWAYS picks position A must net to 0 (no preference) once both
     orders are averaged — proves position-bias control works."""
