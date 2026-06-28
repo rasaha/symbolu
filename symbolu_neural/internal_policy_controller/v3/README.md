@@ -85,7 +85,12 @@ export MISTRAL_API_KEY=...   # or ANTHROPIC_API_KEY
 # rubric eval (absolute 1-5 — NOTE: ceiling-saturates on strong models, see report):
 python -m symbolu_neural.internal_policy_controller.v3.cli run --backend mistral --seeds 3
 # pairwise A/B eval (PREFERRED — forced choice, position-debiased, validity-gated):
-python -m symbolu_neural.internal_policy_controller.v3.cli pairwise --backend mistral --seeds 3
+python -m symbolu_neural.internal_policy_controller.v3.cli pairwise --backend mistral --seeds 1
+# RECOMMENDED: independent judge (Mistral generates, Anthropic judges) — different
+# model family avoids same-model bias and is more likely to pass the validity gate:
+export ANTHROPIC_API_KEY=...
+python -m symbolu_neural.internal_policy_controller.v3.cli pairwise \
+    --backend mistral --judge-backend anthropic --seeds 1
 python symbolu_neural/internal_policy_controller/v3/tests/test_v3.py
 ```
 

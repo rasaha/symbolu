@@ -25,8 +25,13 @@ def main() -> None:
                     help="number of seeds (0..N-1) to pool with 95%% CIs; >1 => multi-seed report")
     pw = sub.add_parser("pairwise",
                         help="forced-choice A/B eval (ceiling-effect fix) + judge validity gate")
-    pw.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"])
+    pw.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"],
+                    help="generator backend")
     pw.add_argument("--model", default=None)
+    pw.add_argument("--judge-backend", default=None, choices=["mock", "anthropic", "mistral"],
+                    help="judge backend (default: same as generator). Use a DIFFERENT "
+                         "family for independence, e.g. --backend mistral --judge-backend anthropic")
+    pw.add_argument("--judge-model", default=None)
     pw.add_argument("--seeds", type=int, default=1)
     sub.add_parser("state")
     sub.add_parser("check")
@@ -41,7 +46,8 @@ def main() -> None:
             pilot.print_report(args.seed, args.backend, args.model)
     elif args.cmd == "pairwise":
         pilot.print_pairwise(pilot.run_pairwise_multi(
-            args.backend, args.model, seeds=tuple(range(max(1, args.seeds)))))
+            args.backend, args.model, seeds=tuple(range(max(1, args.seeds))),
+            judge_backend=args.judge_backend, judge_model=args.judge_model))
     elif args.cmd == "check":
         fi = pilot.field_influence_check()
         for f, ok in fi.items():

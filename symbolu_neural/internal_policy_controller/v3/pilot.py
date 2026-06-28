@@ -282,11 +282,17 @@ def print_multi(res: dict) -> None:
 # --------------------------------------------------------------------------- #
 # Pairwise A/B eval (ceiling-effect fix): forced choice + position debias + gate
 # --------------------------------------------------------------------------- #
-def run_pairwise(backend="mock", model=None, seed=0) -> dict:
+def run_pairwise(backend="mock", model=None, seed=0,
+                 judge_backend=None, judge_model=None) -> dict:
     """Generate every arm's final answer, then pit symbolu against each control in a
     position-debiased pairwise A/B judgment per prompt. Returns per-control margin
-    samples in [-1,1] and the judge-validity-gate margin."""
+    samples in [-1,1] and the judge-validity-gate margin.
+
+    The JUDGE may be a different model from the generator (judge_backend/judge_model)
+    — recommended for independence (e.g. Mistral generates, Anthropic judges). A real
+    verdict requires BOTH the generator and the judge to be real backends."""
     llm = get_llm(backend, model)
+    jllm = get_llm(judge_backend, judge_model) if judge_backend else llm
     ps = prompts()
     with ThreadPoolExecutor(max_workers=_max_workers()) as pool:
         drafts = list(pool.map(
@@ -302,17 +308,19 @@ def run_pairwise(backend="mock", model=None, seed=0) -> dict:
         margins = {}
         for ctrl in CONTROLS:
             margins[ctrl] = list(pool.map(
-                lambda i: judge_pairwise(llm, ps[i][0], finals["symbolu"][i], finals[ctrl][i]),
+                lambda i: judge_pairwise(jllm, ps[i][0], finals["symbolu"][i], finals[ctrl][i]),
                 range(len(ps))))
-        disc = judge_discriminates(llm)
-    return {"backend": backend, "is_real": llm.is_real, "seed": seed,
+        disc = judge_discriminates(jllm)
+    return {"backend": backend, "judge_backend": jllm.backend,
+            "is_real": bool(llm.is_real and jllm.is_real), "seed": seed,
             "margins": margins, "discriminates": disc}
 
 
-def run_pairwise_multi(backend="mock", model=None, seeds=(0, 1, 2)) -> dict:
+def run_pairwise_multi(backend="mock", model=None, seeds=(0, 1, 2),
+                       judge_backend=None, judge_model=None) -> dict:
     """Pool pairwise margins across seeds; per control report mean margin + 95% CI,
     win/loss/tie counts, and significance. Includes the judge validity gate."""
-    runs = [run_pairwise(backend, model, s) for s in seeds]
+    runs = [run_pairwise(backend, model, s, judge_backend, judge_model) for s in seeds]
     is_real = runs[0]["is_real"]
     pooled = {c: [v for r in runs for v in r["margins"][c]] for c in CONTROLS}
     out = {}
@@ -326,7 +334,8 @@ def run_pairwise_multi(backend="mock", model=None, seeds=(0, 1, 2)) -> dict:
                   "significant": bool(not np.isnan(h) and (m - h > 0 or m + h < 0)),
                   "wins": wins, "losses": losses, "ties": ties, "n": len(xs)}
     disc = [r["discriminates"] for r in runs]
-    return {"backend": backend, "is_real": is_real, "seeds": list(seeds),
+    return {"backend": backend, "judge_backend": runs[0].get("judge_backend", backend),
+            "is_real": is_real, "seeds": list(seeds),
             "n_per_control": len(pooled[CONTROLS[0]]),
             "discrimination": {"per_seed": disc, "mean": float(np.mean(disc)) if disc else 0.0},
             "vs_symbolu": out}
@@ -334,8 +343,8 @@ def run_pairwise_multi(backend="mock", model=None, seeds=(0, 1, 2)) -> dict:
 
 def print_pairwise(res: dict) -> None:
     print("=" * 80)
-    print(f"v3 PAIRWISE A/B EVAL  backend={res['backend']} real_LLM={res['is_real']} "
-          f"seeds={res['seeds']} n/control={res['n_per_control']}")
+    print(f"v3 PAIRWISE A/B EVAL  gen={res['backend']} judge={res.get('judge_backend', res['backend'])} "
+          f"real_LLM={res['is_real']} seeds={res['seeds']} n/control={res['n_per_control']}")
     print("=" * 80)
     if not res["is_real"]:
         print("*** MOCK: judge cannot compare answers — NO VERDICT (plumbing only).")
