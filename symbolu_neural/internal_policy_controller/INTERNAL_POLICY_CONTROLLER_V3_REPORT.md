@@ -246,3 +246,13 @@ audited coverage and the evaluator reachability.
    resonance/aspect values, producing richer ontology-specific policy such that
    scrambling labels changes far more than 34% of the prompt. Only then does a
    win-or-lose verdict speak to Symbol-U's merit rather than to a lossy encoding of it.
+
+**v4 is now built** (`v4/`, see `v4/README.md`). It preserves the full distributions
+(top-k components with probabilities + raw names) and continuous resonance/aspect/sign
+values. Offline fidelity audit (`cli_v4 bottleneck`): distinct prompts 24→**36**,
+divergence-from-generic 12%→**60%** (~5× less generic — the bottleneck loosening),
+relabel field-divergence 34%→**43%**, relabel token-divergence 10%→**21%**. Relabel
+divergence is honestly capped (~30% of the policy is continuous-magnitude-driven and
+correctly label-invariant). Re-run the gate-valid pairwise test with
+`v4.cli_v4 pairwise --backend mistral --judge-backend anthropic` for a verdict that
+speaks to the ontology rather than to its encoding.
