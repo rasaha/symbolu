@@ -14,22 +14,30 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
 from typing import Optional
 
 _RETRY_CODES = {429, 500, 502, 503, 504}
-_last_call = [0.0]   # module-level: wall-clock of the previous request (mutable cell)
+# Slot-based global rate limiter: every request is assigned the next time-slot,
+# spaced `min_interval` apart. This caps the GLOBAL request rate at 1/min_interval
+# regardless of how many worker threads call concurrently, so bounded concurrency
+# overlaps per-call latency WITHOUT raising the rate the provider sees (no extra 429).
+_rate_lock = threading.Lock()
+_next_slot = [0.0]
 
 
 def _throttle(min_interval: float) -> None:
     if min_interval <= 0:
         return
-    wait = min_interval - (time.monotonic() - _last_call[0])
+    with _rate_lock:
+        start = max(time.monotonic(), _next_slot[0])
+        _next_slot[0] = start + min_interval
+    wait = start - time.monotonic()
     if wait > 0:
         time.sleep(wait)
-    _last_call[0] = time.monotonic()
 
 
 def _post_json(url: str, headers: dict, payload: dict,

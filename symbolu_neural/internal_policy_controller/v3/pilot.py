@@ -5,6 +5,8 @@ self-check that must pass before any (paid) quality run.
 from __future__ import annotations
 
 import argparse
+import os
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List
 import copy
 
@@ -147,41 +149,61 @@ def coverage_report() -> dict:
     }
 
 
+def _max_workers() -> int:
+    """Bounded concurrency. The slot-based throttle caps the GLOBAL request rate, so
+    workers only overlap per-call latency (no extra 429). 1 => fully sequential."""
+    return max(1, int(os.environ.get("LLM_MAX_WORKERS", 8)))
+
+
+def _arm_prompt_unit(llm, arm, prompt, draft, state, other_state, seed):
+    """One (arm, prompt) unit: produce the final answer (0-1 calls) then judge (1
+    call). Independent across arms and prompts -> safe to run concurrently."""
+    pol, mode = policy_for_arm(arm, state, other_state, seed)
+    if mode == "none":
+        final = draft
+    elif mode == "self_refine":
+        final = llm.chat("Critique your previous draft for clarity, caution, and "
+                         "directness, then output an improved version. Return only "
+                         "the improved answer.",
+                         f"PROMPT:\n{prompt}\n\nDRAFT:\n{draft}", seed)
+    else:
+        final = llm.chat("You revise answers to follow a response policy.",
+                         f"PROMPT:\n{prompt}\n\nDRAFT:\n{draft}\n\n{pol.render()}", seed)
+    v = judge(llm, prompt, draft, final)
+    failed = all(v.get(k, 0) == 0 for k in RUBRIC)           # surface judge failures (fix D7)
+    return v, failed
+
+
 def run_quality(backend="mock", model=None, seed=0) -> dict:
     llm = get_llm(backend, model)
     ps = prompts()
-    drafts = [llm.chat("You are a helpful assistant. Answer the user.", p, seed)
-              for p, _, _ in ps]
-    states = [compute_state(d) for d in drafts]           # state FROM DRAFT (fix D6)
-    other = states[1:] + states[:1]
-    out = {"backend": backend, "is_real": llm.is_real, "arms": {}, "judge_failures": 0}
-    for arm in ARMS:
-        sc = {k: [] for k in RUBRIC}
-        prefer = []
-        per_prompt = []                                      # per-prompt rubric mean (for CIs)
-        for i, (prompt, _para, _cat) in enumerate(ps):
-            pol, mode = policy_for_arm(arm, states[i], other[i], seed)
-            if mode == "none":
-                final = drafts[i]
-            elif mode == "self_refine":
-                final = llm.chat("Critique your previous draft for clarity, caution, and "
-                                 "directness, then output an improved version. Return only "
-                                 "the improved answer.",
-                                 f"PROMPT:\n{prompt}\n\nDRAFT:\n{drafts[i]}", seed)
-            else:
-                final = llm.chat("You revise answers to follow a response policy.",
-                                 f"PROMPT:\n{prompt}\n\nDRAFT:\n{drafts[i]}\n\n{pol.render()}", seed)
-            v = judge(llm, prompt, drafts[i], final)
-            if all(v.get(k, 0) == 0 for k in RUBRIC):       # surface judge failures (fix D7)
-                out["judge_failures"] += 1
-            for k in RUBRIC:
-                sc[k].append(float(v.get(k, 0)))
-            per_prompt.append(float(np.mean([v.get(k, 0) for k in RUBRIC])))
-            prefer.append(1.0 if v.get("prefer_final") else 0.0)
-        out["arms"][arm] = {**{k: float(np.mean(s)) for k, s in sc.items()},
-                            "prefer_final": float(np.mean(prefer)),
-                            "per_prompt": per_prompt,         # length = n_prompts, aligned by i
-                            "rubric_mean": float(np.mean([np.mean(s) for s in sc.values()]))}
+    workers = _max_workers()
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        drafts = list(pool.map(
+            lambda p: llm.chat("You are a helpful assistant. Answer the user.", p, seed),
+            [p for p, _, _ in ps]))
+        states = [compute_state(d) for d in drafts]       # state FROM DRAFT (fix D6)
+        other = states[1:] + states[:1]
+        out = {"backend": backend, "is_real": llm.is_real, "arms": {}, "judge_failures": 0}
+        for arm in ARMS:
+            # submit every (arm, prompt) unit; collect results aligned by prompt index i
+            results = list(pool.map(
+                lambda i: _arm_prompt_unit(llm, arm, ps[i][0], drafts[i],
+                                           states[i], other[i], seed),
+                range(len(ps))))
+            sc = {k: [] for k in RUBRIC}
+            prefer, per_prompt = [], []
+            for v, failed in results:
+                if failed:
+                    out["judge_failures"] += 1
+                for k in RUBRIC:
+                    sc[k].append(float(v.get(k, 0)))
+                per_prompt.append(float(np.mean([v.get(k, 0) for k in RUBRIC])))
+                prefer.append(1.0 if v.get("prefer_final") else 0.0)
+            out["arms"][arm] = {**{k: float(np.mean(s)) for k, s in sc.items()},
+                                "prefer_final": float(np.mean(prefer)),
+                                "per_prompt": per_prompt,     # length = n_prompts, aligned by i
+                                "rubric_mean": float(np.mean([np.mean(s) for s in sc.values()]))}
     return out
 
 
