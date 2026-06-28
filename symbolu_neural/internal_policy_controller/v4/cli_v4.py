@@ -26,6 +26,13 @@ def main() -> None:
     pw.add_argument("--judge-backend", default=None, choices=["mock", "anthropic", "mistral"])
     pw.add_argument("--judge-model", default=None)
     pw.add_argument("--seeds", type=int, default=1)
+    tr = sub.add_parser("trace", help="FORENSIC: dump draft/state/policy/finals/judge-reasons to markdown")
+    tr.add_argument("--n", type=int, default=6, help="number of prompts to trace (cheap)")
+    tr.add_argument("--backend", default="mock", choices=["mock", "anthropic", "mistral"])
+    tr.add_argument("--model", default=None)
+    tr.add_argument("--judge-backend", default=None, choices=["mock", "anthropic", "mistral"])
+    tr.add_argument("--judge-model", default=None)
+    tr.add_argument("--out", default="v4_forensic_trace.md")
     args = ap.parse_args()
 
     if args.cmd == "bottleneck":
@@ -55,6 +62,11 @@ def main() -> None:
         pilot_v4.print_pairwise_v4(pilot_v4.run_pairwise_multi_v4(
             args.backend, args.model, seeds=tuple(range(max(1, args.seeds))),
             judge_backend=args.judge_backend, judge_model=args.judge_model))
+    elif args.cmd == "trace":
+        path = pilot_v4.trace_v4(args.n, args.backend, args.model,
+                                 judge_backend=args.judge_backend, judge_model=args.judge_model,
+                                 out_path=args.out)
+        print(f"forensic trace written to: {path}")
 
 
 if __name__ == "__main__":

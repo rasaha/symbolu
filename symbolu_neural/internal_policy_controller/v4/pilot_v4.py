@@ -13,7 +13,7 @@ import numpy as np
 
 from ..v3.data import prompts
 from ..v3.llm import get_llm
-from ..v3.judge import judge_pairwise, judge_discriminates
+from ..v3.judge import judge_pairwise, judge_discriminates, pairwise_reason
 from ..v3.symbolu_state import compute_state
 from ..v3.pilot import _max_workers, _ci95
 from .policy_v4 import ARMS, translate_v4, policy_for_arm_v4
@@ -134,6 +134,53 @@ def run_pairwise_multi_v4(backend="mock", model=None, seeds=(0, 1, 2),
             "n_per_control": len(pooled[CONTROLS[0]]),
             "discrimination": {"per_seed": disc, "mean": float(np.mean(disc)) if disc else 0.0},
             "vs_symbolu": out}
+
+
+def trace_v4(n=6, backend="mock", model=None, judge_backend=None, judge_model=None,
+             seed=0, out_path=None) -> str:
+    """FORENSIC capture: for the first `n` prompts, persist EVERYTHING the aggregate
+    run discards — draft, draft-state, every arm's final answer, the exact v4 revision
+    prompt, and the judge's winner+reason for symbolu vs each control. Writes a markdown
+    file and returns its path. Cheap: ~n*(1 + 8 + 7) calls."""
+    llm = get_llm(backend, model)
+    jllm = get_llm(judge_backend, judge_model) if judge_backend else llm
+    ps = prompts()[:n]
+    drafts = [llm.chat("You are a helpful assistant. Answer the user.", p, seed) for p, _, _ in ps]
+    states = [compute_state(d) for d in drafts]
+    other = states[1:] + states[:1]
+
+    def md_state(s):
+        cv = s.classical_vritti
+        dist = lambda d: ", ".join(f"{k} {v:.0%}" for k, v in sorted(d.items(), key=lambda x: -x[1]) if v > 0.01)
+        return (f"- classical_vritti: primary={cv['primary']} nidra={cv['nidra']} smrti={cv['smrti']}\n"
+                f"- dynamic_state: {dist(s.dynamic_state)}\n"
+                f"- guna: {dist(s.guna)}\n- kosha: {dist(s.kosha)}\n"
+                f"- aspect_balance={s.aspect_balance:.3f} guna_resonance={s.guna_resonance:.3f} "
+                f"kosha_resonance={s.kosha_resonance:.3f} valence={s.valence} (sign {s.valence_sign:+.2f})")
+
+    out = [f"# v4 FORENSIC TRACE  gen={llm.backend} judge={jllm.backend} "
+           f"real={bool(llm.is_real and jllm.is_real)} n={n} seed={seed}\n",
+           "_Judge uses single-order pairwise+reason for readability; the experiment's "
+           "verdict uses the position-debiased judge. Reasons are the judge's own words._\n"]
+    for i, (p, _para, cat) in enumerate(ps):
+        s = states[i]
+        finals = {arm: _arm_final_v4(llm, arm, p, drafts[i], s, other[i], seed) for arm in ARMS}
+        out.append(f"\n---\n## [{cat}] {p}\n")
+        out.append(f"**DRAFT:**\n\n> {drafts[i]}\n")
+        out.append(f"**Symbol-U state (from the draft):**\n{md_state(s)}\n")
+        out.append(f"**Exact v4 revision prompt sent to the LLM:**\n```\n{translate_v4(s).render()}\n```")
+        out.append(f"**SYMBOLU final:**\n\n> {finals['symbolu']}\n")
+        out.append("**Comparison arms (judge: symbolu=A vs control=B):**\n")
+        for c in CONTROLS:
+            v = pairwise_reason(jllm, p, finals["symbolu"], finals[c])
+            win = {"a": "SYMBOLU wins", "b": f"{c} wins", "tie": "tie"}.get(v["winner"], v["winner"])
+            out.append(f"- **vs {c}** -> {win} — _{v['reason']}_")
+            out.append(f"  - {c} final: {finals[c][:400]}")
+        out.append("")
+    path = out_path or "v4_forensic_trace.md"
+    with open(path, "w") as f:
+        f.write("\n".join(out))
+    return path
 
 
 def print_pairwise_v4(res: dict) -> None:

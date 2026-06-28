@@ -82,6 +82,21 @@ def judge_pairwise(llm, user_prompt: str, ans_sym: str, ans_ctrl: str) -> float:
     return (s1 + s2) / 2.0
 
 
+def pairwise_reason(llm, user_prompt: str, ans_a: str, ans_b: str) -> Dict:
+    """Single-order pairwise WITH a short natural-language reason — for FORENSIC tracing
+    only. (The experiment's verdict uses the position-debiased `judge_pairwise`, which
+    deliberately discards reasons; this is for human inspection of why the judge chose.)"""
+    prompt = pairwise_prompt(user_prompt, ans_a, ans_b).replace(
+        '{"winner":"A"|"B"|"tie"}', '{"winner":"A"|"B"|"tie","reason":"<=18 words"}')
+    raw = llm.chat(_PAIR_SYSTEM, prompt)
+    try:
+        obj = json.loads(raw[raw.index("{"): raw.rindex("}") + 1])
+        return {"winner": str(obj.get("winner", "tie")).strip().lower(),
+                "reason": str(obj.get("reason", ""))[:160]}
+    except Exception:
+        return {"winner": "tie", "reason": "(unparseable judge reply)"}
+
+
 def judge_discriminates(llm) -> float:
     """Validity gate: the judge must prefer a clearly-correct answer over a clearly
     evasive one. Returns the same [-1,1] margin; ~+1 = healthy, ~0 = the judge cannot
