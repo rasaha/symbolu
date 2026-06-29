@@ -73,6 +73,24 @@ non-commutative **product** structure, so a future order/representation probe mu
 aware (linear bigram under-powers it) **and** approximately operator-correct. Instrument-design
 guidance only; **no semantic implication**.
 
+## B.0.2 — operator mismatch / identifiability calibration
+Quantifies how operator-product probe power depends on the match between the true generative
+family `{M_i}` and the probe family `{N_i}`. Files:
+- `harness_mismatch.py` — probe-family builders: exact, gauge (`N=S M Sᵀ`, `s0'=S s0`),
+  perturb(ε) (`polar(M+ε·noise)`, det-sign preserving), random, abelian (commuting diagonal),
+  partial corruption(frac).
+- `test_mismatch.py` — control tests (run: `python3 .../test_mismatch.py`).
+- `run_b0_2.py` — mismatch sweep → `B0_2_RESULT.md` (measured).
+
+**Measured (see `B0_2_RESULT.md`, product signal):** detect rate — exact **1.00**, gauge **1.00**
+(features = `S·(true features)`, an invertible linear map → linear probe is gauge-invariant),
+perturb ε=0.2 **1.00**, random **0.00**, abelian **0.00**, bag/bigram **0.00**. Perturbation power
+holds to ε≈0.4 then collapses (**threshold ε≈0.8**); partial corruption tolerated to ~20% then
+collapses (**threshold ≈0.4 fraction**). Abelian probe operators cannot detect non-commutative
+product signal (their ordered product is count-only). This quantifies the B.0.1 caveat: the
+operator-aware probe needs **approximately-correct, non-abelian** operators. Instrument-design
+finding only; **no semantic implication**.
+
 ## Hard boundaries
 Synthetic calibration only · no external data · no semantic `Y` · no `F`/decoder · no A′ · no real
 B–G · no Symbol-U PASS/FAIL/⊥ · Stage A (`symbolu_neural/structural_v1/`) untouched · ⊥ preserved.
