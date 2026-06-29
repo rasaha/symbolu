@@ -49,6 +49,88 @@ the separation (`test_classical_vritti_is_sentence_level_not_phonological`,
 `test_three_cognitive_signals_hit_their_axes_and_dynamic_hits_delivery`,
 `test_classical_uses_canonical_schema_names`).
 
+## First real run (Mistral) + measurement-validity fix
+
+The first real run (`mistral-small`, seed 0, n=36) produced a **preliminary negative
+result and exposed a measurement defect**:
+
+- **Negative direction:** on the absolute 1-5 rubric, `symbolu` (mean 4.809) was the
+  **lowest of all refinement arms** and beat **none** of the controls — including
+  `generic_refine` (4.827), `nl_policy` (4.830), and crucially `relabeled_symbolu`
+  (4.827, i.e. random label scrambles scored *higher*). This matches the
+  pre-registered expectation that the specific ontology adds nothing.
+- **But the measurement was invalid:** every arm scored 4.68-4.86/5 and
+  `prefer_final ≈ 1.0` everywhere — a **ceiling effect**. A judge that rates
+  everything ~4.8 cannot detect a small effect in *either* direction, so the rubric
+  result cannot even confidently establish a *tie*, only rule out a *large* win.
+
+**Fix — pairwise A/B eval** (`cli pairwise`, `judge.judge_pairwise`): forced choice
+between `symbolu` and each control on the same prompt, **position-debiased** (both
+orders judged and averaged so order bias cancels), reported as a preference margin in
+[-1,+1] with 95% CIs and W/L/T counts. A **judge validity gate**
+(`judge_discriminates`) requires the judge to prefer a correct answer over an evasive
+one (margin > 0.5); if it fails, the verdict is declared **invalid** rather than
+reported. Position-debias and gate are pinned by tests
+(`test_pairwise_judge_cancels_position_bias`,
+`test_pairwise_validity_gate_detects_content_aware_judge`). **The pairwise verdict
+supersedes the rubric verdict**; the rubric path is kept as a (saturated) diagnostic.
+
+## Gate-valid verdict (Mistral generates, Anthropic judges, n=36)
+
+With the independent Anthropic judge the **validity gate PASSED (margin +1.00)** — so
+these numbers are trustworthy (unlike the saturated rubric, which crushed every arm to
+~4.8/5 *even with Anthropic as the rubric judge*, confirming the ceiling is intrinsic
+to absolute scoring). Position-debiased pairwise preference margins in [-1,+1]:
+
+| symbolu vs | margin ±95% CI | W/L/T | verdict |
+|---|---|---|---|
+| draft_only | +0.181 ±0.244 | 15/8/13 | tie (ns) |
+| generic_refine | −0.083 ±0.263 | 12/17/7 | tie (ns) |
+| nl_policy | +0.042 ±0.263 | 13/12/11 | tie (ns) |
+| sentiment_critic | +0.028 ±0.273 | 14/15/7 | tie (ns) |
+| random_policy | +0.125 ±0.274 | 15/11/10 | tie (ns) |
+| shuffled_symbolu | −0.069 ±0.244 | 11/14/11 | tie (ns) |
+| **relabeled_symbolu** | **+0.111 ±0.207** | 12/7/17 | **tie (ns) — ontology not shown to matter** |
+
+`symbolu` beats **no** control; every CI includes 0. It is not reliably better than
+even the **raw draft**, is if anything slightly worse than plain `generic_refine`, and
+ties its own **label-scrambled** version — the decisive ontology test.
+
+## BUT the null is confounded: the translator destroys the ontology (offline audit)
+
+Before concluding "Symbol-U has no merit," we audited whether the experiment actually
+*preserved* the ontology's information, or whether `translate()` collapsed it into a
+few generic English instructions. The audit (`cli bottleneck`,
+`pilot.bottleneck_report`, pinned by `test_bottleneck_audit_quantifies_information_collapse`)
+is decisive — **it collapsed it**:
+
+| measure | value | meaning |
+|---|---|---|
+| distinct full states → distinct policies | 36 → **24** | a third of prompts yield an identical policy |
+| total policy entropy | **4.38 bits** (max 5.17) | the whole ontology compressed to <4.4 bits of canned English |
+| `memory_policy`, `clarity` entropy | **0 bits** | constant — carry no information at all |
+| argmax top1–top2 gap (dynamic, kosha) | **0.10** | `translate()` keeps only the argmax of each distribution, dropping near-ties — the distribution *shape* (the actual content of a vritti/guna/kosha vector) never reaches the prompt |
+| relabel axis-change fraction | **0.34** | scrambling the ontology labels changes only 34% of axes → **66% of every prompt is byte-identical to its label-scrambled version** |
+| overlap with a FIXED generic policy | **0.54** | >half of every "Symbol-U" prompt matches a hand-written generic policy that uses no ontology |
+
+`translate()` reads only argmaxes + two thresholds and renders generic phrases from
+lookups of size ≤5. Under that bottleneck, a tie vs `relabeled_symbolu` and `nl_policy`
+is **near-inevitable by construction** — there is barely any ontology-specific signal
+left in the prompt for *any* judge to detect.
+
+## Corrected conclusion
+
+**This experiment is not yet a fair test of Symbol-U.** The trustworthy (gate-valid)
+finding is about the **translator**, not the ontology: the `state → policy` step
+discards most of the Symbol-U information (distributions → argmax, continuous →
+2–3 buckets, everything → generic English) before the LLM sees it, so the controller's
+prompts are mostly indistinguishable from generic / label-scrambled ones, and they
+tie. We can say the *current controller* adds nothing over generic self-refinement; we
+**cannot** say the *ontology* is meritless — the design lacks the fidelity to test that
+claim. A genuine test requires a higher-fidelity translator (v4) that verbalizes the
+full distributions and continuous signals so that scrambling labels would change far
+more than 34% of the prompt.
+
 ## What was fixed from v2 (each defect → resolution, verified)
 
 | v2 defect | v3 resolution | verification |
@@ -103,13 +185,16 @@ v2 failure.
 
 ```bash
 export PYTHONPATH=$(pwd)
-python -m symbolu_neural.internal_policy_controller.v3.cli check    # gate: all 9 must pass
-python -m symbolu_neural.internal_policy_controller.v3.cli coverage # signals/axes + evaluator reachability
-python -m symbolu_neural.internal_policy_controller.v3.cli state    # inspect state+policy
-export ANTHROPIC_API_KEY=...    # or MISTRAL_API_KEY
+python -m symbolu_neural.internal_policy_controller.v3.cli check      # gate: all 9 must pass
+python -m symbolu_neural.internal_policy_controller.v3.cli coverage   # signals/axes + evaluator reachability
+python -m symbolu_neural.internal_policy_controller.v3.cli bottleneck # translator info-preservation audit
+python -m symbolu_neural.internal_policy_controller.v3.cli state      # inspect state+policy
+export MISTRAL_API_KEY=...    # generator;  export ANTHROPIC_API_KEY=... for an independent judge
 
-# statistically valid run: 36 prompts × 3 seeds = n≈108/arm, with 95% CIs +
-# paired symbolu−control differences (SIG = CI excludes 0)
+# PRIMARY measure — pairwise A/B, gate-validated, independent judge:
+python -m symbolu_neural.internal_policy_controller.v3.cli pairwise \
+    --backend mistral --judge-backend anthropic --seeds 1
+# rubric path (kept as a SATURATED diagnostic only — do not use for the verdict):
 python -m symbolu_neural.internal_policy_controller.v3.cli run --backend anthropic --seeds 3
 python symbolu_neural/internal_policy_controller/v3/tests/test_v3.py
 ```
@@ -140,14 +225,34 @@ real quality run uses **draft**-answer states × seeds, which broadens coverage 
 this question-prompt proxy. A regression test (`test_signal_coverage_audit`) pins this
 audited coverage and the evaluator reachability.
 
-## Final answer
+## Final answer (corrected after the gate-valid run + bottleneck audit)
 
-The experiment is now **structurally sound** — the wiring faithfully implements
-draft → full Symbol-U analysis → ontology-driven policy → LLM rewrite → independent
-judge, and every claimed Symbol-U variable provably influences the policy (the exact
-thing v2 failed). **But the hypothesis remains UNTESTED for answer quality** because
-no LLM API is available here. v3 is the version worth spending API credits on; run
-the commands above on a host with a key to get the honest verdict. Given all prior
-evidence my pre-registered expectation is that `symbolu` ties `generic_refine`/
-`nl_policy` and does not beat `relabeled_symbolu` — but that is now a real empirical
-question this harness can answer.
+1. **The gate-passing null result is valid — for the v3 translator.** With an
+   independent Anthropic judge that passed the validity gate (+1.00), the v3
+   controller ties every control (all 95% CIs include 0), including its own
+   label-scrambled version. As a statement about *this controller*, that is trustworthy:
+   the v3 `state → policy` translator produces no measurable answer-quality gain over
+   generic self-refinement or a random-relabeled baseline.
+2. **It does not refute Symbol-U itself.** The offline `bottleneck` audit shows the
+   translator compresses the rich ontology into **4.38 bits** of generic English
+   (distributions → argmax, continuous → 2–3 buckets), so **66%** of every Symbol-U
+   prompt is identical to its label-scrambled version and **54%** matches a fixed
+   generic policy. With so little ontology-specific signal in the prompt, a tie vs
+   `relabeled`/`nl_policy` is near-inevitable by construction — the result is about
+   the encoding, not the ontology.
+3. **The translator bottleneck is the main limitation**, and the next research move is
+   **v4: test Symbol-U with less compression** — a high-fidelity translator that
+   preserves the full distributions, top-2/3 state probabilities, and continuous
+   resonance/aspect values, producing richer ontology-specific policy such that
+   scrambling labels changes far more than 34% of the prompt. Only then does a
+   win-or-lose verdict speak to Symbol-U's merit rather than to a lossy encoding of it.
+
+**v4 is now built** (`v4/`, see `v4/README.md`). It preserves the full distributions
+(top-k components with probabilities + raw names) and continuous resonance/aspect/sign
+values. Offline fidelity audit (`cli_v4 bottleneck`): distinct prompts 24→**36**,
+divergence-from-generic 12%→**60%** (~5× less generic — the bottleneck loosening),
+relabel field-divergence 34%→**43%**, relabel token-divergence 10%→**21%**. Relabel
+divergence is honestly capped (~30% of the policy is continuous-magnitude-driven and
+correctly label-invariant). Re-run the gate-valid pairwise test with
+`v4.cli_v4 pairwise --backend mistral --judge-backend anthropic` for a verdict that
+speaks to the ontology rather than to its encoding.

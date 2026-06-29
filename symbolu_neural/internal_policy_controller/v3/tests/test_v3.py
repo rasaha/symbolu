@@ -134,6 +134,57 @@ def test_signal_coverage_audit():
         assert c["axes"][a]["n"] == c["axes"][a]["nominal"]    # full range observed
 
 
+def test_bottleneck_audit_quantifies_information_collapse():
+    """Pins the translator information-collapse audit: the rich continuous state is
+    funneled to a few bits of generic English, so a quality null vs relabeled/generic
+    controls tests the TRANSLATOR, not the ontology."""
+    b = pilot.bottleneck_report()
+    assert b["distinct_full_states"] == len(prompts())        # state is fully distinct
+    assert b["distinct_policies"] < b["distinct_full_states"]  # ...but the policy collapses it
+    assert b["total_policy_entropy_bits"] < b["max_entropy_bits"]
+    # the ontology labels move only a minority of the prompt (most is generic/shared)
+    assert b["relabel_axis_change_frac"] < 0.5
+    assert b["overlap_with_fixed_generic_policy"] >= 0.4
+    # distribution shape is discarded: at least one signal's argmax is a near-tie
+    assert min(b["argmax_top1_top2_gap"].values()) < 0.25
+
+
+def test_pairwise_judge_cancels_position_bias():
+    """A judge that ALWAYS picks position A must net to 0 (no preference) once both
+    orders are averaged — proves position-bias control works."""
+    from symbolu_neural.internal_policy_controller.v3.judge import judge_pairwise
+
+    class _AlwaysA:
+        def chat(self, system, user, seed=0):
+            return '{"winner":"A"}'
+    assert judge_pairwise(_AlwaysA(), "q", "sym answer", "ctrl answer") == 0.0
+
+
+def test_pairwise_validity_gate_detects_content_aware_judge():
+    """A content-aware judge (prefers the answer mentioning Paris) must pass the
+    gate (+1); the content-free mock must NOT (it can't discriminate)."""
+    from symbolu_neural.internal_policy_controller.v3.judge import judge_discriminates
+    from symbolu_neural.internal_policy_controller.v3.llm import MockLLM
+
+    class _PrefersParis:
+        def chat(self, system, user, seed=0):
+            a = user.split("ANSWER A:")[1].split("ANSWER B:")[0]
+            return '{"winner":"A"}' if "Paris" in a else '{"winner":"B"}'
+    assert judge_discriminates(_PrefersParis()) == 1.0     # healthy judge
+    assert judge_discriminates(MockLLM()) <= 0.0           # ceiling/blind judge fails gate
+
+
+def test_pairwise_eval_runs_and_reports_gate_on_mock():
+    res = pilot.run_pairwise_multi(backend="mock", seeds=(0, 1))
+    assert res["is_real"] is False
+    assert set(res["vs_symbolu"]) == set(pilot.CONTROLS)
+    for c in pilot.CONTROLS:
+        r = res["vs_symbolu"][c]
+        assert {"margin", "ci95", "significant", "wins", "losses", "ties", "n"} <= set(r)
+        assert r["n"] == len(prompts()) * 2                # pooled over 2 seeds
+    assert "mean" in res["discrimination"]                 # validity gate computed
+
+
 def test_multi_seed_ci_structure_and_pairing():
     res = pilot.run_multi(backend="mock", seeds=(0, 1, 2))
     assert res["n_per_arm"] == len(prompts()) * 3        # pooled n = prompts × seeds
