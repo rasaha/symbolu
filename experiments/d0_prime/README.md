@@ -58,6 +58,25 @@ i.e. order is invisible to the length-3 trace here but plainly visible in the *s
 weaker discriminator for this family; the state-level and algebra-dimension measures are the
 informative ones. Reported as measured, not engineered around.
 
+## D₀′.1 — adversarial structural-specificity test
+`specificity.py` + `run_specificity.py` (tests: `test_specificity.py`) ask whether D₀′'s
+nontrivial algebra is **specific to the Symbol-U feature chart** or generic. Operators are built
+read-only through the frozen `feature_operators(F)` constructor with `F` replaced by five null
+ensembles — **A** permute-rows, **B** independent-global, **C** preserve-norms, **D**
+preserve-cosines (rotation), **E** maxent-first-order — and the **exact** D₀′ statistics are
+compared (K=200/null; two-sided empirical p; Bonferroni over 10 statistics).
+
+**Measured decision: NOT SPECIFIC** (`D0_PRIME_1_SPECIFICITY_RESULT.md`). Stage A is statistically
+**indistinguishable from all five nulls**. The emergence headline `algebra_dim = 16`, plus
+`trace_order_frac = 0`, `reachability_rank = 4`, `order_separation ≈ 1`, are **constant across
+every feature chart** (random, permuted, rotated) — they are properties of the fixed
+non-commuting generators + `expm`, not of the Symbol-U feature values. Commutator magnitudes put
+Stage A at a high tail vs some nulls but typical vs others, and never survive correction
+(`p ≥ 0.02`); on `abelian_defect_mean` Stage A is if anything *less* structured than random
+charts. **This is a structural falsification of the specificity of the current feature
+construction** — structural only, no semantic implication. (Null A is set-invariant by
+construction, so its set-level statistics are degenerate; reported transparently.)
+
 ## Hard boundaries
 Structural only · no semantic `Y` · no `F`/decoder · no A′ · no B–G · no external data ·
 Stage A (`symbolu_neural/structural_v1/`) untouched (operators reproduced read-only by loading
