@@ -25,10 +25,14 @@ similarity group ``M -> P M P^-1``. Quantities are tagged:
 from __future__ import annotations
 
 import itertools
+import pathlib
+import sys
 from dataclasses import dataclass, field
-from typing import Callable
 
 import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common.stats import numerical_rank, random_orthogonal_family  # noqa: E402,F401
 
 # ---- pre-registered numerical thresholds (fixed BEFORE execution) ----
 TOL_COMMUTE = 1e-8      # normalized commutator norm below this -> pair "commutes"
@@ -69,13 +73,6 @@ def load_stage_a_operators() -> tuple[list[str], list[np.ndarray], np.ndarray]:
 # ----------------------------------------------------------------------
 # numerical helpers
 # ----------------------------------------------------------------------
-def numerical_rank(M: np.ndarray, rel_tol: float = RANK_TOL) -> int:
-    s = np.linalg.svd(np.asarray(M), compute_uv=False)
-    if s.size == 0:
-        return 0
-    return int(np.sum(s > rel_tol * s[0])) if s[0] > 0 else 0
-
-
 def _frob(M: np.ndarray) -> float:
     return float(np.linalg.norm(M, "fro"))
 
@@ -299,16 +296,6 @@ def identity_family(n: int, d: int = 4) -> list[np.ndarray]:
 def commuting_diagonal_family(n: int, d: int = 4, seed: int = 0) -> list[np.ndarray]:
     rng = np.random.default_rng(seed)
     return [np.diag(rng.standard_normal(d)) for _ in range(n)]
-
-
-def random_orthogonal_family(n: int, d: int = 4, seed: int = 0) -> list[np.ndarray]:
-    rng = np.random.default_rng(seed)
-    out = []
-    for _ in range(n):
-        Q, R = np.linalg.qr(rng.standard_normal((d, d)))
-        Q = Q @ np.diag(np.sign(np.diag(R)) + (np.diag(R) == 0))
-        out.append(Q)
-    return out
 
 
 @dataclass

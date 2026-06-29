@@ -21,9 +21,14 @@ real-world data, no Symbol-U claim.
 """
 from __future__ import annotations
 
+import pathlib
+import sys
 from dataclasses import dataclass
 
 import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common import stats  # noqa: E402
 
 
 @dataclass
@@ -49,11 +54,7 @@ def _assets(p: GenParams, rng: np.random.Generator):
     B = B - B.T                                              # ANTISYMMETRIC bigram weights:
     #   E[sum_adj B[a,b] | counts] = 0  -> pure order signal, invisible to the bag
     #   baseline, yet still linear in bigram counts (order-aware probe can capture it).
-    ops = []
-    for _ in range(p.n_units):                               # per-unit operators
-        Q, R = np.linalg.qr(rng.standard_normal((p.op_dim, p.op_dim)))
-        Q = Q @ np.diag(np.sign(np.diag(R)) + (np.diag(R) == 0))
-        ops.append(Q)
+    ops = stats.random_orthogonal_matrices(p.n_units, p.op_dim, rng)  # per-unit operators
     s0 = rng.standard_normal(p.op_dim); s0 /= np.linalg.norm(s0)
     u = rng.standard_normal(p.op_dim)
     return w, B, ops, s0, u

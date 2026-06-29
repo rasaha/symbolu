@@ -16,8 +16,13 @@ no Symbol-U PASS/FAIL/bottom. Preserves bottom.
 """
 from __future__ import annotations
 
+import pathlib
+import sys
+
 import numpy as np
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common import stats  # noqa: E402
 from harness import (MIN_DELTA_R2, SHUFFLE_PCTL, bag_features, bigram_features,
                      ridge_oof_r2, _shuffle_within)
 
@@ -36,13 +41,9 @@ def operator_product_features(seqs, ops, s0) -> np.ndarray:
 
 def random_operator_family(n_units: int, op_dim: int, seed: int):
     """A DIFFERENT random orthogonal family + init (for the mismatched probe)."""
-    rng = np.random.default_rng(seed)
-    ops = []
-    for _ in range(n_units):
-        Q, R = np.linalg.qr(rng.standard_normal((op_dim, op_dim)))
-        Q = Q @ np.diag(np.sign(np.diag(R)) + (np.diag(R) == 0))
-        ops.append(Q)
-    s0 = rng.standard_normal(op_dim); s0 /= np.linalg.norm(s0)
+    g = stats.rng(seed)
+    ops = stats.random_orthogonal_matrices(n_units, op_dim, g)
+    s0 = g.standard_normal(op_dim); s0 /= np.linalg.norm(s0)
     return ops, s0
 
 

@@ -13,7 +13,14 @@ AMBIGUOUS. Instrument calibration only — no semantics, no real data.
 """
 from __future__ import annotations
 
+import pathlib
+import sys
+
 import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common.stats import ridge_oof_r2  # noqa: E402  (shared; re-exported here)
+from common.stats import shuffle_within as _shuffle_within  # noqa: E402
 
 # pre-registered decision thresholds (fixed before execution)
 MIN_DELTA_R2 = 0.01     # minimum incremental OOF R^2 to call an order effect real
@@ -35,35 +42,6 @@ def bigram_features(seqs, n_units: int) -> np.ndarray:
         for a, b in zip(s[:-1], s[1:]):
             X[r, a * n_units + b] += 1.0
     return X
-
-
-def ridge_oof_r2(X: np.ndarray, y: np.ndarray, k: int = 5, lam: float = 1.0,
-                 seed: int = 0) -> float:
-    """Out-of-fold R^2 of ridge regression (closed form, standardized features)."""
-    N = len(y)
-    rng = np.random.default_rng(seed)
-    folds = np.array_split(rng.permutation(N), k)
-    pred = np.zeros(N)
-    for f in range(k):
-        te = folds[f]
-        tr = np.concatenate([folds[j] for j in range(k) if j != f])
-        Xtr, Xte, ytr = X[tr], X[te], y[tr]
-        mu, sd = Xtr.mean(0), Xtr.std(0); sd[sd == 0] = 1.0
-        Xtr = (Xtr - mu) / sd; Xte = (Xte - mu) / sd
-        ymu = ytr.mean()
-        A = Xtr.T @ Xtr + lam * np.eye(Xtr.shape[1])
-        beta = np.linalg.solve(A, Xtr.T @ (ytr - ymu))
-        pred[te] = Xte @ beta + ymu
-    ss_res = float(np.sum((y - pred) ** 2))
-    ss_tot = float(np.sum((y - y.mean()) ** 2))
-    return 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
-
-
-def _shuffle_within(seqs, rng) -> list:
-    out = []
-    for s in seqs:
-        t = list(s); rng.shuffle(t); out.append(t)
-    return out
 
 
 def detect_order(seqs, y, n_units: int, K: int = 60, seed: int = 0,
