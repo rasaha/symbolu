@@ -22,9 +22,12 @@ that any decoder is correct. Every formula below is either a **definitional plac
 | **L1** | Structural Operator Layer | **FROZEN** | operator algebra; ordered composition; Stage A benchmark; *structural validation only; no semantic claims* |
 | **L2** | Latent Semantic Formation | **CANDIDATE (this doc)** | how a latent semantic representation `z` might form from L1; *no decoding assumptions* |
 | **L3** | Semantic Decoders | **FUTURE** | DBP, transformation-chain, polarity, or any decoder `D` mapping `z` to an observable; replaceable without touching L2 |
+| **V** | Validation layer | **METHOD (this doc)** | probe `P`, baseline set `B`, and failure state `⊥` used to *test* whether `z` carries recoverable information; an evaluation instrument, **not** part of semantic formation |
 
 L1 is untouched. L2 sits *above* L1 and *below* L3. DBP lives in **L3**, not L2: it is **one
-possible readout of `z`**, not the semantic theory.
+possible readout of `z`**, not the semantic theory. The **Validation layer (V)** is orthogonal:
+it does not produce meaning, it only measures whether `z` contains semantic information, and its
+results never alter L1/L2/L3 definitions (see §3.5).
 
 ## 2. Fundamental hypothesis (stated precisely)
 
@@ -38,9 +41,9 @@ possible readout of `z`**, not the semantic theory.
 ```
 varṇa acoustic-root semantic essences
         ↓  (ordered operator interaction — L1)
-latent semantic representation  z       (L2)
-        ↓  (decoder D — L3)
-observable lexical meaning  y
+latent semantic representation  z ∈ S    (L2)
+        ↓  (decoder D — L3)                 ↘  (probe P, baselines B — Validation layer)
+observable lexical meaning  y ∈ Y           P(z) vs B   →  signal? else ⊥
 ```
 
 The distinctive commitment versus a bag/sum model is that meaning is a projection of a
@@ -131,6 +134,54 @@ be *semantic* rather than *acoustic*, `z` must carry essence/meaning information
 phonological similarity** — i.e., `I(z ; meaning | phonology) > 0`. Without conditioning on
 phonology, any positive `I(z;E)` may merely reflect that `z` encodes sound.
 
+### 3.5 Validation layer (probe, baselines, failure state)
+The layers above *define* `z`; they do not *test* it. Whether `z` carries recoverable
+information is established only through an explicit evaluation layer:
+
+```
+spaces        S = latent state space,   Y = observable semantic output space
+formation     z = F(M_{σ_1},…,M_{σ_n}, s₀) ∈ S        (L2)
+decoding      y = D(z) ∈ Y                              (L3, intended readout)
+validation    P(z) = probe output                       (evaluation instrument)
+              B    = baseline set
+              ⊥    = failure / no-valid-reading state
+```
+
+- `P` is a **probe** — an instrument used *only* to test whether `z` contains recoverable
+  information (e.g. a linear probe or a mutual-information estimator for `I(z;E)`,
+  `I(z;meaning|phonology)`). It is **not** a production decoder.
+- `B` is the **baseline set** against which any probe result must be judged: at minimum
+  **bag-of-varṇas, relabel/random, phonological similarity, length/frequency, and
+  sentiment/lexicon** baselines. A probe "succeeds" only if it exceeds **all** of these,
+  *especially phonological similarity*.
+- `⊥` is the explicit **failure state**: if `P` (or a decoder `D`) cannot extract information
+  above `B`, or if `z` is unstable/undefined, the system **returns `⊥`** rather than forcing a
+  semantic reading. `⊥` is first-class and must never be silently overwritten by a label.
+
+### 3.6 Required conceptual distinctions (binding)
+
+1. **Definition vs validation.** `z` can be *defined* without choosing any decoder. But
+   whether `z` contains *useful semantic information* can only be *tested* through a probe `P`.
+   Consequently every claim of the form "`z` carries semantic information" is meaningful **only
+   relative to a stated probe class `P` and baseline set `B`** — there is no decoder-free
+   measurement of `z`'s content.
+2. **Decoder vs probe.** `D` is an *intended semantic readout* (a candidate product mapping
+   `z → y`). `P` is an *evaluation instrument*. They are not interchangeable: **a probe success
+   does not validate a production decoder** (probes can extract information a decoder does not
+   use), and a decoder failure does not by itself prove `I(z;·)=0`.
+3. **Canonical frame vs hypothetical content.** The `L1 → L2 → L3` (+ Validation) **frame is
+   canonical** — the standing way to organize semantic work. The **actual semantic content of
+   `z` remains hypothetical and unvalidated.** The frame's cleanliness is *not* evidence for
+   the content.
+4. **Representation-learning analogy (structural only).** This resembles a
+   **frozen-backbone + probe / task-head** architecture (L1 frozen, `z` a representation, `D`
+   heads, `P` probing). But unlike modern learned-representation systems, **`F` is not yet
+   learned from data** and there is no training signal. Therefore the architectural similarity
+   is **not evidence of semantic validity** — it borrows the *form* of representation learning
+   without its *engine*.
+5. **Failure state.** If `P` or `D` cannot extract information above `B`, or if the latent state
+   is unstable or undefined, the system must return **`⊥`**, not a forced semantic reading.
+
 ## 4. Scientific status (binding, repeated)
 
 - **Candidate hypothesis.** Not a result.
@@ -153,9 +204,11 @@ phonology, any positive `I(z;E)` may merely reflect that `z` encodes sound.
 ## 6. What would make this testable (pointer, not a plan)
 
 A future Layer-2 test must, at minimum: freeze a varṇa essence table **independently of word
-glosses** (anti-circularity); specify one concrete admissible `F`; and measure `I(z;E)` and
-`I(z;meaning|phonology)` against **bag-of-varṇas, random relabeling, and phonological-similarity**
-baselines, with relabel/random controls.
+glosses** (anti-circularity); specify one concrete admissible `F`; choose a probe `P`; and
+measure `I(z;E)` and `I(z;meaning|phonology)` with `P` against the **baseline set `B`** of §3.5
+(**bag-of-varṇas, relabel/random, phonological similarity, length/frequency, sentiment/lexicon**)
+— passing only if it exceeds **all** of them, *especially phonological similarity*. If it does
+not, the result is **`⊥`**, reported as such, never a forced reading.
 
 On synonyms as a diagnostic: **synonyms may project to similar observable dictionary meanings
 while preserving different latent organization.** Therefore synonym similarity is a **useful
