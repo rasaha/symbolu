@@ -90,6 +90,46 @@ def phoneme_feature_matrix(panphon_table) -> tuple[np.ndarray, list[str]]:
     return M, missing
 
 
+# orthographic morphological proxies (Branch D.1 deconfounding)
+SUFFIXES = ["ation", "ition", "tion", "sion", "ness", "ment", "able", "ible",
+            "ing", "ed", "ly", "er", "est", "ful", "less", "ous", "ity", "al",
+            "ic", "ize", "ise", "y", "s"]
+PREFIXES = ["un", "re", "in", "im", "il", "ir", "dis", "pre", "mis", "non",
+            "over", "under", "anti", "de"]
+
+
+def morph_features(word: str) -> np.ndarray:
+    """Binary indicators for the longest-matching suffix and any matching prefix."""
+    w = word.lower()
+    suf = np.zeros(len(SUFFIXES))
+    for s in sorted(SUFFIXES, key=len, reverse=True):
+        if len(w) > len(s) + 1 and w.endswith(s):
+            suf[SUFFIXES.index(s)] = 1.0
+            break
+    pre = np.array([1.0 if (len(w) > len(p) + 1 and w.startswith(p)) else 0.0
+                    for p in PREFIXES])
+    return np.concatenate([suf, pre])
+
+
+MORPH_DIM = len(SUFFIXES) + len(PREFIXES)
+
+
+def suffix_group(word: str) -> str:
+    w = word.lower()
+    for s in sorted(SUFFIXES, key=len, reverse=True):
+        if len(w) > len(s) + 1 and w.endswith(s):
+            return s
+    return "none"
+
+
+def rime_group(phones: list[str]) -> str:
+    """Rime = from the last vowel to the end (controls rhyme-family leakage)."""
+    last_v = max((i for i, p in enumerate(phones) if p in VOWELS), default=None)
+    if last_v is None:
+        return "novowel"
+    return "_".join(phones[last_v:])
+
+
 def parse_warriner(path) -> dict[str, tuple[float, float, float]]:
     """word -> (valence, arousal, dominance) means (V/A/D .Mean.Sum)."""
     rows = list(csv.reader(Path(path).read_text(encoding="utf-8").splitlines()))
@@ -119,7 +159,7 @@ def build_dataset(cmudict_path, panphon_path, warriner_path):
     vad = parse_warriner(warriner_path)
     idx = {ph: i for i, ph in enumerate(ARPABET)}
 
-    words, E, PH, Y = [], [], [], []
+    words, E, PH, Y, phones_all, NUIS = [], [], [], [], [], []
     for w, (v, a, dom) in vad.items():
         if w not in pron:
             continue
@@ -132,12 +172,18 @@ def build_dataset(cmudict_path, panphon_path, warriner_path):
         words.append(w)
         E.append(counts)
         PH.append(np.concatenate([mean_artic, [len(phones), nsyl]]))
+        NUIS.append(np.concatenate([[len(w)], morph_features(w)]))  # n_letters + morphology
+        phones_all.append(phones)
         Y.append([v, a, dom])
     return {
         "words": words,
         "E_max": np.array(E),
         "PHON": np.array(PH),
+        "NUIS": np.array(NUIS),                 # n_letters + suffix/prefix indicators
         "Y": np.array(Y),
+        "phones": phones_all,
+        "suffix_groups": [suffix_group(w) for w in words],
+        "rime_groups": [rime_group(p) for p in phones_all],
         "n": len(words),
         "n_warriner": len(vad), "n_cmudict": len(pron),
         "missing_phonemes": missing,
