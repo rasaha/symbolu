@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "tol_commute": 1e-08,
+  "tol_abelian": 1e-06,
+  "rank_tol": 1e-09,
+  "generic_seed": 20260629,
+  "max_word_len": 4,
+  "trace_samples": 2000
+}

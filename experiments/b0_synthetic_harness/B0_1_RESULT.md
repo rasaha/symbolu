@@ -58,3 +58,61 @@ Probes compared (all judged by ΔR² vs within-seq shuffle null, p95): **bag**, 
 - Synthetic instrument calibration only; **no semantic validation, no real-world result, no PASS/FAIL/⊥ for Symbol-U.** A′ halted; D₀′ structural-only.
 
 > structure, not validated meaning.
+
+## Reproducibility metadata
+
+| field | value |
+|---|---|
+| git_hash | bae437cb4dd7e2bdd0f5c2b79c75f50da06919cf |
+| python | 3.11.15 |
+| platform | Linux-6.18.5-x86_64-with-glibc2.39 |
+| numpy | 2.4.6 |
+| seed | 2000 |
+| runtime_s | 35.327 |
+
+Config:
+```json
+{
+  "version": 1,
+  "repeats": 20,
+  "k_shuffle": 40,
+  "n_ref": 300,
+  "base_seed": 1000,
+  "min_delta_r2": 0.01,
+  "shuffle_pctl": 95.0,
+  "n_units": 5,
+  "op_dim": 3,
+  "len_min": 3,
+  "len_max": 6,
+  "effect_grid": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    0.8
+  ],
+  "sample_grid": [
+    100,
+    200,
+    400,
+    800
+  ],
+  "noise_grid": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+  ],
+  "confound_grid": [
+    0.0,
+    1.0,
+    2.0,
+    4.0
+  ]
+}
+```
+
+| output | sha256 |
+|---|---|
+| report_body | 5b585960995c24df88d97c22776140ee3034da093b2ed65cdeeadd096e932bff |

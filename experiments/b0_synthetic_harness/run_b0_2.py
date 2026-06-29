@@ -7,20 +7,26 @@ Symbol-U PASS/FAIL/bottom). A' halted; D0' structural-only; Stage A untouched.
 """
 from __future__ import annotations
 
+import pathlib
 import sys
+import time
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common import config as _cfgmod, report as _report, repro as _repro  # noqa: E402
 
 from generators import GenParams, generate_with_assets
 from harness_operator import bigram_fn, detect_with, operator_fn
 from harness_mismatch import (probe_abelian, probe_corrupt, probe_exact,
                               probe_gauge, probe_perturb, probe_random)
 
-REPEATS = 20
-K_SHUFFLE = 40
-N_REF = 300
-BASE = 3000
+_CFG = _cfgmod.load_config(_cfgmod.HarnessConfig,
+                           pathlib.Path(__file__).parent / "config.json")
+REPEATS, K_SHUFFLE, N_REF = _CFG.repeats, _CFG.k_shuffle, _CFG.n_ref
+BASE = 3000  # runner-specific seed offset (kept distinct from b0/b0_1)
 PROD = dict(confound=0.0, effect=1.0, noise=1.0, order_kind="product")
 
 
@@ -53,6 +59,7 @@ def rate_feature(feature_fn_factory, repeats=REPEATS, K=K_SHUFFLE, N=N_REF, base
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     out = Path(argv[0]) if argv else (Path(__file__).resolve().parent / "B0_2_RESULT.md")
+    t0 = time.perf_counter()
     L = []
     L.append("# B0_2_RESULT — Operator Mismatch / Identifiability Calibration (measured)")
     L.append("")
@@ -133,6 +140,9 @@ def main(argv=None) -> int:
     L.append("")
     L.append("> structure, not validated meaning.")
     md = "\n".join(L) + "\n"
+    md += "\n" + _report.metadata_markdown(_repro.collect_metadata(
+        config=asdict(_CFG), seed=BASE, runtime_s=time.perf_counter() - t0,
+        outputs={"report_body": _repro.sha256_text(md)}))
     out.write_text(md)
     print("\n" + md)
     print(f"[written] {out}")

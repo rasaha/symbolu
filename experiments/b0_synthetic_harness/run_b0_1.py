@@ -6,19 +6,25 @@ no A', no B-G, no Symbol-U PASS/FAIL/bottom). A' halted; D0' structural-only.
 """
 from __future__ import annotations
 
+import pathlib
 import sys
+import time
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common import config as _cfgmod, report as _report, repro as _repro  # noqa: E402
 
 from generators import GenParams, generate_with_assets
 from harness_operator import (bigram_fn, detect_with, operator_fn,
                               random_operator_family)
 
-REPEATS = 20
-K_SHUFFLE = 40
-N_REF = 300
-BASE = 2000
+_CFG = _cfgmod.load_config(_cfgmod.HarnessConfig,
+                           pathlib.Path(__file__).parent / "config.json")
+REPEATS, K_SHUFFLE, N_REF = _CFG.repeats, _CFG.k_shuffle, _CFG.n_ref
+BASE = 2000  # runner-specific seed offset (kept distinct from b0/b0_2)
 
 
 def _zero_fn(seqs):                      # bag-only: order features add nothing
@@ -53,6 +59,7 @@ def detect_rate(kind, repeats=REPEATS, K=K_SHUFFLE, N=N_REF, base=BASE, **paramk
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     out = Path(argv[0]) if argv else (Path(__file__).resolve().parent / "B0_1_RESULT.md")
+    t0 = time.perf_counter()
     probes = ["bag", "bigram", "operator_matched", "operator_mismatched"]
     L = []
     L.append("# B0_1_RESULT — Operator-Aware Probe Calibration (measured)")
@@ -96,7 +103,7 @@ def main(argv=None) -> int:
     L.append("| effect | detect rate | median ΔR² |")
     L.append("|---|---|---|")
     mde = None
-    for e in [0.0, 0.1, 0.2, 0.3, 0.5, 0.8]:
+    for e in _CFG.effect_grid:
         c = detect_rate("operator_matched", confound=0.0, effect=e, noise=1.0,
                         order_kind="product")
         L.append(f"| {e:.2f} | {c['rate']:.2f} | {c['median_delta']:.4f} |")
@@ -112,7 +119,7 @@ def main(argv=None) -> int:
     L.append("## 4. Operator-matched noise robustness (product, effect=1)")
     L.append("| noise | detect rate | median ΔR² |")
     L.append("|---|---|---|")
-    for nz in [0.5, 1.0, 2.0, 4.0]:
+    for nz in _CFG.noise_grid:
         c = detect_rate("operator_matched", confound=0.0, effect=1.0, noise=nz,
                         order_kind="product")
         L.append(f"| {nz:.1f} | {c['rate']:.2f} | {c['median_delta']:.4f} |")
@@ -155,6 +162,9 @@ def main(argv=None) -> int:
     L.append("")
     L.append("> structure, not validated meaning.")
     md = "\n".join(L) + "\n"
+    md += "\n" + _report.metadata_markdown(_repro.collect_metadata(
+        config=asdict(_CFG), seed=BASE, runtime_s=time.perf_counter() - t0,
+        outputs={"report_body": _repro.sha256_text(md)}))
     out.write_text(md)
     print("\n" + md)
     print(f"[written] {out}")

@@ -8,8 +8,15 @@ read-only (never modifies Stage A).
 """
 from __future__ import annotations
 
+import pathlib
 import sys
+import time
+from dataclasses import asdict
 from pathlib import Path
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common import config as _cfgmod, report as _report, repro as _repro  # noqa: E402
+_CFG = _cfgmod.load_config(_cfgmod.D0Config, pathlib.Path(__file__).parent / "config.json")
 
 from operator_algebra import (
     analyze_family, commuting_diagonal_family, generated_algebra_dimension,
@@ -26,6 +33,7 @@ def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     out = Path(argv[0]) if argv else (Path(__file__).resolve().parent / "D0_PRIME_RESULT.md")
 
+    t0 = time.perf_counter()
     units, ops, s0 = load_stage_a_operators()
     n, d = len(ops), ops[0].shape[0]
 
@@ -133,6 +141,9 @@ def main(argv=None) -> int:
     L.append("")
     L.append("> structure, not validated meaning.")
     md = "\n".join(L) + "\n"
+    md += "\n" + _report.metadata_markdown(_repro.collect_metadata(
+        config=asdict(_CFG), seed=_CFG.generic_seed, runtime_s=time.perf_counter() - t0,
+        outputs={"report_body": _repro.sha256_text(md)}))
     out.write_text(md)
     print(md)
     print(f"[written] {out}")

@@ -9,6 +9,15 @@ from __future__ import annotations
 import json
 
 
+def metadata_markdown(metadata: dict) -> str:
+    """Standalone reproducibility-metadata block, for runners that assemble
+    markdown directly (without a ReportBuilder instance)."""
+    rb = ReportBuilder("", "")
+    rb._lines = []
+    rb.repro_block(metadata)
+    return "\n".join(rb._lines).strip() + "\n"
+
+
 class ReportBuilder:
     def __init__(self, title: str, status_caveat: str):
         self._lines: list[str] = [f"# {title}", "", f"> {status_caveat}", ""]

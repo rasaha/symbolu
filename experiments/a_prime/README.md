@@ -55,6 +55,14 @@ is unique; individual per-phoneme `E′` values are the **minimum-norm** represe
 not uniquely identified. This is a property to weigh in any future identifiability analysis — it
 is **not** acted on here (no A′ run).
 
+## A′ execution-readiness (guarded; not an A′ run)
+`run_a_prime.py` + `config.json` provide a **guarded readiness entrypoint** (tests:
+`test_readiness.py`). It reads `AprimeConfig`, checks dataset availability + license, and emits
+`A_PRIME_READINESS.md` with a missing-input checklist and the building-block manifest. Default
+state is **NOT_RUN** (no admissible, licensed, construct-aligned E×Y dataset). With inputs present
+and licensed it reports **READY_BUT_GATED** and hands off — A′/B execution still requires lifting
+the pre-registered gate. It never fabricates data and never runs the gated decision.
+
 ## Hard boundaries
 - No semantic `Y`; no probe/baseline/CMI; no inference; no PASS/FAIL/⊥; no B–G work.
 - No third-party data, and no `E′` values, are committed to this repository.

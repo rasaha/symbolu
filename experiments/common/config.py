@@ -48,6 +48,22 @@ class HarnessConfig:
     confound_grid: list = field(default_factory=lambda: [0.0, 1.0, 2.0, 4.0])
 
 
+@dataclass
+class AprimeConfig:
+    """Config for the GUARDED A′ readiness entrypoint. Default = no dataset ->
+    NOT_RUN. When an admissible, licensed, construct-aligned dataset arrives,
+    fill the paths and acknowledge the license; A′ then runs with minimal work."""
+    version: int = CONFIG_VERSION
+    e_path: str = ""                  # gloss-free per-stimulus E ratings table
+    y_path: str = ""                  # external semantic observable Y
+    phonology_path: str = ""          # phonology baseline features
+    license_acknowledged: bool = False
+    endpoint: str = "size"            # construct-aligned confirmatory endpoint
+    min_delta_r2: float = 0.01
+    shuffle_pctl: float = 95.0
+    n_eff_floor: int = 800
+
+
 def save_config(cfg, path) -> None:
     Path(path).write_text(json.dumps(asdict(cfg), indent=2))
 

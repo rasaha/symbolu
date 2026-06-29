@@ -45,3 +45,31 @@ Interpretation guard: this verdict concerns ONLY the algebraic structure of the 
 - control: random-orthogonal: verdict = nontrivial, algebra dim = 16, order-sep = 1.0000
 
 > structure, not validated meaning.
+
+## Reproducibility metadata
+
+| field | value |
+|---|---|
+| git_hash | bae437cb4dd7e2bdd0f5c2b79c75f50da06919cf |
+| python | 3.11.15 |
+| platform | Linux-6.18.5-x86_64-with-glibc2.39 |
+| numpy | 2.4.6 |
+| seed | 20260629 |
+| runtime_s | 0.574 |
+
+Config:
+```json
+{
+  "version": 1,
+  "tol_commute": 1e-08,
+  "tol_abelian": 1e-06,
+  "rank_tol": 1e-09,
+  "generic_seed": 20260629,
+  "max_word_len": 4,
+  "trace_samples": 2000
+}
+```
+
+| output | sha256 |
+|---|---|
+| report_body | ac387b89e4f0c2c495501277462c570778c5960a7fbb2bd27b5e83e47aecee75 |

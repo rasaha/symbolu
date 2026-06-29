@@ -7,19 +7,24 @@ PASS/FAIL/bottom. A' remains halted; D0' remains structural-only.
 """
 from __future__ import annotations
 
+import pathlib
 import sys
+import time
 from collections import Counter
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
-from generators import GenParams, generate
-from harness import (MIN_DELTA_R2, SHUFFLE_PCTL, decision_label, detect_order)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from common import config as _cfgmod, report as _report, repro as _repro  # noqa: E402
+from generators import GenParams, generate  # noqa: E402
+from harness import (MIN_DELTA_R2, SHUFFLE_PCTL, decision_label, detect_order)  # noqa: E402
 
-REPEATS = 20
-K_SHUFFLE = 40
-N_REF = 300
-BASE = 1000
+_CFG = _cfgmod.load_config(_cfgmod.HarnessConfig,
+                           pathlib.Path(__file__).parent / "config.json")
+REPEATS, K_SHUFFLE, N_REF = _CFG.repeats, _CFG.k_shuffle, _CFG.n_ref
+BASE = _CFG.base_seed
 
 
 def run_cell(repeats=REPEATS, K=K_SHUFFLE, N=N_REF, base_seed=BASE, **paramkw):
@@ -45,6 +50,7 @@ def fmt_labels(d: dict) -> str:
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     out = Path(argv[0]) if argv else (Path(__file__).resolve().parent / "B0_RESULT.md")
+    t0 = time.perf_counter()
     L = []
     L.append("# B0_RESULT — Synthetic Harness Calibration (measured)")
     L.append("")
@@ -93,7 +99,7 @@ def main(argv=None) -> int:
 
     # 3. calibration curve over effect size -> MDE ----------------------------
     print("[3/6] calibration curve over effect size ...")
-    effects = [0.0, 0.1, 0.2, 0.3, 0.5, 0.8]
+    effects = _CFG.effect_grid
     L.append("")
     L.append("## 3. Calibration curve (detection rate vs effect size)")
     L.append("| effect | detect rate | median ΔR² |")
@@ -114,7 +120,7 @@ def main(argv=None) -> int:
     L.append("## 4. Sample-size sweep (effect=0.3)")
     L.append("| N | detect rate | median ΔR² |")
     L.append("|---|---|---|")
-    for N in [100, 200, 400, 800]:
+    for N in _CFG.sample_grid:
         c = run_cell(N=N, confound=0.0, effect=0.3)
         L.append(f"| {N} | {c['detect_rate']:.2f} | {c['median_delta']:.4f} |")
 
@@ -124,7 +130,7 @@ def main(argv=None) -> int:
     L.append("## 5. Noise sweep (effect=0.5)")
     L.append("| noise | detect rate | median ΔR² |")
     L.append("|---|---|---|")
-    for nz in [0.5, 1.0, 2.0, 4.0]:
+    for nz in _CFG.noise_grid:
         c = run_cell(confound=0.0, effect=0.5, noise=nz)
         L.append(f"| {nz:.1f} | {c['detect_rate']:.2f} | {c['median_delta']:.4f} |")
 
@@ -134,7 +140,7 @@ def main(argv=None) -> int:
     L.append("## 6. Confounding sweep (effect=0.4)")
     L.append("| confound (bag weight) | detect rate | median ΔR² |")
     L.append("|---|---|---|")
-    for cf in [0.0, 1.0, 2.0, 4.0]:
+    for cf in _CFG.confound_grid:
         c = run_cell(confound=cf, effect=0.4)
         L.append(f"| {cf:.1f} | {c['detect_rate']:.2f} | {c['median_delta']:.4f} |")
 
@@ -160,6 +166,9 @@ def main(argv=None) -> int:
     L.append("")
     L.append("> structure, not validated meaning.")
     md = "\n".join(L) + "\n"
+    md += "\n" + _report.metadata_markdown(_repro.collect_metadata(
+        config=asdict(_CFG), seed=BASE, runtime_s=time.perf_counter() - t0,
+        outputs={"report_body": _repro.sha256_text(md)}))
     out.write_text(md)
     print("\n" + md)
     print(f"[written] {out}")

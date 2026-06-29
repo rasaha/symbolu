@@ -64,3 +64,61 @@ Probe: ridge OOF R²; order statistic = ΔR²(bag+bigram over bag) vs a within-s
 - The harness detects matched planted order signal above an effect/sample/noise-dependent threshold and returns null on planted-null/noise data at the designed false-positive rate; it under-detects non-commutative-product signal a linear probe cannot represent.
 
 > structure, not validated meaning.
+
+## Reproducibility metadata
+
+| field | value |
+|---|---|
+| git_hash | bae437cb4dd7e2bdd0f5c2b79c75f50da06919cf |
+| python | 3.11.15 |
+| platform | Linux-6.18.5-x86_64-with-glibc2.39 |
+| numpy | 2.4.6 |
+| seed | 1000 |
+| runtime_s | 29.214 |
+
+Config:
+```json
+{
+  "version": 1,
+  "repeats": 20,
+  "k_shuffle": 40,
+  "n_ref": 300,
+  "base_seed": 1000,
+  "min_delta_r2": 0.01,
+  "shuffle_pctl": 95.0,
+  "n_units": 5,
+  "op_dim": 3,
+  "len_min": 3,
+  "len_max": 6,
+  "effect_grid": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    0.8
+  ],
+  "sample_grid": [
+    100,
+    200,
+    400,
+    800
+  ],
+  "noise_grid": [
+    0.5,
+    1.0,
+    2.0,
+    4.0
+  ],
+  "confound_grid": [
+    0.0,
+    1.0,
+    2.0,
+    4.0
+  ]
+}
+```
+
+| output | sha256 |
+|---|---|
+| report_body | 67193eefcc169c5a0f24f17a43b476e1878c1ed25e72db77e964e27cd35f082d |
