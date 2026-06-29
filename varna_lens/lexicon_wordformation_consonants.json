@@ -2,7 +2,7 @@
   "_meta": {
     "title": "Varṇa word-formation lexicon — binding (in-combination) reading, consonants only",
     "governing_axis": "The reading axis is BIND vs LIBERATE, which is ORTHOGONAL to good vs bad. Binding = contractive / holding / attachment-forming (fixes or limits consciousness). Liberating = expansive / unbinding / releasing. This is a state of expression, NOT a moral judgement: dharma is BINDING (it holds you to your stance, dhṛ = to hold) even though it is 'good'; adharma is LIBERATING (it breaks the stance, unbinds) even though it is 'bad'; hope (āśā) is binding (forward-grasping), cruelty is binding (contractive), mokṣa is liberating (releasing).",
-    "word_formation_rule": "A varṇa is sattvic / unbound in ISOLATION and BINDS when it enters COMBINATION (a word), because manifestation is contraction into form. Therefore `word_formation_reading` = the BINDING (in-combination, contractive) pole of every varṇa, and is the field to use when reading a word. The liberating pole is the at-rest / isolated / completed state (recoverable: it is the `counter_pole` for the 28 affliction-rooted consonants, and the `worldly_vritti` / Sarkar root for ca, ra, sa, ha, kṣa; for va it is `counter_pole` = Adharma).",
+    "word_formation_rule": "A varṇa is sattvic / unbound in ISOLATION and BINDS when it enters COMBINATION (a word), because manifestation is contraction into form. Therefore `word_formation_reading` = the BINDING (in-combination, contractive) pole of every varṇa, and is the field to use when reading a word. The liberating pole is the at-rest / isolated / completed state (recoverable: it is the `counter_pole` for the 28 affliction-rooted consonants and for kṣa, and the `worldly_vritti` / Sarkar root for ca, ra, sa, ha; for va it is `counter_pole` = Adharma).",
     "purpose": "Primary field `word_formation_reading` gives the binding/in-combination expression used in word formation. `worldly_vritti` (Sarkar's source root) and `counter_pole` are retained for provenance.",
     "source": "P.R. Sarkar (Shrii Shrii Anandamurti), 'Acoustic Roots of the Indo-Aryan Alphabet' (1984-85, Calcutta), verified line-by-line against the source.",
     "word_formation_flip_changelog": [
@@ -11,8 +11,8 @@
       "va: word_formation_reading = Dharma (binding) — dharma HOLDS/sustains the stance, so it binds on the non-moral axis; Adharma is the liberating (unbinding) pole. Sarkar's root retained as worldly_vritti.",
       "sa: word_formation_reading = escapism (binding); Sarkar's root mokṣa/sattva is the liberating pole. (binding gloss derived.)",
       "ha: word_formation_reading = Rātri / night (binding) — corrected to RĀTRI (night/darkness, the contractive opposite of ha=day/sun/light), dropping the abstract 'avidyā'; parā-vidyā is the liberating pole. (binding gloss derived.)",
-      "kṣa: word_formation_reading = Mithyā-jñāna (binding); aparā-vidyā is the liberating pole. (binding gloss derived.)",
-      "The other 28 consonants: word_formation_reading = worldly_vritti (already the binding affliction)."
+      "kṣa: word_formation_reading = Aparā-vidyā (mundane knowledge) — LEFT as mundane knowledge (worldly/binding), NOT flipped; liberating pole = Parā-vidyā (spiritual knowledge). (Reverted earlier mithyā-jñāna flip.)",
+      "The other 28 consonants (and kṣa): word_formation_reading = worldly_vritti (already the worldly/binding root)."
     ],
     "_status": "FAITHFUL DOCTRINAL TRANSCRIPTION + a stated binding-in-combination reading convention. NOT empirically validated: the pre-registered blind signal tests on this lexicon returned NO_SIGNAL (real ≈ scrambled). For word-formation reading / contemplative authoring, not a validated sound→meaning decoder.",
     "scope": "consonants (33 + kṣa); vowels intentionally omitted (handled as an exploratory arm elsewhere).",
@@ -801,20 +801,20 @@
         "sanskrit": "Aparā-vidyā",
         "english": "mundane knowledge / material science"
       },
-      "polarity": "mundane",
+      "polarity": "binding",
       "word_formation_reading": {
-        "sanskrit": "Mithyā-jñāna",
-        "english": "false knowledge / dogma",
+        "sanskrit": "Aparā-vidyā",
+        "english": "mundane / material knowledge",
         "axis": "binding"
       },
       "counter_pole": {
-        "sanskrit": "Aparā-vidyā",
-        "english": "mundane knowledge / material science (liberating / at-rest pole)",
+        "sanskrit": "Parā-vidyā",
+        "english": "spiritual / intuitional knowledge (liberating / at-rest pole)",
         "type": "liberating_at_rest",
         "derived": false
       },
       "source_quote": "Kṣa is the acoustic root of mundane knowledge, and is also the acoustic root of material science.",
-      "_note": "Flipped for uniformity: the binding/in-combination reading is the worldly distortion, mithyā-jñāna / dogma (derived); aparā-vidyā (mundane knowledge) is the liberating/at-rest pole."
+      "_note": "Mundane knowledge (aparā-vidyā) IS the worldly/binding reading; its liberating opposite is spiritual knowledge (parā-vidyā) — the classical parā/aparā-vidyā pairing. Earlier mithyā-jñāna flip reverted."
     }
   }
 }
