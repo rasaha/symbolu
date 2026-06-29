@@ -64,9 +64,7 @@ def _z(x: np.ndarray) -> np.ndarray:
     return (x - x.mean()) / sd if sd > 0 else x * 0.0
 
 
-def generate(n_samples: int, p: GenParams, seed: int):
-    """Return (sequences, y, meta). Deterministic under ``seed``."""
-    rng = np.random.default_rng(seed)
+def _generate_core(n_samples: int, p: GenParams, rng: np.random.Generator):
     w, B, ops, s0, u = _assets(p, rng)
     seqs, bag, order = [], [], []
     for _ in range(n_samples):
@@ -86,7 +84,23 @@ def generate(n_samples: int, p: GenParams, seed: int):
     y = p.confound * _z(bag) + p.effect * _z(order) + p.noise * _z(noise)
     meta = {"order_present": bool(p.effect != 0.0), "params": p,
             "var_bag": float(_z(bag).var()), "var_order": float(_z(order).var())}
+    assets = {"ops": ops, "s0": s0, "u": u, "w": w, "B": B,
+              "n_units": p.n_units, "op_dim": p.op_dim}
+    return seqs, y, meta, assets
+
+
+def generate(n_samples: int, p: GenParams, seed: int):
+    """Return (sequences, y, meta). Deterministic under ``seed``."""
+    seqs, y, meta, _ = _generate_core(n_samples, p, np.random.default_rng(seed))
     return seqs, y, meta
+
+
+def generate_with_assets(n_samples: int, p: GenParams, seed: int):
+    """Return (sequences, y, meta, assets) — assets expose the generative
+    operator family {M_i}, s0, u, bag weights w, bigram weights B. Used by the
+    operator-aware probe (B.0.1) to build matched product-state features, exactly
+    as the real probe would be handed a candidate operator family."""
+    return _generate_core(n_samples, p, np.random.default_rng(seed))
 
 
 # Named regime presets (effect, confound, noise) at a reference scale.

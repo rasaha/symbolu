@@ -49,11 +49,29 @@ A relabel/unit-permutation check confirms the linear probe is permutation-invari
 - **Power limit (hard case):** the full non-commutative **product** signal is detected only ≈0.05
   by the linear bigram probe — it cannot linearly represent an ordered operator product.
 
-## Forward-looking caveat (no claim, just a flag)
-The hard-case result connects to D₀′: the frozen Stage A operators are a genuine non-commutative
-**product** structure, which a **linear** order probe under-detects. Any future order/representation
-probe intended to capture such structure must be non-linear or operator-aware — a linear bigram
-baseline would under-power it. Recorded for instrument design; **no semantic implication**.
+## B.0.1 — operator-aware probe (lifts the product-signal power limit)
+B.0 found a linear bigram probe under-detects pure non-commutative **product** signal (~0.05).
+B.0.1 adds an **Option-A operator-product probe**: given a candidate operator family `{M_i}` and
+init `s0` (as the real probe would be handed the theory's operators), the per-sequence feature is
+the ordered-product state `s(seq)=M_{x_L}…M_{x_1} s0`. Files:
+- `harness_operator.py` — operator-product features, mismatched-family generator, generic
+  `detect_with(order_feature_fn)` (same shuffle-null machinery, so all probes compare fairly).
+- `test_operator_probe.py` — control tests (run: `python3 .../test_operator_probe.py`).
+- `run_b0_1.py` — operator-aware calibration sweep → `B0_1_RESULT.md` (measured).
+- `generators.generate_with_assets` — exposes the generative `{M_i}, s0` to the probe.
+
+**Measured (see `B0_1_RESULT.md`):** on the hard product signal (effect=1, noise=1), detection
+rate is **bag 0.00 · bigram 0.05 · operator-matched 1.00 (median ΔR² 0.51) · operator-mismatched
+0.15**. FPR ≤ 0.05; **MDE ≈ 0.30** (operator-matched); robust to noise (1.00 to σ=2, 0.85 at σ=4)
+and confounding (1.00 across confound 0→4, since product features are bag-orthogonal); shuffling
+order destroys detection (ΔR² 0.55 → not-detected). **Identifiability nuance:** the *mismatched*
+operator family is weak (0.15) — an operator-aware probe needs approximately-correct operators;
+operator-awareness alone is insufficient.
+
+Connection to D₀′ (no claim, just a flag): the frozen Stage A operators are genuine
+non-commutative **product** structure, so a future order/representation probe must be operator-
+aware (linear bigram under-powers it) **and** approximately operator-correct. Instrument-design
+guidance only; **no semantic implication**.
 
 ## Hard boundaries
 Synthetic calibration only · no external data · no semantic `Y` · no `F`/decoder · no A′ · no real
