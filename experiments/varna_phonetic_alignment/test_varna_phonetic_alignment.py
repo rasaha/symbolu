@@ -166,16 +166,15 @@ def test_real_inventory_scaffolds_build_only():
 
 
 def test_no_real_b0_result_emitted():
-    _check("runner: NOT_RUN with no config", RUN.run()["status"] == "NOT_RUN")
-    _check("runner: NOT_RUN computes no alignment", RUN.run()["computed_alignment"] is False)
-    _check("runner: NOT_RUN emits no verdict", RUN.run()["verdict"] is None)
-    _check("runner: partial config → NOT_RUN",
-           RUN.run({"lexicon_sha256": "x"})["status"] == "NOT_RUN")
-    # even a syntactically 'complete' config stays gated in the scaffold
-    full = {k: "x" for k in RUN.REQUIRED_FROZEN_KEYS}
-    res = RUN.run(full)
-    _check("runner: complete config still gated NOT_RUN", res["status"] == "NOT_RUN")
-    _check("runner: complete config computes no alignment", res["computed_alignment"] is False)
+    # manifest-driven runner: NOT_RUN on the default frozen manifest (T_embed deferred)
+    res = RUN.run()
+    _check("runner: NOT_RUN on default manifest", res["status"] == "NOT_RUN")
+    _check("runner: NOT_RUN computes no alignment", res["computed_alignment"] is False)
+    _check("runner: NOT_RUN emits no verdict", res["verdict"] is None)
+    # a missing manifest path also yields NOT_RUN, never a result
+    miss = RUN.run(manifest_path="/nonexistent/b0_frozen_artifacts.json")
+    _check("runner: missing manifest → NOT_RUN", miss["status"] == "NOT_RUN")
+    _check("runner: missing manifest computes no alignment", miss["computed_alignment"] is False)
 
 
 def main():

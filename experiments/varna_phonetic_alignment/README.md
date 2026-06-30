@@ -23,8 +23,10 @@ real comparison.
 | `phonetics.py` | Phonetic-feature scaffold → dissimilarity **P**. Uses PanPhon if importable; else a clearly-labelled **FROZEN MOCK** feature table (scaffolding stand-in — never sets a verdict). Hamming (primary) / cosine (sensitivity). |
 | `control.py` | Coarse **varga place/manner control matrix C** from frozen standard Sanskrit class membership (`C ∈ {0,1,2}` = #class dims that differ). |
 | `table_structure.py` | Loads curated `lexicon_wordformation.json`; builds **T** via pluggable encoders — `categorical_encoder` (REAL mechanical T_cat) and `embedding_encoder` (PLACEHOLDER for the primary T_embed; **refuses** without a frozen model). `scramble_builder` for the null. |
-| `run_b0.py` | Guarded entrypoint — emits **NOT_RUN** (no §17 frozen config); computes no alignment, emits no verdict. |
+| `manifest.py` | **Frozen-manifest loader + hash verifier + readiness gate.** Loads `frozen/b0_frozen_artifacts.json`, recomputes/checks every pinned sha256, exposes `embedding_frozen` / `primary_encoding` (always `embedding`; categorical is sensitivity-only), `check_readiness`, and a dependency-free `validate_record` for `frozen/run_manifest_schema.json`. Computes no alignment. |
+| `run_b0.py` | Guarded entrypoint — loads the frozen manifest, verifies hashes, and **gates**. Returns **NOT_RUN** when not ready (missing/mismatched hashes, or T_embed not frozen) *and* when ready (alignment is a separate approval-gated step). Never computes alignment or a verdict. |
 | `test_varna_phonetic_alignment.py` | **Synthetic** machinery tests (32 checks). |
+| `test_manifest_loader.py` | Manifest-loader tests (hash verify, tamper detection, T_embed-deferred gating, schema validation; no run). |
 
 ## Design choices (per the pre-registration)
 
@@ -50,11 +52,23 @@ real comparison.
 - **No real T-vs-P alignment, no scramble/permutation/bootstrap on the real matrices,
   no B0 verdict.** The runner returns `NOT_RUN`.
 
+## Gating (manifest loader)
+
+`run_b0.run()` loads `frozen/b0_frozen_artifacts.json`, recomputes and checks every
+pinned sha256, confirms the run schema is loadable, then asks `manifest.check_readiness`:
+a run is **ready** only if (a) all hashes verify, (b) every required artifact is pinned,
+and (c) the **T_embed** model is frozen (`status: enabled` + a `weights_sha256`). The
+committed manifest has T_embed **DEFERRED**, so the gate is *not ready* and the runner
+returns `NOT_RUN`. The categorical encoding is **sensitivity-only** and cannot substitute
+as primary. Even a (synthetically) ready manifest still returns `NOT_RUN` here — the
+alignment computation is a separate, approval-gated step, not part of this loader wiring.
+
 ## Run
 
 ```bash
 python3 experiments/varna_phonetic_alignment/test_varna_phonetic_alignment.py  # 32 synthetic checks
-python3 experiments/varna_phonetic_alignment/run_b0.py                          # prints NOT_RUN
+python3 experiments/varna_phonetic_alignment/test_manifest_loader.py           # loader/gate checks
+python3 experiments/varna_phonetic_alignment/run_b0.py                          # prints NOT_RUN (+ readiness)
 ```
 
 > structure, not validated meaning.
