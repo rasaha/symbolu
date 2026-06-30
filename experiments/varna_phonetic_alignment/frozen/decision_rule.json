@@ -1,0 +1,28 @@
+{
+  "id": "b0_decision_rule_v1",
+  "source": "PREREG_VARNA_PHONETIC_ALIGNMENT.md §12 (verbatim logic; no weakening)",
+  "primary_T": "embedding (T_embed)",
+  "sensitivity_T": "categorical (T_cat)",
+  "mandatory_control": "partial_mantel_on_C",
+  "gates": {
+    "scramble_percentile": 95,
+    "permutation_alpha": 0.05,
+    "partial_mantel_ci_lower_strictly_gt": 0.0,
+    "bootstrap_ci_level": 0.90,
+    "require_both_T_encodings": true,
+    "require_both_P_distances": true
+  },
+  "labels": {
+    "PHONETIC_ALIGNED": "raw Mantel > 95th pct of scramble null (p<0.05) AND partial-Mantel r(T,P|C) CI lower bound > 0, under BOTH T-encodings AND BOTH P-distances. The only positive; the only verdict that licenses B1/B2.",
+    "PHONETICS_ONLY": "raw Mantel beats scramble null but partial-Mantel collapses (CI includes 0): alignment is entirely the varga place/manner grid. A NEGATIVE for the table (expected default).",
+    "TABLE_NULL": "raw Mantel <= scramble median: no better than randomly relabeled tables. A clean negative.",
+    "ENCODING_DEPENDENT": "passes under one T-encoding or P-distance but not the other: non-confirmation, not a partial win.",
+    "INCONCLUSIVE": "ambiguous scramble percentile, or partial-Mantel CI spans 0 with wide bounds (low power from 34 items)."
+  },
+  "interpretation_guards": {
+    "no_raw_without_partial": "Raw Mantel is NEVER reported as a result without the partial-Mantel C-control.",
+    "phonetics_only_is_negative": "PHONETICS_ONLY and ENCODING_DEPENDENT are negatives, never relabeled as partial successes.",
+    "scope": "A verdict is about the representation's phonetic grounding ONLY — not perception, not ontology, not Symbol-U.",
+    "verdict_authority": "Verdict set solely by the primary T_embed under both encodings with the mandatory partial-Mantel; the categorical T_cat is sensitivity only."
+  }
+}
