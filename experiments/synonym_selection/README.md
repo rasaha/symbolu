@@ -13,8 +13,11 @@ made.** Stage A is untouched.
 | `g2p.py` | Offline CMUdict loader + the **frozen** ARPABET→varṇa map (copied verbatim from `varna_lens/varna_lens.py`, incl. the frozen Indian-English dialect rule). Sound-only tokenization; **no nltk**. |
 | `lexicon.py` | Loads the **curated** `varna_lens/lexicon_wordformation.json` `word_formation_reading` field (the binding/in-combination pole). **Not** the engine's `binding_state`. |
 | `selection.py` | Confirmatory **equal-weight, consonant-only** composition; cosine selection; **scrambled-table null**; **homophone-invariance leakage check**; **frequency-baseline interface**. Reuses `experiments/common` (`stats`). |
+| `reliability.py` | Krippendorff-style interval α + the two-stage gate: within-pool α below floor → **MEASUREMENT_FAILURE**, insider-vs-naïve α below floor → **CIRCULARITY_FAILURE**. |
+| `rubric.py` | **Target→vṛtti bridge (Version A)** — frozen, name-blind rubric mapping coded TRAIT ratings → vṛtti vector; **Rubric A dispositive / Rubric B sensitivity** (`RUBRIC_DEPENDENT` if A passes but B disagrees; B can never rescue an A-fail). Synthetic placeholders only. |
 | `run_synonym_selection.py` | Guarded entrypoint — emits **NOT_RUN** (no frozen, approved dataset present); computes no real fit. |
-| `test_synonym_selection.py` | **Synthetic** tests only (24 checks). |
+| `test_synonym_selection.py` | **Synthetic** machinery tests (24 checks). |
+| `test_rubric.py` | **Synthetic** rubric-bridge tests (25 checks): reliable passes, unreliable → MEASUREMENT_FAILURE, insider/naïve divergence → CIRCULARITY_FAILURE, A/B sensitivity, no real data loaded. |
 
 ## Design choices (per the pre-registration)
 
@@ -30,10 +33,18 @@ made.** Stage A is untouched.
 - **Scrambled-table null** permutes which consonant gets which reading label (label set
   unchanged); a planted signal beats it, pure noise does not (verified in tests).
 
+## Version-B modularity
+
+`rubric.py` *is* the `target → vṛtti` bridge — the pilot's weakest link (pre-reg §5/§13).
+It is isolated so a future **Version B** (pairwise human acoustic-quality judgments → target
+ordering directly) can replace it without touching `g2p`/`lexicon`/`selection`: downstream
+depends only on the bridge's **output** (per-target profiles/orderings), never on the rubric.
+
 ## Deliberately NOT done (gated on pre-reg freeze + approval)
 
 - No real synonym sets, targets, or ground truth.
-- No `target → vṛtti` rubric profiling (the Version-A bridge; see pre-reg §5/§13).
+- No real trait inventory / vṛtti vocabulary (rubric uses synthetic placeholders).
+- No real `target → vṛtti` coding or human ratings.
 - No fit, no verdict, no frequency data bundled (only the interface).
 - No exploratory arms (driver/passenger weighting, vowels, transitions).
 
