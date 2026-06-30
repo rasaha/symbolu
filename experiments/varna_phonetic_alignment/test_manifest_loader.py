@@ -33,10 +33,18 @@ def _check(name, ok):
 
 
 def _frozen_embedding(m):
-    """Return a deep copy with T_embed marked frozen (SYNTHETIC — no real model)."""
+    """Return a deep copy with T_embed marked frozen (SYNTHETIC — no real model).
+
+    Sets status/enabled and a SYNTHETIC weights sha256 (the field the readiness gate
+    reads). This is a test fixture only — no real weights exist and none are downloaded.
+    """
     m2 = copy.deepcopy(m)
-    m2["embedding_model_T_embed"].update(
-        status="enabled", enabled=True, weights_sha256="deadbeef" * 8)
+    emb = m2["embedding_model_T_embed"]
+    emb["status"] = "enabled"
+    emb["enabled"] = True
+    emb["weights_sha256"] = "ab" * 32                        # synthetic 64-hex
+    emb["file_integrity"]["weights"]["sha256"] = "ab" * 32
+    emb["file_integrity"]["weights"]["verification"] = "VERIFIED"
     return m2
 
 
@@ -91,6 +99,63 @@ def test_frozen_embedding_makes_ready_but_runner_still_not_run():
     _check("ready manifest: no verdict", res["verdict"] is None)
     _check("ready manifest: reason notes alignment not implemented",
            "not implemented" in res["reason"])
+
+
+def test_tembed_metadata_pinned():
+    emb = MF.load_manifest()["embedding_model_T_embed"]
+    _check("T_embed: model_id pinned",
+           emb["model_id"] == "sentence-transformers/all-MiniLM-L6-v2")
+    _check("T_embed: source pinned", emb["source"] == "huggingface.co")
+    _check("T_embed: expected_dim pinned", emb["expected_dim"] == 384)
+    _check("T_embed: status PINNED_UNVERIFIED", emb["status"] == "PINNED_UNVERIFIED")
+    _check("T_embed: file_integrity slots for weights/tokenizer/config",
+           all(k in emb["file_integrity"] for k in ("weights", "tokenizer", "config")))
+    _check("T_embed: weights sha256 not fabricated (gate field null)",
+           emb["weights_sha256"] is None)
+    _check("T_embed: weights provenance UNVERIFIED + null",
+           emb["file_integrity"]["weights"]["sha256"] is None
+           and emb["file_integrity"]["weights"]["verification"] == "UNVERIFIED")
+    _check("T_embed: firewall blocker recorded", "verification_blocker" in emb)
+
+
+def test_pinned_unverified_is_not_frozen():
+    m = MF.load_manifest()
+    _check("pinned-but-unverified is NOT frozen (weights_sha256 null)",
+           MF.embedding_frozen(m) is False)
+    # status flipped to enabled but still no weights hash => still not frozen
+    m2 = copy.deepcopy(m)
+    m2["embedding_model_T_embed"]["status"] = "enabled"
+    m2["embedding_model_T_embed"]["enabled"] = True
+    _check("enabled without weights hash → still not frozen", MF.embedding_frozen(m2) is False)
+    # only a real (here synthetic) weights hash flips it
+    _check("enabled + weights hash → frozen", MF.embedding_frozen(_frozen_embedding(m)) is True)
+
+
+def test_readiness_flips_only_because_of_tembed():
+    """Readiness must change iff the T_embed freeze changes — nothing else moved."""
+    m = MF.load_manifest()
+    rd0 = MF.check_readiness(m)
+    _check("baseline: NOT ready", rd0["ready"] is False)
+    _check("baseline: hashes already OK (not the blocker)", rd0["hashes"]["ok"] is True)
+    _check("baseline: the ONLY blocking reason is T_embed",
+           len(rd0["reasons"]) == 1 and "T_embed" in rd0["reasons"][0])
+
+    # flip ONLY the T_embed fields; touch nothing else
+    m2 = _frozen_embedding(m)
+    rd1 = MF.check_readiness(m2)
+    _check("flip: now ready", rd1["ready"] is True)
+    _check("flip: no remaining reasons", rd1["reasons"] == [])
+    # everything else is provably unchanged
+    _check("flip: hash verification identical", rd1["hashes"] == rd0["hashes"])
+    _check("flip: feature_source identical", rd1["feature_source"] == rd0["feature_source"])
+    _check("flip: primary encoding still embedding (T_cat not promoted)",
+           rd1["primary_encoding"] == "embedding" == rd0["primary_encoding"])
+
+    # converse: changing a NON-T_embed field cannot make it ready while T_embed deferred
+    m3 = copy.deepcopy(m)
+    m3["feature_library"]["primary_source"] = "something_else"
+    _check("converse: non-T_embed change stays NOT ready",
+           MF.check_readiness(m3)["ready"] is False)
 
 
 def test_runner_default_path_not_run():

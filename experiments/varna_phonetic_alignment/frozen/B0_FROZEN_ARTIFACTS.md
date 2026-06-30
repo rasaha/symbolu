@@ -53,15 +53,41 @@ verdict logic and does **not** weaken any caveat. **PanPhon remains reserved for
 §16 independent-replication re-freeze** (IPA tables vs PanPhon), exactly as the
 pre-registration anticipates.
 
-## 4. Embedding model (T_embed) — DEFERRED, not enabled
-Pre-reg §12 makes **T_embed the PRIMARY, verdict-setting encoding**. It is **not enabled
-in this freeze**: the recommended model (`sentence-transformers/all-MiniLM-L6-v2`,
-dim 384) is **not installable/verifiable in the current sandbox**, so its weights cannot
-be sha-pinned.
+## 4. Embedding model (T_embed) — METADATA PINNED, weights UNVERIFIED (`PINNED_UNVERIFIED`)
+Pre-reg §12 makes **T_embed the PRIMARY, verdict-setting encoding**. The model is now
+**selected and its metadata pinned** in `b0_frozen_artifacts.json`:
 
-**Consequence (stated plainly):** because the primary encoding is unfrozen, **B0 cannot
-run to a verdict yet.** A follow-up freeze must pin the embedding model's weight sha256
-and library version before any run. Until then the runner correctly returns `NOT_RUN`.
+| field | value |
+|---|---|
+| `model_id` | `sentence-transformers/all-MiniLM-L6-v2` |
+| `source` | `huggingface.co` |
+| `expected_dim` | 384 |
+| `model_config` | mean pooling, normalize-embeddings, max_seq_length 256 |
+| `library_recommended_pins` | sentence-transformers / transformers / torch / tokenizers (lock at verified freeze) |
+| `weights_sha256` (gate field) | **null** |
+| `file_integrity.weights` | `model.safetensors` — sha256 **null**, `UNVERIFIED` |
+| `file_integrity.tokenizer` / `config` | sha256 **null**, `UNVERIFIED` |
+| `revision` | **null** (pin the immutable HF commit at first download) |
+
+**Why the hashes are null (stated plainly, no fabrication).** `huggingface.co` is
+**blocked by this environment's network policy** (`CONNECT 403`; only PyPI is
+allowlisted). The weights/tokenizer/config sha256 and the immutable revision **cannot be
+computed or resolved here**, and **no hash is fabricated** to make the gate pass. The
+entry is therefore `PINNED_UNVERIFIED` with `weights_sha256: null`.
+
+**Gate behaviour.** `manifest.embedding_frozen()` requires `status: enabled` **and** a
+non-empty `weights_sha256`. With the gate field `null`, this `PINNED_UNVERIFIED` entry
+keeps the readiness gate **NOT ready** and the runner at `NOT_RUN`. (`file_integrity`
+records per-file provenance for the verified freeze; the `weights` entry mirrors the gate
+field.)
+
+**To finish the freeze (in an HF-enabled environment):** download the pinned model,
+compute the sha256 of `model.safetensors` / `tokenizer.json` / `config.json`, record them
+(set `file_integrity.*.verification: VERIFIED`), copy the weights hash into the gate field
+`weights_sha256`, set the immutable `revision`, lock the library versions, and set
+`status: enabled`. Readiness then flips **solely** because T_embed is frozen (tested in
+`test_manifest_loader.py::test_readiness_flips_only_because_of_tembed`).
+
 The categorical encoding (`T_cat`) remains the sensitivity arm only — it can **not**
 stand in as primary (that would change §12), so it does not unblock a verdict.
 
@@ -74,9 +100,12 @@ requires **both** of each), seeds, Ns (scramble ≥1000, permutation ≥10⁴, b
 the schema only — no run has been performed and no values are present.**
 
 ## What is still required before B0 can run (gated on approval)
-1. Freeze the **T_embed** model (weights sha256 + library version) — the primary encoding.
-2. Wire the runner to load this manifest and enforce the schema (a **code** change, out
-   of scope for this artifacts-only freeze).
+1. **Verify** the **T_embed** model in an HF-enabled environment (compute + pin the
+   weights/tokenizer/config sha256 with `verification: VERIFIED`, pin the revision, lock
+   library versions, set `status: enabled`). Metadata is pinned; verification is blocked
+   here by the network policy. *(The manifest loader + readiness gate are already wired.)*
+2. Implement the alignment computation behind the now-ready gate (a **code** change; the
+   runner returns `NOT_RUN` even when the gate reports ready).
 3. Explicit approval to execute (the runner stays `NOT_RUN` until then).
 
 > structure, not validated meaning.

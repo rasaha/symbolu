@@ -51,13 +51,53 @@
     "deviation_note": "Pre-reg §5 names PanPhon as the primary feature library; it is uninstallable here, so the explicitly-permitted 'approved frozen feature table' option is used as primary. This records a source choice; it does NOT alter §12 verdict logic and does NOT weaken any caveat. PanPhon remains the independent replication library (§16)."
   },
   "embedding_model_T_embed": {
-    "status": "DEFERRED",
+    "role": "PRIMARY verdict-setting encoding (pre-reg §12); embeds each varṇa's word_formation_reading string -> cosine dissimilarity T_embed.",
+    "status": "PINNED_UNVERIFIED",
     "enabled": false,
-    "recommended_model_id": "sentence-transformers/all-MiniLM-L6-v2",
-    "recommended_library": "sentence-transformers",
-    "expected_dim": 384,
     "weights_sha256": null,
-    "blocking_note": "Pre-reg §12 makes T_embed the PRIMARY, verdict-setting encoding. It is NOT enabled in this freeze (model not installable/verifiable in the current sandbox). Therefore B0 CANNOT run to a verdict until a follow-up freeze pins the model weights sha256 + library version. Until then the runner stays NOT_RUN. This deferral does not change the design or weaken any caveat."
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "source": "huggingface.co",
+    "revision": null,
+    "revision_note": "Pin the immutable HF commit at first download. Not resolvable here: huggingface.co is blocked by this environment's network policy.",
+    "expected_dim": 384,
+    "model_config": {
+      "pooling": "mean",
+      "normalize_embeddings": true,
+      "max_seq_length": 256,
+      "config_note": "Standard all-MiniLM-L6-v2 card values; confirm against the model's config files at the verified freeze."
+    },
+    "library_recommended_pins": {
+      "note": "RECOMMENDED target pins; LOCK to exact installed versions at the verified freeze (embedding output can vary across versions).",
+      "sentence-transformers": ">=2.2,<4",
+      "transformers": ">=4.30,<5",
+      "torch": ">=2.0,<3",
+      "tokenizers": ">=0.13,<1"
+    },
+    "file_integrity": {
+      "weights": {
+        "file": "model.safetensors",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      },
+      "tokenizer": {
+        "file": "tokenizer.json",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      },
+      "config": {
+        "file": "config.json",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      },
+      "sentence_bert_config": {
+        "file": "sentence_bert_config.json",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      }
+    },
+    "verification_blocker": "huggingface.co is blocked by this environment's network policy (CONNECT 403; only PyPI is allowlisted). The weights/tokenizer/config sha256 and the immutable revision cannot be computed or resolved here. No hash is fabricated. Compute and pin them at first download in an HF-enabled environment, set each verification -> VERIFIED, weights_sha256 -> the real hash, status -> enabled.",
+    "selection_rationale": "Small (~23M params, 384-dim), deterministic on CPU, widely used, runs fully offline once downloaded. A concrete reproducible pin for the §12 primary; any swap requires a fresh freeze.",
+    "blocking_note": "Pre-reg §12 makes T_embed the PRIMARY, verdict-setting encoding. manifest.embedding_frozen() requires status=enabled AND a non-empty weights_sha256, so this PINNED_UNVERIFIED entry (weights_sha256=null) keeps the readiness gate NOT ready and the runner NOT_RUN. Categorical T_cat remains sensitivity-only and cannot substitute as primary."
   },
   "run_parameters_frozen": {
     "scramble_n": 1000,
