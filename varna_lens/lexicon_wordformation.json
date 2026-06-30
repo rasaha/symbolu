@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "title": "Varṇa word-formation lexicon — binding (in-combination) reading, consonants only",
+    "title": "Varṇa word-formation lexicon — binding (in-combination) reading (consonants + vowels)",
     "governing_axis": "The reading axis is BIND vs LIBERATE, which is ORTHOGONAL to good vs bad. Binding = contractive / holding / attachment-forming (fixes or limits consciousness). Liberating = expansive / unbinding / releasing. This is a state of expression, NOT a moral judgement: dharma is BINDING (it holds you to your stance, dhṛ = to hold) even though it is 'good'; adharma is LIBERATING (it breaks the stance, unbinds) even though it is 'bad'; hope (āśā) is binding (forward-grasping), cruelty is binding (contractive), mokṣa is liberating (releasing).",
     "word_formation_rule": "A varṇa is sattvic / unbound in ISOLATION and BINDS when it enters COMBINATION (a word), because manifestation is contraction into form. Therefore `word_formation_reading` = the BINDING (in-combination, contractive) pole of every varṇa, and is the field to use when reading a word. The liberating pole is the at-rest / isolated / completed state (recoverable: it is the `counter_pole` for the 28 affliction-rooted consonants and for kṣa, and the `worldly_vritti` / Sarkar root for ca, ra, sa, ha; for va it is `counter_pole` = Adharma).",
     "purpose": "Primary field `word_formation_reading` gives the binding/in-combination expression used in word formation. `worldly_vritti` (Sarkar's source root) and `counter_pole` are retained for provenance.",
@@ -15,11 +15,12 @@
       "The other 28 consonants (and kṣa): word_formation_reading = worldly_vritti (already the worldly/binding root)."
     ],
     "_status": "FAITHFUL DOCTRINAL TRANSCRIPTION + a stated binding-in-combination reading convention. NOT empirically validated: the pre-registered blind signal tests on this lexicon returned NO_SIGNAL (real ≈ scrambled). For word-formation reading / contemplative authoring, not a validated sound→meaning decoder.",
-    "scope": "consonants (33 + kṣa); vowels intentionally omitted (handled as an exploratory arm elsewhere).",
+    "scope": "consonants (33 + kṣa): SOURCE-GROUNDED (P.R. Sarkar, verified). vowels (12): CANDIDATE / INTUITION-DERIVED — vowels are NOT vṛtti roots in the source (they are roots of musical notes, creation/preservation/destruction, and cosmological/vocalization functions); their vṛtti-style glosses are interpretive. Both sections use the binding-in-combination reading; the vowel section remains EXPLORATORY (see PREREG_OBJECT_PROFILE_FIT.md §16).",
     "polarity_values": "polarity describes SARKAR'S ROOT on a sustaining/binding/mundane sense and is retained for provenance only; word_formation_reading is ALWAYS the binding pole regardless of polarity.",
     "fields": "iast, deva, varga, worldly_vritti (Sarkar root), polarity (Sarkar-root descriptor), element (where stated), word_formation_reading (binding/in-combination — USE THIS), counter_pole{sanskrit,english,type,derived}, source_quote",
     "reading_order": "RULES ARE APPLIED BEFORE MEANING. 1) romanization identifies the varṇa (IAST canonical; popular_roman is the English spelling); 2) the bind/liberate axis (non-moral) selects the pole; 3) word_formation_reading (the binding pole) gives the meaning. Spelling never changes which varṇa or which meaning.",
-    "_romanization_rule": "IAST (`iast`) is CANONICAL for interop (Monier-Williams, g2p) and is kept unchanged. `popular_roman` is the English-facing display per the user's convention: palatal च='cha', छ='chha'; retroflex aspirates ठ='thha', ढ='dhha'; retroflex sibilant ष='shha'; unaspirated retroflex stops ट='tta', ड='dda'. popular_roman is spelling only — it never changes the varṇa identity or its meaning."
+    "_romanization_rule": "IAST (`iast`) is CANONICAL for interop (Monier-Williams, g2p) and is kept unchanged. `popular_roman` is the English-facing display per the user's convention: palatal च='cha', छ='chha'; retroflex aspirates ठ='thha', ढ='dhha'; retroflex sibilant ष='shha'; unaspirated retroflex stops ट='tta', ड='dda'. popular_roman is spelling only — it never changes the varṇa identity or its meaning.",
+    "_vowel_provenance": "Vowel word_formation_reading = the binding/distortion pole of the vowel's active essence; the active essence (birth, expansion, completion, …) is the liberating/at-rest pole. These glosses are intuition-derived, not source-grounded like the consonants, and must not be treated as evidence."
   },
   "consonants": {
     "ka": {
@@ -815,6 +816,188 @@
       },
       "source_quote": "Kṣa is the acoustic root of mundane knowledge, and is also the acoustic root of material science.",
       "_note": "Mundane knowledge (aparā-vidyā) IS the worldly/binding reading; its liberating opposite is spiritual knowledge (parā-vidyā) — the classical parā/aparā-vidyā pairing. Earlier mithyā-jñāna flip reverted."
+    }
+  },
+  "vowels": {
+    "a": {
+      "iast": "a",
+      "popular_roman": "a",
+      "deva": "अ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "restless starting without sustaining",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "birth of cognition / raw potential (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "aa": {
+      "iast": "ā",
+      "popular_roman": "aa",
+      "deva": "आ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "overextension / inflation",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "ongoing thought / expansion (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "i": {
+      "iast": "i",
+      "popular_roman": "i",
+      "deva": "इ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "self-absorption / ego-centric doing",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "I-ness / doing-self (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "ii": {
+      "iast": "ī",
+      "popular_roman": "ii",
+      "deva": "ई",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "over-specialization / isolation",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "specialization of self (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "u": {
+      "iast": "u",
+      "popular_roman": "u",
+      "deva": "उ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "tunnel vision / missing the whole",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "zoom / focused contraction (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "uu": {
+      "iast": "ū",
+      "popular_roman": "uu",
+      "deva": "ऊ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "fixation / obsessive holding",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "sustained attention / holding (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "e": {
+      "iast": "e",
+      "popular_roman": "e",
+      "deva": "ए",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "overthinking / nitpicking",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "practical thought / benefit (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "ai": {
+      "iast": "ai",
+      "popular_roman": "ai",
+      "deva": "ऐ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "paternalism / overcontrol",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "welfare / materialization (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "o": {
+      "iast": "o",
+      "popular_roman": "o",
+      "deva": "ओ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "premature closure / stagnation",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "completion / closure (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "au": {
+      "iast": "au",
+      "popular_roman": "au",
+      "deva": "औ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "abandonment / cutting off prematurely",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "surrender / letting-go (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "am": {
+      "iast": "aṁ",
+      "popular_roman": "am",
+      "deva": "अं",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "purging without integration / loss of vital essence",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "repulsion / detox (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "ah": {
+      "iast": "aḥ",
+      "popular_roman": "ah",
+      "deva": "अः",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "compulsion / clinging pull",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "attraction / nectar-pull (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
     }
   }
 }
