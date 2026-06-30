@@ -156,7 +156,15 @@ It tests one narrow thing: whether an equal-weight, consonant-only, g2p acoustic
 
 **The weakest link is the target → vṛtti profiling bridge (§5).** Mapping a target sense into the vṛtti space is an irreducibly subjective step; the insider-vs-naïve gate *measures* that subjectivity but cannot remove it. This document is therefore **Version A**.
 
-**Version B (preferred; expected long-term protocol).** Remove the `target → vṛtti` bridge entirely. Instead, collect **pairwise human judgments of acoustic/felt qualities** directly among synonyms (e.g. "which of these two sounds harder / brighter / heavier?"), and compare that human acoustic ordering to the **table-derived** ordering, against a scrambled control. This tests the table against *perceived sound qualities* — the one channel that demonstrably exists (cf. the 0.83 bīja inter-judge agreement) — without ever asking anyone to assign a sense to a vṛtti. It is cleaner and less subjective, and avoids this design's main vulnerability. If/when Version B is run, Version A becomes a historical stepping stone rather than the final form.
+**Version B (preferred; expected long-term protocol).** Remove the `target → vṛtti` bridge entirely. Instead, collect **pairwise human judgments of acoustic/felt qualities** directly among synonyms (e.g. "which of these two sounds harder / brighter / heavier?"), and compare that human acoustic ordering to the **table-derived** ordering, against a scrambled control. This tests the table against *perceived sound qualities* — the one channel that demonstrably exists (cf. the 0.83 bīja inter-judge agreement) — without ever asking anyone to assign a sense to a vṛtti. It is cleaner and less subjective, and avoids this design's main vulnerability. If/when Version B is run, Version A becomes a historical stepping stone rather than the final form. Version B is now drafted as a full protocol: `PREREG_SYNONYM_SELECTION_VERSION_B.md`.
+
+## 13a. Sequencing (Version B is the preferred clean gate; Version A is conditional/deferred)
+
+- **Version B is the preferred clean gate.** It removes the subjective bridge (humans judge only acoustic qualities, never meanings).
+- **Version A is conditional/deferred**, because its `target → vṛtti` bridge is irreducibly subjective (the reliability gate measures but cannot eliminate it).
+- **If both are run, the order is B first, then A** — never A then B.
+- **Version A should run only if Version B returns `PERCEPTION_ALIGNED`** (a reason to expect word-level signal) **and** a **less-subjective word-level bridge** becomes available (a behavioural/distributional target that does not require humans to assign vṛttis). Absent both, Version A does not run.
+- Caveat (no advocacy): Version B tests a *narrower* question (per-varṇa perceptual iconicity), so a B-null does **not** refute Version A's compositional claim, and a B-positive does **not** establish it; the two are different experiments, not a strict replacement.
 
 ---
 
