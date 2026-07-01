@@ -1,0 +1,370 @@
+{
+  "schema_version": "1.0",
+  "meanings": [
+    {
+      "word_id": "w000",
+      "canonical_meaning": "time",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w001",
+      "canonical_meaning": "greed",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w002",
+      "canonical_meaning": "delusion",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w003",
+      "canonical_meaning": "desire",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w004",
+      "canonical_meaning": "anger",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w005",
+      "canonical_meaning": "fear",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w006",
+      "canonical_meaning": "love",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w007",
+      "canonical_meaning": "water",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w008",
+      "canonical_meaning": "fire",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w009",
+      "canonical_meaning": "wind",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w010",
+      "canonical_meaning": "mind",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w011",
+      "canonical_meaning": "body",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w012",
+      "canonical_meaning": "soul",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w013",
+      "canonical_meaning": "death",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w014",
+      "canonical_meaning": "truth",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w015",
+      "canonical_meaning": "righteousness",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w016",
+      "canonical_meaning": "action",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w017",
+      "canonical_meaning": "illusion",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w018",
+      "canonical_meaning": "peace",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w019",
+      "canonical_meaning": "bliss",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w020",
+      "canonical_meaning": "suffering",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w021",
+      "canonical_meaning": "happiness",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w022",
+      "canonical_meaning": "knowledge",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w023",
+      "canonical_meaning": "devotion",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w024",
+      "canonical_meaning": "union",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w025",
+      "canonical_meaning": "teacher",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w026",
+      "canonical_meaning": "king",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w027",
+      "canonical_meaning": "god",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w028",
+      "canonical_meaning": "demon",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w029",
+      "canonical_meaning": "man",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w030",
+      "canonical_meaning": "woman",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w031",
+      "canonical_meaning": "son",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w032",
+      "canonical_meaning": "mother",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w033",
+      "canonical_meaning": "father",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w034",
+      "canonical_meaning": "house",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w035",
+      "canonical_meaning": "forest",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w036",
+      "canonical_meaning": "mountain",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w037",
+      "canonical_meaning": "river",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w038",
+      "canonical_meaning": "sun",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w039",
+      "canonical_meaning": "moon",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w040",
+      "canonical_meaning": "star",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w041",
+      "canonical_meaning": "flower",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w042",
+      "canonical_meaning": "tree",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w043",
+      "canonical_meaning": "fruit",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w044",
+      "canonical_meaning": "food",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w045",
+      "canonical_meaning": "hunger",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w046",
+      "canonical_meaning": "sleep",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w047",
+      "canonical_meaning": "dream",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w048",
+      "canonical_meaning": "eye",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w049",
+      "canonical_meaning": "hand",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w050",
+      "canonical_meaning": "foot",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w051",
+      "canonical_meaning": "face",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w052",
+      "canonical_meaning": "heart",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w053",
+      "canonical_meaning": "blood",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w054",
+      "canonical_meaning": "form",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w055",
+      "canonical_meaning": "essence",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w056",
+      "canonical_meaning": "strength",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w057",
+      "canonical_meaning": "knowledge",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w058",
+      "canonical_meaning": "ignorance",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w059",
+      "canonical_meaning": "enemy",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w060",
+      "canonical_meaning": "friend",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w061",
+      "canonical_meaning": "world",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w062",
+      "canonical_meaning": "heaven",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w063",
+      "canonical_meaning": "hell",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w064",
+      "canonical_meaning": "sin",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w065",
+      "canonical_meaning": "merit",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w066",
+      "canonical_meaning": "charity",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w067",
+      "canonical_meaning": "violence",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w068",
+      "canonical_meaning": "nonviolence",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w069",
+      "canonical_meaning": "forgiveness",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w070",
+      "canonical_meaning": "pride",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w071",
+      "canonical_meaning": "power",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w072",
+      "canonical_meaning": "hero",
+      "realization_specific_reference": {}
+    }
+  ]
+}
