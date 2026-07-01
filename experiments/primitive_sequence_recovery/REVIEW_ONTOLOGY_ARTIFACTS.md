@@ -91,4 +91,47 @@ Do **not** ship the initial-consonant family into a READY manifest.
 
 No artifact was modified by this review; this report is the only deliverable.
 
+---
+
+## Addendum — blocking fixes APPLIED (post-review)
+
+The blocking fixes recommended above have now been applied to `frozen/word_list.json`
+and `frozen/meaning_reference.json` (mechanical edits only — **no** realizations,
+distractors, or manifest; readiness remains **NOT_READY**; no embeddings/scores/run;
+Stage A untouched). The word-item schema is `additionalProperties:false`, so exclusion
+reasons cannot be stored inline and are recorded here instead.
+
+**1. Collision exclusions (`exclude_flag=true`, included member kept active):**
+
+| excluded | kept active | shared sequence | reason |
+|---|---|---|---|
+| avidyā (w058) | vidyā (w057) | `va,da,ya` | a-privative dropped by consonant-only decomposition → identical to base term; keep the basic (underived) member |
+| ahimsā (w068) | himsā (w067) | `ha,ma,sa` | a-privative dropped → identical to base term; keep the basic member |
+| nārī (w030) | nara (w029) | `na,ra` | gender marked only by dropped vowel length → identical skeleton; keep the basic member |
+
+**2. Gloss disambiguation.** The only exact-duplicate canonical meaning was `"knowledge"`
+(jñāna & vidyā). Sharpened **jñāna (w022) → "cognition"**; vidyā keeps `"knowledge"`.
+No other exact-duplicate gloss exists among active words (mechanically verified).
+
+**3. `family_id` replaced.** Initial-consonant heuristic removed entirely. Scheme now:
+etymological-root merges for the three review-named cognate pairs — `fam_vid`
+(vidyā/avidyā, √vid), `fam_hims` (himsā/ahimsā, √hiṃs), `fam_nr` (nara/nārī, nṛ) — and a
+conservative **unique family per word** (`fam_<word_id>`) for every other entry. No
+family equals a bare varṇa (checked).
+
+**4. Top-up to N≥100.** Added the 37 collision-checked candidates from §4 (w073–w109),
+each with consonant-only decomposition, a concrete distinct gloss, and a unique family.
+`go→[ga]` is a valid length-1 sequence (schema `minItems:1`).
+
+**Mechanical check results (no scoring/embeddings):**
+
+| check | result |
+|---|---|
+| schema validation (word_list, meaning_reference) | **PASS** both |
+| varṇa decomposition coverage | all tokens are defined varṇas; 29/34 varṇas used (unused: cha, ddha, jha, nga, tta — rare consonants, informational) |
+| canonical-sequence collisions among active words | **none** |
+| meaning coverage / id parity | 110/110 words ↔ meanings; no exact-duplicate active gloss |
+| N | total 110, excluded 3, **active 107 (≥100 ✓)**; 107 active families |
+| readiness | **NOT_READY** (no manifest/realizations/distractors) |
+
 > structure, not validated meaning.

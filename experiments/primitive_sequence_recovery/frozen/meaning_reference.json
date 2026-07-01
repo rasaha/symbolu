@@ -113,7 +113,7 @@
     },
     {
       "word_id": "w022",
-      "canonical_meaning": "knowledge",
+      "canonical_meaning": "cognition",
       "realization_specific_reference": {}
     },
     {
@@ -364,6 +364,191 @@
     {
       "word_id": "w072",
       "canonical_meaning": "hero",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w073",
+      "canonical_meaning": "horse",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w074",
+      "canonical_meaning": "elephant",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w075",
+      "canonical_meaning": "lion",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w076",
+      "canonical_meaning": "snake",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w077",
+      "canonical_meaning": "bird",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w078",
+      "canonical_meaning": "deer",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w079",
+      "canonical_meaning": "cow",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w080",
+      "canonical_meaning": "cloud",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w081",
+      "canonical_meaning": "lightning",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w082",
+      "canonical_meaning": "ocean",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w083",
+      "canonical_meaning": "island",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w084",
+      "canonical_meaning": "jewel",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w085",
+      "canonical_meaning": "gold",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w086",
+      "canonical_meaning": "silver",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w087",
+      "canonical_meaning": "wood",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w088",
+      "canonical_meaning": "grass",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w089",
+      "canonical_meaning": "root",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w090",
+      "canonical_meaning": "seed",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w091",
+      "canonical_meaning": "field",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w092",
+      "canonical_meaning": "village",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w093",
+      "canonical_meaning": "city",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w094",
+      "canonical_meaning": "road",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w095",
+      "canonical_meaning": "door",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w096",
+      "canonical_meaning": "bridge",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w097",
+      "canonical_meaning": "wheel",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w098",
+      "canonical_meaning": "bow",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w099",
+      "canonical_meaning": "arrow",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w100",
+      "canonical_meaning": "sword",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w101",
+      "canonical_meaning": "chariot",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w102",
+      "canonical_meaning": "cloth",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w103",
+      "canonical_meaning": "milk",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w104",
+      "canonical_meaning": "honey",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w105",
+      "canonical_meaning": "oil",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w106",
+      "canonical_meaning": "salt",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w107",
+      "canonical_meaning": "sacrifice",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w108",
+      "canonical_meaning": "austerity",
+      "realization_specific_reference": {}
+    },
+    {
+      "word_id": "w109",
+      "canonical_meaning": "ear",
       "realization_specific_reference": {}
     }
   ]

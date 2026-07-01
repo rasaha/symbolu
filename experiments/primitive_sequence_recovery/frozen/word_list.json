@@ -8,7 +8,7 @@
         "ka",
         "la"
       ],
-      "family_id": "fam_ka",
+      "family_id": "fam_w000",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -19,7 +19,7 @@
         "la",
         "bha"
       ],
-      "family_id": "fam_la",
+      "family_id": "fam_w001",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -30,7 +30,7 @@
         "ma",
         "ha"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w002",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -41,7 +41,7 @@
         "ka",
         "ma"
       ],
-      "family_id": "fam_ka",
+      "family_id": "fam_w003",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -53,7 +53,7 @@
         "ra",
         "dha"
       ],
-      "family_id": "fam_ka",
+      "family_id": "fam_w004",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -64,7 +64,7 @@
         "bha",
         "ya"
       ],
-      "family_id": "fam_bha",
+      "family_id": "fam_w005",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -76,7 +76,7 @@
         "ra",
         "ma"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w006",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -87,7 +87,7 @@
         "ja",
         "la"
       ],
-      "family_id": "fam_ja",
+      "family_id": "fam_w007",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -98,7 +98,7 @@
         "ga",
         "na"
       ],
-      "family_id": "fam_ga",
+      "family_id": "fam_w008",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -109,7 +109,7 @@
         "va",
         "ya"
       ],
-      "family_id": "fam_va",
+      "family_id": "fam_w009",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -121,7 +121,7 @@
         "na",
         "sa"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w010",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -132,7 +132,7 @@
         "da",
         "ha"
       ],
-      "family_id": "fam_da",
+      "family_id": "fam_w011",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -143,7 +143,7 @@
         "ja",
         "va"
       ],
-      "family_id": "fam_ja",
+      "family_id": "fam_w012",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -155,7 +155,7 @@
         "ta",
         "ya"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w013",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -167,7 +167,7 @@
         "ta",
         "ya"
       ],
-      "family_id": "fam_sa",
+      "family_id": "fam_w014",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -179,7 +179,7 @@
         "ra",
         "ma"
       ],
-      "family_id": "fam_dha",
+      "family_id": "fam_w015",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -191,7 +191,7 @@
         "ra",
         "ma"
       ],
-      "family_id": "fam_ka",
+      "family_id": "fam_w016",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -202,7 +202,7 @@
         "ma",
         "ya"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w017",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -214,7 +214,7 @@
         "na",
         "ta"
       ],
-      "family_id": "fam_sha",
+      "family_id": "fam_w018",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -226,7 +226,7 @@
         "na",
         "da"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_w019",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -237,7 +237,7 @@
         "da",
         "kha"
       ],
-      "family_id": "fam_da",
+      "family_id": "fam_w020",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -248,7 +248,7 @@
         "sa",
         "kha"
       ],
-      "family_id": "fam_sa",
+      "family_id": "fam_w021",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -260,7 +260,7 @@
         "nya",
         "na"
       ],
-      "family_id": "fam_ja",
+      "family_id": "fam_w022",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -272,7 +272,7 @@
         "ka",
         "ta"
       ],
-      "family_id": "fam_bha",
+      "family_id": "fam_w023",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -283,7 +283,7 @@
         "ya",
         "ga"
       ],
-      "family_id": "fam_ya",
+      "family_id": "fam_w024",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -294,7 +294,7 @@
         "ga",
         "ra"
       ],
-      "family_id": "fam_ga",
+      "family_id": "fam_w025",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -305,7 +305,7 @@
         "ra",
         "ja"
       ],
-      "family_id": "fam_ra",
+      "family_id": "fam_w026",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -316,7 +316,7 @@
         "da",
         "va"
       ],
-      "family_id": "fam_da",
+      "family_id": "fam_w027",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -327,7 +327,7 @@
         "sa",
         "ra"
       ],
-      "family_id": "fam_sa",
+      "family_id": "fam_w028",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -338,7 +338,7 @@
         "na",
         "ra"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_nr",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -349,9 +349,9 @@
         "na",
         "ra"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_nr",
       "sense_id": "0",
-      "exclude_flag": false
+      "exclude_flag": true
     },
     {
       "word_id": "w031",
@@ -361,7 +361,7 @@
         "ta",
         "ra"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w031",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -372,7 +372,7 @@
         "ma",
         "ta"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w032",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -383,7 +383,7 @@
         "pa",
         "ta"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w033",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -394,7 +394,7 @@
         "ga",
         "ha"
       ],
-      "family_id": "fam_ga",
+      "family_id": "fam_w034",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -405,7 +405,7 @@
         "va",
         "na"
       ],
-      "family_id": "fam_va",
+      "family_id": "fam_w035",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -418,7 +418,7 @@
         "va",
         "ta"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w036",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -429,7 +429,7 @@
         "na",
         "da"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_w037",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -441,7 +441,7 @@
         "ra",
         "ya"
       ],
-      "family_id": "fam_sa",
+      "family_id": "fam_w038",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -454,7 +454,7 @@
         "da",
         "ra"
       ],
-      "family_id": "fam_ca",
+      "family_id": "fam_w039",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -465,7 +465,7 @@
         "ta",
         "ra"
       ],
-      "family_id": "fam_ta",
+      "family_id": "fam_w040",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -477,7 +477,7 @@
         "ssa",
         "pa"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w041",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -488,7 +488,7 @@
         "va",
         "ksha"
       ],
-      "family_id": "fam_va",
+      "family_id": "fam_w042",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -499,7 +499,7 @@
         "pha",
         "la"
       ],
-      "family_id": "fam_pha",
+      "family_id": "fam_w043",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -510,7 +510,7 @@
         "na",
         "na"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_w044",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -521,7 +521,7 @@
         "ksha",
         "dha"
       ],
-      "family_id": "fam_ksha",
+      "family_id": "fam_w045",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -533,7 +533,7 @@
         "da",
         "ra"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_w046",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -546,7 +546,7 @@
         "pa",
         "na"
       ],
-      "family_id": "fam_sa",
+      "family_id": "fam_w047",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -558,7 +558,7 @@
         "ta",
         "ra"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_w048",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -570,7 +570,7 @@
         "sa",
         "ta"
       ],
-      "family_id": "fam_ha",
+      "family_id": "fam_w049",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -581,7 +581,7 @@
         "pa",
         "da"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w050",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -592,7 +592,7 @@
         "ma",
         "kha"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w051",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -604,7 +604,7 @@
         "da",
         "ya"
       ],
-      "family_id": "fam_ha",
+      "family_id": "fam_w052",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -616,7 +616,7 @@
         "ka",
         "ta"
       ],
-      "family_id": "fam_ra",
+      "family_id": "fam_w053",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -627,7 +627,7 @@
         "ra",
         "pa"
       ],
-      "family_id": "fam_ra",
+      "family_id": "fam_w054",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -638,7 +638,7 @@
         "ra",
         "sa"
       ],
-      "family_id": "fam_ra",
+      "family_id": "fam_w055",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -649,7 +649,7 @@
         "ba",
         "la"
       ],
-      "family_id": "fam_ba",
+      "family_id": "fam_w056",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -661,7 +661,7 @@
         "da",
         "ya"
       ],
-      "family_id": "fam_va",
+      "family_id": "fam_vid",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -673,9 +673,9 @@
         "da",
         "ya"
       ],
-      "family_id": "fam_va",
+      "family_id": "fam_vid",
       "sense_id": "0",
-      "exclude_flag": false
+      "exclude_flag": true
     },
     {
       "word_id": "w059",
@@ -685,7 +685,7 @@
         "ta",
         "ra"
       ],
-      "family_id": "fam_sha",
+      "family_id": "fam_w059",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -697,7 +697,7 @@
         "ta",
         "ra"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w060",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -708,7 +708,7 @@
         "la",
         "ka"
       ],
-      "family_id": "fam_la",
+      "family_id": "fam_w061",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -721,7 +721,7 @@
         "ra",
         "ga"
       ],
-      "family_id": "fam_sa",
+      "family_id": "fam_w062",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -733,7 +733,7 @@
         "ra",
         "ka"
       ],
-      "family_id": "fam_na",
+      "family_id": "fam_w063",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -744,7 +744,7 @@
         "pa",
         "pa"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w064",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -756,7 +756,7 @@
         "nna",
         "ya"
       ],
-      "family_id": "fam_pa",
+      "family_id": "fam_w065",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -767,7 +767,7 @@
         "da",
         "na"
       ],
-      "family_id": "fam_da",
+      "family_id": "fam_w066",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -779,7 +779,7 @@
         "ma",
         "sa"
       ],
-      "family_id": "fam_ha",
+      "family_id": "fam_hims",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -791,9 +791,9 @@
         "ma",
         "sa"
       ],
-      "family_id": "fam_ha",
+      "family_id": "fam_hims",
       "sense_id": "0",
-      "exclude_flag": false
+      "exclude_flag": true
     },
     {
       "word_id": "w069",
@@ -802,7 +802,7 @@
         "ksha",
         "ma"
       ],
-      "family_id": "fam_ksha",
+      "family_id": "fam_w069",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -813,7 +813,7 @@
         "ma",
         "na"
       ],
-      "family_id": "fam_ma",
+      "family_id": "fam_w070",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -825,7 +825,7 @@
         "ka",
         "ta"
       ],
-      "family_id": "fam_sha",
+      "family_id": "fam_w071",
       "sense_id": "0",
       "exclude_flag": false
     },
@@ -836,7 +836,438 @@
         "va",
         "ra"
       ],
-      "family_id": "fam_va",
+      "family_id": "fam_w072",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w073",
+      "spelling": "aśva",
+      "varna_sequence": [
+        "sha",
+        "va"
+      ],
+      "family_id": "fam_w073",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w074",
+      "spelling": "gaja",
+      "varna_sequence": [
+        "ga",
+        "ja"
+      ],
+      "family_id": "fam_w074",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w075",
+      "spelling": "siṃha",
+      "varna_sequence": [
+        "sa",
+        "ha"
+      ],
+      "family_id": "fam_w075",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w076",
+      "spelling": "sarpa",
+      "varna_sequence": [
+        "sa",
+        "ra",
+        "pa"
+      ],
+      "family_id": "fam_w076",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w077",
+      "spelling": "khaga",
+      "varna_sequence": [
+        "kha",
+        "ga"
+      ],
+      "family_id": "fam_w077",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w078",
+      "spelling": "mṛga",
+      "varna_sequence": [
+        "ma",
+        "ga"
+      ],
+      "family_id": "fam_w078",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w079",
+      "spelling": "go",
+      "varna_sequence": [
+        "ga"
+      ],
+      "family_id": "fam_w079",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w080",
+      "spelling": "megha",
+      "varna_sequence": [
+        "ma",
+        "gha"
+      ],
+      "family_id": "fam_w080",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w081",
+      "spelling": "vidyut",
+      "varna_sequence": [
+        "va",
+        "da",
+        "ya",
+        "ta"
+      ],
+      "family_id": "fam_w081",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w082",
+      "spelling": "samudra",
+      "varna_sequence": [
+        "sa",
+        "ma",
+        "da",
+        "ra"
+      ],
+      "family_id": "fam_w082",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w083",
+      "spelling": "dvīpa",
+      "varna_sequence": [
+        "da",
+        "va",
+        "pa"
+      ],
+      "family_id": "fam_w083",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w084",
+      "spelling": "ratna",
+      "varna_sequence": [
+        "ra",
+        "ta",
+        "na"
+      ],
+      "family_id": "fam_w084",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w085",
+      "spelling": "suvarṇa",
+      "varna_sequence": [
+        "sa",
+        "va",
+        "ra",
+        "nna"
+      ],
+      "family_id": "fam_w085",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w086",
+      "spelling": "rajata",
+      "varna_sequence": [
+        "ra",
+        "ja",
+        "ta"
+      ],
+      "family_id": "fam_w086",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w087",
+      "spelling": "kāṣṭha",
+      "varna_sequence": [
+        "ka",
+        "ssa",
+        "ttha"
+      ],
+      "family_id": "fam_w087",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w088",
+      "spelling": "tṛṇa",
+      "varna_sequence": [
+        "ta",
+        "nna"
+      ],
+      "family_id": "fam_w088",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w089",
+      "spelling": "mūla",
+      "varna_sequence": [
+        "ma",
+        "la"
+      ],
+      "family_id": "fam_w089",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w090",
+      "spelling": "bīja",
+      "varna_sequence": [
+        "ba",
+        "ja"
+      ],
+      "family_id": "fam_w090",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w091",
+      "spelling": "kṣetra",
+      "varna_sequence": [
+        "ksha",
+        "ta",
+        "ra"
+      ],
+      "family_id": "fam_w091",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w092",
+      "spelling": "grāma",
+      "varna_sequence": [
+        "ga",
+        "ra",
+        "ma"
+      ],
+      "family_id": "fam_w092",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w093",
+      "spelling": "nagara",
+      "varna_sequence": [
+        "na",
+        "ga",
+        "ra"
+      ],
+      "family_id": "fam_w093",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w094",
+      "spelling": "mārga",
+      "varna_sequence": [
+        "ma",
+        "ra",
+        "ga"
+      ],
+      "family_id": "fam_w094",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w095",
+      "spelling": "dvāra",
+      "varna_sequence": [
+        "da",
+        "va",
+        "ra"
+      ],
+      "family_id": "fam_w095",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w096",
+      "spelling": "setu",
+      "varna_sequence": [
+        "sa",
+        "ta"
+      ],
+      "family_id": "fam_w096",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w097",
+      "spelling": "cakra",
+      "varna_sequence": [
+        "ca",
+        "ka",
+        "ra"
+      ],
+      "family_id": "fam_w097",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w098",
+      "spelling": "dhanus",
+      "varna_sequence": [
+        "dha",
+        "na",
+        "sa"
+      ],
+      "family_id": "fam_w098",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w099",
+      "spelling": "śara",
+      "varna_sequence": [
+        "sha",
+        "ra"
+      ],
+      "family_id": "fam_w099",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w100",
+      "spelling": "khaḍga",
+      "varna_sequence": [
+        "kha",
+        "dda",
+        "ga"
+      ],
+      "family_id": "fam_w100",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w101",
+      "spelling": "ratha",
+      "varna_sequence": [
+        "ra",
+        "tha"
+      ],
+      "family_id": "fam_w101",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w102",
+      "spelling": "vastra",
+      "varna_sequence": [
+        "va",
+        "sa",
+        "ta",
+        "ra"
+      ],
+      "family_id": "fam_w102",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w103",
+      "spelling": "kṣīra",
+      "varna_sequence": [
+        "ksha",
+        "ra"
+      ],
+      "family_id": "fam_w103",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w104",
+      "spelling": "madhu",
+      "varna_sequence": [
+        "ma",
+        "dha"
+      ],
+      "family_id": "fam_w104",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w105",
+      "spelling": "taila",
+      "varna_sequence": [
+        "ta",
+        "la"
+      ],
+      "family_id": "fam_w105",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w106",
+      "spelling": "lavaṇa",
+      "varna_sequence": [
+        "la",
+        "va",
+        "nna"
+      ],
+      "family_id": "fam_w106",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w107",
+      "spelling": "yajña",
+      "varna_sequence": [
+        "ya",
+        "ja",
+        "nya"
+      ],
+      "family_id": "fam_w107",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w108",
+      "spelling": "tapas",
+      "varna_sequence": [
+        "ta",
+        "pa",
+        "sa"
+      ],
+      "family_id": "fam_w108",
+      "sense_id": "0",
+      "exclude_flag": false
+    },
+    {
+      "word_id": "w109",
+      "spelling": "karṇa",
+      "varna_sequence": [
+        "ka",
+        "ra",
+        "nna"
+      ],
+      "family_id": "fam_w109",
       "sense_id": "0",
       "exclude_flag": false
     }
