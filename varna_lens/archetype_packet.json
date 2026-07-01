@@ -1,0 +1,408 @@
+{
+  "base_seed": 20240624,
+  "n": 20,
+  "blind": [
+    {
+      "id": 0,
+      "word": "doctor",
+      "from": "suffering",
+      "to": "healing / restored vitality",
+      "choices": {
+        "A": "Adharma, Surrender, Letting-go, Praśraya / Praṇāśa, Moha, Zoom, contraction",
+        "B": "Krodha / Karkaśatā, Ongoing thought / expansion, Āśā, Jāḍya / Nidrā, Birth of cognition / raw potential",
+        "C": "miti, polo, cumo, zozo, lidu"
+      }
+    },
+    {
+      "id": 1,
+      "word": "teacher",
+      "from": "ignorance",
+      "to": "understanding",
+      "choices": {
+        "A": "zozo, tehi, neru, lidu",
+        "B": "Jāḍya / Nidrā, Specialization of self, Aviveka, Birth of cognition / raw potential",
+        "C": "Moha, Welfare, materialization, Ceṣṭā, Zoom, contraction"
+      }
+    },
+    {
+      "id": 2,
+      "word": "judge",
+      "from": "dispute",
+      "to": "resolution / just order",
+      "choices": {
+        "A": "Ahaṁkāra, Birth of cognition / raw potential, Ahaṁkāra",
+        "B": "sano, lidu, sano",
+        "C": "Īrṣyā, Zoom, contraction, Īrṣyā"
+      }
+    },
+    {
+      "id": 3,
+      "word": "warrior",
+      "from": "threat",
+      "to": "protection",
+      "choices": {
+        "A": "Adharma, Completion, closure, Sarvanāśa, Specialization of self, Birth of cognition / raw potential",
+        "B": "rare, huno, juja, tehi, lidu",
+        "C": "Viṣāda, Completion, closure, Lajjā, Welfare, materialization, Zoom, contraction"
+      }
+    },
+    {
+      "id": 4,
+      "word": "mother",
+      "from": "vulnerability",
+      "to": "nourishment / safety",
+      "choices": {
+        "A": "lulo, lidu, mobe, lidu",
+        "B": "Escapism, Zoom, contraction, Avidyā / Rātri, Zoom, contraction",
+        "C": "Praśraya / Praṇāśa, Birth of cognition / raw potential, Lajjā, Birth of cognition / raw potential"
+      }
+    },
+    {
+      "id": 5,
+      "word": "monk",
+      "from": "attachment",
+      "to": "detachment / stillness",
+      "choices": {
+        "A": "Praśraya / Praṇāśa, Birth of cognition / raw potential, Dambha, Āśā",
+        "B": "Escapism, Zoom, contraction, Avajñā, Praśraya / Praṇāśa",
+        "C": "lulo, lidu, nonu, cumo"
+      }
+    },
+    {
+      "id": 6,
+      "word": "king",
+      "from": "disorder",
+      "to": "authority / order",
+      "choices": {
+        "A": "Āśā, I-ness, doing self, Dambha",
+        "B": "Praśraya / Praṇāśa, Ongoing thought / expansion, Avajñā",
+        "C": "cumo, ligu, nonu"
+      }
+    },
+    {
+      "id": 7,
+      "word": "artist",
+      "from": "inner image",
+      "to": "outer form",
+      "choices": {
+        "A": "Ongoing thought / expansion, Sarvanāśa, Jāḍya / Nidrā, Birth of cognition / raw potential, Escapism, Jāḍya / Nidrā",
+        "B": "Surrender, Letting-go, Lajjā, Moha, Zoom, contraction, Krodha / Karkaśatā, Moha",
+        "C": "polo, juja, zozo, lidu, nuta, zozo"
+      }
+    },
+    {
+      "id": 8,
+      "word": "farmer",
+      "from": "seed",
+      "to": "nourishment / harvest",
+      "choices": {
+        "A": "Bhaya, Ongoing thought / expansion, Sarvanāśa, Praśraya / Praṇāśa, Birth of cognition / raw potential",
+        "B": "Āśā, Surrender, Letting-go, Lajjā, Escapism, Zoom, contraction",
+        "C": "koju, polo, juja, lulo, lidu"
+      }
+    },
+    {
+      "id": 9,
+      "word": "priest",
+      "from": "ordinary",
+      "to": "sacred / consecrated",
+      "choices": {
+        "A": "Ghṛṇā, Sarvanāśa, Specialization of self, Escapism, Jāḍya / Nidrā",
+        "B": "damu, juja, tehi, nuta, zozo",
+        "C": "Bhaya, Lajjā, Welfare, materialization, Krodha / Karkaśatā, Moha"
+      }
+    },
+    {
+      "id": 10,
+      "word": "healer",
+      "from": "wound",
+      "to": "wholeness",
+      "choices": {
+        "A": "maki, tehi, pozi, lidu",
+        "B": "Jāḍya / Nidrā, Welfare, materialization, Sarvanāśa, Zoom, contraction",
+        "C": "Avidyā / Rātri, Specialization of self, Krūratā, Birth of cognition / raw potential"
+      }
+    },
+    {
+      "id": 11,
+      "word": "guardian",
+      "from": "danger",
+      "to": "safety",
+      "choices": {
+        "A": "bosi, polo, juja, miti, tehi, lidu, muca",
+        "B": "Restless acquisition / material greed, Surrender, Letting-go, Lajjā, Adharma, Welfare, materialization, Zoom, contraction, Piśunatā",
+        "C": "Ceṣṭā, Ongoing thought / expansion, Sarvanāśa, Krodha / Karkaśatā, Specialization of self, Birth of cognition / raw potential, Moha"
+      }
+    },
+    {
+      "id": 12,
+      "word": "leader",
+      "from": "confusion",
+      "to": "direction",
+      "choices": {
+        "A": "Sarvanāśa, Welfare, materialization, Adharma, Zoom, contraction",
+        "B": "Krūratā, Specialization of self, Krodha / Karkaśatā, Birth of cognition / raw potential",
+        "C": "pozi, tehi, miti, lidu"
+      }
+    },
+    {
+      "id": 13,
+      "word": "thief",
+      "from": "security",
+      "to": "loss / dispossession",
+      "choices": {
+        "A": "Viṣāda, Specialization of self, Bhaya",
+        "B": "tena, tehi, koju",
+        "C": "Mithyā-jñāna, Welfare, materialization, Āśā"
+      }
+    },
+    {
+      "id": 14,
+      "word": "tyrant",
+      "from": "freedom",
+      "to": "oppression / domination",
+      "choices": {
+        "A": "Jāḍya / Nidrā, Welfare, materialization, Sarvanāśa, Birth of cognition / raw potential, Moha, Jāḍya / Nidrā",
+        "B": "zozo, dese, juja, lidu, muca, zozo",
+        "C": "Moha, Birth of cognition / raw potential, Lajjā, Zoom, contraction, Piśunatā, Moha"
+      }
+    },
+    {
+      "id": 15,
+      "word": "nurse",
+      "from": "sickness",
+      "to": "care / recovery",
+      "choices": {
+        "A": "Piśunatā, Zoom, contraction, Krodha / Karkaśatā",
+        "B": "muca, lidu, nuta",
+        "C": "Moha, Birth of cognition / raw potential, Escapism"
+      }
+    },
+    {
+      "id": 16,
+      "word": "builder",
+      "from": "emptiness",
+      "to": "structure",
+      "choices": {
+        "A": "Avajñā, I-ness, doing self, Krūratā, Krodha / Karkaśatā, Birth of cognition / raw potential",
+        "B": "lore, ligu, pozi, miti, lidu",
+        "C": "Anutāpa, Ongoing thought / expansion, Sarvanāśa, Adharma, Zoom, contraction"
+      }
+    },
+    {
+      "id": 17,
+      "word": "hunter",
+      "from": "prey",
+      "to": "sustenance",
+      "choices": {
+        "A": "Avidyā / Rātri, Birth of cognition / raw potential, Moha, Jāḍya / Nidrā, Birth of cognition / raw potential",
+        "B": "maki, lidu, muca, zozo, lidu",
+        "C": "Jāḍya / Nidrā, Zoom, contraction, Piśunatā, Moha, Zoom, contraction"
+      }
+    },
+    {
+      "id": 18,
+      "word": "sage",
+      "from": "question",
+      "to": "wisdom",
+      "choices": {
+        "A": "nuta, gegi, sano",
+        "B": "Escapism, Practical thought, benefit, Ahaṁkāra",
+        "C": "Krodha / Karkaśatā, Practical thought, benefit, Īrṣyā"
+      }
+    },
+    {
+      "id": 19,
+      "word": "servant",
+      "from": "need",
+      "to": "service",
+      "choices": {
+        "A": "Escapism, Birth of cognition / raw potential, Adharma, Birth of cognition / raw potential, Moha, Jāḍya / Nidrā",
+        "B": "nuta, lidu, rare, lidu, muca, zozo",
+        "C": "Krodha / Karkaśatā, Zoom, contraction, Viṣāda, Zoom, contraction, Piśunatā, Moha"
+      }
+    }
+  ],
+  "key": [
+    {
+      "id": 0,
+      "word": "doctor",
+      "label2lex": {
+        "A": "scrambled",
+        "B": "real",
+        "C": "random"
+      }
+    },
+    {
+      "id": 1,
+      "word": "teacher",
+      "label2lex": {
+        "A": "random",
+        "B": "real",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 2,
+      "word": "judge",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 3,
+      "word": "warrior",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 4,
+      "word": "mother",
+      "label2lex": {
+        "A": "random",
+        "B": "scrambled",
+        "C": "real"
+      }
+    },
+    {
+      "id": 5,
+      "word": "monk",
+      "label2lex": {
+        "A": "real",
+        "B": "scrambled",
+        "C": "random"
+      }
+    },
+    {
+      "id": 6,
+      "word": "king",
+      "label2lex": {
+        "A": "real",
+        "B": "scrambled",
+        "C": "random"
+      }
+    },
+    {
+      "id": 7,
+      "word": "artist",
+      "label2lex": {
+        "A": "real",
+        "B": "scrambled",
+        "C": "random"
+      }
+    },
+    {
+      "id": 8,
+      "word": "farmer",
+      "label2lex": {
+        "A": "real",
+        "B": "scrambled",
+        "C": "random"
+      }
+    },
+    {
+      "id": 9,
+      "word": "priest",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 10,
+      "word": "healer",
+      "label2lex": {
+        "A": "random",
+        "B": "scrambled",
+        "C": "real"
+      }
+    },
+    {
+      "id": 11,
+      "word": "guardian",
+      "label2lex": {
+        "A": "random",
+        "B": "scrambled",
+        "C": "real"
+      }
+    },
+    {
+      "id": 12,
+      "word": "leader",
+      "label2lex": {
+        "A": "scrambled",
+        "B": "real",
+        "C": "random"
+      }
+    },
+    {
+      "id": 13,
+      "word": "thief",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 14,
+      "word": "tyrant",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 15,
+      "word": "nurse",
+      "label2lex": {
+        "A": "scrambled",
+        "B": "random",
+        "C": "real"
+      }
+    },
+    {
+      "id": 16,
+      "word": "builder",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 17,
+      "word": "hunter",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 18,
+      "word": "sage",
+      "label2lex": {
+        "A": "random",
+        "B": "real",
+        "C": "scrambled"
+      }
+    },
+    {
+      "id": 19,
+      "word": "servant",
+      "label2lex": {
+        "A": "real",
+        "B": "random",
+        "C": "scrambled"
+      }
+    }
+  ]
+}
