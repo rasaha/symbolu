@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.manifest.schema.json",
+  "title": "manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "design_doc_sha256", "assignment_hash",
+               "realization_hashes", "word_hash", "meaning_hash", "distractor_hash",
+               "realizer_hash", "scramble_seed_hash", "independence_basis", "status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "design_doc_sha256": { "type": "string" },
+    "assignment_hash": { "type": "string" },
+    "realization_hashes": { "type": "object", "additionalProperties": { "type": "string" } },
+    "word_hash": { "type": "string" },
+    "meaning_hash": { "type": "string" },
+    "distractor_hash": { "type": "string" },
+    "realizer_hash": { "type": "string" },
+    "scramble_seed_hash": { "type": "string" },
+    "independence_basis": { "type": "object", "additionalProperties": { "type": "string" } },
+    "status": { "enum": ["NOT_READY", "READY"] }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.realizer.schema.json",
+  "title": "realizer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "realizer_id", "model", "version",
+               "deterministic", "offline", "embedding_dimension", "similarity_metric", "asset_sha256"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "realizer_id": { "type": "string" },
+    "model": { "type": "string" },
+    "version": { "type": "string" },
+    "deterministic": { "type": "boolean" },
+    "offline": { "type": "boolean" },
+    "embedding_dimension": { "type": ["integer", "null"] },
+    "similarity_metric": { "type": "string" },
+    "asset_sha256": { "type": "string" }
+  }
+}
