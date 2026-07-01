@@ -1,0 +1,128 @@
+{
+  "id": "b0_frozen_artifacts_v1",
+  "title": "B0 §17 frozen-artifact manifest (Varṇa–Phonetic-Feature Alignment)",
+  "design_doc": {
+    "path": "varna_lens/PREREG_VARNA_PHONETIC_ALIGNMENT.md",
+    "sha256": "8309b991d2f1992fc1226b5ef0f8fb1ffaa1f4f9ef6f28e3203bd3d6599d0b07"
+  },
+  "status": "FROZEN (artifacts only) — B0 NOT run, no alignment computed, no verdict emitted.",
+  "stage_a": "untouched",
+  "artifacts": {
+    "lexicon_wordformation": {
+      "path": "varna_lens/lexicon_wordformation.json",
+      "sha256": "0c34f44398ffefaf819ccf555ae456438d07b4be0f32219fb2255b4387d73027",
+      "role": "the frozen curated varṇa table (word_formation_reading)"
+    },
+    "iast_ipa_map": {
+      "path": "experiments/varna_phonetic_alignment/frozen/iast_ipa_map.json",
+      "sha256": "16dc8b182245b862a3b70b3dc0dd75186026d6847c206339d9c24adaf5110972",
+      "id": "iast_ipa_v1",
+      "role": "frozen IAST→IPA segment map (34 consonants; kṣa=/k͡ʂ/ mean rule)"
+    },
+    "feature_table": {
+      "path": "experiments/varna_phonetic_alignment/frozen/ipa_feature_table.json",
+      "sha256": "c1464d0bae3d1c5359844bd66d19c26a20c1e02f7d26d7cf5e53c56793c07ef5",
+      "id": "approved_frozen_ipa_v1",
+      "role": "PRIMARY phonetic-feature source P (16 articulatory features)",
+      "primary_distance": "hamming",
+      "sensitivity_distance": "cosine"
+    },
+    "decision_rule": {
+      "path": "experiments/varna_phonetic_alignment/frozen/decision_rule.json",
+      "sha256": "aee058f0b38428819936bfde7c0e7b2f2fde5a855e5f56d1c948620f59ef5144",
+      "id": "b0_decision_rule_v1",
+      "role": "frozen §12 label logic + gates"
+    },
+    "run_manifest_schema": {
+      "path": "experiments/varna_phonetic_alignment/frozen/run_manifest_schema.json",
+      "sha256": "80237d6f7001980e4f8a75e02d53fe4e3951f0d195e80dfcfdc865b91f038d2c",
+      "id": "b0_run_manifest_schema_v1",
+      "role": "schema a completed-run record must satisfy (schema only; no run)"
+    }
+  },
+  "feature_library": {
+    "status": "FROZEN",
+    "primary_source": "approved_frozen_ipa_feature_table",
+    "panphon": {
+      "status": "UNAVAILABLE_IN_ENV",
+      "reason": "pip install panphon failed (unicodecsv wheel build error)",
+      "reserved_for": "§16 independent-replication re-freeze (IPA tables vs PanPhon)"
+    },
+    "deviation_note": "Pre-reg §5 names PanPhon as the primary feature library; it is uninstallable here, so the explicitly-permitted 'approved frozen feature table' option is used as primary. This records a source choice; it does NOT alter §12 verdict logic and does NOT weaken any caveat. PanPhon remains the independent replication library (§16)."
+  },
+  "embedding_model_T_embed": {
+    "role": "PRIMARY verdict-setting encoding (pre-reg §12); embeds each varṇa's word_formation_reading string -> cosine dissimilarity T_embed.",
+    "status": "PINNED_UNVERIFIED",
+    "enabled": false,
+    "weights_sha256": null,
+    "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "source": "huggingface.co",
+    "revision": null,
+    "revision_note": "Pin the immutable HF commit at first download. Not resolvable here: huggingface.co is blocked by this environment's network policy.",
+    "expected_dim": 384,
+    "model_config": {
+      "pooling": "mean",
+      "normalize_embeddings": true,
+      "max_seq_length": 256,
+      "config_note": "Standard all-MiniLM-L6-v2 card values; confirm against the model's config files at the verified freeze."
+    },
+    "library_recommended_pins": {
+      "note": "RECOMMENDED target pins; LOCK to exact installed versions at the verified freeze (embedding output can vary across versions).",
+      "sentence-transformers": ">=2.2,<4",
+      "transformers": ">=4.30,<5",
+      "torch": ">=2.0,<3",
+      "tokenizers": ">=0.13,<1"
+    },
+    "file_integrity": {
+      "weights": {
+        "file": "model.safetensors",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      },
+      "tokenizer": {
+        "file": "tokenizer.json",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      },
+      "config": {
+        "file": "config.json",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      },
+      "sentence_bert_config": {
+        "file": "sentence_bert_config.json",
+        "sha256": null,
+        "verification": "UNVERIFIED"
+      }
+    },
+    "verification_blocker": "huggingface.co is blocked by this environment's network policy (CONNECT 403; only PyPI is allowlisted). The weights/tokenizer/config sha256 and the immutable revision cannot be computed or resolved here. No hash is fabricated. Compute and pin them at first download in an HF-enabled environment, set each verification -> VERIFIED, weights_sha256 -> the real hash, status -> enabled.",
+    "selection_rationale": "Small (~23M params, 384-dim), deterministic on CPU, widely used, runs fully offline once downloaded. A concrete reproducible pin for the §12 primary; any swap requires a fresh freeze.",
+    "blocking_note": "Pre-reg §12 makes T_embed the PRIMARY, verdict-setting encoding. manifest.embedding_frozen() requires status=enabled AND a non-empty weights_sha256, so this PINNED_UNVERIFIED entry (weights_sha256=null) keeps the readiness gate NOT ready and the runner NOT_RUN. Categorical T_cat remains sensitivity-only and cannot substitute as primary."
+  },
+  "run_parameters_frozen": {
+    "scramble_n": 1000,
+    "permutation_n": 10000,
+    "bootstrap_n": 2000,
+    "bootstrap_ci_level": 0.9,
+    "seeds": {
+      "scramble": 0,
+      "permutation": 0,
+      "bootstrap": 0
+    },
+    "encodings_required_for_verdict": [
+      "embedding",
+      "categorical"
+    ],
+    "P_distances_required_for_verdict": [
+      "hamming",
+      "cosine"
+    ],
+    "control_matrix": "coarse varga place/manner C (control.py), C ∈ {0,1,2}"
+  },
+  "caveats_preserved": [
+    "B0 tests representational grounding ONLY — not perception, not ontology, not Symbol-U.",
+    "PHONETICS_ONLY / ENCODING_DEPENDENT are negatives, never partial successes.",
+    "Raw Mantel is never reported without the mandatory partial-Mantel C-control.",
+    "Expected default outcome is PHONETICS_ONLY (table laid out on the varga grid)."
+  ]
+}

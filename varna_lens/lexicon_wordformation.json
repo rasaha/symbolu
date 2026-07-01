@@ -1,0 +1,1003 @@
+{
+  "_meta": {
+    "title": "Varṇa word-formation lexicon — binding (in-combination) reading (consonants + vowels)",
+    "governing_axis": "The reading axis is BIND vs LIBERATE, which is ORTHOGONAL to good vs bad. Binding = contractive / holding / attachment-forming (fixes or limits consciousness). Liberating = expansive / unbinding / releasing. This is a state of expression, NOT a moral judgement: dharma is BINDING (it holds you to your stance, dhṛ = to hold) even though it is 'good'; adharma is LIBERATING (it breaks the stance, unbinds) even though it is 'bad'; hope (āśā) is binding (forward-grasping), cruelty is binding (contractive), mokṣa is liberating (releasing).",
+    "word_formation_rule": "A varṇa is sattvic / unbound in ISOLATION and BINDS when it enters COMBINATION (a word), because manifestation is contraction into form. Therefore `word_formation_reading` = the BINDING (in-combination, contractive) pole of every varṇa, and is the field to use when reading a word. The liberating pole is the at-rest / isolated / completed state (recoverable: it is the `counter_pole` for the 28 affliction-rooted consonants and for kṣa, and the `worldly_vritti` / Sarkar root for ca, ra, sa, ha; for va it is `counter_pole` = Adharma).",
+    "purpose": "Primary field `word_formation_reading` gives the binding/in-combination expression used in word formation. `worldly_vritti` (Sarkar's source root) and `counter_pole` are retained for provenance.",
+    "source": "P.R. Sarkar (Shrii Shrii Anandamurti), 'Acoustic Roots of the Indo-Aryan Alphabet' (1984-85, Calcutta), verified line-by-line against the source.",
+    "word_formation_flip_changelog": [
+      "ca: word_formation_reading = Aviveka (binding). Sarkar's root viveka is the liberating/at-rest pole. (binding gloss derived.)",
+      "ra: word_formation_reading = Sarvanāśa (binding). SOURCE-FAITHFUL — Sarkar gives ra both vitality (liberating) and sarvanāśa (binding).",
+      "va: word_formation_reading = Dharma (binding) — dharma HOLDS/sustains the stance, so it binds on the non-moral axis; Adharma is the liberating (unbinding) pole. Sarkar's root retained as worldly_vritti.",
+      "sa: word_formation_reading = escapism (binding); Sarkar's root mokṣa/sattva is the liberating pole. (binding gloss derived.)",
+      "ha: word_formation_reading = Rātri / night (binding) — corrected to RĀTRI (night/darkness, the contractive opposite of ha=day/sun/light), dropping the abstract 'avidyā'; parā-vidyā is the liberating pole. (binding gloss derived.)",
+      "kṣa: word_formation_reading = Aparā-vidyā (mundane knowledge) — LEFT as mundane knowledge (worldly/binding), NOT flipped; liberating pole = Parā-vidyā (spiritual knowledge). (Reverted earlier mithyā-jñāna flip.)",
+      "The other 28 consonants (and kṣa): word_formation_reading = worldly_vritti (already the worldly/binding root)."
+    ],
+    "_status": "FAITHFUL DOCTRINAL TRANSCRIPTION + a stated binding-in-combination reading convention. NOT empirically validated: the pre-registered blind signal tests on this lexicon returned NO_SIGNAL (real ≈ scrambled). For word-formation reading / contemplative authoring, not a validated sound→meaning decoder.",
+    "scope": "consonants (33 + kṣa): SOURCE-GROUNDED (P.R. Sarkar, verified). vowels (12): CANDIDATE / INTUITION-DERIVED — vowels are NOT vṛtti roots in the source (they are roots of musical notes, creation/preservation/destruction, and cosmological/vocalization functions); their vṛtti-style glosses are interpretive. Both sections use the binding-in-combination reading; the vowel section remains EXPLORATORY (see PREREG_OBJECT_PROFILE_FIT.md §16).",
+    "polarity_values": "polarity describes SARKAR'S ROOT on a sustaining/binding/mundane sense and is retained for provenance only; word_formation_reading is ALWAYS the binding pole regardless of polarity.",
+    "fields": "iast, deva, varga, worldly_vritti (Sarkar root), polarity (Sarkar-root descriptor), element (where stated), word_formation_reading (binding/in-combination — USE THIS), counter_pole{sanskrit,english,type,derived}, source_quote",
+    "reading_order": "RULES ARE APPLIED BEFORE MEANING. 1) romanization identifies the varṇa (IAST canonical; popular_roman is the English spelling); 2) the bind/liberate axis (non-moral) selects the pole; 3) word_formation_reading (the binding pole) gives the meaning. Spelling never changes which varṇa or which meaning.",
+    "_romanization_rule": "IAST (`iast`) is CANONICAL for interop (Monier-Williams, g2p) and is kept unchanged. `popular_roman` is the English-facing display per the user's convention: palatal च='cha', छ='chha'; retroflex aspirates ठ='thha', ढ='dhha'; retroflex sibilant ष='shha'; unaspirated retroflex stops ट='tta', ड='dda'. popular_roman is spelling only — it never changes the varṇa identity or its meaning.",
+    "_vowel_provenance": "Vowel word_formation_reading = the binding/distortion pole of the vowel's active essence; the active essence (birth, expansion, completion, …) is the liberating/at-rest pole. These glosses are intuition-derived, not source-grounded like the consonants, and must not be treated as evidence."
+  },
+  "consonants": {
+    "ka": {
+      "iast": "Ka",
+      "popular_roman": "ka",
+      "deva": "क",
+      "varga": "guttural · ka-varga",
+      "worldly_vritti": {
+        "sanskrit": "Āśā",
+        "english": "hope / forward-seeking desire (abhīpsātmaka)"
+      },
+      "polarity": "binding",
+      "element": "flowing water (ka = water; 'that which produces sound')",
+      "word_formation_reading": {
+        "sanskrit": "Āśā",
+        "english": "hope / forward-grasping desire",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Nirāśā",
+        "english": "detachment",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ka is the acoustic root of the abhīpsātmaka āśā vṛtti. It is also the acoustic root of Kārya Brahma."
+    },
+    "kha": {
+      "iast": "Kha",
+      "popular_roman": "kha",
+      "deva": "ख",
+      "varga": "guttural · ka-varga",
+      "worldly_vritti": {
+        "sanskrit": "Cintā",
+        "english": "worry / impersonal, objective thought"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Cintā",
+        "english": "worry / impersonal thought",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Viśvāsa",
+        "english": "trust / equanimity",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "The acoustic root of cintā vṛtti [worry] is kha. Impersonal thoughts are symbolized by kha."
+    },
+    "ga": {
+      "iast": "Ga",
+      "popular_roman": "ga",
+      "deva": "ग",
+      "varga": "guttural · ka-varga",
+      "worldly_vritti": {
+        "sanskrit": "Ceṣṭā",
+        "english": "effort / striving to arouse dormant potential"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Ceṣṭā",
+        "english": "effort / striving",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Sthiti",
+        "english": "stillness / rest",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "The effort made to arouse one's dormant potentiality is called ceṣṭā. Ga is the acoustic root of ceṣṭā vṛtti."
+    },
+    "gha": {
+      "iast": "Gha",
+      "popular_roman": "gha",
+      "deva": "घ",
+      "varga": "guttural · ka-varga",
+      "worldly_vritti": {
+        "sanskrit": "Mamatā",
+        "english": "attachment / love bound by time, space, individuality"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Mamatā",
+        "english": "attachment / mine-ness",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Anāsakti",
+        "english": "non-attachment",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Mamatā, the vṛtti of love and attachment, is related to time, space and individuality. Gha is the acoustic root of mamatā vṛtti."
+    },
+    "nga": {
+      "iast": "Ṅa",
+      "popular_roman": "nga",
+      "deva": "ङ",
+      "varga": "guttural · ka-varga",
+      "worldly_vritti": {
+        "sanskrit": "Dambha",
+        "english": "vanity / outward pride-display, pretension"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Dambha",
+        "english": "vanity / pride-display",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Vinaya",
+        "english": "humility",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Uṋa is the acoustic root of dambha vṛtti [the propensity of vanity]."
+    },
+    "ca": {
+      "iast": "Ca",
+      "popular_roman": "cha",
+      "deva": "च",
+      "varga": "palatal · ca-varga",
+      "worldly_vritti": {
+        "sanskrit": "Viveka",
+        "english": "conscience / discrimination"
+      },
+      "polarity": "sustaining",
+      "word_formation_reading": {
+        "sanskrit": "Aviveka",
+        "english": "lack of discrimination / confused discernment",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Viveka",
+        "english": "conscience / discrimination (liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": false
+      },
+      "source_quote": "Ca is the acoustic root of viveka [conscience].",
+      "_note": "Sarkar's root viveka is the LIBERATING (at-rest) pole; the binding/in-combination reading is its absence, aviveka (derived). Cf. your example: while the ca is in combination it expresses aviveka; viveka is reached at completion."
+    },
+    "cha": {
+      "iast": "Cha",
+      "popular_roman": "chha",
+      "deva": "छ",
+      "varga": "palatal · ca-varga",
+      "worldly_vritti": {
+        "sanskrit": "Vikalatā",
+        "english": "nervous breakdown / collapse of a functioning mind"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Vikalatā",
+        "english": "nervous breakdown / collapse",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Dhṛti",
+        "english": "emotional firmness",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Cha is the acoustic root of vikalatā vṛtti [nervous breakdown]."
+    },
+    "ja": {
+      "iast": "Ja",
+      "popular_roman": "ja",
+      "deva": "ज",
+      "varga": "palatal · ca-varga",
+      "worldly_vritti": {
+        "sanskrit": "Ahaṁkāra",
+        "english": "ego / inflated I-feeling (the I-maker)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Ahaṁkāra",
+        "english": "ego / inflated I-feeling",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Vinaya",
+        "english": "humility / ego-softening",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ja is the acoustic root of ahaṁkāra vṛtti (ego). The ego becomes inflated when one allows one's 'I' feeling to take a predominant role."
+    },
+    "jha": {
+      "iast": "Jha",
+      "popular_roman": "jha",
+      "deva": "झ",
+      "varga": "palatal · ca-varga",
+      "worldly_vritti": {
+        "sanskrit": "Lolupatā / Lobha",
+        "english": "greed / avarice"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Lobha",
+        "english": "greed / avarice",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Santoṣa",
+        "english": "contentment / non-possession",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Jha is the acoustic root of lolupatā, lobha [greed] and lolatā [avarice] vṛttis."
+    },
+    "nya": {
+      "iast": "Ña",
+      "popular_roman": "nya",
+      "deva": "ञ",
+      "varga": "palatal · ca-varga",
+      "worldly_vritti": {
+        "sanskrit": "Kapaṭatā",
+        "english": "hypocrisy / deceit"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Kapaṭatā",
+        "english": "hypocrisy / deceit",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Ārjavatā",
+        "english": "straightforwardness / integrity",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Iṋa is the acoustic root of kapaṭatā vṛtti [hypocrisy]."
+    },
+    "tta": {
+      "iast": "Ṭa",
+      "popular_roman": "tta",
+      "deva": "ट",
+      "varga": "retroflex · ṭa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Vitarka",
+        "english": "overstating one's case (garrulousness + bad temper)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Vitarka",
+        "english": "overstatement / garrulousness",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Pramita-vāk / Maunam",
+        "english": "measured speech / silence",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ṭa is the acoustic root of vitarka vṛtti [overstating one's case]. Vitarka is a combination of a bad temper and garrulousness."
+    },
+    "ttha": {
+      "iast": "Ṭha",
+      "popular_roman": "thha",
+      "deva": "ठ",
+      "varga": "retroflex · ṭa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Anutāpa",
+        "english": "repentance / remorse"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Anutāpa",
+        "english": "repentance / remorse",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Kṣamā",
+        "english": "forgiveness / self-acceptance",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ṭha is the acoustic root of anutāpa vṛtti [repentance]."
+    },
+    "dda": {
+      "iast": "Ḍa",
+      "popular_roman": "dda",
+      "deva": "ड",
+      "varga": "retroflex · ṭa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Lajjā",
+        "english": "shyness"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Lajjā",
+        "english": "shyness",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Nirbhayatā",
+        "english": "fearlessness",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ḍa is the acoustic root of lajjā vṛtti [the propensity of shyness]."
+    },
+    "ddha": {
+      "iast": "Ḍha",
+      "popular_roman": "dhha",
+      "deva": "ढ",
+      "varga": "retroflex · ṭa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Piśunatā",
+        "english": "senseless / sadistic cruelty"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Piśunatā",
+        "english": "sadistic cruelty",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Karuṇā",
+        "english": "compassion",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Senseless, sadistic killing is called piśunatā vṛtti. [Ḍha is its acoustic root.]"
+    },
+    "nna": {
+      "iast": "Ṇa",
+      "popular_roman": "nna",
+      "deva": "ण",
+      "varga": "retroflex · ṭa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Īrṣyā",
+        "english": "envy"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Īrṣyā",
+        "english": "envy",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Muditā",
+        "english": "sympathetic joy",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ṇa is the acoustic root of īrṣā vṛtti [the propensity of envy]."
+    },
+    "ta": {
+      "iast": "Ta",
+      "popular_roman": "ta",
+      "deva": "त",
+      "varga": "dental · ta-varga",
+      "worldly_vritti": {
+        "sanskrit": "Jāḍya / Nidrā",
+        "english": "staticity, deep sleep, intellectual dullness, spiritual inertia"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Jāḍya / Nidrā",
+        "english": "inertia / staticity / dullness",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Jāgaraṇa",
+        "english": "awakening / alertness",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ta is the acoustic root of staticity, long sleep and deep sleep, and of intellectual dullness and spiritual inertness."
+    },
+    "tha": {
+      "iast": "Tha",
+      "popular_roman": "tha",
+      "deva": "थ",
+      "varga": "dental · ta-varga",
+      "worldly_vritti": {
+        "sanskrit": "Viṣāda",
+        "english": "melancholy / dejection"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Viṣāda",
+        "english": "melancholy / dejection",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Harṣa",
+        "english": "joy / cheer",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Tha is the acoustic root of viṣāda vṛtti, of melancholy."
+    },
+    "da": {
+      "iast": "Da",
+      "popular_roman": "da",
+      "deva": "द",
+      "varga": "dental · ta-varga",
+      "worldly_vritti": {
+        "sanskrit": "Krodha / Karkaśatā",
+        "english": "peevishness / irritability"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Krodha / Karkaśatā",
+        "english": "peevishness / irritability",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Kṣamā / Dhairya",
+        "english": "patience / forbearance",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Da is the acoustic root of peevishness."
+    },
+    "dha": {
+      "iast": "Dha",
+      "popular_roman": "dha",
+      "deva": "ध",
+      "varga": "dental · ta-varga",
+      "worldly_vritti": {
+        "sanskrit": "Tṛṣṇā",
+        "english": "thirst for acquisition (wealth, name, fame, power, prestige)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Tṛṣṇā",
+        "english": "craving / thirst for acquisition",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Tuṣṭi / Nivṛtti",
+        "english": "contentment / renunciation",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Dha is the acoustic root of thirst for acquisition. This limitless craving is called tṛṣṇā in Sanskrit."
+    },
+    "na": {
+      "iast": "Na",
+      "popular_roman": "na",
+      "deva": "न",
+      "varga": "dental · ta-varga",
+      "worldly_vritti": {
+        "sanskrit": "Moha",
+        "english": "blind attachment / infatuation (deśa, kāla, idea, ādhāra)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Moha",
+        "english": "blind attachment / infatuation",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Viveka",
+        "english": "discriminative detachment",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Na is the acoustic root of moha vṛtti [blind attachment or infatuation]."
+    },
+    "pa": {
+      "iast": "Pa",
+      "popular_roman": "pa",
+      "deva": "प",
+      "varga": "labial · pa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Ghṛṇā",
+        "english": "hatred / revulsion (a fetter / pāśa)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Ghṛṇā",
+        "english": "hatred / revulsion",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Maitrī / Sneha",
+        "english": "friendliness / affection",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Pa is the acoustic root of ghṛṇā vṛtti [hatred or revulsion]. Pa is the acoustic root of the fetter of hatred."
+    },
+    "pha": {
+      "iast": "Pha",
+      "popular_roman": "pha",
+      "deva": "फ",
+      "varga": "labial · pa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Bhaya",
+        "english": "fear"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Bhaya",
+        "english": "fear",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Abhaya",
+        "english": "fearlessness",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Pha is the acoustic root of bhaya vṛtti [the propensity of fear]."
+    },
+    "ba": {
+      "iast": "Ba",
+      "popular_roman": "ba",
+      "deva": "ब",
+      "varga": "labial · pa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Avajñā",
+        "english": "indifference (neglecting something of value)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Avajñā",
+        "english": "indifference / neglect",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Ādara",
+        "english": "respect / regard",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ba is the acoustic root of avajñā vṛtti [indifference]."
+    },
+    "bha": {
+      "iast": "Bha",
+      "popular_roman": "bha",
+      "deva": "भ",
+      "varga": "labial · pa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Mūrcchā",
+        "english": "deluded obsession (loss of common sense under a ripu's spell)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Mūrcchā",
+        "english": "deluded obsession",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Jāgaraṇa",
+        "english": "awareness / awakening",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Bha is the acoustic root of the mūrcchā vṛtti. It means to lose one's common sense under the hypnotic spell of a particular ripu."
+    },
+    "ma": {
+      "iast": "Ma",
+      "popular_roman": "ma",
+      "deva": "म",
+      "varga": "labial · pa-varga",
+      "worldly_vritti": {
+        "sanskrit": "Praṇāśa + Praśraya",
+        "english": "annihilation; and giving latitude / indulgence (Hindi baṛhvā denā)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Praṇāśa / Praśraya",
+        "english": "annihilation / indulgence (giving latitude)",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Anuśāsana",
+        "english": "disciplined restraint",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ma is the acoustic root of praṇāśa [annihilation]. It is also the acoustic root of praśraya vṛtti – giving latitude [indulgence]."
+    },
+    "ya": {
+      "iast": "Ya",
+      "popular_roman": "ya",
+      "deva": "य",
+      "varga": "semivowel · antaḥstha",
+      "worldly_vritti": {
+        "sanskrit": "Aviśvāsa",
+        "english": "lack of confidence (in self and others); also constant movement"
+      },
+      "polarity": "binding",
+      "element": "constant movement (like the movement of air)",
+      "word_formation_reading": {
+        "sanskrit": "Aviśvāsa",
+        "english": "lack of confidence / wavering movement",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Viśvāsa",
+        "english": "confidence",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ya is the acoustic root of aviśvāsa vṛtti [lack of confidence], and is also the acoustic root of constant movement (like the movement of air)."
+    },
+    "ra": {
+      "iast": "Ra",
+      "popular_roman": "ra",
+      "deva": "र",
+      "varga": "semivowel · antaḥstha",
+      "worldly_vritti": {
+        "sanskrit": "Agnitattva / Prāṇaśakti",
+        "english": "vitality / creative fire ('ra' = fire)"
+      },
+      "polarity": "sustaining",
+      "element": "agnitattva (fire)",
+      "word_formation_reading": {
+        "sanskrit": "Sarvanāśa",
+        "english": "defeatist annihilation-thought ('everything is gone, I am undone')",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Prāṇaśakti / Agnitattva",
+        "english": "vitality / fire (liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": false
+      },
+      "source_quote": "Ra is the acoustic root of agnitattva or prāṇaśakti – vitality. It is also the acoustic root of sarvanāśa [the thought of annihilation]. The monosyllabic word ra means 'fire'.",
+      "_note": "SOURCE-FAITHFUL flip: Sarkar gives ra both poles. The binding/in-combination reading is sarvanāśa (contractive collapse); the liberating/at-rest pole is vitality/fire."
+    },
+    "la": {
+      "iast": "La",
+      "popular_roman": "la",
+      "deva": "ल",
+      "varga": "semivowel · antaḥstha",
+      "worldly_vritti": {
+        "sanskrit": "Krūratā",
+        "english": "cruelty"
+      },
+      "polarity": "binding",
+      "element": "kṣititattva (the solid factor / earth)",
+      "word_formation_reading": {
+        "sanskrit": "Krūratā",
+        "english": "cruelty",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Karuṇā",
+        "english": "compassion",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "La is the acoustic root of krūratā vṛtti [cruelty]. La is also the acoustic root of kṣititattva, the solid factor."
+    },
+    "va": {
+      "iast": "Va",
+      "popular_roman": "va",
+      "deva": "व",
+      "varga": "semivowel · antaḥstha",
+      "worldly_vritti": {
+        "sanskrit": "Dharma",
+        "english": "ensconcement in one's original stance; the sustaining principle"
+      },
+      "polarity": "sustaining",
+      "element": "jalatattva (the liquid factor; rain-god Varuṇa)",
+      "word_formation_reading": {
+        "sanskrit": "Dharma",
+        "english": "holding / ensconcement in original stance (BINDS — dhṛ = to hold; non-moral)",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Adharma",
+        "english": "non-conforming / deviation from stance (UNBINDS → liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": false
+      },
+      "source_quote": "Va is the acoustic root of dharma. Va is also the acoustic root of jalatattva [the liquid factor], and of the rain-god Varuṇa Deva.",
+      "_note": "SPECIAL on the non-moral bind/release axis: dharma HOLDS/sustains the stance → it is the BINDING (in-combination) reading, even though it is 'good'. Adharma is non-conforming → it UNBINDS → it is the liberating / at-rest pole, even though it is 'bad'. 'Liberating' here means unbinding, not endorsement."
+    },
+    "sha": {
+      "iast": "Śa",
+      "popular_roman": "sha",
+      "deva": "श",
+      "varga": "sibilant palatal · ūṣma",
+      "worldly_vritti": {
+        "sanskrit": "Rajoguṇa + Artha",
+        "english": "the mutative principle; psychic longing / material pursuit (artha)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Rajoguṇa / Artha",
+        "english": "mutative drive / material pursuit",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "—",
+        "english": "transmutation of dynamism into purposeful accomplishment",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Śa is the acoustic root of rajoguṇa [the mutative principle]. It is also the acoustic root of artha [psychic longing]."
+    },
+    "ssa": {
+      "iast": "Ṣa",
+      "popular_roman": "shha",
+      "deva": "ष",
+      "varga": "sibilant retroflex · ūṣma",
+      "worldly_vritti": {
+        "sanskrit": "Tamoguṇa + Kāma",
+        "english": "the static principle; all physical / worldly desires (kāma)"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Tamoguṇa / Kāma",
+        "english": "static inertia / worldly desire",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "—",
+        "english": "transmutation of desire / grounded containment",
+        "type": "liberating_remedy",
+        "derived": true
+      },
+      "source_quote": "Ṣa is the acoustic root of tamoguṇa [the static principle], and of all kinds of worldly desires … kāma."
+    },
+    "sa": {
+      "iast": "Sa",
+      "popular_roman": "sa",
+      "deva": "स",
+      "varga": "sibilant dental · ūṣma",
+      "worldly_vritti": {
+        "sanskrit": "Mokṣa + Sattvaguṇa",
+        "english": "liberation (unqualified); the sentient principle"
+      },
+      "polarity": "sustaining",
+      "word_formation_reading": {
+        "sanskrit": "—",
+        "english": "escapism / premature static withdrawal",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Mokṣa / Sattvaguṇa",
+        "english": "liberation / sentient clarity (liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": false
+      },
+      "source_quote": "Sa is the acoustic root of mokṣa [unqualified liberation]. Sa is the acoustic root of sattvaguṇa [the sentient principle].",
+      "_note": "Sarkar's root mokṣa/sattva is the LIBERATING (at-rest) pole; the binding/in-combination reading is its worldly distortion, escapism / static withdrawal (derived)."
+    },
+    "ha": {
+      "iast": "Ha",
+      "popular_roman": "ha",
+      "deva": "ह",
+      "varga": "aspirate · ūṣma",
+      "worldly_vritti": {
+        "sanskrit": "Parā-vidyā",
+        "english": "intuitional science; ethereal factor, daytime, the sun, svarloka"
+      },
+      "polarity": "sustaining",
+      "element": "ākāśatattva (ether)",
+      "word_formation_reading": {
+        "sanskrit": "Rātri",
+        "english": "night / darkness (the contractive opposite of ha = day / sun / light)",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Parā-vidyā",
+        "english": "intuitional knowledge / day / sun (liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": false
+      },
+      "source_quote": "Ha is the acoustic root of the ethereal factor, of daytime, of the sun, of svarloka, and of parā-vidyā [intuitional science].",
+      "_note": "Binding reading corrected to RĀTRI (night/darkness, the contractive pole), dropping the abstract 'avidyā'. Sarkar's root (day/sun/parā-vidyā) is the liberating/at-rest pole; ha's stated opposite ṭha = night/moon supports rātri as the dark pole."
+    },
+    "ksha": {
+      "iast": "Kṣa",
+      "popular_roman": "ksha",
+      "deva": "क्ष",
+      "varga": "compound",
+      "worldly_vritti": {
+        "sanskrit": "Aparā-vidyā",
+        "english": "mundane knowledge / material science"
+      },
+      "polarity": "binding",
+      "word_formation_reading": {
+        "sanskrit": "Aparā-vidyā",
+        "english": "mundane / material knowledge",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "sanskrit": "Parā-vidyā",
+        "english": "spiritual / intuitional knowledge (liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": false
+      },
+      "source_quote": "Kṣa is the acoustic root of mundane knowledge, and is also the acoustic root of material science.",
+      "_note": "Mundane knowledge (aparā-vidyā) IS the worldly/binding reading; its liberating opposite is spiritual knowledge (parā-vidyā) — the classical parā/aparā-vidyā pairing. Earlier mithyā-jñāna flip reverted."
+    }
+  },
+  "vowels": {
+    "a": {
+      "iast": "a",
+      "popular_roman": "a",
+      "deva": "अ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "initiation",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "birth of cognition / raw potential (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "aa": {
+      "iast": "ā",
+      "popular_roman": "aa",
+      "deva": "आ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "expanding",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "ongoing thought / expansion (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "i": {
+      "iast": "i",
+      "popular_roman": "i",
+      "deva": "इ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "asserting",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "I-ness / doing-self (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "ii": {
+      "iast": "ī",
+      "popular_roman": "ii",
+      "deva": "ई",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "specializing",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "specialization of self (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "u": {
+      "iast": "u",
+      "popular_roman": "u",
+      "deva": "उ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "focused",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "zoom / focused contraction (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "uu": {
+      "iast": "ū",
+      "popular_roman": "uu",
+      "deva": "ऊ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "sustaining",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "sustained attention / holding (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "e": {
+      "iast": "e",
+      "popular_roman": "e",
+      "deva": "ए",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "deliberating",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "practical thought / benefit (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "ai": {
+      "iast": "ai",
+      "popular_roman": "ai",
+      "deva": "ऐ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "controlling",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "welfare / materialization (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "o": {
+      "iast": "o",
+      "popular_roman": "o",
+      "deva": "ओ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "holding",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "completion / closure (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "au": {
+      "iast": "au",
+      "popular_roman": "au",
+      "deva": "औ",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "releasing",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "surrender / letting-go (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "am": {
+      "iast": "aṁ",
+      "popular_roman": "am",
+      "deva": "अं",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "expelling",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "repulsion / detox (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    },
+    "ah": {
+      "iast": "aḥ",
+      "popular_roman": "ah",
+      "deva": "अः",
+      "provenance": "CANDIDATE / intuition-derived (not a vṛtti root in the source)",
+      "word_formation_reading": {
+        "english": "merging",
+        "axis": "binding"
+      },
+      "counter_pole": {
+        "english": "attraction / nectar-pull (active essence; liberating / at-rest pole)",
+        "type": "liberating_at_rest",
+        "derived": true
+      }
+    }
+  }
+}
