@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "seeds": {
+    "candidate_shuffle": 71011,
+    "scramble": 20260702,
+    "random_flip": 1379,
+    "packet_order": 4242,
+    "barnum_variant": 8675309
+  },
+  "note": "fixed seeds; random_flip is a frozen deterministic sign flip; scramble permutes axis signs"
+}

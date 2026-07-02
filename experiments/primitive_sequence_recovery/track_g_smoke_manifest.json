@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "bundle_type": "track_g_input_bundle",
+  "status": "NOT_READY",
+  "run_enabled": false,
+  "approval_status": "NOT_APPROVED",
+  "representation": "signed_polarity_boundary",
+  "four_sphere_integrated": false,
+  "track_b_status": "BLOCKED",
+  "arms": [
+    "A",
+    "R",
+    "B",
+    "I",
+    "X",
+    "D"
+  ],
+  "n_cases": 10,
+  "seeds": {
+    "candidate_shuffle": 71011,
+    "scramble": 20260702,
+    "random_flip": 1379,
+    "packet_order": 4242,
+    "barnum_variant": 8675309
+  },
+  "files": [
+    "track_g_smoke_words.jsonl",
+    "track_g_smoke_contexts.jsonl",
+    "track_g_smoke_candidates.jsonl",
+    "track_g_polarity_axes.json",
+    "track_g_polarity_assignments.jsonl",
+    "track_g_smoke_boundaries.jsonl",
+    "track_g_barnum_polarity.json",
+    "track_g_smoke_seeds.json"
+  ],
+  "hashes": {
+    "track_g_smoke_words.jsonl": "641294d40e91bf7ba5e32aeba046f03cd8d874f81d92a18355a14218c23feaa6",
+    "track_g_smoke_contexts.jsonl": "5d82e93ed27446c27334bf6d1a8573a334363ad36ee429ed95f50c2acb5e499a",
+    "track_g_smoke_candidates.jsonl": "0a4d700ea35a67c51cb72b934c4b3419cde03fbf2b25ffebc9c31050b3bb226d",
+    "track_g_polarity_axes.json": "37631d84eb50a611fde43fb1cf38d88832d5508cab92b3d0f56f7c02893dca8b",
+    "track_g_polarity_assignments.jsonl": "90e7e0bb42913ce05f26b2f27c6a9f964f439884481a345120c28e301b0d2f61",
+    "track_g_smoke_boundaries.jsonl": "6226f2440734c495c98475d6f0cbedf2ddf02abbca88d8c5337336db8032f546",
+    "track_g_barnum_polarity.json": "02fe41e659e0cb63cf98a69a522ee972446aaf06bce0d64cc4a2b618ed6353f2",
+    "track_g_smoke_seeds.json": "cf1a8530c46bb898dc4fa25f32563a0953aafbf10f2ea141dfe4ef4be4b4fc7e"
+  },
+  "polarity_frozen_before_scoring": true,
+  "random_flip_control_included": true,
+  "note": "Track G polarity-boundary smoke input bundle for REVIEW ONLY. Signed polarity axes; four-sphere JSON not integrated. Polarity assignments frozen before scoring (post-hoc edits invalidate a case). Researcher-authored polarity vectors (dev) must be verified before any freeze. run_enabled=false; not approved; not run. Track B remains blocked."
+}

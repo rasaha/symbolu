@@ -1,0 +1,952 @@
+{
+  "schema_version": "1.0",
+  "toy_not_for_scoring": true,
+  "synthetic_only": true,
+  "note": "SYNTHETIC nonsense polarity cases exercising Track G decision mechanics only. No real words/markers, no LLM. Each case pre-computes per-arm candidate scores + a frozen polarity_assignment. expected_label is what process_case must return; REJECT raises RejectedFixture. Banned-token rejection is tested inline in the test file.",
+  "cases": [
+    {
+      "case_id": "G-SIGNAL",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "POLARITY_BOUNDARY_SIGNAL",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "A beats all controls.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-RANDOM",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "RANDOM_POLARITY_EXPLAINS",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "Random flip ties A -> sign carries no info.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-CONTEXT",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "CONTEXT_ONLY_EXPLAINS",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "Context-only ties A.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-SCRAMBLE",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "SCRAMBLE_EQUIVALENT",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "Scramble ties A (R and X beaten).",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-BARNUM",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "BARNUM_POLARITY",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "Barnum ties A (R,X,B beaten).",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-NOSIGNAL",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "NO_SIGNAL",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "Only D ties A (not a veto tier) -> NO_SIGNAL.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-INCONCLUSIVE",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "INCONCLUSIVE",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "All arms tie -> not separable.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-INVALID-POSTHOC",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "INVALID_POSTHOC_POLARITY",
+      "polarity_assignment": {
+        "assigned_before_scoring": false,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "assigned_before_scoring=false -> invalid.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-REJECT-MALFORMED",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "REJECT",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "arms missing I -> reject.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "G-REJECT-CONTAMINATION",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "REJECT",
+      "polarity_assignment": {
+        "assigned_before_scoring": true,
+        "frozen": true,
+        "posthoc_mutated": false,
+        "expected_relation": "direct",
+        "expected_pole": "glorpward",
+        "selected_axis_ids": [
+          "ax_alpha",
+          "ax_beta"
+        ],
+        "assignment_author": "A1"
+      },
+      "rationale": "contamination flag -> reject.",
+      "items": [
+        {
+          "candidates": [
+            {
+              "candidate_id": "c1",
+              "gloss": "glorptic reading",
+              "role": "target"
+            },
+            {
+              "candidate_id": "c2",
+              "gloss": "blicket reading",
+              "role": "opposite_pole"
+            },
+            {
+              "candidate_id": "c3",
+              "gloss": "fendle reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c4",
+              "gloss": "morptic reading",
+              "role": "hard_negative"
+            },
+            {
+              "candidate_id": "c5",
+              "gloss": "quandle reading",
+              "role": "barnum_compatible"
+            }
+          ],
+          "target": "c1",
+          "arm_scores": {
+            "A": {
+              "c1": 0.9,
+              "c2": 0.3,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "R": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "B": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "I": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "X": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            },
+            "D": {
+              "c1": 0.5,
+              "c2": 0.9,
+              "c3": 0.2,
+              "c4": 0.1,
+              "c5": 0.15
+            }
+          }
+        }
+      ],
+      "contamination": true
+    }
+  ]
+}
