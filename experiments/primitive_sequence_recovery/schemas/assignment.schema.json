@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.assignment.schema.json",
+  "title": "assignment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "varnas", "atoms", "tau"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "varnas": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+    "atoms":  { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+    "tau":    { "type": "object", "additionalProperties": { "type": "string" } }
+  }
+}

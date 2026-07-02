@@ -192,7 +192,8 @@ def test_runner_not_run():
     _check("runner: NOT_RUN", res["status"] == "NOT_RUN")
     _check("runner: computed False", res["computed"] is False)
     _check("runner: no result", res["result"] is None)
-    _check("runner: NOT_RUN even with a config", RUN.run({"dataset": "x"})["status"] == "NOT_RUN")
+    _check("runner: NOT_RUN for a missing frozen dir",
+           RUN.run(frozen_dir="/nonexistent/psr")["status"] == "NOT_RUN")
 
 
 def main():

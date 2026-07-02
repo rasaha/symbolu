@@ -41,6 +41,34 @@ realization `R_j`. The decision helper (`decision.py`) enforces this:
 
 English is never privileged: English-only positive → `REALIZATION_ARTIFACT`.
 
+## Schema validator + readiness gate
+
+Real runs are gated by a **frozen bundle** under `frozen/` that must validate before any
+execution. `schemas/*.schema.json` are the JSON Schemas (per `SCHEMA_SPECIFICATION.md`);
+`manifest.py` is a dependency-free validator + readiness gate:
+
+- **schema validation** — each artifact (`assignment`, ≥3 `realization_*`, `word_list`,
+  `meaning_reference`, `distractors`, `realizer`, `manifest`) is checked against its schema,
+  plus semantic rules (assignment must be **semantics-free**; realizer must be
+  `deterministic` **and** `offline`; no duplicate atoms/varṇas/words).
+- **hash verification** — every artifact's sha256 must match the manifest.
+- **referential integrity** — realization `atom_content` is total over the assignment atoms;
+  every word has a meaning covering every realization; distractor candidates resolve.
+- **independence** — the manifest must declare an independence basis for **every**
+  realization pair (English is never privileged).
+- `check_readiness(frozen_dir)` returns `status` (`READY`/`NOT_READY`), `reasons`,
+  `hashes_ok`, `schema_ok`, `references_ok`, `realization_count`,
+  `realization_independence_ok`.
+
+**Why `READY` is not a result.** `READY` means the *inputs* are frozen, well-formed, and
+mutually consistent — it says nothing about whether the varṇa assignment carries any signal.
+No scores are computed anywhere in this layer.
+
+**Why the runner still returns `NOT_RUN`.** `run_primitive_recovery.py` consults the gate
+and returns `NOT_RUN` when `NOT_READY` — and **also** when `READY`, because real experiment
+execution is intentionally not implemented in this validation-only layer. It computes no
+scores, loads no embeddings, calls no network/LLM, and writes no result artifacts.
+
 ## Files
 
 | file | role |
@@ -49,8 +77,11 @@ English is never privileged: English-only positive → `REALIZATION_ARTIFACT`.
 | `realization.py` | `Realization` interface; synthetic signal / noise / english realizations |
 | `scoring.py` | MRR ranking/retrieval; assignment-scramble null; `delta_j`; `score_opaque` guard |
 | `decision.py` | per-realization verdict + cross-realization decision helper |
-| `run_primitive_recovery.py` | guarded runner → **NOT_RUN** (no frozen dataset; writes no artifacts) |
-| `test_primitive_sequence_recovery.py` | synthetic tests (30 checks) |
+| `schemas/*.schema.json` | JSON Schemas for every frozen artifact + the manifest |
+| `manifest.py` | schema validator + hash verify + referential integrity + `check_readiness` |
+| `run_primitive_recovery.py` | guarded runner → **NOT_RUN** (gate-aware; still NOT_RUN even when READY) |
+| `test_primitive_sequence_recovery.py` | synthetic scaffold tests |
+| `test_manifest_gate.py` | synthetic readiness-gate tests (temp frozen dirs) |
 
 ## Why the synthetic tests do NOT validate the theory
 
@@ -63,7 +94,8 @@ lexicon and real realizations, which this scaffold deliberately does not run.
 ## Run
 
 ```bash
-python3 experiments/primitive_sequence_recovery/test_primitive_sequence_recovery.py  # 30 checks
+python3 experiments/primitive_sequence_recovery/test_primitive_sequence_recovery.py  # scaffold checks
+python3 experiments/primitive_sequence_recovery/test_manifest_gate.py                # readiness-gate checks
 python3 experiments/primitive_sequence_recovery/run_primitive_recovery.py            # NOT_RUN
 ```
 
