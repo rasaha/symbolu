@@ -142,6 +142,17 @@ python3 run_track_g_smoke_mistral.py \
   packet assembly, or the frozen polarity — bare runs (no flag) behave identically. Diagnosis of the
   cause and any parser/prompt repair are a **separate, later, explicitly-approved** step.
 
+**Parser accepts the positional-array shape (B2).** Diagnosis of the first real run showed Mistral
+returns `"scores"` as a positional **array** (`[0.2, 0.1, ...]`), sometimes as quoted numbers, rather
+than the required `{"opt_1": 0.2, ...}` object. `parse_scorer_json` now accepts EITHER a keyed object
+OR a positional list of the **same length** — mapped in packet-option order to `opt_1..opt_N` — and
+coerces quoted numbers to floats. It stays strict after normalization: every option present exactly
+once, numeric/finite/in-range, `chosen` a valid option, and the contamination scan unchanged. This
+reads only what the model already returned (never invents a score) and does **not** change the 8
+labels, the label criteria, `A_vs_R`/`A_vs_X` co-primary status, the 0.15 abort threshold, packet
+construction, or the frozen polarity. Arrays with the wrong length, non-numeric/opt-id values,
+out-of-range/NaN scores, or `//`-comment / hybrid-syntax JSON are still rejected as malformed.
+
 **Honest negative prior (record it, don't fish past it).** The varṇa polarity table was authored
 from the frozen glosses **blind to the target poles**, so the derived A vectors mostly do **not**
 match the pre-registered poles (e.g. *happy* derives toward contraction/fear/inertia). The expected

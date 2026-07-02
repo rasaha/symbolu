@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import pathlib
 import re
 import sys
@@ -53,32 +54,65 @@ def _prompt(packet):
     # single user turn (Mistral-safe); packet is already anonymized/leak-scanned by the runner.
     opts = [c["candidate_id"] for c in packet["candidates"]]
     lines = [f'  {c["candidate_id"]}: {c["gloss"]}' for c in packet["candidates"]]
-    user = ("You are a careful annotator. Output JSON only, no prose.\n\n" + packet["premise"] +
-            "\n\nCANDIDATES:\n" + "\n".join(lines) +
-            f'\n\nReturn JSON ONLY with keys exactly {opts} inside "scores", plus "packet_id" '
-            f'("{packet["packet_id"]}") and "chosen".')
+    user = ("You are a careful annotator. Output exactly one JSON object, no prose.\n\n"
+            + packet["premise"] + "\n\nCANDIDATES:\n" + "\n".join(lines) +
+            f'\n\nReturn JSON ONLY. "scores" must be a JSON object keyed by the option id '
+            f'(an object like {{"opt_1": 0.7, ...}}, NOT an array), with keys exactly {opts}. '
+            f'Also include "packet_id" ("{packet["packet_id"]}") and "chosen" (one of {opts}).')
     return [{"role": "user", "content": user}]
 
 
+def _coerce_score(v):
+    """Coerce one score to a finite float in [0,1]; raise ValueError otherwise. Accepts a real
+    number or a numeric string it happened to quote (e.g. "0.4"); rejects bools, non-numeric
+    strings, and NaN/inf. Never invents a value."""
+    if isinstance(v, bool):
+        raise ValueError(f"boolean is not a score: {v!r}")
+    if isinstance(v, str):
+        try:
+            v = float(v.strip())
+        except ValueError:
+            raise ValueError(f"non-numeric score string {v!r}")
+    if not isinstance(v, (int, float)) or not math.isfinite(v):
+        raise ValueError(f"non-finite/non-numeric score {v!r}")
+    if not (0.0 <= v <= 1.0):
+        raise ValueError(f"out-of-range score {v!r}")
+    return float(v)
+
+
+def _normalize_scores(scores, opts):
+    """Return {opt: float} for opts. Accepts `scores` as EITHER a keyed object with the exact opt
+    keys, OR a positional list/tuple of the same length mapped in packet-option order to
+    opt_1..opt_N. Strict: no extra/missing keys, no wrong-length arrays, no invented values.
+    Raises ValueError on any shape/length/key/type mismatch."""
+    if isinstance(scores, dict):
+        if set(scores) != set(opts):
+            raise ValueError("scores keys must equal packet opts")
+        return {o: _coerce_score(scores[o]) for o in opts}
+    if isinstance(scores, (list, tuple)):
+        if len(scores) != len(opts):
+            raise ValueError(f"positional scores length {len(scores)} != {len(opts)} opts")
+        return {o: _coerce_score(scores[i]) for i, o in enumerate(opts)}
+    raise ValueError("scores must be an object keyed by option id or a positional array")
+
+
 def parse_scorer_json(text, opts):
-    """Validate one scorer output. Raises ValueError on any malformed/contaminated content."""
+    """Validate one scorer output. Accepts `scores` as a keyed object OR a positional array of the
+    same length (mapped in packet-option order to opt_1..opt_N); coerces quoted numbers. Strict
+    AFTER normalization: every opt present exactly once, numeric & finite & in range, `chosen` a
+    valid opt (else argmax). Contamination scan preserved. Reads only what the model returned; never
+    invents a score. Raises ValueError on any malformed/contaminated content."""
     m = re.search(r"\{.*\}", text, re.S)
     if not m:
         raise ValueError("no JSON object")
     obj = json.loads(m.group(0))
-    scores = obj.get("scores")
-    if not isinstance(scores, dict) or set(scores) != set(opts):
-        raise ValueError("scores keys must equal packet opts")
-    for k, v in scores.items():
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or not (0.0 <= v <= 1.0):
-            raise ValueError(f"non-numeric/out-of-range score {k}={v!r}")
-    if obj.get("chosen") not in set(opts):
-        obj["chosen"] = max(scores, key=scores.get)
+    scores = _normalize_scores(obj.get("scores"), opts)
+    chosen = obj.get("chosen") if obj.get("chosen") in set(opts) else max(scores, key=scores.get)
     for s in (str(v) for v in obj.values() if isinstance(v, str)):
         low = s.lower()
         if any(b.lower() in low for b in HG.BANNED_REAL + HG.FORBIDDEN_LABELS) or "sphere" in low:
             raise ValueError(f"contamination text: {s!r}")
-    return {"scores": scores, "chosen": obj["chosen"]}
+    return {"scores": scores, "chosen": chosen}
 
 
 def score_packets(packets, hidden, generate_fn, debug_records=None):

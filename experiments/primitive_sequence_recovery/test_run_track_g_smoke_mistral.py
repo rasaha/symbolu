@@ -352,6 +352,118 @@ def test_dry_check_writes_no_debug_or_output():
            not any(m in sys.modules for m in ("torch", "transformers")))
 
 
+# ----------------------------------------- B2: positional-array / quoted-number parse ----
+_O3 = ["opt_1", "opt_2", "opt_3"]
+
+
+def test_parse_keyed_dict_still_accepted():
+    r = M.parse_scorer_json('{"scores":{"opt_1":0.2,"opt_2":0.5,"opt_3":0.9},"chosen":"opt_3"}', _O3)
+    _check("keyed dict accepted", r["scores"] == {"opt_1": 0.2, "opt_2": 0.5, "opt_3": 0.9})
+    _check("keyed dict chosen kept", r["chosen"] == "opt_3")
+
+
+def test_parse_positional_array_maps_in_order():
+    r = M.parse_scorer_json('{"scores":[0.2,0.5,0.9],"chosen":"opt_3"}', _O3)
+    _check("array mapped opt_1..opt_N in packet order",
+           r["scores"] == {"opt_1": 0.2, "opt_2": 0.5, "opt_3": 0.9})
+    _check("array chosen kept", r["chosen"] == "opt_3")
+
+
+def test_parse_array_of_quoted_numbers_coerced():
+    r = M.parse_scorer_json('{"scores":["0.4","0.3","0.2"]}', _O3)
+    _check("quoted-number array coerced", r["scores"] == {"opt_1": 0.4, "opt_2": 0.3, "opt_3": 0.2})
+    _check("array chosen -> argmax when absent", r["chosen"] == "opt_1")
+
+
+def test_parse_dict_of_quoted_numbers_coerced():
+    r = M.parse_scorer_json('{"scores":{"opt_1":"0.9","opt_2":"0.1"}}', ["opt_1", "opt_2"])
+    _check("quoted-number dict coerced", r["scores"] == {"opt_1": 0.9, "opt_2": 0.1})
+
+
+def test_parse_wrong_length_array_rejected():
+    for bad in ('{"scores":[0.1,0.2]}', '{"scores":[0.1,0.2,0.3,0.4]}'):
+        try:
+            M.parse_scorer_json(bad, _O3)
+        except ValueError:
+            continue
+        _check(f"wrong-length array rejected: {bad}", False)
+    _check("wrong-length arrays rejected", True)
+
+
+def test_parse_array_non_numeric_rejected():
+    for bad in ('{"scores":[0.1,"hi",0.3]}',              # non-numeric string
+                '{"scores":["opt_1","opt_2","opt_3"]}'):  # opt-ids as values, not scores
+        try:
+            M.parse_scorer_json(bad, _O3)
+        except ValueError:
+            continue
+        _check(f"non-numeric array rejected: {bad}", False)
+    _check("non-numeric arrays rejected", True)
+
+
+def test_parse_out_of_range_and_nan_rejected():
+    for bad in ('{"scores":[3,8,5]}',        # 0-10 scale -> out of range
+                '{"scores":[NaN,0.2,0.3]}',  # json allows NaN; must be rejected as non-finite
+                '{"scores":[0.1,0.2,1.5]}'):
+        try:
+            M.parse_scorer_json(bad, _O3)
+        except ValueError:
+            continue
+        _check(f"out-of-range/NaN rejected: {bad}", False)
+    _check("out-of-range / NaN arrays rejected", True)
+
+
+def test_parse_extra_and_missing_keys_rejected():
+    extra = '{"scores":{"opt_1":0.1,"opt_2":0.2,"opt_3":0.3,"opt_9":0.5}}'
+    missing = '{"scores":{"opt_1":0.1,"opt_2":0.2}}'
+    for bad in (extra, missing):
+        try:
+            M.parse_scorer_json(bad, _O3)
+        except ValueError:
+            continue
+        _check(f"extra/missing keys rejected: {bad}", False)
+    _check("extra/missing dict keys rejected", True)
+
+
+def test_parse_chosen_still_validated():
+    r = M.parse_scorer_json('{"scores":[0.1,0.9,0.2],"chosen":"opt_99"}', _O3)
+    _check("invalid chosen -> argmax", r["chosen"] == "opt_2")
+    r2 = M.parse_scorer_json('{"scores":[0.1,0.9,0.2],"chosen":"opt_1"}', _O3)
+    _check("valid chosen preserved", r2["chosen"] == "opt_1")
+
+
+def test_parse_array_still_rejects_contamination():
+    bad = '{"scores":[0.9,0.1,0.0],"chosen":"opt_1","why":"the varna clearly fits"}'
+    try:
+        M.parse_scorer_json(bad, _O3)
+    except ValueError:
+        _check("contamination rejected even with array scores", True); return
+    _check("contamination rejected even with array scores", False)
+
+
+def _gen_array(scores_by_pid):
+    """Injected generator that emits `scores` as a positional ARRAY (the observed Mistral shape)."""
+    def f(p):
+        sc = scores_by_pid[p["packet_id"]]
+        opts = [c["candidate_id"] for c in p["candidates"]]
+        return json.dumps({"packet_id": p["packet_id"], "scores": [sc[o] for o in opts],
+                           "chosen": max(sc, key=sc.get)})
+    return f
+
+
+def test_array_form_yields_same_scores_and_label_as_dict_form():
+    bundle, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    s_dict, m_dict = M.score_packets(packets, hidden, _gen_fn(scores), None)   # keyed-object gen
+    s_arr, m_arr = M.score_packets(packets, hidden, _gen_array(scores), None)  # array gen
+    _check("array-form scores == dict-form scores", s_dict == s_arr)
+    _check("array-form malformed count == 0 (now valid)", m_arr == 0 == m_dict)
+    lab_dict = M.assemble_and_score(bundle, hidden, s_dict, m_dict, 0.0)["primary_label"]
+    lab_arr = M.assemble_and_score(bundle, hidden, s_arr, m_arr, 0.0)["primary_label"]
+    _check("label identical whether scores arrived as array or dict", lab_dict == lab_arr)
+    _check("label still in allowed set", lab_arr in HG.ALLOWED_LABELS and lab_arr not in HG.FORBIDDEN_LABELS)
+
+
 def main():
     print("run_track_g_smoke_mistral — scorer-step tests (no LLM, no scoring, no writes)\n")
     for name, fn in sorted(globals().items()):
