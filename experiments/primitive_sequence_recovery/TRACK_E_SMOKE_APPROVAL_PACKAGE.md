@@ -40,19 +40,26 @@ gate below is fully satisfied.
 - **Primary endpoint:** `A_vs_X` (incremental over context). A positive requires A to beat **every**
   control.
 
-## 4. Model selection (fill before approval)
+## 4. Model selection — **PROPOSED_NOT_APPROVED**
 
-| Field | Value |
+The values below are a **proposed** run configuration for review only. They are **not approved**,
+change nothing executable, and do not flip any gate. An approver must still sign §6 before a run.
+
+| Field | Proposed value (`PROPOSED_NOT_APPROVED`) |
 |---|---|
-| generator model | ☐ ________________ |
-| scorer model | ☐ ________________ |
-| generator ≠ scorer confirmed | ☐ yes ☐ no |
-| local GPU or API | ☐ local GPU ________ ☐ API ________ |
-| temperature | ☐ ________ (low / near-deterministic recommended) |
-| max tokens | ☐ ________ |
-| JSON-only mode | ☐ enforced ☐ not |
-| browsing / tools disabled | ☐ yes ☐ no |
-| no memory / no carryover between packets | ☐ yes ☐ no |
+| generator model | `Qwen/Qwen2.5-7B-Instruct` |
+| scorer model | `mistralai/Mistral-7B-Instruct-v0.3` |
+| generator ≠ scorer confirmed | **yes** (distinct model families) |
+| local GPU or API | **local GPU / RunPod** (e.g. RTX 6000 Ada, as used for the D0 pilot) |
+| temperature | **0.0** (or the lowest stable near-deterministic setting) |
+| max tokens | **256** proposed (enough for the JSON `{packet_id, scores, chosen}`; adjust if truncation seen) |
+| JSON-only mode | **required / enforced** (schema-validated on ingest; malformed → dropped, rate tracked) |
+| browsing / tools disabled | **yes** (no browsing, no tools during scoring) |
+| no memory / no carryover between packets | **yes** (each packet scored in isolation; no chat history) |
+| contamination probe per session | **yes** (checks the scorer cannot name the hidden word/varṇa/root) |
+
+These are proposals for the approver to accept, amend, or reject; none is locked and none is
+authorized. Recording them here does **not** set them anywhere executable.
 
 ## 5. Seed lock (already fixed in `track_e_smoke_seeds.json`)
 
@@ -70,18 +77,42 @@ packet order, Barnum variant order.)
 
 ## 6. Approval gate (fill + sign before any run)
 
+Gate fields remain **UNSET** and status remains **`NOT_APPROVED`** (the proposed model config in §4
+does not change this). An approver fills and signs these; only then may the manifest be edited.
+
 | Field | Value |
 |---|---|
-| approver | ☐ ________________ |
-| approval date | ☐ ____-__-__ |
-| approval status | ☐ change `NOT_APPROVED` → `APPROVED` (only after sign-off) |
-| run_enabled switch | ☐ change `false` → `true` (only on the approved commit) |
-| approval signature | ☐ ________________ |
-| command to run | `python3 experiments/primitive_sequence_recovery/track_e_smoke_runner.py` *(after the manifest edits above; emits packets for EXTERNAL scoring — still no model call inside the runner)* |
-| expected output report path | ☐ ________________ (e.g. `experiments/primitive_sequence_recovery/track_e_smoke_result.json`) |
+| approver | ☐ ________________ (unset) |
+| approval date | ☐ ____-__-__ (unset) |
+| approval status | **`NOT_APPROVED`** — to be changed → `APPROVED` **only after sign-off** |
+| run_enabled switch | **`false`** — to be changed → `true` **only on the approved commit** (unchanged here) |
+| approval signature | ☐ ________________ (unset) |
+
+**Proposed pre-run dry-run command** (safe now; no model call, no gate change):
+```
+python3 experiments/primitive_sequence_recovery/track_e_smoke_runner.py
+```
+This prints the dry-run report (108 packets, 0 model calls, leak-clean) and the list of unmet gates
+— it does **not** run the pilot while `run_enabled:false` / `NOT_APPROVED`.
+
+**Proposed command to run (AFTER approval only)** — placeholder; runs only once §4 is accepted, §6
+signed, `approval_status:"APPROVED"`, and `run_enabled:true` on the approved commit:
+```
+# 1) (approved commit) set track_e_smoke_manifest.json: run_enabled=true, approval_status=APPROVED
+# 2) emit real packets for the external scorer (still no model call inside the runner):
+python3 experiments/primitive_sequence_recovery/track_e_smoke_runner.py --emit   # placeholder flag
+# 3) run the two proposed models EXTERNALLY over the packets (generator≠scorer), collect JSON
+# 4) ingest + score via ingest_scorer_outputs / score_from_outputs
+```
+
+**Proposed expected output report path:**
+`experiments/primitive_sequence_recovery/track_e_smoke_result.json`  *(proposed; created only by an
+approved run)*
 
 > Note: the runner never calls a model. Approval authorizes emitting real packets for an external
-> scorer and later ingesting that scorer's JSON via `ingest_scorer_outputs` / `score_from_outputs`.
+> scorer (the two proposed models above) and later ingesting that scorer's JSON via
+> `ingest_scorer_outputs` / `score_from_outputs`. **Final approval is still required**; nothing in
+> §4/§6 as written authorizes a run.
 
 ## 7. Pre-run checklist (verify immediately before running)
 
