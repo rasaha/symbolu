@@ -379,6 +379,13 @@ def check_readiness(frozen_dir) -> dict:
             reasons.append("realizer model_asset missing (no implicit model permitted)")
         if not rz.get("model_sha256"):
             reasons.append("realizer model_sha256 missing (asset must be pinned)")
+        # a concept realization requires an implemented concept resolver
+        concept_needed = any(r.get("language") == "concept"
+                             or r.get("meaning_encoder", {}).get("kind") in ("synset_id", "qid")
+                             for r in realizations)
+        if concept_needed and (not rz.get("concept_resolver")
+                               or rz.get("concept_resolver_status") != "IMPLEMENTED"):
+            reasons.append("concept resolver not implemented (required by concept realization)")
     rp = loaded.get("run_params")
     if rp is not None and rp.get("run_enabled") is not True:
         reasons.append("run_params run_enabled is not true")

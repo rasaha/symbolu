@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "design_doc_sha256": "9439672f64bdccb5b277f1895b88f2da2057ea07cfd49a6b5b689ba74e9e23ff",
+  "assignment_hash": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+  "realization_hashes": {
+    "concept_id": "7da4a70fd2935f8ad981df8a2e301ae78a0b917b1ae5d853bdb900af8ba807ae",
+    "en_gloss": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+    "sa_term": "e69cd6f0985f32a289a582e32b0482ebe38a53a9e04c2417d27ee5230803a518"
+  },
+  "word_hash": "ce42d77154ed7bc7c1fe8dcddcdc1017d31e65bad1c3f9ba16d701d0570d68cc",
+  "meaning_hash": "54dde252252d3ebce1b6b3eada75f0055f9d00458fc70deea0768f7c27bbb4f2",
+  "distractor_hash": "8a42fc4e1f411133c08b63c9a98e9bac0b7aa4abe32309ffdb391c66a16ae508",
+  "realizer_hash": "a9bc78d9d457522e5202364a5cb68819204543cf1319c6be10ac302860f85094",
+  "scramble_seed_hash": "b477f15a4c85127059d4cb8fab5c2016cebfaf3f374d8899f231cdeabe470d9e",
+  "independence_basis": {
+    "concept_id|en_gloss": "distinct source (concept inventory vs English lexicon field) and kind/language (synset_id/concept vs gloss_text/en)",
+    "concept_id|sa_term": "distinct source (concept inventory vs Sanskrit lexicon field) and kind/language (synset_id/concept vs gloss_text/sa)",
+    "en_gloss|sa_term": "distinct source (English vs Sanskrit lexicon field) and language (en vs sa)"
+  },
+  "status": "NOT_READY"
+}

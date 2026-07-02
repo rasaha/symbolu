@@ -235,6 +235,17 @@ def test_run_not_enabled_blocks():
         _check("run_enabled False -> reason", any("run_enabled" in x for x in r["reasons"]))
 
 
+def test_concept_resolver_missing_blocks():
+    a = _default_artifacts()   # includes a language='concept' / synset_id realization
+    a["realizer"].update({"concept_resolver": None, "concept_resolver_status": "NOT_IMPLEMENTED"})
+    with tempfile.TemporaryDirectory() as t:
+        write_bundle(t, a, status="READY")
+        r = MF.check_readiness(t)
+        _check("no concept resolver -> NOT_READY", r["status"] == "NOT_READY")
+        _check("no concept resolver -> reason",
+               any("concept resolver" in x for x in r["reasons"]))
+
+
 def test_independence_not_declared():
     with tempfile.TemporaryDirectory() as t:
         write_bundle(t, _default_artifacts(), status="READY", independence=False)
