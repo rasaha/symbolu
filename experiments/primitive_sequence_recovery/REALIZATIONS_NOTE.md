@@ -166,4 +166,64 @@ term; `definition_en` is the language-neutral concept gloss (from the same vṛt
 | svc:32 | atom_14 | nna | Īrṣyā | envy |
 | svc:33 | atom_31 | sa | — | escapism / premature static withdrawal (no binding-pole Sanskrit term in source) |
 
+---
+
+## 7. Realization-specific meaning references (Step C.3)
+
+`meaning_reference.json` now carries, for **every** word, a
+`realization_specific_reference` with exactly the three realization IDs — how each
+word's *target meaning* enters each realization's space (the query side, built from
+varṇa-atom content, is scored against these targets; **no scoring is done here**).
+
+| key | how produced | consumed by |
+|---|---|---|
+| `en_gloss` | the word's canonical English gloss, **verbatim** from `canonical_meaning` (unchanged) | `en_gloss` (gloss_text / en) |
+| `sa_term` | the word's **Sanskrit lexeme** = `word_list.spelling` (IAST), the sense-fixed Sanskrit target | `sa_term` (gloss_text / sa) |
+| `concept_id` | a deterministic **word-meaning** concept id `wmc:NNN`, one per distinct canonical meaning, numbered alphabetically by the English gloss | `concept_id` (synset_id / concept) |
+
+`canonical_meaning` was **not** changed (no prior audit note required a further
+correction beyond the already-applied jñāna→"cognition" fix).
+
+### Atom concept IDs (`svc:NN`) vs word-meaning concept IDs (`wmc:NNN`)
+
+These are two **different** inventories and must not be conflated:
+
+- **`svc:NN`** (§6) is a **per-varṇa-atom** concept — the *vṛtti* attached to an opaque
+  atom, used on the **query/atom** side by `realization_concept_id.json`. 34 of them.
+- **`wmc:NNN`** is a **per-word-meaning** concept — the target a word denotes (anger,
+  water, …), used on the **meaning/target** side here. One per distinct meaning (110).
+
+Rule 4 requires the word-meaning reference to identify the *meaning*, not the atom; a
+word's `concept_id` target is therefore a `wmc:*`, never an `svc:*`. The two spaces meet
+only through the (later, not-yet-frozen) concept resolver.
+
+### Excluded-word handling
+
+The three excluded words (`w030` nārī, `w058` avidyā, `w068` ahimsā;
+`exclude_flag=true`) **retain** meaning entries with all three references populated. The
+readiness referential-integrity check requires every *present* meaning to carry every
+realization id, and every *non-excluded* word to have a meaning; keeping complete refs on
+the excluded entries satisfies both and keeps ids stable if a word is ever re-included.
+Active count used for READY is **107** (excluded words are dropped from that count).
+
+### Limitations / placeholders / gaps
+
+- **`concept_id` is not yet independently grounded.** `wmc:NNN` is currently 1:1 with the
+  English `canonical_meaning` (it is numbered by that gloss), so as it stands the
+  word-meaning concept is effectively an **opaque relabeling of the English meaning**, not
+  an independent language-neutral encoding. Genuine independence needs the concept
+  resolver / similarity graph (to be frozen in `realizer.json`); until then `concept_id`
+  cannot contribute real independent signal, and READY must not lean on it. Same caveat as
+  the atom-level `svc` inventory (§5).
+- **`sa_term` target = the word's own spelling.** This is the correct Sanskrit sense
+  reference and is non-circular (the query is composed from *atom* vṛtti terms, not the
+  spelling), but it means the Sanskrit target side inherits any transliteration/segmentation
+  choices already in `word_list.spelling`. No word-level Sanskrit gap exists (all 110 words
+  have IAST spellings); the only Sanskrit gap remains at the **atom** level (`sa`→"—", §5).
+- **No placeholders were needed** for `sa_term` at the word level — every word has an exact
+  Sanskrit lexeme, so rule 3's placeholder path did not trigger.
+- **Shared conceptual source (unchanged).** As in §5, all three references still trace to
+  the same meaning table; cross-realization agreement controls for the encoder, not for the
+  meaning assignment.
+
 > structure, not validated meaning.
