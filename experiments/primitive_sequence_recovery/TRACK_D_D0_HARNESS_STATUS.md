@@ -38,6 +38,15 @@ privilege. Track C V1 negative stands.
   "SUGGESTIVE" result is a mechanics check on fabricated numbers — it means the plumbing works,
   nothing about Sanskrit or varṇas.
 
+## Real-pilot package status
+
+The **real D0 pilot run package exists** (runbook, schemas, prompt templates, packet-generation
+plan, pilot-size recommendation, abort criteria, reporting template) — but **no real run has
+occurred, no LLM was called, and no real scoring has been performed.** See
+`TRACK_D_D0_REAL_PILOT_RUNBOOK.md`, `TRACK_D_D0_SCHEMAS.md`, `TRACK_D_D0_PROMPTS.md`. Executing it
+requires a separate explicit approval and an available (offline/pinned preferred) LLM judge; live
+LLM calls remain unimplemented (`run_real_pilot` raises).
+
 ## To run the real D0 pilot later
 
 Requires **explicit approval** and an **available LLM judge** (offline/pinned preferred; a hosted
