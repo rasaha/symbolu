@@ -1,0 +1,26 @@
+{
+  "toy_not_for_scoring": true,
+  "_README": "TEMPLATE ONLY — shows the frozen input-bundle shape the RunPod runner expects. NOT a real config; compositions are nonsense tokens. A real d0_config.json is produced by the approved, frozen input step (see TRACK_D_D0_SCHEMAS.md) with real rendered compositions; 'spelling' is recorded but NEVER sent to the LLM (Stage 1 uses meaning only; Stage 2 uses the anonymized packet). domain must be one of abstract_primary | concrete_control | famous_exploratory. Famous words are exploratory-only and never drive the primary label.",
+  "controlled_vocabulary": ["calm", "tense", "bright", "heavy", "open", "closed", "warm", "cold",
+                            "steady", "restless", "sharp", "soft", "fear", "anger", "grief",
+                            "trust", "longing", "pride", "shame", "hope"],
+  "barnum": {
+    "I1": ["feeling", "mood", "emotion", "affect", "tension", "calm", "intensity", "warmth"],
+    "I2": ["awakening", "transcendence", "surrender", "journey", "insight", "renewal"],
+    "I3": ["pain", "hurt", "wound", "grief", "struggle", "loss", "heaviness", "vulnerability"],
+    "I4": ["growth", "progress", "strength", "resilience", "becoming", "flourishing"]
+  },
+  "seeds": {"scramble": [11, 23, 42, 101, 7], "decoy": 20260702, "shuffle": 0},
+  "words": [
+    {
+      "word_id": "d000", "spelling": "<IAST, records only, NOT sent to LLM>",
+      "dictionary_meaning": "<english meaning>", "pos": "noun",
+      "domain": "abstract_primary", "contamination_tier": "med",
+      "compositions": {
+        "A": "<real gloss-token composition>",
+        "B": "<scrambled-assignment composition>",
+        "C": "<equal-length affliction-gloss decoy>"
+      }
+    }
+  ]
+}
