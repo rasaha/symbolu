@@ -60,8 +60,17 @@ import manifest as MF, run_primitive_recovery as RUN
 print("manifest readiness:", MF.check_readiness(P/"frozen")["status"])   # NOT_READY
 print("psr runner        :", RUN.run()["status"])                        # NOT_RUN
 PY
-grep -q "ONTOLOGICAL_SIGNAL" "${D0_OUT:-/workspace/d0_report.json}" \
-  && { echo "GUARD FAIL: ONTOLOGICAL_SIGNAL in report"; exit 5; } || echo "OK: no ONTOLOGICAL_SIGNAL"
+python3 - "${D0_OUT:-/workspace/d0_report.json}" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+forbidden = {"EXPERIENTIAL_WEATHER_SIGNAL", "ONTOLOGICAL_SIGNAL", "SANSKRIT_PRIVILEGE"}
+# check LABEL FIELDS only (the disclaimer 'note' legitimately mentions ONTOLOGICAL_SIGNAL)
+labels = [d.get("primary_label")] + [w.get("label") for w in d.get("per_word", []) if isinstance(w, dict)]
+bad = sorted({x for x in labels if x in forbidden})
+if bad:
+    print("GUARD FAIL: forbidden label(s):", bad); sys.exit(5)
+print("OK: no forbidden labels (primary_label=%s)" % d.get("primary_label"))
+PY
 if git diff --quiet "$STAGE_A_BASELINE" HEAD -- symbolu_neural/structural_v1; then
   echo "Stage A: UNTOUCHED"; else echo "Stage A: MODIFIED — ABORT"; exit 5; fi
 echo "Track B: BLOCKED (D0 is exploratory triage; not Track B)"
