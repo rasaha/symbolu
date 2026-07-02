@@ -105,6 +105,12 @@ seeds, output-drop rate, contamination-probe result, excluded leakage/tautology 
 abstract-vs-concrete split, and the single overall `LLM_PILOT_*` label. **Profiles are
 LLM-generated** must be stated.
 
+**Discovery / error-taxonomy report (required):** the report must also include the
+discovery-oriented failure analysis defined in `TRACK_D_D0_ERROR_TAXONOMY.md` — which error
+category dominated, domain/famous/Barnum-locus breakdowns, and any non-Barnum substructure. This
+is diagnostic only and, per the no-rescue rule, **cannot** turn a non-`SUGGESTIVE` label into a
+positive; any new construct it suggests requires a new pre-registration.
+
 ---
 
 Real D0 pilot package prepared only. No real scoring has occurred. Track B remains blocked.
