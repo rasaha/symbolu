@@ -189,6 +189,61 @@ def _parse_json(text):
     return json.loads(m.group(0))
 
 
+# ------------------------------------------------------------- judge pass -----------
+_JUDGE_DIMS = ("correctness", "usefulness", "poetic_noise", "hallucination")
+_JUDGE_INSTR = ('For EACH candidate answer, rate in [0,1]: correctness (vs the reference behavior), '
+                'usefulness, poetic_noise (evocative-but-empty language), hallucination (invented '
+                'facts). Respond with JSON ONLY: {"resp_1": {"correctness":0.0,"usefulness":0.0,'
+                '"poetic_noise":0.0,"hallucination":0.0}, ...}.')
+
+
+def _answer_text(a):
+    if not isinstance(a, dict):
+        return ""
+    return " ".join(str(a.get(k, "")) for k in ("answer", "interpretation", "reasoning_summary"))
+
+
+def _lex_dist(a, b):
+    ta = set(re.findall(r"[a-z0-9]+", a.lower()))
+    tb = set(re.findall(r"[a-z0-9]+", b.lower()))
+    if not ta and not tb:
+        return 0.0
+    return round(1.0 - len(ta & tb) / (len(ta | tb) or 1), 4)
+
+
+def _clamp01(v):
+    try:
+        return min(1.0, max(0.0, float(v)))
+    except (TypeError, ValueError):
+        raise ValueError("non-numeric judge score")
+
+
+def _judge_task(model, tok, task, arm_answers, seed):
+    """Single-model judge: Mistral scores the anonymized per-arm answers; distances are lexical.
+    EXPLORATORY (answer model judges its own outputs). Returns a track_f_harness item."""
+    order = [a for a in ("X", "A", "B", "F", "I") if a in arm_answers]
+    random.Random(f"{seed}:{task['task_id']}").shuffle(order)
+    anon = {f"resp_{i}": arm for i, arm in enumerate(order, 1)}
+    lines = [f'{rid}: {_answer_text(arm_answers[arm])[:400]}' for rid, arm in anon.items()]
+    prompt = (f"TASK: {task['base_prompt']}\nCONTEXT: {task['context']}\n"
+              f"REFERENCE (correct behavior): {task['correctness_criteria']}\n\n"
+              "CANDIDATE ANSWERS:\n" + "\n".join(lines) + "\n\n" + _JUDGE_INSTR)
+    scores = _parse_json(_generate(model, tok, prompt))
+    arms_out = {}
+    for rid, arm in anon.items():
+        s = scores.get(rid) or {}
+        arms_out[arm] = {d: _clamp01(s.get(d, 0.0)) for d in _JUDGE_DIMS}
+    for a in ("X", "A", "B", "F", "I"):
+        if a not in arms_out:
+            raise ValueError(f"judge missing arm {a}")
+    at = _answer_text(arm_answers["A"])
+    a_dist = {"to_X": _lex_dist(at, _answer_text(arm_answers["X"])),
+              "to_B": _lex_dist(at, _answer_text(arm_answers["B"])),
+              "to_F": _lex_dist(at, _answer_text(arm_answers["F"])),
+              "to_I": _lex_dist(at, _answer_text(arm_answers["I"]))}
+    return {"arms": arms_out, "a_distances": a_dist}
+
+
 def main():
     global ANSWER_MODEL, TEMPERATURE, MAX_NEW_TOKENS
     ap = argparse.ArgumentParser()
@@ -214,7 +269,10 @@ def main():
     if json.loads(MANIFEST.read_text())["run_enabled"] is not False:
         raise RuntimeError("base smoke manifest must stay run_enabled:false")
 
+    bundle = load_bundle()
     model, tok = _load_model(ANSWER_MODEL)
+
+    # --- answer generation ---
     answers, malformed = {}, 0
     for p in packets:
         try:
@@ -222,31 +280,62 @@ def main():
         except Exception:
             malformed += 1
     rate = malformed / max(1, len(packets))
-    judge_note = ("single-model judge (answer model judged its own anonymized outputs): EXPLORATORY / "
-                  "weaker — no answer≠judge separation" if args.judge_mode == "single"
-                  else "no judge pass run; answers only")
+
+    # --- judge pass (single-model, EXPLORATORY) -> track_f_harness label ---
+    label, metrics, per_arm_means, judged, judge_dropped = "INCONCLUSIVE", None, None, 0, []
+    if args.judge_mode == "single" and rate <= MALFORMED_ABORT_RATE:
+        by_task = {}
+        for pid, ans in answers.items():
+            h = hidden[pid]
+            by_task.setdefault(h["task_id"], {})[h["true_arm"]] = ans
+        items = []
+        for tid, aa in by_task.items():
+            if not all(a in aa for a in ("X", "A", "B", "F", "I")):
+                judge_dropped.append(tid); continue
+            try:
+                items.append(_judge_task(model, tok, bundle["tasks"][tid], aa, bundle["seeds"]["arm_order"]))
+                judged += 1
+            except Exception:
+                judge_dropped.append(tid)
+        if items:
+            metrics = HF.compute_metrics(items)
+            label = HF.decide(metrics)
+            assert label in HF.ALLOWED_LABELS and label not in HF.FORBIDDEN_LABELS, label
+            per_arm_means = {a: {d: round(sum(it["arms"][a][d] for it in items) / len(items), 4)
+                                 for d in _JUDGE_DIMS} for a in ("X", "A", "B", "F", "I")}
+    elif rate > MALFORMED_ABORT_RATE:
+        label = "INCONCLUSIVE"
+
+    judge_note = ("single-model judge (answer model judged its own anonymized outputs; lexical "
+                  "distances): EXPLORATORY / weaker — no answer≠judge separation" if args.judge_mode == "single"
+                  else "no judge pass run; answers only (no label)")
     out = {"artifact": "track_f_smoke_outputs", "exploratory_triage_only": True,
            "answer_model": ANSWER_MODEL, "temperature": TEMPERATURE, "judge_mode": args.judge_mode,
            "judge_note": judge_note, "n_packets": len(packets), "malformed": malformed,
-           "malformed_rate": round(rate, 4),
-           "aborted": rate > MALFORMED_ABORT_RATE,
-           "primary_label": ("INCONCLUSIVE" if (rate > MALFORMED_ABORT_RATE or args.judge_mode == "none")
-                             else "PENDING_JUDGE"),
-           "note": ("Track F smoke, exploratory triage only. Judge scoring feeds track_f_harness for a "
-                    "label from {INFERENCE_STEERING_SIGNAL, PROMPT_PRIMING_ONLY, SCRAMBLE_EQUIVALENT, "
-                    "BARNUM_EQUIVALENT, CORRECTNESS_DEGRADED, NO_EFFECT, INCONCLUSIVE}. Not validation; "
-                    "Track B remains blocked. No ONTOLOGICAL_SIGNAL, no Sanskrit privilege.")}
+           "malformed_rate": round(rate, 4), "aborted": rate > MALFORMED_ABORT_RATE,
+           "tasks_judged": judged, "tasks_dropped_by_judge": judge_dropped,
+           "primary_label": (label if args.judge_mode == "single" else "ANSWERS_ONLY_NO_JUDGE"),
+           "metrics": (metrics and {k: round(v, 4) for k, v in metrics.items()}),
+           "per_arm_means": per_arm_means,
+           "note": ("Track F smoke, exploratory triage only. Single-model judge is weaker than "
+                    "answer≠judge. Label from {INFERENCE_STEERING_SIGNAL, PROMPT_PRIMING_ONLY, "
+                    "SCRAMBLE_EQUIVALENT, BARNUM_EQUIVALENT, CORRECTNESS_DEGRADED, NO_EFFECT, "
+                    "INCONCLUSIVE}. Not validation, no varṇa-truth claim; Track B remains blocked. "
+                    "No ONTOLOGICAL_SIGNAL, no Sanskrit privilege.")}
     OUTPUTS_JSON.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     RESULT_MD.write_text(
         "# Track F Smoke — Result (exploratory triage only)\n\n"
         f"- answer_model: `{ANSWER_MODEL}` | temp {TEMPERATURE} | judge_mode: {args.judge_mode}\n"
+        f"- primary_label: `{out['primary_label']}`\n"
         f"- packets: {len(packets)} | malformed_rate: {round(rate,4)} | aborted: {out['aborted']}\n"
+        f"- tasks_judged: {judged} | dropped_by_judge: {judge_dropped}\n"
         f"- judge_note: {judge_note}\n"
-        f"- primary_label: `{out['primary_label']}`\n\n"
-        "Track F smoke pilot, exploratory triage only. Track B remains blocked. "
-        "Structure, not validated meaning.\n", encoding="utf-8")
-    print(f"[done] malformed_rate={rate:.3f} judge_mode={args.judge_mode} -> wrote "
-          f"{OUTPUTS_JSON.name} + {RESULT_MD.name}")
+        f"- metrics: {out['metrics']}\n"
+        f"- per_arm_means: {per_arm_means}\n\n"
+        "Track F smoke pilot, exploratory triage only. Single-model judge; not validation, no varṇa "
+        "truth. Track B remains blocked. Structure, not validated meaning.\n", encoding="utf-8")
+    print(f"[done] primary_label={out['primary_label']} malformed_rate={rate:.3f} "
+          f"judged={judged} dropped={len(judge_dropped)} -> wrote {OUTPUTS_JSON.name} + {RESULT_MD.name}")
 
 
 if __name__ == "__main__":
