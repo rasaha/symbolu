@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "bundle_type": "track_f_input_bundle",
+  "status": "NOT_READY",
+  "run_enabled": false,
+  "approval_status": "NOT_APPROVED",
+  "representation": "prompt_boundary_injection",
+  "model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "four_sphere_integrated": false,
+  "track_b_status": "BLOCKED",
+  "arms": [
+    "X",
+    "A",
+    "B",
+    "F",
+    "I",
+    "R"
+  ],
+  "n_tasks": 12,
+  "expected_packet_count": 72,
+  "seeds": {
+    "boundary_scramble": 20260702,
+    "arm_order": 4242,
+    "random_boundary": 1379
+  },
+  "files": [
+    "track_f_smoke_tasks.jsonl",
+    "track_f_smoke_prompt_arms.jsonl",
+    "track_f_smoke_boundaries.jsonl"
+  ],
+  "hashes": {
+    "track_f_smoke_tasks.jsonl": "6d58e0ad22dae817e5657899daf55ae532c66074124a9cc075a77a1fa7632397",
+    "track_f_smoke_prompt_arms.jsonl": "7c2ae7c9ca8f6d23f40960985a9a1e0cd99322fc4947023d05930f137ca69355",
+    "track_f_smoke_boundaries.jsonl": "958442a9e410c6d99004176ff334e21002e81a1625c1b0fe993af85fcaf0caf7"
+  },
+  "exploratory_only_tasks": [
+    "f007",
+    "f008"
+  ],
+  "note": "Track F inference-steering smoke input bundle for REVIEW ONLY. Prompt-boundary injection; four-sphere JSON not integrated. Boundaries composed from the frozen en_gloss table for DRAFT consonant-only sequences (dev fields); must be verified before any freeze. run_enabled=false; not approved; not run. Track B remains blocked."
+}

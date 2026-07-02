@@ -16,6 +16,15 @@ LLM output. The build must therefore make **specificity** (A ≠ B, A ≠ I) and
 preservation** first-class, length/register-match all boundary texts, and penalize poetic-but-wrong
 answers. Default expectation: `PROMPT_PRIMING_ONLY` / `NO_EFFECT`.
 
+**Initial model (execution-oriented).** The first smoke uses **`mistralai/Mistral-7B-Instruct-v0.3`
+as the answer model** (RunPod/local GPU, temp 0.0, JSON-only, no browsing, no carryover). A distinct
+judge model is preferred (answer ≠ judge); **if no separate judge is available, a single-model judge
+(Mistral judging its own anonymized outputs) is permitted but is EXPLORATORY / weaker** and must be
+reported as such — it cannot on its own justify a full pilot. The concrete build for this smoke is
+tracked in `TRACK_F_IMPLEMENTATION_STATUS.md` (harness, toy fixtures/tests, 12-task smoke bundle,
+dry-run runner, separate approved run config, operator runbook); the base smoke manifest stays
+`run_enabled:false` / `NOT_APPROVED` and no run is executed here.
+
 ## 1. Purpose
 
 Specify what must be built and frozen before a Track F run: prompt-arm construction, task/packet
