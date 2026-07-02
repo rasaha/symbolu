@@ -58,13 +58,13 @@
   ],
   "hashes": {
     "track_e_smoke_words.jsonl": "b9c63591246794626323c1b21ff3b2613970af3e5cd303fd50d4bb3dcd1bd0a8",
-    "track_e_smoke_contexts.jsonl": "12b882e349f0cb70be8c9bbcbd533c58cd8cd41790735e30962000fc10767bc1",
-    "track_e_smoke_candidates.jsonl": "7f53534305fb1c9849e123d3ae7afb9e4fa51e2fcdacb53e31011395f31ca954",
+    "track_e_smoke_contexts.jsonl": "ca0b24cdc82c287ba3a6b3f66ec8c84c6238ee8a348404e4c185dd9f765d61c4",
+    "track_e_smoke_candidates.jsonl": "71c27982440b88b90c693b5939d65c8b0689b65cdeb8b44696be568385b43cd4",
     "track_e_smoke_etymology.jsonl": "ebc028f2ddc73214bd59a8be7088ebc825db73f86d727606303a1d838ea5edff",
     "track_e_smoke_boundaries.jsonl": "008d598834157ddc58e2cff526c998db5dcaead73154fdcc239578a9a3de7232",
     "track_e_smoke_barnum.json": "d9c74db074060d42d681aac0d7c39c880eebe241ef0e4e36d8e40001f0dbdb6f",
-    "track_e_smoke_seeds.json": "6250fc26270862911177334f2e50fcfe21c2b94041aec9a5a55990825ba5550e"
+    "track_e_smoke_seeds.json": "f3aa4c55c4b8aea798fac9a2cf302ad0d59314e526196f5ed2612e80485c1256"
   },
-  "authoring_note": "Authored candidate_id order uses a DETERMINISTIC PSEUDO-RANDOM permutation (seed candidate_authoring_permute, per case f'{seed}:{word_id}'), replacing the earlier regular descending cycle. Meanings and correct labels are unchanged; only ids/order changed. Authoring hygiene only — the runtime candidate_shuffle is still mandatory.",
+  "authoring_note": "Authored correct-answer positions use a SEEDED BALANCED permutation (seed candidate_authoring_balanced): each of the 6 candidate slots holds the correct answer EXACTLY twice across the 12 cases, with adjacency and periodic cycles rejected. Other candidates per case are shuffled deterministically. Meanings and correct labels are unchanged; only ids/order changed. Authoring hygiene only — the runtime candidate_shuffle is still mandatory before any packet reaches a scorer.",
   "note": "Track E smoke input bundle for REVIEW ONLY. Flat boundary-constraint design; four-sphere JSON not integrated. Boundaries composed deterministically from the frozen en_gloss table for DRAFT consonant-only sequences (dev fields) — sequences must be linguistically verified before any freeze. run_enabled=false; not approved; not run. Track B remains blocked."
 }
