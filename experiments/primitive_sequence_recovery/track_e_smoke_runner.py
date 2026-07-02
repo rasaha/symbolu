@@ -379,42 +379,54 @@ def ingest_scorer_outputs(outputs, hidden):
 
 
 def _assemble_items(bundle, hidden, scores_by_pid):
+    """Build per-case metric items from whatever packets have scores. Packets/cases with missing
+    scores are DROPPED (not fabricated) and returned separately so coverage is reported, not hidden.
+    Returns (items, dropped) where dropped = [{"case_id", "missing_arms"}]."""
     hkey = {h["packet_id"]: h for h in hidden}
     per_case = {}
     for pid, h in hkey.items():
-        if pid not in scores_by_pid:
-            raise MalformedScorerOutput(f"no scores for packet {pid}")
+        if pid not in scores_by_pid:                   # malformed/absent packet -> skip (no fabrication)
+            continue
         cand_scores = {h["opt_to_cand"][opt]: v for opt, v in scores_by_pid[pid].items()}
         d = per_case.setdefault(h["case_id"], {"arms": {}, "correct": h["correct_candidate_id"]})
-        if h["true_arm"] == "I":                       # arm I = max over Barnum variants
+        if h["true_arm"] == "I":                       # arm I = max over available Barnum variants
             agg = d["arms"].setdefault("I", {})
             for c, v in cand_scores.items():
                 agg[c] = max(agg.get(c, 0.0), v)
         else:
             d["arms"][h["true_arm"]] = cand_scores
-    items = []
-    for wid, d in per_case.items():
-        for a in ARMS:
-            if a not in d["arms"]:
-                raise MalformedScorerOutput(f"case {wid} missing arm {a}")
+    # every case must be present with all six arms; else drop it and record why
+    all_cases = {h["case_id"] for h in hidden}
+    items, dropped = [], []
+    for wid in sorted(all_cases):
+        d = per_case.get(wid)
+        missing = [a for a in ARMS if not d or a not in d["arms"]]
+        if missing:
+            dropped.append({"case_id": wid, "missing_arms": missing})
+            continue
         cids = [c["candidate_id"] for c in bundle["candidates"][wid]["candidates"]]
         items.append({"candidates": [{"candidate_id": c} for c in cids],
                       "context_correct": d["correct"], "arm_scores": d["arms"]})
-    return items
+    return items, dropped
 
 
 def score_from_outputs(bundle, hidden, outputs):
     """Ingest external scorer outputs and reuse track_e_harness for metrics + a label.
-    Scores are supplied IN; this makes no model call and performs no real scoring itself."""
+    Scores are supplied IN; this makes no model call and performs no real scoring itself.
+    Cases with any missing arm are dropped (reported in `dropped`), never imputed."""
     scores_by_pid = ingest_scorer_outputs(outputs, hidden)
-    items = _assemble_items(bundle, hidden, scores_by_pid)
+    items, dropped = _assemble_items(bundle, hidden, scores_by_pid)
+    if not items:
+        return {"label": "INCONCLUSIVE", "mrr": None, "top1": None, "deltas": None,
+                "n_cases": 0, "dropped": dropped,
+                "note": "no complete cases after dropping malformed packets; INCONCLUSIVE."}
     metrics = H.arm_metrics(items)
     label = H.decide(metrics)
     assert label in H.ALLOWED_LABELS and label not in H.FORBIDDEN_LABELS, label
     return {"label": label, "mrr": {a: round(metrics[a]["mrr"], 4) for a in ARMS},
             "top1": {a: round(metrics[a]["top1"], 4) for a in ARMS},
             "deltas": {k: round(v, 4) for k, v in H.deltas(metrics).items()},
-            "n_cases": len(items),
+            "n_cases": len(items), "dropped": dropped,
             "note": "labels are MECHANICS over supplied scores; a real result requires an "
                     "approved run + bootstrap CIs + seed stability (not done here)."}
 
