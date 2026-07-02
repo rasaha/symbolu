@@ -46,17 +46,16 @@ The arm *type* is labelled below **for the human reviewer only** — the actual 
 arm label, no correct-answer marker, and no role labels. Candidate order is the shuffled `opt_*`
 order; **the correct candidate is not revealed**.
 
-**Sample 1 — arm A (real boundary), abstract case**
+**Sample 1 — arm A (real boundary), abstract case** *(shown post-fix)*
 > premise: *"After the long fever finally broke, a quiet loosening settled over her. Consider this
-> internal constraint: internal constraint emphasizing: escapism / premature static withdrawal ;
-> worry / impersonal thought"*
+> internal constraint: escapism / premature static withdrawal ; worry / impersonal thought"*
 > candidates: peaceful contentment · good fortune / prosperity · ego gratification · a general
 > sense of well-being · relief after strain · sensory pleasure
 
-**Sample 2 — arm B (scrambled boundary), abstract case**
+**Sample 2 — arm B (scrambled boundary), abstract case** *(shown post-fix)*
 > premise: *"Seeing the official take bread from the starving crowd, she rose to her feet, unable
-> to stay quiet. Consider this internal constraint: internal constraint emphasizing: shyness ;
-> static inertia / worldly desire ; melancholy / dejection"*
+> to stay quiet. Consider this internal constraint: shyness ; static inertia / worldly desire ;
+> melancholy / dejection"*
 > candidates: cold resentment · a strong negative feeling · petty irritation · explosive rage ·
 > righteous indignation at injustice · physical heat / feverishness
 
@@ -76,10 +75,10 @@ order; **the correct candidate is not revealed**.
 > candidates: domination over others · political authority · a body of troops / an army · bodily
 > strength / muscular force · capacity / capability · a great inner force
 
-**Sample 6 — arm I (Barnum boundary, variant B1), abstract case**
+**Sample 6 — arm I (Barnum boundary, variant B1), abstract case** *(shown post-fix)*
 > premise: *"Each night before the verdict, he lay awake staring at the ceiling, unable to picture
-> the days ahead. Consider this internal constraint: internal constraint emphasizing: a broad
-> emotional pull that could fit almost any heartfelt reading"*
+> the days ahead. Consider this internal constraint: a broad emotional pull that could fit almost
+> any heartfelt reading"*
 > candidates: reverent awe · sudden startle / fright · anxious dread of what may come · an
 > unsettled feeling · timid shyness · physical danger itself
 
@@ -106,12 +105,11 @@ a Barnum control (vague, not overpowering).
 
 Listed even where minor:
 
-1. **Redundant boundary wording (cosmetic, all A/B/I packets).** The premise reads *"Consider this
-   internal constraint: internal constraint emphasizing: …"* — "internal constraint" is printed
-   twice, because the runner prepends `"Consider this internal constraint: "` to a boundary
-   description that already begins `"internal constraint emphasizing: "`. Not a leak and not a
-   scoring risk, but it is awkward and a reviewer will notice. **Fix:** adjust `_premise` (or the
-   bundle boundary descriptions) so the prefix is not doubled.
+1. ~~**Redundant boundary wording (cosmetic, all A/B/I packets).** The premise reads *"Consider
+   this internal constraint: internal constraint emphasizing: …"* — "internal constraint" printed
+   twice.~~ **RESOLVED** (see Addendum): `track_e_smoke_runner._constraint_phrase` now strips the
+   redundant lead so every premise carries one clean phrase; re-preview confirms 0/108 packets have
+   duplicated wording.
 2. **Arm-F etymology lexical overlap (minor).** "inner life" ↔ "inner" candidates (see ¹). Because
    A must *beat* F, an inflated F only makes the bar **harder** (conservative), but the overlap is
    worth neutralizing or documenting.
@@ -127,15 +125,37 @@ Listed even where minor:
 
 ## 7. Recommendation
 
-**`NEEDS_PACKET_REVISION`** — narrowly.
+**`READY_FOR_APPROVAL_REVIEW`** *(updated after the wording fix — see Addendum)*.
 
 The bundle is **structurally sound and leak-clean** (108/108 pass, shuffles verified, hidden key
-separate, no four-sphere), and the substantive design (hard negatives, fair X, conservative D/F) is
-acceptable. The single clear defect is the **doubled "internal constraint" wording** (concern 1),
-which a reviewer will flag; concerns 2–3 should at least be documented as accepted-conservative.
-Recommend one small revision pass (fix the premise prefix; note/optionally neutralize the F/D
-lexical overlap), then re-preview and move to `READY_FOR_APPROVAL_REVIEW`. No blocking issue was
-found. Any revision is a separate change; **nothing is changed by this preview.**
+separate, no four-sphere). The single clear defect (concern 1, doubled "internal constraint"
+wording) is now **fixed** and re-verified (0/108 duplicated). The only remaining concerns (2–3) are
+**conservative lexical-overlap items that strengthen the D/F baselines** — i.e. they raise, not
+lower, the bar A must clear, so they are accepted, not blocking. No leak, easy-context, or
+weak-hard-negative issue was found. Per the review criterion (remaining concerns strengthen
+baselines only), the packet bundle is `READY_FOR_APPROVAL_REVIEW`. This remains a review gate,
+**not** an approval to run: the smoke manifest stays `run_enabled:false` / `NOT_APPROVED`.
+
+## Addendum — wording fix applied
+
+The doubled-phrase defect from the first preview has been fixed **in the runner only** (no smoke
+bundle change): `track_e_smoke_runner._constraint_phrase()` strips any leading
+`"internal constraint emphasizing:"` already present in a frozen boundary/Barnum description before
+applying the single prefix `"Consider this internal constraint: "`. Arms F (etymology) and D
+(reference meaning) were already single-phrase and are unchanged in meaning.
+
+Refreshed dry-run (preview mode, no model calls) confirms:
+
+- **108** packets generated (12 × [5 arms + 4 Barnum variants]); **expected 108** ✅
+- **0** model calls; **not scored**;
+- leak scan **clean** (108/108);
+- candidate order shuffled ≠ authored for **all 108**;
+- **0** packets carry any hidden-key field; correct id / true arm never in a packet;
+- **0** four-sphere references;
+- **0/108** packets contain a duplicated "internal constraint" phrase.
+
+Runner tests (`test_track_e_smoke_runner.py`) and harness tests (`test_track_e_harness.py`) both
+still pass after the change.
 
 ## 8. Boundary statement
 

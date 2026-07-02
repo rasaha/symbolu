@@ -138,18 +138,25 @@ def _shuffle_candidates(cands, case, arm, variant, seed):
     return packet_cands, authored, shuffled, opt_to_cand
 
 
+def _constraint_phrase(text):
+    # Present a single clean prefix; drop any redundant "internal constraint emphasizing:" lead
+    # already present in the frozen boundary/Barnum descriptions (avoids the doubled phrase).
+    t = re.sub(r"(?i)^\s*internal constraint emphasizing:\s*", "", text).strip()
+    return "Consider this internal constraint: " + t
+
+
 def _premise(arm, word, ctx, boundary, etym, barnum_text):
     parts = []
     if arm in ARMS_WITH_CONTEXT:
         parts.append(ctx["context_sentence"])
     if arm == "A":
-        parts.append("Consider this internal constraint: " + boundary["boundary_real_description"])
+        parts.append(_constraint_phrase(boundary["boundary_real_description"]))
     elif arm == "B":
-        parts.append("Consider this internal constraint: " + boundary["boundary_scrambled_description"])
+        parts.append(_constraint_phrase(boundary["boundary_scrambled_description"]))
     elif arm == "F":
-        parts.append("Consider this internal constraint: " + etym["etymology_prior_description"])
+        parts.append(_constraint_phrase(etym["etymology_prior_description"]))
     elif arm == "I":
-        parts.append("Consider this internal constraint: " + barnum_text)
+        parts.append(_constraint_phrase(barnum_text))
     elif arm == "D":
         parts.append("Consider this reference meaning: " + word["broad_gloss"])
     return " ".join(parts)
