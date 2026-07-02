@@ -34,6 +34,12 @@ def tokenize(text: str) -> frozenset:
     return frozenset(t for t in _TOKEN_RE.findall(text.lower()) if len(t) > 1)
 
 
+def tokenize_ordered(text: str) -> tuple:
+    """Same rules as tokenize() but preserves occurrence order and duplicates (a tuple).
+    Used by the order-sensitive realizer; tokenize() (set) is used by the bag baseline."""
+    return tuple(t for t in _TOKEN_RE.findall(text.lower()) if len(t) > 1)
+
+
 class Realizer(ABC):
     """Stable realizer interface (Part 2).
 
@@ -100,6 +106,64 @@ class LexicalOverlapRealizer(Realizer):
         if not union:
             return 0.0
         return len(encoded_query & encoded_candidate) / union
+
+
+def _lcs_len(a, b) -> int:
+    """Length of the longest common subsequence of two token tuples. Deterministic DP,
+    parameter-free. O(len(a)*len(b))."""
+    if not a or not b:
+        return 0
+    prev = [0] * (len(b) + 1)
+    for x in a:
+        cur = [0] * (len(b) + 1)
+        for j, y in enumerate(b, 1):
+            cur[j] = prev[j - 1] + 1 if x == y else (prev[j] if prev[j] >= cur[j - 1] else cur[j - 1])
+        prev = cur
+    return prev[len(b)]
+
+
+class OrderSensitiveLexicalRealizer(Realizer):
+    """Phase-2 order-sensitive baseline. Encodings are ORDERED token tuples; similarity is a
+    normalized longest-common-subsequence (LCS) ratio: LCS / max(len_query, len_candidate).
+
+    LCS was chosen over positional-weighting / bigram overlap because it is parameter-free
+    (nothing to weight or tune -> nothing to "fit"), deterministic, needs no assets, and is
+    genuinely order-sensitive: it counts tokens shared *in order*, so reordering the primitive
+    sequence changes the score against any multi-token target — exactly what the bag/Jaccard
+    baseline cannot see. It still ranks single-token candidates (LCS in {0,1} = presence), so
+    it works on the real artifacts even though order cannot matter for a 1-token meaning.
+
+    Like Phase 1 this is a PLUMBING VALIDATOR only: surface-form, English-only, no semantics,
+    no statistics, not a cross-realization test.
+    """
+
+    realizer_type = "order_sensitive_lcs_en"
+    deterministic = True
+    offline = True
+
+    def __init__(self, atom_content: dict):
+        self._atom_content = dict(atom_content)
+
+    @classmethod
+    def from_frozen(cls, frozen_dir=_FROZEN):
+        rec = json.loads(
+            (pathlib.Path(frozen_dir) / "realization_en_gloss.json").read_text(encoding="utf-8"))
+        return cls(rec["atom_content"])
+
+    def encode_sequence(self, atom_ids) -> tuple:
+        toks: list = []
+        for a in atom_ids:                       # atom order preserved
+            toks.extend(tokenize_ordered(self._atom_content[a]))
+        return tuple(toks)
+
+    def encode_candidate(self, meaning_ref) -> tuple:
+        return tokenize_ordered(meaning_ref)
+
+    def similarity(self, encoded_query, encoded_candidate) -> float:
+        denom = max(len(encoded_query), len(encoded_candidate))
+        if denom == 0:
+            return 0.0
+        return _lcs_len(encoded_query, encoded_candidate) / denom
 
 
 def rank(realizer: Realizer, atom_ids, candidate_refs: dict):
