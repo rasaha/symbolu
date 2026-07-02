@@ -55,7 +55,39 @@ unmodified.
   probe further (below), but it does **not** move the confirmatory question, and **Track B
   remains BLOCKED**.
 
-## Robustness checks needed before this sliver is taken seriously (all exploratory, on-pod)
+## Semantic vs lexical floor (computed) + robustness (partial)
+
+Lexical baselines on the same corpus/distractors (no asset needed; `diagnose_track_c.py`):
+
+| realizer | MRR | Top-1 | scramble delta | one-sided p | MRR 95% CI (family bootstrap) | CI low > chance? |
+|---|---|---|---|---|---|---|
+| chance (K=8) | 0.340 | 0.125 | — | — | — | — |
+| lexical Jaccard | 0.3478 | 0.140 | 0.0059 | ~0.14 (stable 0.12–0.16) | **[0.295, 0.404]** | **no** |
+| order LCS | 0.3478 | 0.140 | 0.0059 | ~0.14 | [0.295, 0.404] | no |
+| **GloVe semantic** | **0.3606** | 0.150 | **0.0259** | **~0.046** | *(run on pod — see below)* | *(expected: no)* |
+
+**Semantic gain over lexical: +0.013 MRR** and ~4× the scramble delta; GloVe clears the gate,
+lexical does not. So the effect has a small **semantic** component, not pure token overlap.
+
+**But the decisive robustness point:** the family-bootstrap 95% CI on lexical MRR
+**[0.295, 0.404]** already **straddles chance (0.340)** — its width (~±0.05) is **about twice
+the GloVe delta (0.026)**. That means the result is fragile to *which words* populate the
+corpus (N=107), independent of the scramble null. The scramble-p (0.046) only says "real beats
+random *assignments of the same glosses*"; the bootstrap CI says "MRR_real is *not* robustly
+distinguishable from chance given corpus sampling." **Expectation: GloVe's bootstrap CI will
+also include chance** → the sliver is not robust. Confirm on the pod:
+
+```bash
+python3 experiments/primitive_sequence_recovery/diagnose_track_c.py \
+  --glove /workspace/track_c_assets/glove-wiki-gigaword-50.txt \
+  --sha c7225dc6be8004c0451152074eb54ca7a0790e88614ac91384a7c67259736557 \
+  --n_scram 1000 --boot 2000
+```
+If `static_embedding_glove.ci_low_above_chance` is **false**, the honest verdict is: an
+English-only effect that clears the pre-registered gate but is **not robust** to corpus
+resampling — consistent with a rendering/shared-source artifact, not a stable signal.
+
+## Robustness checks still open (all exploratory, on-pod)
 
 1. **Bootstrap CI on delta** (word-level, family-aware) — is 0.026 distinguishable from 0?
 2. **Multiple seeds** for the scramble null — is p stable around 0.05 or does it wander below/above?
