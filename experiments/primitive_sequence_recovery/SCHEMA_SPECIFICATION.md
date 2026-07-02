@@ -100,7 +100,7 @@ Each `tau` entry contains **only** `varna_id → atom_id`. **Prohibited anywhere
   "K": 8,
   "match_keys": [ "frequency", "length", "category" ],
   "sampling_seed": <int>,
-  "assignments": { "<word_id>": [ "<word_id>", ... ] }   # length K-1 distractors (+ true = K)
+  "assignments": { "<word_id>": [ "<word_id>", ... ] }   # K candidates = true target (once) + K-1 distractors
 }
 ```
 **Why distractors must be frozen.** If candidate sets were sampled at run time, the difficulty (hence the score) would depend on an unfrozen random draw, and re-sampling after seeing scores would be a researcher degree of freedom that inflates false positives. Freezing the per-word candidate IDs with a fixed `sampling_seed` makes the ranking task **fully reproducible** and forbids post-hoc reshuffling. Distractors are matched on `match_keys` to remove trivial cues.
@@ -174,7 +174,7 @@ Each `tau` entry contains **only** `varna_id → atom_id`. **Prohibited anywhere
 - `realization_specific_reference` has a key for **every** `realization_id` (no **invalid references**).
 
 **distractors.json**
-- every `word_id` has a frozen candidate list of length `K-1` (distinct, excluding the true meaning).
+- every `word_id` has a frozen candidate list of length `K` = the true target (exactly once) + `K-1` distinct distractors.
 - all candidate IDs reference known words/meanings (no **unknown IDs**); `sampling_seed` present; assignments immutable.
 
 **realizer.json**
@@ -228,7 +228,7 @@ Realizer assets (embedding files / WordNet dumps) live outside `frozen/` but are
 2. **≥3 realizations** present, hashed; `atom_content` total over atoms; every pair independent with a recorded `independence_basis`.
 3. `word_list.json` present, hashed; IDs resolve; every word has `family_id` + `sense_id`; post-exclusion `N ≥ 100`; full atom coverage.
 4. `meaning_reference.json` present, hashed; one meaning per non-excluded word; a `realization_specific_reference` for **every** realization.
-5. `distractors.json` present, hashed; `K=8`; frozen per-word candidate sets of size `K-1`; matched; `sampling_seed` fixed.
+5. `distractors.json` present, hashed; `K=8`; frozen per-word candidate sets of size `K` (true target once + `K-1` distractors); matched (or documented balanced-sampling limitation); `sampling_seed` fixed.
 6. `realizer.json` present, hashed; `deterministic` & `offline` true; `asset_sha256` verifies against the asset.
 7. `run_params` present, hashed (`scramble_seed_hash`); `n_scram ≥ 1000`, seeds + decision thresholds fixed; `require_all_realizations = true`.
 8. `design_doc_sha256` matches the current pre-registration.
