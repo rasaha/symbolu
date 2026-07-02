@@ -279,21 +279,63 @@ def gate_failures(manifest, seeds, approval, *, leak_ok, shuffle_ok):
     return f
 
 
-def run_real_smoke_pilot(bundle_dir=HERE, approval=None):
+def _validate_approval_config(cfg):
+    """Raise RefusedRun on any missing/invalid field of an approved run config (dict)."""
+    problems = []
+    if cfg.get("config_type") != "track_e_smoke_approved_run_config":
+        problems.append("config_type mismatch")
+    if cfg.get("run_enabled") is not True:
+        problems.append("run_enabled is not true")
+    if cfg.get("approval_status") != "APPROVED":
+        problems.append("approval_status is not APPROVED")
+    g, s = cfg.get("generator_model"), cfg.get("scorer_model")
+    if not g or not s:
+        problems.append("generator_model/scorer_model not set")
+    if g and s and g == s:
+        problems.append("generator_model must differ from scorer_model")
+    if cfg.get("four_sphere_integrated") is not False:
+        problems.append("four_sphere_integrated must be false")
+    if cfg.get("expected_packet_count") != 108:
+        problems.append("expected_packet_count must be 108")
+    rec = cfg.get("approval_record") or {}
+    if not rec.get("date") or not rec.get("signature"):
+        problems.append("approval_record date/signature missing")
+    if problems:
+        raise RefusedRun("invalid approval config: " + "; ".join(problems))
+    return cfg
+
+
+def load_approval_config(path):
+    """Load + validate a SEPARATE approved run config so the base smoke manifest can stay
+    run_enabled:false / NOT_APPROVED. Raises RefusedRun on any invalid field; returns the dict."""
+    return _validate_approval_config(json.loads(pathlib.Path(path).read_text(encoding="utf-8")))
+
+
+def run_real_smoke_pilot(bundle_dir=HERE, approval=None, approval_config=None):
     """Real entrypoint. REFUSES unless every gate passes. Never calls a model (scoring is external
-    via ingest_scorer_outputs). As shipped the bundle refuses (run_enabled:false / NOT_APPROVED)."""
+    via ingest_scorer_outputs). With `approval_config` (a path or dict) the run authorization is
+    read from that SEPARATE file — the base smoke manifest is not read for run_enabled/approval and
+    is never edited. As shipped (no config) the bundle refuses (run_enabled:false / NOT_APPROVED)."""
     bundle = load_bundle(bundle_dir)
     try:
         report, packets, hidden = dry_run(bundle_dir)
         leak_ok, shuffle_ok = True, report["all_shuffled_differ_from_authored"]
     except LeakDetected:
         leak_ok, shuffle_ok, packets, hidden = False, False, [], []
-    fails = gate_failures(bundle["manifest"], bundle["seeds"], approval,
-                          leak_ok=leak_ok, shuffle_ok=shuffle_ok)
+    if approval_config is not None:
+        cfg = (_validate_approval_config(approval_config) if isinstance(approval_config, dict)
+               else load_approval_config(approval_config))
+        man_like = {"run_enabled": cfg.get("run_enabled"), "approval_status": cfg.get("approval_status")}
+        appr = {"generator_model": cfg.get("generator_model"), "scorer_model": cfg.get("scorer_model"),
+                "approval_signature": (cfg.get("approval_record") or {}).get("signature"),
+                "approval_date": (cfg.get("approval_record") or {}).get("date")}
+    else:
+        man_like, appr = bundle["manifest"], (approval or {})
+    fails = gate_failures(man_like, bundle["seeds"], appr, leak_ok=leak_ok, shuffle_ok=shuffle_ok)
     if fails:
         raise RefusedRun("real Track E smoke run refused; unmet gates: " + "; ".join(fails))
-    # Gates satisfied (only under an explicit approved config): emit real packets for EXTERNAL
-    # scoring. Still no model call here — scores are ingested via ingest_scorer_outputs().
+    # Gates satisfied via the separate approved config: emit real packets for EXTERNAL scoring.
+    # Still no model call here; the base smoke manifest is untouched.
     return {"status": "PACKETS_EMITTED_FOR_EXTERNAL_SCORING", "packets": packets, "hidden": hidden}
 
 
@@ -378,8 +420,21 @@ def score_from_outputs(bundle, hidden, outputs):
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="Track E smoke runner (dry-run + gate; no model calls).")
+    ap.add_argument("--approval-config", default=None,
+                    help="path to a track_e_smoke_approved_run_config.json; emits packets only if valid")
+    args = ap.parse_args()
     r, _, _ = dry_run()
     print(json.dumps(r, indent=2))
-    print("run_real_smoke_pilot would REFUSE:",
-          "; ".join(gate_failures(load_manifest(), load_bundle()["seeds"], None,
-                                  leak_ok=True, shuffle_ok=True)))
+    if args.approval_config:
+        try:
+            res = run_real_smoke_pilot(approval_config=args.approval_config)
+            print(f"approval config accepted: {res['status']} "
+                  f"({len(res['packets'])} packets emitted for EXTERNAL scoring; no model call here)")
+        except (RefusedRun, FileNotFoundError, ValueError) as e:
+            print("REFUSED:", e)
+    else:
+        print("run_real_smoke_pilot would REFUSE (no approval config):",
+              "; ".join(gate_failures(load_manifest(), load_bundle()["seeds"], None,
+                                      leak_ok=True, shuffle_ok=True)))

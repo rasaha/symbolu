@@ -58,6 +58,39 @@ def test_refuses_when_not_approved():
     _check("approval gate blocks when not APPROVED", "approval_status is not APPROVED" in fails)
 
 
+def test_approval_config_accepted_base_manifest_untouched():
+    cfg_path = _HERE / "track_e_smoke_approved_run_config.json"
+    cfg = R.load_approval_config(cfg_path)
+    _check("approved config valid: run_enabled true", cfg["run_enabled"] is True)
+    _check("approved config valid: APPROVED", cfg["approval_status"] == "APPROVED")
+    res = R.run_real_smoke_pilot(approval_config=str(cfg_path))
+    _check("valid config emits packets (no model call)",
+           res["status"] == "PACKETS_EMITTED_FOR_EXTERNAL_SCORING" and len(res["packets"]) == 108)
+    man = R.load_manifest()   # re-read base manifest from disk
+    _check("BASE smoke manifest still run_enabled:false", man["run_enabled"] is False)
+    _check("BASE smoke manifest still NOT_APPROVED", man["approval_status"] == "NOT_APPROVED")
+
+
+def test_invalid_approval_config_refuses():
+    base = R.load_approval_config(_HERE / "track_e_smoke_approved_run_config.json")
+    def bad(**over):
+        c = copy.deepcopy(base); c.update(over); return c
+    _check("run_enabled false -> refuse",
+           _raises(lambda: R.run_real_smoke_pilot(approval_config=bad(run_enabled=False)), R.RefusedRun))
+    _check("not APPROVED -> refuse",
+           _raises(lambda: R.run_real_smoke_pilot(approval_config=bad(approval_status="NOT_APPROVED")),
+                   R.RefusedRun))
+    _check("generator==scorer -> refuse",
+           _raises(lambda: R.run_real_smoke_pilot(approval_config=bad(scorer_model=base["generator_model"])),
+                   R.RefusedRun))
+    _check("wrong packet count -> refuse",
+           _raises(lambda: R.run_real_smoke_pilot(approval_config=bad(expected_packet_count=50)),
+                   R.RefusedRun))
+    _check("four_sphere_integrated true -> refuse",
+           _raises(lambda: R.run_real_smoke_pilot(approval_config=bad(four_sphere_integrated=True)),
+                   R.RefusedRun))
+
+
 def test_gates_pass_only_under_full_approval():
     man = dict(BUNDLE["manifest"]); man["run_enabled"] = True; man["approval_status"] = "APPROVED"
     approval = {"generator_model": "gen-x", "scorer_model": "score-y",
