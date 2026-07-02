@@ -34,8 +34,18 @@
     "scramble_delta": 0.0259,
     "scramble_pct": 0.954,
     "one_sided_p_approx": 0.046,
-    "label": "ENGINE_REALIZATION_SIGNAL",
-    "label_note": "borderline: delta just clears 0.02 and p just clears 0.05; English-only => REALIZATION_ARTIFACT ceiling; NOT ONTOLOGICAL_SIGNAL"
+    "label_seed0_gate": "ENGINE_REALIZATION_SIGNAL",
+    "label_note": "seed-0 gate pass only; borderline (delta just clears 0.02, p just clears 0.05)"
+  },
+  "robustness_diagnostic": {
+    "seed_p_glove": [0.047, 0.047, 0.043, 0.048, 0.064],
+    "seed_p_note": "unstable across seeds; one seed > 0.05",
+    "mrr_ci95_glove_family_bootstrap": [0.3076, 0.4171],
+    "ci_includes_chance": true,
+    "ci_low_above_chance": false,
+    "semantic_gain_over_lexical": 0.0128,
+    "lexical_mrr_ci95": [0.2967, 0.4033],
+    "final_verdict": "NOT_ROBUST — no robust semantic signal on the English channel; the seed-0 ENGINE_REALIZATION_SIGNAL is a boundary artifact. Negative-leaning, consistent with the null. English-only => REALIZATION_ARTIFACT ceiling; NOT ONTOLOGICAL_SIGNAL; Track B remains BLOCKED."
   },
   "channels": {
     "en_gloss": "RUN",

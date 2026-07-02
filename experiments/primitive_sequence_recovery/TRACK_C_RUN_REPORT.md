@@ -51,9 +51,11 @@ unmodified.
   authoring (F4), not intrinsic varṇa meaning. GloVe places the composed English gloss tokens
   slightly nearer the English meaning word than a scrambled gloss table does — exactly what a
   rendering artifact produces. This is **not** evidence for Symbol-U.
-- **Bottom line:** a weak, borderline, English-only exploratory effect. Interesting enough to
-  probe further (below), but it does **not** move the confirmatory question, and **Track B
-  remains BLOCKED**.
+- **Bottom line (after the robustness diagnostic below):** the seed-0 gate pass does **not**
+  survive scrutiny — scramble-p is unstable across seeds (one > 0.05) and the family-bootstrap
+  CI includes chance. The English channel shows **no robust semantic signal**. This is a
+  negative-leaning exploratory result, consistent with the null; it does **not** move the
+  confirmatory question, and **Track B remains BLOCKED**.
 
 ## Semantic vs lexical floor (computed) + robustness (partial)
 
@@ -64,28 +66,23 @@ Lexical baselines on the same corpus/distractors (no asset needed; `diagnose_tra
 | chance (K=8) | 0.340 | 0.125 | — | — | — | — |
 | lexical Jaccard | 0.3478 | 0.140 | 0.0059 | ~0.14 (stable 0.12–0.16) | **[0.295, 0.404]** | **no** |
 | order LCS | 0.3478 | 0.140 | 0.0059 | ~0.14 | [0.295, 0.404] | no |
-| **GloVe semantic** | **0.3606** | 0.150 | **0.0259** | **~0.046** | *(run on pod — see below)* | *(expected: no)* |
+| **GloVe semantic** | **0.3606** | 0.150 | **0.0259** | **0.043–0.064 (unstable)** | **[0.308, 0.417]** | **no** |
 
-**Semantic gain over lexical: +0.013 MRR** and ~4× the scramble delta; GloVe clears the gate,
-lexical does not. So the effect has a small **semantic** component, not pure token overlap.
+**Semantic gain over lexical: +0.0128 MRR** — GloVe clears the seed-0 gate, lexical does not,
+so the effect has a small **semantic** component, not pure token overlap.
 
-**But the decisive robustness point:** the family-bootstrap 95% CI on lexical MRR
-**[0.295, 0.404]** already **straddles chance (0.340)** — its width (~±0.05) is **about twice
-the GloVe delta (0.026)**. That means the result is fragile to *which words* populate the
-corpus (N=107), independent of the scramble null. The scramble-p (0.046) only says "real beats
-random *assignments of the same glosses*"; the bootstrap CI says "MRR_real is *not* robustly
-distinguishable from chance given corpus sampling." **Expectation: GloVe's bootstrap CI will
-also include chance** → the sliver is not robust. Confirm on the pod:
+**Robustness — CONFIRMED not robust (diagnostic run on the pod):**
+- **Scramble-p is unstable across seeds:** `[0.047, 0.047, 0.043, 0.048, 0.064]` — it sits right
+  at 0.05 and one seed crosses **above** it. The gate pass at seed 0 is knife-edge.
+- **Family-bootstrap 95% CI on MRR_real = [0.308, 0.417] — includes chance (0.340)**
+  (`ci_low_above_chance = false`). The lexical CI **[0.297, 0.403]** likewise includes chance.
+  The CI width (~±0.05) is ~2× the delta (0.026), so the effect is **not distinguishable from
+  chance under corpus resampling** (N=107), independent of the scramble null.
 
-```bash
-python3 experiments/primitive_sequence_recovery/diagnose_track_c.py \
-  --glove /workspace/track_c_assets/glove-wiki-gigaword-50.txt \
-  --sha c7225dc6be8004c0451152074eb54ca7a0790e88614ac91384a7c67259736557 \
-  --n_scram 1000 --boot 2000
-```
-If `static_embedding_glove.ci_low_above_chance` is **false**, the honest verdict is: an
-English-only effect that clears the pre-registered gate but is **not robust** to corpus
-resampling — consistent with a rendering/shared-source artifact, not a stable signal.
+**Verdict on the effect: NOT ROBUST.** The seed-0 `ENGINE_REALIZATION_SIGNAL` was a boundary
+artifact of the threshold + scramble seed. Treated honestly, the English channel shows **no
+robust semantic signal** — effectively `NO_SIGNAL` / non-robust — exactly what a
+rendering/shared-source artifact produces. This is **not** evidence for Symbol-U.
 
 ## Robustness checks still open (all exploratory, on-pod)
 
