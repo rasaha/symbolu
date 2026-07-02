@@ -68,8 +68,34 @@ python3 track_g_smoke_runner.py \
 python3 -c "import json;m=json.load(open('track_g_smoke_manifest.json'));print('base manifest:',m['run_enabled'],m['approval_status'])"   # -> False NOT_APPROVED
 ```
 The runner emits the 90 anonymized packets for **external** scoring; it does **not** call a model.
-(A model/judge step for Track G is a separate, later, explicitly-approved addition — this package
-stops at dry-run/packet-emission readiness.)
+
+## 7b. Score the packets with the approved model (`run_track_g_smoke_mistral.py`) — GPU host only
+
+This is the scorer step. It re-runs the dry-run first (0 model calls), then — only after the env
+token + separate approved config pass — loads the approved model, scores the 90 packets JSON-only at
+temp 0, ingests the scores into `track_g_harness`, and writes `track_g_smoke_outputs.json` +
+`TRACK_G_SMOKE_RESULT.md` with one of the 8 allowed labels. Malformed scorer output is rejected; if
+the malformed rate exceeds 0.15 the run aborts `INCONCLUSIVE`. It never fabricates scores and never
+edits the base manifest.
+
+```bash
+cd /workspace/symbolu/experiments/primitive_sequence_recovery
+export TRACK_G_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_G_SMOKE
+# dry-check first (no model, no writes):
+python3 run_track_g_smoke_mistral.py --dry-check
+# then the real scored run (loads the approved model AFTER gates pass):
+python3 run_track_g_smoke_mistral.py \
+  --approval-config track_g_smoke_approved_run_config.json \
+  --judge-mode single
+python3 -c "import json;m=json.load(open('track_g_smoke_manifest.json'));print('base manifest:',m['run_enabled'],m['approval_status'])"  # -> False NOT_APPROVED
+```
+
+**Honest negative prior (record it, don't fish past it).** The varṇa polarity table was authored
+from the frozen glosses **blind to the target poles**, so the derived A vectors mostly do **not**
+match the pre-registered poles (e.g. *happy* derives toward contraction/fear/inertia). The expected
+outcome is `RANDOM_POLARITY_EXPLAINS` / `CONTEXT_ONLY_EXPLAINS` / `NO_SIGNAL`. Report whatever comes
+out once — do not retune the table to the answers (that would be `INVALID_POSTHOC_POLARITY` in
+spirit) and do not reinterpret a null as a signal.
 
 ## 8. Requirements for any real run
 - separate approved config (`run_enabled:true`, `approval_status:"APPROVED"`, `scorer_model` filled),

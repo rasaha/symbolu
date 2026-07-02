@@ -61,7 +61,9 @@ and cannot unblock Track B.
 | `track_g_smoke_runner.py` | Dry-run packet emission (arms A/R/B/I/X/D) + leak scan + refusal gates. **No model calls.** |
 | `test_track_g_smoke_runner.py` | Runner dry-run/gate tests — all passing. |
 | `track_g_smoke_approved_run_config.json` | Separate approved-config **template** (base manifest stays gated). |
-| `TRACK_G_SMOKE_OPERATOR_RUNBOOK.md` | Exact RunPod commands + abort checks. |
+| `run_track_g_smoke_mistral.py` | **Scorer step** (GPU-only): dry-run → gates → approved model scores the 90 packets JSON-only (temp 0) → ingests into `track_g_harness` → writes outputs + result MD with one of the 8 labels. No model call in dry-run/gate paths; base manifest never edited. |
+| `test_run_track_g_smoke_mistral.py` | Scorer-step tests (no model): gates, base manifest stays NOT_APPROVED, malformed/contaminated rejected, incomplete cases dropped, post-hoc → INVALID_POSTHOC_POLARITY, only allowed labels, no hidden fields in the prompt, no artifact written. |
+| `TRACK_G_SMOKE_OPERATOR_RUNBOOK.md` | Exact RunPod commands (dry-run, packet emission, **and the scorer run**) + abort checks. |
 
 ## Design (as required)
 
@@ -88,14 +90,35 @@ and cannot unblock Track B.
 - **Dry-run:** **90 packets** (10 cases × [5 arms + 4 Barnum variants]), leak-clean, arm-randomized,
   no hidden labels, no four-sphere, 0 model calls.
 
+## Scorer step now built (but not run)
+
+The scorer/judge execution step (`run_track_g_smoke_mistral.py`) is now implemented, following the
+Track F pattern, so Track G *can* later be scored on a GPU host. Exact command:
+
+```bash
+export TRACK_G_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_G_SMOKE
+python3 run_track_g_smoke_mistral.py --dry-check          # no model, no writes
+python3 run_track_g_smoke_mistral.py \
+    --approval-config track_g_smoke_approved_run_config.json --judge-mode single
+```
+
+The scorer always dry-runs first (0 model calls), loads the approved model only after the env token
++ separate approved config pass, scores JSON-only at temp 0, ingests into `track_g_harness`, and
+writes `track_g_smoke_outputs.json` + `TRACK_G_SMOKE_RESULT.md`. It reports `A_vs_R` and `A_vs_X` as
+**co-primary**, per-arm MRR/Top-1, `malformed_rate`, `tasks_judged`, and `tasks_dropped_by_judge`.
+
+**Honest negative prior.** The varṇa table was authored blind to the target poles, so the derived A
+vectors mostly do **not** match the pre-registered poles. Default expectation is
+`RANDOM_POLARITY_EXPLAINS` / `CONTEXT_ONLY_EXPLAINS` / `NO_SIGNAL`; report the single outcome without
+retuning the table to the answers.
+
 ## No real run
 
-No model was called; no `track_g_smoke_outputs.json` exists. A real run requires the separate
+No model has been called; no `track_g_smoke_outputs.json` exists. A real run requires the separate
 approved config (with a filled `scorer_model` + signature), the env token
 `TRACK_G_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_G_SMOKE`, a leak-clean dry-run, and frozen polarity with
-the random-flip arm — and even then it is exploratory triage, not validation. A model/judge scoring
-step for Track G is a separate, later, explicitly-approved addition; this package stops at dry-run
-readiness.
+the random-flip arm — and even then it is exploratory triage, not validation, and cannot unblock
+Track B.
 
 ---
 
