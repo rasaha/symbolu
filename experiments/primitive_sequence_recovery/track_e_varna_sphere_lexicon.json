@@ -1,0 +1,403 @@
+{
+  "schema_version": "1.0",
+  "artifact_type": "track_e_varna_sphere_lexicon",
+  "representation_status": "researcher_interpretive_extraction",
+  "validation_status": "unvalidated_candidate_representation",
+  "source_supplies_four_spheres": false,
+  "intended_use": "Track E boundary-constraint experiments only",
+  "not_for": [
+    "Track B unblocking",
+    "ontological claims",
+    "Sanskrit privilege claims",
+    "retroactive reinterpretation of Track C or D0"
+  ],
+  "provenance": "The classical source (P.R. Sarkar acoustic-root varna/vrtti table) supplies single acoustic-root meanings per consonant. The four sphere fields (physical/mental/intellectual/spiritual) are a RESEARCHER interpretive expansion of those roots, not present in the source. This is a candidate representation for testing, NOT validated content.",
+  "key_convention": "Keys match frozen/assignment.json (34 consonant varnas). Transliteration variants are recorded in per-entry 'aliases' rather than introducing conflicting keys.",
+  "must_freeze_before_run": "This file must be hash-pinned and frozen (authored blind to the target word list, with inter-annotator agreement recorded) BEFORE any real Track E run. As shipped it is an unfrozen candidate draft.",
+  "spheres": [
+    "physical",
+    "mental",
+    "intellectual",
+    "spiritual"
+  ],
+  "packetization_warning": "Root names and varna names must not be sent to scorers in blinded scoring packets when they can leak target meaning; every entry sets packetize_root=false and records a leak_risk. The pre-send leak scan must also strip surface words and root-names such as moha/bhaya/kama/trishna/lobha.",
+  "leak_risk_legend": {
+    "high": "root directly names a likely target candidate (e.g. moha, bhaya, kama, trishna, greed, fear, desire, attachment) — must never be packetized",
+    "medium": "root is an abstract principle that could still hint at a candidate",
+    "low": "root unlikely to name a target candidate"
+  },
+  "varnas": {
+    "ka": {
+      "root": "asha / hope; creation; karya brahma; flowing water-sound",
+      "physical": "flow, survival movement, water, visible creation and manifestation",
+      "mental": "hope, expectation, longing for possibility",
+      "intellectual": "projection of future possibility; constructive imagination",
+      "spiritual": "expressed universe, creation-field, emergence into manifestation",
+      "source_notes": "Classical root: aasha (hope) / creation / Karya Brahma. Flat binding gloss: 'hope / forward-grasping desire'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "kha": {
+      "root": "cinta / worry; crude heaven; impersonal thought",
+      "physical": "open but unstable space; external uncertainty",
+      "mental": "worry, anxiety, anticipatory concern",
+      "intellectual": "indirect / impersonal reflection; problem-thinking",
+      "spiritual": "crude heavenly plane; lower expansive field, not yet transcendental",
+      "source_notes": "Classical root: cinta (worry). Flat binding gloss: 'worry / impersonal thought'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ga": {
+      "root": "ceshta / effort to arouse dormant potential",
+      "physical": "action, effort, mobilization, activation of dormant power",
+      "mental": "striving, will, motivation",
+      "intellectual": "applied effort, disciplined development",
+      "spiritual": "effort as path to mundane development and spiritual elevation",
+      "source_notes": "Classical root: ceshta (effort). Flat binding gloss: 'effort / striving'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "gha": {
+      "root": "mamata / attachment, possessive love",
+      "physical": "holding, possession, locality, family/body attachment",
+      "mental": "affection, possessiveness, 'mine'-feeling",
+      "intellectual": "biased judgment through attachment to time/place/person",
+      "spiritual": "bondage through limited love; can expand into universal love if sublimated",
+      "source_notes": "Classical root: mamata (attachment). Flat binding gloss: 'attachment / mine-ness'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "nga": {
+      "aliases": [
+        "una",
+        "n(g)a",
+        "ṅa"
+      ],
+      "root": "dambha / vanity",
+      "physical": "display, self-inflation, status projection",
+      "mental": "pride, vanity, self-importance",
+      "intellectual": "distorted self-evaluation",
+      "spiritual": "egoic obstruction; humility is its spiritual correction",
+      "source_notes": "Classical root: dambha (vanity). Flat binding gloss: 'vanity / pride-display'. Key 'nga' per assignment.json.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ca": {
+      "root": "viveka / conscience",
+      "physical": "restraint in action; ethical pause before doing",
+      "mental": "moral sensitivity",
+      "intellectual": "discrimination between right and wrong",
+      "spiritual": "conscience as inner dharmic compass",
+      "source_notes": "Classical root: viveka (conscience/discrimination). Flat binding gloss: 'lack of discrimination / confused discernment' (binding/opposite sense).",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "cha": {
+      "root": "vikalata / nervous breakdown",
+      "physical": "breakdown of function, collapse of coordination",
+      "mental": "nervous disturbance, emotional malfunction",
+      "intellectual": "cognitive disorganization",
+      "spiritual": "loss of inner steadiness; needs re-integration",
+      "source_notes": "Classical root: vikalata (nervous breakdown). Flat binding gloss: 'nervous breakdown / collapse'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "ja": {
+      "root": "ahamkara / ego",
+      "physical": "self-assertive action, control-posture",
+      "mental": "'I did it', self-importance",
+      "intellectual": "ego-centered interpretation",
+      "spiritual": "identity bondage; false doership",
+      "source_notes": "Classical root: ahamkara (ego). Flat binding gloss: 'ego / inflated I-feeling'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "jha": {
+      "root": "lolupata / lobha / greed, avarice",
+      "physical": "grasping, accumulation, consumption",
+      "mental": "greed, fascination, hunger for more",
+      "intellectual": "acquisitive calculation",
+      "spiritual": "bondage through endless wanting",
+      "source_notes": "Classical root: lolupata / lobha (greed). Flat binding gloss: 'greed / avarice'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "nya": {
+      "aliases": [
+        "ina",
+        "ña"
+      ],
+      "root": "kapatata / hypocrisy",
+      "physical": "deceptive conduct, masking",
+      "mental": "duplicity, hidden motive",
+      "intellectual": "false moral reasoning, self-justification",
+      "spiritual": "spiritual falseness; split between outer virtue and inner conduct",
+      "source_notes": "Classical root: kapatata (hypocrisy). Flat binding gloss: 'hypocrisy / deceit'. Key 'nya' per assignment.json.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "tta": {
+      "aliases": [
+        "ṭa"
+      ],
+      "root": "vitarka / overstatement, angry garrulousness",
+      "physical": "excessive speech, reactive expression",
+      "mental": "irritability, argumentativeness",
+      "intellectual": "over-arguing, distortion through exaggeration",
+      "spiritual": "misuse of speech; needs silence / balanced speech",
+      "source_notes": "Classical root: vitarka (overstatement). Flat binding gloss: 'overstatement / garrulousness'. Retroflex ta.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "ttha": {
+      "aliases": [
+        "ṭha"
+      ],
+      "root": "anutapa / repentance",
+      "physical": "heat after action; bodily remorse response",
+      "mental": "regret, remorse, after-pain",
+      "intellectual": "recognition of impropriety after the fact",
+      "spiritual": "repentance as possible doorway to correction",
+      "source_notes": "Classical root: anutapa (repentance). Flat binding gloss: 'repentance / remorse'. Retroflex tha.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "dda": {
+      "aliases": [
+        "ḍa"
+      ],
+      "root": "lajja / shyness",
+      "physical": "withdrawal, hiding, lowered expression",
+      "mental": "shyness, embarrassment",
+      "intellectual": "inhibition of self-expression",
+      "spiritual": "humility if purified; blockage if fear-based",
+      "source_notes": "Classical root: lajja (shyness). Flat binding gloss: 'shyness'. Retroflex da.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ddha": {
+      "aliases": [
+        "ḍha"
+      ],
+      "root": "pishunata / cruel sadistic harm",
+      "physical": "physical cruelty, torture, harm",
+      "mental": "sadism, harshness",
+      "intellectual": "dehumanizing justification",
+      "spiritual": "severe fall into cruelty; compassion is its correction",
+      "source_notes": "Classical root: pishunata (sadistic cruelty). Flat binding gloss: 'sadistic cruelty'. Retroflex dha.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "nna": {
+      "aliases": [
+        "ṇa"
+      ],
+      "root": "irshya / envy",
+      "physical": "competitive tension, bodily agitation",
+      "mental": "envy, comparison-pain",
+      "intellectual": "distorted evaluation of another's good",
+      "spiritual": "bondage through comparison; sympathetic joy (mudita) is its correction",
+      "source_notes": "Classical root: irshya (envy). Flat binding gloss: 'envy'. Retroflex na.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ta": {
+      "root": "staticity, deep sleep, dullness, spiritual inertness",
+      "physical": "heaviness, sleep, inertia",
+      "mental": "dullness, tamasic lethargy",
+      "intellectual": "intellectual dullness",
+      "spiritual": "spiritual inertness that discipline seeks to liberate from",
+      "source_notes": "Classical root: staticity / long sleep / dullness. Flat binding gloss: 'inertia / staticity / dullness'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "tha": {
+      "root": "vishada / melancholy",
+      "physical": "drooping, low vitality",
+      "mental": "sadness, melancholy",
+      "intellectual": "pessimistic interpretation",
+      "spiritual": "depressive contraction; needs upward movement",
+      "source_notes": "Classical root: vishada (melancholy). Flat binding gloss: 'melancholy / dejection'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "da": {
+      "root": "peevishness / irritability",
+      "physical": "reactive body-language, irritability",
+      "mental": "peevishness, touchiness",
+      "intellectual": "adversarial interpretation of others",
+      "spiritual": "small egoic contraction; patience softens it",
+      "source_notes": "Classical root: peevishness. Flat binding gloss: 'peevishness / irritability'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "dha": {
+      "root": "trishna / thirst for acquisition",
+      "physical": "acquisition, hoarding, pursuit of wealth / name / power",
+      "mental": "craving, limitless wanting",
+      "intellectual": "instrumental calculation for gain",
+      "spiritual": "bondage through endless acquisition; spiritual ideation redirects it",
+      "source_notes": "Classical root: trishna (thirst/craving). Flat binding gloss: 'craving / thirst for acquisition'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "na": {
+      "root": "moha / blind attachment, infatuation",
+      "physical": "clinging to person / place / object / time",
+      "mental": "fascination, possessive attachment",
+      "intellectual": "loss of rational discrimination",
+      "spiritual": "bondage through infatuation; indifference and spiritual ideation free it",
+      "source_notes": "Classical root: moha (delusion/infatuation). Flat binding gloss: 'blind attachment / infatuation'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "pa": {
+      "root": "ghrina / hatred, revulsion",
+      "physical": "rejection, pushing away, aversive action",
+      "mental": "hatred, disgust, revulsion",
+      "intellectual": "devaluation of the other",
+      "spiritual": "fetter of hatred; related to moha and fear",
+      "source_notes": "Classical root: ghrina (hatred/revulsion). Flat binding gloss: 'hatred / revulsion'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "pha": {
+      "root": "bhaya / fear",
+      "physical": "defensive contraction, protection impulse",
+      "mental": "fear, insecurity",
+      "intellectual": "threat-bias, danger interpretation",
+      "spiritual": "bondage through fear; fearlessness is correction",
+      "source_notes": "Classical root: bhaya (fear). Flat binding gloss: 'fear'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ba": {
+      "root": "avajna / indifference, neglect",
+      "physical": "neglect of what has value",
+      "mental": "disregard, carelessness",
+      "intellectual": "failure to assign proper value",
+      "spiritual": "spiritual dullness through neglect; respect/attention is correction",
+      "source_notes": "Classical root: avajna (indifference). Flat binding gloss: 'indifference / neglect'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "bha": {
+      "root": "murccha / loss of common sense under ripu",
+      "physical": "trance-like compulsion, obsession",
+      "mental": "hypnotic fixation, emotional capture",
+      "intellectual": "judgment overwhelmed by desire / anger / etc.",
+      "spiritual": "loss of self-command; pratyahara (withdrawal) restores control",
+      "source_notes": "Classical root: murccha (fainting of judgement). Flat binding gloss: 'deluded obsession'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ma": {
+      "root": "pranasha / annihilation; prashraya / indulgent latitude",
+      "physical": "dissolution, collapse, over-permissiveness",
+      "mental": "indulgence, emotional giving-in",
+      "intellectual": "boundary failure, permissive distortion",
+      "spiritual": "annihilation if unrestrained; discipline / sublimation needed",
+      "source_notes": "Classical root: pranasha (annihilation) / prashraya (indulgence). Flat binding gloss: 'annihilation / indulgence (giving latitude)'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "ya": {
+      "root": "avishvasa / lack of confidence; constant air-like movement",
+      "physical": "restless movement, instability",
+      "mental": "lack of confidence, uncertainty",
+      "intellectual": "doubt in self and others",
+      "spiritual": "unstable faith; needs trust and inner steadiness",
+      "source_notes": "Classical root: avishvasa (lack of confidence). Flat binding gloss: 'lack of confidence / wavering movement'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ra": {
+      "root": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+      "physical": "fire, heat, vitality, energy",
+      "mental": "intensity, urgency, frustration if blocked",
+      "intellectual": "decisive force; destructive or illuminating cognition",
+      "spiritual": "fire of life-force; can become defeatism or spiritual energy",
+      "source_notes": "Classical root: agni/prana (fire, vitality) and sarvanasha (annihilation-thought). Flat binding gloss: \"defeatist annihilation-thought ('everything is gone, I am undone')\".",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "la": {
+      "root": "krurata / cruelty; kshiti-tattva / solid factor",
+      "physical": "solidity, hardness, earth, physical rigidity",
+      "mental": "harshness, cruelty",
+      "intellectual": "rigid judgment",
+      "spiritual": "earth-bound hardness; compassion softens it",
+      "source_notes": "Classical root: krurata (cruelty) / kshiti (solid factor). Flat binding gloss: 'cruelty'.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "va": {
+      "root": "dharma; jala-tattva / liquid factor; Varuna",
+      "physical": "water / liquid, sustaining flow",
+      "mental": "natural movement toward happiness and rightness",
+      "intellectual": "alignment with sustaining principle",
+      "spiritual": "dharma; movement toward subtlety; ensconcement in original stance",
+      "source_notes": "Classical root: dharma / jala (liquid factor) / Varuna. Flat binding gloss: 'holding / ensconcement in original stance (BINDS)'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "sha": {
+      "root": "rajo-guna; artha / psychic longing",
+      "physical": "activity, dynamism, outward motion",
+      "mental": "ambition, restlessness, want-removal",
+      "intellectual": "goal-seeking, resource intelligence",
+      "spiritual": "rajas; artha as psychic longing and worldly movement",
+      "source_notes": "Classical root: rajo-guna / artha (psychic longing). Flat binding gloss: 'mutative drive / material pursuit'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "ssa": {
+      "aliases": [
+        "śa",
+        "ṣa",
+        "sha_retroflex"
+      ],
+      "root": "tamo-guna; kama / physical worldly desire",
+      "physical": "physical longing, material desire, sensual pursuit",
+      "mental": "desire, attraction, craving for status / pleasure",
+      "intellectual": "desire-shaped thought",
+      "spiritual": "tamas-bound kama; physical / worldly longing",
+      "source_notes": "Classical root: tamo-guna / kama (physical desire). Flat binding gloss: 'static inertia / worldly desire'. Key 'ssa' per assignment.json; source distinguishes sha/sa/ssa.",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "sa": {
+      "root": "moksha; sattva-guna",
+      "physical": "lightness, release from binding action",
+      "mental": "clarity, peace, release",
+      "intellectual": "sentient discrimination, liberation-oriented thought",
+      "spiritual": "moksha, salvation, unqualified liberation, sattva",
+      "source_notes": "Classical root: moksha / sattva-guna. Flat binding gloss: 'escapism / premature static withdrawal' (binding/opposite sense).",
+      "leak_risk": "high",
+      "packetize_root": false
+    },
+    "ha": {
+      "root": "ether, daytime, sun, svarloka, paravidya; hao = Shiva dancing tandava",
+      "physical": "ether, open sky, day, solar radiance",
+      "mental": "clarity, wakefulness, expansion out of darkness",
+      "intellectual": "intuitional science, higher insight (paravidya)",
+      "spiritual": "svarloka, solar ascent, Shivaic dynamism, tandava force",
+      "source_notes": "Classical root: ether / day / sun / svarloka / paravidya. Flat binding gloss: 'night / darkness (the contractive opposite of ha = day/sun/light)'.",
+      "leak_risk": "medium",
+      "packetize_root": false
+    },
+    "ksha": {
+      "aliases": [
+        "kṣa"
+      ],
+      "root": "mundane / material knowledge; transcendent heaven beyond crude kha",
+      "physical": "structured material field, science of objects",
+      "mental": "organized worldly knowing",
+      "intellectual": "empirical / material knowledge, systematization",
+      "spiritual": "higher-than-crude heavenly knowledge, yet still mundane / material (not paravidya)",
+      "source_notes": "Classical root: mundane / material knowledge (kshatra of heaven). Flat binding gloss: 'mundane / material knowledge'.",
+      "leak_risk": "low",
+      "packetize_root": false
+    }
+  }
+}

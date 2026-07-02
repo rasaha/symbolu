@@ -28,38 +28,38 @@ a proposal to be edited/frozen only after explicit sign-off.
 
 ## 3. Proposed pilot size (recommendation only — not frozen)
 
-- **~24 words total** (within the 20–30 recommendation): **14 abstract/psychological** +
-  **10 concrete negative-control**.
-- Rationale: enough for triage signal-vs-Barnum contrast; small enough to review by hand.
-- Not frozen; final list requires §8 approval.
+**Contamination-reduced split.** ~24 words total, partitioned so famous terms cannot drive the
+result:
 
-## 4. Candidate word list (proposed; NOT scored)
+- **Primary D0 subset (drives the label):** ~8 **low/medium-contamination** abstract terms +
+  **10 concrete negative-controls** = ~18 words.
+- **High-contamination famous subset (exploratory-only, does NOT drive the label):** ~6 famous /
+  culturally-loaded terms.
+- Rationale: enough for a triage signal-vs-Barnum contrast on words the judge is *less* likely to
+  recognize; small enough to review by hand.
+- Not frozen; final lists require §8 approval.
 
-Drawn from the existing frozen corpus (real Sanskrit words already present; listed here for
-review only — not scored, not re-frozen).
+## 4. Candidate word list (proposed; NOT scored) — three subsets
 
-**Abstract / psychological / emotional (target domain):**
+Drawn from the existing frozen corpus (real Sanskrit words already present; listed for review
+only — not scored, not re-frozen). Partitioned to keep famous words out of the primary label.
 
-| word_id | spelling | dictionary meaning | POS/domain | inclusion rationale | contamination-risk notes |
+### 4a. PRIMARY subset — low/medium-contamination abstract (drives the label)
+
+| word_id | spelling | dictionary meaning | POS/domain | inclusion rationale | contamination-risk |
 |---|---|---|---|---|---|
-| w004 | krodha | anger | noun / abstract | strong emotional weather | med — common; judge may infer "anger" |
-| w005 | bhaya | fear | noun / abstract | core affect | med — common affect term |
+| w004 | krodha | anger | noun / abstract | strong emotional weather | med |
+| w005 | bhaya | fear | noun / abstract | core affect | med |
 | w002 | moha | delusion | noun / abstract | psychological state | med |
 | w001 | lobha | greed | noun / abstract | affliction/affect | med |
-| w018 | śānti | peace | noun / abstract | calm-pole weather | **high** — very famous Sanskrit word |
-| w019 | ānanda | bliss | noun / abstract | positive-pole weather | **high** — famous; strong priors |
-| w020 | duḥkha | suffering | noun / abstract | core affliction | **high** — famous Buddhist/Skt term |
-| w021 | sukha | happiness | noun / abstract | positive affect | med–high |
-| w017 | māyā | illusion | noun / abstract | psychological field | **high** — famous, culturally loaded |
+| w021 | sukha | happiness | noun / abstract | positive affect | med |
 | w013 | mṛtyu | death | noun / abstract | heavy emotional field | med |
-| w069 | kṣamā | forgiveness | noun / abstract | moral/relational weather | med |
+| w069 | kṣamā | forgiveness | noun / abstract | moral/relational weather | low–med |
 | w070 | māna | pride | noun / abstract | affect/ego | med |
-| w023 | bhakti | devotion | noun / abstract | relational/spiritual | **high** — famous; spiritual load |
-| w014 | satya | truth | noun / abstract | moral term | **high** — famous |
 
-**Concrete negative-control (should come out ~chance):**
+### 4b. PRIMARY subset — concrete negative-control (drives the label; should be ~chance)
 
-| word_id | spelling | dictionary meaning | POS/domain | inclusion rationale | contamination-risk notes |
+| word_id | spelling | dictionary meaning | POS/domain | inclusion rationale | contamination-risk |
 |---|---|---|---|---|---|
 | w037 | nadī | river | noun / concrete_control | concrete; no emotional weather | low |
 | w036 | parvata | mountain | noun / concrete_control | concrete | low |
@@ -72,9 +72,43 @@ review only — not scored, not re-frozen).
 | w093 | nagara | city | noun / concrete_control | concrete | low |
 | w101 | ratha | chariot | noun / concrete_control | concrete | low |
 
-**Deliberately excluded:** `kāma` (desire) — Track C audit found its gloss literally contains
-"desire" (tautology/leakage); exclude to avoid a spurious hit. Any word whose vṛtti gloss shares
-a surface token with its likely profile descriptors should be excluded at freeze.
+### 4c. HIGH-CONTAMINATION famous subset — EXPLORATORY-ONLY (must NOT drive the label)
+
+| word_id | spelling | dictionary meaning | POS/domain | contamination-risk |
+|---|---|---|---|---|
+| w018 | śānti | peace | noun / abstract | **high** — very famous Sanskrit word |
+| w019 | ānanda | bliss | noun / abstract | **high** — famous; strong priors |
+| w020 | duḥkha | suffering | noun / abstract | **high** — famous Buddhist/Skt term |
+| w017 | māyā | illusion | noun / abstract | **high** — famous, culturally loaded |
+| w023 | bhakti | devotion | noun / abstract | **high** — famous; spiritual load |
+| w014 | satya | truth | noun / abstract | **high** — famous |
+
+### 4d. Label-computation rule (contamination reduction)
+
+- The **primary D0 label** is computed **only** from the PRIMARY subset (§4a low/medium abstract
+  **+** §4b concrete negative-controls). Famous words in §4c **must not** influence the primary
+  `LLM_PILOT_*` label.
+- The §4c **high-contamination famous words are reported separately as EXPLORATORY-ONLY**; their
+  results are shown for interest but are explicitly excluded from the primary label and from any
+  fund-D1 decision. If §4c looks strong but §4a/§4b do not, the honest read is *contamination*,
+  not signal.
+- The concrete negative-control (§4b) still gates the abstract result: if concretes match as well
+  as §4a abstracts, the primary label is void (Barnum at corpus level).
+
+### 4e. Contamination rationale (why this split is necessary)
+
+Even with Stage 2 fully anonymized, contamination can enter via **Stage 1**: profile generation
+still sees the **dictionary meaning**, and for famous terms (śānti, ānanda, duḥkha, māyā, bhakti,
+satya) an LLM readily recognizes the concept and injects **cultural/spiritual associations** —
+producing a profile shaped by priors rather than by a neutral reading of the meaning. Such a
+profile can then be matched by a scorer that shares those priors, inflating the apparent result.
+Low/medium-contamination and concrete words are less prone to this recognition, so restricting the
+primary label to them yields a cleaner triage. (Stage-2 anonymization alone does **not** remove
+this Stage-1 pathway.)
+
+**Deliberately excluded entirely:** `kāma` (desire) — Track C audit found its gloss literally
+contains "desire" (tautology/leakage). Any word whose vṛtti gloss shares a surface token with its
+likely profile descriptors should be excluded at freeze.
 
 ## 5. Barnum family (proposed; NOT frozen — strong controls, not strawmen)
 
@@ -122,7 +156,7 @@ Status of each `TRACK_D_D0_RUN_APPROVAL_CHECKLIST.md` area for this proposal:
 |---|---|
 | §2 non-confirmatory boundary | **ready** (acknowledged in all docs) |
 | §3 model setup | **not ready** — models not selected (needs user decision) |
-| §4 input freeze | **not ready** — nothing hashed; word list is a proposal (needs user decision) |
+| §4 input freeze | **not ready** — nothing hashed; word list is a proposal, now split into primary (§4a+§4b, drives label) vs exploratory-only famous (§4c) (needs user decision) |
 | §5 blinding | **ready** (design specified in runbook/prompts) |
 | §6 prompts | **ready** (drafted in `TRACK_D_D0_PROMPTS.md`; review pending) |
 | §7 abort criteria | **ready** (specified) |
@@ -141,5 +175,5 @@ manifest was marked READY. This is a paper proposal only.
 
 ---
 
-Proposed D0 configuration only. No real scoring has occurred. Track B remains blocked. Structure,
-not validated meaning.
+Contamination-reduced D0 configuration only. No real scoring has occurred. Track B remains
+blocked. Structure, not validated meaning.
