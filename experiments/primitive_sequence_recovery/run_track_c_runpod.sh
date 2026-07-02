@@ -75,6 +75,7 @@ done
 sec "5. DOWNLOAD + CONVERT + HASH-PIN ASSET (kept OUTSIDE the repo)"
 export ASSET_DIR="$WORK/track_c_assets"; mkdir -p "$ASSET_DIR"
 export GLOVE_TXT="$ASSET_DIR/${ASSET_NAME}.txt"
+export ASSET_NAME ASSET_MD5_UPSTREAM   # make available to the python block (fixes false md5 MISMATCH)
 python3 - <<'PY' || { echo "asset acquisition/convert failed"; exit 4; }
 import os, hashlib, pathlib
 import gensim.downloader as api

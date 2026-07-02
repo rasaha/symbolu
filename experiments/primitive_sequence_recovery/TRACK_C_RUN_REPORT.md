@@ -1,133 +1,85 @@
 # Track C — Exploratory Semantic-Realizer Run Report
 
-**EXPLORATORY. NOT Track B. NOT confirmatory. NOT evidence for `ONTOLOGICAL_SIGNAL`.** The code
-can only emit `ENGINE_REALIZATION_SIGNAL` / `NO_SIGNAL` / `REALIZER_DEPENDENT` / `INCONCLUSIVE`.
+**EXPLORATORY. NOT Track B. NOT confirmatory. NOT evidence for `ONTOLOGICAL_SIGNAL`.** Allowed
+labels only: `ENGINE_REALIZATION_SIGNAL` / `NO_SIGNAL` / `REALIZER_DEPENDENT` / `INCONCLUSIVE`.
 
-## Result of this run attempt: **INCONCLUSIVE (asset unavailable)**
+## Run status: COMPLETED on RunPod (A100-80GB), English channel only
 
-A real Track-C run was **attempted** in this build environment and could **not** be completed,
-because **no approved static-embedding asset is obtainable here**. No asset was downloaded, no
-sha256 was fabricated, and no metrics were invented. This is the honest, allowed outcome
-`INCONCLUSIVE`; it is **not** a negative result about varṇas.
+Executed `run_track_c_runpod.sh` on a real pod (all asset hosts reachable; asset acquired,
+hash-pinned, scored offline). Machine: hostname `472e10a43793`, Linux 6.8, Python 3.12.3,
+NVIDIA A100-SXM4-80GB (GPU unused — CPU scoring). All five test suites passed; manifest
+NOT_READY; runner NOT_RUN; Stage A untouched (diff vs `2d42bf6` empty); `manifest.json`
+unmodified.
 
-## 1. Environment verification (all PASS — real)
+## Asset (acquired + pinned)
 
-```
-python3 experiments/primitive_sequence_recovery/test_semantic_realizer.py         # PASS
-python3 experiments/primitive_sequence_recovery/test_baseline_realizer.py         # PASS
-python3 experiments/primitive_sequence_recovery/test_order_sensitive_realizer.py  # PASS
-python3 experiments/primitive_sequence_recovery/test_manifest_gate.py             # PASS
-python3 experiments/primitive_sequence_recovery/test_primitive_sequence_recovery.py # PASS
-python3 experiments/primitive_sequence_recovery/run_primitive_recovery.py         # runner NOT_RUN
-# check_readiness(frozen/) => NOT_READY
-git diff 2d42bf6 HEAD -- symbolu_neural/structural_v1                             # empty (Stage A untouched)
-```
-
-## 2. Asset acquisition — attempted, blocked (real probe evidence)
-
-This environment is the firewalled Claude sandbox, not RunPod. Fresh reachability probes
-(headers only; no asset downloaded):
-
-| source | result |
+| field | value |
 |---|---|
-| `huggingface.co` | **ERR** (unreachable) |
-| `nlp.stanford.edu/data/glove.6B.zip` (GloVe) | **ERR** |
-| `dl.fbaipublicfiles.com/.../cc.en.300.vec.gz` (fastText) | **ERR** |
-| `github.com/RaRe-Technologies/gensim-data/releases/download/...` (gensim-data) | **HTTP 403** |
-| `raw.githubusercontent.com/.../gensim-data/master/list.json` | 200 (index only; not a canonical vector host) |
+| name | `glove-wiki-gigaword-50` (GloVe Wikipedia+Gigaword, dim 50) |
+| source | gensim-data GitHub release |
+| license | ODC-PDDL (permissive) |
+| upstream md5 (cached .gz) | `c289bc5d7f2f02c6dc9f2f9b67641813` — **matches** known-good |
+| **pinned sha256** (exported text) | `c7225dc6be8004c0451152074eb54ca7a0790e88614ac91384a7c67259736557` |
+| vocab | 400,000 tokens |
+| path (pod-local, not committed) | `/workspace/track_c_assets/glove-wiki-gigaword-50.txt` |
 
-The canonical vector sources are all blocked; the only reachable git surface (`raw.github…`)
-does not host the official vectors, and pulling a random mirror would be **unpinned / poor
-provenance** — forbidden by this task. Therefore **no asset was acquired.** Per the rules, an
-unpinned or fabricated asset would **not** be reported as valid, so no run was performed on one.
+## Metrics (en_gloss; n_scram=1000, seed=0, K=8, N=107)
 
-Intended asset (recorded for a real RunPod run — see `track_c_asset.metadata.json`):
-`glove-wiki-gigaword-50`, GloVe/gensim-data, license ODC-PDDL (permissive), dim 50, upstream
-**md5** `c289bc5d7f2f02c6dc9f2f9b67641813` (a cross-check to use at acquisition; the pinned
-**sha256** is computed on real hardware, **not fabricated here**).
+| metric | value | chance (K=8) | reading |
+|---|---|---|---|
+| coverage (en_gloss tokens) | **0.9803** (199/203) | — | good |
+| MRR (real) | **0.3606** | **≈ 0.340** | barely above chance |
+| MRR (scramble mean) | 0.3347 | ≈ 0.340 | at chance (expected) |
+| **scramble delta** | **0.0259** | 0 | tiny |
+| scramble_pct | **0.954** → one-sided p ≈ **0.046** | — | *just* clears 0.05 |
+| Top-1 | 0.1495 | 0.125 | marginally above chance |
+| **LABEL** | **`ENGINE_REALIZATION_SIGNAL`** | — | **knife-edge; see below** |
 
-## 3. Asset metadata record
+`ONTOLOGICAL_SIGNAL` was neither emitted nor emittable.
 
-See `track_c_asset.metadata.json` — `status = NOT_ACQUIRED`; `sha256 = null`; coverage `null`
-(unknown without the asset — not fabricated). Corpus vocabulary that a real asset must cover
-(computed offline from the frozen artifacts):
+## Honest interpretation (do not overclaim)
 
-| quantity | value |
-|---|---|
-| active words | 107 |
-| unique `en_gloss` atom-gloss tokens | 102 |
-| unique `en_gloss` meaning tokens | 107 |
-| total unique tokens needing coverage | **203** |
+- The gate emitted `ENGINE_REALIZATION_SIGNAL` only because delta (0.0259) just cleared the
+  0.02 threshold **and** p (0.046) just cleared 0.05. It is **borderline**: a slightly
+  different threshold, seed, distractor set, or composition would flip it to `NO_SIGNAL`.
+- The real MRR (0.36) is **barely above the K=8 chance baseline (≈0.34)**, and the scramble
+  mean (0.335) sits at chance. The entire effect is a ~0.026 MRR sliver.
+- This is a **single realization (English), a single engine, no multiple-comparison control,
+  N=107, class-agnostic (easy) distractors.** By design this is capped at the
+  **`REALIZATION_ARTIFACT`** ceiling — English-only positives are never confirmatory.
+- **Most parsimonious explanation:** English-gloss/embedding alignment + shared-source gloss
+  authoring (F4), not intrinsic varṇa meaning. GloVe places the composed English gloss tokens
+  slightly nearer the English meaning word than a scrambled gloss table does — exactly what a
+  rendering artifact produces. This is **not** evidence for Symbol-U.
+- **Bottom line:** a weak, borderline, English-only exploratory effect. Interesting enough to
+  probe further (below), but it does **not** move the confirmatory question, and **Track B
+  remains BLOCKED**.
 
-## 4. Metrics
+## Robustness checks needed before this sliver is taken seriously (all exploratory, on-pod)
 
-**None computed** (no asset). `MRR`, `Top-1`, and the real-vs-scrambled delta are all
-**unavailable** for this run. They are **not** fabricated. The scoring machinery
-(`semantic_realizer.compute_exploratory_metrics`) is implemented and validated on synthetic
-fixtures (see the test suite) but has **not** been run on any real vectors.
+1. **Bootstrap CI on delta** (word-level, family-aware) — is 0.026 distinguishable from 0?
+2. **Multiple seeds** for the scramble null — is p stable around 0.05 or does it wander below/above?
+3. **Beat the lexical baselines?** Compare GloVe MRR vs Phase-1 Jaccard and Phase-2 LCS on the
+   same corpus/distractors. If semantic ≈ lexical, there is **no semantic gain** — the whole
+   point of Track C.
+4. **Order-scramble null** — mean-pool is order-insensitive, so this should be ~null; a
+   sanity check that the tiny signal is not order-dependent.
+5. **Leakage probe** — can GloVe recover the meaning from the *bare word* or from unrelated
+   tokens? Quantify how much of the 0.026 is gloss↔meaning token proximity vs assignment.
+6. **Hard-negative distractors** — re-freeze class-matched negatives; the current easy
+   distractors inflate MRR and make the sliver look larger than it is.
 
-## 5. Controls
+## Channels
 
-- **Scramble null:** implemented (seeded assignment-scramble), not run (no asset).
-- **Baseline comparison** (vs Phase-1 Jaccard, Phase-2 LCS): not computable without vectors.
-- **OOV coverage:** unknown until a real asset is loaded (with an empty vector table the frozen
-  corpus encodes to zero vectors — honest OOV, not a metric).
-- **English-only vs cross-realization:** N/A — `sa_term` skipped (no offline Sanskrit vectors),
-  `concept_id` skipped (no non-circular resolver). Cross-realization cannot be assessed.
+- `en_gloss`: **run** (result above).
+- `sa_term`: **skipped** — no offline Sanskrit vectors were acquired (fastText host blocked).
+- `concept_id`: **skipped** — no non-circular concept resolver exists (`CONCEPT_RESOLVER_
+  CIRCULARITY_AUDIT.md`). Cross-realization invariance therefore cannot be assessed.
 
-## 6. Label emitted
+## Reminder — Track B remains BLOCKED
 
-**`INCONCLUSIVE`** — asset unavailable in this environment. (Allowed Track-C labels:
-`ENGINE_REALIZATION_SIGNAL` / `NO_SIGNAL` / `REALIZER_DEPENDENT` / `INCONCLUSIVE`.)
-**`ONTOLOGICAL_SIGNAL` is not emitted and cannot be emitted by this pipeline.**
-
-## 7. Exact commands to complete the run on RunPod (where hosts are reachable)
-
-```bash
-git clone <rasaha/symbolu> symbolu && cd symbolu
-git checkout claude/symbolu-adversarial-eval-zevb4h
-python3 -m venv .venv && . .venv/bin/activate && pip install numpy
-
-# obtain the approved asset (RunPod has network); verify upstream integrity, then PIN sha256
-python3 -c "import urllib.request; urllib.request.urlretrieve(
-  'https://github.com/RaRe-Technologies/gensim-data/releases/download/glove-wiki-gigaword-50/glove-wiki-gigaword-50.gz',
-  '/workspace/glove-50.gz')"
-python3 - <<'PY'
-import hashlib,gzip,pathlib
-raw=pathlib.Path('/workspace/glove-50.gz').read_bytes()
-assert hashlib.md5(raw).hexdigest()=='c289bc5d7f2f02c6dc9f2f9b67641813', 'upstream md5 mismatch'
-# gensim-data .gz is a keyed-vectors format; export to plain `token v1..vd` text, then:
-# sha256 the exported text file and record it in track_c_asset.metadata.json (do NOT fabricate).
-PY
-
-# run Track C (offline after download) — English channel only
-python3 - <<'PY'
-import sys, pathlib, json
-p=pathlib.Path("experiments/primitive_sequence_recovery"); sys.path.insert(0,str(p))
-import semantic_realizer as SR
-vecs = SR.load_vectors('/workspace/glove-50.txt', expected_sha256='<PINNED_SHA256>')
-ac, wa, refs, dz, active = SR.load_frozen_corpus(p/"frozen", "en_gloss")
-m = SR.compute_exploratory_metrics(ac, wa, refs, dz, vecs, words=active, n_scram=1000, seed=0)
-print(json.dumps(m, indent=2))   # label in {ENGINE_REALIZATION_SIGNAL, NO_SIGNAL}
-PY
-```
-Then update this report and `track_c_asset.metadata.json` with the pinned sha256, coverage, and
-real metrics. Never commit the large vector file; keep it on the pod (or commit only a hashed
-vocab slice if explicitly approved).
-
-## 8. Limitations
-
-- **No real asset here → no real result** (this run: `INCONCLUSIVE`).
-- Static mean-pool is **order-insensitive** (semantic gain only; order is a separate axis).
-- **English leakage** caps any future `en_gloss` positive at `ENGINE/REALIZATION_ARTIFACT`.
-- **`sa_term` / `concept_id` skipped honestly** (no Sanskrit vectors; no non-circular resolver).
-- **Shared-source ceiling (F4)** unchanged: even a future exploratory positive would reflect the
-  gloss table + engine, not proof that varṇas carry intrinsic meaning.
-
-## 9. Reminder — Track B remains BLOCKED
-
-This is Track C (exploratory). **Track B (confirmatory) remains BLOCKED** — it needs an
-independent, non-circular concept channel that does not exist. Nothing here unblocks it. No
+This is Track C (exploratory). The English-only, borderline effect above does **not** unblock
+Track B, which requires an independent, non-circular concept channel that does not exist. No
 output may be reported as `ONTOLOGICAL_SIGNAL`. `manifest.json` remains NOT_READY; the runner
 remains NOT_RUN; no `manifest_v2`, no READY, no concept resolver; Stage A untouched.
 

@@ -1,31 +1,45 @@
 {
   "track": "C_exploratory",
-  "status": "NOT_ACQUIRED",
-  "reason": "No approved static-embedding asset is obtainable in this build environment. Fresh reachability probes: huggingface.co, nlp.stanford.edu, dl.fbaipublicfiles.com => unreachable (ERR); GitHub release assets (gensim-data) => HTTP 403; only raw.githubusercontent.com reachable (not a canonical vector host). No asset was downloaded; no sha256 was fabricated.",
-  "intended_asset": {
+  "status": "ACQUIRED",
+  "run_environment": "RunPod A100-SXM4-80GB (hostname 472e10a43793, Linux 6.8, Python 3.12.3); GPU unused, CPU scoring",
+  "asset": {
     "name": "glove-wiki-gigaword-50",
     "source": "GloVe (Wikipedia + Gigaword), distributed via gensim-data GitHub release",
     "read_more": "https://nlp.stanford.edu/projects/glove/",
-    "license": "ODC Public Domain Dedication and License (PDDL) — permissive; confirm at acquisition",
+    "license": "ODC Public Domain Dedication and License (PDDL)",
     "dimensionality": 50,
-    "vocab_size_upstream": 400000,
-    "upstream_md5_reference": "c289bc5d7f2f02c6dc9f2f9b67641813",
-    "file_path": null,
-    "sha256": null,
-    "sha256_note": "computed at acquisition on real hardware; NOT fabricated here"
+    "vocab_size": 400000,
+    "upstream_md5_cached_gz": "c289bc5d7f2f02c6dc9f2f9b67641813",
+    "upstream_md5_status": "MATCHES known-good gensim-data value",
+    "pinned_sha256_exported_text": "c7225dc6be8004c0451152074eb54ca7a0790e88614ac91384a7c67259736557",
+    "file_path_pod_local": "/workspace/track_c_assets/glove-wiki-gigaword-50.txt",
+    "committed_to_repo": false
   },
-  "corpus_vocabulary_to_cover": {
-    "active_words": 107,
-    "unique_en_gloss_atom_tokens": 102,
-    "unique_en_gloss_meaning_tokens": 107,
-    "total_unique_tokens": 203,
-    "coverage_en_gloss_tokens": null,
-    "coverage_sa_term_tokens": null,
-    "coverage_note": "coverage is unknown until a real asset is loaded; not fabricated"
+  "coverage": {
+    "channel": "en_gloss",
+    "tokens_needed": 203,
+    "coverage_en_gloss": 0.9803,
+    "coverage_sa_term": null,
+    "coverage_concept_id": null
+  },
+  "metrics_en_gloss": {
+    "n_words": 107,
+    "K": 8,
+    "n_scram": 1000,
+    "seed": 0,
+    "chance_mrr_k8": 0.3397,
+    "mrr_real": 0.3606,
+    "top1_real": 0.1495,
+    "mrr_scram_mean": 0.3347,
+    "scramble_delta": 0.0259,
+    "scramble_pct": 0.954,
+    "one_sided_p_approx": 0.046,
+    "label": "ENGINE_REALIZATION_SIGNAL",
+    "label_note": "borderline: delta just clears 0.02 and p just clears 0.05; English-only => REALIZATION_ARTIFACT ceiling; NOT ONTOLOGICAL_SIGNAL"
   },
   "channels": {
-    "en_gloss": "PENDING (needs English static vectors)",
-    "sa_term": "SKIPPED (no offline Sanskrit vectors available)",
+    "en_gloss": "RUN",
+    "sa_term": "SKIPPED (no offline Sanskrit vectors)",
     "concept_id": "SKIPPED (no non-circular concept resolver; Track B blocked)"
   }
 }
