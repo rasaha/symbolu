@@ -55,6 +55,36 @@ Edit `track_g_smoke_approved_run_config.json` and fill: `scorer_model`, `approva
 `approval_record.date`, `approval_record.signature`. Leave `run_enabled:true` / `approval_status:
 "APPROVED"` (this is the *separate* config; the **base manifest stays gated**).
 
+### 5a. Approval-config placeholder fields (inspection note — operator honesty required)
+
+The shipped `track_g_smoke_approved_run_config.json` is a **template** with exactly **four**
+`<fill…>` placeholder values you must replace before a real run:
+
+| Field | Gate-relevant? | Notes |
+|---|---|---|
+| `scorer_model` | **Yes** | Must be a real, loadable model id/path (see below). |
+| `approval_record.date` | **Yes** | e.g. `"2026-07-02"`. |
+| `approval_record.signature` | **Yes** | Explicit approval text. |
+| `approval_record.approver` | No (record-only) | Not checked by the gate, but **should be filled** for an honest record. |
+
+- **Gate-relevant** = checked by `load_approval_config` in `track_g_smoke_runner.py`
+  (`scorer_model`, `approval_record.date`, `approval_record.signature` must be non-empty; plus the
+  already-correct `config_type` / `run_enabled:true` / `approval_status:"APPROVED"` /
+  `four_sphere_integrated:false`).
+- **Placeholders are non-empty strings, so they can PASS the gate** even though they are meaningless.
+  The gate only checks presence, not validity — **operator honesty is required** to replace them
+  with real values. A placeholder left in `date`/`signature` yields a dishonest record; a placeholder
+  left in `scorer_model` will fail at model load (below).
+- **`scorer_model` must be a real Hugging Face repo id** (e.g. `mistralai/Mistral-7B-Instruct-v0.3`)
+  **or a local model path** — it is passed **directly** to
+  `AutoModelForCausalLM.from_pretrained(model_id)` / `AutoTokenizer.from_pretrained(model_id)` in
+  `run_track_g_smoke_mistral.py`. A `<fill…>` placeholder passes the gate but errors at load (no
+  partial/fabricated output).
+- **`--model-id` overrides the config value** (`model_id = args.model_id or cfg["scorer_model"] or
+  DEFAULT_MODEL`); `--temperature` / `--max-new-tokens` likewise override the config.
+- **No real scorer run is performed from this documentation task.** This section only records the
+  inspection; running the scorer is a separate, explicitly-operator-driven step (§5–§7b) on a GPU host.
+
 ## 6. Set approval env
 ```bash
 export TRACK_G_SMOKE_RUN_APPROVED=I_APPROVE_TRACK_G_SMOKE
