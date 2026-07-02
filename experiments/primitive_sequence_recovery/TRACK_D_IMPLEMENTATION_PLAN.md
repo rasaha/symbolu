@@ -199,6 +199,17 @@ Allowed labels only:
 **Failing the Barnum comparison alone forces `NO_SIGNAL`**, regardless of B/C/E/F outcomes.
 Forbidden: `ONTOLOGICAL_SIGNAL`, `SANSKRIT_PRIVILEGE`, any Track-B-unblocking language.
 
+## 10.1 D0 / D1 split (see `TRACK_D_ROADMAP_D0_D1.md`)
+
+This plan describes the **rigorous D1** pipeline (human-blind profiles + deterministic scorer),
+which alone can emit the Track D labels above. Human annotation is **deferred** (post-funding).
+In the interim, a cheaper **D0 LLM-scored exploratory pilot** (`TRACK_D_LLM_SCORER_PILOT_PLAN.md`)
+may triage whether D1 is worth funding. D0 is contamination-prone, uses LLM-generated profiles
+and an LLM judge, emits only `LLM_PILOT_SUGGESTIVE` / `LLM_PILOT_NO_SIGNAL` /
+`LLM_PILOT_INCONCLUSIVE` / `LLM_PILOT_CONTAMINATED`, and can **never** produce
+`EXPERIENTIAL_WEATHER_SIGNAL`. The §4–5 blind-human-authoring and §12 approval gates below apply
+to **D1**; D0 has its own lighter, clearly-labelled protocol.
+
 ## 11. Implementation phases
 
 - **Phase 0 — docs/schema only (this document + schemas).** No data, no code. ← current stage.
