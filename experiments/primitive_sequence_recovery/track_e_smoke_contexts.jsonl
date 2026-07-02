@@ -1,12 +1,12 @@
 {"context_id": "e000-c0", "word_id": "e000", "context_sentence": "After the long fever finally broke, a quiet loosening settled over her.", "context_correct_candidate_id": "cand_1"}
-{"context_id": "e001-c0", "word_id": "e001", "context_sentence": "When the others fled, he alone stood his ground at the gate.", "context_correct_candidate_id": "cand_6"}
-{"context_id": "e002-c0", "word_id": "e002", "context_sentence": "After years of feud, the two families finally sat together and settled their claims.", "context_correct_candidate_id": "cand_5"}
-{"context_id": "e003-c0", "word_id": "e003", "context_sentence": "Seeing the official take bread from the starving crowd, she rose to her feet, unable to stay quiet.", "context_correct_candidate_id": "cand_4"}
+{"context_id": "e001-c0", "word_id": "e001", "context_sentence": "When the others fled, he alone stood his ground at the gate.", "context_correct_candidate_id": "cand_3"}
+{"context_id": "e002-c0", "word_id": "e002", "context_sentence": "After years of feud, the two families finally sat together and settled their claims.", "context_correct_candidate_id": "cand_1"}
+{"context_id": "e003-c0", "word_id": "e003", "context_sentence": "Seeing the official take bread from the starving crowd, she rose to her feet, unable to stay quiet.", "context_correct_candidate_id": "cand_1"}
 {"context_id": "e004-c0", "word_id": "e004", "context_sentence": "Each night before the verdict, he lay awake staring at the ceiling, unable to picture the days ahead.", "context_correct_candidate_id": "cand_3"}
-{"context_id": "e005-c0", "word_id": "e005", "context_sentence": "He lifted the fallen beam off the trapped child with his bare hands.", "context_correct_candidate_id": "cand_2"}
-{"context_id": "e006-c0", "word_id": "e006", "context_sentence": "Given two flawed plans, she saw at once which one would fail and chose the other.", "context_correct_candidate_id": "cand_1"}
-{"context_id": "e007-c0", "word_id": "e007", "context_sentence": "They loaded the boat and let the current carry them downstream toward the sea.", "context_correct_candidate_id": "cand_6"}
-{"context_id": "e008-c0", "word_id": "e008", "context_sentence": "The climbers roped together and began the final ascent to the summit.", "context_correct_candidate_id": "cand_5"}
-{"context_id": "e009-c0", "word_id": "e009", "context_sentence": "The masons finished the walls and set the roof beams before the rains came.", "context_correct_candidate_id": "cand_4"}
-{"context_id": "e010-c0", "word_id": "e010", "context_sentence": "From childhood she fixed on one thing: to build the bridge no one thought possible.", "context_correct_candidate_id": "cand_3"}
-{"context_id": "e011-c0", "word_id": "e011", "context_sentence": "Though he longed to stay, the soldier shouldered his pack and returned to his post.", "context_correct_candidate_id": "cand_2"}
+{"context_id": "e005-c0", "word_id": "e005", "context_sentence": "He lifted the fallen beam off the trapped child with his bare hands.", "context_correct_candidate_id": "cand_4"}
+{"context_id": "e006-c0", "word_id": "e006", "context_sentence": "Given two flawed plans, she saw at once which one would fail and chose the other.", "context_correct_candidate_id": "cand_5"}
+{"context_id": "e007-c0", "word_id": "e007", "context_sentence": "They loaded the boat and let the current carry them downstream toward the sea.", "context_correct_candidate_id": "cand_3"}
+{"context_id": "e008-c0", "word_id": "e008", "context_sentence": "The climbers roped together and began the final ascent to the summit.", "context_correct_candidate_id": "cand_3"}
+{"context_id": "e009-c0", "word_id": "e009", "context_sentence": "The masons finished the walls and set the roof beams before the rains came.", "context_correct_candidate_id": "cand_2"}
+{"context_id": "e010-c0", "word_id": "e010", "context_sentence": "From childhood she fixed on one thing: to build the bridge no one thought possible.", "context_correct_candidate_id": "cand_5"}
+{"context_id": "e011-c0", "word_id": "e011", "context_sentence": "Though he longed to stay, the soldier shouldered his pack and returned to his post.", "context_correct_candidate_id": "cand_4"}

@@ -36,6 +36,21 @@ consonant-only, and unverified** (`dev_status:"draft_consonant_only_unverified"`
 hidden `dev_` fields — they **must be linguistically verified before any freeze**. This bundle is a
 review draft, not a frozen artifact.
 
+## Authored candidate positions (hardened)
+
+Authoring-time `candidate_id` order now uses a **deterministic pseudo-random permutation** — a per
+case RNG seeded by `f"{seeds.candidate_authoring_permute}:{word_id}"` (`candidate_authoring_permute
+= 50507193`, recorded in `track_e_smoke_seeds.json` and noted in the manifest's `authoring_note`).
+This replaces the earlier regular descending cycle (`cand_1, cand_6, cand_5, …`). **Candidate
+meanings and correct labels are unchanged; only ids/order changed.** The correct answer now falls
+across 5 of 6 slots (`[1,3,1,1,3,4,5,3,3,2,5,4]`) with no arithmetic or repeated-period cycle.
+
+This is **authoring hygiene / reviewer optics only.** The real protection is the **runtime packet
+shuffle**, which remains **mandatory**: every packet is re-shuffled with `seeds.candidate_shuffle`
+and `role`/`context_correct_candidate_id` stay hidden, so the authored order never reaches a
+scorer. The runbook §8 approval gate now carries an explicit "Runtime candidate shuffle enabled"
+checkbox.
+
 ## Anonymization (enforced by the builder's validation)
 
 Scorer-facing fields carry **no surface word, no varṇa names, no root names, and no arm labels**;
@@ -52,6 +67,8 @@ candidate wording verbatim.
 - every case: exactly 1 context-correct, ≥3 hard negatives, ≥1 dict-valid-context-wrong, ≥1
   Barnum-compatible; unique candidate ids; answer id resolves to the context-correct role;
 - exploratory-only cases excluded from `primary_label_cases`;
+- correct-answer positions spread across ≥4 slots with no descending / arithmetic / repeated-period
+  cycle;
 - **four-sphere artifact not referenced** in any data file (and `four_sphere_integrated:false` in
   the manifest);
 - no scorer-facing field leaks surface/varṇa/root tokens;

@@ -122,6 +122,7 @@ NOT_RUN and `run_enabled:false`.
 | Final seeds (scramble / shuffle / bootstrap) | ☐ ________ |
 | Boundary representation | ☐ **flat boundary-constraint (current)** — four-sphere NOT used |
 | Leak-scan + contamination-probe enabled | ☐ yes ☐ no |
+| **Runtime candidate shuffle enabled** (`seeds.candidate_shuffle`; authored order never sent) | ☐ yes ☐ no |
 | `run_real_pilot` enabled for this run only | ☐ yes ☐ no |
 | Approval date / signature | ☐ ________ |
 
