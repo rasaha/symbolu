@@ -41,6 +41,7 @@ MAX_NEW_TOKENS = 256
 MALFORMED_ABORT_RATE = 0.15
 OUTPUTS_JSON = HERE / "track_g_smoke_outputs.json"
 RESULT_MD = HERE / "TRACK_G_SMOKE_RESULT.md"
+DEBUG_DUMP = HERE / "track_g_smoke_malformed_debug.jsonl"   # diagnostic only; gitignored, not committed
 
 SCORER_INSTRUCTIONS = ('For each candidate meaning, output a score in [0,1] for how well it fits the '
                        'premise. Respond with JSON ONLY, no prose: {"packet_id": "<id>", "scores": '
@@ -78,6 +79,33 @@ def parse_scorer_json(text, opts):
         if any(b.lower() in low for b in HG.BANNED_REAL + HG.FORBIDDEN_LABELS) or "sphere" in low:
             raise ValueError(f"contamination text: {s!r}")
     return {"scores": scores, "chosen": obj["chosen"]}
+
+
+def score_packets(packets, hidden, generate_fn, debug_records=None):
+    """Run each packet through generate_fn + parse_scorer_json. PURE w.r.t. scoring semantics:
+    returns (scores_by_pid, malformed_count) identically whether or not debug_records is passed.
+    If debug_records is a list, append one diagnostic record per MALFORMED generation only —
+    this is observability, it does not alter scores, the malformed count, labels, assembly, or the
+    frozen polarity. generate_fn(packet) -> raw model text (injected so this is model-agnostic)."""
+    scores_by_pid, malformed = {}, 0
+    for p in packets:
+        opts = [c["candidate_id"] for c in p["candidates"]]
+        raw = ""
+        try:
+            raw = generate_fn(p)
+            scores_by_pid[p["packet_id"]] = parse_scorer_json(raw, opts)["scores"]
+        except Exception as e:                        # malformed / contaminated -> counted, captured
+            malformed += 1
+            if debug_records is not None:
+                h = hidden.get(p["packet_id"], {})
+                err = f"{type(e).__name__}: {e}"
+                debug_records.append({
+                    "packet_id": p["packet_id"], "case_id": h.get("case_id"),
+                    "arm": h.get("true_arm"), "n_opts": len(opts),
+                    "parser_error": err,
+                    "contamination_detected": "contamination" in err.lower(),
+                    "raw_text": raw[:2000]})
+    return scores_by_pid, malformed
 
 
 # ---------------------------------------------------------- assemble + label --------
@@ -181,6 +209,10 @@ def main():
     ap.add_argument("--model-id", default=None)
     ap.add_argument("--max-new-tokens", type=int, default=None)
     ap.add_argument("--temperature", type=float, default=None)
+    ap.add_argument("--debug-dump", nargs="?", const=str(DEBUG_DUMP), default=None,
+                    help="Write raw text of MALFORMED scorer generations to a JSONL file for "
+                         "diagnosis (diagnostic only; NOT a score artifact; not committed). "
+                         "Bare flag uses the default filename; pass a path to override.")
     args = ap.parse_args()
 
     report, _, _ = GR.dry_run()                     # always dry-run first; no model
@@ -201,13 +233,15 @@ def main():
     MAX_NEW_TOKENS = args.max_new_tokens or int(cfg.get("max_tokens", MAX_NEW_TOKENS))
 
     model, tok = _load_model(model_id)              # only after gates pass
-    scores_by_pid, malformed = {}, 0
-    for p in packets:
-        opts = [c["candidate_id"] for c in p["candidates"]]
-        try:
-            scores_by_pid[p["packet_id"]] = parse_scorer_json(_generate(model, tok, _prompt(p)), opts)["scores"]
-        except Exception:
-            malformed += 1
+    debug_records = [] if args.debug_dump else None
+    scores_by_pid, malformed = score_packets(
+        packets, hidden, lambda p: _generate(model, tok, _prompt(p)), debug_records)
+    if args.debug_dump and debug_records:
+        pathlib.Path(args.debug_dump).write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in debug_records) + "\n",
+            encoding="utf-8")
+        print(f"[debug] captured {len(debug_records)} malformed generation(s) -> {args.debug_dump} "
+              "(diagnostic only; not a score artifact)")
     rate = malformed / max(1, len(packets))
     if rate > MALFORMED_ABORT_RATE:
         result = _result("INCONCLUSIVE", None, None, 0, [], malformed, rate,

@@ -120,6 +120,28 @@ python3 run_track_g_smoke_mistral.py \
 python3 -c "import json;m=json.load(open('track_g_smoke_manifest.json'));print('base manifest:',m['run_enabled'],m['approval_status'])"  # -> False NOT_APPROVED
 ```
 
+### 7c. Diagnosing malformed scorer output (`--debug-dump`) — diagnostic only
+
+If a run aborts `INCONCLUSIVE` with a high `malformed_rate` (the scorer's output failed JSON
+parsing), add `--debug-dump` to capture the **raw text of the malformed generations** so the format
+failure can be diagnosed:
+
+```bash
+python3 run_track_g_smoke_mistral.py \
+  --approval-config track_g_smoke_approved_run_config.json \
+  --judge-mode single --model-id mistralai/Mistral-7B-Instruct-v0.3 \
+  --debug-dump                       # writes track_g_smoke_malformed_debug.jsonl
+```
+
+- The file `track_g_smoke_malformed_debug.jsonl` holds one JSON record per **malformed** packet:
+  `packet_id`, `case_id`, `arm`, `n_opts`, `parser_error`, `contamination_detected`, `raw_text`.
+- **It is diagnostic only — NOT a score artifact.** It contains no scores, no label, and does not
+  feed back into `track_g_harness`; it exists solely to see what the model emitted. It is
+  **gitignored and must never be committed** (it carries raw model text and the arm mapping).
+- Capturing it **does not change** scores, the malformed count, the abort threshold, the 8 labels,
+  packet assembly, or the frozen polarity — bare runs (no flag) behave identically. Diagnosis of the
+  cause and any parser/prompt repair are a **separate, later, explicitly-approved** step.
+
 **Honest negative prior (record it, don't fish past it).** The varṇa polarity table was authored
 from the frozen glosses **blind to the target poles**, so the derived A vectors mostly do **not**
 match the pre-registered poles (e.g. *happy* derives toward contraction/fear/inertia). The expected

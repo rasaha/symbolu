@@ -237,6 +237,121 @@ def test_constants_are_conservative():
     _check("default model is Mistral", "Mistral" in M.DEFAULT_MODEL)
 
 
+# ---------------------------------------------- B1: malformed debug observability ---
+def _packets_from(hidden):
+    """Anonymized packets (packet_id + opt candidates only) matching a `hidden` map."""
+    return [{"packet_id": pid, "premise": "p", "instructions": "i",
+             "candidates": [{"candidate_id": o, "gloss": "g"} for o in h["opt_to_cand"]]}
+            for pid, h in hidden.items()]
+
+
+def _gen_fn(scores_by_pid, malformed_pids=(), contaminate_pids=()):
+    """Injected generator: valid JSON from scores, or garbage/contaminated for chosen pids."""
+    def f(p):
+        pid = p["packet_id"]
+        if pid in malformed_pids:
+            return "sorry, I cannot produce that. {not valid json"
+        sc = scores_by_pid[pid]
+        obj = {"packet_id": pid, "scores": sc, "chosen": max(sc, key=sc.get)}
+        if pid in contaminate_pids:
+            obj["why"] = "the varna clearly fits"      # trips the contamination scan
+        return json.dumps(obj)
+    return f
+
+
+def test_debug_capture_does_not_change_scores_or_malformed():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    bad = {"pkt_g000_D", "pkt_g001_B"}
+    gf = _gen_fn(scores, malformed_pids=bad)
+    s_no, m_no = M.score_packets(packets, hidden, gf, None)          # debug OFF
+    rec = []
+    s_dbg, m_dbg = M.score_packets(packets, hidden, gf, rec)         # debug ON
+    _check("scores identical with/without debug", s_no == s_dbg)
+    _check("malformed count identical with/without debug", m_no == m_dbg == len(bad))
+
+
+def test_debug_capture_does_not_change_label():
+    bundle, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    gf = _gen_fn(scores)                                             # all valid -> full scoring
+    s_no, m_no = M.score_packets(packets, hidden, gf, None)
+    rec = []
+    s_dbg, m_dbg = M.score_packets(packets, hidden, gf, rec)
+    lab_no = M.assemble_and_score(bundle, hidden, s_no, m_no, 0.0)["primary_label"]
+    lab_dbg = M.assemble_and_score(bundle, hidden, s_dbg, m_dbg, 0.0)["primary_label"]
+    _check("label identical with/without debug", lab_no == lab_dbg)
+    _check("label still in allowed set", lab_dbg in HG.ALLOWED_LABELS and lab_dbg not in HG.FORBIDDEN_LABELS)
+    _check("debug run recorded nothing when no malformed", rec == [])
+
+
+def test_debug_records_only_malformed():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    bad = {"pkt_g000_D", "pkt_g001_X", "pkt_g000_R"}
+    rec = []
+    M.score_packets(packets, hidden, _gen_fn(scores, malformed_pids=bad), rec)
+    _check("one debug record per malformed packet", len(rec) == len(bad))
+    _check("debug records cover exactly the malformed pids", {r["packet_id"] for r in rec} == bad)
+
+
+def test_debug_record_fields_present_and_arm_available():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    rec = []
+    M.score_packets(packets, hidden, _gen_fn(scores, malformed_pids={"pkt_g000_A"}), rec)
+    r = rec[0]
+    for f in ("packet_id", "case_id", "arm", "n_opts", "parser_error",
+              "contamination_detected", "raw_text"):
+        _check(f"debug record has field {f!r}", f in r)
+    _check("arm captured from hidden", r["arm"] == "A")
+    _check("case_id captured from hidden", r["case_id"] == "g000")
+    _check("n_opts captured", r["n_opts"] == 3)
+    _check("raw_text captured", isinstance(r["raw_text"], str) and r["raw_text"])
+
+
+def test_debug_flags_contamination():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    rec = []
+    M.score_packets(packets, hidden, _gen_fn(scores, contaminate_pids={"pkt_g001_I"}), rec)
+    _check("contaminated generation counted malformed", len(rec) == 1)
+    _check("contamination_detected flag set", rec[0]["contamination_detected"] is True)
+
+
+def test_debug_capture_does_not_touch_frozen_polarity_or_assembly():
+    # a non-frozen assignment must still invalidate, regardless of debug capture
+    bundle, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    bundle["assignments"]["g000"]["frozen"] = False
+    rec = []
+    s, m = M.score_packets(packets, hidden, _gen_fn(scores), rec)
+    r = M.assemble_and_score(bundle, hidden, s, m, 0.0)
+    _check("frozen gate still fires with debug on", r["primary_label"] == "INVALID_POSTHOC_POLARITY")
+
+
+def test_debug_dump_file_not_written_by_score_packets():
+    # score_packets never touches disk; only main() writes, and only when --debug-dump is set
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    M.score_packets(packets, hidden, _gen_fn(scores, malformed_pids={"pkt_g000_A"}), [])
+    _check("no debug file written by score_packets", not M.DEBUG_DUMP.exists())
+
+
+def test_dry_check_writes_no_debug_or_output():
+    argv = sys.argv
+    sys.argv = ["run_track_g_smoke_mistral.py", "--dry-check"]
+    try:
+        M.main()                                        # dry-run only; returns before any model
+    finally:
+        sys.argv = argv
+    _check("dry-check wrote no debug file", not M.DEBUG_DUMP.exists())
+    _check("dry-check wrote no outputs.json", not M.OUTPUTS_JSON.exists())
+    _check("dry-check wrote no result md", not M.RESULT_MD.exists())
+    _check("dry-check imported no ML libs",
+           not any(m in sys.modules for m in ("torch", "transformers")))
+
+
 def main():
     print("run_track_g_smoke_mistral — scorer-step tests (no LLM, no scoring, no writes)\n")
     for name, fn in sorted(globals().items()):
