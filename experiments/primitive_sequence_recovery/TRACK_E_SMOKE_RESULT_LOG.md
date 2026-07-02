@@ -17,9 +17,11 @@ this result cannot be converted into a positive.
   carryover. Generator `Qwen/Qwen2.5-7B-Instruct` recorded but **not exercised** (packets are
   pre-authored; only the scorer runs).
 - **Coverage:** **12/12 cases scored**, 0 dropped; **malformed rate 0.0093** (1 packet of 108);
-  **contamination: none**.
+  **contamination: none**. The single malformed packet was benign — the scorer echoed a *mistyped*
+  packet_id (`…415506` for the real `…415406`), correctly rejected as an unknown packet_id (not a
+  content/contamination issue).
 - **Full report (pod-generated):** `track_e_smoke_result.json` + `TRACK_E_SMOKE_RESULT.md`
-  (per-case rows live there).
+  (committed separately from the pod).
 
 ## Result
 
@@ -43,6 +45,38 @@ Incremental deltas (A minus control):
 | `A_vs_F` | −0.0556 | loses to etymology-only |
 | `A_vs_I` | −0.0833 | loses to a generic Barnum boundary |
 | `A_vs_D` | +0.2681 | beats only the (weakest) dictionary-only floor |
+
+## Per-case pattern (rank of the context-correct candidate; 1 = best of 6)
+
+| case | domain | A | B | X | F | D | I |
+|---|---|---|---|---|---|---|---|
+| e000 | abstract | **1** | 1 | 2 | 2 | 4 | 2 |
+| e001 | abstract | 1 | 1 | 1 | 1 | 2 | 1 |
+| e002 | abstract | 1 | 1 | 1 | 1 | 4 | 1 |
+| e003 | abstract | 1 | 1 | 1 | 1 | 2 | 1 |
+| e004 | abstract | **2** | 1 | 1 | 1 | 1 | 1 |
+| e005 | abstract | 1 | 1 | 1 | 1 | 2 | 2 |
+| e006 | abstract | 1 | 1 | 1 | 1 | 4 | 1 |
+| e007 | concrete | **6** | 6 | 1 | 1 | 3 | 1 |
+| e008 | concrete | **3** | 3 | 1 | 3 | 1 | 1 |
+| e009 | concrete | **2** | 6 | 1 | 3 | 1 | 1 |
+| e010 | famous | 1 | 1 | 1 | 1 | 5 | 2 |
+| e011 | famous | 1 | 1 | 1 | 1 | 2 | 1 |
+
+Two things drive the aggregate:
+
+1. **Context-only (X) already solves the task** — X ranks the context-correct candidate #1 in
+   **11 of 12 cases** (only e000 X=2). There is almost no headroom for any boundary to add value.
+2. **The real boundary is actively harmful exactly where it is most mismatched — the concrete
+   controls.** On e007/e008/e009 the real boundary ranks the correct concrete meaning **6, 3, 2**
+   while context ranks it **1**. The affliction-vṛtti "boundary" drags the scorer away from
+   *river / mountain / house* toward affliction-flavoured candidates. Those three cases account for
+   essentially all of A's aggregate deficit; on the abstract/famous cases A is merely
+   context-equivalent (mostly rank 1, but no better than X, and worse on e004).
+
+So the negative `A_vs_X` is not noise: it is **context saturating the task** plus **the varṇa
+boundary injecting domain-mismatched affliction semantics** that only hurts. Scramble (B) shows the
+same concrete collapse (e007 B=6, e009 B=6), confirming the specific mapping is not what matters.
 
 ## Honest interpretation
 
@@ -76,6 +110,13 @@ Incremental deltas (A minus control):
   decoding seed; English-mediated packets; the boundary text is the flat vṛtti-gloss composition
   (the four-sphere representation remains a parked, unadopted candidate). Smoke size cannot
   establish CIs or stability; the negative is triage-strength, not a definitive refutation.
+- **Design caveat surfaced by the run — context ceiling.** X (context-only) MRR 0.958 means the
+  contexts are near-ceiling; a boundary has little room to *demonstrate* value even if it had any.
+  This was flagged as "too easy context" in the packet preview and is now borne out. A revised
+  design would need harder contexts (a lower X baseline) to give any boundary detectable headroom.
+  Note this cuts against a rescue, not toward one: even with the ceiling, the boundary is
+  net-**negative** (esp. on concretes), so "no headroom" is not the whole story — it is also
+  actively misleading where mismatched.
 
 > Track E smoke pilot completed as exploratory triage only. Track B remains blocked. Structure,
 > not validated meaning.
