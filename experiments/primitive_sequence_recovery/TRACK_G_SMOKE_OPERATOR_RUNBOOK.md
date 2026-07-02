@@ -142,6 +142,29 @@ python3 run_track_g_smoke_mistral.py \
   packet assembly, or the frozen polarity — bare runs (no flag) behave identically. Diagnosis of the
   cause and any parser/prompt repair are a **separate, later, explicitly-approved** step.
 
+### 7d. Full audit dump (`--all-raw-dump`) — audit/reproducibility only
+
+For full reproducibility, add `--all-raw-dump` to capture **every** scorer generation (successful
+*and* malformed), not just the malformed ones:
+
+```bash
+python3 run_track_g_smoke_mistral.py \
+  --approval-config track_g_smoke_approved_run_config.json \
+  --judge-mode single --model-id mistralai/Mistral-7B-Instruct-v0.3 \
+  --all-raw-dump                     # writes track_g_smoke_all_raw_debug.jsonl
+```
+
+- `track_g_smoke_all_raw_debug.jsonl` holds one record per packet: `packet_index`, `packet_id`,
+  `case_id`, `arm`, `n_opts`, `raw_text`, `parsed_ok`, `parser_error`, normalized `scores`,
+  `chosen`, `contamination_detected`.
+- **It is diagnostic/audit-only — NOT a scoring artifact.** It records what the model emitted and how
+  each generation parsed, for future reproducibility/auditability; it does **not** feed back into
+  `track_g_harness` and carries no label. It is **gitignored and must not be committed** (raw model
+  text + arm mapping).
+- Enabling it **does not change** scores, labels, malformed rate, deltas, MRR/Top-1, packet
+  construction, or the frozen polarity — bare runs behave identically, and it composes with the
+  malformed-only `--debug-dump` without altering it. Writes nothing on `--dry-check`.
+
 **Parser accepts the positional-array shape (B2).** Diagnosis of the first real run showed Mistral
 returns `"scores"` as a positional **array** (`[0.2, 0.1, ...]`), sometimes as quoted numbers, rather
 than the required `{"opt_1": 0.2, ...}` object. `parse_scorer_json` now accepts EITHER a keyed object

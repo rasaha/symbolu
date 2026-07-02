@@ -43,6 +43,7 @@ MALFORMED_ABORT_RATE = 0.15
 OUTPUTS_JSON = HERE / "track_g_smoke_outputs.json"
 RESULT_MD = HERE / "TRACK_G_SMOKE_RESULT.md"
 DEBUG_DUMP = HERE / "track_g_smoke_malformed_debug.jsonl"   # diagnostic only; gitignored, not committed
+ALL_RAW_DUMP = HERE / "track_g_smoke_all_raw_debug.jsonl"   # audit only; gitignored, not committed
 
 SCORER_INSTRUCTIONS = ('For each candidate meaning, output a score in [0,1] for how well it fits the '
                        'premise. Respond with JSON ONLY, no prose: {"packet_id": "<id>", "scores": '
@@ -115,30 +116,47 @@ def parse_scorer_json(text, opts):
     return {"scores": scores, "chosen": chosen}
 
 
-def score_packets(packets, hidden, generate_fn, debug_records=None):
+def score_packets(packets, hidden, generate_fn, debug_records=None, audit_records=None):
     """Run each packet through generate_fn + parse_scorer_json. PURE w.r.t. scoring semantics:
-    returns (scores_by_pid, malformed_count) identically whether or not debug_records is passed.
-    If debug_records is a list, append one diagnostic record per MALFORMED generation only —
-    this is observability, it does not alter scores, the malformed count, labels, assembly, or the
-    frozen polarity. generate_fn(packet) -> raw model text (injected so this is model-agnostic)."""
+    returns (scores_by_pid, malformed_count) identically whether or not debug_records/audit_records
+    are passed — both are observability sinks only; neither alters scores, the malformed count,
+    labels, deltas, assembly, or the frozen polarity. generate_fn(packet) -> raw model text
+    (injected so this is model-agnostic).
+
+    - debug_records (if a list): append one record per MALFORMED generation only (unchanged B1).
+    - audit_records (if a list): append one record per EVERY generation (success + malformed) for
+      full-run reproducibility/auditability (B3). Contains raw_text + normalized scores/chosen on
+      success; never fed back into scoring."""
     scores_by_pid, malformed = {}, 0
-    for p in packets:
+    for idx, p in enumerate(packets):
         opts = [c["candidate_id"] for c in p["candidates"]]
-        raw = ""
+        raw, parsed, parsed_ok, err = "", None, False, ""
         try:
             raw = generate_fn(p)
-            scores_by_pid[p["packet_id"]] = parse_scorer_json(raw, opts)["scores"]
+            parsed = parse_scorer_json(raw, opts)
+            scores_by_pid[p["packet_id"]] = parsed["scores"]
+            parsed_ok = True
         except Exception as e:                        # malformed / contaminated -> counted, captured
             malformed += 1
+            err = f"{type(e).__name__}: {e}"
             if debug_records is not None:
                 h = hidden.get(p["packet_id"], {})
-                err = f"{type(e).__name__}: {e}"
                 debug_records.append({
                     "packet_id": p["packet_id"], "case_id": h.get("case_id"),
                     "arm": h.get("true_arm"), "n_opts": len(opts),
                     "parser_error": err,
                     "contamination_detected": "contamination" in err.lower(),
                     "raw_text": raw[:2000]})
+        if audit_records is not None:                 # B3: capture EVERY generation for audit
+            h = hidden.get(p["packet_id"], {})
+            audit_records.append({
+                "packet_index": idx, "packet_id": p["packet_id"], "case_id": h.get("case_id"),
+                "arm": h.get("true_arm"), "n_opts": len(opts),
+                "raw_text": raw[:2000], "parsed_ok": parsed_ok,
+                "parser_error": (err or None),
+                "scores": (parsed["scores"] if parsed_ok else None),
+                "chosen": (parsed["chosen"] if parsed_ok else None),
+                "contamination_detected": "contamination" in err.lower()})
     return scores_by_pid, malformed
 
 
@@ -247,6 +265,11 @@ def main():
                     help="Write raw text of MALFORMED scorer generations to a JSONL file for "
                          "diagnosis (diagnostic only; NOT a score artifact; not committed). "
                          "Bare flag uses the default filename; pass a path to override.")
+    ap.add_argument("--all-raw-dump", nargs="?", const=str(ALL_RAW_DUMP), default=None,
+                    help="Write EVERY scorer generation (successful + malformed) to a JSONL audit "
+                         "file for reproducibility/auditability (diagnostic/audit only; NOT a score "
+                         "artifact; not committed). Bare flag uses the default filename; pass a path "
+                         "to override.")
     args = ap.parse_args()
 
     report, _, _ = GR.dry_run()                     # always dry-run first; no model
@@ -268,14 +291,21 @@ def main():
 
     model, tok = _load_model(model_id)              # only after gates pass
     debug_records = [] if args.debug_dump else None
+    audit_records = [] if args.all_raw_dump else None
     scores_by_pid, malformed = score_packets(
-        packets, hidden, lambda p: _generate(model, tok, _prompt(p)), debug_records)
+        packets, hidden, lambda p: _generate(model, tok, _prompt(p)), debug_records, audit_records)
     if args.debug_dump and debug_records:
         pathlib.Path(args.debug_dump).write_text(
             "\n".join(json.dumps(r, ensure_ascii=False) for r in debug_records) + "\n",
             encoding="utf-8")
         print(f"[debug] captured {len(debug_records)} malformed generation(s) -> {args.debug_dump} "
               "(diagnostic only; not a score artifact)")
+    if args.all_raw_dump and audit_records:
+        pathlib.Path(args.all_raw_dump).write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in audit_records) + "\n",
+            encoding="utf-8")
+        print(f"[audit] captured {len(audit_records)} scorer generation(s) -> {args.all_raw_dump} "
+              "(diagnostic/audit only; not a score artifact)")
     rate = malformed / max(1, len(packets))
     if rate > MALFORMED_ABORT_RATE:
         result = _result("INCONCLUSIVE", None, None, 0, [], malformed, rate,

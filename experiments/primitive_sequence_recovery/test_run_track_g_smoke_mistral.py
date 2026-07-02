@@ -31,6 +31,21 @@ def _check(name, ok):
         raise AssertionError(name)
 
 
+# The scored result artifacts may already exist (committed at 1fe5562). Tests must not CREATE or
+# MODIFY them; snapshot their bytes at import so we can assert they're untouched. The gitignored
+# raw/audit dumps, by contrast, must never exist during tests.
+def _snap(p):
+    return p.read_bytes() if p.exists() else None
+
+
+_OUT_SNAP = _snap(M.OUTPUTS_JSON)
+_MD_SNAP = _snap(M.RESULT_MD)
+
+
+def _result_artifacts_untouched():
+    return _snap(M.OUTPUTS_JSON) == _OUT_SNAP and _snap(M.RESULT_MD) == _MD_SNAP
+
+
 # ------------------------------------------------------------- synthetic inputs -----
 def _make_inputs(per_arm):
     """Build (bundle, hidden, scores_by_pid) for 2 cases x 6 arms, 3 candidates each.
@@ -227,8 +242,10 @@ def test_no_ml_libs_imported():
 
 
 def test_no_output_artifact_written_by_tests():
-    _check("no track_g_smoke_outputs.json written by tests", not M.OUTPUTS_JSON.exists())
-    _check("no TRACK_G_SMOKE_RESULT.md written by tests", not M.RESULT_MD.exists())
+    # result artifacts may exist (committed); tests must not create/modify them
+    _check("scored result artifacts untouched by tests", _result_artifacts_untouched())
+    _check("no malformed debug dump written by tests", not M.DEBUG_DUMP.exists())
+    _check("no all-raw audit dump written by tests", not M.ALL_RAW_DUMP.exists())
 
 
 def test_constants_are_conservative():
@@ -346,8 +363,7 @@ def test_dry_check_writes_no_debug_or_output():
     finally:
         sys.argv = argv
     _check("dry-check wrote no debug file", not M.DEBUG_DUMP.exists())
-    _check("dry-check wrote no outputs.json", not M.OUTPUTS_JSON.exists())
-    _check("dry-check wrote no result md", not M.RESULT_MD.exists())
+    _check("dry-check did not modify result artifacts", _result_artifacts_untouched())
     _check("dry-check imported no ML libs",
            not any(m in sys.modules for m in ("torch", "transformers")))
 
@@ -462,6 +478,108 @@ def test_array_form_yields_same_scores_and_label_as_dict_form():
     lab_arr = M.assemble_and_score(bundle, hidden, s_arr, m_arr, 0.0)["primary_label"]
     _check("label identical whether scores arrived as array or dict", lab_dict == lab_arr)
     _check("label still in allowed set", lab_arr in HG.ALLOWED_LABELS and lab_arr not in HG.FORBIDDEN_LABELS)
+
+
+# -------------------------------------------- B3: full all-raw audit dump ----------
+def test_all_raw_capture_does_not_change_scores_or_labels():
+    bundle, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    bad = {"pkt_g000_D"}
+    gf = _gen_fn(scores, malformed_pids=bad)
+    s_no, m_no = M.score_packets(packets, hidden, gf, None, None)          # audit OFF
+    audit = []
+    s_au, m_au = M.score_packets(packets, hidden, gf, None, audit)         # audit ON
+    _check("audit: scores identical", s_no == s_au)
+    _check("audit: malformed count identical", m_no == m_au == len(bad))
+    r_no = M.assemble_and_score(bundle, hidden, s_no, m_no, 0.0)
+    r_au = M.assemble_and_score(bundle, hidden, s_au, m_au, 0.0)
+    _check("audit: label identical", r_no["primary_label"] == r_au["primary_label"])
+    _check("audit: deltas identical", r_no["deltas"] == r_au["deltas"])
+    _check("audit: per_arm_mrr identical", r_no["per_arm_mrr"] == r_au["per_arm_mrr"])
+    _check("audit: per_arm_top1 identical", r_no["per_arm_top1"] == r_au["per_arm_top1"])
+
+
+def test_all_raw_records_success_and_malformed():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    bad = {"pkt_g000_D", "pkt_g001_X"}
+    audit = []
+    M.score_packets(packets, hidden, _gen_fn(scores, malformed_pids=bad), None, audit)
+    _check("audit records EVERY packet", len(audit) == len(packets))
+    ok = [r for r in audit if r["parsed_ok"]]
+    badr = [r for r in audit if not r["parsed_ok"]]
+    _check("audit success count == packets - malformed", len(ok) == len(packets) - len(bad))
+    _check("audit malformed count == malformed", len(badr) == len(bad))
+    _check("audit malformed pids match", {r["packet_id"] for r in badr} == bad)
+    s = ok[0]
+    _check("success record has normalized scores", isinstance(s["scores"], dict) and s["scores"])
+    _check("success record has chosen", s["chosen"] in [c["candidate_id"] for c in
+           next(p for p in packets if p["packet_id"] == s["packet_id"])["candidates"]])
+    _check("success record parser_error is None", s["parser_error"] is None)
+    b = badr[0]
+    _check("malformed record scores None", b["scores"] is None and b["chosen"] is None)
+    _check("malformed record has parser_error", isinstance(b["parser_error"], str) and b["parser_error"])
+
+
+def test_all_raw_audit_fields_present():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    audit = []
+    M.score_packets(packets, hidden, _gen_fn(scores), None, audit)
+    r = audit[0]
+    for f in ("packet_index", "packet_id", "case_id", "arm", "n_opts", "raw_text",
+              "parsed_ok", "parser_error", "scores", "chosen", "contamination_detected"):
+        _check(f"audit record has field {f!r}", f in r)
+    _check("packet_index is int", isinstance(r["packet_index"], int))
+    _check("arm captured from hidden", r["arm"] in HG.ARMS_REQUIRED)
+
+
+def test_all_raw_and_malformed_dumps_coexist_unchanged():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    bad = {"pkt_g000_R", "pkt_g001_B"}
+    dbg, audit = [], []
+    M.score_packets(packets, hidden, _gen_fn(scores, malformed_pids=bad), dbg, audit)
+    _check("malformed-only dump still only malformed", {r["packet_id"] for r in dbg} == bad)
+    _check("malformed dump len == malformed", len(dbg) == len(bad))
+    _check("audit dump len == all packets", len(audit) == len(packets))
+    # B1 record shape unchanged (no B3-only fields leaked into it)
+    _check("malformed record shape unchanged",
+           set(dbg[0]) == {"packet_id", "case_id", "arm", "n_opts", "parser_error",
+                           "contamination_detected", "raw_text"})
+
+
+def test_all_raw_not_leaked_into_result_artifact():
+    bundle, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    audit = []
+    s, m = M.score_packets(packets, hidden, _gen_fn(scores), None, audit)
+    result = M.assemble_and_score(bundle, hidden, s, m, 0.0)
+    for leak in ("raw_text", "audit", "parsed_ok", "packet_index"):
+        _check(f"result artifact has no {leak!r} field", leak not in result)
+    _check("scores_by_pid holds only score dicts, no raw text",
+           all(isinstance(v, dict) and all(isinstance(x, float) for x in v.values())
+               for v in s.values()))
+
+
+def test_all_raw_writes_nothing_by_score_packets():
+    _, hidden, scores = _make_inputs(_A_WINS)
+    packets = _packets_from(hidden)
+    M.score_packets(packets, hidden, _gen_fn(scores), None, [])
+    _check("no all-raw file written by score_packets", not M.ALL_RAW_DUMP.exists())
+
+
+def test_all_raw_writes_nothing_on_dry_check():
+    argv = sys.argv
+    sys.argv = ["run_track_g_smoke_mistral.py", "--dry-check", "--all-raw-dump"]
+    try:
+        M.main()                                        # dry-run only; returns before any model
+    finally:
+        sys.argv = argv
+    _check("dry-check wrote no all-raw file", not M.ALL_RAW_DUMP.exists())
+    _check("dry-check did not modify result artifacts", _result_artifacts_untouched())
+    _check("dry-check imported no ML libs",
+           not any(m in sys.modules for m in ("torch", "transformers")))
 
 
 def main():
