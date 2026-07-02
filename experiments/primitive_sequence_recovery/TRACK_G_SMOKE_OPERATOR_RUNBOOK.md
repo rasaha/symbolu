@@ -10,6 +10,12 @@ not integrated; **Track B remains BLOCKED**; no `ONTOLOGICAL_SIGNAL`, no Sanskri
 **Polarity is frozen before scoring — post-hoc edits invalidate a case (`INVALID_POSTHOC_POLARITY`).**
 Result is exploratory triage only, not validation.
 
+**A is varṇa-derived, not hand-authored.** The real polarity vector A is derived deterministically
+by `track_g_derive.py` from `track_g_varna_polarity_table.json` (frozen per-varṇa signed axis
+contributions) + each word's varṇa sequence; R = sign-flip(A); B = seeded-scramble(A). The varṇa
+table is researcher-authored / high-DOF / unvalidated, so even a positive smoke is architecture-bound
+utility only, never ontology.
+
 ## 1. Branch + commit
 ```bash
 cd /workspace/symbolu
@@ -31,9 +37,11 @@ ABORT if no GPU / `cuda: False`.
 ```bash
 cd /workspace/symbolu/experiments/primitive_sequence_recovery
 python3 test_track_g_harness.py
+python3 test_track_g_derive.py
 python3 test_track_g_smoke_runner.py
 ```
-ABORT if either fails.
+ABORT if any fails. (`test_track_g_derive.py` proves A is varṇa-derived, not hand-authored, and
+that R/B are transforms of the derived A.)
 
 ## 4. Dry-run packet preview (no models)
 ```bash

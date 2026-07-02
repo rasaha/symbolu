@@ -1,0 +1,446 @@
+{
+  "schema_version": "1.0",
+  "artifact_type": "track_g_varna_polarity_table",
+  "authoring_status": "researcher_authored_candidate_representation",
+  "validation_status": "unvalidated",
+  "degrees_of_freedom": "high_degrees_of_freedom",
+  "evidence_status": "not_ontological_evidence",
+  "source_supplies_polarity": false,
+  "axes": [
+    "expansion_contraction",
+    "clarity_obscuration",
+    "binding_release",
+    "desire_contentment",
+    "fear_courage",
+    "attachment_freedom",
+    "activity_inertia",
+    "ascent_descent",
+    "illumination_darkness",
+    "integration_fragmentation"
+  ],
+  "sign_convention": "+1 = axis positive_pole, -1 = axis negative_pole, 0/absent = neutral",
+  "provenance": "Per-varṇa signed axis contributions authored by the researcher from the frozen realization_en_gloss vṛtti glosses (binding/in-combination sense), BLIND to the Track G target words' expected poles. This is a candidate representation, high-DOF, unvalidated; even a positive Track G result is architecture-bound utility, never ontological evidence. Not packetized (dev/table only).",
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "Track B unblocking",
+    "validation"
+  ],
+  "varnas": {
+    "ka": {
+      "varna_id": "ka",
+      "axis_contributions": {
+        "desire_contentment": 1,
+        "expansion_contraction": 1,
+        "activity_inertia": 1,
+        "ascent_descent": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: hope / forward-grasping desire"
+    },
+    "kha": {
+      "varna_id": "kha",
+      "axis_contributions": {
+        "fear_courage": -1,
+        "expansion_contraction": -1,
+        "clarity_obscuration": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: worry / impersonal thought"
+    },
+    "ga": {
+      "varna_id": "ga",
+      "axis_contributions": {
+        "activity_inertia": 1,
+        "ascent_descent": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: effort / striving"
+    },
+    "gha": {
+      "varna_id": "gha",
+      "axis_contributions": {
+        "attachment_freedom": -1,
+        "binding_release": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: attachment / mine-ness"
+    },
+    "nga": {
+      "varna_id": "nga",
+      "axis_contributions": {
+        "ascent_descent": 1,
+        "integration_fragmentation": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: vanity / pride-display"
+    },
+    "ca": {
+      "varna_id": "ca",
+      "axis_contributions": {
+        "clarity_obscuration": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: lack of discrimination / confused discernment"
+    },
+    "cha": {
+      "varna_id": "cha",
+      "axis_contributions": {
+        "integration_fragmentation": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: nervous breakdown / collapse"
+    },
+    "ja": {
+      "varna_id": "ja",
+      "axis_contributions": {
+        "integration_fragmentation": -1,
+        "binding_release": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: ego / inflated I-feeling"
+    },
+    "jha": {
+      "varna_id": "jha",
+      "axis_contributions": {
+        "desire_contentment": 1,
+        "attachment_freedom": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: greed / avarice"
+    },
+    "nya": {
+      "varna_id": "nya",
+      "axis_contributions": {
+        "clarity_obscuration": -1,
+        "integration_fragmentation": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: hypocrisy / deceit"
+    },
+    "tta": {
+      "varna_id": "tta",
+      "axis_contributions": {
+        "expansion_contraction": 1,
+        "activity_inertia": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: overstatement / garrulousness"
+    },
+    "ttha": {
+      "varna_id": "ttha",
+      "axis_contributions": {
+        "ascent_descent": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: repentance / remorse"
+    },
+    "dda": {
+      "varna_id": "dda",
+      "axis_contributions": {
+        "expansion_contraction": -1,
+        "activity_inertia": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: shyness"
+    },
+    "ddha": {
+      "varna_id": "ddha",
+      "axis_contributions": {
+        "integration_fragmentation": -1,
+        "ascent_descent": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: sadistic cruelty"
+    },
+    "nna": {
+      "varna_id": "nna",
+      "axis_contributions": {
+        "integration_fragmentation": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: envy"
+    },
+    "ta": {
+      "varna_id": "ta",
+      "axis_contributions": {
+        "activity_inertia": -1,
+        "clarity_obscuration": -1,
+        "ascent_descent": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: inertia / staticity / dullness"
+    },
+    "tha": {
+      "varna_id": "tha",
+      "axis_contributions": {
+        "ascent_descent": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: melancholy / dejection"
+    },
+    "da": {
+      "varna_id": "da",
+      "axis_contributions": {
+        "integration_fragmentation": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: peevishness / irritability"
+    },
+    "dha": {
+      "varna_id": "dha",
+      "axis_contributions": {
+        "desire_contentment": 1,
+        "attachment_freedom": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: craving / thirst for acquisition"
+    },
+    "na": {
+      "varna_id": "na",
+      "axis_contributions": {
+        "attachment_freedom": -1,
+        "binding_release": 1,
+        "clarity_obscuration": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: blind attachment / infatuation"
+    },
+    "pa": {
+      "varna_id": "pa",
+      "axis_contributions": {
+        "expansion_contraction": -1,
+        "integration_fragmentation": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: hatred / revulsion"
+    },
+    "pha": {
+      "varna_id": "pha",
+      "axis_contributions": {
+        "fear_courage": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: fear"
+    },
+    "ba": {
+      "varna_id": "ba",
+      "axis_contributions": {
+        "activity_inertia": -1,
+        "ascent_descent": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: indifference / neglect"
+    },
+    "bha": {
+      "varna_id": "bha",
+      "axis_contributions": {
+        "clarity_obscuration": -1,
+        "binding_release": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: deluded obsession"
+    },
+    "ma": {
+      "varna_id": "ma",
+      "axis_contributions": {
+        "integration_fragmentation": -1,
+        "ascent_descent": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: annihilation / indulgence (giving latitude)"
+    },
+    "ya": {
+      "varna_id": "ya",
+      "axis_contributions": {
+        "fear_courage": -1,
+        "integration_fragmentation": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: lack of confidence / wavering movement"
+    },
+    "ra": {
+      "varna_id": "ra",
+      "axis_contributions": {
+        "activity_inertia": 1,
+        "expansion_contraction": 1,
+        "ascent_descent": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: defeatist annihilation-thought ('everything is gone, I am undone')"
+    },
+    "la": {
+      "varna_id": "la",
+      "axis_contributions": {
+        "binding_release": 1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: cruelty"
+    },
+    "va": {
+      "varna_id": "va",
+      "axis_contributions": {
+        "integration_fragmentation": 1,
+        "binding_release": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: holding / ensconcement in original stance (BINDS — dhṛ = to hold; non-moral)"
+    },
+    "sha": {
+      "varna_id": "sha",
+      "axis_contributions": {
+        "activity_inertia": 1,
+        "desire_contentment": 1,
+        "expansion_contraction": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: mutative drive / material pursuit"
+    },
+    "ssa": {
+      "varna_id": "ssa",
+      "axis_contributions": {
+        "activity_inertia": -1,
+        "desire_contentment": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: static inertia / worldly desire"
+    },
+    "sa": {
+      "varna_id": "sa",
+      "axis_contributions": {
+        "expansion_contraction": -1,
+        "activity_inertia": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: escapism / premature static withdrawal"
+    },
+    "ha": {
+      "varna_id": "ha",
+      "axis_contributions": {
+        "illumination_darkness": -1,
+        "clarity_obscuration": -1,
+        "expansion_contraction": -1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: night / darkness (the contractive opposite of ha = day / sun / light)"
+    },
+    "ksha": {
+      "varna_id": "ksha",
+      "axis_contributions": {
+        "clarity_obscuration": 1
+      },
+      "source_basis": "frozen_realization_en_gloss_vrtti_binding_sense",
+      "authoring_status": "researcher_authored_candidate_representation",
+      "dev_status": "unvalidated; high_degrees_of_freedom; not_ontological_evidence",
+      "leak_risk": "high_if_packetized_TABLE_IS_DEV_ONLY_never_sent_to_scorer",
+      "notes": "binding-sense vṛtti gloss: mundane / material knowledge"
+    }
+  }
+}

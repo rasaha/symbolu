@@ -6,6 +6,31 @@ this environment. `frozen/manifest.json` remains NOT_READY; the base Track G smo
 parked/not integrated; **Track B remains BLOCKED**; no `ONTOLOGICAL_SIGNAL`, no Sanskrit privilege.
 Track G is a **fresh** hypothesis — it does not rescue or reinterpret Tracks C / D0 / E-flat / F.
 
+## Correction applied — A is now varṇa-derived (not hand-authored)
+
+An earlier version of this smoke authored the "real" polarity vector **A per word by hand**, which
+meant a run would have tested *researcher-authored word-level polarity*, not *varṇa composition*.
+That is fixed:
+
+- **`track_g_varna_polarity_table.json`** (new) — a frozen per-varṇa table mapping each of the 34
+  frozen varṇas to **signed contributions over the 10 axes**, authored from the frozen vṛtti glosses
+  **blind to the target words' expected poles**, and flagged `researcher_authored_candidate_representation`
+  / `unvalidated` / `high_degrees_of_freedom` / `not_ontological_evidence`.
+- **`track_g_derive.py`** (new) — deterministic derivation: **A** = sum of the word's varṇas'
+  signed contributions across axes, thresholded to a sign (no per-word override; missing table
+  entry fails loudly); **R** = sign-flip(A); **B** = seeded-scramble(A).
+- **Boundaries regenerated** so A/R/B are the derived vectors; **assignments** no longer author A
+  (they record only the pre-registered *evaluation target*: `expected_relation`/`expected_pole`,
+  frozen).
+
+This changes Track G from **“researcher-authored word-level polarity smoke”** to
+**“researcher-authored varṇa-table-derived polarity smoke.”** The varṇa table is *still*
+researcher-authored and high-DOF, so **even a future positive smoke result would remain exploratory,
+architecture-bound engineering utility only — never ontology, never validation, never a Track B
+unblock.** (Honestly: the derived A vectors mostly do **not** match the pre-registered poles —
+e.g. *happy* derives toward contraction/fear/inertia — because the table was authored from glosses,
+not tuned to the answers. Default expectation remains `NO_SIGNAL` / `RANDOM_POLARITY_EXPLAINS`.)
+
 ## What Track G tests
 
 Whether a **pre-registered, frozen** varṇa **signed-polarity** vector places a word on its target
@@ -25,8 +50,11 @@ and cannot unblock Track B.
 | `track_g_smoke_contexts.jsonl` | one disambiguating sentence per case. |
 | `track_g_smoke_candidates.jsonl` | target + opposite-pole + hard-negatives + Barnum-compatible per case. |
 | `track_g_polarity_axes.json` | the 10 signed axes (frozen; examples illustrative-only). |
-| `track_g_polarity_assignments.jsonl` | per-case **frozen** assignment (`assigned_before_scoring:true`, `frozen:true`, relation, pole, hash). |
-| `track_g_smoke_boundaries.jsonl` | real / scrambled / random-flip polarity descriptions + dictionary desc. |
+| `track_g_varna_polarity_table.json` | **frozen per-varṇa signed axis contributions** (researcher-authored, high-DOF, unvalidated) — the source of the derived A. |
+| `track_g_derive.py` | deterministic derivation: A = aggregate(varṇa seq × table); R = flip(A); B = scramble(A). |
+| `track_g_polarity_assignments.jsonl` | per-case **frozen** *evaluation target* only (`assigned_before_scoring:true`, `frozen:true`, relation, pole); **does not author A**. |
+| `track_g_smoke_boundaries.jsonl` | **derived** real / scrambled / random-flip polarity descriptions + dictionary desc. |
+| `test_track_g_derive.py` | derivation tests (A derived, no override, R/B transforms, missing-entry fails loudly) — all passing. |
 | `track_g_barnum_polarity.json` | generic Barnum polarity family + arm-I max rule. |
 | `track_g_smoke_seeds.json` | fixed seeds (shuffle / scramble / random-flip / packet / Barnum). |
 | `track_g_smoke_manifest.json` | `run_enabled:false`, `NOT_APPROVED`, `four_sphere_integrated:false`, `track_b_status:BLOCKED`, hashes. |
