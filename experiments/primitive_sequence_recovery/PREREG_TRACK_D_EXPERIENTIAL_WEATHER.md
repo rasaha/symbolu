@@ -128,16 +128,29 @@ Fixed scorer and data across all arms; only the composition/reference varies:
 | **F** | **etymology-only** baseline (if an etymology source is available) |
 | **G** | **vowel-aware** real composition |
 | **H** | **consonant-only** real composition |
-| **I** | **Barnum baseline** — a single **generic broad-emotional profile** designed to loosely fit many words (built from the banned universal descriptors) |
+| **I** | **Barnum baseline family** — a **small fixed family** of broad "could-fit-many-words" profiles (built from the banned universal descriptors), scored per target against its **best-scoring** member (§6.1) |
 
 Comparisons of interest: A vs B, A vs C, A vs E, A vs F, A vs I, G vs H; D is the (already
 non-robust) dictionary contrast reported separately (§13).
 
-**The Barnum arm (I) is decisive.** Include the generic Barnum profile among each word's
-candidate profiles. If the real composition ranks the **generic Barnum profile at or above the
-word's specific frozen profile** — i.e. real does **not** beat Barnum — the result is
-**`NO_SIGNAL`**, regardless of how it did against B/C. A hypothesis that only matches a
-one-size-fits-all emotional profile has predicted nothing.
+### 6.1 Barnum baseline family (the decisive control)
+
+Instead of one generic profile (which can be accidentally weak), use a **fixed family of Barnum
+profiles**, frozen before scoring:
+
+1. **generic-emotional** Barnum profile,
+2. **spiritual/transformation** Barnum profile,
+3. **affliction/wound** Barnum profile,
+4. **inner-growth** Barnum profile.
+
+Each is a broad, non-discriminating profile from the banned universal vocabulary, intended to
+loosely fit many words. For every target, compute the score of the **best-scoring Barnum family
+member** (the max over the four) and treat that as the Barnum bar.
+
+**Decision rule (strict):** if the real composition ranks **any** Barnum family profile **at or
+above** the target's specific frozen profile — equivalently, if A does **not** beat the
+**best-scoring** Barnum member — the result is **`NO_SIGNAL`**, regardless of A vs B/C/E/F. A
+hypothesis that matches a one-size-fits-all profile (of any flavor) has predicted nothing.
 
 **Scoring operationalization (declared, since it reintroduces realizer/leakage risk):** a
 composition is scored against a profile by a **fixed, pre-registered semantic scorer** (e.g.
@@ -155,9 +168,9 @@ distractor profiles** better than the controls (B, C, E), on the abstract/psycho
 - **Chance baselines predefined:** for K candidate profiles, chance MRR = `(1/K)Σ_{r=1}^{K}1/r`,
   chance Top-1 = `1/K`, chance pairwise = 0.5.
 - A primary positive requires A to beat **all of**: scrambled (B), equal-length affliction-gloss
-  decoy (C), lexical (E), etymology (F, if available), **and the Barnum baseline (I)** on the
-  primary metric, with the §10 robustness gate satisfied. **Failing the Barnum comparison alone
-  forces `NO_SIGNAL`.**
+  decoy (C), lexical (E), etymology (F, if available), **and the best-scoring member of the
+  Barnum baseline family (I, §6.1)** on the primary metric, with the §10 robustness gate
+  satisfied. **Failing the Barnum comparison alone forces `NO_SIGNAL`.**
 
 ## 8. Secondary endpoints
 
@@ -196,8 +209,8 @@ distractor profiles** better than the controls (B, C, E), on the abstract/psycho
 ## 11. Decision labels
 
 **Allowed only:**
-- `EXPERIENTIAL_WEATHER_SIGNAL` — A beats **B, C, E, F, and the Barnum baseline I** on the
-  abstract domain; ranks specific target profiles above hard-negative neighbors; CI excludes 0;
+- `EXPERIENTIAL_WEATHER_SIGNAL` — A beats **B, C, E, F, and the best-scoring member of the
+  Barnum baseline family (I, §6.1)** on the abstract domain; ranks specific target profiles above hard-negative neighbors; CI excludes 0;
   p stable across seeds; concrete negative-control shows no comparable signal; not explained by
   leakage/tautology words; not explained by etymology; survives with vague/universal descriptors
   banned. Anything short of this full conjunction is **not** a signal.
@@ -210,8 +223,9 @@ unblocked or the ontology is validated.
 
 ## 12. Failure interpretations (defined in advance — any one triggers a non-signal verdict)
 
-- **Does not beat the Barnum baseline** — A ≤ I: real matches a generic emotional profile no
-  better than the word's specific one → **`NO_SIGNAL`** (the primary Barnum failure).
+- **Does not beat the Barnum baseline family** — A ≤ best-scoring Barnum member (§6.1): real
+  matches some one-size-fits-all profile (emotional / spiritual / affliction / inner-growth) at
+  least as well as the word's specific one → **`NO_SIGNAL`** (the primary Barnum failure).
 - **Only works for vague profiles** — signal present only when profiles contain
   universal/banned descriptors; disappears under the specificity rule → **`NO_SIGNAL`** (Barnum).
 - **Disappears under hard negatives** — A ranks the target profile above *easy* distractors but
@@ -243,7 +257,7 @@ Report **separately** (never collapse dictionary and experiential into one numbe
 | **real vs scrambled** | " | A | B | | | | | (A−B) | |
 | **real vs lexical** | " | A | | | E | | | (A−E) | |
 | **real vs etymology** | " | A | | | | F | | (A−F) | |
-| **real vs Barnum baseline** | " | A | | | | | I | (A−I) | (must be > 0, else NO_SIGNAL) |
+| **real vs Barnum family (best member)** | " | A | | | | | max(I₁..I₄) | (A − best Barnum) | (must be > 0, else NO_SIGNAL) |
 
 Plus: leakage/tautology cases excluded (list), inter-annotator agreement, seed-wise p, and the
 domain-split comparison.
