@@ -1,0 +1,61 @@
+{
+  "artifact": "track_f_smoke_outputs",
+  "exploratory_triage_only": true,
+  "answer_model": "mistralai/Mistral-7B-Instruct-v0.3",
+  "temperature": 0.0,
+  "judge_mode": "single",
+  "judge_note": "single-model judge (answer model judged its own anonymized outputs; lexical distances): EXPLORATORY / weaker — no answer≠judge separation",
+  "n_packets": 72,
+  "malformed": 2,
+  "malformed_rate": 0.0278,
+  "aborted": false,
+  "tasks_judged": 10,
+  "tasks_dropped_by_judge": [
+    "f010",
+    "f002"
+  ],
+  "primary_label": "CORRECTNESS_DEGRADED",
+  "metrics": {
+    "delta_A_vs_X": 0.6448,
+    "spec_A_vs_B": 0.569,
+    "spec_A_vs_I": 0.5675,
+    "incr_A_vs_F": 0.6478,
+    "correctness_preserved": -0.1,
+    "usefulness_gain": -0.1,
+    "noise_A": 0.05,
+    "halluc_A": 0.05
+  },
+  "per_arm_means": {
+    "X": {
+      "correctness": 1.0,
+      "usefulness": 1.0,
+      "poetic_noise": 0.0,
+      "hallucination": 0.0
+    },
+    "A": {
+      "correctness": 0.9,
+      "usefulness": 0.9,
+      "poetic_noise": 0.05,
+      "hallucination": 0.05
+    },
+    "B": {
+      "correctness": 1.0,
+      "usefulness": 1.0,
+      "poetic_noise": 0.0,
+      "hallucination": 0.0
+    },
+    "F": {
+      "correctness": 0.9,
+      "usefulness": 0.9,
+      "poetic_noise": 0.0,
+      "hallucination": 0.0
+    },
+    "I": {
+      "correctness": 1.0,
+      "usefulness": 1.0,
+      "poetic_noise": 0.0,
+      "hallucination": 0.0
+    }
+  },
+  "note": "Track F smoke, exploratory triage only. Single-model judge is weaker than answer≠judge. Label from {INFERENCE_STEERING_SIGNAL, PROMPT_PRIMING_ONLY, SCRAMBLE_EQUIVALENT, BARNUM_EQUIVALENT, CORRECTNESS_DEGRADED, NO_EFFECT, INCONCLUSIVE}. Not validation, no varṇa-truth claim; Track B remains blocked. No ONTOLOGICAL_SIGNAL, no Sanskrit privilege."
+}
