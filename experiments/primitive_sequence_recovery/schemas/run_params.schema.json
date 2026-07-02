@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "psr.run_params.schema.json",
+  "title": "run_params",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "experiment_id", "scoring_metric", "secondary_metric",
+               "K", "scramble_seeds", "bootstrap_iterations", "paired_test",
+               "confidence_interval", "alpha", "order_scramble_enabled",
+               "assignment_scramble_enabled", "family_bootstrap", "run_enabled",
+               "execution_status"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "experiment_id": { "type": "string" },
+    "scoring_metric": { "const": "MRR" },
+    "secondary_metric": { "const": "Top1" },
+    "K": { "type": "integer", "minimum": 2 },
+    "scramble_seeds": { "type": "integer", "minimum": 1000 },
+    "bootstrap_iterations": { "type": "integer", "minimum": 1 },
+    "paired_test": { "type": "string" },
+    "confidence_interval": { "type": "number" },
+    "alpha": { "type": "number" },
+    "order_scramble_enabled": { "type": "boolean" },
+    "assignment_scramble_enabled": { "type": "boolean" },
+    "family_bootstrap": { "type": "boolean" },
+    "run_enabled": { "type": "boolean" },
+    "execution_status": { "enum": ["NOT_RUN", "RUN"] }
+  }
+}

@@ -107,22 +107,62 @@ Each `tau` entry contains **only** `varna_id → atom_id`. **Prohibited anywhere
 
 ---
 
-## 6. `realizer.json` — the deterministic scoring function (no results)
+## 6. `realizer.json` — frozen execution **interface** (no code, no results)
+
+This file freezes the *interface and safety flags* of the future realizer, **not** an
+implementation. It contains no executable code, and while unimplemented it names **no**
+model and pins **no** asset.
 
 ```
 {
-  "schema_version": "1.0",
-  "realizer_id":        "<string>",
-  "model":              "<asset/model name>",
-  "version":            "<string>",
-  "deterministic":      true,
-  "offline":            true,
-  "embedding_dimension":<int | null>,
-  "similarity_metric":  "<cosine | wordnet_path | jaccard | ...>",
-  "asset_sha256":       "<hash of the offline asset file>"
+  "schema_version":         "1.0",
+  "realizer_id":            "<string>",
+  "status":                 "NOT_IMPLEMENTED" | "IMPLEMENTED",
+  "deterministic":          true,
+  "offline_only":           true,
+  "execution_allowed":      false,          # true only once implemented + reviewed
+  "implementation_present": false,
+  "primary_realizer_type":  "<capability description, not a product/model name>",
+  "robustness_realizers":   [ ... ],        # empty until implemented
+  "expected_input":         "<interface description>",
+  "expected_output":        "<interface description; ranking, never scores>",
+  "similarity_metric":      "<cosine | ...>",
+  "normalization":          "<e.g. unit_norm_l2>",
+  "model_asset":            null,           # non-null only once a specific offline asset is pinned
+  "model_sha256":           null,           # sha256 of that asset
+  "concept_resolver":       null,           # deferred; see concept_resolver_status
+  "concept_resolver_status":"NOT_IMPLEMENTED" | "IMPLEMENTED",
+  "notes":                  "<string>"
 }
 ```
-`deterministic` and `offline` **must** be `true` for a confirmatory run (no sampling, no network). LLM judges are excluded (non-deterministic, leakage). **No results/scores** appear in this file — only the fixed configuration and the pinned asset hash.
+`deterministic` and `offline_only` **must** be `true` (no sampling, no network); LLM judges
+are excluded. **No results/scores** ever appear here. **READY requires** `status ==
+"IMPLEMENTED"`, `execution_allowed == true`, `implementation_present == true`, and a non-null
+`model_asset` + `model_sha256` — so READY can never depend on an implicit or absent model.
+
+## 6b. `run_params.json` — frozen experiment parameters (no results)
+
+```
+{
+  "schema_version":              "1.0",
+  "experiment_id":               "<string>",
+  "scoring_metric":              "MRR",
+  "secondary_metric":            "Top1",
+  "K":                           8,
+  "scramble_seeds":              >=1000,
+  "bootstrap_iterations":        <int>,
+  "paired_test":                 "<string>",
+  "confidence_interval":         <number>,
+  "alpha":                       <number>,
+  "order_scramble_enabled":      <bool>,
+  "assignment_scramble_enabled": <bool>,
+  "family_bootstrap":            true,
+  "run_enabled":                 false,     # true only when a run is authorized
+  "execution_status":            "NOT_RUN" | "RUN"
+}
+```
+No scores, results, timestamps, hardware, or runtime configuration. **READY requires**
+`run_enabled == true`.
 
 ---
 
@@ -178,7 +218,11 @@ Each `tau` entry contains **only** `varna_id → atom_id`. **Prohibited anywhere
 - all candidate IDs reference known words/meanings (no **unknown IDs**); `sampling_seed` present; assignments immutable.
 
 **realizer.json**
-- `deterministic == true` and `offline == true`; `asset_sha256` present and verifies against the on-disk asset (no **hash mismatch**).
+- `deterministic == true` and `offline_only == true` (always).
+- For READY: `status == "IMPLEMENTED"`, `execution_allowed == true`, `implementation_present == true`, and non-null `model_asset` + `model_sha256` (which verifies against the on-disk asset, no **hash mismatch**). A `NOT_IMPLEMENTED` realizer is a hard NOT_READY block — **READY never depends on an implicit model.**
+
+**run_params.json**
+- schema-valid; `scoring_metric == "MRR"`, `secondary_metric == "Top1"`, `scramble_seeds >= 1000`. For READY: `run_enabled == true`. No scores/results/timestamps/hardware.
 
 **manifest.json**
 - every `*_hash` matches the sha256 of the corresponding artifact on disk (no **hash mismatch**).
@@ -229,8 +273,8 @@ Realizer assets (embedding files / WordNet dumps) live outside `frozen/` but are
 3. `word_list.json` present, hashed; IDs resolve; every word has `family_id` + `sense_id`; post-exclusion `N ≥ 100`; full atom coverage.
 4. `meaning_reference.json` present, hashed; one meaning per non-excluded word; a `realization_specific_reference` for **every** realization.
 5. `distractors.json` present, hashed; `K=8`; frozen per-word candidate sets of size `K` (true target once + `K-1` distractors); matched (or documented balanced-sampling limitation); `sampling_seed` fixed.
-6. `realizer.json` present, hashed; `deterministic` & `offline` true; `asset_sha256` verifies against the asset.
-7. `run_params` present, hashed (`scramble_seed_hash`); `n_scram ≥ 1000`, seeds + decision thresholds fixed; `require_all_realizations = true`.
+6. `realizer.json` present, hashed; `deterministic` & `offline_only` true; **and** `status == "IMPLEMENTED"`, `execution_allowed == true`, `implementation_present == true`, with a non-null `model_asset` + `model_sha256` that verifies against the asset. A `NOT_IMPLEMENTED` realizer keeps `status = NOT_READY`.
+7. `run_params.json` present, hashed (`scramble_seed_hash`); `scramble_seeds ≥ 1000`, seeds + decision thresholds fixed; `run_enabled == true`.
 8. `design_doc_sha256` matches the current pre-registration.
 9. **Cross-file referential integrity** passes (all IDs resolve across assignment/words/meanings/distractors/realizations).
 10. Every manifest `*_hash` verifies against on-disk files.

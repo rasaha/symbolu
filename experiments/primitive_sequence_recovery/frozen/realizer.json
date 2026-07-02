@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "realizer_id": "psr_realizer_v1",
+  "status": "NOT_IMPLEMENTED",
+  "deterministic": true,
+  "offline_only": true,
+  "execution_allowed": false,
+  "implementation_present": false,
+  "primary_realizer_type": "deterministic_offline_vector_similarity",
+  "robustness_realizers": [],
+  "expected_input": "per-realization content for a word's ordered opaque atom sequence (from realization_*.json) plus the K frozen candidate meaning references for that word (from meaning_reference + distractors)",
+  "expected_output": "for each word, a deterministic ranking of its K candidate meanings under each realization — no scores are produced by this frozen spec",
+  "similarity_metric": "cosine",
+  "normalization": "unit_norm_l2",
+  "model_asset": null,
+  "model_sha256": null,
+  "concept_resolver": null,
+  "concept_resolver_status": "NOT_IMPLEMENTED",
+  "notes": "Frozen INTERFACE only, deliberately unimplemented. No embedding/similarity model is chosen or named here; model_asset/model_sha256 stay null until a specific offline, deterministic asset is selected and pinned by hash at a later, separate step. The concept resolver for realization_concept_id is likewise deferred (concept_resolver_status=NOT_IMPLEMENTED). While status=NOT_IMPLEMENTED / execution_allowed=false / implementation_present=false, the readiness gate must return NOT_READY and the runner must return NOT_RUN. See REALIZER_FREEZE_NOTE.md."
+}

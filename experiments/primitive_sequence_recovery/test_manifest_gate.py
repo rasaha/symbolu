@@ -54,11 +54,20 @@ def _default_artifacts():
          "realization_specific_reference": {"en": "e1", "sa": "s1", "concept": "c1"}}]}
     distractors = {"schema_version": "1.0", "K": 2, "match_keys": ["freq"],
                    "sampling_seed": 0, "assignments": {"w0": ["w1"], "w1": ["w0"]}}
-    realizer = {"schema_version": "1.0", "realizer_id": "r0", "model": "toy",
-                "version": "1", "deterministic": True, "offline": True,
-                "embedding_dimension": 8, "similarity_metric": "cosine",
-                "asset_sha256": "0" * 64}
-    run_params = {"schema_version": "1.0", "n_scram": 1000, "scram_seed": 0}
+    realizer = {"schema_version": "1.0", "realizer_id": "r0", "status": "IMPLEMENTED",
+                "deterministic": True, "offline_only": True, "execution_allowed": True,
+                "implementation_present": True, "primary_realizer_type": "toy_vector",
+                "robustness_realizers": [], "expected_input": "atom sequence",
+                "expected_output": "ranking", "similarity_metric": "cosine",
+                "normalization": "unit", "model_asset": "toy_asset",
+                "model_sha256": "0" * 64, "concept_resolver": "toy_resolver",
+                "concept_resolver_status": "IMPLEMENTED", "notes": "synthetic"}
+    run_params = {"schema_version": "1.0", "experiment_id": "e0", "scoring_metric": "MRR",
+                  "secondary_metric": "Top1", "K": 8, "scramble_seeds": 1000,
+                  "bootstrap_iterations": 1000, "paired_test": "wilcoxon_signed_rank",
+                  "confidence_interval": 0.95, "alpha": 0.05, "order_scramble_enabled": True,
+                  "assignment_scramble_enabled": True, "family_bootstrap": True,
+                  "run_enabled": True, "execution_status": "NOT_RUN"}
     return {"assignment": assignment, "realizations": realizations, "word_list": word_list,
             "meanings": meanings, "distractors": distractors, "realizer": realizer,
             "run_params": run_params}
@@ -194,12 +203,36 @@ def test_hash_mismatch():
 def test_realizer_not_deterministic_offline():
     a = _default_artifacts()
     a["realizer"]["deterministic"] = False
-    a["realizer"]["offline"] = False
+    a["realizer"]["offline_only"] = False
     with tempfile.TemporaryDirectory() as t:
         write_bundle(t, a)
         r = MF.check_readiness(t)
         _check("non-deterministic/offline realizer -> NOT_READY", r["status"] == "NOT_READY")
         _check("non-deterministic/offline -> schema_ok False", r["schema_ok"] is False)
+
+
+def test_realizer_not_implemented_blocks():
+    a = _default_artifacts()
+    a["realizer"].update({"status": "NOT_IMPLEMENTED", "execution_allowed": False,
+                          "implementation_present": False, "model_asset": None,
+                          "model_sha256": None})
+    with tempfile.TemporaryDirectory() as t:
+        write_bundle(t, a, status="READY")
+        r = MF.check_readiness(t)
+        _check("unimplemented realizer -> NOT_READY (no implicit model)",
+               r["status"] == "NOT_READY")
+        _check("unimplemented realizer -> reason cites status",
+               any("status is not IMPLEMENTED" in x for x in r["reasons"]))
+
+
+def test_run_not_enabled_blocks():
+    a = _default_artifacts()
+    a["run_params"]["run_enabled"] = False
+    with tempfile.TemporaryDirectory() as t:
+        write_bundle(t, a, status="READY")
+        r = MF.check_readiness(t)
+        _check("run_enabled False -> NOT_READY", r["status"] == "NOT_READY")
+        _check("run_enabled False -> reason", any("run_enabled" in x for x in r["reasons"]))
 
 
 def test_independence_not_declared():

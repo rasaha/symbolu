@@ -27,6 +27,7 @@ REQUIRED_ARTIFACTS = {
     "meaning_reference": "meaning_reference.json",
     "distractors": "distractors.json",
     "realizer": "realizer.json",
+    "run_params": "run_params.json",
 }
 # manifest hash field -> artifact filename
 _HASH_FIELDS = {
@@ -163,11 +164,16 @@ def validate_distractors(record) -> dict:
 def validate_realizer(record) -> dict:
     r = validate_schema(record, _load_schema("realizer.schema.json"))
     errors = list(r["errors"])
+    # design invariants that must hold even for an unimplemented, frozen realizer
     if record.get("deterministic") is not True:
         errors.append("realizer: deterministic must be true")
-    if record.get("offline") is not True:
-        errors.append("realizer: offline must be true")
+    if record.get("offline_only") is not True:
+        errors.append("realizer: offline_only must be true")
     return {"valid": not errors, "errors": errors}
+
+
+def validate_run_params(record) -> dict:
+    return validate_schema(record, _load_schema("run_params.schema.json"))
 
 
 def validate_manifest(record) -> dict:
@@ -298,6 +304,7 @@ def check_readiness(frozen_dir) -> dict:
         "meaning_reference": ("meaning_reference.json", validate_meaning_reference),
         "distractors": ("distractors.json", validate_distractors),
         "realizer": ("realizer.json", validate_realizer),
+        "run_params": ("run_params.json", validate_run_params),
     }
     for key, (fname, fn) in validators.items():
         fp = frozen_dir / fname
@@ -357,6 +364,24 @@ def check_readiness(frozen_dir) -> dict:
     independence_ok = _independence_ok(manifest, realizations) if realizations else False
     if not independence_ok:
         reasons.append("realization independence not declared for all pairs")
+
+    # execution readiness: READY must never depend on an implicit/absent model. A frozen
+    # but unimplemented realizer (or a disabled run) is a hard block, independent of hashes.
+    rz = loaded.get("realizer")
+    if rz is not None:
+        if rz.get("status") != "IMPLEMENTED":
+            reasons.append("realizer status is not IMPLEMENTED")
+        if rz.get("execution_allowed") is not True:
+            reasons.append("realizer execution_allowed is not true")
+        if rz.get("implementation_present") is not True:
+            reasons.append("realizer implementation_present is not true")
+        if not rz.get("model_asset"):
+            reasons.append("realizer model_asset missing (no implicit model permitted)")
+        if not rz.get("model_sha256"):
+            reasons.append("realizer model_sha256 missing (asset must be pinned)")
+    rp = loaded.get("run_params")
+    if rp is not None and rp.get("run_enabled") is not True:
+        reasons.append("run_params run_enabled is not true")
 
     declared_ready = manifest.get("status") == "READY"
     if not declared_ready:
