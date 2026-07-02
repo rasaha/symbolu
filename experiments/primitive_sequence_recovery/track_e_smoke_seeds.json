@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "seeds": {
+    "candidate_shuffle": 71011,
+    "boundary_scramble": 20260702,
+    "packet_order": 4242,
+    "barnum_variant_order": 1379
+  },
+  "note": "fixed seeds for candidate shuffle, boundary scramble, packet order, Barnum variant order"
+}

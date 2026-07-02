@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0",
+  "bundle_type": "track_e_smoke_input_bundle",
+  "run_enabled": false,
+  "approval_status": "NOT_APPROVED",
+  "representation": "flat_boundary_constraint",
+  "four_sphere_integrated": false,
+  "arms": [
+    "A_real_boundary",
+    "B_scrambled_boundary",
+    "X_context_only",
+    "F_etymology_only",
+    "D_dictionary_only",
+    "I_barnum_boundary"
+  ],
+  "n_cases": 12,
+  "case_mix": {
+    "abstract_primary": 7,
+    "concrete_control": 3,
+    "famous_exploratory": 2
+  },
+  "primary_label_cases": [
+    "e000",
+    "e001",
+    "e002",
+    "e003",
+    "e004",
+    "e005",
+    "e006"
+  ],
+  "control_cases": [
+    "e007",
+    "e008",
+    "e009"
+  ],
+  "exploratory_only_cases": [
+    "e010",
+    "e011"
+  ],
+  "hidden_fields_not_packetized": [
+    "dev_surface_word",
+    "dev_varna_sequence",
+    "dev_root",
+    "dev_real_gloss_terms_full",
+    "dev_scrambled_gloss_terms_full",
+    "dev_status",
+    "role",
+    "context_correct_candidate_id"
+  ],
+  "files": [
+    "track_e_smoke_words.jsonl",
+    "track_e_smoke_contexts.jsonl",
+    "track_e_smoke_candidates.jsonl",
+    "track_e_smoke_etymology.jsonl",
+    "track_e_smoke_boundaries.jsonl",
+    "track_e_smoke_barnum.json",
+    "track_e_smoke_seeds.json"
+  ],
+  "hashes": {
+    "track_e_smoke_words.jsonl": "b9c63591246794626323c1b21ff3b2613970af3e5cd303fd50d4bb3dcd1bd0a8",
+    "track_e_smoke_contexts.jsonl": "07978da2f0ced7c31668319a7832402df8a218d37924ec711171602eab98e769",
+    "track_e_smoke_candidates.jsonl": "9336a919a86de482537147ea88fbc86bc9dda7b17699cb68cb9016d40eb77533",
+    "track_e_smoke_etymology.jsonl": "ebc028f2ddc73214bd59a8be7088ebc825db73f86d727606303a1d838ea5edff",
+    "track_e_smoke_boundaries.jsonl": "008d598834157ddc58e2cff526c998db5dcaead73154fdcc239578a9a3de7232",
+    "track_e_smoke_barnum.json": "d9c74db074060d42d681aac0d7c39c880eebe241ef0e4e36d8e40001f0dbdb6f",
+    "track_e_smoke_seeds.json": "889d03bd361f0b36afa778d4ea986788ae28981d6d0accecaf9a774dd3fb1b35"
+  },
+  "note": "Track E smoke input bundle for REVIEW ONLY. Flat boundary-constraint design; four-sphere JSON not integrated. Boundaries composed deterministically from the frozen en_gloss table for DRAFT consonant-only sequences (dev fields) — sequences must be linguistically verified before any freeze. run_enabled=false; not approved; not run. Track B remains blocked."
+}
