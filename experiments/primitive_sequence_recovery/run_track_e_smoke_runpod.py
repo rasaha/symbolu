@@ -73,23 +73,27 @@ def _load_scorer():
 
 
 def _prompt(packet):
+    # Mistral-v0.3 chat template rejects a separate "system" role, so fold the instruction into the
+    # single user turn (works for Qwen/Mistral/most instruct templates).
     opts = [c["candidate_id"] for c in packet["candidates"]]
     lines = [f'  {c["candidate_id"]}: {c["text"]}' for c in packet["candidates"]]
-    user = (packet["instructions"] + "\n\nPREMISE:\n" + packet["premise"] +
+    scores_tmpl = ", ".join(f'"{o}": 0.0' for o in opts)
+    user = ("You are a careful annotator. Output JSON only, no prose.\n\n" +
+            packet["instructions"] + "\n\nPREMISE:\n" + packet["premise"] +
             "\n\nCANDIDATES:\n" + "\n".join(lines) +
-            f'\n\nReturn JSON ONLY with keys exactly {opts} inside "scores", plus "packet_id" '
-            f'("{packet["packet_id"]}") and "chosen".')
-    return [{"role": "system", "content": "You are a careful annotator. Output JSON only, no prose."},
-            {"role": "user", "content": user}]
+            f'\n\nReturn JSON ONLY in exactly this shape:\n'
+            f'{{"packet_id": "{packet["packet_id"]}", "scores": {{{scores_tmpl}}}, "chosen": "{opts[0]}"}}')
+    return [{"role": "user", "content": user}]
 
 
 def _generate(model, tok, messages):
     import torch
-    inputs = tok.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(model.device)
+    prompt = tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    enc = tok(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
-        out = model.generate(inputs, max_new_tokens=MAX_NEW_TOKENS, do_sample=False,
-                             temperature=None, top_p=None, pad_token_id=tok.eos_token_id)
-    return tok.decode(out[0][inputs.shape[1]:], skip_special_tokens=True)
+        out = model.generate(**enc, max_new_tokens=MAX_NEW_TOKENS, do_sample=False,
+                             pad_token_id=(tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id))
+    return tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
 
 def _extract_json(text, packet_id, opts):
@@ -139,6 +143,9 @@ def main():
     ap.add_argument("--approval-config", default=str(CONFIG_PATH),
                     help="path to track_e_smoke_approved_run_config.json")
     ap.add_argument("--dry-check", action="store_true", help="dry-run only; no models, no run")
+    ap.add_argument("--debug-one", action="store_true",
+                    help="load the scorer, generate for ONE packet, print the raw output, and exit "
+                         "(exceptions propagate with full traceback). No scoring, no result file.")
     args = ap.parse_args()
 
     # pre-run: dry-run + leak scan (always, before anything else)
@@ -162,13 +169,23 @@ def main():
     print(f"[gate] approved config accepted: {emitted['status']}; base manifest untouched.")
 
     model, tok = _load_scorer()
+
+    if args.debug_one:                               # diagnostic: one packet, raw output, real traceback
+        p = packets[0]
+        print("[debug-one] packet_id:", p["packet_id"])
+        print("[debug-one] prompt (first 600 chars):\n", _prompt(p)[0]["content"][:600])
+        raw = _generate(model, tok, _prompt(p))      # NOT wrapped: full traceback on failure
+        print("[debug-one] RAW MODEL OUTPUT:\n", repr(raw))
+        return
+
     outputs, malformed, contaminated, abort_events = [], 0, [], []
     for p in packets:
         opts = [c["candidate_id"] for c in p["candidates"]]
         try:
             raw = _generate(model, tok, _prompt(p))
-        except Exception as e:                       # generation failure counts as malformed
-            malformed += 1; abort_events.append(f"gen_error:{p['packet_id']}:{e}"); continue
+        except Exception as e:                       # capture the TYPE so a blank message can't hide it
+            malformed += 1
+            abort_events.append(f"gen_error:{p['packet_id']}:{type(e).__name__}: {e!r}"); continue
         if _CONTAM.search(raw):
             contaminated.append(p["packet_id"])
         try:
@@ -176,7 +193,8 @@ def main():
             R.validate_scorer_output(obj, packet_opts={p["packet_id"]: opts}, seen=set())
             outputs.append(obj)
         except Exception as e:
-            malformed += 1; abort_events.append(f"malformed:{p['packet_id']}:{e}")
+            malformed += 1
+            abort_events.append(f"malformed:{p['packet_id']}:{type(e).__name__}: {e} :: raw={raw[:160]!r}")
 
     rate = malformed / max(1, len(packets))
     if rate > MALFORMED_ABORT_RATE:
