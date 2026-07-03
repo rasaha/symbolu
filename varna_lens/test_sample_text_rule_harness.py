@@ -159,6 +159,55 @@ def test_display_variants_are_labeled_not_scored():
     _check("random labeled display-only", "DISPLAY_ONLY_RANDOM" in out)
 
 
+# ------------------------------------------------------------- layer 2 synthesis ---
+def test_synthesize_off_by_default():
+    out = _with_fake(lambda: S.render(text="love", g2p=True))
+    _check("synthesize OFF by default -> no Layer 2 label", S.SYNTH_LABEL not in out)
+    _check("synthesize OFF -> no 'synthesis:' line", "synthesis:" not in out)
+
+
+def test_synthesize_prints_label_and_warning():
+    out = _with_fake(lambda: S.render(text="love", g2p=True, synthesize_mode=True))
+    _check("Layer 2 label present", S.SYNTH_LABEL in out)
+    _check("Layer 2 warning present", "prior controlled tests returned NO_SIGNAL" in out)
+    _check("banner still present", out.count(S.BANNER) >= 2)
+
+
+def test_love_synthesis_exact_and_no_unsupported_terms():
+    out = _with_fake(lambda: S.render(text="love", g2p=True, synthesize_mode=True))
+    expected = ("separative harshness moves toward compassion/gentleness, "
+                "and order/dharmic relation is the resolving principle")
+    _check("love synthesis == required frozen text", ("synthesis: " + expected) in out)
+    for bad in ("trust", "bonding", "devotion", "preference"):
+        _check(f"love synthesis omits {bad!r}", bad not in out.lower())
+
+
+def test_unsupported_bridge_term_fails_validation():
+    try:
+        S.validate_synthesis("separative harshness and betrayal is the resolving principle",
+                             ["separative harshness", "order/dharmic relation"])
+    except S.SynthesisInvalid:
+        _check("unsupported term rejected by validator", True); return
+    _check("unsupported term rejected by validator", False)
+
+
+def test_unresolved_preserved_in_synthesis():
+    # 'ma' and 'ta' are not in the frozen BRIDGE table -> must render [unresolved], not invent
+    V.phonemes_cmudict = lambda w: ([("C", "ma", "M"), ("V", "a", "AH1"), ("C", "ta", "T")], [])
+    try:
+        out = S.render(text="fake", g2p=True, synthesize_mode=True)
+        _check("[unresolved] preserved for unmapped glosses", "[unresolved]" in out)
+    finally:
+        V.phonemes_cmudict = _fake_cmudict
+
+
+def test_synthesis_emits_no_scoring_fields():
+    out = _with_fake(lambda: S.render(pair=["like", "love"], mode="shared_seed", g2p=True,
+                                      synthesize_mode=True)).lower()
+    for tok in ("score:", "score=", "verdict", "accuracy", "delta ", "a_vs", "real is better"):
+        _check(f"synthesis emits no scoring token {tok!r}", tok not in out)
+
+
 def test_no_ml_libs_imported():
     _check("no torch/transformers imported",
            not any(m in sys.modules for m in ("torch", "transformers", "openai", "anthropic")))

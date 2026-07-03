@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import pathlib
 import random
+import re
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -38,6 +39,33 @@ RANDOM_SEED = "sample_harness_random_v1"
 FORBIDDEN = ("therefore", "signifies", "represents", " means ", "preference", "bonding",
              "score:", "score=", "verdict", "=>", "⇒", "a_vs", "delta ", "accuracy",
              "is better", "real is better")
+
+
+SYNTH_LABEL = "INTERPRETIVE_SYNTHESIS_ONLY — not scored, not evidence"
+SYNTH_WARNING = ("WARNING: This is interpretive synthesis, not evidence and not semantic proof. "
+                 "The same templates applied to a scrambled/random lexicon read equally well; "
+                 "prior controlled tests returned NO_SIGNAL.")
+
+# FROZEN Layer 2 bridge vocabulary: one fixed paraphrase per lexicon gloss (keyed by the canonical
+# Sanskrit label), authored blind to any target word. A gloss with no entry renders [unresolved];
+# nothing is invented. This is a controlled paraphrase, NOT a semantic mapping.
+BRIDGE = {
+    "krūratā": "separative harshness",
+    "karuṇā/sneha": "compassion/gentleness",
+    "dharma/jalatattva": "order/dharmic relation",
+    "nirāśā": "detachment/letting-go",
+    "āśā": "hope",
+    "viśvāsa": "trust",
+    "cintā": "worry",
+    "mūrcchā": "deluded obsession/entrancement",
+    "jāgaraṇa": "awareness/awakening",
+}
+# fixed template stopwords (the only non-bridge tokens allowed in a synthesis string)
+_SYNTH_STOP = {"moves", "toward", "and", "is", "the", "resolving", "principle", "[unresolved]"}
+
+
+class SynthesisInvalid(ValueError):
+    """Raised when a synthesis contains a term not traceable to an emitted gloss bridge."""
 
 
 class G2PUnavailable(RuntimeError):
@@ -138,6 +166,55 @@ def _display_variant(word, kind):
     return f"  [{tag}] (permuted lexicon; NOT scored, NOT compared) " + " · ".join(parts)
 
 
+# --------------------------------------------------------------- layer 2 synthesis -
+def _canon(state):
+    key = (state.get("sanskrit", "") if isinstance(state, dict) else str(state)).lower().strip()
+    key = re.sub(r"\s*/\s*", "/", key)
+    return re.sub(r"\s+", " ", key)
+
+
+def _bridge(state):
+    """Frozen bridge phrase for a lexicon gloss, or None if unmapped (→ [unresolved])."""
+    return BRIDGE.get(_canon(state))
+
+
+def validate_synthesis(text, used_bridges):
+    """Every content token in `text` must trace to a used bridge phrase (or a fixed template
+    stopword / [unresolved]). Rejects any unsupported/target-fitted term. Raises SynthesisInvalid."""
+    allowed = set()
+    for b in used_bridges:
+        allowed |= set(re.findall(r"[a-z/]+", b.lower()))
+    for tok in re.findall(r"\[unresolved\]|[a-z/]+", text.lower()):
+        if tok in _SYNTH_STOP or tok in allowed:
+            continue
+        raise SynthesisInvalid(f"unsupported synthesis term: {tok!r}")
+    return True
+
+
+def synthesize(prof):
+    """Deterministic Layer 2 paraphrase of Layer 1 poles via FIXED templates + FROZEN bridge table.
+    No dictionary lookup, no target-fitting, no handcrafted prose. Missing bridge → [unresolved].
+    Returns (text, used_bridges); text is validated before return."""
+    units = prof["units"]
+    seed = next((r for r in units if r["role"] == "ONSET_SEED"), None)
+    trans = next((r for r in reversed(units) if r["role"] == "TRANSFORMER"), None)
+    clauses, used = [], []
+    if seed is not None:
+        ent = _lex_entry("C", seed["key"])
+        b_bind = (_bridge(ent["binding_state"]) if ent else None) or "[unresolved]"
+        b_counter = (_bridge(ent["liberating_state"]) if ent else None) or "[unresolved]"
+        clauses.append(f"{b_bind} moves toward {b_counter}")
+        used += [b_bind, b_counter]
+    if trans is not None and trans is not seed:
+        ent = _lex_entry("C", trans["key"])
+        b_tr = (_bridge(ent["liberating_state"]) if ent else None) or "[unresolved]"
+        clauses.append(f"{b_tr} is the resolving principle")
+        used.append(b_tr)
+    text = ", and ".join(clauses) if clauses else "[unresolved]"
+    validate_synthesis(text, used)
+    return text, used
+
+
 # --------------------------------------------------------------- renderers ----------
 def _fmt_units(prof):
     out = []
@@ -160,7 +237,7 @@ def _profile_line(prof):
 
 
 def render(*, text=None, pair=None, mode="word_profile", g2p=True,
-           show_scramble=False, show_random=False, label=None):
+           show_scramble=False, show_random=False, label=None, synthesize_mode=False):
     if not g2p:
         raise G2PUnavailable("G2P_UNAVAILABLE → ABORT: this harness is G2P-only; pass --g2p "
                              "(no roman/written fallback)")
@@ -177,6 +254,11 @@ def render(*, text=None, pair=None, mode="word_profile", g2p=True,
             lines.append("  profile: " + _profile_line(prof))
         if prof["warnings"]:
             lines.append("  warnings: " + " | ".join(prof["warnings"]))
+        if synthesize_mode:                               # Layer 2 — optional, controlled paraphrase
+            syn, _used = synthesize(prof)
+            lines.append("  " + SYNTH_LABEL)
+            lines.append("  synthesis: " + syn)
+            lines.append("  " + SYNTH_WARNING)
         if show_scramble:
             lines.append(_display_variant(w, "scramble"))
         if show_random:
@@ -226,6 +308,9 @@ def main(argv=None):
     ap.add_argument("--g2p", action="store_true", help="required: use true G2P (no fallback)")
     ap.add_argument("--show-scramble", action="store_true")
     ap.add_argument("--show-random", action="store_true")
+    ap.add_argument("--synthesize", action="store_true",
+                    help="OPTIONAL Layer 2 controlled paraphrase (off by default; INTERPRETIVE only, "
+                         "not scored, not evidence)")
     ap.add_argument("--label", default=None, help="printed only as USER_LABEL_NOT_USED, never used")
     args = ap.parse_args(argv)
     if not args.g2p:
@@ -234,7 +319,7 @@ def main(argv=None):
     try:
         print(render(text=args.text, pair=args.pair, mode=args.mode, g2p=True,
                      show_scramble=args.show_scramble, show_random=args.show_random,
-                     label=args.label))
+                     label=args.label, synthesize_mode=args.synthesize))
     except G2PUnavailable as e:
         print(str(e))
         return 3
