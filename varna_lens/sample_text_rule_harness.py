@@ -42,6 +42,15 @@ FORBIDDEN = ("therefore", "signifies", "represents", " means ", "preference", "b
              "is better", "real is better")
 
 
+# EXPERIMENTAL vowel positional polarity (opt-in). Default is field_only (unchanged behavior).
+# This variant only changes the per-unit PROFILE role/pole/term for a *word-initial* vowel; it reads
+# both vowel poles directly from lexicon_authoritative.json (never invents) and does NOT alter
+# synthesize()/Layer 2. It validates code/data behavior ONLY — NOT semantic truth, NOT ontology,
+# NOT Sanskrit privilege.
+VOWEL_MODES = ("field_only", "positional_polarity")
+VOWEL_POSITIONAL_LABEL = ("VOWEL_MODE=positional_polarity — EXPERIMENTAL VARIANT "
+                          "(not default, not evidence, not semantic proof)")
+
 SYNTH_LABEL = "INTERPRETIVE_SYNTHESIS_ONLY — not scored, not evidence"
 SYNTH_WARNING = ("WARNING: This is interpretive synthesis, not evidence and not semantic proof. "
                  "The same templates applied to a scrambled/random lexicon read equally well; "
@@ -117,8 +126,18 @@ def g2p_units(word):
 
 
 # --------------------------------------------------------------- role assignment ----
-def profile(word):
-    """Deterministic per-unit profile for one word under the positional rule. PURE (given g2p)."""
+def profile(word, vowel_mode="field_only"):
+    """Deterministic per-unit profile for one word under the positional rule. PURE (given g2p).
+
+    vowel_mode:
+      * "field_only" (DEFAULT, unchanged): every vowel is FIELD; selected term = vowel liberating_state.
+      * "positional_polarity" (EXPERIMENTAL, opt-in): a vowel at phonemic index 0 becomes VOWEL_SEED
+        with pole worldly(binding) and selected term = vowel binding_state (read from the lexicon);
+        every non-initial vowel stays FIELD / liberating_state. Consonants are unchanged in both modes.
+    Both vowel states are read directly from lexicon_authoritative.json; nothing is invented, and a
+    missing pole is marked MISSING. synthesize()/Layer 2 are NOT affected by vowel_mode."""
+    if vowel_mode not in VOWEL_MODES:
+        raise ValueError(f"unknown vowel_mode {vowel_mode!r}; expected one of {VOWEL_MODES}")
     units, warn = g2p_units(word)
     cons_idx = [i for i, (t, _, _) in enumerate(units) if t == "C"]
     first_c = cons_idx[0] if cons_idx else None
@@ -129,9 +148,16 @@ def profile(word):
         missing = entry is None
         row = {"i": i, "type": typ, "key": key, "arpa": surf, "missing": missing, "approx": True}
         if typ == "V":
-            row["role"] = "FIELD"
-            row["pole"] = "active_essence(liberating)"
-            row["term"] = _gloss(entry["liberating_state"]) if not missing else "MISSING"
+            if vowel_mode == "positional_polarity" and i == 0:   # word-initial vowel → seed (binding)
+                row["role"] = "VOWEL_SEED"
+                row["pole"] = "worldly(binding)"
+                bind = entry.get("binding_state") if not missing else None
+                row["term"] = _gloss(bind) if bind else "MISSING"
+            else:                                                # default / non-initial vowel → field
+                row["role"] = "FIELD"
+                row["pole"] = "active_essence(liberating)"
+                lib = entry.get("liberating_state") if not missing else None
+                row["term"] = _gloss(lib) if lib else "MISSING"
         else:  # consonant
             if i == first_c and i == last_c:
                 row["role"] = "ONSET_SEED"           # single consonant: seed only, no distinct transformer
@@ -260,14 +286,19 @@ def _profile_line(prof):
 
 
 def render(*, text=None, pair=None, mode="word_profile", g2p=True,
-           show_scramble=False, show_random=False, label=None, synthesize_mode=False):
+           show_scramble=False, show_random=False, label=None, synthesize_mode=False,
+           vowel_mode="field_only"):
     if not g2p:
         raise G2PUnavailable("G2P_UNAVAILABLE → ABORT: this harness is G2P-only; pass --g2p "
                              "(no roman/written fallback)")
+    if vowel_mode not in VOWEL_MODES:
+        raise ValueError(f"unknown vowel_mode {vowel_mode!r}; expected one of {VOWEL_MODES}")
     lines = [BANNER, f"mode={mode} | representation=TRUE_G2P_ONLY | lexicon=lexicon_authoritative.json (frozen)"]
+    if vowel_mode == "positional_polarity":       # annotation ONLY when opted-in → field_only unchanged
+        lines.append(VOWEL_POSITIONAL_LABEL)
 
     def emit_word(w):
-        prof = profile(w)
+        prof = profile(w, vowel_mode=vowel_mode)
         lines.append(f"\ninput: {w!r}")
         lines.append("  g2p phonemes: " + " ".join(u["arpa"] for u in prof["units"]))
         lines.append("  varṇa units:  " + " ".join(u["key"] for u in prof["units"]))
@@ -334,6 +365,9 @@ def main(argv=None):
     ap.add_argument("--synthesize", action="store_true",
                     help="OPTIONAL Layer 2 controlled paraphrase (off by default; INTERPRETIVE only, "
                          "not scored, not evidence)")
+    ap.add_argument("--vowel-mode", choices=list(VOWEL_MODES), default="field_only",
+                    help="EXPERIMENTAL: 'positional_polarity' gives a word-initial vowel a VOWEL_SEED "
+                         "(binding) role read from the lexicon; default 'field_only' is unchanged")
     ap.add_argument("--label", default=None, help="printed only as USER_LABEL_NOT_USED, never used")
     args = ap.parse_args(argv)
     if not args.g2p:
@@ -342,7 +376,8 @@ def main(argv=None):
     try:
         print(render(text=args.text, pair=args.pair, mode=args.mode, g2p=True,
                      show_scramble=args.show_scramble, show_random=args.show_random,
-                     label=args.label, synthesize_mode=args.synthesize))
+                     label=args.label, synthesize_mode=args.synthesize,
+                     vowel_mode=args.vowel_mode))
     except G2PUnavailable as e:
         print(str(e))
         return 3
