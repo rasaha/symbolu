@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "artifact": "b1_eval_wordlist",
+    "note": "Loadable eval word list + stratum metadata for the H2 Track B B1 evaluation. Mirrors the controlling prereg (d3a32e2). DRY-RUN input; NOT a frozen B0 package. Dev/demo words (mercy/love/anger/peace) and fixtures (Alakshmi/Lakshmi/anhydrous/theist) are excluded.",
+    "source": "PREREG_TRACK_B_H2_GENERATION_CONDITIONING.md (d3a32e2)",
+    "frozen": false
+  },
+  "primary": ["grief", "courage", "patience", "justice", "silence", "mountain", "river", "music",
+              "friendship", "teacher", "shadow", "freedom", "honesty", "empathy", "ocean", "envy",
+              "order", "integrity", "autumn", "echo"],
+  "privative": ["amoral", "apathy", "asymmetry", "anarchy", "anonymity"]
+}

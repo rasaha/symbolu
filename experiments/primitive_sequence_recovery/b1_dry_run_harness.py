@@ -113,8 +113,10 @@ def _mock_conditioning(key_word, arm):
     return f"[MOCK {arm}-arm conditioning core for '{key_word}']"
 
 
-def build_prompt(key_word, task_template, arm):
-    cond = _mock_conditioning(key_word, arm)
+def build_prompt(key_word, task_template, arm, conditioning_fn=None):
+    """Build (conditioning_core, full_prompt). conditioning_fn(word, arm) -> bare core; default is
+    the labeled mock. Pass b1_real_conditioning.real_core for real deterministic conditioning."""
+    cond = conditioning_fn(key_word, arm) if conditioning_fn else _mock_conditioning(key_word, arm)
     return cond, WRAPPER.format(conditioning=cond, task=task_template.format(w=key_word))
 
 
@@ -151,15 +153,16 @@ class MockModelAdapter(ModelAdapter):
 
 
 # ---------------------------------------------------------------- 6. generation runner ------------
-def run_generation(rows, adapter, dry_run=True):
-    """Produce (mock) outputs for every row. dry_run must be True; a real adapter is refused."""
+def run_generation(rows, adapter, dry_run=True, conditioning_fn=None):
+    """Produce (mock) outputs for every row. dry_run must be True; a real adapter is refused.
+    conditioning_fn(word, arm) supplies the bare core (default = mock; pass real_core for real)."""
     if not dry_run:
         raise RuntimeError("run_generation supports DRY-RUN only in this harness")
     if getattr(adapter, "is_real", False):
         raise RuntimeError("refusing to run: real model adapter passed to the dry-run harness")
     outputs = []
     for r in rows:
-        cond, prompt = build_prompt(r.key_word, TASKS[r.task], r.arm)
+        cond, prompt = build_prompt(r.key_word, TASKS[r.task], r.arm, conditioning_fn=conditioning_fn)
         txt = adapter.generate(prompt, DECODE, r.seed)
         outputs.append(RawOutput(r.row_id, r.key_word, r.stratum, r.task, r.arm, r.model, r.seed,
                                  cond, txt))
@@ -368,12 +371,13 @@ def score_from_aggregate(agg, boot_seed=0, n_boot=1000):
 
 
 # ---------------------------------------------------------------- dry-run demo (no files) ---------
-def dry_run(a_win_prob=0.5, boot_seed=0, n_boot=400, verbose=True):
-    """Full mock pipeline. Returns a summary dict. Writes NO files, calls NO real model."""
+def dry_run(a_win_prob=0.5, boot_seed=0, n_boot=400, verbose=True, conditioning_fn=None):
+    """Full mock pipeline. Returns a summary dict. Writes NO files, calls NO real model.
+    conditioning_fn: None => labeled mock conditioning; pass b1_real_conditioning.real_core for real."""
     inputs = load_frozen_inputs()
     rows = expand_rows(inputs)
     adapter = MockModelAdapter()
-    outputs = run_generation(rows, adapter, dry_run=True)
+    outputs = run_generation(rows, adapter, dry_run=True, conditioning_fn=conditioning_fn)
     leaks = scan_outputs(outputs)
     packets = build_judge_packets(outputs, rand_seed=40411)
     responses = mock_judge(packets, rand_seed=50513, a_win_prob=a_win_prob)
