@@ -192,8 +192,10 @@ def test_unsupported_bridge_term_fails_validation():
 
 
 def test_unresolved_preserved_in_synthesis():
-    # 'ma' and 'ta' are not in the frozen BRIDGE table -> must render [unresolved], not invent
-    V.phonemes_cmudict = lambda w: ([("C", "ma", "M"), ("V", "a", "AH1"), ("C", "ta", "T")], [])
+    # a consonant key NOT in the lexicon -> no entry -> [unresolved] (harness never invents).
+    # (Uses a non-lexicon key so this holds regardless of bridge-table coverage.)
+    V.phonemes_cmudict = lambda w: ([("C", "zz_notavarna", "M"), ("V", "a", "AH1"),
+                                     ("C", "zz_notavarna2", "T")], [])
     try:
         out = S.render(text="fake", g2p=True, synthesize_mode=True)
         _check("[unresolved] preserved for unmapped glosses", "[unresolved]" in out)

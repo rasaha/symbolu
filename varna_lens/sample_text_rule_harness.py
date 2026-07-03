@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import json
 import random
 import re
 import sys
@@ -46,10 +47,11 @@ SYNTH_WARNING = ("WARNING: This is interpretive synthesis, not evidence and not 
                  "The same templates applied to a scrambled/random lexicon read equally well; "
                  "prior controlled tests returned NO_SIGNAL.")
 
-# FROZEN Layer 2 bridge vocabulary: one fixed paraphrase per lexicon gloss (keyed by the canonical
-# Sanskrit label), authored blind to any target word. A gloss with no entry renders [unresolved];
-# nothing is invented. This is a controlled paraphrase, NOT a semantic mapping.
-BRIDGE = {
+# FROZEN Layer 2 bridge vocabulary: one fixed paraphrase per canonical lexicon gloss, authored blind
+# to any target word. A gloss with no entry renders [unresolved]; nothing is invented. This is a
+# controlled paraphrase, NOT a semantic mapping. Loaded from layer2_bridge_vocab.json; if that file
+# is missing, falls back to the original 9-entry inline table so the harness never breaks.
+_INLINE_BRIDGE = {
     "krūratā": "separative harshness",
     "karuṇā/sneha": "compassion/gentleness",
     "dharma/jalatattva": "order/dharmic relation",
@@ -60,6 +62,21 @@ BRIDGE = {
     "mūrcchā": "deluded obsession/entrancement",
     "jāgaraṇa": "awareness/awakening",
 }
+_BRIDGE_JSON = HERE / "layer2_bridge_vocab.json"
+
+
+def _load_bridge():
+    try:
+        data = json.loads(_BRIDGE_JSON.read_text(encoding="utf-8"))
+        b = data.get("bridge")
+        if isinstance(b, dict) and b:
+            return dict(b)
+    except (FileNotFoundError, ValueError, OSError):
+        pass
+    return dict(_INLINE_BRIDGE)
+
+
+BRIDGE = _load_bridge()
 # fixed template stopwords (the only non-bridge tokens allowed in a synthesis string)
 _SYNTH_STOP = {"moves", "toward", "and", "is", "the", "resolving", "principle", "[unresolved]"}
 
@@ -168,7 +185,13 @@ def _display_variant(word, kind):
 
 # --------------------------------------------------------------- layer 2 synthesis -
 def _canon(state):
-    key = (state.get("sanskrit", "") if isinstance(state, dict) else str(state)).lower().strip()
+    # key on the Sanskrit label; fall back to the English gloss when the Sanskrit label is empty
+    # (resolves the empty-label collision). Non-empty labels are unaffected.
+    if isinstance(state, dict):
+        key = state.get("sanskrit", "") or state.get("english", "")
+    else:
+        key = str(state)
+    key = key.lower().strip()
     key = re.sub(r"\s*/\s*", "/", key)
     return re.sub(r"\s+", " ", key)
 
