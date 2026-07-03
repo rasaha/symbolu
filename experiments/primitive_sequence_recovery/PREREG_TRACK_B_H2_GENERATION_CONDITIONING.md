@@ -102,7 +102,8 @@ Even if achieved it means only: **"Under frozen models M and task set T, A showe
 ## 13. Minimal run plan (right-sized)
 
 - **Primary run:** 20 primary words × 6 tasks × 6 arms × 2 models × 2 seeds = **2,880 generations**.
-- **Privative stratum** (5 words) run and reported **separately** (+1,440), never merged into the primary.
+- **Privative stratum:** 5 privative words × 6 tasks × 6 arms × 2 models × 2 seeds = **720 generations**, run and reported **separately**, never merged into the primary.
+- **Total draft scale:** 2,880 + 720 = **3,600 generations** (final counts frozen later).
 - **No expansion** (more words/models/seeds/tasks) unless explicitly justified after seeing the primary run's *design*, never its outcomes.
 - **No further architecture work** before this run.
 
