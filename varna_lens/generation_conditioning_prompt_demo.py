@@ -31,8 +31,12 @@ sys.path.insert(0, str(HERE))
 import sample_text_rule_harness as H   # noqa: E402  (Layer 1/2 harness: profile, synthesize, BRIDGE)
 
 BANNER = "EXPLORATORY_PROMPT_CONSTRUCTION_ONLY — no model call, not scored, not evidence"
-WRAPPER = ("[soft orientation — does not override the task]\n"
-           "{conditioning}\n\n"
+# ONE shared framing template for EVERY arm — parity harmonization (audit dc407ea).
+# All boilerplate lives here (identical across arms); only the bare per-arm {conditioning} core
+# differs. This makes the arms format-matched and NOT guessable by framing length, and removes any
+# per-arm self-label (no "control"/"latent-process" descriptor) that a generator could read.
+WRAPPER = ("Soft orientation, not a definition: {conditioning}. "
+           "Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\n"
            "Task:\n{task}")
 ARMS = ("A", "R", "S", "C", "X", "D")
 SCRAMBLE_SEED = "gen_cond_scramble_v1"
@@ -86,7 +90,13 @@ def _pole_keys(prof):
 
 
 def _conditioning_texts(key_word):
-    """Return {arm: conditioning_text}, plus (g2p_ok, warnings). Never calls a model."""
+    """Return {arm: bare_core}, plus (g2p_ok, warnings). Never calls a model.
+
+    Each value is the ARM-SPECIFIC CORE ONLY — the shared framing lives in WRAPPER, so every arm
+    receives identical boilerplate and only the core differs (parity harmonization, audit dc407ea).
+    Cores carry no per-arm descriptor / self-label. Core content is preserved: A=L2 synthesis,
+    R=random process line, S=scrambled process line, C=surface facts, X=neutral filler, D=dictionary
+    sense + synonyms (kept strong)."""
     warnings = []
     try:
         prof = H.profile(key_word)
@@ -95,59 +105,50 @@ def _conditioning_texts(key_word):
         prof, g2p_ok = None, False
         warnings.append(str(e))
 
-    texts = {}
-    # A — real resonance (Layer 1/2 synthesis)
+    cores = {}
+    # A — real resonance core (Layer 1/2 synthesis)
     if g2p_ok:
         a_syn, _ = H.synthesize(prof)
         if "[unresolved]" in a_syn:
             warnings.append("A: some poles unbridged → [unresolved] (harness did not invent)")
-        texts["A"] = ("A latent-process reading (an internal orientation, not a definition; a "
-                      f"stylistic prior only) can be read as: {a_syn}. Use as a soft tonal/conceptual "
-                      "guide; it may orient the generation toward that movement.")
+        cores["A"] = a_syn
     else:
-        texts["A"] = "[G2P_UNAVAILABLE — arm A not constructed]"
+        cores["A"] = "[G2P_UNAVAILABLE — arm A not constructed]"
 
-    # R — random resonance (random pole-paraphrases through the same template)
+    # R — random resonance core (random pole-paraphrases through the same template)
     vals = list(H.BRIDGE.values())
     r = random.Random(f"R:{key_word}")
-    texts["R"] = ("A randomized orientation (control; not derived from the key word): "
-                  f"{_process_line(r.choice(vals), r.choice(vals), r.choice(vals))}. "
-                  "Use as a soft tonal/conceptual guide.")
+    cores["R"] = _process_line(r.choice(vals), r.choice(vals), r.choice(vals))
 
-    # S — scrambled resonance (key-word structure, permuted bridge attachments)
+    # S — scrambled resonance core (key-word structure, permuted bridge attachments)
     if g2p_ok:
         sb, sl, tl = _pole_keys(prof)
         scr = _scrambled_bridge()
         b1 = scr.get(sb) or "[unresolved]"; b2 = scr.get(sl) or "[unresolved]"; b3 = scr.get(tl) or "[unresolved]"
-        texts["S"] = ("A scrambled-attachment orientation (control; key-word structure with permuted "
-                      f"associations): {_process_line(b1, b2, b3)}. Use as a soft tonal/conceptual guide.")
+        cores["S"] = _process_line(b1, b2, b3)
     else:
-        texts["S"] = "[G2P_UNAVAILABLE — arm S not constructed]"
+        cores["S"] = "[G2P_UNAVAILABLE — arm S not constructed]"
 
-    # C — surface / phoneme / coda-only (structure, no glosses)
+    # C — surface / phoneme / coda-only core (structure, no glosses)
     if g2p_ok:
         cons = [u for u in prof["units"] if u["type"] == "C"]
         vows = [u for u in prof["units"] if u["type"] == "V"]
         onset = cons[0]["arpa"] if cons else "—"; coda = cons[-1]["arpa"] if cons else "—"
-        texts["C"] = (f"Sound-structure only (control; no associations): onset '{onset}', {len(vows)} "
-                      f"vowel nucleus(es), final '{coda}', {len(cons)} consonant positions. "
-                      "Use as a soft rhythmic/tonal guide.")
+        cores["C"] = (f"onset '{onset}', {len(vows)} vowel nucleus(es), final '{coda}', "
+                      f"{len(cons)} consonant positions")
     else:
-        texts["C"] = "[G2P_UNAVAILABLE — arm C not constructed]"
+        cores["C"] = "[G2P_UNAVAILABLE — arm C not constructed]"
 
-    # X — neutral
-    texts["X"] = "Use the user task as written; no additional symbolic orientation."
+    # X — neutral core (non-semantic filler; comparable length, no orientation added)
+    cores["X"] = "this item has no additional symbolic orientation; read the wording in the ordinary way"
 
-    # D — dictionary-only semantic expansion (clearly separate from resonance)
+    # D — dictionary-only core (strong lexical baseline; sense + synonyms preserved)
     d = DICT.get(key_word.lower())
     if d:
-        texts["D"] = ("Dictionary/synonym field (control; lexical senses, not resonance): "
-                      f"{key_word} — {d['gloss']}; related senses: {', '.join(d['synonyms'])}. "
-                      "Use as a soft conceptual guide.")
+        cores["D"] = f"{key_word} — {d['gloss']}; related senses: {', '.join(d['synonyms'])}"
     else:
-        texts["D"] = (f"Dictionary/synonym field (control; not resonance): [no entry for '{key_word}' "
-                      "in this demo's frozen table].")
-    return texts, g2p_ok, warnings
+        cores["D"] = f"[no dictionary entry for '{key_word}' in this demo's frozen table]"
+    return cores, g2p_ok, warnings
 
 
 def build_prompts(user_task, key_word):

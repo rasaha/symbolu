@@ -28,6 +28,8 @@ def _check(name, ok):
 _FAKE = {
     "love": ([("C", "la", "L"), ("V", "a", "AH1"), ("C", "va", "V")], []),
     "mercy": ([("C", "ma", "M"), ("V", "a", "ER1"), ("C", "sa", "S"), ("V", "ii", "IY0")], []),
+    "anger": ([("V", "a", "AE1"), ("C", "nga", "NG"), ("C", "ga", "G"), ("V", "a", "ER0")], []),
+    "peace": ([("C", "pa", "P"), ("V", "ii", "IY1"), ("C", "sa", "S")], []),
 }
 
 
@@ -52,9 +54,27 @@ def test_all_six_arms_built():
 def test_identical_wrapper_across_arms():
     prompts = _with_fake(lambda: G.build_prompts("Write about love.", "love"))
     for arm, p in prompts.items():
-        _check(f"arm {arm} starts with wrapper header",
-               p.startswith("[soft orientation — does not override the task]\n"))
+        _check(f"arm {arm} starts with the shared frame header",
+               p.startswith("Soft orientation, not a definition: "))
+        _check(f"arm {arm} carries the shared frame suffix",
+               "Use this only as a gentle tonal/conceptual guide while following the task exactly."
+               in p)
         _check(f"arm {arm} ends with the same Task block", p.endswith("Task:\nWrite about love."))
+
+
+def test_shared_frame_identical_only_core_differs():
+    # everything except the {conditioning} core must be byte-identical across arms
+    prompts = _with_fake(lambda: G.build_prompts("Write about love.", "love"))
+    frames = set()
+    for arm, p in prompts.items():
+        mid = p.split("\n\nTask:\n")[0]
+        # strip the arm core out of the shared frame -> what remains must match across arms
+        core = mid[len("Soft orientation, not a definition: "):]
+        core = core[:-len(". Use this only as a gentle tonal/conceptual guide "
+                          "while following the task exactly.")]
+        frame = mid.replace(core, "{CORE}")
+        frames.add(frame)
+    _check("shared frame is byte-identical across all arms (only core differs)", len(frames) == 1)
 
 
 def test_only_conditioning_slot_differs():
@@ -85,10 +105,17 @@ def test_no_generated_answer_field():
 
 def test_dictionary_arm_distinct_from_resonance():
     prompts = _with_fake(lambda: G.build_prompts("Write about love.", "love"))
-    _check("D arm marked dictionary/synonym field", "Dictionary/synonym field" in prompts["D"])
-    _check("D arm says NOT resonance", "not resonance" in prompts["D"])
-    _check("A arm is a latent-process reading", "latent-process reading" in prompts["A"])
+    # distinction is now in CONTENT (no per-arm self-label): D carries the dictionary sense +
+    # synonyms; A carries the L2 process synthesis. They must differ.
+    _check("D core carries the dictionary sense", "love — deep affection or attachment" in prompts["D"])
+    _check("D core lists related senses", "related senses:" in prompts["D"])
+    _check("A core is the L2 process synthesis", "is the resolving principle" in prompts["A"])
     _check("A and D differ", prompts["A"] != prompts["D"])
+    # no per-arm self-label leaks into any prompt
+    for arm, p in prompts.items():
+        for label in ("(control", "latent-process reading", "Dictionary/synonym field",
+                      "randomized orientation", "scrambled-attachment", "Sound-structure only"):
+            _check(f"arm {arm}: no self-label {label!r}", label not in p)
 
 
 def test_g2p_unavailable_arms_marked_not_crash():
@@ -96,7 +123,19 @@ def test_g2p_unavailable_arms_marked_not_crash():
     prompts = _with_fake(lambda: G.build_prompts("Write.", "zznotword"))
     _check("arm A marked G2P_UNAVAILABLE", "G2P_UNAVAILABLE" in prompts["A"])
     _check("arm X still constructed", "no additional symbolic orientation" in prompts["X"])
-    _check("arm D still constructed (frozen table fallback)", "Dictionary/synonym field" in prompts["D"])
+    _check("arm D still constructed (frozen table fallback)",
+           "no dictionary entry" in prompts["D"] or "related senses:" in prompts["D"])
+
+
+def test_arm_length_parity_within_25pct():
+    # parity harmonization (audit dc407ea): no arm's full-prompt char length may differ from A by
+    # >25%, across the demo's built-in dictionary words. No model, no scoring.
+    for kw in ("mercy", "love", "anger", "peace"):
+        prompts = _with_fake(lambda kw=kw: G.build_prompts("Write about it.", kw))
+        la = len(prompts["A"])
+        for arm in G.ARMS:
+            d = 100.0 * (len(prompts[arm]) - la) / la
+            _check(f"{kw}: arm {arm} within +/-25% of A by chars ({d:+.1f}%)", abs(d) <= 25.0)
 
 
 def test_no_result_files_written(tmp=pathlib.Path(HERE)):
