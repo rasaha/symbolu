@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "artifact": "layer4_attribute_inventory",
+    "warning": "FROZEN dev/inspection-only synonym-attribute inventory. Not scored, not evidence, not semantic proof, not ontology, not Sanskrit privilege. Attributes authored from a standard thesaurus for each word's synonyms, BLIND to Layer 1/2 output and NOT tuned to make the demo words pass (each word intentionally includes attributes expected to come back UNSUPPORTED). NOT used for evaluation, NOT used for prereg execution. Not a runtime lookup, no web, no model.",
+    "used_for_evaluation": false,
+    "used_for_scoring": false,
+    "used_for_prereg_execution": false,
+    "runtime_lookup": false,
+    "tuned_to_pass_demo_words": false,
+    "frozen": true
+  },
+  "items": {
+    "love": {
+      "attributes": [
+        {"attribute": "affection", "support_terms": ["affection", "gentleness", "care", "tenderness", "compassion"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "trust", "support_terms": ["trust", "faith", "confidence"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "devotion", "support_terms": ["devotion", "dedication", "loyalty"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "desire", "support_terms": ["desire", "longing", "craving"], "source_note": "frozen synonym/attribute inventory"}
+      ]
+    },
+    "mercy": {
+      "attributes": [
+        {"attribute": "restraint", "support_terms": ["restraint", "containment", "discipline", "forbearance"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "release", "support_terms": ["liberation", "release", "relief", "clarity"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "compassion", "support_terms": ["compassion", "kindness", "gentleness"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "forgiveness", "support_terms": ["forgiveness", "pardon", "clemency"], "source_note": "frozen synonym/attribute inventory"}
+      ]
+    },
+    "anger": {
+      "attributes": [
+        {"attribute": "vanity", "support_terms": ["vanity", "pride", "arrogance"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "stillness", "support_terms": ["stillness", "calm", "quiet"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "hostility", "support_terms": ["hostility", "rage", "fury", "resentment"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "agitation", "support_terms": ["agitation", "turmoil", "unrest"], "source_note": "frozen synonym/attribute inventory"}
+      ]
+    },
+    "peace": {
+      "attributes": [
+        {"attribute": "friendliness", "support_terms": ["friendliness", "affection", "warmth"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "clarity", "support_terms": ["clarity", "liberation", "lucidity"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "calm", "support_terms": ["calm", "tranquility", "serenity", "quiet"], "source_note": "frozen synonym/attribute inventory"},
+        {"attribute": "harmony", "support_terms": ["harmony", "concord", "accord"], "source_note": "frozen synonym/attribute inventory"}
+      ]
+    }
+  }
+}
