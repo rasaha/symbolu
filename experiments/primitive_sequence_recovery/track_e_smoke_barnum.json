@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "family": {
+    "B1_generic_affective": "internal constraint emphasizing: a broad emotional pull that could fit almost any heartfelt reading",
+    "B2_affliction_field": "internal constraint emphasizing: struggle, lack, and the ache of something unresolved",
+    "B3_growth_uplift": "internal constraint emphasizing: striving, betterment, and movement toward something higher",
+    "B4_balance_moderation": "internal constraint emphasizing: balance, restraint, and a measured middle way"
+  },
+  "arm_I_rule": "score arm I as max over the family (best-matching generic boundary), as in D0",
+  "note": "Generic 'could-apply-to-anything' boundaries authored for Track E; not copied verbatim from D0's profiles."
+}

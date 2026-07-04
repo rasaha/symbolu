@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "seeds": {
+    "candidate_shuffle": 71011,
+    "boundary_scramble": 20260702,
+    "packet_order": 4242,
+    "barnum_variant_order": 1379,
+    "candidate_authoring_balanced": 8675309
+  },
+  "note": "fixed seeds for candidate shuffle, boundary scramble, packet order, Barnum variant order, and candidate authoring (balanced). candidate_authoring_balanced drives a SEEDED BALANCED permutation of authoring-time correct-answer slots (each of the 6 slots holds the correct answer exactly twice across the 12 cases; adjacency/cycles rejected); other candidates per case shuffled via f'{candidate_authoring_balanced}:others:{word_id}'. The runtime candidate_shuffle remains mandatory before any packet reaches a scorer."
+}

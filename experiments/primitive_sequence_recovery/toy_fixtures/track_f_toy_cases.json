@@ -1,0 +1,453 @@
+{
+  "schema_version": "1.0",
+  "toy_not_for_scoring": true,
+  "synthetic_only": true,
+  "note": "SYNTHETIC judge scores exercising Track F inference-steering decision mechanics only. No real words, no real-language markers, no LLM. Each case pre-computes per-arm judge scores + A-vs-arm distances so decide() can be tested. expected_label is what process_case must return; REJECT cases must raise RejectedFixture. Banned-token rejection is tested inline in the test file, not committed here.",
+  "cases": [
+    {
+      "case_id": "F-SIGNAL",
+      "task_type": "ambiguous_word",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "INFERENCE_STEERING_SIGNAL",
+      "rationale": "A distinct from X/B/F/I, useful (gain .25), correctness kept, low noise/halluc.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.5,
+            "to_F": 0.4,
+            "to_I": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-PRIMING",
+      "task_type": "context_sensitive",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "PROMPT_PRIMING_ONLY",
+      "rationale": "All boundary arms collapse together (A~B~F~I): any boundary steers the same -> priming.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.02,
+            "to_F": 0.02,
+            "to_I": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-SCRAMBLE",
+      "task_type": "metaphor",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "SCRAMBLE_EQUIVALENT",
+      "rationale": "Scrambled matches real (A~B) but Barnum differs -> scramble-equivalent.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.02,
+            "to_F": 0.4,
+            "to_I": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-BARNUM",
+      "task_type": "moral_emotional",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "BARNUM_EQUIVALENT",
+      "rationale": "Barnum matches real (A~I) but scramble differs -> Barnum-equivalent.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.5,
+            "to_F": 0.4,
+            "to_I": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-DEGRADED",
+      "task_type": "short_answer",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "CORRECTNESS_DEGRADED",
+      "rationale": "A steers distinctly but correctness drops (.5 vs X .9) -> harmful steering.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.5,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.5,
+            "to_F": 0.4,
+            "to_I": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-NOEFFECT",
+      "task_type": "reasoning_path",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "NO_EFFECT",
+      "rationale": "A barely differs from X -> no effect.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.02,
+            "to_B": 0.02,
+            "to_F": 0.02,
+            "to_I": 0.02
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-INCONCLUSIVE",
+      "task_type": "candidate_ranking",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "INCONCLUSIVE",
+      "rationale": "A distinct from X/B/I and useful, but indistinct from dict/etym (A~F) -> inconclusive.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.5,
+            "to_F": 0.02,
+            "to_I": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-REJECT-MALFORMED",
+      "task_type": "ambiguous_word",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "REJECT",
+      "rationale": "arms missing 'I' -> RejectedFixture.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.5,
+            "to_F": 0.4,
+            "to_I": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "F-REJECT-CONTAMINATION",
+      "task_type": "ambiguous_word",
+      "toy_not_for_scoring": true,
+      "synthetic_only": true,
+      "expected_label": "REJECT",
+      "rationale": "contamination flag set -> RejectedFixture.",
+      "items": [
+        {
+          "arms": {
+            "X": {
+              "correctness": 0.9,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "A": {
+              "correctness": 0.9,
+              "usefulness": 0.8,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "B": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "F": {
+              "correctness": 0.8,
+              "usefulness": 0.5,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            },
+            "I": {
+              "correctness": 0.85,
+              "usefulness": 0.55,
+              "poetic_noise": 0.1,
+              "hallucination": 0.05
+            }
+          },
+          "a_distances": {
+            "to_X": 0.6,
+            "to_B": 0.5,
+            "to_F": 0.4,
+            "to_I": 0.5
+          }
+        }
+      ],
+      "contamination": true
+    }
+  ]
+}

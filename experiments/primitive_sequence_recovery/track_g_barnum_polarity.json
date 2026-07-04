@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "family": {
+    "P1_generic": "Consider this internal orientation (soft prior; it does not override context or facts): a broad inner pull that could fit almost any reading",
+    "P2_uplift": "Consider this internal orientation (soft prior; it does not override context or facts): toward: expansion, illumination, ascent",
+    "P3_settle": "Consider this internal orientation (soft prior; it does not override context or facts): toward: contentment, release, integration",
+    "P4_tension": "Consider this internal orientation (soft prior; it does not override context or facts): toward: contraction, obscuration, fragmentation"
+  },
+  "arm_I_rule": "score arm I as max over the family",
+  "note": "generic could-fit-anything polarity profiles"
+}

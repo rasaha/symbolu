@@ -1,0 +1,43 @@
+{
+  "B1_APPROVAL_RECORD": {
+    "b1_approval_status": "EXECUTION_APPROVED",
+    "b1_execution_status": "AUTHORIZED_NOT_YET_RUN",
+    "b0_freeze_record_commit": "04cdd9d",
+    "b0_freeze_base_commit": "a2ed5cc",
+    "hash_report_commit": "a2ed5cc",
+    "artifact_count": 11,
+    "artifacts_match_frozen_sha256": true,
+    "model_pair": "Mistral + Qwen",
+    "model_A": "mistralai/Mistral-7B-Instruct-v0.3",
+    "model_B": "Qwen/Qwen2.5-7B-Instruct",
+    "planned_generation_count": 3600,
+    "primary_generation_count": 2880,
+    "privative_generation_count": 720,
+    "runtime_lock_status": "VALIDATED",
+    "cuda_readiness": "READY",
+    "cuda_readiness_note": "FIX_CUDA_RUNTIME resolved on a new operator RunPod (host f07b7e885ac7): torch.cuda.is_available()==True with torch 2.8.0+cu128. Locked backend intact: transformers 5.13.0 and tokenizers 0.22.2 both match TRACK_B_RUNTIME_MODEL_LOCK.yaml. torch (2.11.0+cu130 -> 2.8.0+cu128) is NOT a locked field, so no lock impact and no INVALID_POSTHOC. Prior state was NOT_READY (old pod driver CUDA 12.4 vs torch cu130). CUDA green is a prerequisite for B1 execution; it does NOT itself authorize execution.",
+    "cuda_readiness_updated_utc": "2026-07-04T03:31:38Z",
+    "operator_name": "Rakesh Mohan",
+    "approval_decision": "REQUEST_B1_APPROVAL",
+    "approval_timestamp_utc": "2026-07-04T03:22:37Z",
+    "track_b_status": "BLOCKED",
+    "model_call_status": "NO_MODEL_CALL_IN_SANDBOX",
+    "generation_status": "NOT_YET_GENERATED",
+    "scoring_status": "NO_SCORING",
+    "result_status": "NO_RESULT_CHANGE",
+    "scope_note": "This is the B1 approval REQUEST (Gate 4), separate from B0 freeze (Gate 3) and from B1 execution (Gate 5). It verifies the intended run matches the frozen B0 baseline. It does NOT approve execution, run a model, or unblock Track B.",
+    "gating_prerequisites_before_execution": [
+      "Separate explicit APPROVE_B1_EXECUTION decision",
+      "cuda_readiness must become READY (torch.cuda.is_available()==True on transformers backend)",
+      "Frozen 11 hashes must still match at execution time (else INVALID_POSTHOC)"
+    ],
+    "informed_negative_prior": "Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075); Track F CORRECTNESS_DEGRADED. 'Freeze then stop' remains a valid outcome.",
+    "co_primaries": "A must beat ALL of D/R/S/C/X; beating only X is not success.",
+    "note": "Structure, not validated meaning.",
+    "execution_authorized_timestamp_utc": "2026-07-04T03:36:37Z",
+    "execution_environment": "Must run on operator RunPod (cuda True, transformers 5.13.0). This git/prep VM (hostname vm) has NO torch/transformers/GPU and CANNOT generate; no model was called here.",
+    "execution_runner": "experiments/primitive_sequence_recovery/run_b1_generation.py",
+    "execution_output_target": "experiments/primitive_sequence_recovery/b1_raw_outputs.jsonl (raw generations only; not scored)",
+    "pre_execution_integrity": "ALL_6_PASS (frozen hashes match, cuda READY, backend matches lock, approval recorded, no freeze-set change, Track B BLOCKED)"
+  }
+}

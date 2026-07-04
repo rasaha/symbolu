@@ -3,7 +3,13 @@
 **Synthetic mechanics only. Nothing run, scored, or validated.** No LLM, no network, no real
 data, no model download, no scoring of the hypothesis. `manifest.json` remains **NOT_READY**; the
 psr runner remains **NOT_RUN**; Stage A is untouched; **Track B remains BLOCKED**; no
-`ONTOLOGICAL_SIGNAL`, no `EXPERIENTIAL_WEATHER_SIGNAL`, no Sanskrit privilege. This is the
+`ONTOLOGICAL_SIGNAL`, no `EXPERIENTIAL_WEATHER_SIGNAL`, no Sanskrit privilege.
+
+**Four-sphere JSON not integrated.** This harness implements the *current* Track E flat
+boundary-constraint design (single boundary per arm; controls A/B/X/F/D/I). The four-sphere varṇa
+lexicon (`track_e_varna_sphere_lexicon.json`) remains a **saved candidate artifact only** — it is
+**not** loaded, referenced, or used by the harness, fixtures, or tests, and adopting it would
+require separate approval and its own controls. This is the
 synthetic-first harness required by §9 of `TRACK_E_IMPLEMENTATION_PILOT_PLAN.md`, built and proven
 on toy data **before** any real Track E data exists.
 
@@ -81,6 +87,8 @@ Run: `python3 experiments/primitive_sequence_recovery/test_track_e_harness.py`
   (incremental candidate reweighting) and cannot reinterpret or soften those negatives.
 - Not a claim that a real Track E run is approved, ready, or likely to be positive. The prereg's
   default expectation stays `NO_SIGNAL` / `CONTEXT_ONLY_EXPLAINS`.
+- Not an adoption of the four-sphere representation. `track_e_varna_sphere_lexicon.json` stays a
+  saved candidate artifact; nothing here loads or depends on it.
 
 ## Next step (gated; not taken here)
 
@@ -91,4 +99,4 @@ multi-seed statistics above. None of that is built or authorized here.
 
 ---
 
-Track E synthetic harness validates mechanics only. No real Track E signal has been tested. Track B remains blocked. Structure, not validated meaning.
+Track E synthetic harness validates mechanics only. Four-sphere JSON remains a saved candidate artifact, not an adopted Track E input. No real Track E signal has been tested. Track B remains blocked. Structure, not validated meaning.

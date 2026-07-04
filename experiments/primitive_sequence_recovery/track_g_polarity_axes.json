@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0",
+  "axes": [
+    {
+      "axis_id": "expansion_contraction",
+      "positive_pole": "expansion",
+      "negative_pole": "contraction",
+      "description": "widening vs narrowing of scope",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "clarity_obscuration",
+      "positive_pole": "clarity",
+      "negative_pole": "obscuration",
+      "description": "lucid seeing vs confusion",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "binding_release",
+      "positive_pole": "binding",
+      "negative_pole": "release",
+      "description": "being bound vs let go",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "desire_contentment",
+      "positive_pole": "desire",
+      "negative_pole": "contentment",
+      "description": "craving vs settled sufficiency",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "fear_courage",
+      "positive_pole": "courage",
+      "negative_pole": "fear",
+      "description": "standing firm vs shrinking back",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "attachment_freedom",
+      "positive_pole": "freedom",
+      "negative_pole": "attachment",
+      "description": "letting go vs clinging",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "activity_inertia",
+      "positive_pole": "activity",
+      "negative_pole": "inertia",
+      "description": "movement vs stillness",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "ascent_descent",
+      "positive_pole": "ascent",
+      "negative_pole": "descent",
+      "description": "rising vs falling",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "illumination_darkness",
+      "positive_pole": "illumination",
+      "negative_pole": "darkness",
+      "description": "light vs dark",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    },
+    {
+      "axis_id": "integration_fragmentation",
+      "positive_pole": "integration",
+      "negative_pole": "fragmentation",
+      "description": "coming together vs breaking apart",
+      "allowed_direct_relation": true,
+      "allowed_contrast_relation": true,
+      "examples": [
+        "illustrative-only; not used to tune the test"
+      ],
+      "leak_risk": "low"
+    }
+  ],
+  "note": "axis list frozen before scoring; examples illustrative-only, never used to select assignments"
+}

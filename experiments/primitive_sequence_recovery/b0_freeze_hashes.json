@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "artifact": "b0_freeze_hashes",
+    "gate": "GATE_2_COMPUTE_HASHES_FOR_REVIEW",
+    "purpose": "sha256 over the files enumerated by b0_artifact_index.json freeze_set. Read-only hashing draft. Does NOT freeze B0, sign a record, approve B1, or unblock Track B.",
+    "scope_note": "Hashes exactly the files the index enumerates (the experimental artifacts). The index catalog itself is the enumerator/pointer, not a hashed member; its integrity is bound by this manifest's explicit path+hash list.",
+    "generated_utc": "2026-07-04T03:05:12Z",
+    "git_head": "ac1c7c7c9c21ba6223d65db1523b72734bed50c2",
+    "hash_algo": "sha256",
+    "n_artifacts": 11,
+    "b0_frozen": false,
+    "b0_freeze_signed": false,
+    "b1_approved": false,
+    "track_b": "BLOCKED",
+    "status": "B0_HASHES_COMPUTED_FOR_REVIEW \u2014 B0 STILL NOT FROZEN",
+    "informed_negative_prior": "Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075); Track F CORRECTNESS_DEGRADED",
+    "note": "Structure, not validated meaning. Hashing does not validate ontology/meaning/Sanskrit privilege and does not unblock Track B."
+  },
+  "artifacts": [
+    {
+      "path": "experiments/primitive_sequence_recovery/b1_eval_wordlist.json",
+      "role": "1. Evaluation word list + stratum metadata",
+      "sha256": "9c2728b9c4ba6887cb87212f7c6a4702b52477d2ec0f1a872aef0c196cb14020",
+      "bytes": 752
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/b1_eval_dtable.json",
+      "role": "2. D-arm dictionary table (data)",
+      "sha256": "958df144c5e0302ba8a15d158b42fe1a251d842bf227e8805b2a8fb508c61434",
+      "bytes": 3809
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/b1_real_conditioning.py",
+      "role": "3. A/R/S/C/X/D arm-construction rules; 4. Real conditioning generation path",
+      "sha256": "f0eff3cc8a93bc62d632897158c35a3884be9a549d2f0d1df8ba9b77c8de0a75",
+      "bytes": 5277
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/b1_dry_run_harness.py",
+      "role": "5. Prompt wrapper + 6 task templates; 7. Randomization (seeds); 8. Judge-packet/blinding; 9. Leak-scan; 10. Scoring/analysis machinery; 11. Verdict-label rules; 14. B1 runner/scorer dry-run harness",
+      "sha256": "674b74bbceb9ec6866f24792b78cd8d4ba5e126bdb72dd7bc4a96223a2661ba1",
+      "bytes": 19590
+    },
+    {
+      "path": "varna_lens/varna_lens.py",
+      "role": "4. Real conditioning path (upstream) \u2014 G2P + lexicon + BRIDGE",
+      "sha256": "fa51038bddf11fd8e557a19619436d5808595d3625284ad6f085a647dbb85049",
+      "bytes": 34918
+    },
+    {
+      "path": "varna_lens/sample_text_rule_harness.py",
+      "role": "4. Real conditioning path (upstream) \u2014 profile/synthesize/BRIDGE (A/S/C)",
+      "sha256": "882a82e2512f9d3fa4ba25640e44ed3ed0e17a57b86ec7e1846af3422dba5ef3",
+      "bytes": 18747
+    },
+    {
+      "path": "varna_lens/generation_conditioning_prompt_demo.py",
+      "role": "5. Prompt wrapper + arm cores (upstream) \u2014 WRAPPER, _process_line, _pole_keys, _scrambled_bridge",
+      "sha256": "46b78756db59ff85bc5919079780aefd562ce7781950dd76749d73b2a1ed36a1",
+      "bytes": 9370
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/PREREG_TRACK_B_H2_GENERATION_CONDITIONING.md",
+      "role": "operative spec (all sections); 6. model/decode/seed; 10. analysis; 11. verdict; 12. kill/positive labels",
+      "sha256": "b295ad4165e912141b09d29030afb237576360ae09c7369b591ae15724eba498",
+      "bytes": 9893
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/TRACK_B_B0_D_ARM_DICTIONARY_TABLE.md",
+      "role": "2. D-arm dictionary table (human-readable source of the data file)",
+      "sha256": "88968b343d5319d0a9c0e78798dd0c7490bf86319920e7221ba9bc2059c89fd9",
+      "bytes": 11169
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/TRACK_B_B0_ARM_CONSTRUCTION_LOCK.md",
+      "role": "3. arm-construction rules (human-readable lock)",
+      "sha256": "f47c9fc8442eb31881628c4a0c5045932a4f7fcf719e4a2d9a15cc20fd02c76c",
+      "bytes": 7978
+    },
+    {
+      "path": "experiments/primitive_sequence_recovery/TRACK_B_RUNTIME_MODEL_LOCK.yaml",
+      "role": "6. Model/decode/seed policy (runtime lock); 13. Runtime model lock record",
+      "sha256": "497c759cd8b5b2fd8a3c9ee7b44f9dabdf1293e968af7895adaf78b92a8860fe",
+      "bytes": 2816
+    }
+  ]
+}
