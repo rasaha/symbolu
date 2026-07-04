@@ -230,8 +230,13 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True):
     attn_fail = 0
     flagged = 0
     all_items = [("real", v) for v in views] + [("attn", a) for a in attn]
+    n_items = len(all_items)
+    done_n = len(done)
+    if verbose:
+        print(f"[judge {judge_slug(judge_id)}] starting: {n_items} items "
+              f"({done_n} already done, resuming)", flush=True)
     with path.open("a", encoding="utf-8") as fh:
-        for kind, item in all_items:
+        for i, (kind, item) in enumerate(all_items, 1):
             did = item["display_id"]
             if did in done:
                 continue
@@ -249,6 +254,10 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True):
                    "correctness_flag": rec_fields["correctness_flag"],
                    "short_reason": rec_fields["short_reason"], "parse_ok": ok}
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            fh.flush()                                    # progress is durable + visible via wc -l
+            if verbose and (i % 100 == 0 or i == n_items):
+                print(f"[judge {judge_slug(judge_id)}] {i}/{n_items} "
+                      f"(attn_fail {attn_fail}, flagged {flagged})", flush=True)
     excluded = attention_excluded(attn_fail, len(attn))
     if verbose:
         print(f"[judge {judge_slug(judge_id)}] attention fails {attn_fail}/{len(attn)} "
