@@ -1,0 +1,27 @@
+# B1 RunPod environment — pinned, known-good (host driver CUDA 12.8, e.g. NVIDIA 570.x).
+# NOT a frozen B0 artifact. torch/vision/audio are NOT locked fields; transformers + tokenizers ARE
+# (they must match TRACK_B_RUNTIME_MODEL_LOCK.yaml exactly). Install torch trio via the cu128 index:
+#
+#   pip install --index-url https://download.pytorch.org/whl/cu128 \
+#       torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0
+#   pip install -r b1_runpod_requirements.txt          # the rest (below)
+#
+# If the pod's driver reports a DIFFERENT max CUDA (nvidia-smi -> "CUDA Version: X.Y"),
+# swap cu128 for the matching wheel index (cu124 / cu126 / cu130 ...) and keep all THREE
+# torch packages on the SAME cuXXX build. Mismatch is what caused nms / libcudart.so.13 errors.
+
+# --- LOCKED backend (must equal the runtime lock; do not bump) ---
+transformers==5.13.0
+tokenizers==0.22.2
+
+# --- required companions (unlocked) ---
+accelerate            # required by device_map="auto" in the runner
+huggingface_hub       # model resolution / download (also used for metadata-only lock checks)
+nltk                  # true G2P for conditioning (ARPAbet->varna); needs the cmudict corpus:
+                      #   python3 -c "import nltk; nltk.download('cmudict')"
+pyyaml                # runner reads TRACK_B_RUNTIME_MODEL_LOCK.yaml
+
+# --- torch trio (install separately via the cu128 index-url above; listed here for the record) ---
+# torch==2.8.0        # +cu128
+# torchvision==0.23.0 # +cu128  (transformers eagerly imports it at model-load)
+# torchaudio==2.8.0   # +cu128  (transformers imports it via loss_rnnt at model-load)
