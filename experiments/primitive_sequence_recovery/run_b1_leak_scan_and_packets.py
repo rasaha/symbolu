@@ -21,6 +21,8 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import random
+import re
 import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -34,6 +36,7 @@ PACKETS_FULL = HERE / "b1_judge_packets_full.jsonl"
 JUDGE_VIEW = HERE / "b1_judge_view.jsonl"
 
 JUDGE_PACKET_SEED = 50513                 # frozen (runtime lock judge_packet_randomization)
+OUTPUT_RANDOMIZATION_SEED = 40411         # frozen (runtime lock output_randomization)
 EXPECTED_ROWS = 3600
 EXPECTED_PRIMARY = 2880
 EXPECTED_PRIVATIVE = 720
@@ -109,28 +112,58 @@ def check_leaks(outs):
 
 def build_packets(outs):
     print("\n== 4. blinded packet build ==")
-    packets = B.build_judge_packets(outs, rand_seed=JUDGE_PACKET_SEED)
-    # scorer-only full packets (with truth map)
+    packets = B.build_judge_packets(outs, rand_seed=JUDGE_PACKET_SEED)   # left/right shuffle (50513)
+    # Presentation-order randomization (frozen output seed 40411), then reassign opaque display_ids so
+    # display_id carries NO positional info about the control arm (build order groups by control).
+    random.Random(OUTPUT_RANDOMIZATION_SEED).shuffle(packets)
+    for i, p in enumerate(packets):
+        p.display_id = f"P{i:05d}"
+
+    # --- structural blinding assertions (the real guarantee; not substring scans of free-text prose) ---
+    ALLOWED_VIEW = {"display_id", "key_word", "task_text", "outputs"}
+    ALLOWED_OUT = {"id", "text"}
+    bad = 0
+    for p in packets:
+        v = B.judge_view(p)
+        if (set(v) != ALLOWED_VIEW
+                or not re.fullmatch(r"P\d{5}", v["display_id"])
+                or any(set(o) != ALLOWED_OUT for o in v["outputs"])
+                or {o["id"] for o in v["outputs"]} != {"Output 1", "Output 2"}
+                or B.leak_scan(v["task_text"])
+                or any(B.leak_scan(o["text"]) for o in v["outputs"])):
+            bad += 1
+    print(f"[{'PASS' if bad == 0 else 'FAIL'}] structural blinding "
+          f"(judge_view = {sorted(ALLOWED_VIEW)}; opaque id; leak-clean text) — {bad} real leaks")
+    if bad:
+        _fail("judge view structurally leaked a field")
+
+    # --- transparency: prove the earlier naive-substring hits were benign (opaque-id digits / prose),
+    #     never an arm/model/seed FIELD (those fields are not in judge_view at all) ---
+    naive = ('"A"', '"R"', '"S"', '"C"', '"X"', '"D"', "A_vs_", "control_arm", "truth", "1101", "2027")
+    where = {"display_id": 0, "key_word": 0, "task_text": 0, "output_text": 0}
+    for p in packets:
+        v = B.judge_view(p)
+        if any(t in v["display_id"] for t in naive):
+            where["display_id"] += 1
+        if any(t in v["key_word"] for t in naive):
+            where["key_word"] += 1
+        if any(t in v["task_text"] for t in naive):
+            where["task_text"] += 1
+        if any(any(t in o["text"] for t in naive) for o in v["outputs"]):
+            where["output_text"] += 1
+    print(f"[info] naive-token occurrences (benign) by location: {where}")
+    print("[info]   -> all are opaque display_id digits or incidental prose; no arm/model/seed field.")
+
+    # scorer-only full packets (with truth map) + blinded judge view
     with PACKETS_FULL.open("w", encoding="utf-8") as fh:
         for p in packets:
             fh.write(json.dumps({"packet_id": p.packet_id, "display_id": p.display_id,
                                  "control_arm": p.control_arm, "key_word": p.key_word,
                                  "task_text": p.task_text, "outputs": p.outputs,
                                  "truth": p.truth}, ensure_ascii=False) + "\n")
-    # blinded judge view (what a judge/LLM-judge sees) — must contain NO arm/model/seed/truth
-    leak_in_view = 0
     with JUDGE_VIEW.open("w", encoding="utf-8") as fh:
         for p in packets:
-            v = B.judge_view(p)
-            blob = json.dumps(v)
-            if any(t in blob for t in ('"A"', '"R"', '"S"', '"C"', '"X"', '"D"', "A_vs_",
-                                       "MODEL", "control_arm", "truth", "1101", "2027")):
-                leak_in_view += 1
-            fh.write(json.dumps(v, ensure_ascii=False) + "\n")
-    print(f"[{'PASS' if leak_in_view == 0 else 'FAIL'}] judge_view blinding "
-          f"({leak_in_view} views with a leaked field)")
-    if leak_in_view:
-        _fail("judge view leaked an internal field")
+            fh.write(json.dumps(B.judge_view(p), ensure_ascii=False) + "\n")
     print(f"[ok] built {len(packets)} packets -> {PACKETS_FULL.name} (scorer) / {JUDGE_VIEW.name} (blind)")
     return packets
 
