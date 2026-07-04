@@ -1,0 +1,90 @@
+{
+  "B0_FREEZE_RECORD": {
+    "b0_freeze_status": "FROZEN",
+    "b0_frozen": true,
+    "b0_freeze_signed": true,
+    "freeze_hash_report": "experiments/primitive_sequence_recovery/b0_freeze_hashes.json",
+    "artifact_count": 11,
+    "hash_report_commit": "a2ed5cc",
+    "freeze_base_commit": "a2ed5cc87cb661aad6bb94c6f42e539a0516435b",
+    "operator_name": "Rakesh Mohan",
+    "operator_signature": "Rakesh Mohan",
+    "freeze_decision": "FREEZE_B0_NOW",
+    "freeze_timestamp_utc": "2026-07-04T03:10:31Z",
+    "operator_statement": "I approve freezing B0 against the 11 artifact hashes recorded in b0_freeze_hashes.json. I understand that any later edit to a freeze-set artifact invalidates this B0 for B1 unless a new freeze is explicitly created.",
+    "b1_approval_status": "NOT_APPROVED",
+    "track_b_status": "BLOCKED",
+    "model_call_status": "NO_MODEL_CALL",
+    "generation_status": "NO_LLM_GENERATION",
+    "scoring_status": "NO_SCORING",
+    "result_status": "NO_RESULT_CHANGE",
+    "posthoc_rule": "any edit to a freeze-set artifact after this freeze requires abandoning this B0 or creating a new explicit B0 freeze",
+    "provenance": {
+      "artifact_index": "cff6d65",
+      "judging_blockers_closed": "ac1c7c7",
+      "hash_report": "a2ed5cc",
+      "runtime_lock_validated": "1acf4a4",
+      "parity_fix": "64b0f40",
+      "controlling_prereg": "d3a32e2"
+    },
+    "informed_negative_prior": "Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075); Track F CORRECTNESS_DEGRADED",
+    "scope_note": "This freezes B0 (inputs + procedure) only. It does NOT approve B1, run any model, or unblock Track B. Structure, not validated meaning.",
+    "bound_artifacts": [
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_eval_wordlist.json",
+        "sha256": "9c2728b9c4ba6887cb87212f7c6a4702b52477d2ec0f1a872aef0c196cb14020",
+        "bytes": 752
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_eval_dtable.json",
+        "sha256": "958df144c5e0302ba8a15d158b42fe1a251d842bf227e8805b2a8fb508c61434",
+        "bytes": 3809
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_real_conditioning.py",
+        "sha256": "f0eff3cc8a93bc62d632897158c35a3884be9a549d2f0d1df8ba9b77c8de0a75",
+        "bytes": 5277
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_dry_run_harness.py",
+        "sha256": "674b74bbceb9ec6866f24792b78cd8d4ba5e126bdb72dd7bc4a96223a2661ba1",
+        "bytes": 19590
+      },
+      {
+        "path": "varna_lens/varna_lens.py",
+        "sha256": "fa51038bddf11fd8e557a19619436d5808595d3625284ad6f085a647dbb85049",
+        "bytes": 34918
+      },
+      {
+        "path": "varna_lens/sample_text_rule_harness.py",
+        "sha256": "882a82e2512f9d3fa4ba25640e44ed3ed0e17a57b86ec7e1846af3422dba5ef3",
+        "bytes": 18747
+      },
+      {
+        "path": "varna_lens/generation_conditioning_prompt_demo.py",
+        "sha256": "46b78756db59ff85bc5919079780aefd562ce7781950dd76749d73b2a1ed36a1",
+        "bytes": 9370
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/PREREG_TRACK_B_H2_GENERATION_CONDITIONING.md",
+        "sha256": "b295ad4165e912141b09d29030afb237576360ae09c7369b591ae15724eba498",
+        "bytes": 9893
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/TRACK_B_B0_D_ARM_DICTIONARY_TABLE.md",
+        "sha256": "88968b343d5319d0a9c0e78798dd0c7490bf86319920e7221ba9bc2059c89fd9",
+        "bytes": 11169
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/TRACK_B_B0_ARM_CONSTRUCTION_LOCK.md",
+        "sha256": "f47c9fc8442eb31881628c4a0c5045932a4f7fcf719e4a2d9a15cc20fd02c76c",
+        "bytes": 7978
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/TRACK_B_RUNTIME_MODEL_LOCK.yaml",
+        "sha256": "497c759cd8b5b2fd8a3c9ee7b44f9dabdf1293e968af7895adaf78b92a8860fe",
+        "bytes": 2816
+      }
+    ]
+  }
+}
