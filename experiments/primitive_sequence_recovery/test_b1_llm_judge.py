@@ -82,23 +82,54 @@ def test_json_schema_validation_and_invalid_choice():
            and rec["confidence"] == "low" and rec["correctness_flag"] == "none")
 
 
-def test_robust_json_extraction_prose_fences_truncation():
-    # prose-wrapped JSON (the exact failure mode that sank judges 2 & 3) now parses
-    prose = 'Sure! Here is my assessment:\n{"choice": "output_2_better", "confidence": "medium"} Hope that helps.'
-    rec, ok = J.parse_judge_response(prose)
-    _check("prose-wrapped JSON parses", ok and rec["choice"] == "output_2_better")
-    # markdown-fenced JSON parses
-    fenced = '```json\n{"choice": "output_1_better", "short_reason": "clearer"}\n```'
-    rec, ok = J.parse_judge_response(fenced)
-    _check("fenced JSON parses", ok and rec["choice"] == "output_1_better")
-    # nested braces inside a string value don't break the balanced extractor
-    nested = '{"choice": "tie_no_preference", "short_reason": "uses {braces} oddly"}'
-    rec, ok = J.parse_judge_response(nested)
-    _check("nested braces in string parse", ok and rec["choice"] == "tie_no_preference")
-    # truncated (unbalanced) -> fallback, flagged
-    trunc = '{"choice": "output_1_better", "short_reason": "the response was cut off mid'
-    rec, ok = J.parse_judge_response(trunc)
-    _check("truncated JSON -> tie fallback", (not ok) and rec["choice"] == "tie_no_preference")
+_FULL = ('{"choice": "%s", "confidence": "high", "correctness_flag": "none", '
+         '"short_reason": "a clear reason"}')
+
+
+def test_strict_and_fenced_and_prose_parse_without_repair():
+    # strict JSON
+    rec, ok = J.parse_judge_response(_FULL % "output_1_better")
+    _check("strict JSON parses", ok and rec["choice"] == "output_1_better" and rec["parse_repair"] is None)
+    # markdown-fenced
+    rec, ok = J.parse_judge_response("```json\n" + (_FULL % "output_2_better") + "\n```")
+    _check("fenced JSON parses (no repair)", ok and rec["choice"] == "output_2_better"
+           and rec["parse_repair"] is None)
+    # prose-wrapped
+    rec, ok = J.parse_judge_response("Sure, here: " + (_FULL % "both_bad") + " done.")
+    _check("prose-wrapped JSON parses (no repair)", ok and rec["choice"] == "both_bad"
+           and rec["parse_repair"] is None)
+
+
+def test_missing_final_brace_is_safely_repaired():
+    # the exact judge-2 failure mode: complete body, all fields, only the closing brace missing
+    body = ('{\n"choice": "output_1_better",\n"confidence": "high",\n"correctness_flag": "none",\n'
+            '"short_reason": "More effective use of metaphor and vivid imagery."')
+    rec, ok = J.parse_judge_response(body)
+    _check("missing-final-brace repaired -> ok", ok and rec["choice"] == "output_1_better")
+    _check("repair is flagged missing_final_brace", rec["parse_repair"] == "missing_final_brace")
+
+
+def test_repair_refused_when_field_missing_or_invalid_or_duplicated():
+    # missing a required field -> NOT repaired
+    miss = '{"choice": "output_1_better", "confidence": "high", "correctness_flag": "none"'
+    rec, ok = J.parse_judge_response(miss)
+    _check("missing required field not repaired", (not ok) and rec["choice"] == "tie_no_preference")
+    # invalid choice -> NOT repaired
+    badc = '{"choice": "output_3_better", "confidence": "high", "correctness_flag": "none", "short_reason": "x"'
+    rec, ok = J.parse_judge_response(badc)
+    _check("invalid choice not repaired", (not ok) and rec["choice"] == "tie_no_preference")
+    # invalid confidence -> NOT repaired (repair path requires valid confidence)
+    badconf = '{"choice": "output_1_better", "confidence": "sky", "correctness_flag": "none", "short_reason": "x"'
+    rec, ok = J.parse_judge_response(badconf)
+    _check("invalid confidence not repaired", not ok)
+    # duplicated key -> NOT repaired
+    dup = ('{"choice": "output_1_better", "choice": "output_2_better", "confidence": "high", '
+           '"correctness_flag": "none", "short_reason": "x"')
+    rec, ok = J.parse_judge_response(dup)
+    _check("duplicated key not repaired", not ok)
+    # genuinely non-JSON prose -> fallback
+    rec, ok = J.parse_judge_response("I think Output 1 is better, honestly.")
+    _check("prose (no json) -> tie fallback", (not ok) and rec["choice"] == "tie_no_preference")
 
 
 def test_tie_and_both_bad_map_to_half():
@@ -156,6 +187,39 @@ def test_mock_run_resume_flagged_and_no_scoring():
             r = json.loads(ln)
             _check("record has choice, no a_win/truth",
                    r["choice"] in J.CHOICES and "a_win" not in r and "truth" not in r)
+
+
+def test_raw_preserved_and_repair_flagged_end_to_end():
+    class BraceDropAdapter:
+        is_real = False
+
+        def __init__(self, jid):
+            self.judge_id = J.validate_judge(jid)
+
+        def judge_raw(self, prompt, view):
+            # complete body, all fields, NO closing brace (the exact judge-2 failure)
+            return ('{"choice": "output_1_better", "confidence": "high", '
+                    '"correctness_flag": "none", "short_reason": "good"')
+
+    with tempfile.TemporaryDirectory() as td:
+        td = pathlib.Path(td)
+        views = _sample_views(2)
+        (td / "b1_judge_view.jsonl").write_text("\n".join(json.dumps(v) for v in views) + "\n",
+                                                encoding="utf-8")
+        J.JUDGE_VIEW = td / "b1_judge_view.jsonl"
+        J.OUT_DIR = td
+        jid = J.DECLARED_JUDGES[0]
+        s = J.run_one_judge(jid, BraceDropAdapter(jid), views, J.build_attention_checks(n=4),
+                            resume=True, verbose=False)
+        rows = [json.loads(x) for x in J.out_path_for(jid).read_text(encoding="utf-8").splitlines()]
+        real = [r for r in rows if r["kind"] == "real"]
+        _check("repaired records are parse_ok", all(r["parse_ok"] for r in real))
+        _check("repaired records flagged missing_final_brace",
+               all(r["parse_repair"] == "missing_final_brace" for r in real))
+        _check("raw text preserved UNCHANGED (no appended brace in raw)",
+               all(not r["raw"].rstrip().endswith("}") for r in real))
+        _check("repaired choice is valid", all(r["choice"] == "output_1_better" for r in real))
+        _check("summary counts repaired", s.get("repaired", 0) >= len(real))
 
 
 def test_only_judge_view_is_read():

@@ -88,14 +88,20 @@ def build_judge_prompt(view):
 
 
 # ---------------------------------------------------------------- response parsing -----------------
-def _extract_json_object(text):
-    """Return the first BALANCED {...} object substring, tolerating surrounding prose / markdown
-    code fences / trailing junk. Returns None if no balanced object exists (e.g. truncated)."""
+_REQUIRED_KEYS = ("choice", "confidence", "correctness_flag", "short_reason")
+
+
+def _strip_fences(text):
     t = (text or "").strip()
     if t.startswith("```"):                      # strip a leading ```json fence if present
         t = t.split("```", 2)[1] if t.count("```") >= 2 else t.lstrip("`")
         if t[:4].lower() == "json":
             t = t[4:]
+    return t.strip()
+
+
+def _extract_balanced(t):
+    """Return the first BALANCED {...} object substring, or None if none is closed (truncated)."""
     start = t.find("{")
     if start < 0:
         return None
@@ -118,30 +124,65 @@ def _extract_json_object(text):
             depth -= 1
             if depth == 0:
                 return t[start:i + 1]
-    return None                                   # unbalanced -> truncated / malformed
+    return None                                   # no balanced object
+
+
+def _loads_no_dupkeys(s):
+    """json.loads that RAISES on any duplicated key (so a duplicated field blocks repair)."""
+    def hook(pairs):
+        keys = [k for k, _ in pairs]
+        if len(keys) != len(set(keys)):
+            raise ValueError("duplicate key")
+        return dict(pairs)
+    return json.loads(s, object_pairs_hook=hook)
+
+
+def _record(d, repair=None):
+    return {"choice": d["choice"],
+            "confidence": d.get("confidence") if d.get("confidence") in CONFIDENCE else "low",
+            "correctness_flag": d.get("correctness_flag") if d.get("correctness_flag") in CORRECTNESS else "none",
+            "short_reason": str(d.get("short_reason", ""))[:200],
+            "parse_repair": repair}
 
 
 def parse_judge_response(text):
-    """Extract + validate the JSON object. Returns (record_fields, ok). On any violation returns a
-    tie_no_preference fallback with ok=False (flagged)."""
-    fallback = {"choice": "tie_no_preference", "confidence": "low",
-                "correctness_flag": "none", "short_reason": "unparseable-or-invalid"}
-    blob = _extract_json_object(text)
-    if not blob:
+    """Parse the judge reply. Returns (record_fields, ok). Order:
+      1. strict parse of the first BALANCED object;
+      2. if none, ONE narrow safe repair: text starts with '{', appending a single '}' yields valid
+         JSON, all required keys present exactly once, and choice/confidence/correctness_flag all
+         valid -> repair (parse_repair='missing_final_brace'). Anything ambiguous is NOT repaired.
+    On any violation returns a tie_no_preference fallback with ok=False (flagged)."""
+    fallback = {"choice": "tie_no_preference", "confidence": "low", "correctness_flag": "none",
+                "short_reason": "unparseable-or-invalid", "parse_repair": None}
+    t = _strip_fences(text)
+
+    # 1 + 2: strict parse of first balanced object (tolerates surrounding prose / fences)
+    blob = _extract_balanced(t)
+    if blob is not None:
+        try:
+            d = _loads_no_dupkeys(blob)
+        except Exception:  # noqa: BLE001
+            return fallback, False
+        if isinstance(d, dict) and d.get("choice") in CHOICES:
+            return _record(d), True
+        return fallback, False                    # balanced but invalid/duplicated -> no repair
+
+    # 3: narrow safe repair — missing final '}' ONLY
+    start = t.find("{")
+    if start < 0:
         return fallback, False
+    cand = t[start:].rstrip()
     try:
-        d = json.loads(blob)
+        d = _loads_no_dupkeys(cand + "}")         # exactly one appended brace
     except Exception:  # noqa: BLE001
         return fallback, False
-    if not isinstance(d, dict) or d.get("choice") not in CHOICES:
-        return fallback, False
-    rec = {
-        "choice": d["choice"],
-        "confidence": d.get("confidence") if d.get("confidence") in CONFIDENCE else "low",
-        "correctness_flag": d.get("correctness_flag") if d.get("correctness_flag") in CORRECTNESS else "none",
-        "short_reason": str(d.get("short_reason", ""))[:200],
-    }
-    return rec, True
+    if (isinstance(d, dict)
+            and all(k in d for k in _REQUIRED_KEYS)     # all required keys present (dups already rejected)
+            and d.get("choice") in CHOICES
+            and d.get("confidence") in CONFIDENCE
+            and d.get("correctness_flag") in CORRECTNESS):
+        return _record(d, repair="missing_final_brace"), True
+    return fallback, False
 
 
 # ---------------------------------------------------------------- scoring helper (NOT the scorer) --
@@ -195,7 +236,7 @@ class LlamaJudgeAdapter:
                                            return_dict=True).to(self.model.device)
         with torch.no_grad():
             out = self.model.generate(**enc, do_sample=False, temperature=None, top_p=None,
-                                      max_new_tokens=256, pad_token_id=self.tok.eos_token_id)
+                                      max_new_tokens=384, pad_token_id=self.tok.eos_token_id)
         return self.tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
 
@@ -264,6 +305,7 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True, tag
     attn_fail = 0
     flagged = 0
     parse_fail = 0
+    repaired = 0
     use_views = views[:limit] if limit else views
     all_items = [("real", v) for v in use_views] + [("attn", a) for a in attn]
     n_items = len(all_items)
@@ -280,8 +322,11 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True, tag
             prompt = build_judge_prompt(view)
             raw = adapter.judge_raw(prompt, view)
             rec_fields, ok = parse_judge_response(raw)
+            repair = rec_fields.get("parse_repair")
             if not ok:
                 parse_fail += 1
+            elif repair:
+                repaired += 1
             if not ok or rec_fields["choice"] in FLAGGED_CHOICES:
                 flagged += 1
             if kind == "attn":
@@ -291,20 +336,22 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True, tag
                    "choice": rec_fields["choice"], "confidence": rec_fields["confidence"],
                    "correctness_flag": rec_fields["correctness_flag"],
                    "short_reason": rec_fields["short_reason"], "parse_ok": ok,
-                   "raw": (raw or "")[:1200]}          # raw saved for audit / re-parse
+                   "parse_repair": repair,               # None | "missing_final_brace"
+                   "raw": (raw or "")[:1200]}          # raw saved UNCHANGED for audit / re-parse
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
             fh.flush()                                    # progress is durable + visible via wc -l
             if verbose and (i % 100 == 0 or i == n_items):
                 print(f"[judge {judge_slug(judge_id)}] {i}/{n_items} "
-                      f"(attn_fail {attn_fail}, parse_fail {parse_fail}, flagged {flagged})", flush=True)
+                      f"(attn_fail {attn_fail}, parse_fail {parse_fail}, repaired {repaired}, "
+                      f"flagged {flagged})", flush=True)
     excluded = attention_excluded(attn_fail, len(attn))
     if verbose:
         print(f"[judge {judge_slug(judge_id)}] attention fails {attn_fail}/{len(attn)} "
               f"-> {'EXCLUDED' if excluded else 'kept'} | parse_fail {parse_fail} | "
-              f"flagged(tie/both_bad) {flagged}")
+              f"repaired {repaired} | flagged(tie/both_bad) {flagged}")
     return {"judge_id": judge_id, "attn_fail": attn_fail, "n_attn": len(attn),
             "excluded": excluded, "flagged": flagged, "parse_fail": parse_fail,
-            "out_path": str(path)}
+            "repaired": repaired, "out_path": str(path)}
 
 
 def main(argv=None):
@@ -334,7 +381,7 @@ def main(argv=None):
         "judges": [judge_slug(j) for j in judges],
         "per_judge": [{"judge": judge_slug(s["judge_id"]), "attn_fail": s["attn_fail"],
                        "n_attn": s["n_attn"], "excluded": s["excluded"], "flagged": s["flagged"],
-                       "parse_fail": s.get("parse_fail"),
+                       "parse_fail": s.get("parse_fail"), "repaired": s.get("repaired"),
                        "out_sha256": hashlib.sha256(pathlib.Path(s["out_path"]).read_bytes()).hexdigest()
                        if pathlib.Path(s["out_path"]).exists() else None}
                       for s in summaries],
