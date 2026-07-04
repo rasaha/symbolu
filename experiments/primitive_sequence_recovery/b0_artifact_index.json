@@ -80,12 +80,12 @@
   },
 
   "residual_open_fields_before_hashing": {
-    "note": "Pre-registration-critical fields the OPERATIVE prereg leaves soft. These must be pinned (operator decision) and written into the prereg before Gate 2 hashing, or explicitly scoped out with justification. Surfaced honestly, not invented here.",
+    "note": "Pre-registration-critical judging-protocol fields — RESOLVED via operator-approved conservative defaults and written into the operative prereg §9/§10 + harness constants. Values chosen before any output exists.",
     "fields": [
-      {"id": "n_judges", "where": "prereg §9", "state": "OPEN — number of judges per pairwise item not fixed"},
-      {"id": "attention_check_and_failed_attention_rule", "where": "prereg §9", "state": "OPEN — exact predeclared attention-check + exclusion rule not specified"},
-      {"id": "tie_both_bad_final", "where": "prereg §9", "state": "STATED (0.5) but flagged 'finalize before freeze'; confirm as final"},
-      {"id": "bootstrap_iterations_and_seed", "where": "prereg §10 / runtime lock", "state": "coded n_boot=1000; seed=60617 in lock; prereg says 'finalize iteration count/seed at freeze' — confirm+wire"}
+      {"id": "n_judges", "where": "prereg §9 / harness JUDGING", "state": "RESOLVED — n_judges=3 minimum; 5 preferred if available before B1 approval, else 3 valid"},
+      {"id": "attention_check_and_failed_attention_rule", "where": "prereg §9 / harness JUDGING", "state": "RESOLVED — exclude judge if fails >1 attention check OR >25% of attention checks (stricter); applied before outcome analysis"},
+      {"id": "tie_both_bad_final", "where": "prereg §9 / harness JUDGING", "state": "RESOLVED — tie/no-preference=0.5 final; both-bad=0.5 final and separately flagged"},
+      {"id": "bootstrap_iterations_and_seed", "where": "prereg §10 / harness BOOTSTRAP / runtime lock", "state": "RESOLVED — n_boot=2000, seed=60617 (runtime-lock bootstrap_statistical), clustered over item-level units"}
     ]
   },
 

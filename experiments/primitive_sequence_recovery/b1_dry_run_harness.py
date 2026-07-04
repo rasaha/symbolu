@@ -50,6 +50,14 @@ DECODE = {"temperature": 0.7, "top_p": 0.95, "max_tokens": 300, "frequency_penal
 WRAPPER = ("Soft orientation, not a definition: {conditioning}. Use this only as a gentle "
            "tonal/conceptual guide while following the task exactly.\n\nTask:\n{task}")
 
+# Frozen analysis / judging protocol (prereg §9-§10). Bootstrap seed == runtime-lock
+# `bootstrap_statistical`. These pin researcher degrees of freedom before any output exists.
+BOOTSTRAP = {"n_boot": 2000, "seed": 60617}
+JUDGING = {"n_judges_min": 3, "n_judges_preferred": 5, "tie": 0.5, "both_bad": 0.5,
+           "attention_exclude_rule": ("exclude a judge only if they fail more than 1 attention check "
+                                      "OR fail more than 25% of attention checks (whichever is "
+                                      "stricter); all exclusions applied before outcome analysis")}
+
 FORBIDDEN = ("ontology", "ontological validation", "sanskrit proves", "sanskrit privilege",
              "semantic truth", "validated meaning", "therefore means", "varṇas prove",
              "varnas prove", "phonemes encode true meaning", "track b support", "track g rescue")
@@ -356,7 +364,7 @@ def apply_verdict(results, flags=None):
     return "LIMITED_GENERATION_UTILITY"     # beats ALL of D/R/S/C/X
 
 
-def score_from_aggregate(agg, boot_seed=0, n_boot=1000):
+def score_from_aggregate(agg, boot_seed=BOOTSTRAP["seed"], n_boot=BOOTSTRAP["n_boot"]):
     """Convenience: aggregate -> per-control CI + Holm -> results dict for apply_verdict."""
     per = {}
     pvals = {}

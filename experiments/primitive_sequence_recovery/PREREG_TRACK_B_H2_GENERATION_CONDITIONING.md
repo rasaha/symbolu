@@ -75,9 +75,10 @@ Identical wrapper; **only the conditioning slot varies**:
 
 - Judges see **task + anonymized outputs only** — no arm labels, no conditioning text, no L1/L2/L3/L4 metadata, no dictionary answer key.
 - **Primary: pairwise forced choice** A vs each of D/R/S/C/X (left/right randomized).
-- **Tie / no preference = 0.5** (finalize before freeze); **both-bad = 0.5 and separately flagged**.
+- **Judges:** `n_judges = 3` per pairwise packet (minimum); `n_judges = 5` **preferred** only if available before B1 approval, otherwise 3 is valid.
+- **Tie / no preference = 0.5** (final); **both-bad = 0.5** (final) and separately flagged.
 - **Correctness hard flag** on explanation (T4): a style win that costs correctness is not a utility win.
-- **Attention checks** included; **inter-rater agreement reported**; judge exclusion only via the predeclared attention-check rule.
+- **Attention checks:** planted attention-check packets with an obvious quality/control distinction are included. A judge is **excluded only if they fail more than 1 attention check OR fail more than 25% of attention checks (whichever is stricter)**; all exclusions are applied **before** outcome analysis. **Inter-rater agreement reported.**
 
 ## 10. Analysis plan
 
@@ -86,7 +87,7 @@ Identical wrapper; **only the conditioning slot varies**:
 - **Primary metric:** pairwise A win-rate.
 - **Threshold:** corrected CI lower bound **> 0.5** for each co-primary.
 - **Correction:** Holm-Bonferroni across the five co-primaries.
-- **CI:** clustered (paired) bootstrap over item-level units (finalize iteration count/seed at freeze).
+- **CI:** clustered (paired) bootstrap over item-level units; **`n_boot = 2000`, seed = `60617`** (runtime-lock `bootstrap_statistical`).
 - **Reporting:** per-model, per-seed, per-task, per-stratum; **all arms and all failures reported**; no cherry-picking; no rerun-until-pass.
 
 ## 11. Kill labels (any ⇒ Track B stays BLOCKED)
