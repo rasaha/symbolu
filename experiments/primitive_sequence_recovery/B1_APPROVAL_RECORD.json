@@ -1,0 +1,37 @@
+{
+  "B1_APPROVAL_RECORD": {
+    "b1_approval_status": "APPROVAL_REQUESTED",
+    "b1_execution_status": "NOT_RUN",
+    "b0_freeze_record_commit": "04cdd9d",
+    "b0_freeze_base_commit": "a2ed5cc",
+    "hash_report_commit": "a2ed5cc",
+    "artifact_count": 11,
+    "artifacts_match_frozen_sha256": true,
+    "model_pair": "Mistral + Qwen",
+    "model_A": "mistralai/Mistral-7B-Instruct-v0.3",
+    "model_B": "Qwen/Qwen2.5-7B-Instruct",
+    "planned_generation_count": 3600,
+    "primary_generation_count": 2880,
+    "privative_generation_count": 720,
+    "runtime_lock_status": "VALIDATED",
+    "cuda_readiness": "NOT_READY",
+    "cuda_readiness_note": "Last known target check (operator RunPod) returned cuda False: host NVIDIA driver CUDA 12.4 vs torch 2.11.0+cu130. Must be green (torch.cuda.is_available()==True) on the locked transformers backend BEFORE B1 execution. This approval-request does NOT run anything; CUDA is a prerequisite for the separate execution gate, not for this record.",
+    "operator_name": "Rakesh Mohan",
+    "approval_decision": "REQUEST_B1_APPROVAL",
+    "approval_timestamp_utc": "2026-07-04T03:22:37Z",
+    "track_b_status": "BLOCKED",
+    "model_call_status": "NO_MODEL_CALL",
+    "generation_status": "NO_LLM_GENERATION",
+    "scoring_status": "NO_SCORING",
+    "result_status": "NO_RESULT_CHANGE",
+    "scope_note": "This is the B1 approval REQUEST (Gate 4), separate from B0 freeze (Gate 3) and from B1 execution (Gate 5). It verifies the intended run matches the frozen B0 baseline. It does NOT approve execution, run a model, or unblock Track B.",
+    "gating_prerequisites_before_execution": [
+      "Separate explicit APPROVE_B1_EXECUTION decision",
+      "cuda_readiness must become READY (torch.cuda.is_available()==True on transformers backend)",
+      "Frozen 11 hashes must still match at execution time (else INVALID_POSTHOC)"
+    ],
+    "informed_negative_prior": "Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075); Track F CORRECTNESS_DEGRADED. 'Freeze then stop' remains a valid outcome.",
+    "co_primaries": "A must beat ALL of D/R/S/C/X; beating only X is not success.",
+    "note": "Structure, not validated meaning."
+  }
+}
