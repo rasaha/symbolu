@@ -90,20 +90,24 @@ class TransformersAdapter:
         import torch
         from transformers import set_seed
         set_seed(seed)  # deterministic per (row, seed)
-        # locked chat wrapping: user turn only, NO system prompt (decode.system_prompt == none)
+        # locked chat wrapping: user turn only, NO system prompt (decode.system_prompt == none).
+        # transformers 5.x apply_chat_template returns a BatchEncoding dict (input_ids +
+        # attention_mask); feed it via **enc. Prompt content is identical either way.
         msgs = [{"role": "user", "content": prompt}]
-        inputs = self.tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt"
-                                              ).to(self.model.device)
+        enc = self.tok.apply_chat_template(
+            msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True,
+        ).to(self.model.device)
+        in_len = enc["input_ids"].shape[1]
         with torch.no_grad():
             out = self.model.generate(
-                inputs,
+                **enc,
                 do_sample=True,
                 temperature=self.decode["temperature"],
                 top_p=self.decode["top_p"],
                 max_new_tokens=self.decode["max_tokens"],
                 pad_token_id=self.tok.eos_token_id,
             )
-        text = self.tok.decode(out[0][inputs.shape[1]:], skip_special_tokens=True)
+        text = self.tok.decode(out[0][in_len:], skip_special_tokens=True)
         return text.strip()
 
 
