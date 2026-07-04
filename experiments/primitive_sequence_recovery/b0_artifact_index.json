@@ -1,0 +1,106 @@
+{
+  "_meta": {
+    "artifact": "b0_artifact_index",
+    "purpose": "Track B / H2 Stage B0 artifact index (item 15 of the required B0 set). Enumerates the EXACT files that will later be hashed at Gate 2 and frozen at Gate 3. Assembled at Gate 1 (FINALIZE_B0_ARTIFACTS_FOR_REVIEW) for review only.",
+    "gate": "GATE_1_FINALIZE_FOR_REVIEW",
+    "frozen": false,
+    "hashes_computed": false,
+    "manifest_populated": false,
+    "b0_frozen": false,
+    "b1_approved": false,
+    "track_b": "BLOCKED",
+    "operative_spec": "PREREG_TRACK_B_H2_GENERATION_CONDITIONING.md (d3a32e2, arithmetic e147575)",
+    "runtime_lock": "TRACK_B_RUNTIME_MODEL_LOCK.yaml (filled+validated 1acf4a4)",
+    "parity_fix": "64b0f40",
+    "dry_run_harness": "0dd6460",
+    "real_conditioning_wiring": "d8c3be3",
+    "informed_negative_prior": "Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075); Track F CORRECTNESS_DEGRADED",
+    "note": "Structure, not validated meaning. This index does not run a model, generate, score, hash, populate a manifest, freeze B0, approve B1, or unblock Track B."
+  },
+
+  "repo_root_relative": true,
+
+  "freeze_set": {
+    "note": "These files determine inputs, generation, conditioning, and analysis machinery. Their bytes are the freeze-critical surface to be hashed at Gate 2. All are content-final and placeholder-clean; frozen flags flip to true only at Gate 3.",
+
+    "data_inputs": [
+      {"role": "1. Evaluation word list + stratum metadata",
+       "path": "experiments/primitive_sequence_recovery/b1_eval_wordlist.json",
+       "resolves": "20 primary + 5 privative; dev/demo + fixture words excluded"},
+      {"role": "2. D-arm dictionary table (data)",
+       "path": "experiments/primitive_sequence_recovery/b1_eval_dtable.json",
+       "resolves": "25/25 eval words; gloss + 3-5 synonyms; transcribed verbatim from bcb604e"}
+    ],
+
+    "conditioning_and_harness_code": [
+      {"role": "3. A/R/S/C/X/D arm-construction rules; 4. Real conditioning generation path",
+       "path": "experiments/primitive_sequence_recovery/b1_real_conditioning.py",
+       "resolves": "deterministic per-(word,arm) cores matching committed generator 64b0f40"},
+      {"role": "5. Prompt wrapper + 6 task templates; 7. Randomization (seeds); 8. Judge-packet/blinding; 9. Leak-scan; 10. Scoring/analysis machinery; 11. Verdict-label rules; 14. B1 runner/scorer dry-run harness",
+       "path": "experiments/primitive_sequence_recovery/b1_dry_run_harness.py",
+       "resolves": "WRAPPER, TASKS(T1-T6), ARMS, SEEDS(1101,2027), DECODE, FORBIDDEN leak list, judge_view blinding, clustered_bootstrap_ci, holm_bonferroni, apply_verdict, VERDICT_LABELS, expand_rows(3600)"}
+    ],
+
+    "pinned_upstream_conditioning_dependencies": [
+      {"role": "4. Real conditioning path (upstream) — G2P + lexicon + BRIDGE",
+       "path": "varna_lens/varna_lens.py"},
+      {"role": "4. Real conditioning path (upstream) — profile/synthesize/BRIDGE (A/S/C)",
+       "path": "varna_lens/sample_text_rule_harness.py"},
+      {"role": "5. Prompt wrapper + arm cores (upstream) — WRAPPER, _process_line, _pole_keys, _scrambled_bridge",
+       "path": "varna_lens/generation_conditioning_prompt_demo.py"}
+    ],
+
+    "governing_spec_and_policy": [
+      {"role": "operative spec (all sections); 6. model/decode/seed; 10. analysis; 11. verdict; 12. kill/positive labels",
+       "path": "experiments/primitive_sequence_recovery/PREREG_TRACK_B_H2_GENERATION_CONDITIONING.md",
+       "resolves": "co-primaries A_vs_{D,R,S,C,X}; CI=clustered paired bootstrap; correction=Holm-Bonferroni; threshold=corrected CI lower bound>0.5; robustness>=2 models/>=2 seeds/>1 task; tie/both-bad=0.5"},
+      {"role": "2. D-arm dictionary table (human-readable source of the data file)",
+       "path": "experiments/primitive_sequence_recovery/TRACK_B_B0_D_ARM_DICTIONARY_TABLE.md",
+       "resolves": "verbatim source (bcb604e) for b1_eval_dtable.json"},
+      {"role": "3. arm-construction rules (human-readable lock)",
+       "path": "experiments/primitive_sequence_recovery/TRACK_B_B0_ARM_CONSTRUCTION_LOCK.md",
+       "resolves": "prose lock for A/R/S/C/X/D; code of record is b1_real_conditioning.py"}
+    ],
+
+    "runtime": [
+      {"role": "6. Model/decode/seed policy (runtime lock); 13. Runtime model lock record",
+       "path": "experiments/primitive_sequence_recovery/TRACK_B_RUNTIME_MODEL_LOCK.yaml",
+       "resolves": "Mistral-7B-Instruct-v0.3 + Qwen2.5-7B-Instruct; rev/tokenizer/backend filled; decode; seeds; availability OK; no_model_output_produced YES"}
+    ]
+  },
+
+  "provenance_only_superseded": {
+    "note": "SUPERSEDED by the consolidated prereg (d3a32e2) per its own header. These remain as audit trail. They still contain unresolved <TBD_AT_FREEZE> placeholders and are therefore NOT members of the freeze/hash set. The operative resolution lives in the freeze_set files above.",
+    "files": [
+      "experiments/primitive_sequence_recovery/TRACK_B_B0_MODEL_DECODE_SEED_POLICY.md",
+      "experiments/primitive_sequence_recovery/TRACK_B_B0_JUDGE_RANDOMIZATION_LEAK_LOCK.md",
+      "experiments/primitive_sequence_recovery/TRACK_B_B0_ANALYSIS_PLAN_LOCK.md",
+      "experiments/primitive_sequence_recovery/TRACK_B_B0_FAILURE_MODE_PREMORTEM.md"
+    ]
+  },
+
+  "residual_open_fields_before_hashing": {
+    "note": "Pre-registration-critical fields the OPERATIVE prereg leaves soft. These must be pinned (operator decision) and written into the prereg before Gate 2 hashing, or explicitly scoped out with justification. Surfaced honestly, not invented here.",
+    "fields": [
+      {"id": "n_judges", "where": "prereg §9", "state": "OPEN — number of judges per pairwise item not fixed"},
+      {"id": "attention_check_and_failed_attention_rule", "where": "prereg §9", "state": "OPEN — exact predeclared attention-check + exclusion rule not specified"},
+      {"id": "tie_both_bad_final", "where": "prereg §9", "state": "STATED (0.5) but flagged 'finalize before freeze'; confirm as final"},
+      {"id": "bootstrap_iterations_and_seed", "where": "prereg §10 / runtime lock", "state": "coded n_boot=1000; seed=60617 in lock; prereg says 'finalize iteration count/seed at freeze' — confirm+wire"}
+    ]
+  },
+
+  "required_checks_at_gate_1": {
+    "no_placeholders_in_freeze_set": true,
+    "wordlist_20_primary_5_privative": true,
+    "excluded_words_absent": true,
+    "dtable_25_of_25": true,
+    "real_conditioning_150_of_150": "verified by test when true-G2P available (else SKIP loud)",
+    "planned_expansion_3600": true,
+    "judge_packets_blinded": true,
+    "leak_dry_check_clean": true,
+    "parity_within_25pct": true,
+    "runtime_lock_validated_and_referenced": true,
+    "no_result_files": true,
+    "no_model_called": true
+  }
+}
