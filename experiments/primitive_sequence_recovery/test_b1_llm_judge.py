@@ -55,7 +55,7 @@ def test_banned_and_undeclared_judges_rejected():
             J.validate_judge(banned); _check(f"reject banned {banned}", False)
         except ValueError:
             _check(f"reject banned {banned}", True)
-    for undeclared in ("google/gemma-2-9b-it", "meta-llama/Llama-3.1-70B-Instruct"):
+    for undeclared in ("meta-llama/Llama-3.2-3B-Instruct", "meta-llama/Llama-3.1-70B-Instruct"):
         try:
             J.validate_judge(undeclared); _check(f"reject undeclared {undeclared}", False)
         except ValueError:

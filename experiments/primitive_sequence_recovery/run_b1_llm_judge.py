@@ -32,11 +32,11 @@ JUDGE_VIEW = HERE / "b1_judge_view.jsonl"          # the ONLY packet input the j
 OUT_DIR = HERE                                      # per-judge outputs written here
 
 # --- declared panel (addendum b13ac74). Do not add models here without a new pre-run addendum. ---
-DECLARED_JUDGES = (
+DECLARED_JUDGES = (                                # panel per amendment V2 (B1_JUDGE_PATH_ADDENDUM_V2)
     "meta-llama/Llama-3.1-8B-Instruct",
     "meta-llama/Meta-Llama-3-8B-Instruct",
-    "meta-llama/Llama-3.2-3B-Instruct",
-)
+    "google/gemma-2-9b-it",                        # replaced Llama-3.2-3B (genuine QC failure; echoed
+)                                                  # the option-list as its choice, not a parser issue)
 BANNED_JUDGE_SUBSTR = ("mistral", "qwen")          # generation families — never judges
 
 CHOICES = ("output_1_better", "output_2_better", "tie_no_preference", "both_bad")
