@@ -82,6 +82,25 @@ def test_json_schema_validation_and_invalid_choice():
            and rec["confidence"] == "low" and rec["correctness_flag"] == "none")
 
 
+def test_robust_json_extraction_prose_fences_truncation():
+    # prose-wrapped JSON (the exact failure mode that sank judges 2 & 3) now parses
+    prose = 'Sure! Here is my assessment:\n{"choice": "output_2_better", "confidence": "medium"} Hope that helps.'
+    rec, ok = J.parse_judge_response(prose)
+    _check("prose-wrapped JSON parses", ok and rec["choice"] == "output_2_better")
+    # markdown-fenced JSON parses
+    fenced = '```json\n{"choice": "output_1_better", "short_reason": "clearer"}\n```'
+    rec, ok = J.parse_judge_response(fenced)
+    _check("fenced JSON parses", ok and rec["choice"] == "output_1_better")
+    # nested braces inside a string value don't break the balanced extractor
+    nested = '{"choice": "tie_no_preference", "short_reason": "uses {braces} oddly"}'
+    rec, ok = J.parse_judge_response(nested)
+    _check("nested braces in string parse", ok and rec["choice"] == "tie_no_preference")
+    # truncated (unbalanced) -> fallback, flagged
+    trunc = '{"choice": "output_1_better", "short_reason": "the response was cut off mid'
+    rec, ok = J.parse_judge_response(trunc)
+    _check("truncated JSON -> tie fallback", (not ok) and rec["choice"] == "tie_no_preference")
+
+
 def test_tie_and_both_bad_map_to_half():
     _check("tie -> 0.5", J.choice_to_a_win_placeholder("tie_no_preference") == 0.5)
     _check("both_bad -> 0.5", J.choice_to_a_win_placeholder("both_bad") == 0.5)

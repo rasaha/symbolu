@@ -88,19 +88,52 @@ def build_judge_prompt(view):
 
 
 # ---------------------------------------------------------------- response parsing -----------------
+def _extract_json_object(text):
+    """Return the first BALANCED {...} object substring, tolerating surrounding prose / markdown
+    code fences / trailing junk. Returns None if no balanced object exists (e.g. truncated)."""
+    t = (text or "").strip()
+    if t.startswith("```"):                      # strip a leading ```json fence if present
+        t = t.split("```", 2)[1] if t.count("```") >= 2 else t.lstrip("`")
+        if t[:4].lower() == "json":
+            t = t[4:]
+    start = t.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_str = esc = False
+    for i in range(start, len(t)):
+        c = t[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return t[start:i + 1]
+    return None                                   # unbalanced -> truncated / malformed
+
+
 def parse_judge_response(text):
     """Extract + validate the JSON object. Returns (record_fields, ok). On any violation returns a
     tie_no_preference fallback with ok=False (flagged)."""
     fallback = {"choice": "tie_no_preference", "confidence": "low",
                 "correctness_flag": "none", "short_reason": "unparseable-or-invalid"}
-    m = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not m:
+    blob = _extract_json_object(text)
+    if not blob:
         return fallback, False
     try:
-        d = json.loads(m.group(0))
+        d = json.loads(blob)
     except Exception:  # noqa: BLE001
         return fallback, False
-    if d.get("choice") not in CHOICES:
+    if not isinstance(d, dict) or d.get("choice") not in CHOICES:
         return fallback, False
     rec = {
         "choice": d["choice"],
@@ -162,7 +195,7 @@ class LlamaJudgeAdapter:
                                            return_dict=True).to(self.model.device)
         with torch.no_grad():
             out = self.model.generate(**enc, do_sample=False, temperature=None, top_p=None,
-                                      max_new_tokens=96, pad_token_id=self.tok.eos_token_id)
+                                      max_new_tokens=256, pad_token_id=self.tok.eos_token_id)
         return self.tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
 
@@ -207,8 +240,9 @@ def load_views():
     return [json.loads(x) for x in JUDGE_VIEW.read_text(encoding="utf-8").splitlines() if x.strip()]
 
 
-def out_path_for(judge_id):
-    return OUT_DIR / f"b1_judge_responses_{judge_slug(judge_id)}.jsonl"
+def out_path_for(judge_id, tag=""):
+    suffix = f"_{tag}" if tag else ""
+    return OUT_DIR / f"b1_judge_responses_{judge_slug(judge_id)}{suffix}.jsonl"
 
 
 def _done_ids(path):
@@ -222,14 +256,16 @@ def _done_ids(path):
     return done
 
 
-def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True):
+def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True, tag="", limit=0):
     """Judge all real views + attention checks with one judge. Writes per-judge JSONL. Returns a
-    summary (attention fails, flagged count). Does NOT score or map to A-win."""
-    path = out_path_for(judge_id)
+    summary (attention fails, flagged, parse-fail count). Does NOT score or map to A-win."""
+    path = out_path_for(judge_id, tag)
     done = _done_ids(path) if resume else set()
     attn_fail = 0
     flagged = 0
-    all_items = [("real", v) for v in views] + [("attn", a) for a in attn]
+    parse_fail = 0
+    use_views = views[:limit] if limit else views
+    all_items = [("real", v) for v in use_views] + [("attn", a) for a in attn]
     n_items = len(all_items)
     done_n = len(done)
     if verbose:
@@ -244,6 +280,8 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True):
             prompt = build_judge_prompt(view)
             raw = adapter.judge_raw(prompt, view)
             rec_fields, ok = parse_judge_response(raw)
+            if not ok:
+                parse_fail += 1
             if not ok or rec_fields["choice"] in FLAGGED_CHOICES:
                 flagged += 1
             if kind == "attn":
@@ -252,18 +290,21 @@ def run_one_judge(judge_id, adapter, views, attn, resume=True, verbose=True):
             rec = {"display_id": did, "judge_id": judge_id, "kind": kind,
                    "choice": rec_fields["choice"], "confidence": rec_fields["confidence"],
                    "correctness_flag": rec_fields["correctness_flag"],
-                   "short_reason": rec_fields["short_reason"], "parse_ok": ok}
+                   "short_reason": rec_fields["short_reason"], "parse_ok": ok,
+                   "raw": (raw or "")[:1200]}          # raw saved for audit / re-parse
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
             fh.flush()                                    # progress is durable + visible via wc -l
             if verbose and (i % 100 == 0 or i == n_items):
                 print(f"[judge {judge_slug(judge_id)}] {i}/{n_items} "
-                      f"(attn_fail {attn_fail}, flagged {flagged})", flush=True)
+                      f"(attn_fail {attn_fail}, parse_fail {parse_fail}, flagged {flagged})", flush=True)
     excluded = attention_excluded(attn_fail, len(attn))
     if verbose:
         print(f"[judge {judge_slug(judge_id)}] attention fails {attn_fail}/{len(attn)} "
-              f"-> {'EXCLUDED' if excluded else 'kept'} | flagged(tie/both_bad) {flagged}")
+              f"-> {'EXCLUDED' if excluded else 'kept'} | parse_fail {parse_fail} | "
+              f"flagged(tie/both_bad) {flagged}")
     return {"judge_id": judge_id, "attn_fail": attn_fail, "n_attn": len(attn),
-            "excluded": excluded, "flagged": flagged, "out_path": str(path)}
+            "excluded": excluded, "flagged": flagged, "parse_fail": parse_fail,
+            "out_path": str(path)}
 
 
 def main(argv=None):
@@ -272,23 +313,28 @@ def main(argv=None):
                     help="'all' or a specific declared judge id")
     ap.add_argument("--mock", action="store_true", help="use MockJudgeAdapter (no model call)")
     ap.add_argument("--no-resume", action="store_true")
+    ap.add_argument("--limit", type=int, default=0, help="cap real views judged (smoke); 0 = all")
+    ap.add_argument("--tag", default="", help="output filename suffix (e.g. 'smoke', 'v2') to keep "
+                                              "a run separate from earlier files")
     args = ap.parse_args(argv)
 
     judges = DECLARED_JUDGES if args.judge == "all" else (validate_judge(args.judge),)
     views = load_views()
     attn = build_attention_checks()
     print(f"[ok] {len(views)} blinded views + {len(attn)} attention checks | judges: "
-          f"{[judge_slug(j) for j in judges]} | mock={args.mock}")
+          f"{[judge_slug(j) for j in judges]} | mock={args.mock} | limit={args.limit} | tag={args.tag!r}")
 
     summaries = []
     for jid in judges:                                   # SEQUENTIAL (one model resident at a time)
         adapter = MockJudgeAdapter(jid) if args.mock else LlamaJudgeAdapter(jid)
-        summaries.append(run_one_judge(jid, adapter, views, attn, resume=not args.no_resume))
+        summaries.append(run_one_judge(jid, adapter, views, attn, resume=not args.no_resume,
+                                       tag=args.tag, limit=args.limit))
 
     prov = {"B1_JUDGE_RUN_PROVENANCE": {
         "judges": [judge_slug(j) for j in judges],
         "per_judge": [{"judge": judge_slug(s["judge_id"]), "attn_fail": s["attn_fail"],
                        "n_attn": s["n_attn"], "excluded": s["excluded"], "flagged": s["flagged"],
+                       "parse_fail": s.get("parse_fail"),
                        "out_sha256": hashlib.sha256(pathlib.Path(s["out_path"]).read_bytes()).hexdigest()
                        if pathlib.Path(s["out_path"]).exists() else None}
                       for s in summaries],
