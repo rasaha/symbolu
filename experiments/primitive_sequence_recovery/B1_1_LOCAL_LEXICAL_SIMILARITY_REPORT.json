@@ -3,7 +3,7 @@
   "note": "INTERIM WEAKER fallback for the blocked embedding gate; surface overlap only, NOT semantic. PASS_LOCAL_SURFACE_ONLY does NOT mean the embedding gate passed.",
   "b1_verdict_unchanged": "RANDOM_OR_SCRAMBLED_MATCHES",
   "track_b_status": "BLOCKED",
-  "input_sha256": "acf8ee6d791e988f73ffeb1f1f8558efdabb403a2267c66576b471fe79f2244f",
+  "input_sha256": "b7e83818a9c8aaf63502fb28fe4262f48cf7375bccdd514bafef940e7b7585b1",
   "n_evaluated": 34,
   "thresholds": {
     "token_jaccard_hard": 0.55,

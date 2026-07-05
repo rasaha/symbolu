@@ -1,0 +1,97 @@
+{
+  "artifact": "b1_1_bridge_pool_generation_report",
+  "qualification": "FALLBACK_QUALIFIED",
+  "b1_verdict_unchanged": "RANDOM_OR_SCRAMBLED_MATCHES",
+  "track_b_status": "BLOCKED",
+  "input_lexicon_sha256": "b7e83818a9c8aaf63502fb28fe4262f48cf7375bccdd514bafef940e7b7585b1",
+  "n_entries": 34,
+  "n_bridge_phrases": 68,
+  "duplicate_bridge": [],
+  "forbidden_language": [],
+  "distinction_checks": {
+    "Ca_Va": true,
+    "Ha_Ksa": true,
+    "Sa_guna": true,
+    "Ra_dual": true,
+    "Ddha_La": true,
+    "Ka_Sa": true
+  },
+  "manual_heuristic_alteration": false,
+  "checks": {
+    "1_34_entries": {
+      "pass": true,
+      "detail": 34
+    },
+    "2_68_phrases": {
+      "pass": true,
+      "detail": 68
+    },
+    "3_no_missing_varnas": {
+      "pass": true,
+      "detail": 34
+    },
+    "4_no_duplicate_bridge": {
+      "pass": true,
+      "detail": []
+    },
+    "5_no_empty_phrase": {
+      "pass": true,
+      "detail": 0
+    },
+    "6_no_forbidden_framing": {
+      "pass": true,
+      "detail": []
+    },
+    "7_no_moksha_endpoint": {
+      "pass": true,
+      "detail": []
+    },
+    "8_ca_va_distinct": {
+      "pass": true,
+      "detail": {
+        "Ca": "falsehood-discerning Viveka without egoic superiority — separates trut",
+        "Va": "truth-assent purified by discernment, installing only what is non-bind"
+      }
+    },
+    "9_ha_ksa_distinct": {
+      "pass": true,
+      "detail": {
+        "Ha": "realized knowing without ownership — lets knowledge dissolve identity ",
+        "Kṣa": "instrumental knowledge released from possession — uses knowledge as to"
+      }
+    },
+    "10_sa_guna_binding_aware": {
+      "pass": true,
+      "detail": "sattvic clarity/order owned as purity, superiority, or attachment to harmony"
+    },
+    "11_ra_dual_source": {
+      "pass": true,
+      "detail": "rajasic activation driven by compulsion, desire, projection, or destructive collapse"
+    },
+    "12_ddha_la_distinct": {
+      "pass": true,
+      "detail": {
+        "Ḍha": "malice — sadistic cruelty toward the maligned",
+        "La": "physical harm inflicted on the weak"
+      }
+    },
+    "13_ka_sa_not_identical": {
+      "pass": true,
+      "detail": {
+        "Ka": "forward-orientation held without attachment to the outcome — aspires a",
+        "Sa": "clarity without attachment to clarity — lets clarity function without "
+      }
+    },
+    "14_each_phrase_one_source": {
+      "pass": true,
+      "detail": true
+    }
+  },
+  "gate_status": "PASS_BRIDGE_DRAFT",
+  "caveat": "Bridge pool generated under FALLBACK_QUALIFIED status (embedding gate BLOCKED). Not final B1.1 freeze; not generation authorization.",
+  "non_claims": [
+    "no ontology validation",
+    "no Sanskrit privilege",
+    "no semantic truth"
+  ]
+}

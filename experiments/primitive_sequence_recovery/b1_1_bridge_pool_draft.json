@@ -1,54 +1,29 @@
 {
-  "artifact": "b1_1_experimental_contrastive_lexicon_draft",
+  "artifact": "b1_1_bridge_pool_draft",
   "status": "draft_not_frozen",
-  "schema": "binding_liberating_v2",
-  "scope": "consonants_only",
-  "vowels_out_of_scope": true,
-  "framing_note": "Poles are binding vs liberating EXPRESSION of the same source tendency — NOT good/bad, positive/negative, or vice/virtue. Restores lexicon _legend (states of expression, not moral judgements). See B1_1_BINDING_LIBERATING_POLE_LANGUAGE_ADDENDUM.md.",
+  "qualification": "FALLBACK_QUALIFIED",
+  "qualification_note": "Generated under weaker LOCAL lexical fallback; the real embedding gate remains BLOCKED_DEPENDENCY_UNAVAILABLE (huggingface.co egress-denied) and is still owed. NOT a B1.1 freeze, NOT generation authorization.",
   "b1_verdict_unchanged": "RANDOM_OR_SCRAMBLED_MATCHES",
   "track_b_status": "BLOCKED",
-  "non_claims": [
-    "no ontology validation",
-    "no Sanskrit privilege",
-    "no semantic truth claim",
-    "not a B1 rescue"
-  ],
-  "deferred_count": 0,
-  "resolved_count": 34,
-  "human_review_required_count": 0,
-  "rewrite_status_allowed": [
-    "source_preserved_counter_rewritten",
-    "exception_protected",
-    "theory_owner_resolved"
-  ],
-  "theory_owner_resolved": [
-    "Ra",
-    "Sa",
-    "Śa",
-    "Ha",
-    "Kṣa"
-  ],
-  "exception_protected": [
-    "Ca",
-    "Va"
-  ],
-  "source_files_consulted": [
-    "varna_lens/lexicon_authoritative.json (read-only)",
-    "classical source: P.R. Sarkar, Acoustic Roots of the Indo-Aryan Alphabet (uploaded PDF, read-only)"
-  ],
-  "governing_addenda": {
-    "proposal": "7c8fbfa",
-    "open_item_resolution": "5c851d3",
-    "guna_binding": "29cb457",
-    "vidya_binding": "ac88dc5",
-    "ca_va_distinction": "226da85",
-    "pole_language": "7b70240"
+  "source_lexicon": "b1_1_experimental_contrastive_lexicon_draft.json",
+  "source_lexicon_sha256": "b7e83818a9c8aaf63502fb28fe4262f48cf7375bccdd514bafef940e7b7585b1",
+  "n_varnas": 34,
+  "n_bridge_phrases": 68,
+  "bridge_derivation": {
+    "binding_bridge": "binding_expression (normalized)",
+    "liberating_bridge": "liberating_expression + ' — ' + functional_operation"
   },
+  "manual_heuristic_alteration": false,
+  "non_claims": [
+    "binding/liberating language only",
+    "no good/bad framing",
+    "experimentally testable, not spiritual truth",
+    "no ontology/Sanskrit/semantic claim"
+  ],
   "entries": [
     {
-      "lexicon_key": "ka",
       "varna": "Ka",
-      "transliteration": "ka",
+      "lexicon_key": "ka",
       "source_attested_pole": {
         "sanskrit_label": "Āśā",
         "english_rendering": "Hope",
@@ -62,12 +37,14 @@
       "contrast_boundary": "not object-renunciation (Gha), not craving-cessation (Dha), not de-fascination (Na)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "hope as grasping / clinging to a specific outcome",
+      "liberating_bridge": "forward-orientation held without attachment to the outcome — aspires and acts while releasing the grip on the result",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "kha",
       "varna": "Kha",
-      "transliteration": "kha",
+      "lexicon_key": "kha",
       "source_attested_pole": {
         "sanskrit_label": "Cintā",
         "english_rendering": "Worry",
@@ -81,12 +58,14 @@
       "contrast_boundary": "not self-efficacy (Ya), not threat-steadiness (Pha), not firmness-under-strain (Cha)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "anxious impersonal rumination over open contingencies",
+      "liberating_bridge": "composed openness within unresolved impersonal uncertainty — holds an unsettled impersonal situation open without forcing premature closure",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ga",
       "varna": "Ga",
-      "transliteration": "ga",
+      "lexicon_key": "ga",
       "source_attested_pole": {
         "sanskrit_label": "Ceṣṭā",
         "english_rendering": "Effort / striving",
@@ -100,12 +79,14 @@
       "contrast_boundary": "not dull inertia (Ta), not outcome-release (Ka), not containment (Ma)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "striving driven by restlessness that cannot stop",
+      "liberating_bridge": "effort that can rest — poised, alert stillness when action completes — exerts, then ceases into stable alert repose without inertia",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "gha",
       "varna": "Gha",
-      "transliteration": "gha",
+      "lexicon_key": "gha",
       "source_attested_pole": {
         "sanskrit_label": "Mamatā",
         "english_rendering": "Attachment",
@@ -119,12 +100,14 @@
       "contrast_boundary": "not outcome-release (Ka), not thirst-cessation (Dha), not indifference (Ba)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "love owned as possession and mine-ness",
+      "liberating_bridge": "care that holds the loved on an open hand — loves while relinquishing ownership of the object",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "nga",
       "varna": "Ṅa",
-      "transliteration": "ṅa",
+      "lexicon_key": "nga",
       "source_attested_pole": {
         "sanskrit_label": "Dambha",
         "english_rendering": "Vanity",
@@ -138,12 +121,14 @@
       "contrast_boundary": "not inner I-claim deflation (Ja), not inner/outer honesty (Ña)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "self displayed and performed for others' eyes",
+      "liberating_bridge": "conduct that stands without outward performance — acts without staging the self for approval",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ca",
       "varna": "Ca",
-      "transliteration": "ca",
+      "lexicon_key": "ca",
       "source_attested_pole": {
         "sanskrit_label": "Viveka",
         "english_rendering": "Discernment (real vs unreal, right vs wrong)",
@@ -157,12 +142,14 @@
       "contrast_boundary": "not Va/dharma, not assent, not acceptance-as-true, not conduct-ordering",
       "rewrite_status": "exception_protected",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": "Ca removes the false; Va installs the accepted-as-true. Distinct from Na (de-fascination)."
+      "binding_bridge": "discernment hardening into judgment / separation-pride",
+      "liberating_bridge": "falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "cha",
       "varna": "Cha",
-      "transliteration": "cha",
+      "lexicon_key": "cha",
       "source_attested_pole": {
         "sanskrit_label": "Vikalatā",
         "english_rendering": "Nervous breakdown",
@@ -176,12 +163,14 @@
       "contrast_boundary": "not threat-steadiness (Pha), not forbearance (Da), not poised rest (Ga)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "collapse of mental function under strain",
+      "liberating_bridge": "steadiness that keeps function intact under load — holds the mind operational under a load that would otherwise break it",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ja",
       "varna": "Ja",
-      "transliteration": "ja",
+      "lexicon_key": "ja",
       "source_attested_pole": {
         "sanskrit_label": "Ahaṁkāra",
         "english_rendering": "Ego inflation",
@@ -195,12 +184,14 @@
       "contrast_boundary": "not outward display-dropping (Ṅa), not inner/outer honesty (Ña)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "the inflated 'I did / I control this'",
+      "liberating_bridge": "agency exercised without inflating the I — acts while withdrawing the inflated I-claim from the account of events",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "jha",
       "varna": "Jha",
-      "transliteration": "jha",
+      "lexicon_key": "jha",
       "source_attested_pole": {
         "sanskrit_label": "Lolupatā / Lobha",
         "english_rendering": "Greed",
@@ -214,12 +205,14 @@
       "contrast_boundary": "not thirst-cessation (Dha), not non-possessive love (Gha), not outcome-release (Ka)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "hoarding accumulation without limit",
+      "liberating_bridge": "sufficiency — appetite that releases at enough — stops accumulation at sufficiency and releases the surplus grip",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "nya",
       "varna": "Ña",
-      "transliteration": "ña",
+      "lexicon_key": "nya",
       "source_attested_pole": {
         "sanskrit_label": "Kapaṭatā",
         "english_rendering": "Hypocrisy",
@@ -233,12 +226,14 @@
       "contrast_boundary": "not display-dropping (Ṅa), not I-claim deflation (Ja)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "concealment — inner and outer diverging",
+      "liberating_bridge": "transparency — inner intent and outer act coincide — aligns inner intent with outer act, removing concealment",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "tta",
       "varna": "Ṭa",
-      "transliteration": "ṭa",
+      "lexicon_key": "tta",
       "source_attested_pole": {
         "sanskrit_label": "Vitarka",
         "english_rendering": "Overstatement",
@@ -252,12 +247,14 @@
       "contrast_boundary": "not honesty of intent (Ña), not containment (Ma), not poised rest (Ga)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "garrulous exaggeration beyond the warranted",
+      "liberating_bridge": "measured speech saying only what is warranted — trims expression to exactly the warranted amount",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ttha",
       "varna": "Ṭha",
-      "transliteration": "ṭha",
+      "lexicon_key": "ttha",
       "source_attested_pole": {
         "sanskrit_label": "Anutāpa",
         "english_rendering": "Repentance",
@@ -271,12 +268,14 @@
       "contrast_boundary": "not other-directed forbearance (Da), not shame-release (Ḍa)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "remorse that grips and repeats over one's own past act",
+      "liberating_bridge": "self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "dda",
       "varna": "Ḍa",
-      "transliteration": "ḍa",
+      "lexicon_key": "dda",
       "source_attested_pole": {
         "sanskrit_label": "Lajjā",
         "english_rendering": "Shyness",
@@ -290,12 +289,14 @@
       "contrast_boundary": "not threat-steadiness (Pha), not remorse-release (Ṭha)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "action inhibited by others' regard",
+      "liberating_bridge": "acting unhindered by social shame — releases the inhibiting grip of others' regard on action",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ddha",
       "varna": "Ḍha",
-      "transliteration": "ḍha",
+      "lexicon_key": "ddha",
       "source_attested_pole": {
         "sanskrit_label": "Piśunatā",
         "english_rendering": "Sadistic cruelty",
@@ -309,12 +310,14 @@
       "contrast_boundary": "not protection of the physically weak (La), not goodwill against revulsion (Pa)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "malice — sadistic cruelty toward the maligned",
+      "liberating_bridge": "compassion that shields the maligned — turns malice-energy toward protecting the maligned (social harm)",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "nna",
       "varna": "Ṇa",
-      "transliteration": "ṇa",
+      "lexicon_key": "nna",
       "source_attested_pole": {
         "sanskrit_label": "Īrṣyā",
         "english_rendering": "Envy",
@@ -328,12 +331,14 @@
       "contrast_boundary": "not goodwill against revulsion (Pa), not compassion for suffering (Ḍha/La)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "the sting at another's success",
+      "liberating_bridge": "sympathetic gladness at another's fortune — converts the sting at another's fortune into shared gladness",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ta",
       "varna": "Ta",
-      "transliteration": "ta",
+      "lexicon_key": "ta",
       "source_attested_pole": {
         "sanskrit_label": "Jāḍya / Nidrā",
         "english_rendering": "Inertia, deep sleep",
@@ -347,12 +352,14 @@
       "contrast_boundary": "not breaking an induced spell (Bha), not poised rest (Ga), not discernment (Ca)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "dullness, torpor, deep sleep of mind",
+      "liberating_bridge": "alert wakefulness rising from torpor — lifts dullness and sleep into active alertness",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "tha",
       "varna": "Tha",
-      "transliteration": "tha",
+      "lexicon_key": "tha",
       "source_attested_pole": {
         "sanskrit_label": "Viṣāda",
         "english_rendering": "Melancholy",
@@ -366,12 +373,14 @@
       "contrast_boundary": "not gladness at others' good (Ṇa), not goodwill toward others (Pa)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "dejection that sinks one's own mood",
+      "liberating_bridge": "warm buoyancy lifting one's own dejection — raises one's own dejection into affectionate uplift",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "da",
       "varna": "Da",
-      "transliteration": "da",
+      "lexicon_key": "da",
       "source_attested_pole": {
         "sanskrit_label": "Krodha / Karkaśatā",
         "english_rendering": "Peevishness / irritability",
@@ -385,12 +394,14 @@
       "contrast_boundary": "not self-remorse-release (Ṭha), not shame-release (Ḍa), not poised rest (Ga)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "reactive irritability discharged at others",
+      "liberating_bridge": "forbearance that absorbs provocation — absorbs present provocation from another without discharging it back",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "dha",
       "varna": "Dha",
-      "transliteration": "dha",
+      "lexicon_key": "dha",
       "source_attested_pole": {
         "sanskrit_label": "Tṛṣṇā",
         "english_rendering": "Craving",
@@ -404,12 +415,14 @@
       "contrast_boundary": "not outcome-release (Ka), not object non-possession (Gha), not anti-hoarding (Jha)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "limitless thirst to acquire",
+      "liberating_bridge": "the acquisitive thirst quenched at its root — extinguishes the thirst-to-acquire itself, not merely one object",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "na",
       "varna": "Na",
-      "transliteration": "na",
+      "lexicon_key": "na",
       "source_attested_pole": {
         "sanskrit_label": "Moha",
         "english_rendering": "Blind attachment",
@@ -423,12 +436,14 @@
       "contrast_boundary": "not Ca/Viveka, not general clarity, not renunciation, not disgust",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": "Distinct from Bha: Na = self-generated infatuation; Bha = externally induced spell."
+      "binding_bridge": "infatuation that fixates on a compulsive attraction",
+      "liberating_bridge": "de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "pa",
       "varna": "Pa",
-      "transliteration": "pa",
+      "lexicon_key": "pa",
       "source_attested_pole": {
         "sanskrit_label": "Ghṛṇā",
         "english_rendering": "Hatred / revulsion",
@@ -442,12 +457,14 @@
       "contrast_boundary": "not compassion for the suffering (Ḍha/La), not gladness at fortune (Ṇa)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "revulsion turned against another",
+      "liberating_bridge": "goodwill that dissolves revulsion — converts revulsion toward another into active goodwill",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "pha",
       "varna": "Pha",
-      "transliteration": "pha",
+      "lexicon_key": "pha",
       "source_attested_pole": {
         "sanskrit_label": "Bhaya",
         "english_rendering": "Fear",
@@ -461,12 +478,14 @@
       "contrast_boundary": "not social-shame release (Ḍa), not composure under uncertainty (Kha), not firmness-under-strain (Cha)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "collapse or flight before danger",
+      "liberating_bridge": "steadiness meeting a genuine threat — meets a real danger without collapse or flight",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ba",
       "varna": "Ba",
-      "transliteration": "ba",
+      "lexicon_key": "ba",
       "source_attested_pole": {
         "sanskrit_label": "Avajñā",
         "english_rendering": "Indifference",
@@ -480,12 +499,14 @@
       "contrast_boundary": "not goodwill against revulsion (Pa), not gladness at fortune (Ṇa)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "neglect of what actually has value",
+      "liberating_bridge": "regard that recognizes and attends to worth — attends to and honors what has real value instead of neglecting it",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "bha",
       "varna": "Bha",
-      "transliteration": "bha",
+      "lexicon_key": "bha",
       "source_attested_pole": {
         "sanskrit_label": "Mūrcchā",
         "english_rendering": "Deluded obsession",
@@ -499,12 +520,14 @@
       "contrast_boundary": "not lifting dullness/sleep (Ta), not self-generated de-fascination (Na), not discernment (Ca)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": "Distinct from Na: Bha = externally induced; Na = self-generated infatuation."
+      "binding_bridge": "hypnotic entrancement, loss of common sense",
+      "liberating_bridge": "breaking the entrancing spell into clear sense — snaps an externally-induced hypnotic fixation and restores clear common sense",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ma",
       "varna": "Ma",
-      "transliteration": "ma",
+      "lexicon_key": "ma",
       "source_attested_pole": {
         "sanskrit_label": "Praśraya / Praṇāśa",
         "english_rendering": "Indulgence / annihilating collapse",
@@ -518,12 +541,14 @@
       "contrast_boundary": "not measured speech (Ṭa), not forbearance (Da), not poised rest (Ga)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "giving latitude to the point of dissolution",
+      "liberating_bridge": "disciplined containment that holds form — contains and holds a form against over-indulgence and dissolution",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ya",
       "varna": "Ya",
-      "transliteration": "ya",
+      "lexicon_key": "ya",
       "source_attested_pole": {
         "sanskrit_label": "Aviśvāsa",
         "english_rendering": "Lack of confidence",
@@ -537,12 +562,14 @@
       "contrast_boundary": "not composure under impersonal uncertainty (Kha), not threat-steadiness (Pha)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "self-doubt that cannot commit",
+      "liberating_bridge": "self-efficacy to commit and to rely — musters the self-trust needed to commit to an action",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ra",
       "varna": "Ra",
-      "transliteration": "ra",
+      "lexicon_key": "ra",
       "source_attested_pole": {
         "sanskrit_label": "Prāṇaśakti/Agnitattva + Sarvanāśa",
         "english_rendering": "vitality / creative fire AND destructive-collapse tendency",
@@ -556,12 +583,14 @@
       "contrast_boundary": "not mere vitality, not suppression, not passive calm, not destructive sarvanāśa-collapse",
       "rewrite_status": "theory_owner_resolved",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "rajasic activation driven by compulsion, desire, projection, or destructive collapse",
+      "liberating_bridge": "directed energy without bondage — converts force into non-compulsive action",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "la",
       "varna": "La",
-      "transliteration": "la",
+      "lexicon_key": "la",
       "source_attested_pole": {
         "sanskrit_label": "Krūratā",
         "english_rendering": "Cruelty",
@@ -575,12 +604,14 @@
       "contrast_boundary": "not shielding the maligned from slander (Ḍha), not goodwill against revulsion (Pa)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "physical harm inflicted on the weak",
+      "liberating_bridge": "compassion that protects the physically vulnerable — turns harming-energy toward protecting the physically weak",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "va",
       "varna": "Va",
-      "transliteration": "va",
+      "lexicon_key": "va",
       "source_attested_pole": {
         "sanskrit_label": "Dharma",
         "english_rendering": "Accepted order / truth-status alignment",
@@ -594,12 +625,14 @@
       "contrast_boundary": "not Ca/viveka, not falsehood detection, not analysis, not verification",
       "rewrite_status": "exception_protected",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": "Va installs the accepted-as-true; depends on Ca for purification (weak Ca + strong Va can bind)."
+      "binding_bridge": "accepting-as-true without sufficient discernment",
+      "liberating_bridge": "truth-assent purified by discernment, installing only what is non-bindingly recognized — accepts-as-true and organizes conduct around what is granted reality/order status",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "sha",
       "varna": "Śa",
-      "transliteration": "śa",
+      "lexicon_key": "sha",
       "source_attested_pole": {
         "sanskrit_label": "rajoguṇa + artha",
         "english_rendering": "mutative / worldly-directed principle",
@@ -613,12 +646,14 @@
       "contrast_boundary": "not greed/generosity pair, not anti-worldliness, not renunciation",
       "rewrite_status": "theory_owner_resolved",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "worldly purpose possessed as acquisition, status, or control",
+      "liberating_bridge": "purposeful action without possessive bondage — uses aim and artha without identity or ownership",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ssa",
       "varna": "Ṣa",
-      "transliteration": "ṣa",
+      "lexicon_key": "ssa",
       "source_attested_pole": {
         "sanskrit_label": "Kāma / Tamoguṇa",
         "english_rendering": "Physical desire / inertia",
@@ -632,12 +667,14 @@
       "contrast_boundary": "not thirst-cessation (Dha), not anti-hoarding sufficiency (Jha), not non-possession (Gha)",
       "rewrite_status": "source_preserved_counter_rewritten",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "sensory craving bound to inertia",
+      "liberating_bridge": "raw desire transmuted into grounded, contained drive — channels raw sensory desire into a grounded, contained drive",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "sa",
       "varna": "Sa",
-      "transliteration": "sa",
+      "lexicon_key": "sa",
       "source_attested_pole": {
         "sanskrit_label": "Mokṣa / Sattvaguṇa",
         "english_rendering": "sattvic clarity / order (mokṣa is trans-guṇa)",
@@ -651,12 +688,14 @@
       "contrast_boundary": "not mokṣa as final endpoint, not tamas removal, not moral goodness",
       "rewrite_status": "theory_owner_resolved",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+      "liberating_bridge": "clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ha",
       "varna": "Ha",
-      "transliteration": "ha",
+      "lexicon_key": "ha",
       "source_attested_pole": {
         "sanskrit_label": "Parā-vidyā",
         "english_rendering": "higher / intuitional knowledge",
@@ -670,12 +709,14 @@
       "contrast_boundary": "not information, not doctrine, not intellectual certainty",
       "rewrite_status": "theory_owner_resolved",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "higher knowledge owned as spiritual identity or subtle pride",
+      "liberating_bridge": "realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     },
     {
-      "lexicon_key": "ksha",
       "varna": "Kṣa",
-      "transliteration": "kṣa",
+      "lexicon_key": "ksha",
       "source_attested_pole": {
         "sanskrit_label": "Aparā-vidyā",
         "english_rendering": "structured / worldly knowledge",
@@ -689,7 +730,10 @@
       "contrast_boundary": "not parā-vidyā, not dogma replacement, not technical pride",
       "rewrite_status": "theory_owner_resolved",
       "b1_1_use_status": "resolved",
-      "collision_resolution_notes": ""
+      "binding_bridge": "structured knowledge owned as control, dogma, or intellectual identity",
+      "liberating_bridge": "instrumental knowledge released from possession — uses knowledge as tool without becoming the knower-identity",
+      "binding_bridge_source": "binding_expression",
+      "liberating_bridge_source": "liberating_expression + functional_operation"
     }
   ]
 }
