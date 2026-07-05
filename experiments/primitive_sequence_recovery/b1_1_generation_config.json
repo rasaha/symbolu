@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "artifact": "b1_1_generation_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate; NOT frozen; does NOT authorize generation (separate B1_1_GENERATION_AUTHORIZATION).",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED",
+    "source_of_model_values": "TRACK_B_RUNTIME_MODEL_LOCK.yaml (committed B1 runtime lock)"
+  },
+  "generation_models": [
+    {"id": "mistralai/Mistral-7B-Instruct-v0.3", "family": "Mistral",
+     "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71"},
+    {"id": "Qwen/Qwen2.5-7B-Instruct", "family": "Qwen",
+     "revision": "a09a35458c702b33eeacc393d103063234e8bc28"}
+  ],
+  "generation_model_id": "mistralai/Mistral-7B-Instruct-v0.3 + Qwen/Qwen2.5-7B-Instruct (dual, per B1 lock)",
+  "provider_runtime": "transformers",
+  "model_revision": "Mistral c170c708...; Qwen a09a3545... (from committed lock)",
+  "decoding": {
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "max_tokens": 300,
+    "arm_specific_decoding": false,
+    "number_of_samples_per_cell": 2,
+    "generation_seeds": [1101, 2027]
+  },
+  "prompt_template": "Soft orientation, not a definition: {arm_bridge_text}. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\n{task}",
+  "prompt_template_source": "reused from committed B1 WRAPPER (b1_dry_run_harness.py); {conditioning}->{arm_bridge_text}; task uses {target_word}; no arm/varṇa/Sanskrit label revealed; X uses a neutral (empty) bridge",
+  "task_templates_source": "reused verbatim from committed B1 TASKS (b1_dry_run_harness.py); {w}->{target_word}",
+  "task_templates": {
+    "T1": {"intent": "reflective paragraph", "exact_prompt": "Write a short reflective paragraph about {target_word}."},
+    "T2": {"intent": "kind message",        "exact_prompt": "Write a gentle, kind message on the theme of {target_word}."},
+    "T3": {"intent": "metaphor",            "exact_prompt": "Write one original metaphor for {target_word}."},
+    "T4": {"intent": "explain plainly and accurately", "correctness_sensitive": true, "exact_prompt": "Explain {target_word} plainly and accurately in 3-4 sentences."},
+    "T5": {"intent": "tone-match",          "exact_prompt": "Respond to someone reflecting on {target_word}, matching the emotional tone."},
+    "T6": {"intent": "evoke",               "exact_prompt": "Rewrite this line to evoke {target_word}: 'The day went on as usual.'"}
+  },
+  "retry_policy": "on transient error retry up to 3x with backoff; abort on repeated failure",
+  "failure_policy": "abort-on-empty output; no silent drops; all raw generations retained",
+  "no_post_hoc_prompt_edits": true,
+  "raw_output_retention": "all raw outputs retained and hash-bound (durable storage, not ephemeral pod only)",
+  "frozen_source_references": {
+    "note": "G4 pin — the word/task pool and the D/C/X control construction live in committed (previously not-frozen) sources; their exact paths + sha256 are now hash-bound in the freeze manifest (referenced_source_hashes).",
+    "word_task_pool_source": "experiments/primitive_sequence_recovery/b1_dry_run_harness.py (PRIMARY_WORDS + PRIVATIVE_WORDS + TASKS T1–T6 + WRAPPER)",
+    "dcx_control_source": "experiments/primitive_sequence_recovery/b1_real_conditioning.py (D = D-table gloss, C = surface facts, X = neutral filler)",
+    "d_table_source": "experiments/primitive_sequence_recovery/b1_eval_dtable.json",
+    "word_list_source": "experiments/primitive_sequence_recovery/b1_eval_wordlist.json",
+    "g2p_routing_source": "varna_lens module — phonemes_cmudict G2P->varṇa ROUTING ONLY (not a meaning source); hash-bound in the manifest referenced_source_hashes"
+  },
+  "generation_authorized": false
+}

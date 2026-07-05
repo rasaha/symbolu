@@ -1,0 +1,50 @@
+{
+  "artifact": "b1_1_freeze_artifact_validation_report",
+  "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+  "track_b_anchor": "BLOCKED",
+  "embedding_gate_status": "BLOCKED_DEPENDENCY_UNAVAILABLE",
+  "fallback_qualification": "FALLBACK_QUALIFIED",
+  "status": "READY_FOR_FREEZE_REVIEW",
+  "checks": {
+    "exists:b1_1_arm_construction_config.json": true,
+    "exists:b1_1_generation_config.json": true,
+    "exists:b1_1_seeds_config.json": true,
+    "exists:b1_1_judge_panel_config.json": true,
+    "exists:b1_1_scorer_config.json": true,
+    "exists:b1_1_leak_and_packet_config.json": true,
+    "no_placeholder_required": true,
+    "no_unknown_pending": true,
+    "arms_exactly_8": true,
+    "primary_has_all_three_R": true,
+    "generation_authorized_false": true,
+    "b1_verdict_anchor_present": true,
+    "track_b_anchor_present": true,
+    "embedding_status_correct": true,
+    "fallback_qualification_correct": true,
+    "bridge_68": true,
+    "bridge_no_dup": true,
+    "bridge_no_forbidden": true,
+    "no_source_lexicon_target": true
+  },
+  "blockers": [],
+  "warnings": [
+    "judge panel: Meta-Llama-3-8B requires explicit acceptance (heavy missing-brace repair in B1) before freeze"
+  ],
+  "sha256": {
+    "b1_1_arm_construction_config.json": "167343c28fe15dc88c2b4aa87c03b7a9e0291a09b0f5f6b45a292b99e9769a11",
+    "b1_1_generation_config.json": "268d0c02ee968f602ba00e9668572105c1aa4ef313b15f1bc426ccbe1377f011",
+    "b1_1_seeds_config.json": "1c044278ff1ee064c35d1ebacfa0ef5b7fea4cc782d020654ee15200c07730c0",
+    "b1_1_judge_panel_config.json": "1632b11794a98dd0b864d3e2a3e35e76614da7de8d6cd17c6a85f6f2bb4dfc74",
+    "b1_1_scorer_config.json": "aac682fe8bf22d51eb530c40440d07fb629ee148a6b822a69c3c1f9f440befd6",
+    "b1_1_leak_and_packet_config.json": "0804e3d23a336f55f1d2a176d859f0e3931ab3719eb1c97b56e921e6ebb9db48",
+    "b1_1_bridge_pool_draft.json": "1ce2ae14b563621ac495381e8397796e6791aba740978bb817544935c6ba8c15",
+    "b1_1_experimental_contrastive_lexicon_draft.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7"
+  },
+  "generation_authorized": false,
+  "b1_1_frozen": false,
+  "non_claims": [
+    "no ontology validation",
+    "no Sanskrit privilege",
+    "no semantic truth"
+  ]
+}

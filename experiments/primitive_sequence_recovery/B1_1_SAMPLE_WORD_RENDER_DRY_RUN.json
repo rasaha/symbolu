@@ -1,0 +1,1025 @@
+{
+  "artifact": "b1_1_sample_word_render_dry_run",
+  "status": "PASS_RENDER_DRY_RUN",
+  "g2p_mode": "REAL_G2P (varna_lens.phonemes_cmudict) — supersedes illustrative spelling-based dry run",
+  "note": "STRUCTURAL render only. No model/generation/judging/scoring. No evidence B1.1 outperforms B1/H2.",
+  "word_pool_status": "COMMITTED_B1_POOL (b1_dry_run_harness.py PRIMARY_WORDS); selected 8 by seed 70101",
+  "sample_words": [
+    "echo",
+    "envy",
+    "integrity",
+    "justice",
+    "music",
+    "ocean",
+    "shadow",
+    "silence"
+  ],
+  "arms_rendered": [
+    "A",
+    "D",
+    "S",
+    "R_same",
+    "R_deranged",
+    "R_domain",
+    "C",
+    "X"
+  ],
+  "tasks_rendered": [
+    "T1",
+    "T3",
+    "T4",
+    "T6"
+  ],
+  "pool_level_sanskrit_leakage": [],
+  "per_render_leakage": [],
+  "weak_controls": [],
+  "sa_artha_check": "Śa liberating bridge contains no 'artha' (real-G2P conditioning path clean)",
+  "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+  "track_b_anchor": "BLOCKED",
+  "generation_run": false,
+  "b1_1_frozen": false,
+  "generation_authorized": false,
+  "samples": [
+    {
+      "target_word": "echo",
+      "real_g2p_varna_sequence": [
+        [
+          "Ka",
+          "liberating"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "forward-orientation held without attachment to the outcome — aspires and acts while releasing the grip on the result",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Ka",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 1,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "echo — a sound reflected back to the listener; related senses: reverberation, reflection, repetition, ring",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "forward-orientation held without attachment to the outcome — aspires and acts while releasing the grip on the result",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 1,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 1,
+            "excluded_own": [
+              "ka"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "hope as grasping / clinging to a specific outcome ; the inflated 'I did / I control this'",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "courage",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Ka",
+                  "binding"
+                ],
+                [
+                  "Ja",
+                  "binding"
+                ]
+              ],
+              "n_varnas": 2,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "compassion that shields the maligned — turns malice-energy toward protecting the maligned (social harm)",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "motion/action",
+            "mismatched_bucket": "social/relation",
+            "n_picked": 1,
+            "target_len": 116,
+            "achieved_len": 103,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'K', 2 vowel nucleus(es), final 'K', 1 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: forward-orientation held without attachment to the outcome — aspires and acts while releasing the grip on the result. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about echo.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "envy",
+      "real_g2p_varna_sequence": [
+        [
+          "Ṇa",
+          "binding"
+        ],
+        [
+          "Va",
+          "liberating"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "the sting at another's success ; truth-assent purified by discernment, installing only what is non-bindingly recognized — accepts-as-true and organizes conduct around what is granted reality/order status",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Va",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "envy — resentful longing for what another has; related senses: jealousy, covetousness, resentment, begrudging",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "truth-assent purified by discernment, installing only what is non-bindingly recognized — accepts-as-true and organizes conduct around what is granted reality/order status ; the sting at another's success",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 2,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "agency exercised without inflating the I — acts while withdrawing the inflated I-claim from the account of events ; forward-orientation held without attachment to the outcome — aspires and acts while releasing the grip on the result",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 2,
+            "excluded_own": [
+              "nna",
+              "va"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony ; disciplined containment that holds form — contains and holds a form against over-indulgence and dissolution ; garrulous exaggeration beyond the warranted ; directed energy without bondage — converts force into non-compulsive action",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "asymmetry",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Sa",
+                  "liberating"
+                ],
+                [
+                  "Ma",
+                  "liberating"
+                ],
+                [
+                  "Ṭa",
+                  "binding"
+                ],
+                [
+                  "Ra",
+                  "liberating"
+                ]
+              ],
+              "n_varnas": 4,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "dejection that sinks one's own mood ; care that holds the loved on an open hand — loves while relinquishing ownership of the object",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "ethical/order",
+            "mismatched_bucket": "material/object",
+            "n_picked": 2,
+            "target_len": 203,
+            "achieved_len": 131,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'N', 2 vowel nucleus(es), final 'V', 2 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: the sting at another's success ; truth-assent purified by discernment, installing only what is non-bindingly recognized — accepts-as-true and organizes conduct around what is granted reality/order status. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about envy.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "integrity",
+      "real_g2p_varna_sequence": [
+        [
+          "Ṇa",
+          "binding"
+        ],
+        [
+          "Ṭa",
+          "liberating"
+        ],
+        [
+          "Ga",
+          "binding"
+        ],
+        [
+          "Ra",
+          "liberating"
+        ],
+        [
+          "Ṭa",
+          "liberating"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "the sting at another's success ; measured speech saying only what is warranted — trims expression to exactly the warranted amount ; striving driven by restlessness that cannot stop ; directed energy without bondage — converts force into non-compulsive action ; measured speech saying only what is warranted — trims expression to exactly the warranted amount",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ],
+              [
+                "Ga",
+                "binding"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 5,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "integrity — firm adherence to moral principle; related senses: uprightness, probity, rectitude, honor",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "measured speech saying only what is warranted — trims expression to exactly the warranted amount ; measured speech saying only what is warranted — trims expression to exactly the warranted amount ; striving driven by restlessness that cannot stop ; directed energy without bondage — converts force into non-compulsive action ; the sting at another's success",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 5,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "compassion that protects the physically vulnerable — turns harming-energy toward protecting the physically weak ; breaking the entrancing spell into clear sense — snaps an externally-induced hypnotic fixation and restores clear common sense ; acting unhindered by social shame — releases the inhibiting grip of others' regard on action ; discernment hardening into judgment / separation-pride ; physical harm inflicted on the weak",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 5,
+            "excluded_own": [
+              "ga",
+              "nna",
+              "ra",
+              "tta"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "revulsion turned against another ; purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership ; the sting at another's success ; sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "patience",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Pa",
+                  "binding"
+                ],
+                [
+                  "Śa",
+                  "liberating"
+                ],
+                [
+                  "Ṇa",
+                  "binding"
+                ],
+                [
+                  "Sa",
+                  "binding"
+                ]
+              ],
+              "n_varnas": 4,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "the acquisitive thirst quenched at its root — extinguishes the thirst-to-acquire itself, not merely one object ; sufficiency — appetite that releases at enough — stops accumulation at sufficiency and releases the surplus grip ; dejection that sinks one's own mood ; limitless thirst to acquire ; hoarding accumulation without limit",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "motion/action",
+            "mismatched_bucket": "material/object",
+            "n_picked": 5,
+            "target_len": 357,
+            "achieved_len": 331,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'N', 4 vowel nucleus(es), final 'T', 5 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: the sting at another's success ; measured speech saying only what is warranted — trims expression to exactly the warranted amount ; striving driven by restlessness that cannot stop ; directed energy without bondage — converts force into non-compulsive action ; measured speech saying only what is warranted — trims expression to exactly the warranted amount. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about integrity.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "justice",
+      "real_g2p_varna_sequence": [
+        [
+          "Ja",
+          "binding"
+        ],
+        [
+          "Sa",
+          "binding"
+        ],
+        [
+          "Ṭa",
+          "liberating"
+        ],
+        [
+          "Sa",
+          "binding"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "the inflated 'I did / I control this' ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; measured speech saying only what is warranted — trims expression to exactly the warranted amount ; sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Ja",
+                "binding"
+              ],
+              [
+                "Sa",
+                "binding"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ],
+              [
+                "Sa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "justice — fair treatment according to what is right; related senses: fairness, equity, impartiality, righteousness",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "measured speech saying only what is warranted — trims expression to exactly the warranted amount ; the inflated 'I did / I control this' ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 4,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "neglect of what actually has value ; self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance ; directed energy without bondage — converts force into non-compulsive action ; alert wakefulness rising from torpor — lifts dullness and sleep into active alertness",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 4,
+            "excluded_own": [
+              "ja",
+              "sa",
+              "tta"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership ; the sting at another's success",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "ocean",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Śa",
+                  "liberating"
+                ],
+                [
+                  "Ṇa",
+                  "binding"
+                ]
+              ],
+              "n_varnas": 2,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance ; sympathetic gladness at another's fortune — converts the sting at another's fortune into shared gladness ; warm buoyancy lifting one's own dejection — raises one's own dejection into affectionate uplift",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "ethical/order",
+            "mismatched_bucket": "emotion/affect",
+            "n_picked": 3,
+            "target_len": 294,
+            "achieved_len": 314,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'JH', 2 vowel nucleus(es), final 'S', 4 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: the inflated 'I did / I control this' ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; measured speech saying only what is warranted — trims expression to exactly the warranted amount ; sattvic clarity/order owned as purity, superiority, or attachment to harmony. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "music",
+      "real_g2p_varna_sequence": [
+        [
+          "Ma",
+          "binding"
+        ],
+        [
+          "Ya",
+          "liberating"
+        ],
+        [
+          "Sa",
+          "liberating"
+        ],
+        [
+          "Ka",
+          "binding"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "giving latitude to the point of dissolution ; self-efficacy to commit and to rely — musters the self-trust needed to commit to an action ; clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony ; hope as grasping / clinging to a specific outcome",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Ma",
+                "binding"
+              ],
+              [
+                "Ya",
+                "liberating"
+              ],
+              [
+                "Sa",
+                "liberating"
+              ],
+              [
+                "Ka",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "music — arranged sound expressing feeling or ideas; related senses: melody, tune, harmony, song",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony ; hope as grasping / clinging to a specific outcome ; self-efficacy to commit and to rely — musters the self-trust needed to commit to an action ; giving latitude to the point of dissolution",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 4,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "rajasic activation driven by compulsion, desire, projection, or destructive collapse ; sensory craving bound to inertia ; agency exercised without inflating the I — acts while withdrawing the inflated I-claim from the account of events ; alert wakefulness rising from torpor — lifts dullness and sleep into active alertness",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 4,
+            "excluded_own": [
+              "ka",
+              "ma",
+              "sa",
+              "ya"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "sympathetic gladness at another's fortune — converts the sting at another's fortune into shared gladness ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; measured speech saying only what is warranted — trims expression to exactly the warranted amount",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "honesty",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Ṇa",
+                  "liberating"
+                ],
+                [
+                  "Sa",
+                  "binding"
+                ],
+                [
+                  "Ṭa",
+                  "liberating"
+                ]
+              ],
+              "n_varnas": 3,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "forbearance that absorbs provocation — absorbs present provocation from another without discharging it back ; action inhibited by others' regard ; the sting at another's success ; revulsion turned against another",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "motion/action",
+            "mismatched_bucket": "social/relation",
+            "n_picked": 4,
+            "target_len": 299,
+            "achieved_len": 212,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'M', 2 vowel nucleus(es), final 'K', 4 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: giving latitude to the point of dissolution ; self-efficacy to commit and to rely — musters the self-trust needed to commit to an action ; clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony ; hope as grasping / clinging to a specific outcome. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about music.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "ocean",
+      "real_g2p_varna_sequence": [
+        [
+          "Śa",
+          "liberating"
+        ],
+        [
+          "Ṇa",
+          "binding"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership ; the sting at another's success",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Śa",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "ocean — a vast expanse of salt water; related senses: sea, deep, waters, brine",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "the sting at another's success ; purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 2,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "anxious impersonal rumination over open contingencies ; accepting-as-true without sufficient discernment",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 2,
+            "excluded_own": [
+              "nna",
+              "sha"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "giving latitude to the point of dissolution ; self-efficacy to commit and to rely — musters the self-trust needed to commit to an action ; clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony ; hope as grasping / clinging to a specific outcome",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "music",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Ma",
+                  "binding"
+                ],
+                [
+                  "Ya",
+                  "liberating"
+                ],
+                [
+                  "Sa",
+                  "liberating"
+                ],
+                [
+                  "Ka",
+                  "binding"
+                ]
+              ],
+              "n_varnas": 4,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "hoarding accumulation without limit ; care that holds the loved on an open hand — loves while relinquishing ownership of the object",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "motion/action",
+            "mismatched_bucket": "material/object",
+            "n_picked": 2,
+            "target_len": 138,
+            "achieved_len": 131,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'SH', 2 vowel nucleus(es), final 'N', 2 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership ; the sting at another's success. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about ocean.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "shadow",
+      "real_g2p_varna_sequence": [
+        [
+          "Śa",
+          "binding"
+        ],
+        [
+          "Ḍa",
+          "liberating"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "worldly purpose possessed as acquisition, status, or control ; acting unhindered by social shame — releases the inhibiting grip of others' regard on action",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Śa",
+                "binding"
+              ],
+              [
+                "Ḍa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "shadow — a dark shape cast by blocking light; related senses: shade, silhouette, darkness, outline",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "acting unhindered by social shame — releases the inhibiting grip of others' regard on action ; worldly purpose possessed as acquisition, status, or control",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 2,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "structured knowledge owned as control, dogma, or intellectual identity ; self displayed and performed for others' eyes",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 2,
+            "excluded_own": [
+              "dda",
+              "sha"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "giving latitude to the point of dissolution ; goodwill that dissolves revulsion — converts revulsion toward another into active goodwill ; alert wakefulness rising from torpor — lifts dullness and sleep into active alertness",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "empathy",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Ma",
+                  "binding"
+                ],
+                [
+                  "Pa",
+                  "liberating"
+                ],
+                [
+                  "Ta",
+                  "liberating"
+                ]
+              ],
+              "n_varnas": 3,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "effort that can rest — poised, alert stillness when action completes — exerts, then ceases into stable alert repose without inertia ; infatuation that fixates on a compulsive attraction",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "social/relation",
+            "mismatched_bucket": "motion/action",
+            "n_picked": 2,
+            "target_len": 155,
+            "achieved_len": 185,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'SH', 2 vowel nucleus(es), final 'D', 2 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: worldly purpose possessed as acquisition, status, or control ; acting unhindered by social shame — releases the inhibiting grip of others' regard on action. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about shadow.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    },
+    {
+      "target_word": "silence",
+      "real_g2p_varna_sequence": [
+        [
+          "Sa",
+          "binding"
+        ],
+        [
+          "La",
+          "liberating"
+        ],
+        [
+          "Ṇa",
+          "binding"
+        ],
+        [
+          "Sa",
+          "binding"
+        ]
+      ],
+      "arms": {
+        "A": {
+          "bridge_text": "sattvic clarity/order owned as purity, superiority, or attachment to harmony ; compassion that protects the physically vulnerable — turns harming-energy toward protecting the physically weak ; the sting at another's success ; sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+          "leak_hits": 0,
+          "meta": {
+            "varna_sequence": [
+              [
+                "Sa",
+                "binding"
+              ],
+              [
+                "La",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Sa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        },
+        "D": {
+          "bridge_text": "silence — the absence of sound; related senses: quiet, stillness, hush, calm",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+          }
+        },
+        "S": {
+          "bridge_text": "compassion that protects the physically vulnerable — turns harming-energy toward protecting the physically weak ; the sting at another's success ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+          "leak_hits": 0,
+          "meta": {
+            "n_varnas": 4,
+            "warn": []
+          }
+        },
+        "R_same": {
+          "bridge_text": "giving latitude to the point of dissolution ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego ; care that holds the loved on an open hand — loves while relinquishing ownership of the object",
+          "leak_hits": 0,
+          "meta": {
+            "n_picked": 4,
+            "excluded_own": [
+              "la",
+              "nna",
+              "sa"
+            ]
+          }
+        },
+        "R_deranged": {
+          "bridge_text": "rajasic activation driven by compulsion, desire, projection, or destructive collapse ; acting unhindered by social shame — releases the inhibiting grip of others' regard on action",
+          "leak_hits": 0,
+          "meta": {
+            "source_word": "order",
+            "source_meta": {
+              "varna_sequence": [
+                [
+                  "Ra",
+                  "binding"
+                ],
+                [
+                  "Ḍa",
+                  "liberating"
+                ]
+              ],
+              "n_varnas": 2,
+              "warn": [],
+              "contrast_boundary_excluded": true
+            }
+          }
+        },
+        "R_domain": {
+          "bridge_text": "steadiness meeting a genuine threat — meets a real danger without collapse or flight ; collapse of mental function under strain ; collapse or flight before danger ; giving latitude to the point of dissolution",
+          "leak_hits": 0,
+          "meta": {
+            "native_bucket": "protection/harm",
+            "mismatched_bucket": "cosmic/abstract",
+            "n_picked": 4,
+            "target_len": 302,
+            "achieved_len": 208,
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
+          }
+        },
+        "C": {
+          "bridge_text": "onset 'S', 2 vowel nucleus(es), final 'S', 4 consonant positions",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning surface facts"
+          }
+        },
+        "X": {
+          "bridge_text": "this item has no additional symbolic orientation; read the wording in the ordinary way",
+          "leak_hits": 0,
+          "meta": {
+            "source": "b1_real_conditioning neutral filler"
+          }
+        }
+      },
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: sattvic clarity/order owned as purity, superiority, or attachment to harmony ; compassion that protects the physically vulnerable — turns harming-energy toward protecting the physically weak ; the sting at another's success ; sattvic clarity/order owned as purity, superiority, or attachment to harmony. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about silence.",
+      "t4_correctness_check": "PASS (T4 preserves correctness sensitivity)"
+    }
+  ]
+}

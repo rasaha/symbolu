@@ -1,0 +1,100 @@
+{
+  "_meta": {
+    "artifact": "b1_1_arm_construction_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate config; B1.1 NOT frozen until the freeze-manifest gate. Does NOT authorize generation.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED",
+    "embedding_gate_status": "BLOCKED_DEPENDENCY_UNAVAILABLE",
+    "fallback_qualification": "FALLBACK_QUALIFIED",
+    "crux": "R_deranged is the crux; contrastivity is necessary but not sufficient."
+  },
+  "inputs": {
+    "lexicon": "b1_1_experimental_contrastive_lexicon_draft.json",
+    "bridge_pool": "b1_1_bridge_pool_draft.json"
+  },
+  "arms": {
+    "A":          {"description": "target word's own varṇa-derived binding/liberating bridge (real mapping)",
+                   "construction_rule": "G2P->varṇa sequence of the target word; compose its bridge phrases in order (see composition_policy). contrast_boundary is metadata only and is NEVER rendered.",
+                   "composition_policy": {
+                     "g2p_source": "varna_lens.phonemes_cmudict — REAL G2P->varṇa routing ONLY (routing code, NOT a meaning source)",
+                     "meaning_source": "b1_1 bridge pool binding_bridge/liberating_bridge ONLY (derived from b1_1_experimental_contrastive_lexicon_draft.json); NEVER the varna_lens meaning lexicon",
+                     "consonants_only": true,
+                     "pole_rule": "vowel-attachment (varna_lens read_op rule): word-first consonant -> binding; consonant with a vowel immediately after (onset) -> liberating; bare consonant (word-final / pre-consonant) -> binding; doubled consonant: 1st occurrence -> liberating, 2nd -> binding",
+                     "phrase_selected": "binding_bridge for a binding pole, liberating_bridge for a liberating pole",
+                     "order": "the word's varṇa order",
+                     "separator": " ; ",
+                     "cap": "none (all consonant varṇas of the word)",
+                     "contrast_boundary_rendered": false,
+                     "deterministic": true}},
+    "D":          {"description": "dictionary / conventional lexical baseline",
+                   "construction_rule": "plain dictionary meaning of the target word; must NOT leak the A mapping"},
+    "S":          {"description": "scrambled mapping control",
+                   "construction_rule": "retain the word's varṇa set; break assignment/order via seeded scramble (arm_construction_seed)"},
+    "R_same":     {"description": "random bridge from the same revised pool",
+                   "construction_rule": "sample bridge phrases from the same 68-phrase pool, NOT the target's own mapping; matched count/length/style; seed r_same_sample_seed"},
+    "R_deranged": {"description": "another word's REAL A mapping assigned to the wrong word (CRUX)",
+                   "construction_rule": "fixed seeded derangement pi over the word list (pi(w)!=w); word w receives the real A mapping of pi(w); mapping quality maximal, only word->mapping fit broken; seed r_deranged_assignment_seed"},
+    "R_domain":   {"description": "fluent symbolic mapping from a deliberately mismatched domain",
+                   "construction_rule": "sample a coherent mapping from a domain in the word's forbidden-domain list; same length/grammar/style; seed r_domain_assignment_seed"},
+    "C":          {"description": "surface / style control",
+                   "construction_rule": "surface facts / style-matched filler; must NOT leak the A mapping"},
+    "X":          {"description": "neutral prompt control",
+                   "construction_rule": "no conditioning (floor)"}
+  },
+  "contrast_boundary_policy": {
+    "status": "METADATA_ONLY",
+    "rendered_in_model_facing_prompt": false,
+    "reason": "contrast_boundary names other varṇas (e.g. 'not object-renunciation (Gha)') and would leak the mapping; it is retained for traceability only and MUST NOT enter any conditioning/prompt.",
+    "runner_enforcement": "run_b1_1_generation.py composes A/S from binding_bridge/liberating_bridge only; it never reads contrast_boundary into conditioning."
+  },
+  "rules": {
+    "no_target_self": "R_same and R_deranged must NEVER use the target word's own mapping",
+    "same_pool": "R_same draws only from the revised 68-phrase bridge pool",
+    "deranged_real_mapping_from_other_word": "R_deranged uses a REAL A mapping from a different word (not synthetic, not ugly)",
+    "domain_mismatch": "R_domain uses a coherent but domain-mismatched mapping; forbidden/allowed domain lists per word",
+    "style_length_normalization": "all arms comparable in length/style; R controls strong and fluent, never ugly or nonsense",
+    "exclusion_rules": "none beyond the pre-registered word/task set"
+  },
+  "seeds_ref": "b1_1_seeds_config.json",
+  "r_domain_policy": {
+    "buckets": ["body/health", "social/relation", "cognition/knowledge", "motion/action",
+                "material/object", "ethical/order", "emotion/affect", "cosmic/abstract",
+                "speech/communication", "protection/harm"],
+    "assignment_rule": "for each target item, deterministically assign one MISMATCHED bucket (different from the word's native semantic bucket) via r_domain_assignment_seed; sample a fluent, same-style symbolic mapping from that bucket",
+    "no_target_self": "R_domain never uses the target word's own B1.1 bridge or its native bucket",
+    "determinism": "seeded by r_domain_assignment_seed (b1_1_seeds_config.json); independent of generation results; no model judgment",
+    "style_parity": "same symbolic richness / length / grammar as A; never ugly, nonsense, or obviously weaker than A",
+    "per_word_expansion": "the native-bucket-per-word map is expanded at arm-builder time against the FROZEN B1.1 word list; policy is defined at bucket level now and does not fabricate an unknown final word list",
+    "validation_rule": "every R_domain assignment must come from a bucket != the target word's native bucket",
+    "seed_ref": "r_domain_assignment_seed (b1_1_seeds_config.json)",
+    "bucket_keyword_map": {
+      "body/health": ["sensory", "body", "sleep", "torpor", "physical", "desire", "craving"],
+      "social/relation": ["another", "others", "social", "regard", "shame", "malign", "maligned"],
+      "cognition/knowledge": ["knowledge", "discern", "insight", "clarity", "knowing", "sense", "common sense"],
+      "motion/action": ["action", "act", "effort", "striving", "commit", "energy", "force"],
+      "material/object": ["accumulation", "hoard", "possession", "acquire", "surplus", "object", "own"],
+      "ethical/order": ["order", "truth", "dharma", "conduct", "value", "worth", "warranted"],
+      "emotion/affect": ["remorse", "dejection", "melancholy", "grief", "envy", "sting", "gladness", "buoyancy"],
+      "cosmic/abstract": ["identity", "ego", "spell", "entrancement", "dissolution", "collapse", "bondage"],
+      "speech/communication": ["speech", "exaggeration", "overstat", "display", "performance", "transparency"],
+      "protection/harm": ["harm", "cruelty", "protect", "shield", "compassion", "goodwill", "vulnerable"]
+    },
+    "bucket_keyword_map_note": "'dharma' here is a bucketing KEYWORD used only to sort English bridge text into a domain; it is NOT rendered into any prompt (bridge phrases contain no Sanskrit after the Śa fix).",
+    "bridge_bucket_rule": "each of the 68 bridge phrases is assigned to the bucket whose keyword list it matches most (ties -> first bucket in the fixed bucket order).",
+    "native_bucket_rule": "a target word's native bucket = the bucket of its own A-composition text (same bridge_bucket_rule).",
+    "mismatched_bucket_rule": "deterministically pick a bucket != native (and non-empty) via r_domain_assignment_seed keyed on the word; sample count-matched bridge phrases from it.",
+    "assignments_artifact": "b1_1_r_domain_assignments.json (persisted per-word native/mismatched buckets; deterministically reproducible from this frozen policy + frozen seeds + frozen word pool)",
+    "config_is_authoritative": "run_b1_1_generation.py loads bucket_keyword_map + bucket order from THIS frozen config; the bucketing is no longer a runner-internal heuristic.",
+    "length_parity_rule": "accumulate distinct phrases from the chosen mismatched bucket until >= n phrases AND >= 0.6x the target word's A-composition length; prefer a mismatched bucket whose total text can reach that length, so R_domain is never obviously weaker/shorter than A.",
+    "empty_bucket_note": "a bucket may hold 0 phrases (e.g. speech/communication under the current keyword map); empty buckets are never chosen as the mismatched bucket and never fabricated."
+  },
+  "validation_expectations": {
+    "arms_exactly": ["A", "D", "S", "R_same", "R_deranged", "R_domain", "C", "X"],
+    "no_target_self_enforced": true,
+    "R_controls_fluent_same_style": true,
+    "no_A_leak_in_D_C_X": true
+  },
+  "generation_authorized": false
+}

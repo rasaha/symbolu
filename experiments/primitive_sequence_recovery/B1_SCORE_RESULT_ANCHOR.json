@@ -1,0 +1,101 @@
+{
+  "B1_SCORE_RESULT": {
+    "gate": "RUN_B1_SCORING",
+    "recorded_utc": "2026-07-04T17:04:48Z",
+    "scorer_commit": "76d87b5",
+    "judge_run": "B1_JUDGE_RUN_V2_PROVENANCE (b4976b9)",
+    "b0_freeze_base": "a2ed5cc",
+    "frozen_integrity": "OK (11/11 hashes match)",
+    "judges_kept": [
+      "Llama-3.1-8B",
+      "Meta-Llama-3-8B",
+      "gemma-2-9b-it"
+    ],
+    "VERDICT": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "verdict_meaning": "A must beat ALL of D/R/S/C/X. A did NOT beat R (random conditioning): win-rate 0.5135, corrected CI [0.4656, 0.5573] straddles 0.5, Holm p=0.296 (not rejected). A is statistically indistinguishable from RANDOM evocative conditioning -> KILL.",
+    "primary_co_primaries": {
+      "D": {
+        "win_rate": 0.5542,
+        "ci_lo": 0.5073,
+        "ci_hi": 0.6,
+        "holm_p": 0.022,
+        "beats": true
+      },
+      "R": {
+        "win_rate": 0.5135,
+        "ci_lo": 0.4656,
+        "ci_hi": 0.5573,
+        "holm_p": 0.296,
+        "beats": false
+      },
+      "S": {
+        "win_rate": 0.5615,
+        "ci_lo": 0.5146,
+        "ci_hi": 0.6062,
+        "holm_p": 0.018,
+        "beats": true
+      },
+      "C": {
+        "win_rate": 0.7562,
+        "ci_lo": 0.7135,
+        "ci_hi": 0.7979,
+        "holm_p": 0.0,
+        "beats": true
+      },
+      "X": {
+        "win_rate": 0.6271,
+        "ci_lo": 0.5813,
+        "ci_hi": 0.6729,
+        "holm_p": 0.0,
+        "beats": true
+      }
+    },
+    "privative_stratum_separate": {
+      "D": [
+        0.5542,
+        0.4542,
+        0.6625
+      ],
+      "R": [
+        0.4958,
+        0.4083,
+        0.5875
+      ],
+      "S": [
+        0.5333,
+        0.4333,
+        0.6333
+      ],
+      "C": [
+        0.65,
+        0.5542,
+        0.7458
+      ],
+      "X": [
+        0.6458,
+        0.55,
+        0.7375
+      ],
+      "note": "privative also fails vs R (0.4958, CI straddles 0.5) \u2014 consistent kill"
+    },
+    "inter_judge_unanimous_a_win_rate": 0.389,
+    "n_common_packets": 3000,
+    "t4_correctness_diagnostic": {
+      "A_problem": 30,
+      "control_problem": 13,
+      "of": 1500,
+      "note": "A had MORE correctness problems than controls on T4 explanations \u2014 directionally against A"
+    },
+    "flagged_primary": 685,
+    "flagged_privative": 152,
+    "bootstrap": {
+      "n_boot": 2000,
+      "seed": 60617
+    },
+    "interpretation": "A beats the weaker controls (X neutral 0.63, C surface 0.76, and marginally D 0.55 / S 0.56) \u2014 i.e. SOME evocative conditioning beats none/dry facts. But A does NOT beat R (random bridge conditioning): the SPECIFIC symbolic-resonance content carries no advantage over random similarly-structured conditioning. Corroborates the prior negative Track G RANDOM_POLARITY_EXPLAINS.",
+    "track_b": "BLOCKED (kill label; not unblocked)",
+    "evidence_scope": "internal LLM-judge (8B/9B); a KILL does not require human replication to stand as a negative",
+    "preserved_prior": "Track G RANDOM_POLARITY_EXPLAINS (A_vs_R -0.1917, A_vs_X -0.075); Track F CORRECTNESS_DEGRADED",
+    "note": "Structure, not validated meaning. Honest negative; hypothesis of specific resonance signal NOT supported."
+  }
+}

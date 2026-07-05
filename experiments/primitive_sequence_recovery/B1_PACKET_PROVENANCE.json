@@ -1,0 +1,35 @@
+{
+  "B1_PACKET_PROVENANCE": {
+    "gate": "RUN_B1_LEAK_SCAN_AND_PACKET_BUILD",
+    "recorded_utc": "2026-07-04T07:43:05Z",
+    "builder_script_commit": "31f1545",
+    "b0_freeze_record_commit": "04cdd9d",
+    "b0_freeze_base_commit": "a2ed5cc",
+    "raw_outputs_rows": 3600,
+    "raw_outputs_sha256": "e2930149242dae243b7c786fc6dfeba6f369422f0ada6e3d5cbc8ecfdf5f00a5",
+    "judge_packets": 3000,
+    "expected_packets": 3000,
+    "judge_packet_seed": 50513,
+    "output_randomization_seed": 40411,
+    "judge_view_sha256": "f795707ac73e11b82ab974d4e37b365ce55e73089aebc2a8f72cb420a2d752d1",
+    "packets_full_sha256": "8ad369cec61c5d3eca05d9a1ce2f413d8e909caded6192101666538096d310b3",
+    "integrity": "PASS (3600 rows, complete crossing, no empties, all scored:false)",
+    "leak_scan": "CLEAN (0 hits over 3600 outputs)",
+    "structural_blinding": "PASS (0 real leaks; judge_view = display_id/key_word/task_text/outputs)",
+    "naive_token_hits_benign": {
+      "display_id": 2,
+      "output_text": 240,
+      "key_word": 0,
+      "task_text": 0,
+      "explanation": "opaque display_id digits (P01101/P02027) + incidental prose; no arm/model/seed field"
+    },
+    "excluded_outputs": 0,
+    "data_location": "RunPod only (raw outputs + packets not pushed; bound here by sha256)",
+    "scored": false,
+    "verdict": null,
+    "b1_execution": "COMPLETE_GENERATION_ONLY",
+    "b0_frozen": true,
+    "track_b": "BLOCKED",
+    "note": "Blinded packets built and integrity-verified. NOT judged, NOT scored. Structure, not validated meaning."
+  }
+}

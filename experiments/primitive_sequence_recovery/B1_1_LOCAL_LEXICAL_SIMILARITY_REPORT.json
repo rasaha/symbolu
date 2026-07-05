@@ -1,0 +1,75 @@
+{
+  "artifact": "b1_1_local_lexical_similarity_report",
+  "note": "INTERIM WEAKER fallback for the blocked embedding gate; surface overlap only, NOT semantic. PASS_LOCAL_SURFACE_ONLY does NOT mean the embedding gate passed.",
+  "b1_verdict_unchanged": "RANDOM_OR_SCRAMBLED_MATCHES",
+  "track_b_status": "BLOCKED",
+  "input_sha256": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
+  "n_evaluated": 34,
+  "thresholds": {
+    "token_jaccard_hard": 0.55,
+    "token_jaccard_soft": 0.4,
+    "char_ngram_hard": 0.7,
+    "char_ngram_soft": 0.55,
+    "lcs_soft": 0.5,
+    "head_phrase_len": 3,
+    "head_min_group": 3,
+    "generic_df_min": 6
+  },
+  "exact_duplicates": {
+    "liberating_expression": [],
+    "functional_operation": []
+  },
+  "n_hard": 0,
+  "n_soft_pairs": 2,
+  "repeated_head_phrases": [],
+  "repeated_generic_terms": [],
+  "gate_status": "SOFT_REVIEW_REQUIRED",
+  "flags": [
+    {
+      "varna_a": "Ka",
+      "varna_b": "Sa",
+      "lexicon_key_a": "ka",
+      "lexicon_key_b": "sa",
+      "field_compared": "liberating_expression",
+      "metric": "lcs_ratio",
+      "score": 0.6216,
+      "all_metrics": {
+        "token_jaccard": 0.2,
+        "char_3gram": 0.3091,
+        "char_4gram": 0.2759,
+        "lcs_ratio": 0.6216
+      },
+      "text_a": "forward-orientation held without attachment to the outcome",
+      "text_b": "clarity without attachment to clarity",
+      "flag_level": "soft",
+      "suggested_action": "accept-with-rationale-or-leave-for-embedding-gate",
+      "rationale": "<TBD_HUMAN>"
+    },
+    {
+      "varna_a": "Ḍha",
+      "varna_b": "La",
+      "lexicon_key_a": "ddha",
+      "lexicon_key_b": "la",
+      "field_compared": "functional_operation",
+      "metric": "lcs_ratio",
+      "score": 0.5088,
+      "all_metrics": {
+        "token_jaccard": 0.3,
+        "char_3gram": 0.4,
+        "char_4gram": 0.3425,
+        "lcs_ratio": 0.5088
+      },
+      "text_a": "turns malice-energy toward protecting the maligned (social harm)",
+      "text_b": "turns harming-energy toward protecting the physically weak",
+      "flag_level": "soft",
+      "suggested_action": "accept-with-rationale-or-leave-for-embedding-gate",
+      "rationale": "<TBD_HUMAN>"
+    }
+  ],
+  "non_claims": [
+    "weaker than embedding gate",
+    "no semantic synonymy detection",
+    "does not replace B1_1_NON_SYNONYM_EMBEDDING_GATE",
+    "no ontology/Sanskrit/semantic claim"
+  ]
+}

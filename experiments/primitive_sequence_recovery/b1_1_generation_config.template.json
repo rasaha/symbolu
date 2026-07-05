@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "artifact": "b1_1_generation_config",
+    "status": "TEMPLATE_NOT_FROZEN",
+    "note": "Template with placeholders. NOT final, NOT frozen, does NOT authorize generation.",
+    "authorization_note": "NOT authorized until B1_1_GENERATION_AUTHORIZATION",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED"
+  },
+  "generation_model_id": "PLACEHOLDER_REQUIRED",
+  "provider_runtime": "PLACEHOLDER_REQUIRED",
+  "model_revision": "PLACEHOLDER_REQUIRED_IF_AVAILABLE",
+  "reference_b1_models": {
+    "note": "For reference only (comparable-to-B1 policy, prereg §10); MUST be explicitly confirmed/frozen, not assumed.",
+    "b1_generation_models": ["mistralai/Mistral-7B-Instruct-v0.3", "Qwen/Qwen2.5-7B-Instruct"]
+  },
+  "decoding": {
+    "temperature": "PLACEHOLDER_REQUIRED",
+    "top_p": "PLACEHOLDER_REQUIRED",
+    "max_tokens": "PLACEHOLDER_REQUIRED",
+    "number_of_samples": "PLACEHOLDER_REQUIRED"
+  },
+  "retry_policy": "PLACEHOLDER_REQUIRED",
+  "failure_policy": "PLACEHOLDER_REQUIRED (e.g. abort-on-empty, no silent drops, all raw retained)",
+  "prompt_template": "PLACEHOLDER_REQUIRED",
+  "task_templates": {
+    "T1_definition": "PLACEHOLDER_REQUIRED",
+    "T2_explanation": "PLACEHOLDER_REQUIRED",
+    "T3_metaphor": "PLACEHOLDER_REQUIRED",
+    "T4_correctness_sensitive": "PLACEHOLDER_REQUIRED (correctness tracked separately)",
+    "T5_tone_match": "PLACEHOLDER_REQUIRED",
+    "T6_evoke_creative": "PLACEHOLDER_REQUIRED"
+  },
+  "generation_authorized": false
+}
