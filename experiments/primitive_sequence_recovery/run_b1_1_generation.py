@@ -49,7 +49,10 @@ import json
 import os
 import pathlib
 import random
+import subprocess
 import sys
+import time
+from datetime import datetime, timezone
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -466,6 +469,195 @@ def model_access_readiness():
     return checks
 
 
+# ============================================================ model adapters ======================
+class TransformersAdapter:
+    """REAL model adapter — loads a FROZEN model at its FROZEN revision and generates with the FROZEN
+    decode policy. Reuses B1's committed pattern (run_b1_generation.TransformersAdapter): user-turn only,
+    NO system prompt, apply_chat_template(return_dict=True), set_seed per row. Instantiated ONLY inside the
+    execute-generation loop on a model-access host — never in render-only or mock mode, and never reached in
+    this egress-denied environment (the CUDA/transformers gate refuses first)."""
+    is_real = True
+
+    def __init__(self, model_id, revision, decode):
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        self.model_id, self.revision, self.decode = model_id, revision, decode
+        self.tok = AutoTokenizer.from_pretrained(model_id, revision=revision)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_id, revision=revision, torch_dtype=torch.float16, device_map="auto")
+        self.model.eval()
+
+    def generate(self, prompt, seed):
+        import torch
+        from transformers import set_seed
+        set_seed(seed)                       # deterministic per (row, seed)
+        msgs = [{"role": "user", "content": prompt}]   # NO system prompt (frozen decode.system_prompt=none)
+        enc = self.tok.apply_chat_template(
+            msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(self.model.device)
+        in_len = enc["input_ids"].shape[1]
+        with torch.no_grad():
+            out = self.model.generate(
+                **enc, do_sample=True, temperature=self.decode["temperature"],
+                top_p=self.decode["top_p"], max_new_tokens=self.decode["max_tokens"],
+                pad_token_id=self.tok.eos_token_id)
+        return self.tok.decode(out[0][in_len:], skip_special_tokens=True).strip()
+
+
+class MockAdapter:
+    """MOCK_ONLY adapter — deterministic non-model placeholder for LOCAL CI of the loop mechanics
+    (JSONL schema, resume, incremental write, error handling). Calls NO model and touches NO network. Its
+    output is NEVER B1.1 evidence; every row is stamped mock=true / status MOCK_ONLY and written to a
+    mock-marked path."""
+    is_real = False
+    name = "MOCK_ONLY"
+
+    def __init__(self, model_id, revision, decode):
+        self.model_id, self.revision, self.decode = model_id, revision, decode
+
+    def generate(self, prompt, seed):
+        h = hashlib.sha256(f"{self.model_id}|{self.revision}|{seed}|{prompt}".encode()).hexdigest()
+        return f"[MOCK_ONLY — deterministic non-model placeholder, NOT B1.1 evidence — {h[:24]}]"
+
+
+# ============================================================ generation rows + loop ==============
+def build_generation_prompt(cfg, core, word, task_id):
+    """Build the model-facing prompt from the FROZEN generation config ONLY (prompt_template +
+    task_templates). No post-hoc edits. core = the arm's conditioning (from the frozen bridge pool)."""
+    gen = cfg["generation"]
+    task = gen["task_templates"][task_id]["exact_prompt"].format(target_word=word)
+    return gen["prompt_template"].format(arm_bridge_text=core, task=task)
+
+
+def expand_generation_rows(builder, cfg):
+    """Full frozen generation matrix: word × arm × task × model × seed. Prompts + conditioning are built
+    from the frozen configs; nothing is invented. Returns a list of row dicts (no model called)."""
+    gen = cfg["generation"]
+    models = gen["generation_models"]                 # [{id, revision, ...}]
+    seeds = gen["decoding"]["generation_seeds"]
+    task_ids = list(gen["task_templates"].keys())     # T1..T6 (frozen order)
+    rows = []
+    for word in builder.words:
+        for arm in ARMS:
+            core, cmeta = builder.core(word, arm)
+            if core is None:
+                continue
+            for task_id in task_ids:
+                prompt = build_generation_prompt(cfg, core, word, task_id)
+                prompt_id = hashlib.sha256(prompt.encode()).hexdigest()[:16]
+                for m in models:
+                    for seed in seeds:
+                        rows.append({
+                            "key": f"{word}|{task_id}|{arm}|{m['id']}|{seed}",
+                            "target_word": word, "arm": arm, "task_id": task_id,
+                            "model_id": m["id"], "model_revision": m.get("revision"),
+                            "seed": seed, "prompt_id": prompt_id, "prompt_text": prompt,
+                            "conditioning_text": core})
+    return rows
+
+
+def _git_head():
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True,
+                              text=True, timeout=10).stdout.strip() or None
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
+def _now():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _gen_with_retry(adapter, prompt, seed, max_attempts, mock):
+    """Frozen retry policy: retry up to max_attempts on transient error with backoff; then record an error
+    row (never silently skip). Mock never sleeps and never errors."""
+    last_err = None
+    for attempt in range(max_attempts):
+        try:
+            text = adapter.generate(prompt, seed)
+            return text, ("MOCK_ONLY" if mock else "ok"), None
+        except Exception as e:                          # noqa: BLE001
+            last_err = f"{type(e).__name__}: {e}"
+            if not mock and attempt < max_attempts - 1:
+                time.sleep(min(2 ** attempt, 8))
+    return None, "error", last_err
+
+
+def run_generation_loop(builder, cfg, man, manifest_path, out_path, resume, mock):
+    """Frozen generation loop. Verifies leakage over every prompt FIRST, then writes one JSONL row per
+    (word,task,arm,model,seed). Incremental append + flush; structured error rows on failure; resume skips
+    completed keys. Real adapter loads models (HF) — reached only on a model-access host."""
+    lex = cfg["lexicon"]
+    decode = cfg["generation"]["decoding"]
+    max_attempts = 3                                    # frozen retry_policy: "retry up to 3x"
+    rows = expand_generation_rows(builder, cfg)
+
+    # requirement #6: leakage validation BEFORE any model call. Scan every unique conditioning + prompt.
+    leaks = []
+    seen_core = {}
+    for r in rows:
+        c = r["conditioning_text"]
+        if c not in seen_core:
+            seen_core[c] = leak_scan(c, lex)[0]
+        p_leak = leak_scan(r["prompt_text"], lex)[0] if r["arm"] == "X" else seen_core[c]
+        if p_leak:
+            leaks.append(r["key"])
+    if leaks:
+        raise SystemExit(f"ABORT: {len(leaks)} prompt(s) contain leakage; refusing to generate. "
+                         f"e.g. {leaks[:3]}. (Structure, not validated meaning.)")
+
+    manifest_sha = hashlib.sha256(pathlib.Path(manifest_path).read_bytes()).hexdigest()
+    run_id = f"b1_1_gen_{'mock_' if mock else ''}{_now().replace(':', '').replace('-', '')}"
+    freeze_commit = _git_head()
+
+    done = set()
+    if resume and out_path.exists():
+        for ln in out_path.read_text(encoding="utf-8").splitlines():
+            try:
+                rec = json.loads(ln)
+                if rec.get("status") in ("ok", "MOCK_ONLY"):
+                    done.add(rec["key"])
+            except Exception:                           # noqa: BLE001
+                pass
+
+    Adapter = MockAdapter if mock else TransformersAdapter
+    adapters, written, errors = {}, 0, 0
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("a", encoding="utf-8") as fh:
+        for i, r in enumerate(rows, 1):
+            if r["key"] in done:
+                continue
+            mid = r["model_id"]
+            if mid not in adapters:
+                print(f"[load] adapter for {mid} @ {str(r['model_revision'])[:10]} "
+                      f"({'MOCK' if mock else 'REAL'}) …")
+                adapters[mid] = Adapter(mid, r["model_revision"], decode)  # real: loads model (HF)
+            text, status, err = _gen_with_retry(adapters[mid], r["prompt_text"], r["seed"],
+                                                max_attempts, mock)
+            rec = {
+                "run_id": run_id, "manifest_sha256": manifest_sha,
+                "manifest_path": str(pathlib.Path(manifest_path).name), "freeze_commit": freeze_commit,
+                "model_id": r["model_id"], "model_revision": r["model_revision"],
+                "task_id": r["task_id"], "target_word": r["target_word"], "arm": r["arm"],
+                "prompt_id": r["prompt_id"], "prompt_text": r["prompt_text"],
+                "conditioning_text": r["conditioning_text"], "generation_text": text,
+                "decoding": {"temperature": decode["temperature"], "top_p": decode["top_p"],
+                             "max_tokens": decode["max_tokens"]},
+                "seed": r["seed"], "timestamp": _now(), "status": status, "error": err,
+                "key": r["key"], "mock": bool(mock),
+                "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b_anchor": "BLOCKED",
+                "is_b1_1_evidence": (False if mock else None),
+            }
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            fh.flush()
+            written += 1
+            if status not in ("ok", "MOCK_ONLY"):
+                errors += 1
+            if i % 500 == 0 or i == len(rows):
+                print(f"  … {i}/{len(rows)} (written {written}, errors {errors})")
+    return {"total_rows": len(rows), "written": written, "errors": errors, "skipped_resume": len(done),
+            "run_id": run_id, "manifest_sha256": manifest_sha, "mock": bool(mock)}
+
+
 # ============================================================ main =================================
 def main(argv=None):
     ap = argparse.ArgumentParser(description="B1.1 8-arm generation runner (render-only safe).")
@@ -474,11 +666,15 @@ def main(argv=None):
                       help="DEFAULT-SAFE: render + hash + leak-scan prompts; no model, no network.")
     mode.add_argument("--execute-generation", action="store_true",
                       help="Real generation. Requires B1_1_GENERATION_APPROVED=YES + a model-access host.")
+    mode.add_argument("--mock-generation", action="store_true",
+                      help="MOCK_ONLY loop for local CI: exercises the JSONL/resume/error mechanics with a "
+                           "deterministic non-model placeholder. NO model, NO network, NOT B1.1 evidence. "
+                           "Requires --out with a 'mock' filename.")
     ap.add_argument("--json-out", default=str(HERE / "B1_1_GENERATION_RENDER_ONLY_REPORT.json"))
     ap.add_argument("--md-out", default=str(HERE / "B1_1_GENERATION_RENDER_ONLY_REPORT.md"))
-    ap.add_argument("--out", default=str(HERE / "b1_1_raw_outputs.jsonl"),
-                    help="(execute mode) raw-output JSONL path")
-    ap.add_argument("--resume", action="store_true", help="(execute mode) resume into an existing --out")
+    ap.add_argument("--out", default=None,
+                    help="(execute/mock mode) raw-output JSONL path (required for those modes)")
+    ap.add_argument("--resume", action="store_true", help="(execute/mock mode) resume into an existing --out")
     ap.add_argument("--manifest", default=None,
                     help="manifest to verify (default: final b1_1_freeze_manifest.json; falls back to the "
                          "draft for render-only bootstrap before the final freeze is signed).")
@@ -491,27 +687,59 @@ def main(argv=None):
     cfg = load_frozen_configs(man)
     builder = ArmBuilder(cfg)
 
-    # ----- real generation path: hard-gated, refuses in this environment ----------------------
+    # ----- real generation path: hard-gated; refuses in this egress-denied environment -------------
     if args.execute_generation:
         if os.environ.get("B1_1_GENERATION_APPROVED") != "YES":
             raise SystemExit("REFUSED: --execute-generation requires B1_1_GENERATION_APPROVED=YES in "
                              "the environment. Real generation is not authorized without it.")
-        ready = model_access_readiness()
-        print("[model-access readiness]", json.dumps(ready, indent=2))
+        if not args.out:
+            raise SystemExit("REFUSED: --execute-generation requires an explicit --out <path.jsonl>.")
         out_path = pathlib.Path(args.out)
         if out_path.exists() and not args.resume:
             raise SystemExit(f"REFUSED: output path {out_path} already exists; pass --resume to append, "
                              "or move it. Never silently overwrite raw outputs.")
+        # requirement #6: render/leak validation BEFORE any model call.
+        pre = render_only(builder, cfg["lexicon"])
+        if pre["leak_total"] != 0 or pre["empty_arms"]:
+            raise SystemExit(f"REFUSED: render/leak validation failed (leak_total={pre['leak_total']}, "
+                             f"empty_arms={len(pre['empty_arms'])}); refusing to generate.")
+        print(f"[pre-run] render/leak validation OK (leak_total=0, {pre['n_conditioning_cores']} cores).")
+        ready = model_access_readiness()
+        print("[model-access readiness]", json.dumps(ready, indent=2))
         if not ready["cuda_available"] or ready["transformers_version"] is None:
-            raise SystemExit("REFUSED: no CUDA / transformers backend on this host. Real generation must "
-                             "run on the model-access host (RunPod), not this prep environment.")
-        # Model-access host would proceed below; in THIS env HF egress is denied, so refuse loudly
-        # BEFORE any model is contacted (no download, no call).
-        raise SystemExit("REFUSED_HF_EGRESS: this environment denies huggingface.co egress (same denial "
-                         "that blocks the embedding gate); the frozen generation models "
-                         "(mistralai/Mistral-7B-Instruct-v0.3, Qwen/Qwen2.5-7B-Instruct) cannot be "
-                         "fetched here. No model call attempted. Run on a model-access host and author "
-                         "the RunPod execution plan (B1_1_RUNPOD_GENERATION_EXECUTION_PLAN) first.")
+            # THIS environment: no CUDA / egress-denied -> refuse BEFORE any model is contacted.
+            raise SystemExit("REFUSED: no CUDA / transformers backend on this host (and huggingface.co "
+                             "egress is denied here). Real generation must run on the model-access host "
+                             "(RunPod), not this prep environment. No model call attempted.")
+        # --- model-access host only (never reached here): run the frozen generation loop ---
+        try:
+            summary = run_generation_loop(builder, cfg, man, mpath, out_path, args.resume, mock=False)
+        except SystemExit:
+            raise
+        except Exception as e:                          # noqa: BLE001  (clear HF/load failure)
+            raise SystemExit(f"ABORT: generation loop failed (model load/egress or runtime error): {e}. "
+                             "No partial result is treated as evidence.")
+        print(f"[done] {summary['written']} rows -> {out_path} (errors {summary['errors']})")
+        print("RAW GENERATION ONLY. Not scored, not judged, no packets, no verdict. Track B BLOCKED.")
+        print("Next gate: B1_1_POST_GENERATION_LEAK_SCAN (separately approved).")
+        return
+
+    # ----- MOCK generation path (local CI only; no model, no network, NOT evidence) ----------------
+    if args.mock_generation:
+        if not args.out or "mock" not in pathlib.Path(args.out).name.lower():
+            raise SystemExit("REFUSED: --mock-generation requires --out with a 'mock' filename (so mock "
+                             "output is never confused with real B1.1 evidence).")
+        out_path = pathlib.Path(args.out)
+        if out_path.exists() and not args.resume:
+            raise SystemExit(f"REFUSED: mock output {out_path} exists; pass --resume or move it.")
+        pre = render_only(builder, cfg["lexicon"])
+        if pre["leak_total"] != 0 or pre["empty_arms"]:
+            raise SystemExit(f"REFUSED: render/leak validation failed (leak_total={pre['leak_total']}).")
+        print("[mock] MOCK_ONLY loop — deterministic placeholder, NO model, NO network. NOT B1.1 evidence.")
+        summary = run_generation_loop(builder, cfg, man, mpath, out_path, args.resume, mock=True)
+        print(f"[mock] {summary['written']} MOCK_ONLY rows -> {out_path} "
+              f"(errors {summary['errors']}, skipped {summary['skipped_resume']})")
+        return
 
     # ----- render-only path (default) ---------------------------------------------------------
     print("[render-only] building 8 arms from the frozen set — NO model, NO network.")
