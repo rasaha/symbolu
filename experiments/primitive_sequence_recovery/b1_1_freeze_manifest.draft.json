@@ -1,6 +1,7 @@
 {
   "B1_1_FREEZE_MANIFEST": {
     "manifest_status": "DRAFT_READY_FOR_FREEZE_REVIEW",
+    "regenerated_after": "Ca de-Sanskritization leakage fix (e125e0c); prior draft manifest hashes were stale",
     "freeze_status": "READY_FOR_FREEZE_REVIEW",
     "generation_authorized": false,
     "fallback_qualification": "FALLBACK_QUALIFIED",
@@ -30,11 +31,11 @@
     "bound_artifacts": [
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_experimental_contrastive_lexicon_draft.json",
-        "sha256": "b7e83818a9c8aaf63502fb28fe4262f48cf7375bccdd514bafef940e7b7585b1"
+        "sha256": "434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc"
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_bridge_pool_draft.json",
-        "sha256": "4da248bc622fa4284a2f414252441c371e71519fc068f160bc7278c206a35a5c"
+        "sha256": "c0e5460787e00177c37064d4e0355dc0644936ad1f1bea6eaca1e43c4f8c258a"
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_arm_construction_config.json",
@@ -74,12 +75,12 @@
       },
       {
         "path": "experiments/primitive_sequence_recovery/B1_1_FREEZE_ARTIFACT_VALIDATION_REPORT.json",
-        "sha256": "94e952e035429adebc393adc3c2580f9c89f8056fd7ef6a97a645e5c539f6ca8"
+        "sha256": "49534b093832dcc089ef838772e35e6b65bd522d93e45b3f6c25da203ec0e80c"
       }
     ],
     "n_bound_artifacts": 12,
-    "commit_hash": "c3bdacd593c290fa16b8561ea193a5ac445608a2",
-    "created_at": "2026-07-05T05:56:21+00:00",
+    "commit_hash": "e125e0cbe4f0b8e100cad818c6576a1de2b71d0c",
+    "created_at": "2026-07-05T06:19:41+00:00",
     "authorization_statements": {
       "does_not_authorize_generation": true,
       "requires_freeze_finalization_gate": "B1_1_FREEZE_FINALIZATION",

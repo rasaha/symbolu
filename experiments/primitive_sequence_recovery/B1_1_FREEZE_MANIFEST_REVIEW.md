@@ -10,16 +10,19 @@ validated meaning.**
 
 ## 2. Freeze-readiness status
 
+- **Regenerated** after the Ca de-Sanskritization leakage fix (`e125e0c`): the prior draft manifest's
+  hashes were **stale**; this draft re-binds the current post-fix artifacts.
 - Freeze-artifact validator: **`READY_FOR_FREEZE_REVIEW`** (0 blockers, 1 warning).
+- Sample-word render dry run: **`PASS_RENDER_DRY_RUN`** (0 Sanskrit/varṇa leakage after the fix).
 - Draft manifest status: **`DRAFT_READY_FOR_FREEZE_REVIEW`**.
 - B1.1 is **not frozen**; generation is **not authorized**.
 
 ## 3. Artifact hash summary
 
-**12 artifacts bound** with sha256 in the draft manifest: the lexicon, bridge pool, six configs
-(arm-construction, generation, seeds, judge-panel, scorer, leak/packet), the prereg, the bridge/prereg
-decision, the prereg/freeze decision, and the freeze-artifact validation report. Manifest verifier
-recomputed every hash → **`MANIFEST_VERIFIED`** (no mismatch).
+**12 artifacts bound** with sha256 in the draft manifest (re-hashed after `e125e0c`): the lexicon, bridge
+pool, six configs (arm-construction, generation, seeds, judge-panel, scorer, leak/packet), the prereg, the
+bridge/prereg decision, the prereg/freeze decision, and the freeze-artifact validation report. Manifest
+verifier recomputed every hash against the current artifacts → **`MANIFEST_VERIFIED`** (no mismatch).
 
 ## 4. Validator status summary
 
