@@ -1,6 +1,6 @@
 {
   "artifact": "b1_1_sample_word_render_dry_run",
-  "status": "REVIEW_REQUIRED",
+  "status": "PASS_RENDER_DRY_RUN",
   "note": "STRUCTURAL render only. No model/generation/judging/scoring. No evidence B1.1 outperforms B1/H2. A varṇa decomposition is ILLUSTRATIVE spelling-based, not frozen G2P.",
   "word_pool_status": "COMMITTED_B1_POOL (b1_dry_run_harness.py PRIMARY_WORDS); selected 8 by seed 70101",
   "sample_words": [
@@ -29,57 +29,8 @@
     "T4",
     "T6"
   ],
-  "pool_level_sanskrit_leakage": [
-    {
-      "varna": "Ca",
-      "field": "liberating_bridge",
-      "term": "Viveka"
-    }
-  ],
-  "per_render_leakage": [
-    {
-      "word": "echo",
-      "arm": "A",
-      "hits": [
-        "sanskrit:Viveka"
-      ]
-    },
-    {
-      "word": "echo",
-      "arm": "S",
-      "hits": [
-        "sanskrit:Viveka"
-      ]
-    },
-    {
-      "word": "music",
-      "arm": "R_deranged",
-      "hits": [
-        "sanskrit:Viveka"
-      ]
-    },
-    {
-      "word": "ocean",
-      "arm": "A",
-      "hits": [
-        "sanskrit:Viveka"
-      ]
-    },
-    {
-      "word": "ocean",
-      "arm": "S",
-      "hits": [
-        "sanskrit:Viveka"
-      ]
-    },
-    {
-      "word": "silence",
-      "arm": "R_deranged",
-      "hits": [
-        "sanskrit:Viveka"
-      ]
-    }
-  ],
+  "pool_level_sanskrit_leakage": [],
+  "per_render_leakage": [],
   "weak_controls": [],
   "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
   "track_b_anchor": "BLOCKED",
@@ -96,7 +47,7 @@
       ],
       "arms": {
         "A": {
-          "bridge_text": "falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego",
+          "bridge_text": "falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego",
           "source": "ILLUSTRATIVE spelling-based varṇas ['Ca', 'Ha'] (NOT frozen G2P)"
         },
         "R_same": {
@@ -117,7 +68,7 @@
           "preview": "[conventional dictionary gloss of 'echo'] (filled by arm-builder at generation time)"
         },
         "S": {
-          "bridge_text": "realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego ; falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance",
+          "bridge_text": "realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego ; falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance",
           "source": "A phrases, order scrambled"
         },
         "C": {
@@ -127,31 +78,17 @@
           "preview": "(no conditioning; neutral bare task)"
         }
       },
-      "arm_leakage": {
-        "A": [
-          "sanskrit:Viveka"
-        ],
-        "S": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "arm_leakage": {},
       "task_previews_T1_T3_T4_T6": {
         "T1": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about echo.",
         "T3": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite one original metaphor for echo.",
         "T4": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nExplain echo plainly and accurately in 3-4 sentences.",
         "T6": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nRewrite this line to evoke echo: 'The day went on as usual.'"
       },
-      "full_prompt_example_A_T1": "Soft orientation, not a definition: falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about echo.",
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about echo.",
       "comparability_note": "pool-based arms A/R_same/R_deranged/R_domain/S all draw real liberating-bridge phrases of similar richness/length; D/C/X are build-time slots",
       "weak_control_note": "R controls are real fluent phrases, not ugly/nonsense",
-      "leakage_check": {
-        "A": [
-          "sanskrit:Viveka"
-        ],
-        "S": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "leakage_check": "clean",
       "t4_correctness_check": "PASS (T4='Explain {w} plainly and accurately in 3-4 sentences.' preserves correctness sensitivity)"
     },
     {
@@ -330,7 +267,7 @@
           "source": "seeded random pool varṇas ['Ṭa', 'Ta'] (not word's own)"
         },
         "R_deranged": {
-          "bridge_text": "falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip",
+          "bridge_text": "falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip",
           "source": "real A composition of 'ocean' (derangement)"
         },
         "R_domain": {
@@ -353,11 +290,7 @@
           "preview": "(no conditioning; neutral bare task)"
         }
       },
-      "arm_leakage": {
-        "R_deranged": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "arm_leakage": {},
       "task_previews_T1_T3_T4_T6": {
         "T1": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about music.",
         "T3": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite one original metaphor for music.",
@@ -367,11 +300,7 @@
       "full_prompt_example_A_T1": "Soft orientation, not a definition: disciplined containment that holds form — contains and holds a form against over-indulgence and dissolution ; clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about music.",
       "comparability_note": "pool-based arms A/R_same/R_deranged/R_domain/S all draw real liberating-bridge phrases of similar richness/length; D/C/X are build-time slots",
       "weak_control_note": "R controls are real fluent phrases, not ugly/nonsense",
-      "leakage_check": {
-        "R_deranged": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "leakage_check": "clean",
       "t4_correctness_check": "PASS (T4='Explain {w} plainly and accurately in 3-4 sentences.' preserves correctness sensitivity)"
     },
     {
@@ -383,7 +312,7 @@
       ],
       "arms": {
         "A": {
-          "bridge_text": "falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip",
+          "bridge_text": "falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip",
           "source": "ILLUSTRATIVE spelling-based varṇas ['Ca', 'Na'] (NOT frozen G2P)"
         },
         "R_same": {
@@ -404,7 +333,7 @@
           "preview": "[conventional dictionary gloss of 'ocean'] (filled by arm-builder at generation time)"
         },
         "S": {
-          "bridge_text": "de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip ; falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance",
+          "bridge_text": "de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip ; falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance",
           "source": "A phrases, order scrambled"
         },
         "C": {
@@ -414,31 +343,17 @@
           "preview": "(no conditioning; neutral bare task)"
         }
       },
-      "arm_leakage": {
-        "A": [
-          "sanskrit:Viveka"
-        ],
-        "S": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "arm_leakage": {},
       "task_previews_T1_T3_T4_T6": {
         "T1": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about ocean.",
         "T3": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite one original metaphor for ocean.",
         "T4": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nExplain ocean plainly and accurately in 3-4 sentences.",
         "T6": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nRewrite this line to evoke ocean: 'The day went on as usual.'"
       },
-      "full_prompt_example_A_T1": "Soft orientation, not a definition: falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about ocean.",
+      "full_prompt_example_A_T1": "Soft orientation, not a definition: falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; de-fascination from false attraction — breaks the spell of blind attachment by making the attractive object lose compulsive grip. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about ocean.",
       "comparability_note": "pool-based arms A/R_same/R_deranged/R_domain/S all draw real liberating-bridge phrases of similar richness/length; D/C/X are build-time slots",
       "weak_control_note": "R controls are real fluent phrases, not ugly/nonsense",
-      "leakage_check": {
-        "A": [
-          "sanskrit:Viveka"
-        ],
-        "S": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "leakage_check": "clean",
       "t4_correctness_check": "PASS (T4='Explain {w} plainly and accurately in 3-4 sentences.' preserves correctness sensitivity)"
     },
     {
@@ -511,7 +426,7 @@
           "source": "seeded random pool varṇas ['Pa', 'Dha'] (not word's own)"
         },
         "R_deranged": {
-          "bridge_text": "falsehood-discerning Viveka without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego",
+          "bridge_text": "falsehood-discerning insight without egoic superiority — separates truth from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without ownership — lets knowledge dissolve identity instead of forming spiritual ego",
           "source": "real A composition of 'echo' (derangement)"
         },
         "R_domain": {
@@ -534,11 +449,7 @@
           "preview": "(no conditioning; neutral bare task)"
         }
       },
-      "arm_leakage": {
-        "R_deranged": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "arm_leakage": {},
       "task_previews_T1_T3_T4_T6": {
         "T1": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about silence.",
         "T3": "Soft orientation, not a definition: <ARM_BRIDGE_TEXT>. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite one original metaphor for silence.",
@@ -548,11 +459,7 @@
       "full_prompt_example_A_T1": "Soft orientation, not a definition: clarity without attachment to clarity — lets clarity function without identity, pride, or bondage to harmony ; compassion that protects the physically vulnerable — turns harming-energy toward protecting the physically weak. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about silence.",
       "comparability_note": "pool-based arms A/R_same/R_deranged/R_domain/S all draw real liberating-bridge phrases of similar richness/length; D/C/X are build-time slots",
       "weak_control_note": "R controls are real fluent phrases, not ugly/nonsense",
-      "leakage_check": {
-        "R_deranged": [
-          "sanskrit:Viveka"
-        ]
-      },
+      "leakage_check": "clean",
       "t4_correctness_check": "PASS (T4='Explain {w} plainly and accurately in 3-4 sentences.' preserves correctness sensitivity)"
     }
   ]

@@ -8,7 +8,7 @@ and still owed; this is **not** a B1.1 freeze and **not** generation authorizati
 the verdict (`RANDOM_OR_SCRAMBLED_MATCHES`), or unblock Track B (**BLOCKED**). **Structure, not validated meaning.**
 
 ## Inputs & derivation
-- input: `b1_1_experimental_contrastive_lexicon_draft.json` (sha256 `b7e83818a9c8aaf63502fb28fe4262f48cf7375bccdd514bafef940e7b7585b1`)
+- input: `b1_1_experimental_contrastive_lexicon_draft.json` (sha256 `434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc`)
 - entries loaded: **34** · bridge phrases: **68**
 - binding_bridge = binding_expression (normalized) · liberating_bridge = liberating_expression + " — " + functional_operation
 - **manual/heuristic per-entry alteration: NONE** (uniform template; every phrase links to one source expression)
@@ -23,7 +23,7 @@ the verdict (`RANDOM_OR_SCRAMBLED_MATCHES`), or unblock Track B (**BLOCKED**). *
 | 5_no_empty_phrase | PASS | 0 |
 | 6_no_forbidden_framing | PASS | [] |
 | 7_no_moksha_endpoint | PASS | [] |
-| 8_ca_va_distinct | PASS | {'Ca': 'falsehood-discerning Viveka without egoic superiority — separates trut', |
+| 8_ca_va_distinct | PASS | {'Ca': 'falsehood-discerning insight without egoic superiority — separates tru', |
 | 9_ha_ksa_distinct | PASS | {'Ha': 'realized knowing without ownership — lets knowledge dissolve identity ', |
 | 10_sa_guna_binding_aware | PASS | sattvic clarity/order owned as purity, superiority, or attachment to harmony |
 | 11_ra_dual_source | PASS | rajasic activation driven by compulsion, desire, projection, or destructive coll |

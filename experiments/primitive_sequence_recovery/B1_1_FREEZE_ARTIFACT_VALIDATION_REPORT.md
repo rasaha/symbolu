@@ -40,8 +40,8 @@ _none_
 - `b1_1_judge_panel_config.json`: 1632b11794a98dd0b864d3e2a3e35e76614da7de8d6cd17c6a85f6f2bb4dfc74
 - `b1_1_scorer_config.json`: aac682fe8bf22d51eb530c40440d07fb629ee148a6b822a69c3c1f9f440befd6
 - `b1_1_leak_and_packet_config.json`: 09e869827be3626b327c76897886226741898b1a24187f9dd821111e28242c69
-- `b1_1_bridge_pool_draft.json`: 4da248bc622fa4284a2f414252441c371e71519fc068f160bc7278c206a35a5c
-- `b1_1_experimental_contrastive_lexicon_draft.json`: b7e83818a9c8aaf63502fb28fe4262f48cf7375bccdd514bafef940e7b7585b1
+- `b1_1_bridge_pool_draft.json`: c0e5460787e00177c37064d4e0355dc0644936ad1f1bea6eaca1e43c4f8c258a
+- `b1_1_experimental_contrastive_lexicon_draft.json`: 434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc
 
 ## Final status
 ```

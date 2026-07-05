@@ -1,6 +1,9 @@
 # B1.1 Sample-Word Render Dry Run (structural, pre-freeze)
 
-## Status: `REVIEW_REQUIRED`
+## Status: `PASS_RENDER_DRY_RUN`
+
+*(Re-run after the Ca de-Sanskritization fix, commit history: prior dry run `156c8da` was `REVIEW_REQUIRED`
+on the Ca→"Viveka" leakage; that leakage is now removed.)*
 
 ## Scope and non-claims
 
@@ -26,10 +29,10 @@ semantic-truth claim. **Structure, not validated meaning.**
   real G2P→varṇa at generation time. Pool-based arms draw **real** committed bridge phrases; D/C are
   build-time slots; X is the bare task.
 
-## Full prompt example (echo, arm A, T1)
+## Full prompt example (echo, arm A, T1) — post-fix
 
 ```
-Soft orientation, not a definition: falsehood-discerning Viveka without egoic superiority — separates truth
+Soft orientation, not a definition: falsehood-discerning insight without egoic superiority — separates truth
 from falsehood by detecting misperception, distortion, and false appearance ; realized knowing without
 ownership — lets knowledge dissolve identity instead of forming spiritual ego. Use this only as a gentle
 tonal/conceptual guide while following the task exactly.
@@ -43,41 +46,32 @@ Write a short reflective paragraph about echo.
 - **Is A word-specific and coherent?** Yes structurally — A composes the target word's (illustrative) varṇa
   bridges; coherent English.
 - **Is R_same fluent and strong?** Yes — real liberating-bridge phrases from the pool, not the word's own.
-- **Is R_deranged fluent and strong, not nonsense?** Yes — it is another sample word's *real* A composition
-  (fluent, strong, real-looking; wrong word). This is the crux control and it is a fair, hard control.
+- **Is R_deranged fluent and strong, not nonsense?** Yes — another sample word's *real* A composition
+  (fluent, strong, real-looking; wrong word). The crux control is fair and hard.
 - **Is R_domain fluent and strong, not nonsense?** Yes — real phrases from a deterministically mismatched
-  domain bucket (native≠assigned).
+  domain bucket (native ≠ assigned).
 - **Does R_domain clearly use a mismatched domain?** Yes — each render records `native_bucket` ≠
   `mismatched_bucket`.
 - **Does any arm leak labels A/R/D/S/C/X?** No — 0 arm-label leaks.
-- **Does any arm reveal varṇa/Sanskrit terms?** **YES — see leakage finding below (the review trigger).**
-- **Are controls comparable in style/length?** Yes — pool-based arms have similar richness/length; D/C/X are
-  comparable build-time slots.
+- **Does any arm reveal varṇa/Sanskrit terms?** **No — 0 proper Sanskrit nouns and 0 IAST diacritics in any
+  bridge phrase after the Ca fix.** (Benign observation below.)
+- **Are controls comparable in style/length?** Yes.
 - **Is any control accidentally too weak?** No — 0 weak-control flags.
-- **Does T4 preserve correctness sensitivity?** Yes — T4 = "Explain {w} plainly and accurately in 3-4
-  sentences."
+- **Does T4 preserve correctness sensitivity?** Yes — "Explain {w} plainly and accurately in 3-4 sentences."
 
-## Leakage finding (the review trigger)
+## Leakage result (post-fix)
 
-**`Ca`'s `liberating_bridge` contains the Sanskrit term "Viveka"** — the only Sanskrit token in all 68 bridge
-phrases (pool-level scan). Consequence in the render: **6 per-render hits**, all `sanskrit:Viveka`:
+- **Proper Sanskrit nouns in bridge phrases:** **NONE** (the sole prior hit, `Ca`→"Viveka", is removed →
+  now "falsehood-discerning insight").
+- **IAST diacritics in bridge phrases:** **NONE.**
+- **Arm-label leakage:** **NONE.**
+- **Per-render leakage across the 8 samples × pool-based arms:** **0 hits.**
 
-| word | arm | hit |
-|---|---|---|
-| echo | A | Viveka (composition includes Ca) |
-| echo | S | Viveka |
-| ocean | A | Viveka |
-| ocean | S | Viveka |
-| music | R_deranged | Viveka (deranged partner uses Ca) |
-| silence | R_deranged | Viveka |
-
-**Why it matters:** the conditioning is fed to the generation model. If the model echoes "Viveka" into a
-Ca-conditioned output but not into non-Ca outputs, a judge could distinguish A/R by that token — a
-**leakage confound**. Conditioning text should be plain English with **no** Sanskrit/varṇa terms.
-
-**Recommended fix (next gate):** rewrite `Ca`'s `liberating_expression` to drop "Viveka" (e.g.
-"falsehood-discerning insight without egoic superiority"), then **regenerate the bridge pool** and re-run the
-leak scan. This is a lexicon edit → a separate, approved gate.
+**Benign observation (not a blocker):** two owner-authored, dictionary-English guṇa adjectives remain in
+`theory_owner_resolved` binding expressions — `rajasic` (Ra) and `sattvic` (Sa). These are common English
+philosophical adjectives, are **not** varṇa-revealing proper terms, and were authored by the theory owner.
+They are **not** changed here (that would exceed the Ca-only decision and alter owner wording); flagged for
+an optional future owner decision.
 
 ## Weak-control / comparability
 
@@ -86,21 +80,23 @@ leak scan. This is a lexicon edit → a separate, approved gate.
 
 ## Status & next gate
 
-- **Status: `REVIEW_REQUIRED`** — driven solely by the `Ca`→"Viveka" Sanskrit leakage (no weak-control,
-  no arm-label leak, no malformed render).
-- **Next gate: `B1_1_ARM_CONSTRUCTION_REVIEW_FIXES`** — de-Sanskritize `Ca`'s bridge, regenerate the pool,
-  re-run the bridge validator + leak scan, then re-render.
+- **Status: `PASS_RENDER_DRY_RUN`** — no leakage, no weak control, no malformed render.
+- The **draft freeze manifest (`b1_1_freeze_manifest.draft.json`) is now STALE** (lexicon/bridge/report
+  hashes changed with the Ca fix); it is **not** updated here.
+- **Next gate: `B1_1_FREEZE_MANIFEST_REGENERATION`** (freeze validator `READY_FOR_FREEZE_REVIEW`, render
+  `PASS_RENDER_DRY_RUN`).
 
 ## Final status block
 
 ```
-dry_run_status:        REVIEW_REQUIRED (Ca -> "Viveka" Sanskrit leakage)
+dry_run_status:        PASS_RENDER_DRY_RUN
 generation_run:        NO
 B1.1 frozen:           NO
 generation_authorized: NO
 word_pool:             COMMITTED_B1_POOL (8 sampled, seed 70101)
 B1 verdict:            RANDOM_OR_SCRAMBLED_MATCHES (unchanged)
 Track B:               BLOCKED
+draft_manifest:        STALE (regeneration is a separate gate)
 ```
 Preserved prior: Track G `RANDOM_POLARITY_EXPLAINS` (`1fe5562`) · Track F `CORRECTNESS_DEGRADED`.
 `R_deranged` remains the crux. **Structure, not validated meaning.** Structural render only — no performance
