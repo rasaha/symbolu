@@ -1,0 +1,3533 @@
+{
+  "B1_1_GENERATION_RENDER_ONLY_REPORT": {
+    "status": "REVIEW_REQUIRED_BLOCKER",
+    "runner_mechanics": "PASS (8 arms built, seeded, deterministic, manifest-verified)",
+    "blockers": [
+      "FROZEN_ARTIFACT_LEAK: model-facing leak(s) originate in the FROZEN bridge pool and cannot be repaired post-hoc without editing a frozen artifact (INVALID_POSTHOC). Generation must NOT proceed until a re-freeze removes the leak. See leak_findings."
+    ],
+    "mode": "render-only (no model, no network, no judging, no scoring)",
+    "manifest_status": "FROZEN",
+    "generation_authorized": false,
+    "freeze_base": "d92dc2ef6c5bd9a75385e43016f915b9109c46f4",
+    "arms": [
+      "A",
+      "D",
+      "S",
+      "R_same",
+      "R_deranged",
+      "R_domain",
+      "C",
+      "X"
+    ],
+    "render": {
+      "n_words": 25,
+      "n_tasks_rendered": 4,
+      "n_arms": 8,
+      "n_conditioning_cores": 200,
+      "n_full_prompts_would_render": 800,
+      "leak_total": 10,
+      "per_arm_leak": {
+        "A": 3,
+        "D": 0,
+        "S": 3,
+        "R_same": 1,
+        "R_deranged": 3,
+        "R_domain": 0,
+        "C": 0,
+        "X": 0
+      },
+      "leak_findings": [
+        {
+          "token": "artha",
+          "category": "sanskrit_labels",
+          "count": 10,
+          "arms": [
+            "A",
+            "R_deranged",
+            "R_same",
+            "S"
+          ],
+          "words": [
+            "freedom",
+            "friendship",
+            "integrity",
+            "justice",
+            "mountain",
+            "ocean",
+            "patience"
+          ],
+          "varna_source": [
+            "Śa/liberating"
+          ],
+          "blocker": "FROZEN_ARTIFACT_LEAK — requires re-freeze (bridge pool is frozen; cannot be edited without INVALID_POSTHOC and a new manifest)"
+        }
+      ],
+      "empty_arms": [],
+      "full_prompt_examples": [
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "A",
+          "prompt": "Soft orientation, not a definition: the inflated 'I did / I control this' ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; measured speech saying only what is warranted — trims expression to exactly the warranted amount ; sattvic clarity/order owned as purity, superiority, or attachment to harmony. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "547477c76602bf203b2e49f1aa7afc7cf3c01c41192519c6a0a38c2ed76d3227"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "D",
+          "prompt": "Soft orientation, not a definition: justice — fair treatment according to what is right; related senses: fairness, equity, impartiality, righteousness. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "9f601627a763761db51ae19bd2f0a2849937235dccf21a475562b99ced2f2a4d"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "S",
+          "prompt": "Soft orientation, not a definition: measured speech saying only what is warranted — trims expression to exactly the warranted amount ; the inflated 'I did / I control this' ; sattvic clarity/order owned as purity, superiority, or attachment to harmony ; sattvic clarity/order owned as purity, superiority, or attachment to harmony. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "2f18a3d337876561df8ffd32e0646484ddef858f9080594e2e5f8167d70d843d"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "R_same",
+          "prompt": "Soft orientation, not a definition: neglect of what actually has value ; self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance ; directed energy without bondage — converts force into non-compulsive action ; alert wakefulness rising from torpor — lifts dullness and sleep into active alertness. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "f65b8e1d7d66a1aac90f911ff5d0b4e3171febbe442644652780f46809a0adcf"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "R_deranged",
+          "prompt": "Soft orientation, not a definition: purposeful action without possessive bondage — uses aim and artha without identity or ownership ; the sting at another's success. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "55cdeec60cb1b89395ba888b020972b69179f6c4f685bdb9ed4a741b3f8f740b"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "R_domain",
+          "prompt": "Soft orientation, not a definition: warm buoyancy lifting one's own dejection — raises one's own dejection into affectionate uplift ; sympathetic gladness at another's fortune — converts the sting at another's fortune into shared gladness ; self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "20025d0f8e3a9f27e6f11ee8747597c6e725d2fce3ddf46b1d210ad7061100b5"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "C",
+          "prompt": "Soft orientation, not a definition: onset 'JH', 2 vowel nucleus(es), final 'S', 4 consonant positions. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "ed67a7f28b3ce35d275e99b2848a4497f718df299dd9f236bd6f097b9da121c0"
+        },
+        {
+          "word": "justice",
+          "task": "T1",
+          "arm": "X",
+          "prompt": "Soft orientation, not a definition: this item has no additional symbolic orientation; read the wording in the ordinary way. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "803607b432d4a5a37f397ce70eb9bce5049ae22146d072d31b85a23544e26c63"
+        }
+      ]
+    },
+    "cores": [
+      {
+        "word": "grief",
+        "arm": "A",
+        "core_sha256": "450bf5ea5e12bc2851a3b39bd05ec50eafdffbced676919268e71d555bbe6463",
+        "n_chars": 161,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ga",
+              "binding"
+            ],
+            [
+              "Ra",
+              "liberating"
+            ],
+            [
+              "Pha",
+              "binding"
+            ]
+          ],
+          "n_varnas": 3,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "D",
+        "core_sha256": "109eadcf069fe1249087b2f3b8e593819e7ff9781e14171f16ce5a871080a766",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "S",
+        "core_sha256": "8962c072cb165407e625e5c9443b3bcdd2c47b73ae18c7ddd55585ef2948b4b0",
+        "n_chars": 161,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 3,
+          "warn": []
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "R_same",
+        "core_sha256": "e53c6b3b1d879d13ae8a08a181b80e5a254d9eba94d9346a9993df0d0446b1f7",
+        "n_chars": 262,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 3,
+          "excluded_own": [
+            "ga",
+            "pha",
+            "ra"
+          ]
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "R_deranged",
+        "core_sha256": "6a2d0d66d9ae49b784307e225f07b96e7abf65da9af810d5b0c711d8d886c8d7",
+        "n_chars": 178,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "apathy",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Pa",
+                "liberating"
+              ],
+              [
+                "Ta",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "R_domain",
+        "core_sha256": "8be95bb3aed7868223e5e9b743288d47e76bd8c1a04cb63cb317cad81204d0b1",
+        "n_chars": 195,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "cognition/knowledge",
+          "n_picked": 3,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "C",
+        "core_sha256": "fcbe6ef5b2cad9164578df016cf0fa79a9a467e16c070129d53a80e6b9a1446f",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "grief",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "A",
+        "core_sha256": "8bdf29efc91ec77da24e04b91dcfefeac9fa261d7d419cb2e1c11b148d31a579",
+        "n_chars": 89,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ka",
+              "binding"
+            ],
+            [
+              "Ja",
+              "binding"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "D",
+        "core_sha256": "20ff23bdcad22a4a4342b8daa452e09f65121836b69546d60b8e80a80e953e35",
+        "n_chars": 101,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "S",
+        "core_sha256": "902355925aaa3e3ea0eff2e7388382afc6e416d9d4eae6b454dc7441c49717d7",
+        "n_chars": 89,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "R_same",
+        "core_sha256": "4add2a7e92610b996b88fc95c5fb438248fc0cbf4f93ad8318bd6ecf7550183d",
+        "n_chars": 221,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "ja",
+            "ka"
+          ]
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "R_deranged",
+        "core_sha256": "a4524788bc039a51aa7060a3b08518601e6b1adc25cf6f88b5934d90bec530cd",
+        "n_chars": 142,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "autumn",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṭa",
+                "liberating"
+              ],
+              [
+                "Ma",
+                "binding"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "R_domain",
+        "core_sha256": "85ab69fc53b66400b14d0c6d78dafdbe3715bce2d266f264f740e00381f7c5e4",
+        "n_chars": 76,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "body/health",
+          "mismatched_bucket": "material/object",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "C",
+        "core_sha256": "8e86fc2c2a78f886f77b072c6fd3700214a92b3a7ed47de2002fd28915888184",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "courage",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "A",
+        "core_sha256": "118dcc5df7adf9bd8c0768075fe1c1ce2df912adc4d912f7af48a47e2abaa8a1",
+        "n_chars": 242,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "varna_sequence": [
+            [
+              "Pa",
+              "binding"
+            ],
+            [
+              "Śa",
+              "liberating"
+            ],
+            [
+              "Ṇa",
+              "binding"
+            ],
+            [
+              "Sa",
+              "binding"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "D",
+        "core_sha256": "5c539136fd5215a3d511d178d4211dc5d35e8ef381fe6a59fcc5b3a87860e3b4",
+        "n_chars": 110,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "S",
+        "core_sha256": "a76f0dd9c0c42d4541d3c2a482928283240970cd3a712d7341f8df1408204f8f",
+        "n_chars": 242,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "R_same",
+        "core_sha256": "1d0686b95b7ac718070c73541b986ef0ca168b6200ef7d688b3c9290a4211c4d",
+        "n_chars": 155,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "nna",
+            "pa",
+            "sa",
+            "sha"
+          ]
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "R_deranged",
+        "core_sha256": "f60b6ad21b1b99f1f9ccbb945921e3148e98a661d83d8a18e1cb9f7ab47f8a95",
+        "n_chars": 223,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "anarchy",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "liberating"
+              ],
+              [
+                "Ka",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "R_domain",
+        "core_sha256": "4e5bedc1d6cc38c5feb61bead3b9beb8bed55504af020d9f325a4d9fc2ec6ce5",
+        "n_chars": 204,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "social/relation",
+          "mismatched_bucket": "protection/harm",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "C",
+        "core_sha256": "b16c986dec42798d8a71e57d024b1ba4f00bb38f5bce7305dceeac990c300fab",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "patience",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "A",
+        "core_sha256": "dfc3d3f2a5aa524570139f8c946dc58325cecaab9a295b212ae71b33b88576a9",
+        "n_chars": 294,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ja",
+              "binding"
+            ],
+            [
+              "Sa",
+              "binding"
+            ],
+            [
+              "Ṭa",
+              "liberating"
+            ],
+            [
+              "Sa",
+              "binding"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "D",
+        "core_sha256": "4a26f2fb7ae60ad5ab60b1ea95f0b4c98891612bea765609a17a5047d1834783",
+        "n_chars": 114,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "S",
+        "core_sha256": "9337f0d2313982e881045ef7691401d0b8d5ea8c9f40eb23de25b1f84f551bd3",
+        "n_chars": 294,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "R_same",
+        "core_sha256": "948aa6de843faefbc7a1b9b9bc7c62bde785b3bcd46dfffa2c18b7dca507e164",
+        "n_chars": 312,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "ja",
+            "sa",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "R_deranged",
+        "core_sha256": "eae6bb369121d66945051abce0f9cdcd20db60a7d1e7fa9b4f356d53ddf61436",
+        "n_chars": 128,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "source_word": "ocean",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Śa",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "R_domain",
+        "core_sha256": "1fa4fac1bcb5d66f995ff2903ff1a104c98c96f359f1d9f19cda42de6c1def45",
+        "n_chars": 314,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "ethical/order",
+          "mismatched_bucket": "emotion/affect",
+          "n_picked": 3,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "C",
+        "core_sha256": "5cda6dafa62499d598d7a862a52d679acb277b10a07e31f9c14a7304fdb4abb8",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "justice",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "A",
+        "core_sha256": "52b1998c4feb6ebaa7fd67d7d7ae4ca8313333f886758532f02d3367f7ef2fb1",
+        "n_chars": 302,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Sa",
+              "binding"
+            ],
+            [
+              "La",
+              "liberating"
+            ],
+            [
+              "Ṇa",
+              "binding"
+            ],
+            [
+              "Sa",
+              "binding"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "D",
+        "core_sha256": "00b99e6cec0c320d8bae293ab6428f1ede6016f97616a75d7e18d8b57468c8d3",
+        "n_chars": 76,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "S",
+        "core_sha256": "e132b11ab1237c4c9eaee661473c427ab0165c33afa61a88f2c438adf2abe103",
+        "n_chars": 302,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "R_same",
+        "core_sha256": "9e792e6031ecdc9e6fb3cc3f33df23cd316ef3cac9feead73e13e517ebec1402",
+        "n_chars": 375,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "la",
+            "nna",
+            "sa"
+          ]
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "R_deranged",
+        "core_sha256": "511c9a0b8db5ac6d93e95bcd61628daf3a881133aca68979c1094bce761b62f9",
+        "n_chars": 179,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "order",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ra",
+                "binding"
+              ],
+              [
+                "Ḍa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "R_domain",
+        "core_sha256": "1eb9fa8f18e05785f2dc0fd9c81c6b4757ed1525b248f4732566028e9e7011aa",
+        "n_chars": 231,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "protection/harm",
+          "mismatched_bucket": "cosmic/abstract",
+          "n_picked": 4,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "C",
+        "core_sha256": "98d240877bae554f4bede3796fd1d06ad97a3b1f80a663f8060661b0dfef04d8",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "silence",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "A",
+        "core_sha256": "66b09ce5c20818f77bca2c753e9ae2b79f570559b749a0c8ec94cbfbe4671986",
+        "n_chars": 208,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ma",
+              "binding"
+            ],
+            [
+              "Ṇa",
+              "binding"
+            ],
+            [
+              "Ṭa",
+              "liberating"
+            ],
+            [
+              "Ṇa",
+              "binding"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "D",
+        "core_sha256": "008e461290d48c982fc8dd76cf200e13e7903717c646079b3e6ceed7f395b9f7",
+        "n_chars": 89,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "S",
+        "core_sha256": "2bdb2acd4e1cbff4d57853da5bd92420b9c96f4f08259ef5c20d754ac3da0907",
+        "n_chars": 208,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "R_same",
+        "core_sha256": "1b864b969c4c467150168a6aaf70e5210ddcfc3546c3dd901466c3b29369cb58",
+        "n_chars": 373,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "ma",
+            "nna",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "R_deranged",
+        "core_sha256": "65c57573305aa56959d63806cd65c4c3e0cd934681098844c099a98dcbb94f92",
+        "n_chars": 420,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "anonymity",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "liberating"
+              ],
+              [
+                "Ma",
+                "liberating"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "R_domain",
+        "core_sha256": "a9bd613cd4853284a1d5136edeb5775d082a41fa8623ca5804d28ac224c0e76b",
+        "n_chars": 359,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "social/relation",
+          "mismatched_bucket": "material/object",
+          "n_picked": 4,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "C",
+        "core_sha256": "a112140916ab22460417b4471cc595296acd8fa7505ae4806e215c15e3e91ef5",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "mountain",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "river",
+        "arm": "A",
+        "core_sha256": "48ec268014947c20bcd961963d65a3f574120af52bae7d4b6b6daf38616a9791",
+        "n_chars": 257,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ra",
+              "binding"
+            ],
+            [
+              "Va",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "river",
+        "arm": "D",
+        "core_sha256": "6faed385e05ec77a0207f4b0105ebb58f576f7288e386db0cefdb5d79b4433cd",
+        "n_chars": 103,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "river",
+        "arm": "S",
+        "core_sha256": "b6b853f91c05c65bd1aa4c4db5c2c4cbd1a9048eb68862888b0b47264dafc7fc",
+        "n_chars": 257,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "river",
+        "arm": "R_same",
+        "core_sha256": "ea4ece3b19d0ff74e3f03fe16159822bdeebea6bcd2809464b5beed42fc68173",
+        "n_chars": 154,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "ra",
+            "va"
+          ]
+        }
+      },
+      {
+        "word": "river",
+        "arm": "R_deranged",
+        "core_sha256": "01a4db25f9a120e5c6b07f55c2d51f9410c031d0400ee88efbd24d484330a469",
+        "n_chars": 357,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "integrity",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ],
+              [
+                "Ga",
+                "binding"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 5,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "river",
+        "arm": "R_domain",
+        "core_sha256": "0d42543721fe56cc38525b1532640a42b21970a7e744f487401aa9b30338861e",
+        "n_chars": 227,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "ethical/order",
+          "mismatched_bucket": "cognition/knowledge",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "river",
+        "arm": "C",
+        "core_sha256": "fa611aea8f401002a324b4fd729ea1eddc9c486c22b4277991f2f68494e9a9df",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "river",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "music",
+        "arm": "A",
+        "core_sha256": "c8ceef258e0b59ca5048fba43dee85e36d695c4d586aff1e24727ecd2692f382",
+        "n_chars": 299,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ma",
+              "binding"
+            ],
+            [
+              "Ya",
+              "liberating"
+            ],
+            [
+              "Sa",
+              "liberating"
+            ],
+            [
+              "Ka",
+              "binding"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "music",
+        "arm": "D",
+        "core_sha256": "390b076feaa55eaa620e71e7e70d38163187f325616e7aa6e52164077a8e31cd",
+        "n_chars": 95,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "music",
+        "arm": "S",
+        "core_sha256": "b6a82403ed8fa304afa6d34f87d6a47eaf5eb0a79c20c7c4f480a00bd88875b9",
+        "n_chars": 299,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "music",
+        "arm": "R_same",
+        "core_sha256": "6a3af931ff953b19226b43e5218ec8a9bf51b5f22be0da411d5dbd059b0a4f3a",
+        "n_chars": 323,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "ka",
+            "ma",
+            "sa",
+            "ya"
+          ]
+        }
+      },
+      {
+        "word": "music",
+        "arm": "R_deranged",
+        "core_sha256": "8e820c7f8aaf968e13494fdae15b0aa30037e07c6e59859821e1ae72cb977959",
+        "n_chars": 282,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "honesty",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "liberating"
+              ],
+              [
+                "Sa",
+                "binding"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 3,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "music",
+        "arm": "R_domain",
+        "core_sha256": "cc0827ce0343d896e2374d3319347656ec13113843ed6e73c3a95526fe262c24",
+        "n_chars": 291,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "social/relation",
+          "n_picked": 4,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "music",
+        "arm": "C",
+        "core_sha256": "be26bdaf763dd0f77fd06ddf5ffcc477382b69538ba5709212474f17ec8f0f73",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "music",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "A",
+        "core_sha256": "d8d7226407ca1ed43921bba1bc5046876b83637660c06ded16cd682fb885e253",
+        "n_chars": 313,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "varna_sequence": [
+            [
+              "Pha",
+              "binding"
+            ],
+            [
+              "Ra",
+              "liberating"
+            ],
+            [
+              "Ṇa",
+              "binding"
+            ],
+            [
+              "Ḍa",
+              "binding"
+            ],
+            [
+              "Śa",
+              "liberating"
+            ],
+            [
+              "Pa",
+              "binding"
+            ]
+          ],
+          "n_varnas": 6,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "D",
+        "core_sha256": "5e71a2cf949710dfb6d46c094082b9c38e7309a634e3a4e69604163d497b9bdd",
+        "n_chars": 121,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "S",
+        "core_sha256": "0cb01bb6118189b4b82a56a686a2f1beefd72b35b8780f176cd60a6c31cdea0a",
+        "n_chars": 313,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "n_varnas": 6,
+          "warn": []
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "R_same",
+        "core_sha256": "d2d2cf1e228b4110d922a34b79f34f56dcb43c797bb238d8e7c8b51f70833aea",
+        "n_chars": 400,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 6,
+          "excluded_own": [
+            "dda",
+            "nna",
+            "pa",
+            "pha",
+            "ra",
+            "sha"
+          ]
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "R_deranged",
+        "core_sha256": "dfc3d3f2a5aa524570139f8c946dc58325cecaab9a295b212ae71b33b88576a9",
+        "n_chars": 294,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "justice",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ja",
+                "binding"
+              ],
+              [
+                "Sa",
+                "binding"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ],
+              [
+                "Sa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "R_domain",
+        "core_sha256": "505ba013591ae8d04a6ea0f5a61d130b24876ad2128c67c3f7c428965904148b",
+        "n_chars": 320,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "social/relation",
+          "n_picked": 6,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "C",
+        "core_sha256": "1c4e89e9a7aae09776019fd8062c8b0c3c1d3d6aa0a76f09fc48e03391fa3346",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "friendship",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "A",
+        "core_sha256": "dc9678fae2c4ce6bad105af9fbb0a3fbba0eda1d31278bbd9d62a1d4c1d37602",
+        "n_chars": 194,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṭa",
+              "binding"
+            ],
+            [
+              "Ca",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "D",
+        "core_sha256": "8f91b3cdfe413daa69d63de822fa1774b5a4eccb13b44907a1eb4f281abc8e5e",
+        "n_chars": 94,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "S",
+        "core_sha256": "afa44914229edbe9254208f617eb3a95de2b2f8c96f82a5ccf136a19f2ffe998",
+        "n_chars": 194,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "R_same",
+        "core_sha256": "78a909f05073c0d3916682b38884d97143e19b2e557dccde701c5a037b211ad9",
+        "n_chars": 149,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "ca",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "R_deranged",
+        "core_sha256": "52b1998c4feb6ebaa7fd67d7d7ae4ca8313333f886758532f02d3367f7ef2fb1",
+        "n_chars": 302,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "silence",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Sa",
+                "binding"
+              ],
+              [
+                "La",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Sa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "R_domain",
+        "core_sha256": "3b904f691237667eb7ac78d150f12134251b9747cd923b7ae0ddf1c56499608d",
+        "n_chars": 78,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "cognition/knowledge",
+          "mismatched_bucket": "body/health",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "C",
+        "core_sha256": "1131e0623530aac3cf2ab30b1b03d8a6b8aecbe666f663b2cf2ad16189b020f7",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "teacher",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "A",
+        "core_sha256": "d7da4f11f493464aba1c287a7806e1f5d945156b9d9d4bbf0da11d2dee986d54",
+        "n_chars": 155,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Śa",
+              "binding"
+            ],
+            [
+              "Ḍa",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "D",
+        "core_sha256": "f2b51671ca4ec3b681f0ba9490d97f02493be6326e77624caeb2dd3b7a545ef2",
+        "n_chars": 98,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "S",
+        "core_sha256": "d5527119bb04a283a3e48a284ae38a48288c0f6519a06730e7e531efd925d539",
+        "n_chars": 155,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "R_same",
+        "core_sha256": "2e94141c2d2213f8eda0ce1262f0756bf21fb401acb60fb11017d90de9472c05",
+        "n_chars": 118,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "dda",
+            "sha"
+          ]
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "R_deranged",
+        "core_sha256": "2953244bfa8eb6e18a96d92d90ae4a9352da87c77701e3f1a6da917471d47999",
+        "n_chars": 224,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "empathy",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ma",
+                "binding"
+              ],
+              [
+                "Pa",
+                "liberating"
+              ],
+              [
+                "Ta",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 3,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "R_domain",
+        "core_sha256": "baeab34419c0e0d4e5bed76b7a893a3230e3eca01c4366a806904b377b1e9686",
+        "n_chars": 185,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "social/relation",
+          "mismatched_bucket": "motion/action",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "C",
+        "core_sha256": "d8d1372f881cdc6ca88877311d982e8886540b4710a69a2f0af5448197253fae",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "shadow",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "A",
+        "core_sha256": "57512b1c6860d50a76d9029c8bcf8eb7e03d0d5900d739ac46ae69aa13a5a579",
+        "n_chars": 251,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Pha",
+              "binding"
+            ],
+            [
+              "Ra",
+              "liberating"
+            ],
+            [
+              "Ḍa",
+              "liberating"
+            ],
+            [
+              "Ma",
+              "binding"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "D",
+        "core_sha256": "9083bae5c8f714e1c6f0ed576ec1c4835b60e26a493fc74a36ed95669bc8c01d",
+        "n_chars": 107,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "S",
+        "core_sha256": "70c46a8142fb9107eca8ff28a2c8d05e8768380cb349508b5b02eff48da4ed1f",
+        "n_chars": 251,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "R_same",
+        "core_sha256": "9f2cad18655bd7ab66360298d23d71cc36a7b984b773ee26b75fe467390f3bba",
+        "n_chars": 383,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "dda",
+            "ma",
+            "pha",
+            "ra"
+          ]
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "R_deranged",
+        "core_sha256": "d8d7226407ca1ed43921bba1bc5046876b83637660c06ded16cd682fb885e253",
+        "n_chars": 313,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "source_word": "friendship",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Pha",
+                "binding"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Ḍa",
+                "binding"
+              ],
+              [
+                "Śa",
+                "liberating"
+              ],
+              [
+                "Pa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 6,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "R_domain",
+        "core_sha256": "ee4a0ebcdbb558d2f0a481cf90ece1ac29d3fb98c778bcc4ff39c9329a1f03bf",
+        "n_chars": 229,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "material/object",
+          "n_picked": 4,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "C",
+        "core_sha256": "3685e9bda9fdcefc0a25d6c09e56ebe82f0b023dc29e93fee2fe0351565d4670",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "freedom",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "A",
+        "core_sha256": "8e820c7f8aaf968e13494fdae15b0aa30037e07c6e59859821e1ae72cb977959",
+        "n_chars": 282,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṇa",
+              "liberating"
+            ],
+            [
+              "Sa",
+              "binding"
+            ],
+            [
+              "Ṭa",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 3,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "D",
+        "core_sha256": "b94ea7ed494fa8c6a1114ad935cbed4bde2dd386797ee99c50d0cfafdc62510b",
+        "n_chars": 107,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "S",
+        "core_sha256": "131cb441d6a9a89bf8728703ee1b84227b0c4a78dffb05e1d42e35ebe9c42592",
+        "n_chars": 282,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 3,
+          "warn": []
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "R_same",
+        "core_sha256": "d54b573850ff5d0624dd3036dc9b2527b1754479ef3ff9ce711bcff70985498c",
+        "n_chars": 300,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 3,
+          "excluded_own": [
+            "nna",
+            "sa",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "R_deranged",
+        "core_sha256": "7a7a500777c929c267a99250d3dedf196b2e971edd1f8a35f543d1a0f104b49a",
+        "n_chars": 203,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "envy",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Va",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "R_domain",
+        "core_sha256": "6d24301d1097693992459152f51e5dc34444b58f7704ef8323d318f8d4d2fe0e",
+        "n_chars": 255,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "ethical/order",
+          "mismatched_bucket": "motion/action",
+          "n_picked": 3,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "C",
+        "core_sha256": "1465c1f430a6ec86158ef4ed9f1380b045e44b3c746238790ebba5862fc987e1",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "honesty",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "A",
+        "core_sha256": "2953244bfa8eb6e18a96d92d90ae4a9352da87c77701e3f1a6da917471d47999",
+        "n_chars": 224,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ma",
+              "binding"
+            ],
+            [
+              "Pa",
+              "liberating"
+            ],
+            [
+              "Ta",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 3,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "D",
+        "core_sha256": "8fb0ceec530f41811f014922253f1538d36b0f7378c56c97de4c26ee4d362e9e",
+        "n_chars": 115,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "S",
+        "core_sha256": "3489c8b95b929493922897263e3628aa8e33ee3ea4946c4d98069413ee5be4f8",
+        "n_chars": 224,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 3,
+          "warn": []
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "R_same",
+        "core_sha256": "bf7a26f45525c80f7a1a55b8c170f6a2d4023bfaf0ec333df3147a189961039d",
+        "n_chars": 252,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 3,
+          "excluded_own": [
+            "ma",
+            "pa",
+            "ta"
+          ]
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "R_deranged",
+        "core_sha256": "578fc01b918145bb8025c29f4077cd3eb1d1b5de83e0f96f7bacbdd1abfd1716",
+        "n_chars": 223,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "amoral",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ma",
+                "liberating"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ],
+              [
+                "La",
+                "binding"
+              ]
+            ],
+            "n_varnas": 3,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "R_domain",
+        "core_sha256": "dbe261a46bf55d226dbcc277a3429ee483579e75c96c744a574fc6bb327e738e",
+        "n_chars": 331,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "body/health",
+          "mismatched_bucket": "ethical/order",
+          "n_picked": 3,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "C",
+        "core_sha256": "3b04845e6c212fdf43722cce4d9e6ee060a1c334fb1c869fc9eaefaf109817e3",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "empathy",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "A",
+        "core_sha256": "eae6bb369121d66945051abce0f9cdcd20db60a7d1e7fa9b4f356d53ddf61436",
+        "n_chars": 128,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "varna_sequence": [
+            [
+              "Śa",
+              "liberating"
+            ],
+            [
+              "Ṇa",
+              "binding"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "D",
+        "core_sha256": "a885f24aa9cafcba58506832890f0a55f6dda019b6544592d6dc4b188fa66ab1",
+        "n_chars": 78,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "S",
+        "core_sha256": "5c87df7556d456ecd9bd4aad37247447d3a3179a617271237b4c7069ca17aef9",
+        "n_chars": 128,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "R_same",
+        "core_sha256": "eaf1c5c2010477fe735302219ed855fda19908c9265d19865e5deb4b942c1dec",
+        "n_chars": 104,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "nna",
+            "sha"
+          ]
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "R_deranged",
+        "core_sha256": "c8ceef258e0b59ca5048fba43dee85e36d695c4d586aff1e24727ecd2692f382",
+        "n_chars": 299,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "music",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ma",
+                "binding"
+              ],
+              [
+                "Ya",
+                "liberating"
+              ],
+              [
+                "Sa",
+                "liberating"
+              ],
+              [
+                "Ka",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "R_domain",
+        "core_sha256": "0c9e6944bef4c2082cc6c3d7116aad02ac3101251c39edc44cd841b150c38b9e",
+        "n_chars": 68,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "material/object",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "C",
+        "core_sha256": "80c52ef624e06894ab3434fa143c8342aa7aa0052ec50e73590132bc765abe01",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "ocean",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "A",
+        "core_sha256": "7a7a500777c929c267a99250d3dedf196b2e971edd1f8a35f543d1a0f104b49a",
+        "n_chars": 203,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṇa",
+              "binding"
+            ],
+            [
+              "Va",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "D",
+        "core_sha256": "221971c70c6ac615a9a0b1a4a2799401b87665930c434e44a40fad94b0184dd6",
+        "n_chars": 109,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "S",
+        "core_sha256": "223da68eecb992f2987865186fc156f806945160adc0a111f3124465ec298666",
+        "n_chars": 203,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "R_same",
+        "core_sha256": "258a4ff25b27fdf6617e900ae664c08369273def73141a73520533d020a5a252",
+        "n_chars": 232,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "nna",
+            "va"
+          ]
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "R_deranged",
+        "core_sha256": "55835971ff10a003a3125a191bff71a417444ecb34589e2a76a39b57ed4ca0ec",
+        "n_chars": 342,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "asymmetry",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Sa",
+                "liberating"
+              ],
+              [
+                "Ma",
+                "liberating"
+              ],
+              [
+                "Ṭa",
+                "binding"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "R_domain",
+        "core_sha256": "ee414f479d477c4b6c9030d2458bb358e53d498550804d6692aa572e4cf702f8",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "ethical/order",
+          "mismatched_bucket": "material/object",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "C",
+        "core_sha256": "95787bf74b36f1d17a7860671e0c4833c93696ae766790902082773c9298868d",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "envy",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "order",
+        "arm": "A",
+        "core_sha256": "511c9a0b8db5ac6d93e95bcd61628daf3a881133aca68979c1094bce761b62f9",
+        "n_chars": 179,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ra",
+              "binding"
+            ],
+            [
+              "Ḍa",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "order",
+        "arm": "D",
+        "core_sha256": "6e8bd77b361f166f5abf9c4a44ac5e5500ea8d75f8ae7f96ffa6defcaf46b6e4",
+        "n_chars": 109,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "order",
+        "arm": "S",
+        "core_sha256": "ebbd3ee164b3e1c4a608f563dcf03d2a90b058aed737686df6b37d740038c3ed",
+        "n_chars": 179,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "order",
+        "arm": "R_same",
+        "core_sha256": "1ba366683647406dfa6907194df4a25f6cfe50751bef861353abbf2596949863",
+        "n_chars": 155,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "dda",
+            "ra"
+          ]
+        }
+      },
+      {
+        "word": "order",
+        "arm": "R_deranged",
+        "core_sha256": "450bf5ea5e12bc2851a3b39bd05ec50eafdffbced676919268e71d555bbe6463",
+        "n_chars": 161,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "grief",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ga",
+                "binding"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ],
+              [
+                "Pha",
+                "binding"
+              ]
+            ],
+            "n_varnas": 3,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "order",
+        "arm": "R_domain",
+        "core_sha256": "85ab69fc53b66400b14d0c6d78dafdbe3715bce2d266f264f740e00381f7c5e4",
+        "n_chars": 76,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "social/relation",
+          "mismatched_bucket": "material/object",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "order",
+        "arm": "C",
+        "core_sha256": "e98029ce41bf74314a8c7d21e9f4e7b98ebc01582a83f829f3069d9ea52c6394",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "order",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "A",
+        "core_sha256": "01a4db25f9a120e5c6b07f55c2d51f9410c031d0400ee88efbd24d484330a469",
+        "n_chars": 357,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṇa",
+              "binding"
+            ],
+            [
+              "Ṭa",
+              "liberating"
+            ],
+            [
+              "Ga",
+              "binding"
+            ],
+            [
+              "Ra",
+              "liberating"
+            ],
+            [
+              "Ṭa",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 5,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "D",
+        "core_sha256": "827f1e30ada538e65ec942f277b5d9a2a8f66398a59e97752ff05728fec5c6d1",
+        "n_chars": 101,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "S",
+        "core_sha256": "bb9c2d2e2e0b384ef49209ca145f4a8aa63f70af326a046d0c7b16292a624067",
+        "n_chars": 357,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 5,
+          "warn": []
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "R_same",
+        "core_sha256": "50b37c7eb4c2ef807379cab053bba74555ea4165f4be8c85b13b1c1b5f00aa2e",
+        "n_chars": 430,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 5,
+          "excluded_own": [
+            "ga",
+            "nna",
+            "ra",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "R_deranged",
+        "core_sha256": "118dcc5df7adf9bd8c0768075fe1c1ce2df912adc4d912f7af48a47e2abaa8a1",
+        "n_chars": 242,
+        "leak_hits": 1,
+        "leak_detail": {
+          "iast_diacritics": [],
+          "sanskrit_labels": [
+            "artha"
+          ],
+          "varna_names": [],
+          "arm_labels": []
+        },
+        "meta": {
+          "source_word": "patience",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Pa",
+                "binding"
+              ],
+              [
+                "Śa",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Sa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "R_domain",
+        "core_sha256": "32ee9caa1b202724e7b4cecdc323c2b4a25974dca35ea66054ac975f086627a3",
+        "n_chars": 204,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "protection/harm",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "C",
+        "core_sha256": "39673fe434c583a65d578bdcee9ea3a45dc5715c9de327a0f3d655927b836664",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "integrity",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "A",
+        "core_sha256": "a4524788bc039a51aa7060a3b08518601e6b1adc25cf6f88b5934d90bec530cd",
+        "n_chars": 142,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṭa",
+              "liberating"
+            ],
+            [
+              "Ma",
+              "binding"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "D",
+        "core_sha256": "6ab545f2c4a0b394e85476695e4d4c1eb5e2d8785b9ddcf76fbf99dab0d2308c",
+        "n_chars": 95,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "S",
+        "core_sha256": "933a5aca992e0a27ae353ae8704804b4ec70164256775a829f758a38f63e5b82",
+        "n_chars": 142,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "R_same",
+        "core_sha256": "a6d4dff36c3d2d80159be4cf4d22876a1c8ffa81a859527b46c2da9ecd3511c1",
+        "n_chars": 138,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "ma",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "R_deranged",
+        "core_sha256": "66b09ce5c20818f77bca2c753e9ae2b79f570559b749a0c8ec94cbfbe4671986",
+        "n_chars": 208,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "mountain",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ma",
+                "binding"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ],
+              [
+                "Ṭa",
+                "liberating"
+              ],
+              [
+                "Ṇa",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "R_domain",
+        "core_sha256": "f5bb137a1f1dbfbddf07b94d7901cf87c0357a2d43fdc4939ffea7dda58ee479",
+        "n_chars": 216,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "ethical/order",
+          "mismatched_bucket": "emotion/affect",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "C",
+        "core_sha256": "bfa700d864e863b3926a2dcc5d65326451dded53c46a494821aadb5488d5de3b",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "autumn",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "A",
+        "core_sha256": "b028bfa874e93cb3bb7142cc6272fe2b7f21757979aefef3b09224c11e9a57ae",
+        "n_chars": 116,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ka",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 1,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "D",
+        "core_sha256": "dc1696b7f129121714482913c21d5248c817e10687a245488bb4e49e6ef6215e",
+        "n_chars": 106,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "S",
+        "core_sha256": "b028bfa874e93cb3bb7142cc6272fe2b7f21757979aefef3b09224c11e9a57ae",
+        "n_chars": 116,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 1,
+          "warn": []
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "R_same",
+        "core_sha256": "494c455032a783cea13f99974d07db228fa820e124317844796d42c5027b70ba",
+        "n_chars": 108,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 1,
+          "excluded_own": [
+            "ka"
+          ]
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "R_deranged",
+        "core_sha256": "8bdf29efc91ec77da24e04b91dcfefeac9fa261d7d419cb2e1c11b148d31a579",
+        "n_chars": 89,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "courage",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ka",
+                "binding"
+              ],
+              [
+                "Ja",
+                "binding"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "R_domain",
+        "core_sha256": "a96a5474f635daf3a7c5120c867a8572f581b6b8c6779bc55b6d1b389e12222d",
+        "n_chars": 45,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "social/relation",
+          "n_picked": 1,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "C",
+        "core_sha256": "a5d6764de50796a8239c89631fb10021fb0f292898329b0afe24e19692a56fd0",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "echo",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "A",
+        "core_sha256": "578fc01b918145bb8025c29f4077cd3eb1d1b5de83e0f96f7bacbdd1abfd1716",
+        "n_chars": 223,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ma",
+              "liberating"
+            ],
+            [
+              "Ra",
+              "liberating"
+            ],
+            [
+              "La",
+              "binding"
+            ]
+          ],
+          "n_varnas": 3,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "D",
+        "core_sha256": "e7ece8bb56a710210254f59c8f87dba9df61d9a968b6f6e0ac7e7f20ec23c774",
+        "n_chars": 114,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "S",
+        "core_sha256": "d58e3fa000e013a92cef39f4b2abdf86890c612cdfec1beea7db528ae0a84a52",
+        "n_chars": 223,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 3,
+          "warn": []
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "R_same",
+        "core_sha256": "25f2db2281a1839e7f5e54863ff642cd25cb9a2af547b7115c94e59a44697e7f",
+        "n_chars": 225,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 3,
+          "excluded_own": [
+            "la",
+            "ma",
+            "ra"
+          ]
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "R_deranged",
+        "core_sha256": "48ec268014947c20bcd961963d65a3f574120af52bae7d4b6b6daf38616a9791",
+        "n_chars": 257,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "river",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ra",
+                "binding"
+              ],
+              [
+                "Va",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "R_domain",
+        "core_sha256": "3c08382d8e7546c66c76c5d1bd1881244bce5870a7ec1e43f3f8498a92e4f790",
+        "n_chars": 282,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "body/health",
+          "n_picked": 3,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "C",
+        "core_sha256": "718e9bf124f2462072cea7a46a725551c73c8b1f73e3ccff0acead1c4a3ca6a5",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "amoral",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "A",
+        "core_sha256": "6a2d0d66d9ae49b784307e225f07b96e7abf65da9af810d5b0c711d8d886c8d7",
+        "n_chars": 178,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Pa",
+              "liberating"
+            ],
+            [
+              "Ta",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "D",
+        "core_sha256": "9f1da5927bfbd6f4ae405055415bf78273d29d74e0000b8e67fca1c0ae290e93",
+        "n_chars": 105,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "S",
+        "core_sha256": "aee24d2e7a75f398793fb7bcd8af45ea9357b40a199a1e26d815ca4f50e149f0",
+        "n_chars": 178,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "R_same",
+        "core_sha256": "902e45d24d45935f76289219564f87b9e3944eee84a082e2bb032f86affc4aae",
+        "n_chars": 138,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "pa",
+            "ta"
+          ]
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "R_deranged",
+        "core_sha256": "dc9678fae2c4ce6bad105af9fbb0a3fbba0eda1d31278bbd9d62a1d4c1d37602",
+        "n_chars": 194,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "teacher",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ṭa",
+                "binding"
+              ],
+              [
+                "Ca",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "R_domain",
+        "core_sha256": "32ee9caa1b202724e7b4cecdc323c2b4a25974dca35ea66054ac975f086627a3",
+        "n_chars": 204,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "body/health",
+          "mismatched_bucket": "protection/harm",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "C",
+        "core_sha256": "689f82899fb4256476d39f59be1a14e087d3843541f3d3979e81b966a3ccdf9c",
+        "n_chars": 65,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "apathy",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "A",
+        "core_sha256": "55835971ff10a003a3125a191bff71a417444ecb34589e2a76a39b57ed4ca0ec",
+        "n_chars": 342,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Sa",
+              "liberating"
+            ],
+            [
+              "Ma",
+              "liberating"
+            ],
+            [
+              "Ṭa",
+              "binding"
+            ],
+            [
+              "Ra",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "D",
+        "core_sha256": "29ccd6a65401e768e13d8eedd455ea3b3801534f8b042ae2b49c1eea024015a1",
+        "n_chars": 111,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "S",
+        "core_sha256": "61ec4f5eea21c450e8f0be9a0b9882cd9f3d00a43b68ba435164dca097723974",
+        "n_chars": 342,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "R_same",
+        "core_sha256": "31d23d6e2482e5f786061b95310fcee1e435917eb14b047a99385c89f632b1ed",
+        "n_chars": 412,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "ma",
+            "ra",
+            "sa",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "R_deranged",
+        "core_sha256": "b028bfa874e93cb3bb7142cc6272fe2b7f21757979aefef3b09224c11e9a57ae",
+        "n_chars": 116,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "echo",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Ka",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 1,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "R_domain",
+        "core_sha256": "41e9b7232091148f94fff7b59702a80ece292d65df3613b57cdcc281b7743d1b",
+        "n_chars": 208,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "motion/action",
+          "mismatched_bucket": "cosmic/abstract",
+          "n_picked": 4,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "C",
+        "core_sha256": "fb68f5429df536ee367c9936a887968595c6f1d531ee31ee2cfa698562c0b331",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "asymmetry",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "A",
+        "core_sha256": "f60b6ad21b1b99f1f9ccbb945921e3148e98a661d83d8a18e1cb9f7ab47f8a95",
+        "n_chars": 223,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṇa",
+              "liberating"
+            ],
+            [
+              "Ka",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 2,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "D",
+        "core_sha256": "0000a8c12a6780aa77b637801dffe1289fcd4aedffafec5a7239a731a6418094",
+        "n_chars": 99,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "S",
+        "core_sha256": "b9292274b176a75b14eb205ed361aa569518c757c1a68a5f211299921fdc77fa",
+        "n_chars": 223,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 2,
+          "warn": []
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "R_same",
+        "core_sha256": "68f4b4351f26090dee2194bb5f795d6b22ce1b841216929401054fe4e36088d3",
+        "n_chars": 153,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 2,
+          "excluded_own": [
+            "ka",
+            "nna"
+          ]
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "R_deranged",
+        "core_sha256": "d7da4f11f493464aba1c287a7806e1f5d945156b9d9d4bbf0da11d2dee986d54",
+        "n_chars": 155,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "shadow",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Śa",
+                "binding"
+              ],
+              [
+                "Ḍa",
+                "liberating"
+              ]
+            ],
+            "n_varnas": 2,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "R_domain",
+        "core_sha256": "e87549777011a8c101398a76afbde8a8ef98689f6d6a6a3fe8558fc00eb7abb4",
+        "n_chars": 93,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "emotion/affect",
+          "mismatched_bucket": "social/relation",
+          "n_picked": 2,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "C",
+        "core_sha256": "dd060cb71294fa58e1d7b6f8fb0783c9ba86d706803328960bfa1eede601e372",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "anarchy",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "A",
+        "core_sha256": "65c57573305aa56959d63806cd65c4c3e0cd934681098844c099a98dcbb94f92",
+        "n_chars": 420,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "varna_sequence": [
+            [
+              "Ṇa",
+              "liberating"
+            ],
+            [
+              "Ṇa",
+              "liberating"
+            ],
+            [
+              "Ma",
+              "liberating"
+            ],
+            [
+              "Ṭa",
+              "liberating"
+            ]
+          ],
+          "n_varnas": 4,
+          "warn": [],
+          "contrast_boundary_excluded": true
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "D",
+        "core_sha256": "a25be1ddf2cdc38b65353b3e9eec3d0d6956cf47f2d021133fa028c550ffc104",
+        "n_chars": 122,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning D-table (committed, NOT frozen)"
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "S",
+        "core_sha256": "aa22a68891cf530f244c828456ae2ff61f27d30c0d29bc8e34b28a63541929ee",
+        "n_chars": 420,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_varnas": 4,
+          "warn": []
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "R_same",
+        "core_sha256": "0cda06ff0d631eac2edf26a0e5bacf69aca0995c926bc56447a33f9c85d3c16b",
+        "n_chars": 219,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "n_picked": 4,
+          "excluded_own": [
+            "ma",
+            "nna",
+            "tta"
+          ]
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "R_deranged",
+        "core_sha256": "57512b1c6860d50a76d9029c8bcf8eb7e03d0d5900d739ac46ae69aa13a5a579",
+        "n_chars": 251,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source_word": "freedom",
+          "source_meta": {
+            "varna_sequence": [
+              [
+                "Pha",
+                "binding"
+              ],
+              [
+                "Ra",
+                "liberating"
+              ],
+              [
+                "Ḍa",
+                "liberating"
+              ],
+              [
+                "Ma",
+                "binding"
+              ]
+            ],
+            "n_varnas": 4,
+            "warn": [],
+            "contrast_boundary_excluded": true
+          }
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "R_domain",
+        "core_sha256": "3a7acdc9f00462fdf1e624215bb453e1468942a32f149c461e766ff92ef3e307",
+        "n_chars": 356,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "native_bucket": "emotion/affect",
+          "mismatched_bucket": "motion/action",
+          "n_picked": 4,
+          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "C",
+        "core_sha256": "d7dcbf3c5d4db4a8420f023360ccefc8fe6fdf7c745cc625c6f259e5f37597fa",
+        "n_chars": 64,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning surface facts"
+        }
+      },
+      {
+        "word": "anonymity",
+        "arm": "X",
+        "core_sha256": "0bc4e951a8f9494d1847748306990aac9104560978a99d80ef753def4bde6525",
+        "n_chars": 86,
+        "leak_hits": 0,
+        "leak_detail": null,
+        "meta": {
+          "source": "b1_real_conditioning neutral filler"
+        }
+      }
+    ],
+    "freeze_coverage_gaps": [
+      "G1: A-composition pole/cap/separator NOT pinned in the frozen arm-construction config (runner uses varna_lens vowel-attachment polarity + ' ; ' + no cap).",
+      "G2: contrast_boundary cannot be rendered (it names other varṇas -> would leak); kept in metadata only. The frozen config's 'preserve contrast_boundary' cannot apply to prompt text.",
+      "G3: R_domain word->bucket and bridge->bucket maps NOT frozen; runner uses a build-time keyword heuristic and flags R_domain NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG.",
+      "G4: word/task pool (b1_dry_run_harness.py) and D/C/X sources (b1_real_conditioning.py) are committed but NOT in the frozen artifact set."
+    ],
+    "model_access": {
+      "torch_importable": true,
+      "cuda_available": false,
+      "transformers_version": "5.13.0",
+      "huggingface_egress": "DENIED_BY_ENV_POLICY (huggingface.co 403 CONNECT). No download attempted. Real generation must run on a model-access host (RunPod)."
+    },
+    "anchors": {
+      "b1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+      "track_b": "BLOCKED",
+      "track_g": {
+        "commit": "1fe5562",
+        "label": "RANDOM_POLARITY_EXPLAINS",
+        "A_vs_R": -0.1917,
+        "A_vs_X": -0.075
+      },
+      "positive_cap": "LIMITED_GENERATION_UTILITY",
+      "crux": "R_deranged",
+      "fallback_qualification": "FALLBACK_QUALIFIED"
+    },
+    "non_claims": [
+      "structure not validated meaning",
+      "render is not evidence B1.1 works",
+      "does not authorize generation",
+      "does not unblock Track B"
+    ]
+  }
+}
