@@ -1,0 +1,106 @@
+{
+  "B1_1_FREEZE_MANIFEST": {
+    "manifest_status": "FROZEN",
+    "regenerated_after": "Ca de-Sanskritization leakage fix (e125e0c); prior draft manifest hashes were stale",
+    "freeze_status": "FROZEN_NOT_AUTHORIZED_FOR_GENERATION",
+    "generation_authorized": false,
+    "fallback_qualification": "FALLBACK_QUALIFIED",
+    "embedding_gate_status": "BLOCKED_DEPENDENCY_UNAVAILABLE",
+    "embedding_gate_reason": "HuggingFace model-host egress denial; all-MiniLM-L6-v2 unavailable under the environment egress policy (huggingface.co 403 CONNECT)",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED",
+    "track_g_anchor": {
+      "commit": "1fe5562",
+      "label": "RANDOM_POLARITY_EXPLAINS",
+      "A_vs_R": -0.1917,
+      "A_vs_X": -0.075
+    },
+    "positive_label_limit": "LIMITED_GENERATION_UTILITY",
+    "non_claims": [
+      "not ontology validation",
+      "not Sanskrit privilege",
+      "not semantic truth",
+      "not Track B unblocking"
+    ],
+    "judge_panel_warning_decision": {
+      "judge": "Meta-Llama-3-8B-Instruct",
+      "decision": "ACCEPT_WITH_CAVEAT",
+      "caveat": "heavy missing-brace repair in B1; parser/QC rules must remain strict; judge outputs must be audited",
+      "no_post_hoc_judge_selection": true
+    },
+    "bound_artifacts": [
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_experimental_contrastive_lexicon_draft.json",
+        "sha256": "434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_bridge_pool_draft.json",
+        "sha256": "c0e5460787e00177c37064d4e0355dc0644936ad1f1bea6eaca1e43c4f8c258a"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_arm_construction_config.json",
+        "sha256": "26e7899103c0ad8cc241f5a8b292f62f86f9ea99d7e0e2dba9b15e4f2cc2da9b"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_generation_config.json",
+        "sha256": "0ed50203f4da1954477adb99c1279a6bf6b798078f807798388f64f7e3c1bc87"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_seeds_config.json",
+        "sha256": "1c044278ff1ee064c35d1ebacfa0ef5b7fea4cc782d020654ee15200c07730c0"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_judge_panel_config.json",
+        "sha256": "1632b11794a98dd0b864d3e2a3e35e76614da7de8d6cd17c6a85f6f2bb4dfc74"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_scorer_config.json",
+        "sha256": "aac682fe8bf22d51eb530c40440d07fb629ee148a6b822a69c3c1f9f440befd6"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/b1_1_leak_and_packet_config.json",
+        "sha256": "09e869827be3626b327c76897886226741898b1a24187f9dd821111e28242c69"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/B1_1_PREREG.md",
+        "sha256": "a6911ab31e2df210309ff850b1138b92c8f8b0655b5db0b08cebb4aa7b3b886a"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/B1_1_BRIDGE_POOL_REVIEW_AND_PREREG_DECISION.md",
+        "sha256": "c3993367a9cd3e1cdc72a103e09ce884ec2f46cb24d785ab84726729447b43ed"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/B1_1_PREREG_REVIEW_AND_FREEZE_DECISION.md",
+        "sha256": "9f62b076fdb368ea1ec39e09a0da0c83d0ada914df0591fad2844ba613e97347"
+      },
+      {
+        "path": "experiments/primitive_sequence_recovery/B1_1_FREEZE_ARTIFACT_VALIDATION_REPORT.json",
+        "sha256": "49534b093832dcc089ef838772e35e6b65bd522d93e45b3f6c25da203ec0e80c"
+      }
+    ],
+    "n_bound_artifacts": 12,
+    "commit_hash": "e125e0cbe4f0b8e100cad818c6576a1de2b71d0c",
+    "created_at": "2026-07-05T06:19:41+00:00",
+    "authorization_statements": {
+      "does_not_authorize_generation": true,
+      "requires_freeze_finalization_gate": "B1_1_FREEZE_FINALIZATION",
+      "requires_generation_authorization_gate": "B1_1_GENERATION_AUTHORIZATION"
+    },
+    "not_ontology_validation": true,
+    "R_deranged_note": "R_deranged remains the crux; contrastivity/non-synonymy repair is necessary but not sufficient.",
+    "note": "B1.1 artifact set FROZEN; generation NOT authorized. Any post-freeze artifact edit invalidates this freeze and requires a new manifest. Structure, not validated meaning.",
+    "finalization": {
+      "finalized_at": "2026-07-05T06:38:11+00:00",
+      "finalized_from_draft_manifest_sha256": "d3afbeed40f9ef30fd3ee139dddac0ff8cb51f8f72546aaad6cdd273366bcc88",
+      "finalized_commit_base": "d92dc2ef6c5bd9a75385e43016f915b9109c46f4",
+      "finalization_decision": "FREEZE_FINALIZED_UNDER_FALLBACK_QUALIFICATION",
+      "generation_authorization_required_next": "B1_1_GENERATION_AUTHORIZATION"
+    },
+    "post_freeze_rules": {
+      "generation_not_authorized_by_this_freeze": true,
+      "separate_authorization_required": "B1_1_GENERATION_AUTHORIZATION",
+      "first_run_must_use_frozen_manifest_only": true,
+      "any_artifact_edit_after_freeze_invalidates_this_freeze": true
+    }
+  }
+}
