@@ -21,19 +21,16 @@ Non-claims: this runner does NOT authorize generation, does NOT change the B1 ve
 (RANDOM_OR_SCRAMBLED_MATCHES), does NOT unblock Track B (BLOCKED). Rendering is structural only and is
 NOT evidence that B1.1 works. R_deranged remains the crux. Structure, not validated meaning.
 
-HONEST FREEZE-COVERAGE GAPS surfaced by this build (reported, NOT silently resolved; these do NOT
-block render-only validation but MUST be pinned in a frozen artifact before the real RunPod run):
-  G1  A-composition policy (which pole per varṇa, cap, separator) is NOT pinned in the frozen
-      arm-construction config. This runner uses the varna_lens vowel-attachment polarity rule + a
-      ' ; ' separator + no cap. Deterministic, but a design choice, not a frozen one.
-  G2  contrast_boundary (frozen config says "preserve") CANNOT be rendered into model-facing text: it
-      names other varṇas (e.g. "not object-renunciation (Gha)") and would LEAK the mapping. It is kept
-      in metadata only, never in the prompt. The config wording cannot be applied literally.
-  G3  R_domain bucket maps (word->native-bucket and bridge->bucket) are NOT frozen. This runner uses a
-      documented BUILD-TIME keyword heuristic so the render is fluent and leak-checkable, and flags
-      R_domain as NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG.
-  G4  The word/task pool lives in the committed (but NOT frozen) b1_dry_run_harness.py, and D/C/X reuse
-      the committed (NOT frozen) b1_real_conditioning.py D-table / surface facts / neutral filler.
+FREEZE-COVERAGE GAPS (surfaced by the first render; PINNED in the re-freeze — see
+B1_1_POSTFREEZE_LEAK_FIX_AND_REFREEZE):
+  G1  A-composition policy (pole rule, no cap, separator) is pinned in the frozen arm config
+      arms.A.composition_policy; the runner reads the separator from it.
+  G2  contrast_boundary is pinned METADATA_ONLY in the arm/leak configs and is never rendered; the
+      runner composes A/S from binding_bridge/liberating_bridge only.
+  G3  R_domain bucket_keyword_map + bucket order + derivation rules + seed are pinned in the frozen arm
+      config; the runner LOADS them from config and persists b1_1_r_domain_assignments.json.
+  G4  The word/task pool + D/C/X + G2P-routing source paths are recorded in the generation config and
+      hash-bound in the freeze manifest referenced_source_hashes.
 
 Usage:
   # default: safe render-only structural validation (no model, no network)
@@ -62,16 +59,33 @@ import varna_lens as V                 # noqa: E402  real G2P->varṇa pipeline 
 import b1_dry_run_harness as B         # noqa: E402  committed word/task pool + WRAPPER (NOT frozen)
 import b1_real_conditioning as RC      # noqa: E402  committed D-table / surface / neutral (NOT frozen)
 
+# Performance only (no behavior change): nltk cmudict.dict() rebuilds the whole dict on every call, and
+# the G2P routing is invoked hundreds of times. Cache it once so render-only/dry-run/audit stay fast.
+try:
+    import nltk.corpus as _nc
+    _CMU_CACHE = _nc.cmudict.dict()
+    _nc.cmudict.dict = lambda: _CMU_CACHE          # noqa: E731  identical data, memoized
+except Exception:                                   # noqa: BLE001  (fall back to per-call load)
+    pass
+
 MANIFEST = HERE / "b1_1_freeze_manifest.json"
 ARMS = ("A", "D", "S", "R_same", "R_deranged", "R_domain", "C", "X")
 
 
 # ============================================================ integrity gate ======================
-def verify_frozen_or_abort():
-    """Re-hash every bound artifact in the FROZEN manifest. Abort INVALID_POSTHOC on any mismatch."""
-    man = json.loads(MANIFEST.read_text(encoding="utf-8"))["B1_1_FREEZE_MANIFEST"]
-    if man.get("manifest_status") != "FROZEN":
-        raise SystemExit(f"ABORT: manifest_status is {man.get('manifest_status')!r}, not FROZEN.")
+def verify_frozen_or_abort(manifest_path=MANIFEST, require_frozen=True):
+    """Re-hash every bound artifact in the manifest. Abort INVALID_POSTHOC on any mismatch.
+
+    require_frozen=True (generation path): manifest_status MUST be FROZEN.
+    require_frozen=False (render-only bootstrap): a DRAFT_READY_FOR_FREEZE_REVIEW manifest is accepted so
+    candidate artifacts can be leak-validated BEFORE the final freeze is signed. Rendering is structural
+    and authorizes nothing; the generation path still demands the FROZEN manifest.
+    """
+    man = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))["B1_1_FREEZE_MANIFEST"]
+    status = man.get("manifest_status")
+    ok_status = {"FROZEN"} if require_frozen else {"FROZEN", "DRAFT_READY_FOR_FREEZE_REVIEW"}
+    if status not in ok_status:
+        raise SystemExit(f"ABORT: manifest_status {status!r} not in {sorted(ok_status)}.")
     bad = []
     for art in man["bound_artifacts"]:
         p = REPO / art["path"]
@@ -80,12 +94,11 @@ def verify_frozen_or_abort():
         elif hashlib.sha256(p.read_bytes()).hexdigest() != art["sha256"]:
             bad.append(f"HASH MISMATCH {art['path']}")
     if bad:
-        raise SystemExit("ABORT INVALID_POSTHOC: frozen artifact(s) changed since freeze:\n  "
+        raise SystemExit("ABORT INVALID_POSTHOC: bound artifact(s) changed vs manifest:\n  "
                          + "\n  ".join(bad))
     if man.get("generation_authorized") is not False:
         raise SystemExit("ABORT: manifest generation_authorized is not False.")
-    print(f"[ok] frozen manifest verified: all {len(man['bound_artifacts'])} bound artifacts match "
-          f"(freeze base {man['finalization']['finalized_commit_base'][:10]}).")
+    print(f"[ok] manifest verified ({status}): all {len(man['bound_artifacts'])} bound artifacts match.")
     return man
 
 
@@ -115,6 +128,13 @@ class ArmBuilder:
     def __init__(self, cfg):
         self.cfg = cfg
         self.seeds = cfg["seeds"]
+        arm = cfg["arm_config"]
+        # G1: separator is pinned in the frozen arm config's A composition_policy.
+        self.sep = arm["arms"]["A"].get("composition_policy", {}).get("separator", " ; ")
+        # G3: bucket keyword map + bucket order are pinned in the frozen arm config (authoritative).
+        rdp = arm.get("r_domain_policy", {})
+        self._bucket_keywords = rdp.get("bucket_keyword_map") or dict(self._BUCKET_KEYWORDS_FALLBACK)
+        self._buckets = tuple(self._bucket_keywords)
         pool = cfg["bridge_pool"]["entries"]
         # lexicon_key -> {varna, binding_bridge, liberating_bridge}
         self.pool = {e["lexicon_key"]: {"varna": e["varna"],
@@ -126,8 +146,10 @@ class ArmBuilder:
             self.all_bridges.append((e["lexicon_key"], "binding", e["binding_bridge"]))
             self.all_bridges.append((e["lexicon_key"], "liberating", e["liberating_bridge"]))
         self.words = list(B.PRIMARY_WORDS) + list(B.PRIVATIVE_WORDS)
+        self._poles_cache = {}                                # memo: word -> (poles, warn)
+        self._a_cache = {}                                    # memo: word -> (A_text, meta)
         self._derangement = self._build_derangement()
-        self._bridge_bucket = self._bucket_bridges()          # G3 build-time heuristic (flagged)
+        self._bridge_bucket = self._bucket_bridges()          # G3 buckets from frozen config map
 
     # -- real G2P->varṇa + vowel-attachment polarity (varna_lens rule) --------------------------
     def varna_poles(self, word):
@@ -139,6 +161,8 @@ class ArmBuilder:
           * a bare consonant (word-final / pre-consonant) -> binding
           * doubled consonant: 1st occurrence -> liberating, 2nd -> binding
         """
+        if word in self._poles_cache:
+            return self._poles_cache[word]
         ph, warn = V.phonemes_cmudict(word)
         n = len(ph)
         out = []
@@ -158,22 +182,28 @@ class ArmBuilder:
             else:
                 pole = "binding"                      # bare
             out.append((key, pole, surf))
+        self._poles_cache[word] = (out, warn)
         return out, warn
 
     def _compose(self, items):
-        """items: [(lexicon_key, pole)] -> ' ; '-joined bridge text (G1 separator/no-cap policy)."""
-        return " ; ".join(self.pool[k][pole] for k, pole in items)
+        """items: [(lexicon_key, pole)] -> separator-joined bridge text (G1 policy; separator from config)."""
+        return self.sep.join(self.pool[k][pole] for k, pole in items)
 
     # -- A: word's own real varṇa-derived bridge ------------------------------------------------
     def core_A(self, word):
+        if word in self._a_cache:
+            return self._a_cache[word]
         poles, warn = self.varna_poles(word)
         if not poles:
-            return None, {"warn": warn, "empty": True}
-        text = self._compose([(k, p) for k, p, _ in poles])
-        meta = {"varna_sequence": [(self.pool[k]["varna"], p) for k, p, _ in poles],
-                "n_varnas": len(poles), "warn": warn,
-                "contrast_boundary_excluded": True}      # G2: never rendered (leaks varṇa names)
-        return text, meta
+            res = (None, {"warn": warn, "empty": True})
+        else:
+            text = self._compose([(k, p) for k, p, _ in poles])
+            meta = {"varna_sequence": [(self.pool[k]["varna"], p) for k, p, _ in poles],
+                    "n_varnas": len(poles), "warn": warn,
+                    "contrast_boundary_excluded": True}  # G2: never rendered (leaks varṇa names)
+            res = (text, meta)
+        self._a_cache[word] = res
+        return res
 
     # -- S: word's varṇa set, seeded scramble of bridge->position -------------------------------
     def core_S(self, word):
@@ -186,7 +216,7 @@ class ArmBuilder:
         rng.shuffle(scrambled)
         if len(scrambled) > 1 and scrambled == bridges:      # force a real derangement of order
             scrambled = scrambled[1:] + scrambled[:1]
-        return " ; ".join(scrambled), {"n_varnas": len(poles), "warn": warn}
+        return self.sep.join(scrambled), {"n_varnas": len(poles), "warn": warn}
 
     # -- R_same: seeded sample from the 68-pool, excluding the word's own varṇas ----------------
     def core_R_same(self, word, n):
@@ -195,7 +225,7 @@ class ArmBuilder:
         rng = random.Random(f"{self.seeds['r_same_sample_seed']}:{word}")
         k = max(1, min(n, len(candidates)))
         picks = rng.sample(candidates, k)
-        return " ; ".join(t for _, _, t in picks), {"n_picked": k, "excluded_own": sorted(own)}
+        return self.sep.join(t for _, _, t in picks), {"n_picked": k, "excluded_own": sorted(own)}
 
     # -- R_deranged: another word's REAL A mapping (seeded derangement pi, pi(w)!=w) -------------
     def _build_derangement(self):
@@ -213,8 +243,10 @@ class ArmBuilder:
         text, meta = self.core_A(other)
         return text, {"source_word": other, "source_meta": meta}
 
-    # -- R_domain: fluent bridge from a deterministically MISMATCHED bucket (G3, build-time) -----
-    _BUCKET_KEYWORDS = {
+    # -- R_domain: fluent bridge from a deterministically MISMATCHED bucket -----------------------
+    # G3: the authoritative bucket_keyword_map is loaded from the FROZEN arm config in __init__.
+    # This fallback is used only if the config lacks the map (should not happen post-refreeze).
+    _BUCKET_KEYWORDS_FALLBACK = {
         "body/health": ["sensory", "body", "sleep", "torpor", "physical", "desire", "craving"],
         "social/relation": ["another", "others", "social", "regard", "shame", "malign", "maligned"],
         "cognition/knowledge": ["knowledge", "discern", "insight", "clarity", "knowing", "sense", "common sense"],
@@ -226,19 +258,18 @@ class ArmBuilder:
         "speech/communication": ["speech", "exaggeration", "overstat", "display", "performance", "transparency"],
         "protection/harm": ["harm", "cruelty", "protect", "shield", "compassion", "goodwill", "vulnerable"],
     }
-    _BUCKETS = tuple(_BUCKET_KEYWORDS)
 
     def _bucket_of_text(self, text):
         low = text.lower()
-        best, score = self._BUCKETS[0], -1
-        for b, kws in self._BUCKET_KEYWORDS.items():
-            s = sum(low.count(k) for k in kws)
+        best, score = self._buckets[0], -1
+        for b in self._buckets:                       # fixed bucket order for deterministic ties
+            s = sum(low.count(k) for k in self._bucket_keywords[b])
             if s > score:
                 best, score = b, s
         return best
 
     def _bucket_bridges(self):
-        m = {b: [] for b in self._BUCKETS}
+        m = {b: [] for b in self._buckets}
         for key, pole, text in self.all_bridges:
             m[self._bucket_of_text(text)].append((key, pole, text))
         return m
@@ -248,18 +279,43 @@ class ArmBuilder:
         return self._bucket_of_text(text or "")
 
     def core_R_domain(self, word, n):
+        # style_parity (pinned): R_domain must be a MISMATCHED-domain bridge that is length-comparable to
+        # A (never obviously weaker). Accumulate distinct phrases from one mismatched bucket until we have
+        # >= n phrases AND >= 0.6x A's length; prefer buckets that can reach that length.
+        a_text, _ = self.core_A(word)
+        target = len(a_text or "")
         native = self._native_bucket(word)
         rng = random.Random(f"{self.seeds['r_domain_assignment_seed']}:{word}")
-        candidate_buckets = [b for b in self._BUCKETS if b != native and self._bridge_bucket[b]]
-        if not candidate_buckets:
+        nonempty = [b for b in self._buckets if b != native and self._bridge_bucket[b]]
+        if not nonempty:
             return None, {"note": "no mismatched bucket available", "native_bucket": native}
+        able = [b for b in nonempty
+                if sum(len(t) for _, _, t in self._bridge_bucket[b]) >= 0.6 * target]
+        candidate_buckets = able or nonempty          # fall back to any non-native bucket if none suffice
         mism = rng.choice(candidate_buckets)
-        pool = self._bridge_bucket[mism]
-        k = max(1, min(n, len(pool)))
-        picks = rng.sample(pool, k)
-        return " ; ".join(t for _, _, t in picks), {
-            "native_bucket": native, "mismatched_bucket": mism, "n_picked": k,
-            "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"}
+        order = self._bridge_bucket[mism][:]
+        rng.shuffle(order)
+        picks, total = [], 0
+        for cand in order:
+            picks.append(cand)
+            total += len(cand[2]) + len(self.sep)
+            if len(picks) >= n and total >= 0.6 * target:
+                break
+        return self.sep.join(t for _, _, t in picks), {
+            "native_bucket": native, "mismatched_bucket": mism, "n_picked": len(picks),
+            "target_len": target, "achieved_len": len(self.sep.join(t for _, _, t in picks)),
+            "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"}
+
+    def r_domain_assignments(self):
+        """Deterministic per-word native/mismatched R_domain buckets (G3 persisted artifact)."""
+        out = {}
+        for w in self.words:
+            a_text, _ = self.core_A(w)
+            n = len((a_text or "").split(self.sep)) if a_text else 1
+            _, meta = self.core_R_domain(w, n)
+            out[w] = {"native_bucket": meta.get("native_bucket"),
+                      "mismatched_bucket": meta.get("mismatched_bucket"), "n_picked": meta.get("n_picked")}
+        return out
 
     # -- D / C / X : lexicon-independent controls reused from committed B1 (NOT frozen; G4) ------
     def core_D(self, word):
@@ -423,9 +479,15 @@ def main(argv=None):
     ap.add_argument("--out", default=str(HERE / "b1_1_raw_outputs.jsonl"),
                     help="(execute mode) raw-output JSONL path")
     ap.add_argument("--resume", action="store_true", help="(execute mode) resume into an existing --out")
+    ap.add_argument("--manifest", default=None,
+                    help="manifest to verify (default: final b1_1_freeze_manifest.json; falls back to the "
+                         "draft for render-only bootstrap before the final freeze is signed).")
     args = ap.parse_args(argv)
 
-    man = verify_frozen_or_abort()
+    mpath = pathlib.Path(args.manifest) if args.manifest else MANIFEST
+    if not args.manifest and not mpath.exists():
+        mpath = HERE / "b1_1_freeze_manifest.draft.json"   # render-only bootstrap fallback
+    man = verify_frozen_or_abort(mpath, require_frozen=bool(args.execute_generation))
     cfg = load_frozen_configs(man)
     builder = ArmBuilder(cfg)
 
@@ -454,15 +516,23 @@ def main(argv=None):
     # ----- render-only path (default) ---------------------------------------------------------
     print("[render-only] building 8 arms from the frozen set — NO model, NO network.")
     result = render_only(builder, cfg["lexicon"])
+    # G3: persist the deterministic per-word R_domain assignments artifact.
+    rda = {"artifact": "b1_1_r_domain_assignments", "status": "candidate_deterministic",
+           "policy": "pinned in b1_1_arm_construction_config.json r_domain_policy (bucket_keyword_map + seed)",
+           "seed_ref": "r_domain_assignment_seed", "assignments": builder.r_domain_assignments(),
+           "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b_anchor": "BLOCKED",
+           "generation_authorized": False}
+    (HERE / "b1_1_r_domain_assignments.json").write_text(
+        json.dumps(rda, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     gaps = [
-        "G1: A-composition pole/cap/separator NOT pinned in the frozen arm-construction config "
-        "(runner uses varna_lens vowel-attachment polarity + ' ; ' + no cap).",
-        "G2: contrast_boundary cannot be rendered (it names other varṇas -> would leak); kept in "
-        "metadata only. The frozen config's 'preserve contrast_boundary' cannot apply to prompt text.",
-        "G3: R_domain word->bucket and bridge->bucket maps NOT frozen; runner uses a build-time keyword "
-        "heuristic and flags R_domain NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG.",
-        "G4: word/task pool (b1_dry_run_harness.py) and D/C/X sources (b1_real_conditioning.py) are "
-        "committed but NOT in the frozen artifact set.",
+        "G1 (RESOLVED): A-composition policy (pole rule, no cap, separator) is now pinned in "
+        "b1_1_arm_construction_config.json arms.A.composition_policy; the runner reads the separator from it.",
+        "G2 (RESOLVED): contrast_boundary is pinned METADATA_ONLY in arm/leak configs and is never rendered; "
+        "the runner composes A/S from binding_bridge/liberating_bridge only.",
+        "G3 (RESOLVED): R_domain bucket_keyword_map + bucket order + derivation rules + seed are pinned in "
+        "the frozen arm config; the runner loads them from config and persists b1_1_r_domain_assignments.json.",
+        "G4 (RESOLVED): word/task pool + D/C/X + G2P-routing source paths are recorded in the generation "
+        "config and hash-bound in the freeze manifest referenced_source_hashes.",
     ]
     passed = result["leak_total"] == 0 and not result["empty_arms"]
     report = {
@@ -476,7 +546,7 @@ def main(argv=None):
             "mode": "render-only (no model, no network, no judging, no scoring)",
             "manifest_status": man["manifest_status"],
             "generation_authorized": man["generation_authorized"],
-            "freeze_base": man["finalization"]["finalized_commit_base"],
+            "freeze_base": man.get("finalization", {}).get("finalized_commit_base", man.get("created_at", "draft")),
             "arms": list(ARMS),
             "render": {k: v for k, v in result.items() if k != "cores"},
             "cores": result["cores"],

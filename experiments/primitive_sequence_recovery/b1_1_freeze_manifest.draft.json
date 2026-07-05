@@ -1,12 +1,19 @@
 {
   "B1_1_FREEZE_MANIFEST": {
     "manifest_status": "DRAFT_READY_FOR_FREEZE_REVIEW",
-    "regenerated_after": "Ca de-Sanskritization leakage fix (e125e0c); prior draft manifest hashes were stale",
     "freeze_status": "READY_FOR_FREEZE_REVIEW",
+    "refreeze": true,
+    "supersedes": {
+      "prior_freeze_commit": "2b8e427",
+      "prior_freeze_manifest": "b1_1_freeze_manifest.json @ 2b8e427 (finalized base d92dc2e)",
+      "reason": "post-freeze real-G2P render-only leak (FROZEN_ARTIFACT_LEAK): Sanskrit 'artha' in the Śa liberating bridge entered model-facing conditioning under real G2P. Prior freeze is INVALIDATED for generation. See B1_1_FREEZE_INVALIDATION_POST_RUNNER_RENDER.md.",
+      "invalidation_memo": "experiments/primitive_sequence_recovery/B1_1_FREEZE_INVALIDATION_POST_RUNNER_RENDER.md"
+    },
+    "sa_fix": "Śa functional_operation 'uses aim and artha ...' -> 'uses aim and worldly purpose ...'; 'artha' removed from ALL model-facing conditioning (retained only in non-rendered sanskrit_label/source_note provenance, consistent with all 34 entries).",
     "generation_authorized": false,
     "fallback_qualification": "FALLBACK_QUALIFIED",
     "embedding_gate_status": "BLOCKED_DEPENDENCY_UNAVAILABLE",
-    "embedding_gate_reason": "HuggingFace model-host egress denial; all-MiniLM-L6-v2 unavailable under the environment egress policy (huggingface.co 403 CONNECT)",
+    "embedding_gate_reason": "HuggingFace model-host egress denial; all-MiniLM-L6-v2 unavailable (huggingface.co 403 CONNECT).",
     "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
     "track_b_anchor": "BLOCKED",
     "track_g_anchor": {
@@ -22,6 +29,12 @@
       "not semantic truth",
       "not Track B unblocking"
     ],
+    "gap_resolution": {
+      "G1_a_composition": "PINNED in b1_1_arm_construction_config.json arms.A.composition_policy (pole rule, no cap, ' ; ' separator, consonants-only, bridge-pool-only meaning).",
+      "G2_contrast_boundary": "PINNED METADATA_ONLY (arm + leak configs); never rendered.",
+      "G3_r_domain_buckets": "PINNED bucket_keyword_map + bucket order + derivation rules + seed in the arm config; runner loads them; per-word assignments persisted (b1_1_r_domain_assignments.json).",
+      "G4_pool_and_dcx": "Word/task pool + D/C/X + G2P routing source paths recorded in generation config and hash-bound here (referenced_source_hashes)."
+    },
     "judge_panel_warning_decision": {
       "judge": "Meta-Llama-3-8B-Instruct",
       "decision": "ACCEPT_WITH_CAVEAT",
@@ -31,19 +44,19 @@
     "bound_artifacts": [
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_experimental_contrastive_lexicon_draft.json",
-        "sha256": "434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc"
+        "sha256": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7"
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_bridge_pool_draft.json",
-        "sha256": "c0e5460787e00177c37064d4e0355dc0644936ad1f1bea6eaca1e43c4f8c258a"
+        "sha256": "1ce2ae14b563621ac495381e8397796e6791aba740978bb817544935c6ba8c15"
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_arm_construction_config.json",
-        "sha256": "26e7899103c0ad8cc241f5a8b292f62f86f9ea99d7e0e2dba9b15e4f2cc2da9b"
+        "sha256": "167343c28fe15dc88c2b4aa87c03b7a9e0291a09b0f5f6b45a292b99e9769a11"
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_generation_config.json",
-        "sha256": "0ed50203f4da1954477adb99c1279a6bf6b798078f807798388f64f7e3c1bc87"
+        "sha256": "268d0c02ee968f602ba00e9668572105c1aa4ef313b15f1bc426ccbe1377f011"
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_seeds_config.json",
@@ -59,7 +72,7 @@
       },
       {
         "path": "experiments/primitive_sequence_recovery/b1_1_leak_and_packet_config.json",
-        "sha256": "09e869827be3626b327c76897886226741898b1a24187f9dd821111e28242c69"
+        "sha256": "0804e3d23a336f55f1d2a176d859f0e3931ab3719eb1c97b56e921e6ebb9db48"
       },
       {
         "path": "experiments/primitive_sequence_recovery/B1_1_PREREG.md",
@@ -75,19 +88,46 @@
       },
       {
         "path": "experiments/primitive_sequence_recovery/B1_1_FREEZE_ARTIFACT_VALIDATION_REPORT.json",
-        "sha256": "49534b093832dcc089ef838772e35e6b65bd522d93e45b3f6c25da203ec0e80c"
+        "sha256": "9dc5353b682d1ca4f9651f7bd33bfe9a0da961519ce891f189fdc8b0e4cd6867"
       }
     ],
     "n_bound_artifacts": 12,
-    "commit_hash": "e125e0cbe4f0b8e100cad818c6576a1de2b71d0c",
-    "created_at": "2026-07-05T06:19:41+00:00",
+    "referenced_source_hashes": {
+      "word_task_pool": {
+        "path": "experiments/primitive_sequence_recovery/b1_dry_run_harness.py",
+        "sha256": "674b74bbceb9ec6866f24792b78cd8d4ba5e126bdb72dd7bc4a96223a2661ba1"
+      },
+      "dcx_controls": {
+        "path": "experiments/primitive_sequence_recovery/b1_real_conditioning.py",
+        "sha256": "f0eff3cc8a93bc62d632897158c35a3884be9a549d2f0d1df8ba9b77c8de0a75"
+      },
+      "d_table": {
+        "path": "experiments/primitive_sequence_recovery/b1_eval_dtable.json",
+        "sha256": "958df144c5e0302ba8a15d158b42fe1a251d842bf227e8805b2a8fb508c61434"
+      },
+      "word_list": {
+        "path": "experiments/primitive_sequence_recovery/b1_eval_wordlist.json",
+        "sha256": "9c2728b9c4ba6887cb87212f7c6a4702b52477d2ec0f1a872aef0c196cb14020"
+      },
+      "g2p_routing_only": {
+        "path": "varna_lens/varna_lens.py",
+        "sha256": "fa51038bddf11fd8e557a19619436d5808595d3625284ad6f085a647dbb85049",
+        "role": "G2P->varṇa ROUTING ONLY; NOT a meaning source"
+      }
+    },
+    "r_domain_assignments_ref": {
+      "path": "experiments/primitive_sequence_recovery/b1_1_r_domain_assignments.json",
+      "sha256": "b766d77a05e7664fcc649db7dc0117a87753442fd6cebdb2abf7af4e2d6d0f9e",
+      "status": "candidate_deterministic (derived from frozen policy+seeds+pool)"
+    },
+    "created_at": "2026-07-05T07:55:35+00:00",
     "authorization_statements": {
       "does_not_authorize_generation": true,
-      "requires_freeze_finalization_gate": "B1_1_FREEZE_FINALIZATION",
       "requires_generation_authorization_gate": "B1_1_GENERATION_AUTHORIZATION"
     },
     "not_ontology_validation": true,
     "R_deranged_note": "R_deranged remains the crux; contrastivity/non-synonymy repair is necessary but not sufficient.",
-    "note": "This DRAFT manifest does NOT authorize generation and is NOT the final freeze. Structure, not validated meaning."
+    "real_g2p_leak_audit": "B1_1_GENERATION_RENDER_ONLY_REPORT.json (real G2P routing; leak_total must be 0).",
+    "note": "DRAFT re-freeze manifest (post real-G2P leak fix). Does NOT authorize generation and is NOT the final freeze. Structure, not validated meaning."
   }
 }

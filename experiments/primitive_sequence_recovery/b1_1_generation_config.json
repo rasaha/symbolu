@@ -40,5 +40,13 @@
   "failure_policy": "abort-on-empty output; no silent drops; all raw generations retained",
   "no_post_hoc_prompt_edits": true,
   "raw_output_retention": "all raw outputs retained and hash-bound (durable storage, not ephemeral pod only)",
+  "frozen_source_references": {
+    "note": "G4 pin — the word/task pool and the D/C/X control construction live in committed (previously not-frozen) sources; their exact paths + sha256 are now hash-bound in the freeze manifest (referenced_source_hashes).",
+    "word_task_pool_source": "experiments/primitive_sequence_recovery/b1_dry_run_harness.py (PRIMARY_WORDS + PRIVATIVE_WORDS + TASKS T1–T6 + WRAPPER)",
+    "dcx_control_source": "experiments/primitive_sequence_recovery/b1_real_conditioning.py (D = D-table gloss, C = surface facts, X = neutral filler)",
+    "d_table_source": "experiments/primitive_sequence_recovery/b1_eval_dtable.json",
+    "word_list_source": "experiments/primitive_sequence_recovery/b1_eval_wordlist.json",
+    "g2p_routing_source": "varna_lens module — phonemes_cmudict G2P->varṇa ROUTING ONLY (not a meaning source); hash-bound in the manifest referenced_source_hashes"
+  },
   "generation_authorized": false
 }

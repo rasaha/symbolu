@@ -8,7 +8,7 @@ and still owed; this is **not** a B1.1 freeze and **not** generation authorizati
 the verdict (`RANDOM_OR_SCRAMBLED_MATCHES`), or unblock Track B (**BLOCKED**). **Structure, not validated meaning.**
 
 ## Inputs & derivation
-- input: `b1_1_experimental_contrastive_lexicon_draft.json` (sha256 `434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc`)
+- input: `b1_1_experimental_contrastive_lexicon_draft.json` (sha256 `e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7`)
 - entries loaded: **34** · bridge phrases: **68**
 - binding_bridge = binding_expression (normalized) · liberating_bridge = liberating_expression + " — " + functional_operation
 - **manual/heuristic per-entry alteration: NONE** (uniform template; every phrase links to one source expression)

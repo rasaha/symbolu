@@ -6,7 +6,7 @@
   "b1_verdict_unchanged": "RANDOM_OR_SCRAMBLED_MATCHES",
   "track_b_status": "BLOCKED",
   "source_lexicon": "b1_1_experimental_contrastive_lexicon_draft.json",
-  "source_lexicon_sha256": "434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc",
+  "source_lexicon_sha256": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
   "n_varnas": 34,
   "n_bridge_phrases": 68,
   "bridge_derivation": {
@@ -642,12 +642,12 @@
       "source_note": "Sarkar: Śa = acoustic root of rajoguṇa (mutative principle) and artha (psychic / worldly longing). A neutral dynamic principle, not a virtue/vice.",
       "binding_expression": "worldly purpose possessed as acquisition, status, or control",
       "liberating_expression": "purposeful action without possessive bondage",
-      "functional_operation": "uses aim and artha without identity or ownership",
+      "functional_operation": "uses aim and worldly purpose without identity or ownership",
       "contrast_boundary": "not greed/generosity pair, not anti-worldliness, not renunciation",
       "rewrite_status": "theory_owner_resolved",
       "b1_1_use_status": "resolved",
       "binding_bridge": "worldly purpose possessed as acquisition, status, or control",
-      "liberating_bridge": "purposeful action without possessive bondage — uses aim and artha without identity or ownership",
+      "liberating_bridge": "purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership",
       "binding_bridge_source": "binding_expression",
       "liberating_bridge_source": "liberating_expression + functional_operation"
     },

@@ -16,7 +16,18 @@
   },
   "arms": {
     "A":          {"description": "target word's own varṇa-derived binding/liberating bridge (real mapping)",
-                   "construction_rule": "G2P->varṇa sequence of the target word; compose its bridge phrases in order; preserve functional_operation + contrast_boundary"},
+                   "construction_rule": "G2P->varṇa sequence of the target word; compose its bridge phrases in order (see composition_policy). contrast_boundary is metadata only and is NEVER rendered.",
+                   "composition_policy": {
+                     "g2p_source": "varna_lens.phonemes_cmudict — REAL G2P->varṇa routing ONLY (routing code, NOT a meaning source)",
+                     "meaning_source": "b1_1 bridge pool binding_bridge/liberating_bridge ONLY (derived from b1_1_experimental_contrastive_lexicon_draft.json); NEVER the varna_lens meaning lexicon",
+                     "consonants_only": true,
+                     "pole_rule": "vowel-attachment (varna_lens read_op rule): word-first consonant -> binding; consonant with a vowel immediately after (onset) -> liberating; bare consonant (word-final / pre-consonant) -> binding; doubled consonant: 1st occurrence -> liberating, 2nd -> binding",
+                     "phrase_selected": "binding_bridge for a binding pole, liberating_bridge for a liberating pole",
+                     "order": "the word's varṇa order",
+                     "separator": " ; ",
+                     "cap": "none (all consonant varṇas of the word)",
+                     "contrast_boundary_rendered": false,
+                     "deterministic": true}},
     "D":          {"description": "dictionary / conventional lexical baseline",
                    "construction_rule": "plain dictionary meaning of the target word; must NOT leak the A mapping"},
     "S":          {"description": "scrambled mapping control",
@@ -31,6 +42,12 @@
                    "construction_rule": "surface facts / style-matched filler; must NOT leak the A mapping"},
     "X":          {"description": "neutral prompt control",
                    "construction_rule": "no conditioning (floor)"}
+  },
+  "contrast_boundary_policy": {
+    "status": "METADATA_ONLY",
+    "rendered_in_model_facing_prompt": false,
+    "reason": "contrast_boundary names other varṇas (e.g. 'not object-renunciation (Gha)') and would leak the mapping; it is retained for traceability only and MUST NOT enter any conditioning/prompt.",
+    "runner_enforcement": "run_b1_1_generation.py composes A/S from binding_bridge/liberating_bridge only; it never reads contrast_boundary into conditioning."
   },
   "rules": {
     "no_target_self": "R_same and R_deranged must NEVER use the target word's own mapping",
@@ -50,7 +67,28 @@
     "determinism": "seeded by r_domain_assignment_seed (b1_1_seeds_config.json); independent of generation results; no model judgment",
     "style_parity": "same symbolic richness / length / grammar as A; never ugly, nonsense, or obviously weaker than A",
     "per_word_expansion": "the native-bucket-per-word map is expanded at arm-builder time against the FROZEN B1.1 word list; policy is defined at bucket level now and does not fabricate an unknown final word list",
-    "validation_rule": "every R_domain assignment must come from a bucket != the target word's native bucket"
+    "validation_rule": "every R_domain assignment must come from a bucket != the target word's native bucket",
+    "seed_ref": "r_domain_assignment_seed (b1_1_seeds_config.json)",
+    "bucket_keyword_map": {
+      "body/health": ["sensory", "body", "sleep", "torpor", "physical", "desire", "craving"],
+      "social/relation": ["another", "others", "social", "regard", "shame", "malign", "maligned"],
+      "cognition/knowledge": ["knowledge", "discern", "insight", "clarity", "knowing", "sense", "common sense"],
+      "motion/action": ["action", "act", "effort", "striving", "commit", "energy", "force"],
+      "material/object": ["accumulation", "hoard", "possession", "acquire", "surplus", "object", "own"],
+      "ethical/order": ["order", "truth", "dharma", "conduct", "value", "worth", "warranted"],
+      "emotion/affect": ["remorse", "dejection", "melancholy", "grief", "envy", "sting", "gladness", "buoyancy"],
+      "cosmic/abstract": ["identity", "ego", "spell", "entrancement", "dissolution", "collapse", "bondage"],
+      "speech/communication": ["speech", "exaggeration", "overstat", "display", "performance", "transparency"],
+      "protection/harm": ["harm", "cruelty", "protect", "shield", "compassion", "goodwill", "vulnerable"]
+    },
+    "bucket_keyword_map_note": "'dharma' here is a bucketing KEYWORD used only to sort English bridge text into a domain; it is NOT rendered into any prompt (bridge phrases contain no Sanskrit after the Śa fix).",
+    "bridge_bucket_rule": "each of the 68 bridge phrases is assigned to the bucket whose keyword list it matches most (ties -> first bucket in the fixed bucket order).",
+    "native_bucket_rule": "a target word's native bucket = the bucket of its own A-composition text (same bridge_bucket_rule).",
+    "mismatched_bucket_rule": "deterministically pick a bucket != native (and non-empty) via r_domain_assignment_seed keyed on the word; sample count-matched bridge phrases from it.",
+    "assignments_artifact": "b1_1_r_domain_assignments.json (persisted per-word native/mismatched buckets; deterministically reproducible from this frozen policy + frozen seeds + frozen word pool)",
+    "config_is_authoritative": "run_b1_1_generation.py loads bucket_keyword_map + bucket order from THIS frozen config; the bucketing is no longer a runner-internal heuristic.",
+    "length_parity_rule": "accumulate distinct phrases from the chosen mismatched bucket until >= n phrases AND >= 0.6x the target word's A-composition length; prefer a mismatched bucket whose total text can reach that length, so R_domain is never obviously weaker/shorter than A.",
+    "empty_bucket_note": "a bucket may hold 0 phrases (e.g. speech/communication under the current keyword map); empty buckets are never chosen as the mismatched bucket and never fabricated."
   },
   "validation_expectations": {
     "arms_exactly": ["A", "D", "S", "R_same", "R_deranged", "R_domain", "C", "X"],

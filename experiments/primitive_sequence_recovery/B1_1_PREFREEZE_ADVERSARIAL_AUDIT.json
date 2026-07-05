@@ -1,5 +1,6 @@
 {
   "artifact": "b1_1_prefreeze_adversarial_audit",
+  "g2p_mode": "REAL_G2P",
   "status": "PASS_PREFREEZE_AUDIT",
   "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
   "track_b_anchor": "BLOCKED",
@@ -8,22 +9,31 @@
   "generation_authorized": false,
   "b1_1_frozen": false,
   "final_manifest_created": false,
+  "supersedes_audit": "pre-first-freeze audit (hardcoded Sanskrit list; missed 'artha')",
   "blockers": [],
   "warnings": [
     "expected caveat: embedding gate remains BLOCKED_DEPENDENCY_UNAVAILABLE (owed)",
     "expected caveat: fallback qualification required (FALLBACK_QUALIFIED)",
     "expected caveat: local lexical audit is surface-only (not semantic)",
     "expected caveat: Meta-Llama-3-8B ACCEPT_WITH_CAVEAT",
-    "expected caveat: positive limited to LIMITED_GENERATION_UTILITY; R_deranged is the crux"
+    "expected caveat: positive limited to LIMITED_GENERATION_UTILITY; R_deranged is the crux",
+    "expected caveat: 'artha' retained ONLY in non-rendered provenance metadata (sanskrit_label/source_note)"
   ],
   "results": {
-    "1_leakage": {
+    "1_leakage_generic": {
       "clean": true,
-      "sanskrit_proper": [],
-      "iast": [],
-      "meta_terms": [],
-      "arm_labels": [],
-      "template_meta_after_fill": false
+      "scan": "generic sanskrit-label-token (runner.leak_scan)",
+      "sanskrit_labels": 0,
+      "iast": 0,
+      "varna_names": 0,
+      "arm_labels": 0,
+      "template_meta": false
+    },
+    "1b_real_g2p_conditioning": {
+      "clean": true,
+      "status": "PASS_RENDER_ONLY",
+      "leak_total": 0,
+      "n_cores": 200
     },
     "2_forbidden_framing": {
       "clean": true,
@@ -31,7 +41,7 @@
       "unnegated_claims": []
     },
     "3_control_strength": {
-      "clean": true,
+      "clean": "b1_1_r_domain_assignments.json (persisted per-word native/mismatched buckets; deterministically reproducible from this frozen policy + frozen seeds + frozen word pool)",
       "arm_rules_present": [
         "no_target_self",
         "same_pool",
@@ -40,7 +50,7 @@
         "style_length_normalization"
       ],
       "weak_controls": [],
-      "r_domain_policy_present": true
+      "g3_pinned": "b1_1_r_domain_assignments.json (persisted per-word native/mismatched buckets; deterministically reproducible from this frozen policy + frozen seeds + frozen word pool)"
     },
     "4_freeze_status": {
       "clean": true,
@@ -55,8 +65,7 @@
     },
     "6_judge_panel": {
       "ok": true,
-      "meta_llama3_status": "WARNING_ACCEPTANCE_REQUIRED",
-      "accept_with_caveat": "ACCEPT_WITH_CAVEAT"
+      "meta_llama3_status": "WARNING_ACCEPTANCE_REQUIRED"
     },
     "7_prereg_consistency": {
       "clean": true,
@@ -69,10 +78,10 @@
       "track_b_blocked": true,
       "fallback_caveat": true
     },
-    "8_dry_run_consistency": {
+    "8_dry_run_realg2p": {
       "ok": true,
       "status": "PASS_RENDER_DRY_RUN",
-      "generation_run": false,
+      "g2p_mode": "REAL_G2P (varna_lens.phonemes_cmudict) — supersedes illustrative spelling-based dry run",
       "leakage_clean": true
     }
   },

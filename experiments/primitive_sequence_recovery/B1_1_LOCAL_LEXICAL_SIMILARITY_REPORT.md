@@ -13,7 +13,7 @@ mean nearly the same thing — this screen is blind to that. **`PASS_LOCAL_SURFA
 embedding gate passed.**
 
 ## 3. Inputs
-- `b1_1_experimental_contrastive_lexicon_draft.json` (sha256 `434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc`)
+- `b1_1_experimental_contrastive_lexicon_draft.json` (sha256 `e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7`)
 - fields: liberating_expression, functional_operation (primary) · combined (diagnostic) · contrast_boundary NOT a target
 - entries: 34 · no deferrals · vowels excluded
 

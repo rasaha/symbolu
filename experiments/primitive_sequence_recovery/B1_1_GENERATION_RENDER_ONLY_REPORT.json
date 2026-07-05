@@ -1,14 +1,12 @@
 {
   "B1_1_GENERATION_RENDER_ONLY_REPORT": {
-    "status": "REVIEW_REQUIRED_BLOCKER",
+    "status": "PASS_RENDER_ONLY",
     "runner_mechanics": "PASS (8 arms built, seeded, deterministic, manifest-verified)",
-    "blockers": [
-      "FROZEN_ARTIFACT_LEAK: model-facing leak(s) originate in the FROZEN bridge pool and cannot be repaired post-hoc without editing a frozen artifact (INVALID_POSTHOC). Generation must NOT proceed until a re-freeze removes the leak. See leak_findings."
-    ],
+    "blockers": [],
     "mode": "render-only (no model, no network, no judging, no scoring)",
     "manifest_status": "FROZEN",
     "generation_authorized": false,
-    "freeze_base": "d92dc2ef6c5bd9a75385e43016f915b9109c46f4",
+    "freeze_base": "2026-07-05T07:58:19+00:00",
     "arms": [
       "A",
       "D",
@@ -25,43 +23,18 @@
       "n_arms": 8,
       "n_conditioning_cores": 200,
       "n_full_prompts_would_render": 800,
-      "leak_total": 10,
+      "leak_total": 0,
       "per_arm_leak": {
-        "A": 3,
+        "A": 0,
         "D": 0,
-        "S": 3,
-        "R_same": 1,
-        "R_deranged": 3,
+        "S": 0,
+        "R_same": 0,
+        "R_deranged": 0,
         "R_domain": 0,
         "C": 0,
         "X": 0
       },
-      "leak_findings": [
-        {
-          "token": "artha",
-          "category": "sanskrit_labels",
-          "count": 10,
-          "arms": [
-            "A",
-            "R_deranged",
-            "R_same",
-            "S"
-          ],
-          "words": [
-            "freedom",
-            "friendship",
-            "integrity",
-            "justice",
-            "mountain",
-            "ocean",
-            "patience"
-          ],
-          "varna_source": [
-            "Śa/liberating"
-          ],
-          "blocker": "FROZEN_ARTIFACT_LEAK — requires re-freeze (bridge pool is frozen; cannot be edited without INVALID_POSTHOC and a new manifest)"
-        }
-      ],
+      "leak_findings": [],
       "empty_arms": [],
       "full_prompt_examples": [
         {
@@ -96,15 +69,15 @@
           "word": "justice",
           "task": "T1",
           "arm": "R_deranged",
-          "prompt": "Soft orientation, not a definition: purposeful action without possessive bondage — uses aim and artha without identity or ownership ; the sting at another's success. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
-          "prompt_sha256": "55cdeec60cb1b89395ba888b020972b69179f6c4f685bdb9ed4a741b3f8f740b"
+          "prompt": "Soft orientation, not a definition: purposeful action without possessive bondage — uses aim and worldly purpose without identity or ownership ; the sting at another's success. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "d39de1735f07cdff9c98c85033874cd153828955c15cb9249c2162a0d8086015"
         },
         {
           "word": "justice",
           "task": "T1",
           "arm": "R_domain",
-          "prompt": "Soft orientation, not a definition: warm buoyancy lifting one's own dejection — raises one's own dejection into affectionate uplift ; sympathetic gladness at another's fortune — converts the sting at another's fortune into shared gladness ; self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
-          "prompt_sha256": "20025d0f8e3a9f27e6f11ee8747597c6e725d2fce3ddf46b1d210ad7061100b5"
+          "prompt": "Soft orientation, not a definition: self-directed release of remorse into acceptance — discharges remorse over one's own past act into acceptance ; sympathetic gladness at another's fortune — converts the sting at another's fortune into shared gladness ; warm buoyancy lifting one's own dejection — raises one's own dejection into affectionate uplift. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\nWrite a short reflective paragraph about justice.",
+          "prompt_sha256": "99ab59b0392a5d9c0f941fd3b3e4d5d10898a350801572bfb8f06681af1f435c"
         },
         {
           "word": "justice",
@@ -218,15 +191,17 @@
       {
         "word": "grief",
         "arm": "R_domain",
-        "core_sha256": "8be95bb3aed7868223e5e9b743288d47e76bd8c1a04cb63cb317cad81204d0b1",
-        "n_chars": 195,
+        "core_sha256": "49a77fd9d4b8306b82262ccc0edc3f46ba8a0e5a53b31b95814f715e1f892b3a",
+        "n_chars": 289,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "cognition/knowledge",
           "n_picked": 3,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 161,
+          "achieved_len": 289,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -341,15 +316,17 @@
       {
         "word": "courage",
         "arm": "R_domain",
-        "core_sha256": "85ab69fc53b66400b14d0c6d78dafdbe3715bce2d266f264f740e00381f7c5e4",
-        "n_chars": 76,
+        "core_sha256": "355b855e3ecd384e79b33b7858d5dd9cfed4b505eaffdc60526877e028a4d27c",
+        "n_chars": 150,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "body/health",
           "mismatched_bucket": "material/object",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 89,
+          "achieved_len": 150,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -377,17 +354,10 @@
       {
         "word": "patience",
         "arm": "A",
-        "core_sha256": "118dcc5df7adf9bd8c0768075fe1c1ce2df912adc4d912f7af48a47e2abaa8a1",
-        "n_chars": 242,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "563827b908118f632299ea0db804b1452350a220a046ce3fd228a712d834ff9d",
+        "n_chars": 252,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "varna_sequence": [
             [
@@ -426,17 +396,10 @@
       {
         "word": "patience",
         "arm": "S",
-        "core_sha256": "a76f0dd9c0c42d4541d3c2a482928283240970cd3a712d7341f8df1408204f8f",
-        "n_chars": 242,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "10987ee5905444bdea63ac2e611dc919b93bfd09973984d8e348c36d36c4ba4d",
+        "n_chars": 252,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "n_varnas": 4,
           "warn": []
@@ -488,7 +451,7 @@
       {
         "word": "patience",
         "arm": "R_domain",
-        "core_sha256": "4e5bedc1d6cc38c5feb61bead3b9beb8bed55504af020d9f325a4d9fc2ec6ce5",
+        "core_sha256": "32ee9caa1b202724e7b4cecdc323c2b4a25974dca35ea66054ac975f086627a3",
         "n_chars": 204,
         "leak_hits": 0,
         "leak_detail": null,
@@ -496,7 +459,9 @@
           "native_bucket": "social/relation",
           "mismatched_bucket": "protection/harm",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 252,
+          "achieved_len": 204,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -594,17 +559,10 @@
       {
         "word": "justice",
         "arm": "R_deranged",
-        "core_sha256": "eae6bb369121d66945051abce0f9cdcd20db60a7d1e7fa9b4f356d53ddf61436",
-        "n_chars": 128,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "74dad89663a6b7aaab50b52ee6f54091cbef9bd3485b6d873dcf26e23b964af1",
+        "n_chars": 138,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "source_word": "ocean",
           "source_meta": {
@@ -627,7 +585,7 @@
       {
         "word": "justice",
         "arm": "R_domain",
-        "core_sha256": "1fa4fac1bcb5d66f995ff2903ff1a104c98c96f359f1d9f19cda42de6c1def45",
+        "core_sha256": "1dd1183bc828e82617c39f0a5f8d169a1de62775057c5ec28aac18b9847aecac",
         "n_chars": 314,
         "leak_hits": 0,
         "leak_detail": null,
@@ -635,7 +593,9 @@
           "native_bucket": "ethical/order",
           "mismatched_bucket": "emotion/affect",
           "n_picked": 3,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 294,
+          "achieved_len": 314,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -759,15 +719,17 @@
       {
         "word": "silence",
         "arm": "R_domain",
-        "core_sha256": "1eb9fa8f18e05785f2dc0fd9c81c6b4757ed1525b248f4732566028e9e7011aa",
-        "n_chars": 231,
+        "core_sha256": "f7319ca23a37dbb43760dbef61710724cc925a420791c45b62d64fe26a918578",
+        "n_chars": 208,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "protection/harm",
           "mismatched_bucket": "cosmic/abstract",
           "n_picked": 4,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 302,
+          "achieved_len": 208,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -849,17 +811,10 @@
       {
         "word": "mountain",
         "arm": "R_same",
-        "core_sha256": "1b864b969c4c467150168a6aaf70e5210ddcfc3546c3dd901466c3b29369cb58",
-        "n_chars": 373,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "4c0adc1d7b67e9ad0f74f8bae8915e10baf7e77a49c6ed76ce63713b06a35d96",
+        "n_chars": 383,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "n_picked": 4,
           "excluded_own": [
@@ -906,15 +861,17 @@
       {
         "word": "mountain",
         "arm": "R_domain",
-        "core_sha256": "a9bd613cd4853284a1d5136edeb5775d082a41fa8623ca5804d28ac224c0e76b",
-        "n_chars": 359,
+        "core_sha256": "37d0bb3f4ee11b23688c18845c15f8a6bef19bdc7976915cb782192bbf216cf9",
+        "n_chars": 221,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "social/relation",
           "mismatched_bucket": "material/object",
           "n_picked": 4,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 208,
+          "achieved_len": 221,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1041,15 +998,17 @@
       {
         "word": "river",
         "arm": "R_domain",
-        "core_sha256": "0d42543721fe56cc38525b1532640a42b21970a7e744f487401aa9b30338861e",
-        "n_chars": 227,
+        "core_sha256": "6544c1b6cb67b66563bbe7c95f0b370603b8da39f211bdb58c70c418e8490623",
+        "n_chars": 199,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "ethical/order",
           "mismatched_bucket": "cognition/knowledge",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 257,
+          "achieved_len": 199,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1178,15 +1137,17 @@
       {
         "word": "music",
         "arm": "R_domain",
-        "core_sha256": "cc0827ce0343d896e2374d3319347656ec13113843ed6e73c3a95526fe262c24",
-        "n_chars": 291,
+        "core_sha256": "e61b264eb8cc896a1b492cce2f22602a043e25862dd73bd7e84661ca71d410d2",
+        "n_chars": 212,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "social/relation",
           "n_picked": 4,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 299,
+          "achieved_len": 212,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1214,17 +1175,10 @@
       {
         "word": "friendship",
         "arm": "A",
-        "core_sha256": "d8d7226407ca1ed43921bba1bc5046876b83637660c06ded16cd682fb885e253",
-        "n_chars": 313,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "8e4b3a62476e298326a45a7ecfc4ab7496faac23e00401784d5a28ed572d1a6d",
+        "n_chars": 323,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "varna_sequence": [
             [
@@ -1271,17 +1225,10 @@
       {
         "word": "friendship",
         "arm": "S",
-        "core_sha256": "0cb01bb6118189b4b82a56a686a2f1beefd72b35b8780f176cd60a6c31cdea0a",
-        "n_chars": 313,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "27d32428036377d9191f0b8c9857868036dfdab235d55a982306e561314b97a6",
+        "n_chars": 323,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "n_varnas": 6,
           "warn": []
@@ -1343,15 +1290,17 @@
       {
         "word": "friendship",
         "arm": "R_domain",
-        "core_sha256": "505ba013591ae8d04a6ea0f5a61d130b24876ad2128c67c3f7c428965904148b",
-        "n_chars": 320,
+        "core_sha256": "572391c9ba27b4fd8e594fed0ed369323ed2830876aa8d80ae918beabd563d90",
+        "n_chars": 434,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "social/relation",
           "n_picked": 6,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 323,
+          "achieved_len": 434,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1474,15 +1423,17 @@
       {
         "word": "teacher",
         "arm": "R_domain",
-        "core_sha256": "3b904f691237667eb7ac78d150f12134251b9747cd923b7ae0ddf1c56499608d",
-        "n_chars": 78,
+        "core_sha256": "a71806a2939baa36bfc5be37b0a1d1a77bfc913131bbebf9541bfa56a7b83065",
+        "n_chars": 141,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "cognition/knowledge",
           "mismatched_bucket": "body/health",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 194,
+          "achieved_len": 141,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1601,7 +1552,7 @@
       {
         "word": "shadow",
         "arm": "R_domain",
-        "core_sha256": "baeab34419c0e0d4e5bed76b7a893a3230e3eca01c4366a806904b377b1e9686",
+        "core_sha256": "7066b05cb8217c8746fc928201d942256d4a9e57925deda8f141589f5b42d14b",
         "n_chars": 185,
         "leak_hits": 0,
         "leak_detail": null,
@@ -1609,7 +1560,9 @@
           "native_bucket": "social/relation",
           "mismatched_bucket": "motion/action",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 155,
+          "achieved_len": 185,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1708,17 +1661,10 @@
       {
         "word": "freedom",
         "arm": "R_deranged",
-        "core_sha256": "d8d7226407ca1ed43921bba1bc5046876b83637660c06ded16cd682fb885e253",
-        "n_chars": 313,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "8e4b3a62476e298326a45a7ecfc4ab7496faac23e00401784d5a28ed572d1a6d",
+        "n_chars": 323,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "source_word": "friendship",
           "source_meta": {
@@ -1757,15 +1703,17 @@
       {
         "word": "freedom",
         "arm": "R_domain",
-        "core_sha256": "ee4a0ebcdbb558d2f0a481cf90ece1ac29d3fb98c778bcc4ff39c9329a1f03bf",
-        "n_chars": 229,
+        "core_sha256": "1309ed87b50f6f5a29bfe15f3d34c95f12e27e39596f283f451905a876ecbac5",
+        "n_chars": 274,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "material/object",
           "n_picked": 4,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 251,
+          "achieved_len": 274,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -1885,15 +1833,17 @@
       {
         "word": "honesty",
         "arm": "R_domain",
-        "core_sha256": "6d24301d1097693992459152f51e5dc34444b58f7704ef8323d318f8d4d2fe0e",
-        "n_chars": 255,
+        "core_sha256": "ba774d0667244ace17d8261857af92d523b0e80c424506335a4b77412eb9a766",
+        "n_chars": 220,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "ethical/order",
           "mismatched_bucket": "motion/action",
           "n_picked": 3,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 282,
+          "achieved_len": 220,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2017,15 +1967,17 @@
       {
         "word": "empathy",
         "arm": "R_domain",
-        "core_sha256": "dbe261a46bf55d226dbcc277a3429ee483579e75c96c744a574fc6bb327e738e",
-        "n_chars": 331,
+        "core_sha256": "713985051e04cc4b9ccdf70fd48889b2771e57d1c8d9add413f2c0d1d610110a",
+        "n_chars": 257,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "body/health",
           "mismatched_bucket": "ethical/order",
           "n_picked": 3,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 224,
+          "achieved_len": 257,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2053,17 +2005,10 @@
       {
         "word": "ocean",
         "arm": "A",
-        "core_sha256": "eae6bb369121d66945051abce0f9cdcd20db60a7d1e7fa9b4f356d53ddf61436",
-        "n_chars": 128,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "74dad89663a6b7aaab50b52ee6f54091cbef9bd3485b6d873dcf26e23b964af1",
+        "n_chars": 138,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "varna_sequence": [
             [
@@ -2094,17 +2039,10 @@
       {
         "word": "ocean",
         "arm": "S",
-        "core_sha256": "5c87df7556d456ecd9bd4aad37247447d3a3179a617271237b4c7069ca17aef9",
-        "n_chars": 128,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "54aebe359f0a6959edd3672ba7de7e5c16981aecef987fc2a2d5509f73650a7f",
+        "n_chars": 138,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "n_varnas": 2,
           "warn": []
@@ -2162,15 +2100,17 @@
       {
         "word": "ocean",
         "arm": "R_domain",
-        "core_sha256": "0c9e6944bef4c2082cc6c3d7116aad02ac3101251c39edc44cd841b150c38b9e",
-        "n_chars": 68,
+        "core_sha256": "36a0063465ee1351d1a4514d3584b2a4d473ad5c081d55f3aa59aea51d52dac0",
+        "n_chars": 131,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "material/object",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 138,
+          "achieved_len": 131,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2293,15 +2233,17 @@
       {
         "word": "envy",
         "arm": "R_domain",
-        "core_sha256": "ee414f479d477c4b6c9030d2458bb358e53d498550804d6692aa572e4cf702f8",
-        "n_chars": 65,
+        "core_sha256": "be5bd24b5c6a949b792c6b9e4546872d674c9e85bdbe5ef0d6c4f40276076b07",
+        "n_chars": 131,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "ethical/order",
           "mismatched_bucket": "material/object",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 203,
+          "achieved_len": 131,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2420,15 +2362,17 @@
       {
         "word": "order",
         "arm": "R_domain",
-        "core_sha256": "85ab69fc53b66400b14d0c6d78dafdbe3715bce2d266f264f740e00381f7c5e4",
-        "n_chars": 76,
+        "core_sha256": "1ec3a00e049b021434355e494c11c97d48e06faf68c2515c5e7f1decb7a6d15c",
+        "n_chars": 208,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "social/relation",
           "mismatched_bucket": "material/object",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 179,
+          "achieved_len": 208,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2531,17 +2475,10 @@
       {
         "word": "integrity",
         "arm": "R_deranged",
-        "core_sha256": "118dcc5df7adf9bd8c0768075fe1c1ce2df912adc4d912f7af48a47e2abaa8a1",
-        "n_chars": 242,
-        "leak_hits": 1,
-        "leak_detail": {
-          "iast_diacritics": [],
-          "sanskrit_labels": [
-            "artha"
-          ],
-          "varna_names": [],
-          "arm_labels": []
-        },
+        "core_sha256": "563827b908118f632299ea0db804b1452350a220a046ce3fd228a712d834ff9d",
+        "n_chars": 252,
+        "leak_hits": 0,
+        "leak_detail": null,
         "meta": {
           "source_word": "patience",
           "source_meta": {
@@ -2572,15 +2509,17 @@
       {
         "word": "integrity",
         "arm": "R_domain",
-        "core_sha256": "32ee9caa1b202724e7b4cecdc323c2b4a25974dca35ea66054ac975f086627a3",
-        "n_chars": 204,
+        "core_sha256": "f35084c0d1c69abe0b5ab53e03c81e27ecdc976f61eedc4f75785b5002150f0e",
+        "n_chars": 331,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
-          "mismatched_bucket": "protection/harm",
-          "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "mismatched_bucket": "material/object",
+          "n_picked": 5,
+          "target_len": 357,
+          "achieved_len": 331,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2703,15 +2642,17 @@
       {
         "word": "autumn",
         "arm": "R_domain",
-        "core_sha256": "f5bb137a1f1dbfbddf07b94d7901cf87c0357a2d43fdc4939ffea7dda58ee479",
-        "n_chars": 216,
+        "core_sha256": "23b756ff955e67152f8ed97141a002ce1695abc8e19b474e1334702c49776c47",
+        "n_chars": 207,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "ethical/order",
           "mismatched_bucket": "emotion/affect",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 142,
+          "achieved_len": 207,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2821,15 +2762,17 @@
       {
         "word": "echo",
         "arm": "R_domain",
-        "core_sha256": "a96a5474f635daf3a7c5120c867a8572f581b6b8c6779bc55b6d1b389e12222d",
-        "n_chars": 45,
+        "core_sha256": "4503f738f1f6c47ed1edb4fddc372a5be69dab65860f9e48d924c13d62563ade",
+        "n_chars": 103,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "social/relation",
           "n_picked": 1,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 116,
+          "achieved_len": 103,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -2949,15 +2892,17 @@
       {
         "word": "amoral",
         "arm": "R_domain",
-        "core_sha256": "3c08382d8e7546c66c76c5d1bd1881244bce5870a7ec1e43f3f8498a92e4f790",
-        "n_chars": 282,
+        "core_sha256": "fb0c160813e7060375ab16c15d644555be9656af42124d6b453741c5f04a9ffd",
+        "n_chars": 169,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
           "mismatched_bucket": "body/health",
-          "n_picked": 3,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "n_picked": 4,
+          "target_len": 223,
+          "achieved_len": 169,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -3072,7 +3017,7 @@
       {
         "word": "apathy",
         "arm": "R_domain",
-        "core_sha256": "32ee9caa1b202724e7b4cecdc323c2b4a25974dca35ea66054ac975f086627a3",
+        "core_sha256": "4e5bedc1d6cc38c5feb61bead3b9beb8bed55504af020d9f325a4d9fc2ec6ce5",
         "n_chars": 204,
         "leak_hits": 0,
         "leak_detail": null,
@@ -3080,7 +3025,9 @@
           "native_bucket": "body/health",
           "mismatched_bucket": "protection/harm",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 178,
+          "achieved_len": 204,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -3201,15 +3148,17 @@
       {
         "word": "asymmetry",
         "arm": "R_domain",
-        "core_sha256": "41e9b7232091148f94fff7b59702a80ece292d65df3613b57cdcc281b7743d1b",
-        "n_chars": 208,
+        "core_sha256": "0e3fc81a55436cf7756c703a1f6f54b55c308dd7f158685ffb5c1322c0f36b2f",
+        "n_chars": 285,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "motion/action",
-          "mismatched_bucket": "cosmic/abstract",
+          "mismatched_bucket": "material/object",
           "n_picked": 4,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 342,
+          "achieved_len": 285,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -3324,15 +3273,17 @@
       {
         "word": "anarchy",
         "arm": "R_domain",
-        "core_sha256": "e87549777011a8c101398a76afbde8a8ef98689f6d6a6a3fe8558fc00eb7abb4",
-        "n_chars": 93,
+        "core_sha256": "725c6f401b7232fe3b80b87669093c56c55ae809e9ded9bd485d267864a356f2",
+        "n_chars": 142,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "emotion/affect",
           "mismatched_bucket": "social/relation",
           "n_picked": 2,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "target_len": 223,
+          "achieved_len": 142,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -3464,15 +3415,17 @@
       {
         "word": "anonymity",
         "arm": "R_domain",
-        "core_sha256": "3a7acdc9f00462fdf1e624215bb453e1468942a32f149c461e766ff92ef3e307",
-        "n_chars": 356,
+        "core_sha256": "2bbb1059764ae5a9fd2e42f35701fd70a3768b3ab1d2e1708380e0ab3682a149",
+        "n_chars": 329,
         "leak_hits": 0,
         "leak_detail": null,
         "meta": {
           "native_bucket": "emotion/affect",
-          "mismatched_bucket": "motion/action",
-          "n_picked": 4,
-          "policy_status": "NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG (G3: build-time heuristic bucketing)"
+          "mismatched_bucket": "social/relation",
+          "n_picked": 5,
+          "target_len": 420,
+          "achieved_len": 329,
+          "policy_status": "PINNED_BY_FROZEN_CONFIG (G3: bucket_keyword_map in b1_1_arm_construction_config.json)"
         }
       },
       {
@@ -3499,10 +3452,10 @@
       }
     ],
     "freeze_coverage_gaps": [
-      "G1: A-composition pole/cap/separator NOT pinned in the frozen arm-construction config (runner uses varna_lens vowel-attachment polarity + ' ; ' + no cap).",
-      "G2: contrast_boundary cannot be rendered (it names other varṇas -> would leak); kept in metadata only. The frozen config's 'preserve contrast_boundary' cannot apply to prompt text.",
-      "G3: R_domain word->bucket and bridge->bucket maps NOT frozen; runner uses a build-time keyword heuristic and flags R_domain NOT_FULLY_SPECIFIED_BY_FROZEN_CONFIG.",
-      "G4: word/task pool (b1_dry_run_harness.py) and D/C/X sources (b1_real_conditioning.py) are committed but NOT in the frozen artifact set."
+      "G1 (RESOLVED): A-composition policy (pole rule, no cap, separator) is now pinned in b1_1_arm_construction_config.json arms.A.composition_policy; the runner reads the separator from it.",
+      "G2 (RESOLVED): contrast_boundary is pinned METADATA_ONLY in arm/leak configs and is never rendered; the runner composes A/S from binding_bridge/liberating_bridge only.",
+      "G3 (RESOLVED): R_domain bucket_keyword_map + bucket order + derivation rules + seed are pinned in the frozen arm config; the runner loads them from config and persists b1_1_r_domain_assignments.json.",
+      "G4 (RESOLVED): word/task pool + D/C/X + G2P-routing source paths are recorded in the generation config and hash-bound in the freeze manifest referenced_source_hashes."
     ],
     "model_access": {
       "torch_importable": true,

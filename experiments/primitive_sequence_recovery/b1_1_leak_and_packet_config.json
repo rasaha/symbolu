@@ -13,6 +13,8 @@
     "varna_sanskrit_leakage": "flag raw varṇa names / Sanskrit labels / IAST that could reveal the mapping",
     "obvious_mapping_hint_checks": "flag output text that names the conditioning bridge or its source expression",
     "model_seed_field_leakage": "no model_id / seed / conditioning field in judge-visible text",
+    "contrast_boundary_in_prompt": "FORBIDDEN — contrast_boundary is metadata only (it names other varṇas); it must never appear in conditioning or judge-visible text (G2 pin)",
+    "generic_sanskrit_source_label_scan": "flag ANY Sanskrit source-label token (from the lexicon source_attested_pole) appearing in a model-facing bridge/prompt — generic, not a hardcoded list (added after the real-G2P 'artha' finding)",
     "action_on_leak": "FAIL or repair before judging (structural blinding, as in B1)"
   },
   "blinded_packet_format": {

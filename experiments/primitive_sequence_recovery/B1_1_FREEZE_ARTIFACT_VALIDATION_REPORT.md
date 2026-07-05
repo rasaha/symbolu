@@ -34,14 +34,14 @@ _none_
 - judge panel: Meta-Llama-3-8B requires explicit acceptance (heavy missing-brace repair in B1) before freeze
 
 ## sha256 (candidate artifacts)
-- `b1_1_arm_construction_config.json`: 26e7899103c0ad8cc241f5a8b292f62f86f9ea99d7e0e2dba9b15e4f2cc2da9b
-- `b1_1_generation_config.json`: 0ed50203f4da1954477adb99c1279a6bf6b798078f807798388f64f7e3c1bc87
+- `b1_1_arm_construction_config.json`: 167343c28fe15dc88c2b4aa87c03b7a9e0291a09b0f5f6b45a292b99e9769a11
+- `b1_1_generation_config.json`: 268d0c02ee968f602ba00e9668572105c1aa4ef313b15f1bc426ccbe1377f011
 - `b1_1_seeds_config.json`: 1c044278ff1ee064c35d1ebacfa0ef5b7fea4cc782d020654ee15200c07730c0
 - `b1_1_judge_panel_config.json`: 1632b11794a98dd0b864d3e2a3e35e76614da7de8d6cd17c6a85f6f2bb4dfc74
 - `b1_1_scorer_config.json`: aac682fe8bf22d51eb530c40440d07fb629ee148a6b822a69c3c1f9f440befd6
-- `b1_1_leak_and_packet_config.json`: 09e869827be3626b327c76897886226741898b1a24187f9dd821111e28242c69
-- `b1_1_bridge_pool_draft.json`: c0e5460787e00177c37064d4e0355dc0644936ad1f1bea6eaca1e43c4f8c258a
-- `b1_1_experimental_contrastive_lexicon_draft.json`: 434f33440be8452789cd0a41c7119348963d7ee06ea788dd0e0ba3e5ff9f6fdc
+- `b1_1_leak_and_packet_config.json`: 0804e3d23a336f55f1d2a176d859f0e3931ab3719eb1c97b56e921e6ebb9db48
+- `b1_1_bridge_pool_draft.json`: 1ce2ae14b563621ac495381e8397796e6791aba740978bb817544935c6ba8c15
+- `b1_1_experimental_contrastive_lexicon_draft.json`: e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7
 
 ## Final status
 ```

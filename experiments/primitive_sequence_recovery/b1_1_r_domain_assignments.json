@@ -1,0 +1,136 @@
+{
+  "artifact": "b1_1_r_domain_assignments",
+  "status": "candidate_deterministic",
+  "policy": "pinned in b1_1_arm_construction_config.json r_domain_policy (bucket_keyword_map + seed)",
+  "seed_ref": "r_domain_assignment_seed",
+  "assignments": {
+    "grief": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "cognition/knowledge",
+      "n_picked": 3
+    },
+    "courage": {
+      "native_bucket": "body/health",
+      "mismatched_bucket": "material/object",
+      "n_picked": 2
+    },
+    "patience": {
+      "native_bucket": "social/relation",
+      "mismatched_bucket": "protection/harm",
+      "n_picked": 2
+    },
+    "justice": {
+      "native_bucket": "ethical/order",
+      "mismatched_bucket": "emotion/affect",
+      "n_picked": 3
+    },
+    "silence": {
+      "native_bucket": "protection/harm",
+      "mismatched_bucket": "cosmic/abstract",
+      "n_picked": 4
+    },
+    "mountain": {
+      "native_bucket": "social/relation",
+      "mismatched_bucket": "material/object",
+      "n_picked": 4
+    },
+    "river": {
+      "native_bucket": "ethical/order",
+      "mismatched_bucket": "cognition/knowledge",
+      "n_picked": 2
+    },
+    "music": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "social/relation",
+      "n_picked": 4
+    },
+    "friendship": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "social/relation",
+      "n_picked": 6
+    },
+    "teacher": {
+      "native_bucket": "cognition/knowledge",
+      "mismatched_bucket": "body/health",
+      "n_picked": 2
+    },
+    "shadow": {
+      "native_bucket": "social/relation",
+      "mismatched_bucket": "motion/action",
+      "n_picked": 2
+    },
+    "freedom": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "material/object",
+      "n_picked": 4
+    },
+    "honesty": {
+      "native_bucket": "ethical/order",
+      "mismatched_bucket": "motion/action",
+      "n_picked": 3
+    },
+    "empathy": {
+      "native_bucket": "body/health",
+      "mismatched_bucket": "ethical/order",
+      "n_picked": 3
+    },
+    "ocean": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "material/object",
+      "n_picked": 2
+    },
+    "envy": {
+      "native_bucket": "ethical/order",
+      "mismatched_bucket": "material/object",
+      "n_picked": 2
+    },
+    "order": {
+      "native_bucket": "social/relation",
+      "mismatched_bucket": "material/object",
+      "n_picked": 2
+    },
+    "integrity": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "material/object",
+      "n_picked": 5
+    },
+    "autumn": {
+      "native_bucket": "ethical/order",
+      "mismatched_bucket": "emotion/affect",
+      "n_picked": 2
+    },
+    "echo": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "social/relation",
+      "n_picked": 1
+    },
+    "amoral": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "body/health",
+      "n_picked": 4
+    },
+    "apathy": {
+      "native_bucket": "body/health",
+      "mismatched_bucket": "protection/harm",
+      "n_picked": 2
+    },
+    "asymmetry": {
+      "native_bucket": "motion/action",
+      "mismatched_bucket": "material/object",
+      "n_picked": 4
+    },
+    "anarchy": {
+      "native_bucket": "emotion/affect",
+      "mismatched_bucket": "social/relation",
+      "n_picked": 2
+    },
+    "anonymity": {
+      "native_bucket": "emotion/affect",
+      "mismatched_bucket": "social/relation",
+      "n_picked": 5
+    }
+  },
+  "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+  "track_b_anchor": "BLOCKED",
+  "generation_authorized": false
+}
