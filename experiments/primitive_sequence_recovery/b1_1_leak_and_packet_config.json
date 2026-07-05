@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "artifact": "b1_1_leak_and_packet_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate; NOT frozen; does NOT authorize generation/judging.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED"
+  },
+  "leak_checks": {
+    "forbidden_arm_label_leakage": ["A", "D", "S", "R_same", "R_deranged", "R_domain", "C", "X",
+                                    "control_arm", "arm", "mapping"],
+    "varna_sanskrit_leakage": "flag raw varṇa names / Sanskrit labels / IAST that could reveal the mapping",
+    "obvious_mapping_hint_checks": "flag output text that names the conditioning bridge or its source expression",
+    "model_seed_field_leakage": "no model_id / seed / conditioning field in judge-visible text",
+    "action_on_leak": "FAIL or repair before judging (structural blinding, as in B1)"
+  },
+  "blinded_packet_format": {
+    "judge_view_fields": ["display_id", "key_word", "task_text", "outputs"],
+    "outputs_fields": ["id", "text"],
+    "display_id_pattern": "P\\d{5} (opaque; carries no arm/order info)",
+    "presentation_order": "seeded shuffle (judge_packet_shuffle_seed=50513)"
+  },
+  "packet_hashing": {
+    "raw_outputs_sha256": true,
+    "judge_view_sha256": true,
+    "packets_full_sha256": true
+  },
+  "persistence": {
+    "packet_persistence_sample": "commit 30-50 leak-scanned blinded packets, INCLUDING R-beats-A and A-beats-R cases",
+    "raw_output_persistence": "full raw outputs stored durably (not ephemeral pod only), hash-bound",
+    "judge_output_persistence": "all judge responses retained + hash-bound",
+    "note": "closes the B1 gap where raw outputs were RunPod-only and unrecoverable"
+  },
+  "failure_repair_policy_before_judging": "if any leak found, FAIL or repair (structural re-blind) BEFORE building judge packets; never judge leaked packets",
+  "generation_authorized": false
+}

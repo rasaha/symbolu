@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "artifact": "b1_1_generation_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate; NOT frozen; does NOT authorize generation (separate B1_1_GENERATION_AUTHORIZATION).",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED",
+    "source_of_model_values": "TRACK_B_RUNTIME_MODEL_LOCK.yaml (committed B1 runtime lock)"
+  },
+  "generation_models": [
+    {"id": "mistralai/Mistral-7B-Instruct-v0.3", "family": "Mistral",
+     "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71"},
+    {"id": "Qwen/Qwen2.5-7B-Instruct", "family": "Qwen",
+     "revision": "a09a35458c702b33eeacc393d103063234e8bc28"}
+  ],
+  "generation_model_id": "mistralai/Mistral-7B-Instruct-v0.3 + Qwen/Qwen2.5-7B-Instruct (dual, per B1 lock)",
+  "provider_runtime": "transformers",
+  "model_revision": "Mistral c170c708...; Qwen a09a3545... (from committed lock)",
+  "decoding": {
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "max_tokens": 300,
+    "arm_specific_decoding": false,
+    "number_of_samples_per_cell": 2,
+    "generation_seeds": [1101, 2027]
+  },
+  "prompt_template": "UNKNOWN_PENDING_FREEZE_REVIEW",
+  "task_templates": {
+    "T1_definition":            {"intent": "define the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
+    "T2_explanation":           {"intent": "explain the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
+    "T3_metaphor":              {"intent": "produce a metaphor for the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
+    "T4_correctness_sensitive": {"intent": "explain plainly and accurately (correctness tracked separately)", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
+    "T5_tone_match":            {"intent": "match a target tone for the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
+    "T6_evoke_creative":        {"intent": "evoke the word creatively", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"}
+  },
+  "retry_policy": "on transient error retry up to 3x with backoff; abort on repeated failure",
+  "failure_policy": "abort-on-empty output; no silent drops; all raw generations retained",
+  "no_post_hoc_prompt_edits": true,
+  "raw_output_retention": "all raw outputs retained and hash-bound (durable storage, not ephemeral pod only)",
+  "generation_authorized": false
+}

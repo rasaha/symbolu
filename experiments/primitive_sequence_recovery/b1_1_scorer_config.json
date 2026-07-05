@@ -1,0 +1,40 @@
+{
+  "_meta": {
+    "artifact": "b1_1_scorer_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate; NOT frozen; does NOT authorize scoring.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED"
+  },
+  "primary_comparisons": ["A_vs_R_deranged", "A_vs_R_domain", "A_vs_R_same"],
+  "secondary_comparisons": ["A_vs_D", "A_vs_S", "A_vs_C", "A_vs_X"],
+  "primary_success_criterion": "A must beat R_deranged AND R_domain AND R_same (corrected CI lower bound > 0.5), survive multiplicity correction, and avoid unacceptable correctness degradation (T4)",
+  "ci_policy": {
+    "method": "item-clustered paired bootstrap",
+    "n_boot": 2000,
+    "seed": 60617,
+    "ci": "95% (lower bound > 0.5 to 'beat')"
+  },
+  "multiplicity_correction": "Holm-Bonferroni across the co-primary set (A vs each of D/S/R_same/R_deranged/R_domain/C/X)",
+  "task_level_diagnostics": true,
+  "correctness_tracking": {
+    "enabled": true,
+    "note": "T4 correctness degradation reported separately regardless of creative wins"
+  },
+  "verdict_label_rules": {
+    "LIMITED_GENERATION_UTILITY": "A beats R_deranged AND R_domain AND R_same (and D/S/C/X), multiplicity-corrected, no unacceptable correctness degradation",
+    "RANDOM_OR_SCRAMBLED_MATCHES": "R controls match A",
+    "DERANGED_RESONANCE_MATCHES": "A ties R_deranged",
+    "DOMAIN_RESONANCE_MATCHES": "A ties R_domain",
+    "SURFACE_STRUCTURE_EXPLAINS": "C explains",
+    "DICTIONARY_DOMINATES": "A fails D",
+    "CORRECTNESS_DEGRADED": "correctness worse for A",
+    "NO_SIGNAL": "A beats only X",
+    "NOT_ROBUST": "effect not robust",
+    "BLOCKED": "hard blocker"
+  },
+  "no_rescue": "A failure cannot be reinterpreted as ontology signal or unblock Track B",
+  "scoring_authorized": false,
+  "generation_authorized": false
+}

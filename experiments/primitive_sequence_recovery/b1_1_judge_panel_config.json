@@ -1,0 +1,40 @@
+{
+  "_meta": {
+    "artifact": "b1_1_judge_panel_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate; NOT frozen; does NOT authorize judging.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED",
+    "source_of_judges": "B1 judge panel v2 (candidate; requires explicit acceptance before freeze)"
+  },
+  "judge_model_ids": [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "meta-llama/Meta-Llama-3-8B-Instruct",
+    "google/gemma-2-9b-it"
+  ],
+  "judge_caveats": {
+    "Meta-Llama-3-8B-Instruct": "B1 v2: relied on missing-final-brace repair for ~55% of verdicts (safe, flagged, choice unchanged). REQUIRES EXPLICIT ACCEPTANCE before freeze, or replacement.",
+    "acceptance_required_before_freeze": true
+  },
+  "judge_prompt": "blinded pairwise; JSON-only output; greedy decoding (declare exact prompt at freeze)",
+  "judge_prompt_exact": "UNKNOWN_PENDING_FREEZE_REVIEW",
+  "output_schema": {
+    "choice": "output_1_better | output_2_better | tie_no_preference | both_bad",
+    "correctness_flag": "none | output_1_problem | output_2_problem | both_problem"
+  },
+  "parser_rules": {
+    "json_only": true,
+    "narrow_repair": "missing_final_brace ONLY (all fields present + valid; duplicate keys rejected)",
+    "declared_up_front": true
+  },
+  "qc_rules": {
+    "attention_checks": "included; blinded",
+    "exclusion_rule": "exclude a judge if attention fails > 1 OR > 25% of its attention items"
+  },
+  "replacement_policy": "predeclared: an excluded judge is replaced by a predeclared backup judge (declare backup at freeze)",
+  "exclusion_policy": "apply the frozen attention-exclusion rule per judge before scoring",
+  "no_post_hoc_judge_selection": true,
+  "judge_outputs_retained": true,
+  "judging_authorized": false
+}

@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "artifact": "b1_1_arm_construction_config",
+    "status": "CONFIG_CANDIDATE",
+    "freeze_status": "NOT_READY_FOR_FREEZE",
+    "note": "Final candidate config; B1.1 NOT frozen until the freeze-manifest gate. Does NOT authorize generation.",
+    "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b_anchor": "BLOCKED",
+    "embedding_gate_status": "BLOCKED_DEPENDENCY_UNAVAILABLE",
+    "fallback_qualification": "FALLBACK_QUALIFIED",
+    "crux": "R_deranged is the crux; contrastivity is necessary but not sufficient."
+  },
+  "inputs": {
+    "lexicon": "b1_1_experimental_contrastive_lexicon_draft.json",
+    "bridge_pool": "b1_1_bridge_pool_draft.json"
+  },
+  "arms": {
+    "A":          {"description": "target word's own varṇa-derived binding/liberating bridge (real mapping)",
+                   "construction_rule": "G2P->varṇa sequence of the target word; compose its bridge phrases in order; preserve functional_operation + contrast_boundary"},
+    "D":          {"description": "dictionary / conventional lexical baseline",
+                   "construction_rule": "plain dictionary meaning of the target word; must NOT leak the A mapping"},
+    "S":          {"description": "scrambled mapping control",
+                   "construction_rule": "retain the word's varṇa set; break assignment/order via seeded scramble (arm_construction_seed)"},
+    "R_same":     {"description": "random bridge from the same revised pool",
+                   "construction_rule": "sample bridge phrases from the same 68-phrase pool, NOT the target's own mapping; matched count/length/style; seed r_same_sample_seed"},
+    "R_deranged": {"description": "another word's REAL A mapping assigned to the wrong word (CRUX)",
+                   "construction_rule": "fixed seeded derangement pi over the word list (pi(w)!=w); word w receives the real A mapping of pi(w); mapping quality maximal, only word->mapping fit broken; seed r_deranged_assignment_seed"},
+    "R_domain":   {"description": "fluent symbolic mapping from a deliberately mismatched domain",
+                   "construction_rule": "sample a coherent mapping from a domain in the word's forbidden-domain list; same length/grammar/style; seed r_domain_assignment_seed"},
+    "C":          {"description": "surface / style control",
+                   "construction_rule": "surface facts / style-matched filler; must NOT leak the A mapping"},
+    "X":          {"description": "neutral prompt control",
+                   "construction_rule": "no conditioning (floor)"}
+  },
+  "rules": {
+    "no_target_self": "R_same and R_deranged must NEVER use the target word's own mapping",
+    "same_pool": "R_same draws only from the revised 68-phrase bridge pool",
+    "deranged_real_mapping_from_other_word": "R_deranged uses a REAL A mapping from a different word (not synthetic, not ugly)",
+    "domain_mismatch": "R_domain uses a coherent but domain-mismatched mapping; forbidden/allowed domain lists per word",
+    "style_length_normalization": "all arms comparable in length/style; R controls strong and fluent, never ugly or nonsense",
+    "exclusion_rules": "none beyond the pre-registered word/task set"
+  },
+  "seeds_ref": "b1_1_seeds_config.json",
+  "forbidden_domain_lists_per_word": "UNKNOWN_PENDING_FREEZE_REVIEW",
+  "validation_expectations": {
+    "arms_exactly": ["A", "D", "S", "R_same", "R_deranged", "R_domain", "C", "X"],
+    "no_target_self_enforced": true,
+    "R_controls_fluent_same_style": true,
+    "no_A_leak_in_D_C_X": true
+  },
+  "generation_authorized": false
+}
