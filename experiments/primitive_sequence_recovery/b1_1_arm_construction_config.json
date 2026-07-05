@@ -41,7 +41,17 @@
     "exclusion_rules": "none beyond the pre-registered word/task set"
   },
   "seeds_ref": "b1_1_seeds_config.json",
-  "forbidden_domain_lists_per_word": "UNKNOWN_PENDING_FREEZE_REVIEW",
+  "r_domain_policy": {
+    "buckets": ["body/health", "social/relation", "cognition/knowledge", "motion/action",
+                "material/object", "ethical/order", "emotion/affect", "cosmic/abstract",
+                "speech/communication", "protection/harm"],
+    "assignment_rule": "for each target item, deterministically assign one MISMATCHED bucket (different from the word's native semantic bucket) via r_domain_assignment_seed; sample a fluent, same-style symbolic mapping from that bucket",
+    "no_target_self": "R_domain never uses the target word's own B1.1 bridge or its native bucket",
+    "determinism": "seeded by r_domain_assignment_seed (b1_1_seeds_config.json); independent of generation results; no model judgment",
+    "style_parity": "same symbolic richness / length / grammar as A; never ugly, nonsense, or obviously weaker than A",
+    "per_word_expansion": "the native-bucket-per-word map is expanded at arm-builder time against the FROZEN B1.1 word list; policy is defined at bucket level now and does not fabricate an unknown final word list",
+    "validation_rule": "every R_domain assignment must come from a bucket != the target word's native bucket"
+  },
   "validation_expectations": {
     "arms_exactly": ["A", "D", "S", "R_same", "R_deranged", "R_domain", "C", "X"],
     "no_target_self_enforced": true,

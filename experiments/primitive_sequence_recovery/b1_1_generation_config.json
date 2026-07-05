@@ -25,14 +25,16 @@
     "number_of_samples_per_cell": 2,
     "generation_seeds": [1101, 2027]
   },
-  "prompt_template": "UNKNOWN_PENDING_FREEZE_REVIEW",
+  "prompt_template": "Soft orientation, not a definition: {arm_bridge_text}. Use this only as a gentle tonal/conceptual guide while following the task exactly.\n\nTask:\n{task}",
+  "prompt_template_source": "reused from committed B1 WRAPPER (b1_dry_run_harness.py); {conditioning}->{arm_bridge_text}; task uses {target_word}; no arm/varṇa/Sanskrit label revealed; X uses a neutral (empty) bridge",
+  "task_templates_source": "reused verbatim from committed B1 TASKS (b1_dry_run_harness.py); {w}->{target_word}",
   "task_templates": {
-    "T1_definition":            {"intent": "define the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
-    "T2_explanation":           {"intent": "explain the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
-    "T3_metaphor":              {"intent": "produce a metaphor for the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
-    "T4_correctness_sensitive": {"intent": "explain plainly and accurately (correctness tracked separately)", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
-    "T5_tone_match":            {"intent": "match a target tone for the word", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"},
-    "T6_evoke_creative":        {"intent": "evoke the word creatively", "exact_prompt": "UNKNOWN_PENDING_FREEZE_REVIEW"}
+    "T1": {"intent": "reflective paragraph", "exact_prompt": "Write a short reflective paragraph about {target_word}."},
+    "T2": {"intent": "kind message",        "exact_prompt": "Write a gentle, kind message on the theme of {target_word}."},
+    "T3": {"intent": "metaphor",            "exact_prompt": "Write one original metaphor for {target_word}."},
+    "T4": {"intent": "explain plainly and accurately", "correctness_sensitive": true, "exact_prompt": "Explain {target_word} plainly and accurately in 3-4 sentences."},
+    "T5": {"intent": "tone-match",          "exact_prompt": "Respond to someone reflecting on {target_word}, matching the emotional tone."},
+    "T6": {"intent": "evoke",               "exact_prompt": "Rewrite this line to evoke {target_word}: 'The day went on as usual.'"}
   },
   "retry_policy": "on transient error retry up to 3x with backoff; abort on repeated failure",
   "failure_policy": "abort-on-empty output; no silent drops; all raw generations retained",

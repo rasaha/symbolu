@@ -14,11 +14,17 @@
     "google/gemma-2-9b-it"
   ],
   "judge_caveats": {
-    "Meta-Llama-3-8B-Instruct": "B1 v2: relied on missing-final-brace repair for ~55% of verdicts (safe, flagged, choice unchanged). REQUIRES EXPLICIT ACCEPTANCE before freeze, or replacement.",
-    "acceptance_required_before_freeze": true
+    "Meta-Llama-3-8B-Instruct": "B1 v2: relied on missing-final-brace repair for ~55% of verdicts (safe, flagged, choice unchanged).",
+    "meta_llama3_status": "WARNING_ACCEPTANCE_REQUIRED",
+    "acceptance_required_before_freeze": true,
+    "candidate_panel_not_final_until_freeze_review": true,
+    "note": "Freeze review must explicitly ACCEPT this judge (acknowledging the repair caveat) or REPLACE it before final freeze; no post-hoc judge selection."
   },
-  "judge_prompt": "blinded pairwise; JSON-only output; greedy decoding (declare exact prompt at freeze)",
-  "judge_prompt_exact": "UNKNOWN_PENDING_FREEZE_REVIEW",
+  "judge_prompt": "blinded pairwise; JSON-only output; greedy decoding",
+  "judge_prompt_exact": "You are comparing two responses to the same task. Read the task and both responses, then decide which response better accomplishes the task. Judge quality and correctness only; ignore length and surface style. Do NOT explain your thinking. Respond with ONLY a JSON object of this exact shape and nothing else:\n{\"choice\": \"output_1_better|output_2_better|tie_no_preference|both_bad\", \"confidence\": \"low|medium|high\", \"correctness_flag\": \"none|output_1_problem|output_2_problem|both_problem\", \"short_reason\": \"one short sentence\"}\n\nTask: {task_text}\n\nOutput 1: {text1}\n\nOutput 2: {text2}\n\nJSON:",
+  "judge_prompt_source": "reused verbatim from committed B1 run_b1_llm_judge.py JUDGE_PROMPT",
+  "judging_priority": {"default": "task success, clarity, relevance, correctness where applicable",
+                       "T4": "correctness dominates surface style"},
   "output_schema": {
     "choice": "output_1_better | output_2_better | tie_no_preference | both_bad",
     "correctness_flag": "none | output_1_problem | output_2_problem | both_problem"

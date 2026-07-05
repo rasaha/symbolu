@@ -1,6 +1,6 @@
 # B1.1 Freeze-Artifact Validation Report
 
-## Status: `NOT_READY_FOR_FREEZE`
+## Status: `READY_FOR_FREEZE_REVIEW`
 
 Pure-stdlib validation of the candidate freeze configs + bridge pool. NO model / embedding / generation /
 scoring / judging. B1.1 **not frozen**; generation **not authorized**. B1 verdict
@@ -14,7 +14,7 @@ scoring / judging. B1.1 **not frozen**; generation **not authorized**. B1 verdic
 - [PASS] exists:b1_1_scorer_config.json
 - [PASS] exists:b1_1_leak_and_packet_config.json
 - [PASS] no_placeholder_required
-- [FAIL] no_unknown_pending
+- [PASS] no_unknown_pending
 - [PASS] arms_exactly_8
 - [PASS] primary_has_all_three_R
 - [PASS] generation_authorized_false
@@ -27,19 +27,17 @@ scoring / judging. B1.1 **not frozen**; generation **not authorized**. B1 verdic
 - [PASS] bridge_no_forbidden
 - [PASS] no_source_lexicon_target
 
-## Blockers (3)
-- UNKNOWN_PENDING_FREEZE_REVIEW in b1_1_arm_construction_config.json: ['$.forbidden_domain_lists_per_word']
-- UNKNOWN_PENDING_FREEZE_REVIEW in b1_1_generation_config.json: ['$.prompt_template', '$.task_templates.T1_definition.exact_prompt', '$.task_templates.T2_explanation.exact_prompt', '$.task_templates.T3_metaphor.exact_prompt', '$.task_templates.T4_correctness_sensitive.exact_prompt', '$.task_templates.T5_tone_match.exact_prompt', '$.task_templates.T6_evoke_creative.exact_prompt']
-- UNKNOWN_PENDING_FREEZE_REVIEW in b1_1_judge_panel_config.json: ['$.judge_prompt_exact']
+## Blockers (0)
+_none_
 
 ## Warnings (1)
 - judge panel: Meta-Llama-3-8B requires explicit acceptance (heavy missing-brace repair in B1) before freeze
 
 ## sha256 (candidate artifacts)
-- `b1_1_arm_construction_config.json`: 019c2ec8ab79cb33619ef4eb1457c7ee7821b1cb0b58df514cca32a3d14bb4d9
-- `b1_1_generation_config.json`: 16af2be6de57dd33064e016a94becc9f525d510307f56338d268408a4cd739f2
+- `b1_1_arm_construction_config.json`: 26e7899103c0ad8cc241f5a8b292f62f86f9ea99d7e0e2dba9b15e4f2cc2da9b
+- `b1_1_generation_config.json`: 0ed50203f4da1954477adb99c1279a6bf6b798078f807798388f64f7e3c1bc87
 - `b1_1_seeds_config.json`: 1c044278ff1ee064c35d1ebacfa0ef5b7fea4cc782d020654ee15200c07730c0
-- `b1_1_judge_panel_config.json`: 7ba6200c44a1719f216d4b4f40df4f47cf2216744a5985fa49d1bbb06d75e0ad
+- `b1_1_judge_panel_config.json`: 1632b11794a98dd0b864d3e2a3e35e76614da7de8d6cd17c6a85f6f2bb4dfc74
 - `b1_1_scorer_config.json`: aac682fe8bf22d51eb530c40440d07fb629ee148a6b822a69c3c1f9f440befd6
 - `b1_1_leak_and_packet_config.json`: 09e869827be3626b327c76897886226741898b1a24187f9dd821111e28242c69
 - `b1_1_bridge_pool_draft.json`: 4da248bc622fa4284a2f414252441c371e71519fc068f160bc7278c206a35a5c
@@ -47,7 +45,7 @@ scoring / judging. B1.1 **not frozen**; generation **not authorized**. B1 verdic
 
 ## Final status
 ```
-status:                NOT_READY_FOR_FREEZE
+status:                READY_FOR_FREEZE_REVIEW
 B1 verdict:            RANDOM_OR_SCRAMBLED_MATCHES (unchanged)
 Track B:               BLOCKED
 Embedding gate:        BLOCKED_DEPENDENCY_UNAVAILABLE (owed)
