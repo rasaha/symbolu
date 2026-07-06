@@ -9,8 +9,10 @@ corrected three-layer theory.
 document:   B1.2 mapping-fidelity PREREGISTRATION (prereg only)
 status:     NOT_RUN · NOT_FROZEN · NOT_AUTHORIZED_FOR_GENERATION_OR_JUDGING
 authority:  one final authorized mapping-fidelity falsifier (per B1_2_MAPPING_FIDELITY_PREREG_DECISION.md)
-amendment:  A1 — prediction-vs-answer-key design folded in (see §6a); G(word)=dictionary differential answer
-            key, V(word)=varṇa prediction; §6a governs on any conflict with the original draft
+amendment:  A1 — prediction-vs-answer-key design (see §6a); G(word)=dictionary differential answer key,
+            V(word)=varṇa prediction; §6a governs on any conflict with the original draft.
+            A2 — two-axis controls (see §12): Axis 1 answer-key distractors (vary G, hold V) test
+            word-specificity; Axis 2 prediction ablations (vary V, hold G) test mechanism. Both required.
 ```
 
 This document specifies the study. It does **not** implement it, build packets, run models, judge, or score.
@@ -181,26 +183,72 @@ prediction V(target) is scored against these as distractors):
 - **no post-hoc reassignment** — a tier label cannot move after results are seen; divergent cases resolved by
   pre-set rule or dropped, never hand-adjudicated afterward.
 
-## 12. Controls (the distractor answer keys V is scored against)
+## 12. Controls — two independent axes (Amendment A2)
 
-The prediction **V(target)** is matched against the correct key **G(target)** and these distractors:
+Controls are split into two **independent axes** that test two different claims. Axis 1 varies the *answer
+key* (holding the prediction fixed) to test **word-specificity**; Axis 2 varies the *prediction* (holding the
+answer fixed) to test **mechanism** — whether the real varṇa skeleton causally produces the alignment. **Both
+axes must pass** for support (§15). These are **not** "randomness tests"; they are a semantic-distance
+manipulation, answer-key distractors, and prediction-side ablations (§7 naming).
+
+### Axis 1 — answer-key distractors / word-specificity  (hold V = V(target); vary G)
+
+V(target) is matched against the correct key G(target) and these wrong keys:
 
 - **G(near)**, **G(mid)**, **G(far)** — wrong-word differential answer keys at increasing semantic distance
-  (§11);
-- **R_same** — a differential answer key of a random same-pool word (no distance structure);
-- **R_domain** — a differential answer key from a mismatched domain bucket;
-- **generic_symbolic** — high-quality non-varṇa reflective text (bounds the generic-resonance baseline);
-- **dictionary_baseline** — optional floor anchor.
+  (§11) — the **primary** distance-gradient controls;
+- **R_same** — differential answer key of a random same-pool word (distance-free) — secondary;
+- **R_domain** — differential answer key from a mismatched domain bucket — secondary;
+- **generic_symbolic** — high-quality non-varṇa reflective text, treated as an answer-key-like distractor
+  (bounds the generic-resonance floor) — secondary.
 
-Rules:
+**Purpose:** does V(target) align *specifically* with the correct word's dictionary differential rather than
+wrong words' differentials, and does alignment fall off with semantic distance?
 
-- every distractor is a **real, fluent, plausible** differential built by the same G procedure — **no
-  ugly/nonsense** controls;
-- **length/register/format matched** to G(target) and to V (uniform across tiers, so tier differences reflect
-  semantics, not style drift);
+### Axis 2 — prediction ablations / mechanism  (hold G = G(target); vary V)
+
+G(target) is held fixed; the prediction is ablated:
+
+- **V_real(target)** — the real varṇa-derived prediction (§10a).
+- **V_scrambled(target)** — same target word, same non-varṇa setup, **varṇa skeleton order scrambled**
+  (seeded). *Tests whether varṇa order/structure matters* (the B1.1 scrambled-tie warning, now on the
+  prediction side).
+- **V_deranged(other word)** — **another word's** varṇa-derived prediction tested against G(target). The
+  prediction-side mirror of R_deranged. *Tests whether another word's varṇa prediction fits the target key
+  equally well.*
+- **V_removed / dictionary-only** — a no-varṇa / dictionary-only predictor. **Pivotal, not secondary** — its
+  two roles are pinned in §12a.
+- **V_random** *(optional)* — glosses from random varṇas not in the word. Extra chance-level anchor.
+
+**Purpose:** does the *real* varṇa skeleton contribute causally to alignment with G(target), or would a
+scrambled / other-word / no-varṇa predictor align just as well?
+
+### Rules (both axes)
+
+- every answer-key distractor is a **real, fluent, plausible** differential built by the **same G procedure**
+  — **no ugly/nonsense** controls;
+- every prediction ablation is built by the **same V procedure** save the one manipulated factor (order /
+  source word / varṇa-presence), so a difference is attributable to that factor;
+- **length/register/format matched** across all keys and all predictions (differences reflect semantics/
+  mechanism, not style drift);
 - **"far" means a distant source word, not degraded text**;
-- **no leakage of identity** — no marker revealing which key is G(target) vs a distractor, or which object is
-  V.
+- **no leakage of identity** — no marker revealing which key is G(target), or which prediction is V_real.
+
+## 12a. Dictionary-only (V_removed): ceiling reference and mechanism probe — not a wrong-key distractor
+
+Dictionary-only is **not** an answer-key distractor. It has two roles, both pivotal:
+
+- **(a) Ceiling / manipulation check.** A dictionary-derived predictor *should* align strongly with the
+  dictionary-derived G(target) (both come from the lexical pipeline). **If it does not, the alignment
+  judge/scorer is broken** and the study is uninterpretable — run this as a sanity gate before trusting any
+  V_real number.
+- **(b) Mechanism probe.** V_real must show a **varṇa contribution beyond** the chance / scrambled / deranged
+  baselines. The decisive negative: if dictionary-only aligns well but **V_real does not rise above
+  V_scrambled / V_deranged / chance**, the dictionary pipeline works but the **varṇa prediction carries no
+  measurable signal** — Symbol-U mapping fidelity is unsupported.
+
+Filing dictionary-only as "secondary randomness" would understate the single control that decides the
+hypothesis.
 
 ## 13. Judge task (alignment of the varṇa prediction to the answer keys)
 
@@ -223,21 +271,35 @@ for word-fit on its own** — it only ever appears as one candidate key the pred
 - **No target/control truth leakage**; candidate order shuffled by a frozen seed.
 - **Private truth map stored separately** from judge-facing packets (as in B1.1), revealed only at scoring.
 
-## 15. Primary endpoints (alignment of V to G)
+## 15. Primary endpoints (alignment of V to G) — BOTH axes required
 
-Primary **success** requires **all** — where "V(target) beats X" means V(target) aligns with G(target) more
-than with X, corrected CI lower bound > chance:
+B1.2 support requires **Axis 1 AND Axis 2** to pass. Axis 1 alone (word-specific alignment) without Axis 2
+(varṇa causally responsible) is **not** Symbol-U evidence; Axis 2 alone without an Axis-1 distance gradient is
+generic resonance. Throughout, "V beats X" means V aligns with G(target) more than with X, corrected CI lower
+bound > chance; chance floor is explicit per task (1/k for k-way; 0.5 for pairwise).
+
+**Axis 1 success — word-specificity (hold V = V(target), vary G):**
 
 - **V(target) aligns best with G(target)** overall (correct-key selection above chance);
-- **V(target) beats G(far)** (corrected CI lower bound > chance);
-- **V(target) beats G(mid)** (corrected CI lower bound > chance);
-- **V(target) does not lose** to **G(near)**;
-- a **monotonic distance gradient**: margin vs G(far) > margin vs G(mid) > margin vs G(near);
-- **V(target) also beats R_same and R_domain** (and the generic_symbolic baseline);
-- the result **survives** multiplicity correction and all pre-specified robustness checks.
+- **V(target) beats G(far)** and **beats G(mid)**;
+- **V(target) does not collapse** against **G(near)**;
+- a **monotonic distance gradient**: alignment G(target) > G(near) > G(mid) > G(far) — equivalently margin vs
+  G(far) > margin vs G(mid) > margin vs G(near);
+- **V(target) also beats R_same and R_domain** (and the generic_symbolic baseline).
 
-Chance floor is explicit per task (1/k for k-way selection; 0.5 for pairwise/odd-one-out). The gradient — not
-any single comparison — is the distinctive evidence that the varṇa mapping recovers word-specific meaning.
+**Axis 2 success — mechanism (hold G = G(target), vary V):**
+
+- **V_real(target) beats V_scrambled** (real varṇa order/structure aligns with G(target) better than a
+  scrambled skeleton);
+- **V_real(target) beats V_deranged** (the target's own varṇa aligns better than another word's varṇa);
+- **V_real(target) beats chance / V_random**;
+- **V_real shows a non-trivial varṇa contribution** — it rises above the scrambled/deranged/chance baselines,
+  and dictionary-only passes its **ceiling/sanity gate** (§12a); a working dictionary pipeline with V_real at
+  the ablation floor is a **failure**, not a pass.
+
+**Both** must **survive** multiplicity correction and all pre-specified robustness checks. The gradient
+(Axis 1) plus the ablation margins (Axis 2) together — not any single comparison — are the distinctive
+evidence that the varṇa mapping recovers word-specific meaning.
 
 ## 16. Allowed positive label
 
@@ -248,15 +310,35 @@ privilege, semantic-truth claim, Track B unblock.
 
 ## 17. Kill criteria
 
-- **V(target) fails G(far)** → no recoverable word-specific signal (strongest kill).
+**Axis 1 (word-specificity):**
+
+- **V(target) fails G(far)** → no recoverable word-specific signal (strongest Axis-1 kill).
 - **alignment flat across G(near)/G(mid)/G(far)** → generic symbolic resonance explains the effect.
 - **V(target) fails R_same or R_domain** → mapping fidelity unsupported regardless of the deranged gradient.
+
+**Axis 2 (mechanism):**
+
+- **V_real ≈ V_scrambled** → varṇa order/structure carries no signal.
+- **V_real ≈ V_deranged** → the target's *own* varṇa skeleton carries no word-specific signal.
+- **V_real ≈ chance / V_random** → no recoverable varṇa signal at all.
+- **dictionary-only cannot align with G(target)** → the alignment judge/scorer is **broken** (study
+  uninterpretable; fix the machinery, do not report a verdict).
+- **dictionary-only explains all signal and V_real adds nothing beyond the ablations** → dictionary pipeline
+  works but **Symbol-U mapping fidelity is unsupported**.
+
+**Cross-axis:**
+
+- **Axis 1 passes but Axis 2 fails** → **not Symbol-U evidence** (something other than varṇa produced the
+  alignment).
+- **Axis 2 passes weakly but Axis 1 flat across near/mid/far** → generic resonance, not word-specific mapping.
+
+**Validity (either axis):**
+
 - **Success only on handpicked examples** / not surviving robustness → not robust, not support.
-- **G(word) scored as the "A signature" by itself** (judging the dictionary key for word-fit) → **invalid**
-  (tests dictionaries, not varṇa).
-- **G(word) or V(word) hand-authored / hand-tuned post-hoc**, or **anything varṇa-derived leaking into G** →
-  overfit / circular / **invalid**.
-- **Layer 1 made optional in V** (alignment survives without the varṇa term) → the dictionary did the work →
+- **G scored as the "A signature" by itself** (judging the dictionary key for word-fit) → **invalid**.
+- **G or V hand-authored / hand-tuned post-hoc**, or **anything varṇa-derived leaking into G** → circular /
+  **invalid**.
+- **Layer 1 made optional in V** (alignment survives without the varṇa term) → dictionary did the work →
   **null for Symbol-U**.
 - **Controls weakened** (uglified, shortened, off-topic) → invalid.
 
@@ -265,10 +347,15 @@ weak controls.
 
 ## 18. Statistical plan
 
-- **Pairwise alignment-win rate** per comparison (V(target) matches G(target) over the distractor);
-  **correct-key selection rate** and **ranking accuracy** (correct-in-top-1 / MRR) if ranking used.
+- **Axis 1 (vary G):** pairwise alignment-win rate per comparison (V(target) matches G(target) over the
+  distractor key); **correct-key selection rate** and **ranking accuracy** (correct-in-top-1 / MRR) if
+  ranking used; the near/mid/far **distance-gradient** tested as a monotonic trend, not just pairwise wins.
+- **Axis 2 (vary V):** alignment-win rate of **V_real vs each ablation** (V_scrambled, V_deranged,
+  V_random) against the fixed G(target); **dictionary-only ceiling** reported as a sanity gate, not scored as
+  support.
 - **Word-clustered paired bootstrap CIs** (item = word), n_boot and seed frozen in the config.
-- **Holm–Bonferroni** correction across all co-primary comparisons and tasks.
+- **Holm–Bonferroni** correction across all co-primary comparisons **on both axes** (Axis-1 distance/distractor
+  comparisons and Axis-2 ablation comparisons corrected together).
 - **Per-judge breakdown** reported.
 - **Judge exclusion only by preregistered attention/parser rules** (as B1.1: fail > 1 or > 25% of attention
   checks); **no post-hoc judge selection**.
@@ -280,7 +367,10 @@ weak controls.
 - **drop-repaired** sensitivity (if the parser performs any repair);
 - **near/mid/far tier** sensitivity (result stable to reasonable tier-boundary perturbation);
 - **word-cluster** sensitivity (leave-one-word-out);
-- **generic-symbolic comparison** (A must exceed the generic-resonance baseline, not just the weak controls).
+- **generic-symbolic comparison** (V(target) must exceed the generic-resonance baseline, not just the weak
+  controls);
+- **Axis-2 ablation sensitivity** (V_real's margin over V_scrambled / V_deranged stable to seed and to
+  leave-one-word-out).
 
 ## 20. Leakage and artifact freeze
 
@@ -292,15 +382,20 @@ weak controls.
 
 ## 21. Expected interpretations
 
-*(All in terms of how well the varṇa prediction V(target) aligns with the correct answer key G(target)
-against the distractor keys.)*
+*(Read across both axes: Axis 1 = alignment of V(target) to the correct key G(target) vs distractor keys;
+Axis 2 = alignment of V_real vs its ablations to the fixed G(target).)*
 
-- **V hits G(target) with a clean monotonic gradient + beats R_same and R_domain** → `MAPPING_FIDELITY_SIGNAL`.
-- **V beats G(far) only** (fails G(mid)/G(near)) → **category-level resonance**, explicitly **not**
-  word-specific mapping.
+- **Axis 1 clean monotonic gradient + beats R_same/R_domain, AND Axis 2 V_real beats scrambled/deranged/chance
+  above the dictionary-only sanity gate** → `MAPPING_FIDELITY_SIGNAL`.
+- **Axis 1 passes but Axis 2 fails** (V_real ≈ scrambled/deranged) → **not Symbol-U evidence** — something
+  other than the varṇa skeleton produced the alignment.
+- **V beats G(far) only** (fails G(mid)/G(near)) → **category-level resonance**, not word-specific mapping.
 - **V aligns flat across G(near)/G(mid)/G(far)** → **generic symbolic resonance**.
 - **V fails G(far)** → no recoverable word-specific signal.
 - **V loses to R_same or R_domain** → mapping fidelity **unsupported**.
+- **dictionary-only fails its ceiling gate** → alignment machinery **broken** — no verdict until fixed.
+- **dictionary-only strong but V_real at the ablation floor** → dictionary works, **varṇa carries no signal**
+  → unsupported.
 
 ## 22. Stop / default rule
 
@@ -310,7 +405,10 @@ controls **without hand-tuning** — i.e. without a human authoring the answer k
 labels to favor the target — then per the decision memo the **DECISION defaults to `STOP_NOW`** and the
 varṇa-mapping line closes. In particular: if V cannot be derived from the varṇa skeleton by a frozen rule, or
 if G can only be produced by hand, there is nothing varṇa-specific to test and the study must not run. A B1.2
-that can only be made to pass by design choices is not a valid falsifier.
+that can only be made to pass by design choices is not a valid falsifier. The **Axis-2 ablations
+(V_scrambled, V_deranged, V_removed) must also be mechanically specifiable** from the same frozen V procedure;
+if the varṇa prediction cannot even be scrambled/deranged by rule, there is no mechanism to probe and the
+default is again `STOP_NOW`.
 
 ## 23. Final status block
 
@@ -327,7 +425,9 @@ Track F negative:           CORRECTNESS_DEGRADED — preserved
 ontology validation:        NONE
 Sanskrit privilege:         NONE
 semantic-truth claim:       NONE
-default rule:               STOP_NOW if Layer 2 / Layer 3 / tiers / controls require hand-tuning
+controls:                   two axes — Axis 1 answer-key distractors (word-specificity) + Axis 2 prediction
+                            ablations (mechanism); BOTH required for support
+default rule:               STOP_NOW if G / V / tiers / Axis-2 ablations require hand-tuning
 next:                       prereg review, then freeze — no build before both
 ```
 
