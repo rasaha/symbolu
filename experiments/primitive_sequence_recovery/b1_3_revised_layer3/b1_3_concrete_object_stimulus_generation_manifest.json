@@ -1,0 +1,78 @@
+{
+  "artifact": "b1_3_concrete_object_stimulus_generation_manifest",
+  "status": "STIMULI_DRAFTED_AUDITS_PASS_PRE_FREEZE",
+  "evidence": false,
+  "generation_seed": "b1_3_concrete_object_stimgen_v1",
+  "determinism": "sha256-seeded, no random/Date; fully reproducible from inputs + seed",
+  "inputs_used": {
+    "final_primary_wordlist": "b1_3_concrete_object_final_primary_wordlist.json",
+    "deranged_source_map": "b1_3_concrete_object_deranged_source_map.json",
+    "generation_template_spec": "b1_3_concrete_object_generation_template_spec.json",
+    "arm_construction_spec": "b1_3_concrete_object_arm_construction_spec.json",
+    "semantic_baseline_spec": "b1_3_concrete_object_semantic_baseline_spec.json",
+    "scoring_freeze_manifest_v2": "b1_3_concrete_object_llm_freeze_manifest_draft_v2.json",
+    "bridge_pool_varna_tag_source": "b1_2_mapping_fidelity/b1_2_varna_bridge_pool.json",
+    "varna_pipeline": "varna_lens (G2P->varṇa via cmudict) + run_b1_1_generation.ArmBuilder",
+    "wordnet": "synset / hypernym for semantic baseline + synonym leak filter"
+  },
+  "outputs": {
+    "stimuli_draft": "b1_3_concrete_object_final_stimuli_draft.jsonl",
+    "style_audit_report_json": "b1_3_concrete_object_style_audit_report.json",
+    "style_audit_report_md": "b1_3_concrete_object_style_audit_report.md"
+  },
+  "n_stimuli_records": 371,
+  "n_targets": 53,
+  "comparisons_generated": [
+    "A_real_vs_R_deranged_mid", "A_real_vs_R_deranged_far", "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled", "A_real_vs_R_random", "A_real_vs_X_neutral", "A_real_vs_semantic_only_baseline"
+  ],
+  "record_fields": ["item_id","target_word","primary_or_secondary_or_diagnostic","object_family",
+    "dictionary_anchor","neutral_context","comparison_id","arm_left","arm_right","option_left","option_right",
+    "deranged_stratum","position_seed","generation_seed","source_metadata"],
+  "template": "Within the fixed meaning, this object is modulated by {t1}, {t2}, {t3}, and {t4}.",
+  "global_rules_applied_uniformly": [
+    "anti-leak: tag != target and not a WordNet synonym of target",
+    "no Sanskrit/varṇa tokens in tags",
+    "within-option dedupe (4 distinct tags)",
+    "shared-register normalization (short plain tokens, per-arm mean tag length 5.29-5.75)",
+    "content-word preference (skip function/deictic tokens)"
+  ],
+  "no_per_item_hand_polishing": true,
+  "audit_results": {
+    "style_parity": {"pass": true, "mean_abs_charlen_diff": 2.113, "all_4_tags": true},
+    "style_tell": {"pass": true, "balanced_accuracy": 0.3779, "threshold_draft": 0.55,
+      "method": "mechanical LOO nearest-centroid on FORMAT features only, distinct options"},
+    "denotation_leakage": {"pass": true, "repeats_target": 0, "uses_synonym": 0},
+    "quality_parity": {"pass": true, "empty": 0, "garbage": 0, "duplicates": 0, "sanskrit_tokens": 0},
+    "semantic_baseline": {"pass": true, "present_all_53": true, "same_format": true, "no_varna_input": true, "separated_from_X_neutral": true},
+    "near_mid_far_map_sanity": {"result": "MAP_ACCEPTED_NO_REPLACEMENTS", "obvious_mislabels": 0, "replacements": 0},
+    "overall_pass": true
+  },
+  "decision": "STIMULI_AND_STYLE_AUDIT_PASS_READY_FOR_FREEZE_REVIEW",
+  "evidence_judge_run": false,
+  "scoring_run": false,
+  "evidence_freeze_declared": false,
+  "prior_results_preserved": {
+    "B1.1": "LLM null (RANDOM_OR_SCRAMBLED_MATCHES)",
+    "B1.2_B1.3_automated": "nulls (scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED",
+    "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)",
+    "Track_F": "CORRECTNESS_DEGRADED",
+    "Track_B": "BLOCKED"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL","PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY","MAPPING_FIDELITY_SIGNAL","ontology_validation","Sanskrit_privilege","semantic_truth"],
+  "remaining_blockers": [
+    "final judge model list",
+    "scoring script implementation",
+    "final thresholds",
+    "manifest hash binding of frozen stimuli + all artifacts",
+    "explicit EVIDENCE_FREEZE declaration",
+    "actual evidence judge run"
+  ],
+  "next_gate": "B1_3_CONCRETE_OBJECT_LLM_EVIDENCE_FREEZE_REVIEW",
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["draft stimuli + mechanical audits only","not evidence","no evidence judge run","no scoring","no positive label earned","draft is not frozen"]
+}
