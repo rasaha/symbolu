@@ -52,3 +52,17 @@ level up.
 
 No file in this folder authorizes generation, judging, or scoring. Implementation remains gated behind a
 Layer-3 derivation-feasibility check, a prereg review, and a new freeze.
+
+## Reused varṇa mapping + rule/config artifacts (byte-identical copies of B1.1)
+
+The folder now also contains **byte-identical copies** of the B1.1 varṇa mapping data plus the small reused
+config/data files that define how `V(word)` uses it — so V provenance is self-contained. Source **code** is
+referenced by commit/path/function + hash, not copied (see `B1_2_RULE_ARTIFACT_COPY_AUDIT.md` and
+`B1_2_VARNA_MAPPING_PROVENANCE.md`):
+
+- `b1_2_varna_source_lexicon.json`, `b1_2_varna_bridge_pool.json` (mapping data)
+- `b1_2_arm_construction_config.reused_from_b1_1.json` (composition policy / pole rule)
+- `b1_2_seeds_config.reused_from_b1_1.json` (ablation seeds)
+- `b1_2_eval_dtable.reused_from_b1_1.json`, `b1_2_eval_wordlist.reused_from_b1_1.json` (core_D / V_removed)
+
+These are staged reuse material — **not** a B1.2 freeze and **not** an authorization to run.
