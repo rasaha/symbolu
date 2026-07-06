@@ -1,0 +1,59 @@
+{
+  "artifact": "b1_3_varna_field_table_precheck",
+  "evidence": false,
+  "development_only": true,
+  "table_source": "b1_1_bridge_pool_draft.json (frozen var\u1e47a glosses); mechanical blind keyword->dimension lexicon authored from dimension meanings, applied uniformly; single-coder HIGH-RISK",
+  "dimensions": [
+    "formality",
+    "intimacy",
+    "warmth",
+    "dependency",
+    "distance",
+    "potency",
+    "activity",
+    "hardness",
+    "sacred_institutional",
+    "domestic_personal"
+  ],
+  "defensibility_hits_per_dim_max68": {
+    "formality": 4,
+    "intimacy": 5,
+    "warmth": 9,
+    "dependency": 14,
+    "distance": 4,
+    "potency": 31,
+    "activity": 24,
+    "hardness": 12,
+    "sacred_institutional": 9,
+    "domestic_personal": 5
+  },
+  "n_real_forms": 70,
+  "n_pseudo_forms": 1,
+  "nondegeneracy": {
+    "mean_pairwise_cosine_all_forms": 0.3185,
+    "mean_vector_density": 0.2972,
+    "all_zero_rate": 0.0141,
+    "per_dimension_variance": {
+      "formality": 0.02031,
+      "intimacy": 0.00194,
+      "warmth": 0.04837,
+      "dependency": 0.14271,
+      "distance": 0.00663,
+      "potency": 0.23964,
+      "activity": 0.10635,
+      "hardness": 0.02725,
+      "sacred_institutional": 0.06285,
+      "domestic_personal": 0.00194
+    },
+    "zero_variance_dims": []
+  },
+  "order_sensitivity": {
+    "mean_cos_scrambled_vs_real": 0.9673,
+    "reading": "1.0 = order-invariant (BAD); <1 = order matters"
+  },
+  "deranged_check": {
+    "mean_cos_deranged_vs_real": 0.2885,
+    "reading": "high = another word's vector ~ real (generic risk)"
+  },
+  "note": "DEVELOPMENT non-degeneracy pre-check ONLY. Not evidence, no judges, no field-theory scoring. Passing non-degeneracy does NOT validate Symbol-U. Structure, not validated meaning."
+}
