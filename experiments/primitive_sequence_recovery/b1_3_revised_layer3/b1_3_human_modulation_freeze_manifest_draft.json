@@ -1,0 +1,44 @@
+{
+  "artifact": "b1_3_human_modulation_freeze_manifest_draft",
+  "evidence_freeze_declared": false,
+  "status": "DRAFT_ONLY_NOT_FROZEN_NOT_RUN",
+  "scope": "ONLY the previously-unrun human judged-modulation study; not a reopening of the full varṇa line",
+  "hypothesis": "Dictionary meaning fixes the object; varṇa/vṛtti supplies a modulation/propensity-field, not a definition. Test: given the fixed meaning/context, do blinded human raters judge the REAL varṇa-derived modulation as more coherent/apt/genuine for the target word than scrambled/deranged/random/neutral modulations?",
+  "instrument": "blinded HUMAN raters (LLM judges already returned null in B1.1)",
+  "arms": ["A_real", "R_deranged", "R_scrambled", "R_random", "X_neutral", "(optional) R_semantic_near", "(optional) R_varna_near"],
+  "primary_endpoint": "A_real win-rate vs R_deranged (forced choice); A_real must also beat R_scrambled, R_random, X_neutral",
+  "allowed_future_label": "HUMAN_PROPENSITY_MODULATION_SIGNAL",
+  "disallowed_labels": ["PROPENSITY_MODULATION_SIGNAL", "LLM_PROPENSITY_FIELD_DISCRIMINATION", "MAPPING_FIDELITY_SIGNAL", "LIMITED_GENERATION_UTILITY", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "prior_results_preserved": {
+    "B1.1": "RANDOM_OR_SCRAMBLED_MATCHES (real ≈ fake, LLM judges)",
+    "B1.2": "mapping fidelity not earned; real ≈ deranged",
+    "B1.3_automated": "scrambled ≈ real (cosine 0.967); order-invariant",
+    "B1.3_register_field": "CLOSED (category mismatch)",
+    "B1.4_vritti": "CLOSED (ground truth absent / not empirically adjudicable)",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562; A_vs_R -0.1917, A_vs_X -0.075)",
+    "Track_F": "CORRECTNESS_DEGRADED"
+  },
+  "item_pool_status": "NOT_FINALIZED (broad diverse pool required; kinship only as high-confound diagnostic subset; no cherry-picking; frozen before generation)",
+  "generation_status": "NOT_GENERATED (same template/length band across arms; no hand-polishing; no varṇa markers; hash-bound before judging)",
+  "rater_protocol_status": "NOT_FINALIZED (blinded; randomized order; position-balanced; naive + optional spiritually-literate strata; sample size fixed pre-run; doctrine-only effect = kill)",
+  "scoring_plan_status": "NOT_FINALIZED (pairwise forced-choice; mixed-effects logistic with item+rater random effects; Holm correction; drop-kinship + per-stratum sensitivity; exclusion rules pre-fixed)",
+  "style_leakage_gate": "REQUIRED before judging: style-tell audit; if real arm identifiable by style -> STOP",
+  "missing_blockers": [
+    "final word list",
+    "final generation template",
+    "final arm-construction artifacts",
+    "final rater sample size",
+    "final recruitment / ethics plan",
+    "final style-tell audit",
+    "final scoring script",
+    "final decision thresholds",
+    "manifest hash binding of all frozen artifacts"
+  ],
+  "honest_burden": "Automated probes found real ≈ fake objects (scrambled≈real 0.967; deranged≈real); the human is asked to choose between near-identical stimuli -> low prior. Pre-register so a null is believable.",
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": ["no ontology validation", "no Sanskrit privilege", "no semantic truth", "no prior-result reversal", "draft is not evidence"]
+}
