@@ -645,7 +645,7 @@ def run_generation_loop(builder, cfg, man, manifest_path, out_path, resume, mock
                 "seed": r["seed"], "timestamp": _now(), "status": status, "error": err,
                 "key": r["key"], "mock": bool(mock),
                 "b1_verdict_anchor": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b_anchor": "BLOCKED",
-                "is_b1_1_evidence": (False if mock else None),
+                "is_b1_1_evidence": (False if mock else True),
             }
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
             fh.flush()
