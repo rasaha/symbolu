@@ -1,0 +1,58 @@
+{
+  "artifact": "b1_3_concrete_object_llm_judge_model_config_v2",
+  "status": "JUDGE_CONFIG_FINAL_POLICY_PENDING_OPERATOR_RUNTIME_ID_CONFIRMATION",
+  "evidence_freeze_declared": false,
+  "version": 2,
+  "applies_to_stimuli": "b1_3_concrete_object_final_stimuli_draft_v2.jsonl (v2 polished)",
+  "model_family_policy": {
+    "rationale": "Exact runtime model availability cannot be guaranteed inside this preparation environment, so a constrained model-FAMILY policy is fixed here; the operator pins exact runtime model identifiers + versions at freeze/run time (they become part of the frozen record).",
+    "min_families": 2,
+    "target_families": 3,
+    "family_slots": [
+      {"slot": "frontier_A", "descriptor": "a top-tier frontier judge model (highest-capability family available at run time)"},
+      {"slot": "frontier_B", "descriptor": "a mid/large model from the SAME vendor family (version-distinct from frontier_A)"},
+      {"slot": "cross_vendor_C", "descriptor": "a strong model from a DIFFERENT vendor family (cross-vendor robustness; guards against single-vendor bias)", "recommended": true}
+    ],
+    "diversity_requirement": "at least one cross-vendor family SHOULD be included; a result carried by a single family is down-weighted by the scorer's no-single-model-family-dominance rule",
+    "operator_must_pin": ["exact model identifiers", "exact model versions/date-stamps", "provider endpoints"],
+    "note": "exact identifiers are intentionally NOT hard-coded here; the operator records them in the frozen run log"
+  },
+  "run_configuration": {
+    "temperature": 0.0,
+    "temperature_note": "deterministic decoding; if a provider forbids 0, use the lowest permitted and record it",
+    "top_p": 1.0,
+    "max_output_tokens": 16,
+    "system_prompt": "You are a careful annotator. Follow the instructions exactly. Answer with a single letter only, optionally followed by a confidence line. Do not explain.",
+    "user_prompt_template": "Object: {target_word}\nDictionary meaning: {dictionary_anchor}\nContext: {neutral_context}\n\nOption A: {option_left}\nOption B: {option_right}\n\nQuestion: Given the dictionary meaning of the object, which option gives a more fitting inner tendency or field around this object without changing what it is?\n\nAnswer with exactly one letter: A or B. Optionally, on a second line, give a confidence from 1 (guess) to 5 (certain).",
+    "chain_of_thought_required": false,
+    "optional_confidence_scale": "1-5",
+    "output_schema": {
+      "item_id": "string (echoed from stimulus)",
+      "comparison_id": "string (echoed)",
+      "target_word": "string (echoed)",
+      "primary_or_secondary_or_diagnostic": "string (echoed)",
+      "object_family": "string (echoed)",
+      "model_id": "string (the pinned runtime model identifier)",
+      "arm_left": "string (echoed from stimulus; hidden from the model)",
+      "arm_right": "string (echoed from stimulus; hidden from the model)",
+      "deranged_stratum": "near|mid|far|null (echoed)",
+      "selected_option": "A|B (parsed from model output)",
+      "confidence": "int 1-5 or null",
+      "parse_status": "ok|unparseable|refused|malformed|tie",
+      "invalid_flag": "bool"
+    },
+    "retries": {"max_retries": 2, "on": ["transport_error", "empty_output"], "no_prompt_change_on_retry": true},
+    "invalid_handling": "if after retries the output is not parseable to A/B -> parse_status set accordingly and invalid_flag=true; NEVER hand-repaired; counted toward the 10% invalid cap",
+    "model_ordering": "each item judged by every pinned model; model order recorded; results reported per model_id",
+    "position_balancing": "already baked into stimuli via position_seed (A_real left/right balanced across the 53 objects); the model never sees arm labels",
+    "no_access_to_hidden_arm_labels": true,
+    "blinding": "arm_left/arm_right are NOT shown to the model; they live in the stimulus record for scoring only"
+  },
+  "judge_prompt_final": "Object: {target_word}\nDictionary meaning: {dictionary_anchor}\nContext: {neutral_context}\n\nOption A: {option_left}\nOption B: {option_right}\n\nQuestion: Given the dictionary meaning of the object, which option gives a more fitting inner tendency or field around this object without changing what it is?\n\nAnswer with exactly one letter: A or B. Optionally, on a second line, confidence 1-5.",
+  "forbidden_prompt_wording": ["deeper", "spiritual", "poetic", "Sanskritic", "which defines the object", "sacred", "mystical"],
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["judge config policy; not a run", "no judge invoked", "exact runtime IDs pinned by operator at freeze", "no positive label earned"]
+}
