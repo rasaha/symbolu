@@ -1,0 +1,92 @@
+{
+  "artifact": "b1_3_concrete_object_llm_freeze_review_manifest",
+  "status": "FREEZE_REVIEW_COMPLETE_NOT_FROZEN",
+  "review_type": "EVIDENCE_FREEZE readiness review (review only; freeze NOT declared here)",
+  "evidence_freeze_declared": false,
+  "evidence_judge_run": false,
+  "scoring_run": false,
+  "prior_results_preserved": true,
+  "study_object": "Dictionary meaning fixes the object; varṇa/vṛtti supplies modulation tags, not a definition. Blinded LLM judges compare which option better fits the object-function without changing denotation.",
+  "artifact_hashes_sha256": {
+    "b1_3_concrete_object_final_primary_wordlist.json": "c8cf24c4af7a26cd0dbd26d2040d9fafde6150ad37cc53e85eb061b2d26bf01e",
+    "b1_3_concrete_object_deranged_source_map.json": "123a86aa8fb30f57d64c9e1f337cb613d567253680314ddb607d7984c0551eda",
+    "b1_3_concrete_object_generation_template_spec.json": "59b09eb8c5c07b0035ccbd00572f2b85053f5ac8eb75d000193132a05741ae44",
+    "b1_3_concrete_object_arm_construction_spec.json": "f4a52635b2229ccb1d0abb2f2458fb41bc0fd856a08b2a872f4497d572477d22",
+    "b1_3_concrete_object_semantic_baseline_spec.json": "3f88056b133371fda3b0b0690280598d99362068a52207cd0e9a43a1108affa1",
+    "b1_3_concrete_object_llm_freeze_manifest_draft_v2.json": "abf19f6b4d03f3d9b440118b708b5a2ed8541ef45040396488efa210f1627731",
+    "b1_3_concrete_object_final_stimuli_draft.jsonl": "48beaf88f32bf11e89d8909c860b1adea7abd528f01c8fd5b0f9e678ec00bbbf",
+    "b1_3_concrete_object_style_audit_report.json": "fe3a04a1a0df27d429ab1ee42262a41fb281fe758b891409d2206f0ac666b4f8",
+    "b1_3_concrete_object_style_audit_report.md": "99c41f64cd4c4a6ffb8e3de72ac412429b7302f7ac66b04016631d8b01086890",
+    "b1_3_concrete_object_stimulus_generation_manifest.json": "16aec92972917c592fb3a65f4afe8e845f2359a2061e05ae84479378016382e9",
+    "b1_3_concrete_object_llm_judge_spec.json": "8f49f26e82cea78533e35e09c9b18a46012ab4f8c34848d41619a40b2224a16f",
+    "b1_3_concrete_object_llm_scoring_contract_v2.json": "b55bc91f63a8b7fb57672ddef479a5e49c50fbebda31ae618b71ca4adcb04a25",
+    "b1_3_concrete_object_llm_style_audit_protocol_draft.json": "156008bc85702a318a679813d7e73cccc9a84a9eee4426cadfa0fe7f3eb7275c",
+    "b1_3_concrete_object_deranged_stratification_spec.json": "dcaafe22ac22edeb37e13c0fcdf9ae2ad00c3f8a4205df4fb4d9d1b3531eadc1",
+    "b1_3_concrete_object_final_screen_manifest.json": "9a9860834bc5c2c5c2b70e057f52b9c054eea88dba6c2d77c0531ad77a643a89"
+  },
+  "hash_note": "digests captured at review time; re-bind these exact versions (plus the future scoring script + judge model list) at the actual EVIDENCE_FREEZE",
+  "final_stimulus_status": {
+    "n_records": 371, "n_primary_objects": 53, "comparisons_per_object": 7,
+    "comparisons": ["A_real_vs_R_deranged_mid","A_real_vs_R_deranged_far","A_real_vs_R_deranged_near",
+      "A_real_vs_R_scrambled","A_real_vs_R_random","A_real_vs_X_neutral","A_real_vs_semantic_only_baseline"],
+    "evidence_judging_done": false
+  },
+  "audit_status": {
+    "style_parity": "PASS", "style_tell": "PASS (balanced accuracy 0.378 <= 0.55)",
+    "denotation_leakage": "PASS", "quality_parity": "PASS", "semantic_baseline": "PASS",
+    "near_mid_far_sanity": "MAP_ACCEPTED_NO_REPLACEMENTS",
+    "all_fixes_global_template_level": true, "per_item_rescue": false
+  },
+  "blocker_assessment": {
+    "final_judge_model_list": "OPEN (cannot responsibly pin model identifiers in this prep environment)",
+    "final_judge_prompt": "RESOLVED (drafted, frozen-ready)",
+    "final_scoring_script_implementation": "OPEN (only contract spec exists; no runnable scorer)",
+    "final_thresholds": "RESOLVED (promoted to final; not tuned to any result)",
+    "final_hash_binding": "RESOLVED at review (re-bind at freeze)",
+    "explicit_operator_evidence_freeze": "OPEN (separate operator step required)"
+  },
+  "judge_prompt_frozen_ready": "Object: {target_word}\\nDictionary meaning: {dictionary_anchor}\\nContext: {neutral_context}\\n\\nOption A: {option_left}\\nOption B: {option_right}\\n\\nQuestion: Given the dictionary meaning of the object, which option gives a more fitting inner tendency or field around this object without changing what it is?\\n\\nAnswer with exactly one letter: A or B. Optionally, on a second line, confidence 1-5.",
+  "final_thresholds": {
+    "primary_A_real_vs_R_deranged_mid_lower_CI": "> 0.50",
+    "A_real_vs_R_deranged_far_lower_CI": "> 0.50",
+    "directional_vs_scrambled_random_neutral_baseline": "> 0.50",
+    "semantic_baseline_must_not_match_or_beat_A_real": true,
+    "near_deranged": "hard specificity test; strong requires A_real > R_deranged_near; else category-limited",
+    "no_single_model_family_dominance": true,
+    "no_diagnostic_or_secondary_contamination": true,
+    "multiplicity_correction": "Holm across required comparisons",
+    "invalid_rate_cap_draft": 0.10,
+    "promoted_from_draft": true, "tuned_to_results": false
+  },
+  "scoring_script_required_labels": [
+    "LLM_OBJECT_MODULATION_SIGNAL_EARNED_STRONG",
+    "LLM_OBJECT_MODULATION_SIGNAL_EARNED_CATEGORY_LIMITED",
+    "LLM_OBJECT_MODULATION_NULL",
+    "LLM_OBJECT_MODULATION_STYLE_CONFOUNDED",
+    "LLM_OBJECT_MODULATION_SEMANTIC_BASELINE_EXPLAINS",
+    "LLM_OBJECT_MODULATION_INVALID_RUN"
+  ],
+  "freeze_decision": "FREEZE_REVIEW_BLOCKED_NEEDS_SCORING_SCRIPT",
+  "co_open_blocker": "final judge model list (also required before freeze; single decision label names scoring script as the primary gating artifact)",
+  "artifacts_to_create_before_freeze": [
+    "runnable scoring script implementing b1_3_concrete_object_llm_scoring_contract_v2.json + emitting the six terminal labels and full report contract",
+    "final judge model list (pinned identifiers + temperature + run config), hash-bound",
+    "updated freeze manifest re-binding all hashes including the two new artifacts",
+    "re-run freeze review -> operator confirmation -> EVIDENCE_FREEZE"
+  ],
+  "evidence_freeze_declaration_rule": "EVIDENCE_FREEZE is NOT declared inside any review; requires a separate explicit operator step. After freeze: no changes to stimuli, thresholds, prompts, or scoring rules; post-freeze changes spawn a new version and cannot retro-rescue a run.",
+  "prior_results": {
+    "B1.1": "LLM null (RANDOM_OR_SCRAMBLED_MATCHES)",
+    "B1.2_B1.3_automated": "nulls (scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED",
+    "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)",
+    "Track_F": "CORRECTNESS_DEGRADED",
+    "Track_B": "BLOCKED"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL","PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY","MAPPING_FIDELITY_SIGNAL","ontology_validation","Sanskrit_privilege","semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["freeze review only","not evidence","no judge run","no scoring","EVIDENCE_FREEZE not declared","no positive label earned"]
+}
