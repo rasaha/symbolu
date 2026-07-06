@@ -1,0 +1,91 @@
+{
+  "artifact": "b1_3_concrete_object_final_screen_manifest",
+  "status": "SCREEN_MANIFEST_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence_freeze_declared": false,
+  "final_stimuli_generated": false,
+  "judge_run_completed": false,
+  "scoring_completed": false,
+  "prior_results_preserved": true,
+  "screening_seed": "b1_3_concrete_object_final_screen_v1",
+  "tie_break": "word ascending (lexical), fully deterministic; no Date/random",
+  "resolves": [
+    "final screened primary object list",
+    "final near/mid/far deranged source map"
+  ],
+  "n_final_primary": 53,
+  "n_excluded_demoted": 0,
+  "object_family_distribution": {
+    "furniture": 5,
+    "container": 8,
+    "barrier": 6,
+    "tool": 10,
+    "natural": 8,
+    "household": 8,
+    "structure": 8
+  },
+  "balance_checks": {
+    "family_distribution": {
+      "furniture": 5,
+      "container": 8,
+      "barrier": 6,
+      "tool": 10,
+      "natural": 8,
+      "household": 8,
+      "structure": 8
+    },
+    "any_family_dominates": false,
+    "most_used_near_source": {
+      "word": "box",
+      "count": 1
+    },
+    "most_used_mid_source": {
+      "word": "blanket",
+      "count": 2
+    },
+    "most_used_far_source": {
+      "word": "basketball",
+      "count": 3
+    },
+    "all_targets_have_near_mid_far": true,
+    "all_final_targets_eligible": true
+  },
+  "prior_results": {
+    "B1.1": "LLM null (RANDOM_OR_SCRAMBLED_MATCHES)",
+    "B1.2_B1.3_automated": "nulls (scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED",
+    "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)",
+    "Track_F": "CORRECTNESS_DEGRADED",
+    "Track_B": "BLOCKED"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": [
+    "HUMAN_PROPENSITY_MODULATION_SIGNAL",
+    "PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY",
+    "MAPPING_FIDELITY_SIGNAL",
+    "ontology_validation",
+    "Sanskrit_privilege",
+    "semantic_truth"
+  ],
+  "remaining_blockers": [
+    "actual final stimulus generation",
+    "actual style-audit execution/result",
+    "final judge model list",
+    "scoring script implementation",
+    "final thresholds",
+    "manifest hash binding",
+    "explicit EVIDENCE_FREEZE declaration",
+    "actual judge run"
+  ],
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "screen manifest draft, not frozen",
+    "not evidence",
+    "no positive label earned"
+  ]
+}
