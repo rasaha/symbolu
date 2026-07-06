@@ -1,0 +1,29 @@
+{
+  "artifact": "g_function_config",
+  "extraction_method": "deterministic_wordnet",
+  "llm_used": false,
+  "render_caps": {
+    "K_features": 5,
+    "J_constraints": 3,
+    "N_summary_words": 10,
+    "M_feature_words": 4
+  },
+  "style_tell_threshold": 0.55,
+  "neighbor_min": 10,
+  "shared_threshold": 0.34,
+  "source": "WordNet (offline, version-pinned)",
+  "no_live_web_calls": true,
+  "provisional_targets": [
+    "mother",
+    "water",
+    "fire",
+    "mountain",
+    "ocean",
+    "friendship",
+    "justice",
+    "patience",
+    "knowledge",
+    "freedom"
+  ],
+  "evidence": false
+}
