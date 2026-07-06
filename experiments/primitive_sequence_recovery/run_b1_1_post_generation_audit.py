@@ -22,7 +22,7 @@ REQUIRED_FIELDS = ["run_id", "manifest_sha256", "model_id", "model_revision", "t
                    "arm", "prompt_id", "prompt_text", "conditioning_text", "generation_text", "decoding",
                    "seed", "timestamp", "status", "key", "mock"]
 ARMS = list(R.ARMS)
-flags, blockers = [], []
+flags, blockers, info = [], [], []      # info = benign/expected notes; do NOT demote status
 
 # ---- 0. file hash + load ----
 raw_bytes = RAW.read_bytes()
@@ -66,10 +66,14 @@ evid_vals = collections.Counter(r.get("is_b1_1_evidence") for r in rows)
 all_real = all(r.get("mock") is False for r in rows)
 if not all_real:
     blockers.append(f"NOT all rows are real (mock=false): {dict(mock_vals)}")
-# is_b1_1_evidence may be None on this run (generated before the label fix); authoritative flag is mock=false
-if any(r.get("is_b1_1_evidence") is not True for r in rows):
-    flags.append("is_b1_1_evidence not True on all rows (this run predates the label fix; None is expected; "
-                 "authoritative real-marker is mock=false, which is correct).")
+# is_b1_1_evidence may be None on this run (generated before the label fix); authoritative flag is mock=false.
+# Benign/expected -> info note, does NOT demote status. (A blocker only if a row is affirmatively False on a
+# real row, which would wrongly mark real evidence as not-evidence.)
+if any(r.get("is_b1_1_evidence") is False and r.get("mock") is False for r in rows):
+    blockers.append("is_b1_1_evidence=False on a real (mock=false) row — a real row wrongly marked not-evidence.")
+elif any(r.get("is_b1_1_evidence") is not True for r in rows):
+    info.append("is_b1_1_evidence is None (not True) on rows generated before the label fix; expected. "
+                "Authoritative real-marker is mock=false, which is correct on all rows.")
 
 # ---- 4. manifest binding + frozen integrity ----
 row_manifest_shas = {r.get("manifest_sha256") for r in rows}
@@ -152,7 +156,7 @@ report = {
         "conditioning_by_category": dict(leak["conditioning_text"]["by_cat"]),
         "generation_examples": leak["generation_text"]["examples"],
     },
-    "blockers": blockers, "flags": flags,
+    "blockers": blockers, "flags": flags, "info": info,
     "anchors": {"b1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED",
                 "positive_cap": "LIMITED_GENERATION_UTILITY", "crux": "R_deranged"},
     "non_claims": ["no judging", "no scoring", "no packets", "not a verdict", "structure not validated meaning"],
@@ -202,6 +206,9 @@ calls.** Does not change the B1 verdict (`RANDOM_OR_SCRAMBLED_MATCHES`) or unblo
 ## Flags ({len(flags)})
 {chr(10).join('- ' + f for f in flags) or '_none_'}
 
+## Info (benign / expected — does not affect status) ({len(info)})
+{chr(10).join('- ' + i for i in info) or '_none_'}
+
 ## Final status
 ```
 audit_status:          {status}
@@ -224,8 +231,9 @@ print(f"  rows {len(rows)} | ok {len(ok_rows)} | error {len(err_rows)} | full480
 print(f"  all_real(mock=false) {all_real} | frozen_integrity {frozen_ok} | manifest_matches {manifest_matches_current}")
 print(f"  prompt/cond leak {prompt_leak_total} | generation leak {gen_leak_total} "
       f"{dict(leak['generation_text']['by_arm']) if gen_leak_total else ''}")
-print(f"  blockers {len(blockers)} | flags {len(flags)}")
+print(f"  blockers {len(blockers)} | flags {len(flags)} | info {len(info)}")
 for b in blockers: print("   BLOCKER:", b)
 for f in flags: print("   FLAG:", f)
+for i in info: print("   info:", i)
 print("  wrote B1_1_POST_GENERATION_RAW_OUTPUT_AUDIT.{json,md}")
 print("  NO judging, NO scoring, NO packets. Track B BLOCKED.")
