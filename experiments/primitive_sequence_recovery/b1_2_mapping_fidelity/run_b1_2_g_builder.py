@@ -162,41 +162,34 @@ def build_G(word, wn):
 
 
 # ============================================================ shared V/G normalizer (R3) ===========
-_SPLIT = re.compile(r"[;—•\n]| - ")
+# Symmetric keyword schema: BOTH V and G are reduced to matched-length SINGLE-WORD content keywords by the
+# SAME rule (R3 "compact, matched length band, same register"). This removes structural/punctuation tells so
+# the style-tell audit tests residual register (word length/abstractness), which is the real R3 concern.
+N_SUMMARY_KW = 8
 
 
-def _short_phrase(s, maxw=M_FEATURE_WORDS):
-    s = re.sub(r"[^a-z0-9 ]", " ", s.lower()).strip()
-    return " ".join(s.split()[:maxw]).strip()
+def keyword_signature(source_text, sig_id, maxlen=None):
+    kws = content_lemmas(source_text)
+    if maxlen:                                     # revision knob: cap word length to neutralize register
+        seen, capped = set(), []
+        for k in kws:
+            kk = k[:maxlen]
+            if kk not in seen:
+                seen.add(kk); capped.append(kk)
+        kws = capped
+    return {"signature_id": sig_id,
+            "features": kws[:K_FEATURES],
+            "summary": " ".join(kws[:N_SUMMARY_KW]),
+            "constraints": kws[K_FEATURES:K_FEATURES + J_CONSTRAINTS]}
 
 
-def normalize_signature(raw_text, feature_list, summary_text, constraint_list, sig_id):
-    """Project ANY source (V prose or G record) into the one shared judge-facing schema.
-    Neutralizes source-specific punctuation (';', '—') and casing so style ≈ source-independent."""
-    feats = [p for p in (_short_phrase(x) for x in feature_list) if p][:K_FEATURES]
-    if len(feats) < K_FEATURES and raw_text:                    # backfill from raw text, same rule
-        for chunk in _SPLIT.split(raw_text):
-            p = _short_phrase(chunk)
-            if p and p not in feats:
-                feats.append(p)
-            if len(feats) >= K_FEATURES:
-                break
-    summ = " ".join(_short_phrase(summary_text or raw_text or "", maxw=N_SUMMARY_WORDS).split())
-    cons = [p for p in (_short_phrase(x) for x in constraint_list) if p][:J_CONSTRAINTS]
-    return {"signature_id": sig_id, "features": feats, "summary": summ, "constraints": cons}
+def v_to_signature(word, v_text, sig_id, maxlen=None):
+    return keyword_signature(v_text or "", sig_id, maxlen)
 
 
-def v_to_signature(word, v_text, sig_id):
-    chunks = [c for c in _SPLIT.split(v_text or "") if c.strip()]
-    feats = chunks[:K_FEATURES]
-    cons = chunks[K_FEATURES:K_FEATURES + J_CONSTRAINTS]
-    return normalize_signature(v_text, feats, v_text, cons, sig_id)
-
-
-def g_to_signature(rec, sig_id):
-    return normalize_signature(rec["differential_summary"], rec["target_specific_features"],
-                               rec["differential_summary"],
-                               ["not " + f for f in rec["excluded_neighbor_features"]], sig_id)
+def g_to_signature(rec, sig_id, maxlen=None):
+    src = " ".join(rec["target_specific_features"]) + " " + rec["differential_summary"]
+    return keyword_signature(src, sig_id, maxlen)
 
 
 # ============================================================ R3 style-tell audit =================
@@ -280,23 +273,20 @@ def main():
         v_renders[rec["target_word"]] = vt or ""
 
     # ---- shared-schema projection + style-tell audit (one auto-revision allowed) ----
-    def project(sig_cap_words):
-        global M_FEATURE_WORDS, N_SUMMARY_WORDS
+    def project(maxlen):
         sigs, labels = [], []
         for rec in g_records:
             w = rec["target_word"]
-            sigs.append(g_to_signature(rec, f"g_{w}")); labels.append(1)
-            sigs.append(v_to_signature(w, v_renders[w], f"v_{w}")); labels.append(0)
+            sigs.append(g_to_signature(rec, f"g_{w}", maxlen)); labels.append(1)
+            sigs.append(v_to_signature(w, v_renders[w], f"v_{w}", maxlen)); labels.append(0)
         return sigs, labels
 
     revision = 0
     sigs, labels = project(None)
     ba, per_class = balanced_accuracy_loo([style_vector(s) for s in sigs], labels)
-    if ba > STYLE_TELL_THRESHOLD:                      # one revision: tighten caps to equalize surface
+    if ba > STYLE_TELL_THRESHOLD:                      # one revision: cap word length (register neutralize)
         revision = 1
-        globals()["M_FEATURE_WORDS"] = 4
-        globals()["N_SUMMARY_WORDS"] = 10
-        sigs, labels = project(None)
+        sigs, labels = project(6)                      # truncate keywords to 6 chars, same rule both sides
         ba, per_class = balanced_accuracy_loo([style_vector(s) for s in sigs], labels)
 
     style_pass = not (ba > STYLE_TELL_THRESHOLD)

@@ -1,18 +1,18 @@
 {
   "artifact": "g_style_tell_audit",
   "method": "leave-one-out nearest-centroid on style-only surface features (counts/lengths/punct; content-blind)",
-  "balanced_accuracy": 0.9375,
+  "balanced_accuracy": 0.5625,
   "threshold": 0.55,
   "pass": false,
   "revision_applied": 1,
   "n_signatures": 16,
   "per_class_recall_counts": {
     "V": [
-      8,
+      3,
       8
     ],
     "G": [
-      7,
+      6,
       8
     ]
   },

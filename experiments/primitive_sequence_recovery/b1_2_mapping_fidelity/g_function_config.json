@@ -5,8 +5,8 @@
   "render_caps": {
     "K_features": 5,
     "J_constraints": 3,
-    "N_summary_words": 10,
-    "M_feature_words": 4
+    "N_summary_words": 14,
+    "M_feature_words": 6
   },
   "style_tell_threshold": 0.55,
   "neighbor_min": 10,
