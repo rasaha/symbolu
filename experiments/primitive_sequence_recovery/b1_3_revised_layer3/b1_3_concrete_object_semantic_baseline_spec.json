@@ -1,0 +1,41 @@
+{
+  "artifact": "b1_3_concrete_object_semantic_baseline_spec",
+  "status": "SPEC_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "purpose": "Required control: a dictionary-derived object-function baseline that produces 4 tags in the SAME format WITHOUT any varṇa input. If it matches or beats A_real, the Symbol-U-specific claim FAILS (the modulation is re-derivable from ordinary object semantics).",
+  "construction": {
+    "input": "dictionary anchor / object function ONLY (no varṇa input)",
+    "method": "extract the anchor's function head + salient object properties by a FIXED deterministic rule (e.g. WordNet gloss / hypernym / function-word extraction), reduce to <=2-word tags, take first 4",
+    "output_format": "Within the fixed meaning, this object is modulated by {tag1}, {tag2}, {tag3}, and {tag4}.",
+    "deterministic": true,
+    "seeded": true,
+    "no_varna_input": true,
+    "no_hand_polishing": true,
+    "same_template_as_arms": true
+  },
+  "illustrative_examples_not_final": {
+    "note": "ILLUSTRATIVE ONLY — NOT FINAL STIMULI, NOT EVIDENCE",
+    "knife": ["cutting", "edge", "separation", "precision"],
+    "cup": ["holding", "containment", "receiving", "use"]
+  },
+  "role_in_study": {
+    "required_check": true,
+    "comparison": "semantic-only baseline vs A_real is a REQUIRED comparison",
+    "success_requirement": "A_real must beat OR add beyond the semantic-only baseline",
+    "fail_rule": "if the semantic-only baseline matches or beats A_real, the Symbol-U-specific claim FAILS",
+    "restatement_guard": "if A_real wins ONLY because its tags coincide with the dictionary-derived function tags (i.e. it merely restates object function), that is a FAIL, not a signal"
+  },
+  "separation_from_X_neutral": {
+    "X_neutral": "content-FREE generic filler tags; tests whether ANY modulation beats nothing",
+    "semantic_only_baseline": "dictionary-derived object-function CONTENT; tests whether varṇa beats ordinary object semantics",
+    "kept_separate": true
+  },
+  "reproducibility": {"json_serializable": true, "seeds_recorded": true, "source_files_recorded": true, "hash_bound_at_evidence_freeze": true, "no_manual_mutation_after_hash": true},
+  "source_files": ["b1_3_human_modulation_concrete_object_candidate_wordlist.json (dictionary_anchor, tier=primary)", "WordNet (gloss/hypernym)"],
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "baseline_built": false, "llm_judges_run": false},
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["baseline spec draft, not frozen", "not evidence", "no baseline built yet", "no positive label earned"]
+}

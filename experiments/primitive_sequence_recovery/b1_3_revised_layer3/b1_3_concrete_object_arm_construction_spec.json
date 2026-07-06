@@ -1,0 +1,73 @@
+{
+  "artifact": "b1_3_concrete_object_arm_construction_spec",
+  "status": "SPEC_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "principle": "Every arm supplies exactly 4 field tags into the SAME fixed template. Arms differ ONLY in which varṇa-derived (or baseline) field is used; denotation is fixed by the anchor and never changed. Deterministic + seeded, NO per-item hand-polishing.",
+  "field_tag_extraction_rule": {
+    "step_1": "target word -> phoneme string -> varṇa sequence via bound G2P->varṇa pipeline (varna_lens, cmudict), same as B1.1/B1.2",
+    "step_2": "for each varṇa in composition order, take its pole gloss from frozen bridge pool (b1_2_varna_bridge_pool.json, 34 entries) under the fixed read_op pole rule ('zero free choices')",
+    "step_3": "reduce each pole gloss to a <=2-word neutral tag by a FIXED rule (lowercase; strip Sanskrit labels and binding/liberating wording; take head noun-phrase; no synonym substitution)",
+    "step_4": "take first 4 tags by composition order",
+    "ranking": "composition order; tie-break = lexicon_key ascending",
+    "backfill_if_fewer_than_4": "next varṇa in sequence; if still short, seeded draw from the global tag pool (recorded, never hand-chosen)",
+    "unknown_or_missing_varna": "skipped deterministically, logged",
+    "no_dictionary_input_for_A_real": true,
+    "same_extraction_all_arms": true,
+    "no_hand_polishing_per_item": true
+  },
+  "arms": {
+    "A_real": {
+      "input_source": "target word's REAL varṇa sequence (real G2P -> varṇa)",
+      "field_derivation": "fixed extraction rule -> exactly 4 tags",
+      "no_dictionary_anchor_used_to_choose_tags": true,
+      "no_post_hoc_editing": true,
+      "controls_for": "(reference arm)"
+    },
+    "R_deranged": {
+      "input_source": "ANOTHER word's varṇa-derived tags, via frozen derangement pi (pi(w)!=w) fixed before judging",
+      "matching": "broad category/length only where deterministic; else nearest by frozen order",
+      "controls_for": "object-SPECIFICITY (is it THIS object's field?)",
+      "failure_meaning": "R_deranged ~ A_real => field not object-specific (crux; B1.1/B1.2 found this null)",
+      "constraints": ["derangement frozen before judging", "no cherry-picking", "no obvious-opposite or favorable pairing"]
+    },
+    "R_scrambled": {
+      "input_source": "target word's OWN varṇas, order-disrupted (recorded deterministic scramble seed)",
+      "field_derivation": "same extraction over the scrambled sequence",
+      "controls_for": "ORDER / structure",
+      "failure_meaning": "R_scrambled ~ A_real => order carries nothing (CRITICAL; prior automated cosine 0.967)"
+    },
+    "R_random": {
+      "input_source": "4 tags sampled from the global field-tag pool via fixed seed, excluding the word's own varṇa tags",
+      "controls_for": "GENERIC symbolic tag fit (does any coherent tag set suffice?)",
+      "failure_meaning": "R_random ~ A_real => generic resonance, not varṇa-specific",
+      "no_dictionary_input": true
+    },
+    "X_neutral": {
+      "input_source": "neutral / no-varṇa: 4 generic non-modulating filler tags (or bare no-modulation rendering)",
+      "controls_for": "whether modulation adds ANY value over a content-free option",
+      "failure_meaning": "X_neutral ~ A_real => modulation adds no value",
+      "must_not_become_dictionary_baseline": "content-FREE generic filler; kept SEPARATE from the dictionary-derived semantic-only baseline (see semantic_baseline_spec)"
+    },
+    "R_semantic_near": {"optional": true, "input_source": "a semantic near-neighbor word's real varṇa field", "controls_for": "fine meaning-neighbor discrimination"},
+    "R_varna_near": {"optional": true, "input_source": "a varṇa-near / semantic-far word's real field", "controls_for": "sound-transfer confound"}
+  },
+  "style_controls": {
+    "equal_length_bands": true,
+    "same_field_tag_count": 4,
+    "same_syntax": true,
+    "no_arm_specific_rich_adjectives": true,
+    "no_manual_editing_after_arm_identity_known": true,
+    "editing_only_global_template_level": true,
+    "shared_surface_register_normalization": true
+  },
+  "blinding_prep": {"arm_labels_hidden": true, "position_randomized": true, "position_seed_recorded": true, "no_vocabulary_that_reveals_real_arm": true},
+  "determinism": {"seeded": true, "seeds_recorded": true, "generation_seed_recorded": true, "hash_bound_before_judging": true, "no_per_word_hand_polishing": true},
+  "source_files": ["b1_2_varna_bridge_pool.json", "varna_lens/varna_lens.py", "b1_3_human_modulation_concrete_object_candidate_wordlist.json (tier=primary)"],
+  "primary_pairing": "A_real vs R_deranged (crux); A_real must also beat R_scrambled, R_random, X_neutral, and the semantic-only baseline",
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "arms_constructed": false, "llm_judges_run": false},
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["arm spec draft, not frozen", "not evidence", "no arms constructed yet", "no positive label earned"]
+}
