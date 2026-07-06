@@ -9,6 +9,8 @@ corrected three-layer theory.
 document:   B1.2 mapping-fidelity PREREGISTRATION (prereg only)
 status:     NOT_RUN · NOT_FROZEN · NOT_AUTHORIZED_FOR_GENERATION_OR_JUDGING
 authority:  one final authorized mapping-fidelity falsifier (per B1_2_MAPPING_FIDELITY_PREREG_DECISION.md)
+amendment:  A1 — prediction-vs-answer-key design folded in (see §6a); G(word)=dictionary differential answer
+            key, V(word)=varṇa prediction; §6a governs on any conflict with the original draft
 ```
 
 This document specifies the study. It does **not** implement it, build packets, run models, judge, or score.
@@ -37,8 +39,9 @@ This document specifies the study. It does **not** implement it, build packets, 
 
 ## 4. Research question
 
-**Primary:** *Can the correct Layer-3 differential signature of a target word be distinguished from wrong but
-equally fluent signatures, under blinded conditions?*
+**Primary:** *Does the varṇa-derived prediction `V(word)` align with the target word's dictionary-derived
+differential answer key `G(word)` better than with wrong-word answer keys — under blinded conditions, and
+with a semantic-distance gradient?*
 
 **Not** the question: does the bridge improve open-ended generation? (That was B1.1; it failed and is not
 re-asked.)
@@ -47,9 +50,9 @@ re-asked.)
 
 **Can test:**
 
-- mapping-fidelity **within this artifact system** — whether the target-specific differential signature is
-  blind-distinguishable from wrong signatures;
-- whether A_correct beats **near / mid / far** wrong signatures, and whether fit tracks semantic distance.
+- mapping-fidelity **within this artifact system** — whether the varṇa prediction V(word) is
+  blind-distinguishable in its alignment to the *correct* dictionary answer key vs wrong keys;
+- whether V(target) beats **G(near) / G(mid) / G(far)**, and whether alignment tracks semantic distance.
 
 **Cannot prove (must not be claimed at any outcome):**
 
@@ -58,20 +61,45 @@ re-asked.)
 
 ## 6. Study type
 
-**Discriminative forced-choice / ranking study.** The primary endpoint is discrimination accuracy (correct
-signature vs wrong signatures), **not** open-ended generation quality. No open generation is scored as a
-primary endpoint.
+**Discriminative forced-choice / ranking study.** The primary endpoint is **alignment accuracy** — whether
+the varṇa-derived *prediction* lands on the correct word's dictionary-derived *answer key* rather than a
+wrong word's — **not** open-ended generation quality. No open generation is scored as a primary endpoint.
+
+## 6a. Prediction vs answer key (Amendment A1 — governing definition; supersedes on any conflict)
+
+B1.2 tests the varṇa mapping as a **predictor of meaning**, not as a piece of judged prose. Two objects,
+built by **separate, frozen, word-agnostic** procedures, play two distinct roles:
+
+- **G(word) — dictionary-derived differential answer key (the ground truth).** What makes the word distinct
+  from its near neighbors, computed *mechanically from dictionaries* (§9). G is the **correct answer**; it is
+  **never** scored as the "A signature" by itself. Judging G for fit would only prove that dictionaries
+  describe words — vacuous, and invalid.
+- **V(word) — varṇa-derived prediction (the object under test).** What Symbol-U's varṇa mapping *predicts*
+  the word means, computed *mechanically from the varṇa skeleton + frozen gloss table* (§10). V is the
+  **shot** at the answer.
+
+**The test (governing endpoint):** does **V(target)** align with **G(target)** better than with the wrong
+answer keys **G(near), G(mid), G(far)** and the non-answer-key controls **R_same, R_domain, generic_symbolic**
+— and does alignment strengthen with semantic distance (near hardest, far easiest)?
+
+Wherever an earlier draft says "A_correct is the Layer-3 differential signature," read it as: **A_correct =
+the alignment V(target)↔G(target); Layer 3 is G(word), the answer key the prediction must hit — not the
+judged signature.**
 
 ## 7. Unit of analysis
 
 The item is the **target word**. Each item bundles:
 
 - **target word**;
-- **frozen dictionary semantic field** (Layer 2);
-- **near-neighbor confusion set** (the synonyms/category-neighbors Layer 3 must separate against);
-- **A_correct** — the word's Layer-3 differential signature (frozen answer key);
-- control signatures: **R_deranged_near**, **R_deranged_mid**, **R_deranged_far**, **R_same**, **R_domain**,
-  **generic_symbolic**, and **dictionary_baseline** (optional, retained as a floor anchor if used).
+- **frozen dictionary semantic field** (Layer 2, §9) — input to G;
+- **near-neighbor confusion set** (≥10 synonyms/category-neighbors used to build G);
+- **G(target)** — the word's dictionary-derived differential **answer key** (frozen);
+- **V(target)** — the word's varṇa-derived **prediction** (frozen);
+- **wrong answer keys**: **G(near)** = G(R_deranged_near source), **G(mid)**, **G(far)** — other words'
+  differential answer keys at near/mid/far semantic distance;
+- **non-answer-key controls**: **R_same** (same-pool random differential), **R_domain** (mismatched-domain
+  differential), **generic_symbolic** (high-quality non-varṇa reflective text), **dictionary_baseline**
+  (optional floor).
 
 ## 8. Target word pool
 
@@ -86,33 +114,63 @@ The item is the **target word**. Each item bundles:
 - **Sanskrit/IAST domain shift is excluded** from this B1.2 (it is a separate question requiring its own
   scoping memo; not a fix to B1.1).
 
-## 9. Layer 2 construction (dictionary semantic grounding)
+## 9. Layer 2 construction (dictionary semantic grounding — input to G)
+
+Layer 2 is the raw lexical material G is built from.
 
 - The dictionary semantic field for each word is **created before judging** and **frozen**.
 - **Source documented** (named dictionary / lexical resource; extraction rule recorded).
 - **Same format for every word** (uniform fields: gloss, lexical category, semantic role).
-- **No model output may influence Layer 2** — it is built from lexical sources only, never from generations.
-- **Layer 2 is not, by itself, a success condition** — it is grounding, not the endpoint.
+- **No model output may influence Layer 2** — built from lexical sources only, never from generations.
+- **Layer 2 is not, by itself, a success condition** — it is grounding/input, not the endpoint.
 
-## 10. Layer 3 construction (differential signature — the answer key)
+## 10. Layer 3 = G(word), the dictionary-derived differential answer key (NOT the judged signature)
 
-- Must **explicitly separate** the target word from its near neighbors (state what makes the target distinct,
-  not merely what it evokes).
-- **Frozen before judging** and hash-bound; **not tuned** after seeing any output or score.
-- **Avoids generic universals** (clarity, release, warmth, protection) **unless** uniquely constrained to the
-  target.
-- **Short** — bounded length, to prevent a prose-quality/verbosity confound.
-- **Matched across arms** — A_correct and every control signature share length, register, and structural
-  format, so the judge cannot win on surface form instead of fit.
-- Authored by a documented procedure recorded in the prereg **before** any packet is built.
+**Layer 3 is the ground-truth answer key `G(word)`, produced mechanically from dictionaries — it is the
+target the varṇa prediction `V(word)` must hit, never itself the "A" signature scored for fit.**
+
+**G(word) is built by a fixed, word-agnostic procedure:**
+
+1. **Target definition** — the frozen Layer-2 dictionary field of the target word.
+2. **≥10 synonym / near-neighbor definitions** — the frozen Layer-2 fields of at least ten synonyms /
+   category-neighbors, drawn by a documented rule (e.g. thesaurus + WordNet neighbors), **not** hand-picked
+   to flatter the target.
+3. **Shared-feature subtraction** — remove the semantic features the target shares with the neighbor set.
+4. **Target-specific differential features** — what remains: the features unique to (or dominant in) the
+   target relative to its neighbors. This residual **is** G(word).
+
+Constraints on G(word):
+
+- **Mechanical and uniform** — the *same* extraction+subtraction procedure produces G for every word
+  (target and every control-source word). No bespoke per-word authoring.
+- **Frozen and hash-bound before judging**; **not tuned** after seeing any output, score, or alignment.
+- **Built from lexical sources only** — no model output, and crucially **nothing varṇa-derived** may enter G
+  (G must be a clean, independent ground truth so the test of V is not circular).
+- **Short and format-matched** across all G's (target and wrong keys), so the judge cannot win on surface
+  form instead of alignment.
+- **Not a success condition by itself** — judging G for word-fit only tests dictionaries and is **invalid**
+  (§17 kill criterion).
+
+## 10a. V(word) construction (the varṇa-derived prediction under test)
+
+- Built **mechanically** from: (1) the **Layer-1 raw varṇa skeleton** of the word (real G2P→varṇa), (2) the
+  **frozen varṇa gloss table** (the committed bridge pool / ontology), (3) a **frozen composition rule**.
+- The **same** function produces V for every word — no per-word hand-authoring, no post-hoc tuning.
+- **Layer 1 is mandatory, not optional** — V is the *only* legitimate source of the prediction's
+  word-specificity. If the varṇa term is removed and alignment survives, the dictionary did the work (a
+  null for Symbol-U).
+- V is frozen and hash-bound before judging; format-matched to the G's for blinding.
+- V and G are built by **independent** pipelines (varṇa vs dictionary) so that "does V hit G" is a real,
+  non-circular test.
 
 ## 11. Semantic-distance tiering
 
-Three deranged tiers, each a wrong signature drawn from another word at a specified distance:
+Three **wrong answer keys**, each a `G(other word)` drawn at a specified distance from the target (the varṇa
+prediction V(target) is scored against these as distractors):
 
-- **R_deranged_near** — signature of a close semantic neighbor (shared category).
-- **R_deranged_mid** — signature of a related but non-equivalent domain.
-- **R_deranged_far** — signature of a semantically distant word.
+- **G(near)** — differential answer key of a close semantic neighbor (shared category).
+- **G(mid)** — differential answer key of a related but non-equivalent domain.
+- **G(far)** — differential answer key of a semantically distant word.
 
 **Tier assignment before judging**, by a documented, frozen procedure:
 
@@ -123,31 +181,40 @@ Three deranged tiers, each a wrong signature drawn from another word at a specif
 - **no post-hoc reassignment** — a tier label cannot move after results are seen; divergent cases resolved by
   pre-set rule or dropped, never hand-adjudicated afterward.
 
-## 12. Controls
+## 12. Controls (the distractor answer keys V is scored against)
 
-Arms: **A_correct**, **R_deranged_near**, **R_deranged_mid**, **R_deranged_far**, **R_same** (same-pool
-random real signature), **R_domain** (mismatched-domain real signature), **generic_symbolic** (high-quality
-non-varṇa resonant prose), **dictionary_baseline** (optional floor).
+The prediction **V(target)** is matched against the correct key **G(target)** and these distractors:
+
+- **G(near)**, **G(mid)**, **G(far)** — wrong-word differential answer keys at increasing semantic distance
+  (§11);
+- **R_same** — a differential answer key of a random same-pool word (no distance structure);
+- **R_domain** — a differential answer key from a mismatched domain bucket;
+- **generic_symbolic** — high-quality non-varṇa reflective text (bounds the generic-resonance baseline);
+- **dictionary_baseline** — optional floor anchor.
 
 Rules:
 
-- every control **fluent, real, plausible** — **no ugly/nonsense** controls;
-- **length/register matched** to A_correct (uniform across tiers, so tier differences reflect semantics, not
-  style drift);
+- every distractor is a **real, fluent, plausible** differential built by the same G procedure — **no
+  ugly/nonsense** controls;
+- **length/register/format matched** to G(target) and to V (uniform across tiers, so tier differences reflect
+  semantics, not style drift);
 - **"far" means a distant source word, not degraded text**;
-- **no leakage of arm identity** — no marker that reveals which signature is A vs a control.
+- **no leakage of identity** — no marker revealing which key is G(target) vs a distractor, or which object is
+  V.
 
-## 13. Judge task
+## 13. Judge task (alignment of the varṇa prediction to the answer keys)
 
-Blinded discriminative prompts (a frozen B1.2 picks a pre-specified subset):
+The judge is shown the varṇa-derived **prediction V(target)** (blinded, unlabeled) and asked which
+**answer key** it best matches. Blinded discriminative prompts (a frozen B1.2 picks a pre-specified subset):
 
-- **Selection:** *"Which signature best fits the target word and distinguishes it from its near synonyms?"*
-  among k blinded candidates.
-- **Pairwise:** A_correct vs one control, blinded order; pick the better-fitting signature.
-- **Ranking (optional):** rank all candidate signatures by fit; score by rank of A_correct.
+- **Selection:** *"This description was derived from one word's sound-structure. Which of these differential
+  meanings does it best match?"* — candidates = G(target) + wrong keys, k-way, blinded.
+- **Pairwise:** V(target) against G(target) vs one distractor key, blinded order; pick the better match.
+- **Ranking (optional):** rank all candidate answer keys by match to V(target); score by rank of G(target).
 
-The judge must be instructed to evaluate **fit and word-specific distinction**, **not** beauty, fluency, or
-style. Every candidate is presented without arm labels or mapping metadata.
+The judge must evaluate **alignment/word-specific match**, **not** beauty, fluency, or style, and never sees
+arm labels, varṇa/Sanskrit labels, or which object is the prediction vs a key. **G(target) is never judged
+for word-fit on its own** — it only ever appears as one candidate key the prediction is matched against.
 
 ## 14. Blinding
 
@@ -156,19 +223,21 @@ style. Every candidate is presented without arm labels or mapping metadata.
 - **No target/control truth leakage**; candidate order shuffled by a frozen seed.
 - **Private truth map stored separately** from judge-facing packets (as in B1.1), revealed only at scoring.
 
-## 15. Primary endpoints
+## 15. Primary endpoints (alignment of V to G)
 
-Primary **success** requires **all**:
+Primary **success** requires **all** — where "V(target) beats X" means V(target) aligns with G(target) more
+than with X, corrected CI lower bound > chance:
 
-- A_correct **beats R_deranged_far** (corrected CI lower bound > chance);
-- A_correct **beats R_deranged_mid** (corrected CI lower bound > chance);
-- A_correct **does not lose** to **R_deranged_near**;
-- a **monotonic distance gradient**: margin_far > margin_mid > margin_near;
-- A_correct **also beats R_same and R_domain**;
+- **V(target) aligns best with G(target)** overall (correct-key selection above chance);
+- **V(target) beats G(far)** (corrected CI lower bound > chance);
+- **V(target) beats G(mid)** (corrected CI lower bound > chance);
+- **V(target) does not lose** to **G(near)**;
+- a **monotonic distance gradient**: margin vs G(far) > margin vs G(mid) > margin vs G(near);
+- **V(target) also beats R_same and R_domain** (and the generic_symbolic baseline);
 - the result **survives** multiplicity correction and all pre-specified robustness checks.
 
 Chance floor is explicit per task (1/k for k-way selection; 0.5 for pairwise/odd-one-out). The gradient — not
-any single comparison — is the distinctive evidence for word-specific mapping.
+any single comparison — is the distinctive evidence that the varṇa mapping recovers word-specific meaning.
 
 ## 16. Allowed positive label
 
@@ -179,11 +248,16 @@ privilege, semantic-truth claim, Track B unblock.
 
 ## 17. Kill criteria
 
-- **A fails far** → no recoverable word-specific signal (strongest kill).
-- **near ≈ mid ≈ far (flat)** → generic symbolic resonance explains the effect.
-- **A fails R_same or R_domain** → mapping fidelity unsupported regardless of the deranged gradient.
+- **V(target) fails G(far)** → no recoverable word-specific signal (strongest kill).
+- **alignment flat across G(near)/G(mid)/G(far)** → generic symbolic resonance explains the effect.
+- **V(target) fails R_same or R_domain** → mapping fidelity unsupported regardless of the deranged gradient.
 - **Success only on handpicked examples** / not surviving robustness → not robust, not support.
-- **Layer 3 hand-authored post-hoc** → overfit and invalid.
+- **G(word) scored as the "A signature" by itself** (judging the dictionary key for word-fit) → **invalid**
+  (tests dictionaries, not varṇa).
+- **G(word) or V(word) hand-authored / hand-tuned post-hoc**, or **anything varṇa-derived leaking into G** →
+  overfit / circular / **invalid**.
+- **Layer 1 made optional in V** (alignment survives without the varṇa term) → the dictionary did the work →
+  **null for Symbol-U**.
 - **Controls weakened** (uglified, shortened, off-topic) → invalid.
 
 Any kill closes the varṇa-mapping line (per the decision memo); no rescue language, no goalpost move to the
@@ -191,7 +265,8 @@ weak controls.
 
 ## 18. Statistical plan
 
-- **Pairwise A-win rate** per comparison; **ranking accuracy** (e.g. correct-in-top-1 / MRR) if ranking used.
+- **Pairwise alignment-win rate** per comparison (V(target) matches G(target) over the distractor);
+  **correct-key selection rate** and **ranking accuracy** (correct-in-top-1 / MRR) if ranking used.
 - **Word-clustered paired bootstrap CIs** (item = word), n_boot and seed frozen in the config.
 - **Holm–Bonferroni** correction across all co-primary comparisons and tasks.
 - **Per-judge breakdown** reported.
@@ -217,19 +292,25 @@ weak controls.
 
 ## 21. Expected interpretations
 
-- **clean monotonic gradient + beats R_same and R_domain** → `MAPPING_FIDELITY_SIGNAL`.
-- **beats far only** (fails mid/near) → **category-level resonance**, explicitly **not** word-specific
-  mapping.
-- **flat across tiers** → **generic symbolic resonance**.
-- **fails far** → no recoverable word-specific signal.
-- **loses to R_same or R_domain** → mapping fidelity **unsupported**.
+*(All in terms of how well the varṇa prediction V(target) aligns with the correct answer key G(target)
+against the distractor keys.)*
+
+- **V hits G(target) with a clean monotonic gradient + beats R_same and R_domain** → `MAPPING_FIDELITY_SIGNAL`.
+- **V beats G(far) only** (fails G(mid)/G(near)) → **category-level resonance**, explicitly **not**
+  word-specific mapping.
+- **V aligns flat across G(near)/G(mid)/G(far)** → **generic symbolic resonance**.
+- **V fails G(far)** → no recoverable word-specific signal.
+- **V loses to R_same or R_domain** → mapping fidelity **unsupported**.
 
 ## 22. Stop / default rule
 
-If this prereg **cannot** specify Layer 2, Layer 3, the near/mid/far tiering, or the controls **without
-hand-tuning** (i.e. without authoring the answer key or tier labels to favor A), then per the decision memo
-the **DECISION defaults to `STOP_NOW`** and the varṇa-mapping line closes. A B1.2 that can only be made to
-pass by design choices is not a valid falsifier and must not run.
+If this prereg **cannot** specify a **mechanical, word-agnostic** procedure for **G(word)** (the
+dictionary differential answer key), **V(word)** (the varṇa prediction), the near/mid/far tiering, or the
+controls **without hand-tuning** — i.e. without a human authoring the answer key, the prediction, or the tier
+labels to favor the target — then per the decision memo the **DECISION defaults to `STOP_NOW`** and the
+varṇa-mapping line closes. In particular: if V cannot be derived from the varṇa skeleton by a frozen rule, or
+if G can only be produced by hand, there is nothing varṇa-specific to test and the study must not run. A B1.2
+that can only be made to pass by design choices is not a valid falsifier.
 
 ## 23. Final status block
 
