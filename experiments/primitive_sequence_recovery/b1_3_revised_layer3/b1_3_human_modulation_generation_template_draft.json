@@ -1,0 +1,31 @@
+{
+  "artifact": "b1_3_human_modulation_generation_template_draft",
+  "status": "DRAFT_NOT_FROZEN",
+  "evidence": false,
+  "purpose": "Fixed, arm-agnostic template that renders a modulation OPTION around a FIXED dictionary anchor. Same template for every arm; only the field phrases differ (supplied by arm construction). Denotation is never altered.",
+  "rater_facing_item_layout": {
+    "target_word": "<word>",
+    "dictionary_meaning": "<fixed dictionary_anchor — identical across arms>",
+    "context": "<fixed neutral context — identical across arms>",
+    "prompt": "Given the dictionary meaning and context above, which option better modulates or brings out the inner tendency/field of this word WITHOUT changing its meaning?",
+    "option_A": "<rendered template with field phrases from arm 1>",
+    "option_B": "<rendered template with field phrases from arm 2>"
+  },
+  "option_template": "Within its fixed meaning, {word} carries a tendency toward {f1}, {f2}, and {f3}, giving the concept a tone of {f4}.",
+  "template_constraints": {
+    "single_fixed_sentence": true,
+    "field_phrase_slots": 4,
+    "field_phrase_max_words_each": 4,
+    "total_length_band_words": [22, 30],
+    "same_syntax_all_arms": true,
+    "no_poetic_flourish": true,
+    "no_new_denotation": "field phrases describe modulation/tone only; may not restate or redefine the dictionary meaning",
+    "no_symbolu_varna_vritti_markers": "no varṇa names, Sanskrit terms, pole labels, or 'binding/liberating' wording visible to raters",
+    "no_arm_identifying_vocabulary": "field phrases drawn from a shared surface register; no arm may use systematically richer/rarer adjectives",
+    "forbidden_phrasings": ["this word means", "which is deeper", "more spiritual", "more Sanskritic", "more poetic"]
+  },
+  "field_phrase_source": "arm construction spec provides the 4 field phrases per (word, arm); the template is identical",
+  "style_audit_hook": "after rendering, run the style-tell audit on options across arms; if the real arm is identifiable by surface style above threshold, STOP (do not proceed to human rating)",
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["draft template, not frozen", "not evidence", "no stimuli generated"]
+}

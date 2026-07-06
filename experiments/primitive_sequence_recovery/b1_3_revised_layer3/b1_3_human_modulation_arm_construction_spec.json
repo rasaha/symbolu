@@ -1,0 +1,71 @@
+{
+  "artifact": "b1_3_human_modulation_arm_construction_spec",
+  "status": "SPEC_DRAFT_NOT_FROZEN",
+  "evidence": false,
+  "principle": "Every arm supplies exactly 4 field phrases into the SAME fixed template (generation_template_draft). Arms differ ONLY in which varṇa-derived field is used; denotation is fixed by the anchor and never changed. Field phrases are drawn from the frozen bridge-pool gloss space, normalized to the shared surface register, deterministic + seeded, NO per-word hand-polishing.",
+  "field_phrase_derivation": "for a given varṇa sequence, take its per-varṇa pole glosses (bridge pool), reduce each to a <=4-word neutral field phrase by a FIXED rule, take the first 4 by composition order; identical reduction rule for all arms",
+  "arms": {
+    "A_real": {
+      "input_source": "target word's REAL varṇa sequence (real G2P -> varṇa via bound pipeline)",
+      "field_derivation": "core_A field phrases (real poles/positions)",
+      "controls_for": "(reference arm)",
+      "failure_meaning": "n/a (reference)"
+    },
+    "R_deranged": {
+      "input_source": "ANOTHER word's real varṇa sequence, assigned by a frozen derangement pi (pi(w)!=w), matched by broad category and length band where possible",
+      "field_derivation": "that other word's core_A field phrases",
+      "controls_for": "word-SPECIFICITY (is it THIS word's field?)",
+      "failure_meaning": "R_deranged approx A_real => varṇa field is not word-specific (the crux; B1.1 found this null)",
+      "constraints": ["derangement frozen before judging", "no accidental obvious-opposite or obviously-favorable pairing", "category/length matched"]
+    },
+    "R_scrambled": {
+      "input_source": "target word's OWN varṇas, order-disrupted (seeded scramble; forces a real order change)",
+      "field_derivation": "core_S field phrases (same multiset, scrambled order)",
+      "controls_for": "ORDER / structure (does sequence matter?)",
+      "failure_meaning": "R_scrambled approx A_real => order carries nothing (prior automated: cosine 0.967 — CRITICAL control)"
+    },
+    "R_random": {
+      "input_source": "randomly selected field phrases from the bridge-pool space, excluding the word's own varṇas (seeded)",
+      "field_derivation": "core_R_same style random-pool phrases",
+      "controls_for": "GENERIC symbolic prose (does any coherent field suffice?)",
+      "failure_meaning": "R_random approx A_real => generic resonance, not varṇa-specific"
+    },
+    "X_neutral": {
+      "input_source": "no varṇa; dictionary-only neutral rendering",
+      "field_derivation": "neutral filler field phrases (no modulation content)",
+      "controls_for": "whether modulation adds ANY value over a bare rendering",
+      "failure_meaning": "X_neutral approx A_real => modulation adds no value"
+    },
+    "R_semantic_near": {
+      "optional": true,
+      "input_source": "a semantic near-neighbor word's real varṇa field (WuP-near, varṇa-any)",
+      "controls_for": "fine meaning-neighbor discrimination",
+      "failure_meaning": "should be intermediate; if it beats A_real, not word-specific"
+    },
+    "R_varna_near": {
+      "optional": true,
+      "input_source": "a varṇa-near / semantic-far word's real field (sound-neighbor)",
+      "controls_for": "sound-transfer confound",
+      "failure_meaning": "if R_varna_near beats A_real => sound-neighbor artifact, not field"
+    }
+  },
+  "style_controls": {
+    "equal_length_bands": true,
+    "same_field_phrase_count": 4,
+    "same_syntax": true,
+    "no_arm_specific_rich_adjectives": true,
+    "no_manual_editing_after_arm_identity_known": true,
+    "editing_only_global_template_level": true,
+    "shared_surface_register_normalization": "all field phrases mapped to a common plain register so no arm reads richer"
+  },
+  "blinding_prep": {
+    "arm_labels_hidden": true,
+    "position_randomized": true,
+    "pairwise_comparisons_balanced": true,
+    "no_vocabulary_that_reveals_real_arm": true
+  },
+  "determinism": {"seeded": true, "seeds_recorded": true, "hash_bound_before_judging": true, "no_per_word_hand_polishing": true},
+  "primary_pairing": "A_real vs R_deranged (crux); A_real must also beat R_scrambled, R_random, X_neutral",
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["spec draft, not frozen", "not evidence", "no arms constructed yet"]
+}
