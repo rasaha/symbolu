@@ -75,6 +75,7 @@ Proceed gate-by-gate, commit each clean artifact, stop only on a hard STOP_NOW.
 
 | date (op) | artifact | what changed | why | prior result still valid |
 |---|---|---|---|---|
+| — | v2 propensity reframe (`B1_3_PROPENSITY_REFRAME_REVISION.md`) | unfroze B1.3 dev gates; object changed **varṇa→taxonomic-meaning → varṇa→affective/sensory PROPENSITY**; **B1.2 control arms kept**; target space → external VAD/sensory norms | operator directive; affective/sensory is the one axis the arc never tested (prior nulls were taxonomic) | B1.1 `RANDOM_OR_SCRAMBLED_MATCHES`; B1.2 failures; **B1.3-v1 raw-varṇa ρ≈0 remains valid for *taxonomic* meaning** |
 | — | B1.3 creation | new revised Layer-3 line established | B1.2 prose + feature-space paths failed in development | B1.1 `RANDOM_OR_SCRAMBLED_MATCHES` (evidence); Track G/F |
 
 **Structure, not validated meaning.** B1.3 is development-only design work; no evidence, no positive claim,
