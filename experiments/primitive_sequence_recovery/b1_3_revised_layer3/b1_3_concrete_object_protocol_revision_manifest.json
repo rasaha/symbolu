@@ -1,0 +1,54 @@
+{
+  "artifact": "b1_3_concrete_object_protocol_revision_manifest",
+  "status": "REVISION_DRAFT_NOT_FROZEN_NOT_RUN",
+  "revision_reason": "A single R_deranged arm conflates source-word distance: far deranged is easy (a win shows only broad category/function coherence), near deranged is hard (strongest word-specificity evidence), mid is the best primary practical test. Stratifying into near/mid/far prevents a category-level win from masquerading as word-specific modulation.",
+  "replaces_single_deranged": true,
+  "new_deranged_arms": ["R_deranged_near", "R_deranged_mid", "R_deranged_far"],
+  "primary_endpoint_changed_to_mid_deranged": true,
+  "primary_endpoint": "A_real win-rate vs R_deranged_mid on the primary concrete-object set",
+  "prior_primary_endpoint": "A_real win-rate vs R_deranged (single, undifferentiated)",
+  "retained_arms": ["A_real", "R_scrambled", "R_random", "X_neutral", "semantic_only_baseline"],
+  "controlling_revision_for": [
+    "B1_3_CONCRETE_OBJECT_LLM_JUDGE_REVISION.md",
+    "B1_3_CONCRETE_OBJECT_LLM_STYLE_AUDIT_AND_SCORING_PROTOCOL.md",
+    "B1_3_CONCRETE_OBJECT_LLM_GENERATION_AND_BASELINE_SPEC.md",
+    "future scoring/freezing manifest"
+  ],
+  "downstream_specs_not_rewritten": "prior specs stand; this memo governs where they differ until a consolidation pass",
+  "interpretation_labels": {
+    "strong_success": "A_real beats near, mid, and far",
+    "moderate_success": "A_real beats mid and far; near remains close",
+    "weak_category_only": "A_real beats far only",
+    "failure": "A_real fails against mid or far"
+  },
+  "evidence_freeze_declared": false,
+  "final_stimuli_generated": false,
+  "judge_run_completed": false,
+  "scoring_run": false,
+  "prior_results_preserved": true,
+  "prior_results": {
+    "B1.1": "LLM null on earlier mixed/loaded design (RANDOM_OR_SCRAMBLED_MATCHES)",
+    "B1.2_B1.3_automated": "nulls (real~deranged; scrambled~real 0.967; order-invariant)",
+    "B1.3_register_field": "CLOSED (category mismatch)",
+    "B1.4_vritti": "CLOSED (ground truth absent)",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562; A_vs_R -0.1917, A_vs_X -0.075)",
+    "Track_F": "CORRECTNESS_DEGRADED",
+    "Track_B": "BLOCKED"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LLM_PROPENSITY_FIELD_DISCRIMINATION", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "VRITTI_PROPENSITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "remaining_blockers": [
+    "final screened primary object list",
+    "frozen deranged source map (near/mid/far assignment)",
+    "actual final stimulus generation",
+    "actual style-audit execution/result",
+    "final judge model list",
+    "final scoring script",
+    "final thresholds",
+    "manifest hash binding",
+    "explicit EVIDENCE_FREEZE declaration"
+  ],
+  "decision": "DERANGED_STRATIFICATION_SPEC_READY",
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["revision draft, not frozen", "not evidence", "sharpening of the crux control, not a signal claim", "no prior-result reversal", "no positive label earned"]
+}
