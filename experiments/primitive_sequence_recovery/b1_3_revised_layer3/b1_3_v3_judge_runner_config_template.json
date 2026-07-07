@@ -1,0 +1,81 @@
+{
+  "artifact": "b1_3_v3_judge_runner_config_template",
+  "status": "TEMPLATE_ONLY_NOT_A_RUN",
+  "purpose": "Portable config template for an EXTERNAL-environment judge runner (run_b1_3_v3_judges.py). Placeholders only; no credentials, no execution. Fill in the external env where cross-family judge access exists.",
+  "evidence_freeze_declared": false,
+  "run_mode": "<probe-only | freeze-check | score-frozen | single-family-pilot | multi-family-evidence-run>",
+  "stimuli_path": "b1_3_concrete_object_final_stimuli_draft_v3_authoritative.jsonl",
+  "style_audit_path": "b1_3_concrete_object_style_audit_report_v3_authoritative.json",
+  "scoring_contract_path": "b1_3_concrete_object_llm_scoring_contract_v2.json",
+  "freeze_manifest_path": "b1_3_concrete_object_llm_freeze_review_manifest_v3_authoritative.json",
+  "output": {
+    "judge_output_jsonl": "<OUT_DIR>/judge_outputs.jsonl",
+    "score_report_json": "<OUT_DIR>/score_report.json",
+    "score_report_md": "<OUT_DIR>/score_report.md",
+    "probe_report_json": "<OUT_DIR>/compliance_probe.json"
+  },
+  "judge_panel": [
+    {
+      "slot": "family_1",
+      "provider": "<openai | google | mistral | anthropic | local>",
+      "model_id": "<PIN_EXACT_RUNTIME_MODEL_ID_INCLUDING_VERSION>",
+      "api_key_env": "<ENV_VAR_NAME_HOLDING_KEY>",
+      "base_url": "<optional; e.g. local OpenAI-compatible / Ollama endpoint>",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_output_tokens": 16
+    },
+    {
+      "slot": "family_2_cross_vendor_recommended",
+      "provider": "<DIFFERENT_VENDOR_from_family_1>",
+      "model_id": "<PIN_EXACT_RUNTIME_MODEL_ID>",
+      "api_key_env": "<ENV_VAR_NAME>",
+      "base_url": "<optional>",
+      "temperature": 0.0,
+      "top_p": 1.0,
+      "max_output_tokens": 16
+    }
+  ],
+  "min_families": 2,
+  "single_family_pilot_downgrade": {
+    "allowed": true,
+    "requires_explicit_flag": "--mode single-family-pilot",
+    "reporting": "result MUST be labeled a single-family pilot with a weak-blinding / generator-adjacency caveat; subject to the scorer's single-model-family-dominance guard"
+  },
+  "system_prompt": "You are a careful annotator. Follow the instructions exactly. Answer with a single letter only, optionally followed by a confidence line. Do not explain.",
+  "user_prompt_template": "Object: {target_word}\nDictionary meaning: {dictionary_anchor}\nContext: {neutral_context}\n\nOption A: {option_left}\nOption B: {option_right}\n\nQuestion: Given the dictionary meaning of the object, which option gives a more fitting inner tendency or field around this object without changing what it is?\n\nAnswer with exactly one letter: A or B. Optionally, on a second line, give a confidence from 1 (guess) to 5 (certain).",
+  "blinding": {
+    "judge_facing_fields": ["target_word", "dictionary_anchor", "neutral_context", "option_left", "option_right"],
+    "never_send_to_model": ["arm_left", "arm_right", "source_metadata"],
+    "note": "arm_left/arm_right are copied from the stimulus into the judge-output row for SCORING only, never shown to the model"
+  },
+  "retry": {"max_retries": 2, "on": ["transport_error", "empty_output"], "no_prompt_change_on_retry": true},
+  "invalid_policy": {
+    "parse": "map output to A|B; else parse_status in {unparseable, refused, malformed, tie} and invalid_flag=true",
+    "no_hand_repair": true,
+    "max_invalid_rate": 0.10
+  },
+  "position_balancing": "already baked into stimuli via position_seed; runner must NOT re-order options",
+  "judge_output_row_schema": [
+    "item_id", "comparison_id", "target_word", "primary_or_secondary_or_diagnostic", "object_family",
+    "model_id", "arm_left", "arm_right", "deranged_stratum", "selected_option", "confidence",
+    "parse_status", "invalid_flag"
+  ],
+  "freeze_prerequisites": [
+    "exact model IDs pinned + recorded",
+    "compliance probe passed per model",
+    "provider/family panel selected (>=2 families or explicit single-family-pilot)",
+    "16 active artifact hashes re-confirmed vs freeze manifest (no change)",
+    "explicit operator EVIDENCE_FREEZE declaration"
+  ],
+  "invalid_run_conditions": [
+    "missing exact model IDs",
+    "refusal/malformed rate over cap",
+    "single-family dominance when not explicitly downgraded",
+    "artifacts changed after freeze (hash mismatch)",
+    "threshold or scorer edits after freeze"
+  ],
+  "disallowed_labels": ["LLM_OBJECT_MODULATION_SIGNAL (until earned by a frozen scored run)", "MAPPING_FIDELITY_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "ONTOLOGICAL_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["config template only", "no credentials", "no execution", "no model call", "no scoring", "no freeze"]
+}
