@@ -30,24 +30,38 @@ holds broadly or is cherry-picked.
 - **Silent `K` route:** written `K` → varṇa **`ka`**.
 - **Why silent-`K`-as-liberating-detachment *seems* attractive:** a withdrawn/unvoiced letter reading as a
   "cutting-away" liberating modifier is poetically tidy for a knife.
-- **Why it fails on inspection:** the `ka` varṇa's **actual bridge-pool gloss is *hope / āśā*** (binding:
-  grasping hope; liberating: forward-orientation without attachment) — **not** cutting or detachment. So adding
-  the silent `K` does **not** inject "cutting"; it injects **"hope."** The attractive story is a folk-
-  orthographic intuition that **does not match the varṇa's own meaning**. This is the core adversarial finding:
-  the flagship case does not actually work at the gloss level.
-- **Why it is post-hoc risky:** it was proposed *after* seeing that spoken-only `knife` looked weak — a textbook
-  rescue motivation.
+- **CORRECTION (operator note, post-commit):** an earlier draft of this bullet judged the silent `K` against
+  `ka`'s **binding** pole ("hope as grasping / clinging to a specific outcome") and concluded "ka = hope, not
+  cutting." That was **unfair to the stipulated rule**, which is **silent consonants take the LIBERATING
+  polarity** (rule C). Under the liberating pole, `ka`'s frozen bridge-pool gloss is *"forward-orientation held
+  without attachment to the outcome — aspires and acts while releasing the grip on the result"* — a
+  **non-attachment / releasing-the-grip / letting-go** reading, i.e. **detachment-flavored, not
+  "hope-as-grasping."** So under the intended rule the silent `K` maps toward **detachment**, and the harsh
+  "flagship fails at the gloss level" framing is **withdrawn**.
+- **Where an adversarial caveat still holds:** `ka`-liberating is *psychological non-attachment to an outcome*
+  (a mental/vṛtti detachment). A knife's function is *physical severance / cutting*. "Non-attachment →
+  detachment → cutting-away" is a real semantic slide — **closer than 'hope,' but not yet 'a knife cuts.'** The
+  reading lands on `knife` only by fixing silent→liberating **and** reading non-attachment as cutting.
+- **Why a fixed rule (not a patch) is required:** picking the liberating pole *because it makes knife work* is
+  the post-hoc risk. To be legitimate, "silent = liberating" must be **pre-registered and applied uniformly**
+  to every word (§7 ablation) — where `ba`/`ga`-liberating mostly will not fit `lamb`/`comb`/`thumb`/`debt`/
+  `doubt`. The correction strengthens the case for *specifying* the ablation; it does not by itself validate a
+  silent-`K`-as-cutting mapping.
+- **The lexicon is not modified:** `ka`'s glosses are quoted verbatim from the frozen bridge pool; nothing in
+  `varna_lens/` or the active study is changed.
 
 ## 5. Cross-sample review (20 words, spoken-only route verified via cmudict)
 
-Silent/latent consonant → varṇa it *would* add (B–F): `K`→`ka`(gloss *hope*), `B`→`ba`, `G`→`ga`,
-`GH`→`ga`/`ha`, `W`→`va`. "Improves fit?" is a one-reader qualitative impression, **not** a score.
+Silent/latent consonant → varṇa it *would* add (B–F). Under the stipulated **silent-liberating** rule (C) the
+relevant pole is the **liberating** gloss: `ka`-lib = *non-attachment / releasing the grip* (detachment-
+flavored); `ba`/`ga`/`va`-lib = the respective liberating poles. "Improves fit?" is a one-reader qualitative
+impression under the **silent-liberating** rule, **not** a score.
 
-| word | ordinary object-function | spoken route (varṇa) | silent/weak cons | latent add | polarity under B–F | improves fit? | cherry-pick risk |
+| word | ordinary object-function | spoken route (varṇa) | silent/weak cons | latent add | polarity under B–F | improves fit? (silent-liberating) | cherry-pick risk |
 |---|---|---|---|---|---|---|---|
-| knife | cutting tool | nna,pha | **K** | ka (*hope*) | ign/bind/lib/dual | **No** — ka=hope, not cutting | high (flagship, post-hoc) |
-| knot | tied loop | nna,tta | **K** | ka | " | No — hope ≠ knotting | high |
-| knock | strike | nna,ka | **K** | ka (dup of spoken ka) | " | No — redundant | high |
+| knife | cutting tool | nna,pha | **K** | ka-lib (*non-attachment/detachment*) | ign/bind/lib/dual | **Partly** — detachment-adjacent, but ≠ physical cutting | high (flagship, post-hoc) |
+| knot | tied loop | nna,tta | **K** | ka-lib | " | No — non-attachment ≠ knotting/binding | high |
+| knock | strike | nna,ka | **K** | ka-lib (dup of spoken ka) | " | No — redundant with spoken ka | high |
 | knee | joint | nna | **K** | ka | " | No | high |
 | lamb | young sheep | la,ma | **B** | ba | ign/bind/lib/dual | No — ba unrelated | high |
 | comb | grooming tool | ka,ma | **B** | ba | " | No | high |
@@ -68,9 +82,10 @@ Silent/latent consonant → varṇa it *would* add (B–F): `K`→`ka`(gloss *ho
 
 **Answers to the review questions:**
 
-- **Does silent-liberating improve many examples or only `knife`?** It improves **none** cleanly — not even
-  `knife` (ka=hope). At best it is superficially attractive for `knife` on folk intuition, which collapses on
-  inspection.
+- **Does silent-liberating improve many examples or only `knife`?** Under the stipulated silent-liberating
+  rule, it improves **only `knife`** (and there only *partly*: `ka`-liberating = non-attachment/detachment,
+  detachment-adjacent but still ≠ physical cutting). For the other silent-consonant words it does **not** help —
+  so the gain, such as it is, is **selective and concentrated on the one word that motivated the idea**.
 - **Does it hurt lamb/comb/thumb/debt/doubt?** Yes — a silent `B`→`ba` pole is **functionally unrelated** to a
   sheep, a comb, a digit, a debt, or uncertainty; adding it injects noise.
 - **Systematic or cherry-picked?** Any apparent gain is **selective and post-hoc**; there is no rule under
@@ -119,8 +134,8 @@ expected win.
 document:                    B1.3 ORTHOGRAPHIC-LATENT / silent-consonant AD HOC sample test (exploratory)
 sample words reviewed:       20 (knife, knot, knock, knee, lamb, comb, thumb, debt, doubt, subtle, sign, design,
                              light, night, bridge, rope, key, door, wall, sword)
-silent-liberating help:      broad? NO — helps no example cleanly; knife flagship fails (ka = hope, not cutting)
-strongest "favorable":       knife (superficial only; collapses on inspection)
+silent-liberating help:      broad? NO — selective; helps ONLY knife, and there only partly (ka-lib = non-attachment/detachment, ≠ physical cutting)
+strongest "favorable":       knife (ka-liberating = detachment-adjacent under the silent-liberating rule; still ≠ cutting)
 strongest adverse:           lamb / comb / thumb / debt / doubt (silent B injects unrelated pole)
 cherry-pick risk:            HIGH — mostly adds degrees of freedom; selective post-hoc gains only
 recommendation:              ORTHOGRAPHIC_LATENT_ABLATION_WORTH_SPECIFYING (as a clean pre-registered falsification)
@@ -135,9 +150,11 @@ Track B:                     BLOCKED
 ontology / Sanskrit / truth: NONE
 ```
 
-**Structure, not validated meaning.** This is an exploratory ad hoc inspection only: silent/orthographic-latent
-consonant inclusion does not cleanly improve object-function fit for any sample word (the flagship `knife` fails
-because the silent `K`'s varṇa `ka` glosses to *hope*, not *cutting*), it mostly adds degrees of freedom, and it
-is recommended only as a **future pre-registered falsification ablation** — never a patch to the active study.
+**Structure, not validated meaning.** This is an exploratory ad hoc inspection only. Under the stipulated
+**silent-liberating** rule, the silent `K` in `knife` maps to `ka`-liberating = *non-attachment / releasing the
+grip* (detachment-flavored — **corrected** from an earlier draft that wrongly used `ka`'s binding "hope" gloss);
+this is detachment-adjacent but still not physical *cutting*, and it helps **only** `knife` while not fitting
+the other silent-consonant words. Silent inclusion therefore mostly adds degrees of freedom, and it is
+recommended only as a **future pre-registered falsification ablation** — never a patch to the active study.
 No active B1.3 or v2 artifact was changed, no judge was run, nothing was scored, prior nulls and closures stand,
 Track B remains BLOCKED, and EVIDENCE_FREEZE is not declared.
