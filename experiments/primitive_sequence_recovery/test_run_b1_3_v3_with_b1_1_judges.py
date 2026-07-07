@@ -81,6 +81,27 @@ def test_probe_only_synthetic_only_no_real_calls():
         assert res["adapter"] == "mock" and res["compliant"] == res["n"] and res["invalid"] == 0
 
 
+def test_three_model_judging_loop_mock():
+    # the actual 3-model x 371-comparison loop, exercised with the MOCK adapter into a TMP dir
+    # (no model call, no freeze, nothing written to the repo)
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        summ = RUN.build_judge_outputs(CONFIG, real=False, out_dir=td, resume=False, verbose=False)
+        assert summ["adapter"] == "mock"
+        assert summ["n_models"] == 3 and summ["n_packets"] == 371
+        assert summ["expected_total"] == 371 * 3 == summ["n_written"]
+        rows = [json.loads(l) for l in open(summ["judge_outputs"]).read().splitlines() if l.strip()]
+        assert len(rows) == 1113
+        models = {r["model_id"] for r in rows}
+        assert models == set(CONFIG["judge_model_ids"])            # all 3 judges present
+        for r in rows[:50]:
+            assert r["selected_option"] in ("A", "B") and r["invalid_flag"] is False
+            assert "arm_left" in r and "arm_right" in r             # truth carried for scoring
+        # resume: a second pass writes 0 new rows
+        summ2 = RUN.build_judge_outputs(CONFIG, real=False, out_dir=td, resume=True, verbose=False)
+        assert summ2["n_written"] == 0
+
+
 def test_freeze_check_no_scoring():
     out = RUN.mode_freeze_check(CONFIG, verbose=False)
     assert out["scored"] is False

@@ -11,8 +11,15 @@
 - **B1.3 packets/prompt/parser — B1.3's own**: blinded A/B packets (arm identity, keys, source, metadata, and
   v2/v3 provenance hidden), forced-A/B parser that rejects B1.1 `output_1/output_2/tie/both_bad`.
 
-**Artifacts added:** `run_b1_3_v3_with_b1_1_judges.py`, `test_run_b1_3_v3_with_b1_1_judges.py` (9/9 mock tests
-PASS), `b1_3_v3_b1_1_judge_runner_config.json`, `B1_3_V3_RUNPOD_B1_1_JUDGE_RUNBOOK.md`.
+**Artifacts added:** `run_b1_3_v3_with_b1_1_judges.py`, `test_run_b1_3_v3_with_b1_1_judges.py` (**10/10** mock
+tests PASS), `b1_3_v3_b1_1_judge_runner_config.json`, `B1_3_V3_RUNPOD_B1_1_JUDGE_RUNBOOK.md`.
+
+**3-model run implemented:** `score-frozen` (post-freeze) runs the full loop — for each of the **3 judges**
+(Llama-3.1-8B, Llama-3-8B, Gemma-2-9b) over all **371** comparisons it builds a blinded A/B packet, calls the
+judge, parses A/B, and appends one row per (item, comparison, model) → **1113 rows** in
+`b1_3_v3_judge_outputs.jsonl` (resumable), then invokes the frozen B1.3 scorer. The mock test exercises the
+entire loop (3 × 371 = 1113 rows) with **no model call, no freeze, into a temp dir**. Both hard gates
+(operator EVIDENCE_FREEZE declaration file + artifact hash match) must pass before any real model call.
 
 **Run state:** `freeze-check` → ready (16 artifacts hash-match; v3 source audit pass; judge IDs in declared
 panel; scorer present). `probe-only` (mock) → all 3 judges compliant on synthetic items. `score-frozen` →

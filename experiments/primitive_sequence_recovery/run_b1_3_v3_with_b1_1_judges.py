@@ -234,17 +234,89 @@ def mode_freeze_check(config, verbose=True):
     return out
 
 
-def mode_score_frozen(config, real=False):
+def _adapter_for(judge_id, real):
+    """Real open-weight judge (B1.1 LlamaJudgeAdapter) or the no-model B1.3 mock (post-freeze dry-run)."""
+    return J.LlamaJudgeAdapter(judge_id) if real else B13MockAdapter(judge_id)
+
+
+def _done_pairs(path):
+    done = set()
+    if pathlib.Path(path).exists():
+        for line in pathlib.Path(path).read_text().splitlines():
+            if line.strip():
+                r = json.loads(line)
+                done.add((r["item_id"], r["comparison_id"], r["model_id"]))
+    return done
+
+
+def build_judge_outputs(config, real, out_dir, resume=True, verbose=True):
+    """The actual 3-model x 371-comparison judging loop. Builds blinded A/B packets, calls EACH judge over
+    EVERY comparison, parses A/B (B1.3 parser), and appends one judge-output row per (item, comparison, model)
+    to judge_outputs.jsonl. Reusable/resumable. NO scoring here. Callable directly with real=False + mock for a
+    plumbing dry-run; the real run is gated by mode_score_frozen (freeze + hashes)."""
+    out_dir = pathlib.Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
+    jout = out_dir / "b1_3_v3_judge_outputs.jsonl"
+    rows = [json.loads(l) for l in (B3 / config["v3_stimuli_path"]).read_text().splitlines() if l.strip()]
+    public, private = build_packets(rows)
+    for pk in public:                                  # blinding hard-stop
+        leaks = leak_scan(pk)
+        if leaks:
+            raise SystemExit(f"BLINDING LEAK in packet {pk['packet_id']}: {leaks}")
+    done = _done_pairs(jout) if resume else set()
+    ids = config["judge_model_ids"]
+    n_written = 0
+    with jout.open("a", encoding="utf-8") as f:
+        for jid in ids:
+            adapter = _adapter_for(jid, real)
+            for pk in public:
+                pv = private[pk["packet_id"]]
+                if (pv["item_id"], pv["comparison_id"], jid) in done:
+                    continue
+                parsed = parse_ab(adapter.judge_raw(build_b13_prompt(pk), pk))
+                f.write(json.dumps({
+                    "item_id": pv["item_id"], "comparison_id": pv["comparison_id"],
+                    "target_word": pv["target_word"],
+                    "primary_or_secondary_or_diagnostic": pv["primary_or_secondary_or_diagnostic"],
+                    "object_family": pv["object_family"], "model_id": jid,
+                    "arm_left": pv["arm_left"], "arm_right": pv["arm_right"],
+                    "deranged_stratum": pv["deranged_stratum"],
+                    "selected_option": parsed["selected_option"], "confidence": parsed["confidence"],
+                    "parse_status": parsed["parse_status"], "invalid_flag": parsed["invalid_flag"],
+                }) + "\n")
+                n_written += 1
+    summary = {"judge_outputs": str(jout), "n_written": n_written, "n_models": len(ids),
+               "n_packets": len(public), "expected_total": len(public) * len(ids), "adapter": "real" if real else "mock"}
+    if verbose:
+        print(f"judging: {n_written} new rows across {len(ids)} judges x {len(public)} comparisons "
+              f"(target {summary['expected_total']}) -> {jout}")
+    return summary
+
+
+def mode_score_frozen(config, real=False, out_dir="run_out"):
+    # HARD GATE 1: operator EVIDENCE_FREEZE declaration must exist (this runner never creates it)
     ok, why = freeze_declared()
     if not ok:
         raise SystemExit(f"score-frozen REFUSED: {why}. EVIDENCE_FREEZE not declared by operator. "
                          "This runner never declares freeze. Nothing run or scored. Track B BLOCKED.")
-    # (post-freeze path — not reachable in this repo; no declaration file exists)
+    # HARD GATE 2: artifacts must match the frozen manifest hashes
     hashes_ok, mismatches, _ = verify_hashes(B3 / config["v3_freeze_manifest"])
     if not hashes_ok:
         raise SystemExit(f"score-frozen REFUSED: artifact hash mismatch after freeze: {mismatches}")
-    raise SystemExit("score-frozen path guarded: refusing to auto-run the 371-comparison study in this "
-                     "environment. Run on a model host with the runbook after an explicit operator freeze.")
+    # gates passed (post-freeze, model host): run the 3-model judging loop, then the FROZEN B1.3 scorer
+    jsum = build_judge_outputs(config, real=real, out_dir=out_dir)
+    import score_b1_3_concrete_object_llm as SC              # frozen B1.3 scorer (own arms/thresholds/labels)
+    od = pathlib.Path(out_dir)
+    rep = SC.score(
+        stimuli_path=str(B3 / config["v3_stimuli_path"]),
+        judge_path=jsum["judge_outputs"],
+        style_audit_path=str(B3 / config["v3_style_audit_path"]),
+        contract_path=str(B3 / config["b1_3_scorer_reference"]["scoring_contract"]),
+        out_json=str(od / "b1_3_v3_score_report.json"),
+        out_md=str(od / "b1_3_v3_score_report.md"),
+    )
+    print(f"TERMINAL_LABEL: {rep['terminal_label']}")
+    return {"mode": "score-frozen", "judging": jsum, "terminal_label": rep["terminal_label"],
+            "report_json": str(od / "b1_3_v3_score_report.json")}
 
 
 def main(argv=None):
@@ -252,6 +324,7 @@ def main(argv=None):
     ap.add_argument("--mode", choices=["probe-only", "freeze-check", "score-frozen"], default="probe-only")
     ap.add_argument("--config", default=str(DEFAULT_CONFIG))
     ap.add_argument("--real", action="store_true", help="use real models (probe-only/score-frozen on a model host)")
+    ap.add_argument("--out-dir", default="run_out", help="output dir for score-frozen judge outputs + report")
     a = ap.parse_args(argv)
     config = load_config(a.config)
     if a.mode == "probe-only":
@@ -259,7 +332,7 @@ def main(argv=None):
     elif a.mode == "freeze-check":
         r = mode_freeze_check(config)
     else:
-        r = mode_score_frozen(config, real=a.real)
+        r = mode_score_frozen(config, real=a.real, out_dir=a.out_dir)
     print(json.dumps({"mode": a.mode, "evidence_freeze_declared": False, "track_b": "BLOCKED"}))
     return 0
 
