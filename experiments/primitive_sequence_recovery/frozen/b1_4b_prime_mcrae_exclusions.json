@@ -1,0 +1,39 @@
+{
+  "artifact": "b1_4b_prime_mcrae_exclusions",
+  "note": "Concept labels only (already public). NO McRae feature values.",
+  "homograph_sense_pairs_excluded": [
+    "bat_(animal)",
+    "bat_(baseball)",
+    "board_(black)",
+    "board_(wood)",
+    "bow_(ribbon)",
+    "bow_(weapon)",
+    "cap_(bottle)",
+    "cap_(hat)",
+    "hose",
+    "hose_(leggings)",
+    "mink",
+    "mink_(coat)",
+    "mouse",
+    "mouse_(computer)",
+    "pipe",
+    "pipe_(smoking)",
+    "tank_(army)",
+    "tank_(container)"
+  ],
+  "false_collision_excluded": [
+    "cloak",
+    "clock"
+  ],
+  "non_decomposable_excluded": [],
+  "reason_codes": {
+    "HOMOGRAPH_COLLAPSE": "same base word -> identical Stage A\u2032 sequence -> identical F-3",
+    "G2P_FALSE_COLLISION": "distinct words mapped identically by coverage-oriented A_PRIME_EN G2P",
+    "NON_DECOMPOSABLE": "did not fully decompose under Stage A\u2032 after tag-strip"
+  },
+  "counts": {
+    "total_concepts": 541,
+    "excluded": 20,
+    "retained": 521
+  }
+}
