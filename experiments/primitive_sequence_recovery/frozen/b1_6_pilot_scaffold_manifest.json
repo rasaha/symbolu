@@ -1,0 +1,62 @@
+{
+  "artifact_type": "b1_6_pilot_scaffold_manifest",
+  "schema_version": "1.0",
+  "status": "SPEC_MANIFEST_NOT_A_FREEZE",
+  "readiness_label": "B1_6_PILOT_SCAFFOLD_INSTANTIATION_READY",
+  "generation_run": false,
+  "judging_run": false,
+  "evidence_freeze_declared": false,
+  "n_targets": 24,
+  "all_targets_eligible": true,
+  "ineligible_items": [],
+  "coverage_threshold": 0.6,
+  "global_scaffold_metadata": {
+    "KCPR_POLICY": "DUAL_POLE_RENDERING",
+    "KCPR_THEORY_STATUS": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "KOSHA": "DEFERRED",
+    "CSR_STL": "DEFERRED",
+    "POLARITY_INPUT_STATUS": "READOUT_SCAFFOLD_ONLY",
+    "STAGE_A_OPERATOR_POLARITY_STATUS": "POLARITY_FREE"
+  },
+  "active_scaffold_frames": [
+    "{TARGET_TEXT}",
+    "{VARNA_SEQUENCE}",
+    "{VARNA_PROFILE_TABLE}",
+    "{KCPR_DUAL_POLE_FRAME}"
+  ],
+  "deferred_frames": [
+    "{CSR_STL_FRAME}"
+  ],
+  "hashes": {
+    "target_scaffolds": "6a76825fc87481ce465d60cfda6ec7a18ad39c945b9277f6e11629b583ae1c19",
+    "randomized_control": "3a9cac7ef50e85ab66fdfb5ecb001ea55329fe95392fb9caa86016f1cc951c3c",
+    "bridge_manifest": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed",
+    "english_aspirate_amendment": "5b5e5322ac98df4f5cef18376f8fec757d8175e38599ea2044fa60130c692882",
+    "kcpr_manifest": "fc5103d7e4c2aba43efed227f7f2f83a83925d1c69a9f073c5696066e5bf8db7",
+    "kcpr_theory_amendment": "f441c84b1e081f36192ba5bacf002672a7453a8e660e352d505e3af9b896081b",
+    "kcpr_theory_accommodation_audit": "81e383ff628b62d421983d3383e31f16f468d5ba8e10455909dab0662912d9c2",
+    "prompt_rubric_doc": "080a67086c8631568c53c57a02d76f75a8a25f5ce3f8f8bc4f3205655b0ecc5b",
+    "prereg_doc": "66db9e67a6f300f0fd46f0c8e3b0e2e9cb88fa93a30abbf8e261715e7a2be2cb",
+    "varna_polarity_table": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742",
+    "varna_sphere_lexicon": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+    "polarity_axes": "37631d84eb50a611fde43fb1cf38d88832d5508cab92b3d0f56f7c02893dca8b",
+    "decomposer": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd"
+  },
+  "baseline_parity": {
+    "same_target_text": true,
+    "same_neutral_context": true,
+    "same_output_format": true,
+    "same_prompt_rubric_spec": true,
+    "same_model_settings_placeholder": "TBD_at_evidence_freeze",
+    "same_token_budget": true,
+    "no_arm_labels_in_output": true,
+    "target_visible_to_judges": true
+  },
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "Track B unblocking",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM"
+  ]
+}
