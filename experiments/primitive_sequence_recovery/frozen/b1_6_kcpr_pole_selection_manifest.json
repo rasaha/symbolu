@@ -2,7 +2,30 @@
   "artifact_type": "b1_6_kcpr_pole_selection_manifest",
   "schema_version": "1.0",
   "status": "SPEC_MANIFEST_NOT_A_FREEZE",
-  "readiness_label": "B1_6_KCPR_POLE_RULEBOOK_READY",
+  "readiness_label": "B1_6_KCPR_THEORY_AMENDED_READY",
+  "theory_accommodation": {
+    "audit": "B1_6_KCPR_THEORY_ACCOMMODATION_AUDIT.md",
+    "amendment": "B1_6_KCPR_THEORY_AMENDMENT.md",
+    "decision": "KCPR_THEORY_AMENDMENT_REQUIRED",
+    "kcpr_named_theory_doc": "NOT_FOUND (KCPR acronym confined to the experiment track; never expanded in a theory doc)",
+    "governing_theory_docs": {
+      "PRIMITIVE_VRTTI_WITHOUT_POLARITY.md": "43ab478894bb184e01a7bd17b9e4da2cf4dc21438d824aadbc6055570cb79143",
+      "PREREG_CRS_POLE_SELECTION.md": "06e38428b719e88da625ce905426e32e06bf103dc780066e40cf099b7de528ad",
+      "VARNA_STATE_OPERATOR_THEORY.md": "16d9eeda9b6644b3c94db11bd0b6842a9e2845a71fd3b842a54949cdead0ae3e",
+      "SYMBOL_U_THEORY_V1_FREEZE.md": "7862c2837244e8d93efe7ca885bade03badfb1559aef45521ffe4d4715bd044d"
+    },
+    "pole_selection_theory": "SATISFIED (DUAL_POLE_RENDERING selects no pole, flips no pole; CRS prereg forbids semantic pole selection/flipping)",
+    "conflict": "per-varna polarity used as scaffold INPUT vs PRIMITIVE_VRTTI 'polarity emergent after composition, never an input; no counter-pole grounding'",
+    "resolution_guard": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "resolution_notes": [
+      "dual-pole frame is an admittedly theory-noncanonical candidate READOUT scaffold for a utility test; not a claim polarity is a real per-varna input; not validated",
+      "operator layer L (Stage A-prime) stays polarity-free; polarity enters only the downstream readout scaffold, never operator composition (PRIMITIVE_VRTTI core prohibition honored)",
+      "no pole selection, no pole flip (CRS prereg satisfied)"
+    ],
+    "kosha": "DEFERRED_NOT_USED (no mechanical Kosha->pole rule in any theory source; not required for dual-pole rendering)",
+    "mechanism_changed": false,
+    "policy_sha256_unchanged": true
+  },
   "generation_run": false,
   "evidence_freeze_declared": false,
   "target_scaffolds_instantiated": false,
