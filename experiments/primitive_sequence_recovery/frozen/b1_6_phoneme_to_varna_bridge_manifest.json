@@ -1,0 +1,117 @@
+{
+  "artifact_type": "b1_6_phoneme_to_varna_bridge_manifest",
+  "schema_version": "1.0",
+  "status": "SPEC_MANIFEST_NOT_A_FREEZE",
+  "bridge_mode": "CONSONANT_ONLY_BRIDGE",
+  "readiness_label": "B1_6_PHONEME_VARNA_BRIDGE_SPEC_READY",
+  "generation_run": false,
+  "evidence_freeze_declared": false,
+  "target_scaffolds_instantiated": false,
+  "tuned_to_any_target_set": false,
+  "kcpr_expansion": "KCPR_EXPANSION_NOT_FOUND",
+  "kosha_lexicon_found": false,
+  "csr_stl_rulebook": "AMBIGUOUS",
+  "authoritative_vowel_profile_source_found": false,
+  "purpose": "Frozen, target-independent lookup bridge from Stage A-prime single-phoneme output keys to the existing Sanskrit consonant-varna profile keys, so B1.6 {VARNA_PROFILE_TABLE} can be populated later WITHOUT inventing target-specific mappings. Consonant-only; vowels carry no profile in the current tables and are excluded (never invented).",
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "Track B unblocking",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM",
+    "any evidence claim"
+  ],
+  "sources": {
+    "decomposer": {
+      "path": "experiments/primitive_sequence_recovery/stage_a_prime_coverage.py",
+      "sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+      "phoneme_key_count": 39
+    },
+    "varna_polarity_profile_table": {
+      "path": "experiments/primitive_sequence_recovery/track_g_varna_polarity_table.json",
+      "sha256": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742",
+      "key_space": "34 Sanskrit consonant varnas; no vowels",
+      "self_declared_status": "researcher_authored_candidate_representation; unvalidated; not_ontological_evidence"
+    },
+    "varna_four_sphere_lexicon": {
+      "path": "experiments/primitive_sequence_recovery/track_e_varna_sphere_lexicon.json",
+      "sha256": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29"
+    },
+    "polarity_axes": {
+      "path": "experiments/primitive_sequence_recovery/track_g_polarity_axes.json",
+      "sha256": "37631d84eb50a611fde43fb1cf38d88832d5508cab92b3d0f56f7c02893dca8b"
+    },
+    "varna_atom_assignment": {
+      "path": "experiments/primitive_sequence_recovery/frozen/assignment.json",
+      "sha256": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4"
+    },
+    "vrtti_gloss_reference": {
+      "path": "experiments/primitive_sequence_recovery/frozen/realization_en_gloss.json",
+      "sha256": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+      "note": "gloss/dictionary-like; excluded from any judge-facing surface"
+    },
+    "governing_rules": [
+      "experiments/primitive_sequence_recovery/VARNA_ATTRIBUTE_KCPR_EXPERIMENT_RULES.md",
+      "experiments/primitive_sequence_recovery/SYMBOL_U_L2_VALIDATION_RULEBOOK.md"
+    ]
+  },
+  "bridge_table": {
+    "level": "applied to single-phoneme keys AFTER Stage A-prime decomposition; does not modify the decomposer",
+    "mapping_table_sha256": "1415350d3fabe6ffb433edf4fe82e56f8a5af8b3ee2eed4905e9de0c1b1332b3",
+    "mapping": {
+      "b": "ba", "ch": "ca", "d": "da", "dh": "dha", "dr": "dda", "g": "ga",
+      "h": "ha", "jh": "ja", "k": "ka", "l": "la", "m": "ma", "n": "na",
+      "ng": "nga", "nr": "nna", "ny": "nya", "p": "pa", "r": "ra", "s": "sa",
+      "sh": "sha", "shr": "ssa", "t": "ta", "th": "tha", "tr": "tta",
+      "v": "va", "w": "va", "y": "ya"
+    },
+    "vowel_no_profile": ["a", "aa", "ax", "e", "i", "ii", "o", "rv", "u", "uu"],
+    "unsupported_no_varna": ["f", "z", "zh"]
+  },
+  "coverage_audit": {
+    "varna_table_keys_total": 34,
+    "reachable_varna_keys": ["ba","ca","da","dda","dha","ga","ha","ja","ka","la","ma","na","nga","nna","nya","pa","ra","sa","sha","ssa","ta","tha","tta","va","ya"],
+    "reachable_count": 25,
+    "unreachable_varna_keys": ["bha","cha","ddha","gha","jha","kha","ksha","pha","ttha"],
+    "unreachable_count": 9,
+    "unreachable_reason": "The decomposer splits most aspirated stops into base+'h' (kh->[k,h], gh->[g,h], ph->[p,h] or [f], bh->[b,h], retroflex Th/Dh->[tr/dr,h]) or collapses affricate aspiration (c/ch->'ch', j/jh->'jh'), so aspirated varna keys cannot be selected from the phoneme stream. 'ksha' is a conjunct (x->[k,s]) with no single phoneme. Dental th/dh are the exception (kept as single phonemes) and are reachable.",
+    "recorded_collapses": [
+      "ca/cha -> ca (palatal aspiration lost)",
+      "ja/jha -> ja (palatal aspiration lost)",
+      "v/w -> va (English v/w distinction lost)"
+    ],
+    "preserved_contrasts": [
+      "dental vs retroflex: t/ta vs tr/tta, d/da vs dr/dda, n/na vs nr/nna",
+      "nasal place: na / nna / nga / nya",
+      "sibilants: s/sa (dental) vs sh/sha (palatal) vs shr/ssa (retroflex)"
+    ]
+  },
+  "policies": {
+    "vowel_policy": "VOWEL_NO_PROFILE: vowels (and vocalic rv) are retained in VARNA_SEQUENCE, marked VOWEL_NO_PROFILE, excluded from VARNA_PROFILE_TABLE; the scaffold states vowel profiles are unavailable; no vowel meanings invented.",
+    "unsupported_policy": "UNSUPPORTED_SEGMENT: f, z, zh (and any future unmatched phoneme) are retained in the sequence, marked UNSUPPORTED_NO_VARNA, excluded from the profile lookup, and reported visibly; never silently dropped or coerced.",
+    "ambiguity_policy": "Map only single phonemes that resolve to exactly one existing varna key. Aspiration-bearing distinctions the decomposer does not carry are recorded as collapses (not silently merged into a new key). No conservative default is used where it would fabricate a distinction.",
+    "no_target_tuning": "The bridge is frozen before any B1.6 target freeze and must not change after seeing target outputs or judge scores.",
+    "english_vs_sanskrit": "Same bridge for both tracks (both decompose to the shared 39-phoneme inventory). A_PRIME_SA transliteration may preserve retroflex/palatal/sibilant distinctions that A_PRIME_EN collapses, but neither recovers aspiration for velar/labial/palatal stops. Any language-specific rule must be frozen before target selection; none is added here."
+  },
+  "downstream_still_required": [
+    "final B1.6 pilot target freeze",
+    "scaffold instantiation ({VARNA_SEQUENCE}, {VARNA_PROFILE_TABLE} via this bridge)",
+    "{CSR_STL_FRAME} disambiguation or drop (still AMBIGUOUS)",
+    "{KCPR_CONTEXT_FRAME} resolution or drop (KCPR_EXPANSION_NOT_FOUND; no kosha lexicon)",
+    "randomized Symbol-U control freeze",
+    "operator evidence-freeze declaration",
+    "generation run",
+    "blind judging"
+  ],
+  "guardrails": {
+    "b1_4b_prime": "NULL_RETURN_BOTTOM (unchanged)",
+    "original_b1_4b": "blocked",
+    "track_b": "blocked",
+    "no_ontological_signal": true,
+    "no_sanskrit_privilege": true,
+    "no_semantic_truth_claim": true,
+    "no_varna_meaning_invented": true,
+    "no_target_tuning": true,
+    "motto": "Structure, not validated meaning."
+  }
+}
