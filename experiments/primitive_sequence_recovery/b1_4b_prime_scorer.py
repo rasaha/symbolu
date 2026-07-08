@@ -367,6 +367,41 @@ def score_run_arms(records, Y, flags=None):
 
 
 # =====================================================================================
+# FULL-BASELINE mode. Positive `L1_L2_L3_ATTRIBUTE_SIGNAL` is possible ONLY here, and ONLY
+# when the complete baseline suite (including H_SENTIMENT_LEXICON) is present. If any required
+# baseline is pending (e.g. no approved sentiment source), full-baseline mode is BLOCKED and no
+# label is emitted (use screening mode instead — which cannot certify a positive).
+# =====================================================================================
+FULL_BASELINE_REQUIRED_ARMS = tuple(a["id"] for a in ARMS)   # all nine
+
+
+def full_baseline_readiness(arm_scores, pending_arms):
+    if pending_arms.get("H_SENTIMENT_LEXICON") or "H_SENTIMENT_LEXICON" not in arm_scores:
+        return "B1_4B_PRIME_FULL_BASELINES_BLOCKED_H_SENTIMENT"
+    g_pending = str(pending_arms.get("G_LENGTH_FREQUENCY", "")).startswith("FREQ_")
+    if "G_LENGTH_FREQUENCY" not in arm_scores or g_pending:
+        return "B1_4B_PRIME_FULL_BASELINES_BLOCKED_G_FREQUENCY"
+    if any(a not in arm_scores for a in FULL_BASELINE_REQUIRED_ARMS):
+        return "B1_4B_PRIME_FULL_BASELINES_INCONCLUSIVE"
+    return "B1_4B_PRIME_FULL_BASELINES_READY"
+
+
+def score_run_full_baseline(records, Y, flags=None):
+    """Full-baseline scorer. SIGNAL possible ONLY when the suite is complete. Refuses to emit a
+    label (and never a positive) while any required baseline is pending. SYNTHETIC/interface use
+    only — NOT the real evidence run (that requires a separate freeze + operator authorization)."""
+    arm_scores, pending_arms = score_arms(records, Y)
+    readiness = full_baseline_readiness(arm_scores, pending_arms)
+    if readiness != "B1_4B_PRIME_FULL_BASELINES_READY":
+        return {"mode": "full_baseline", "readiness": readiness, "label": None,
+                "signal_possible": False, "arm_scores": arm_scores, "pending_arms": pending_arms,
+                "note": "full-baseline blocked; no positive certification; use screening mode."}
+    label = decide_label_arms(arm_scores, flags)   # SIGNAL reachable only here
+    return {"mode": "full_baseline", "readiness": readiness, "label": label,
+            "signal_possible": True, "arm_scores": arm_scores, "pending_arms": pending_arms}
+
+
+# =====================================================================================
 # synthetic self-check (NO real McRae Y). Records use the real Stage A′ inventory.
 # =====================================================================================
 def _rand_records(n, seed, alphabet=None, length=(3, 7), covars=False):

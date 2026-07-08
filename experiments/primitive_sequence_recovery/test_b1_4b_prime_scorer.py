@@ -192,6 +192,83 @@ def test_arm_pipeline_regimes_match_expected():
         assert res["arms_are"] == "predictor_feature_arms_not_llm_prompt_arms"
 
 
+def test_full_baseline_blocked_without_sentiment():
+    # records with frequency but NO sentiment -> H pending -> full-baseline blocked, no label
+    recs = [{"phonemes": ["k", "a", "t"], "covars": {"freq": 1.0}} for _ in range(40)]
+    Y = np.random.default_rng(3).normal(size=(40, 4))
+    res = S.score_run_full_baseline(recs, Y)
+    assert res["readiness"] == "B1_4B_PRIME_FULL_BASELINES_BLOCKED_H_SENTIMENT"
+    assert res["label"] is None and res["signal_possible"] is False
+    assert res["pending_arms"].get("H_SENTIMENT_LEXICON") == S.BASELINE_PENDING_SOURCE
+
+
+def test_full_baseline_ready_with_sentiment_and_signal_possible():
+    # synthetic f3 regime records DO carry sentiment (make_synthetic covars=True) -> H active
+    recs, Y = S.make_synthetic("f3")
+    arm_scores, pending = S.score_arms(recs, Y)
+    assert "H_SENTIMENT_LEXICON" in arm_scores and "H_SENTIMENT_LEXICON" not in pending
+    assert S.full_baseline_readiness(arm_scores, pending) == "B1_4B_PRIME_FULL_BASELINES_READY"
+    res = S.score_run_full_baseline(recs, Y)
+    assert res["readiness"] == "B1_4B_PRIME_FULL_BASELINES_READY" and res["signal_possible"] is True
+    assert res["label"] == "L1_L2_L3_ATTRIBUTE_SIGNAL"      # SIGNAL only reachable in full-baseline mode
+
+
+def test_g_frequency_present_when_covariate_supplied():
+    recs = [{"phonemes": ["d", "o", "g"], "covars": {"freq": 2.0}} for _ in range(30)]
+    Y = np.random.default_rng(4).normal(size=(30, 3))
+    arm_scores, pending = S.score_arms(recs, Y)
+    assert "G_LENGTH_FREQUENCY" in arm_scores
+    assert "G_LENGTH_FREQUENCY" not in pending          # frequency wired -> not pending
+
+
+def test_screening_still_works_with_h_pending():
+    import run_b1_4b_prime_screening as R
+    recs, Y = S.make_synthetic("phonology")
+    # drop sentiment so H is pending, as in the real screening path
+    recs = [{"phonemes": r["phonemes"], "covars": {k: v for k, v in r["covars"].items() if k != "sentiment"}}
+            for r in recs]
+    arm_scores, pending = S.score_arms(recs, Y)
+    assert pending.get("H_SENTIMENT_LEXICON") == S.BASELINE_PENDING_SOURCE
+    assert R.screening_decide(arm_scores) in R.SCREENING_ALLOWED
+
+
+def test_covariate_adapter_wires_freq_and_strict_sentiment():
+    import tempfile, csv as _csv
+    import b1_4b_prime_covariates as C
+    with tempfile.TemporaryDirectory() as d:
+        dd = pathlib.Path(d)
+        words = ["cat", "dog", "pen", "cup", "bag"]
+        # temp McRae CONCS with KF/BNC/syllables
+        with open(dd / "CONCS_brm.txt", "w", newline="") as fh:
+            w = _csv.writer(fh, delimiter="\t")
+            w.writerow(["Concept", "KF", "BNC", "Length_Syllables"])
+            for i, wd in enumerate(words):
+                w.writerow([wd, i + 1, (i + 1) * 10, 1])
+        # (a) no sentiment source -> sentiment absent, freq present
+        recs, cov = C.build_records(words, dd, sentiment_path=None)
+        assert cov["n_with_frequency"] == 5 and cov["n_with_sentiment"] == 0
+        assert cov["sentiment_source_supplied"] is False
+        assert all("freq" in r["covars"] and "sentiment" not in r["covars"] for r in recs)
+        # (b) supplied Warriner-style lexicon -> sentiment attached (NOT fabricated; read from file)
+        with open(dd / "sent.tsv", "w", newline="") as fh:
+            w = _csv.writer(fh, delimiter="\t")
+            w.writerow(["Word", "V.Mean.Sum"])
+            for wd in words:
+                w.writerow([wd, 5.0])
+        recs2, cov2 = C.build_records(words, dd, sentiment_path=str(dd / "sent.tsv"))
+        assert cov2["sentiment_full_coverage"] is True and cov2["n_with_sentiment"] == 5
+        assert all("sentiment" in r["covars"] for r in recs2)
+        # missing source path -> None (no fabrication)
+        assert C.load_sentiment_lexicon(None) is None
+        assert C.load_sentiment_lexicon(str(dd / "nope.tsv")) is None
+
+
+def test_no_covariate_or_lexicon_files_tracked():
+    tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True).stdout.splitlines()
+    for pat in ("warriner", "nrc", "emolex", "sent.tsv", "CONCS_brm", "sentiment_lexicon_data"):
+        assert not [t for t in tracked if pat.lower() in pathlib.Path(t).name.lower()], pat
+
+
 def run_all():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:
