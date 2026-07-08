@@ -15,11 +15,11 @@ def _sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def _valid_decl():
+def _valid_decl(mode="pilot_generation"):
     return {
         "artifact": "b1_6_pilot_EVIDENCE_FREEZE_DECLARED",
         "evidence_freeze_declared": True,
-        "mode": "pilot_generation",
+        "mode": mode,
         "scaffold_manifest_sha256": _sha(drv.SCAFFOLD_MANIFEST_FILE),
         "target_scaffold_sha256": _sha(drv.TARGETS_FILE),
         "randomized_control_manifest_sha256": _sha(drv.RANDCTL_FILE),
@@ -198,3 +198,81 @@ def test_b1_4b_prime_status_referenced(tmp_path):
     res = _run(tmp_path)
     assert res["manifest"]["b1_4b_prime_status"] == "NULL_RETURN_BOTTOM"
     assert drv.B1_4B_PRIME_STATUS == "NULL_RETURN_BOTTOM"
+
+
+# ---- local LLM adapter integration / modes / subset ----------------------------------
+import b1_6_llm_adapter as A
+
+
+def test_exploratory_mode_requires_exploratory_declaration(tmp_path):
+    # pilot-mode declaration cannot authorize an exploratory run
+    decl = _write_decl(tmp_path, _valid_decl(mode="pilot_generation"))
+    with pytest.raises(PermissionError):
+        drv.run(mock=True, mode=drv.EXPLORATORY_MODE, limit_items=10,
+                decl_path=decl, out_dir=tmp_path / "o", write=False)
+
+
+def test_10_sample_exploratory_mock(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode=drv.EXPLORATORY_MODE))
+    res = drv.run(mock=True, mode=drv.EXPLORATORY_MODE, limit_items=10,
+                  decl_path=decl, out_dir=tmp_path / "o", write=True)
+    m = res["manifest"]
+    assert m["declared_freeze_mode"] == drv.EXPLORATORY_MODE
+    assert m["run_label"] == drv.EXPLORATORY_LABEL
+    assert m["n_targets"] == 10 and m["n_prompts"] == 50 and m["subset"] is True
+    # all six strata represented in the deterministic subset
+    cats = {r["item_id"] for r in res["records"]}
+    assert len(cats) == 50 // 5  # 10 distinct items
+
+
+def test_full_pilot_requires_pilot_mode(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode="pilot_generation"))
+    res = drv.run(mock=True, mode="pilot_generation", decl_path=decl, out_dir=tmp_path / "o", write=False)
+    assert res["manifest"]["n_targets"] == 24 and res["manifest"]["n_prompts"] == 120
+
+
+def test_fake_adapter_10x5_exploratory(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode=drv.EXPLORATORY_MODE))
+    adapter = A.FakeAdapter()
+    res = drv.run(mock=False, adapter=adapter, mode=drv.EXPLORATORY_MODE, limit_items=10,
+                  decl_path=decl, out_dir=tmp_path / "o", write=True)
+    m = res["manifest"]
+    assert m["n_prompts"] == 50 and m["n_success"] == 50 and m["n_failures"] == 0
+    assert m["generator_meta"]["backend"] == "fake"
+    # judge-visible remains blind even with real-shaped adapter output
+    for pkg in res["judge_visible"]:
+        assert "arm" not in pkg and "true_arm" not in pkg
+    assert len(res["hidden_meta"]) == 50
+
+
+def test_fake_adapter_full_24x5(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode="pilot_generation"))
+    res = drv.run(mock=False, adapter=A.FakeAdapter(), mode="pilot_generation",
+                  decl_path=decl, out_dir=tmp_path / "o", write=False)
+    assert res["manifest"]["n_prompts"] == 120 and res["manifest"]["n_success"] == 120
+
+
+def test_output_validation_catches_malformed(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode=drv.EXPLORATORY_MODE))
+    res = drv.run(mock=False, adapter=A.FakeAdapter(malformed=True), mode=drv.EXPLORATORY_MODE,
+                  limit_items=10, decl_path=decl, out_dir=tmp_path / "o", write=True)
+    m = res["manifest"]
+    assert m["n_success"] == 0 and m["n_failures"] == 50
+    assert all(f["status"] == "format_invalid" for f in res["failures"])
+    assert res["judge_visible"] == []          # malformed never written to judge-visible
+
+
+def test_real_mode_requires_adapter_or_generator(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode="pilot_generation"))
+    with pytest.raises(ValueError):
+        drv.run(mock=False, adapter=None, generator=None, mode="pilot_generation",
+                decl_path=decl, out_dir=tmp_path / "o", write=False)
+
+
+def test_balanced_subset_covers_all_strata():
+    import json as _json
+    doc = _json.loads(drv.TARGETS_FILE.read_text())
+    picked = drv.select_balanced_subset(doc["targets"], 10)
+    assert len(picked) == 10
+    cats = {t["category"] for t in picked}
+    assert len(cats) == 6                       # all six strata represented

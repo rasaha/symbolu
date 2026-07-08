@@ -82,10 +82,52 @@ python3 -m pytest test_run_b1_6_pilot_generation.py -q
 # 3a) MOCK run (deterministic placeholder text; plumbing only; still gated)
 python3 run_b1_6_pilot_generation.py --mock
 
-# 3b) REAL run — NOT runnable from this module/CLI. Requires an operator-supplied
-#     model-adapter callable `generator(record)->str`; no external API is implemented here.
-#     e.g. in an operator harness:  run(mock=False, generator=my_adapter)
+# 3b) REAL run — now supported via the local LLM adapter (b1_6_llm_adapter.py), on a
+#     MODEL-ACCESS HOST (CUDA + transformers, or a local OpenAI-compatible server).
+#     Still gated by the evidence-freeze declaration; see §13 (local LLM adapter).
 ```
+
+## 13. Local LLM adapter (real generation on a model host)
+
+Real generation is provided by `b1_6_llm_adapter.py` (modeled on the B1.1 run pattern):
+`TransformersAdapter` (HF model at a frozen revision), `OpenAICompatLocalAdapter` (a **local** vLLM/OpenAI-style
+server), and a deterministic `FakeAdapter` for tests. Output-format validation (`Title` / `Interpretation` /
+`Practical reflection` / `Caution`, rough length) + a frozen retry policy apply; malformed generations are
+**failed, never edited**.
+
+**10-sample exploratory probe** (separate declaration `mode: "exploratory_10_sample_generation_probe"`):
+
+```bash
+# operator writes run_out/.../EVIDENCE_FREEZE with mode "exploratory_10_sample_generation_probe"
+python3 run_b1_6_pilot_generation.py --local-model <hf_id_or_path> \
+        --mode exploratory_10_sample_generation_probe --limit-items 10
+# emits run_label B1_6_10_SAMPLE_EXPLORATORY_GENERATION_PROBE; 10 balanced targets x 5 arms = 50.
+```
+
+**Full pilot** (`mode: "pilot_generation"`):
+
+```bash
+python3 run_b1_6_pilot_generation.py --local-model <hf_id_or_path> --mode pilot_generation
+# 24 targets x 5 arms = 120.
+```
+
+**Local OpenAI-compatible server** instead of transformers:
+
+```bash
+python3 run_b1_6_pilot_generation.py --base-url http://localhost:8000 --local-model <served_model> \
+        --mode pilot_generation
+```
+
+**RunPod example** (transformers backend): provision a CUDA pod, `pip install torch transformers`, place a
+model, write the mode-matched evidence-freeze declaration, then run the full-pilot command above. The driver
+**REFUSES** if there is no CUDA/transformers backend (as it does in this environment). The **same fixed model +
+settings are used for every arm** (`GenerationSettings`: temperature, top_p, max_tokens, seed) — parity is not
+optional. All artifacts land under `run_out/` (gitignored). **Generation never judges**; next step is blind
+ratings (`B1_6_PILOT_BLIND_JUDGING_RUNBOOK.md`).
+
+**Failure/retry policy:** each generation is validated for the required sections + rough length; on failure the
+adapter retries up to `max_attempts` (frozen), then records a `format_invalid` / `error` failure in the run
+manifest and **omits** that output from the judge-visible package — it is never silently edited to look valid.
 
 ## 6. Mock-mode command
 

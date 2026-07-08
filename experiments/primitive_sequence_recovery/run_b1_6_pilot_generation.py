@@ -34,6 +34,9 @@ DECL_FILE = FROZEN / "b1_6_pilot_EVIDENCE_FREEZE_DECLARED.json"
 RUN_OUT = HERE / "run_out" / "b1_6_pilot_generation"
 
 MODE = "pilot_generation"
+EXPLORATORY_MODE = "exploratory_10_sample_generation_probe"
+VALID_MODES = (MODE, EXPLORATORY_MODE)
+EXPLORATORY_LABEL = "B1_6_10_SAMPLE_EXPLORATORY_GENERATION_PROBE"
 ACTIVE_ARMS = [
     "SYMBOLU_SCAFFOLD",
     "PLAIN_PROMPT_BASELINE",
@@ -88,8 +91,10 @@ def _sha_text(s: str) -> str:
 # --------------------------------------------------------------------------------------
 # Evidence-freeze gate
 # --------------------------------------------------------------------------------------
-def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE) -> Tuple[bool, List[str]]:
-    """Return (ok, reasons). Refuses unless a valid operator declaration exists."""
+def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE,
+                       expected_mode: str = MODE) -> Tuple[bool, List[str]]:
+    """Return (ok, reasons). Refuses unless a valid operator declaration exists whose mode matches
+    expected_mode (MODE for the full pilot, EXPLORATORY_MODE for the 10-sample probe)."""
     reasons: List[str] = []
     if not decl_path.exists():
         return False, ["no EVIDENCE_FREEZE_DECLARED file (operator must create it)"]
@@ -105,8 +110,8 @@ def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE) -> Tuple[bool, List[
         reasons.append("artifact != b1_6_pilot_EVIDENCE_FREEZE_DECLARED")
     if decl.get("evidence_freeze_declared") is not True:
         reasons.append("evidence_freeze_declared != true")
-    if decl.get("mode") != MODE:
-        reasons.append(f"mode != {MODE}")
+    if decl.get("mode") != expected_mode:
+        reasons.append(f"mode != {expected_mode}")
     if reasons:
         return False, reasons
 
@@ -222,12 +227,40 @@ def render_prompt(arm: str, rec: Dict, rand_rec: Optional[Dict]) -> str:
     raise ValueError(f"unknown arm {arm!r}")
 
 
-def build_records(targets_doc: Dict, randctl_doc: Dict) -> List[Dict]:
-    """Cross the frozen targets with the active arms; render every prompt."""
+def select_balanced_subset(targets: List[Dict], n: int) -> List[Dict]:
+    """Deterministic balanced subset: round-robin across strata (category), file order within stratum."""
+    strata: Dict[str, List[Dict]] = {}
+    for t in targets:
+        strata.setdefault(t["category"], []).append(t)
+    picked: List[Dict] = []
+    p = 0
+    while len(picked) < n and any(p < len(v) for v in strata.values()):
+        for items in strata.values():
+            if p < len(items) and len(picked) < n:
+                picked.append(items[p])
+        p += 1
+    return picked
+
+
+def select_items(targets_doc: Dict, item_ids=None, limit_items=None) -> List[Dict]:
+    targets = targets_doc["targets"]
+    if item_ids:
+        want = list(item_ids)
+        order = {i: k for k, i in enumerate(want)}
+        chosen = [t for t in targets if t["item_id"] in set(want)]
+        chosen.sort(key=lambda t: order.get(t["item_id"], 10 ** 9))
+        return chosen
+    if limit_items:
+        return select_balanced_subset(targets, limit_items)
+    return list(targets)
+
+
+def build_records(targets: List[Dict], randctl_doc: Dict) -> List[Dict]:
+    """Cross the (possibly-subset) target list with the active arms; render every prompt."""
     rand_by_id = {r["item_id"]: r for r in randctl_doc["randomized_scaffolds"]}
     out: List[Dict] = []
     blind_n = 0
-    for rec in targets_doc["targets"]:
+    for rec in targets:
         rand_rec = rand_by_id.get(rec["item_id"])
         for arm in ACTIVE_ARMS:
             prompt = render_prompt(arm, rec, rand_rec)
@@ -293,47 +326,97 @@ def mock_generator(record: Dict) -> str:
     return f"{MOCK_TEXT} [{record['blinded_output_id']}]"
 
 
-def run(mock: bool,
+def _make_emit(mock, adapter, generator, settings, validate_real):
+    """Return (emit(record)->(text|None,status,reasons), gen_meta)."""
+    if mock:
+        return (lambda rec: (mock_generator(rec), "mock", [])), {"backend": "mock", "model_id": "MOCK_ONLY"}
+    from b1_6_llm_adapter import generate_with_retry, validate_output_format  # lazy; no torch at import
+    if adapter is not None:
+        def emit(rec):
+            return generate_with_retry(adapter, rec["prompt"], settings, validate=validate_real)
+        return emit, {**settings.metadata(), "backend": getattr(adapter, "backend", "custom")}
+    if generator is not None:
+        def emit(rec):
+            txt = generator(rec)
+            if not validate_real:
+                return txt, "ok", []
+            okv, rs = validate_output_format(txt)
+            return (txt, "ok", []) if okv else (None, "format_invalid", rs)
+        return emit, {"backend": "custom_generator", **settings.metadata()}
+    raise ValueError("real mode requires an operator-supplied adapter or generator callable; none provided")
+
+
+def run(mock: bool = False,
         generator: Optional[Callable[[Dict], str]] = None,
+        adapter=None,
+        settings=None,
+        mode: str = MODE,
+        item_ids=None,
+        limit_items: Optional[int] = None,
         out_dir: pathlib.Path = RUN_OUT,
         decl_path: pathlib.Path = DECL_FILE,
-        write: bool = True) -> Dict:
-    """Gated run. Refuses without a valid operator declaration."""
-    ok, reasons = verify_freeze_gate(decl_path)
+        write: bool = True,
+        validate_real: bool = True) -> Dict:
+    """Gated run. Refuses without a valid operator declaration whose mode matches `mode`.
+    Real generation uses `adapter` (b1_6_llm_adapter) or a bare `generator` callable, with output-format
+    validation + retry. `mock` is unchanged deterministic placeholder text. No judging."""
+    if mode not in VALID_MODES:
+        raise ValueError(f"unknown mode {mode!r}")
+    ok, reasons = verify_freeze_gate(decl_path, expected_mode=mode)
     if not ok:
         raise PermissionError("EVIDENCE_FREEZE gate refused: " + "; ".join(reasons))
 
-    if not mock and generator is None:
-        raise ValueError("real mode requires an explicit operator-supplied model adapter "
-                         "(generator callable); none is implemented in this module")
-    gen: Callable[[Dict], str] = mock_generator if mock else generator  # type: ignore
+    from b1_6_llm_adapter import GenerationSettings
+    settings = settings or GenerationSettings()
+    emit, gen_meta = _make_emit(mock, adapter, generator, settings, validate_real)
 
     targets_doc = json.loads(TARGETS_FILE.read_text())
     randctl_doc = json.loads(RANDCTL_FILE.read_text())
     seed = randctl_doc.get("seed")
-    records = build_records(targets_doc, randctl_doc)
+    chosen = select_items(targets_doc, item_ids=item_ids, limit_items=limit_items)
+    records = build_records(chosen, randctl_doc)
 
-    judge_visible = []
-    hidden_meta = []
-    rendered_hidden = []
+    judge_visible, hidden_meta, rendered_hidden, failures = [], [], [], []
     for rec in records:
-        text = gen(rec)
-        judge_visible.append(make_judge_visible(rec, text))
-        hidden_meta.append(make_hidden_meta(rec, seed))
-        rendered_hidden.append({"blinded_output_id": rec["blinded_output_id"],
-                                "arm": rec["arm"], "prompt": rec["prompt"]})
+        text, status, rs = emit(rec)
+        if status in ("ok", "mock") and text is not None:
+            judge_visible.append(make_judge_visible(rec, text))
+            hidden_meta.append(make_hidden_meta(rec, seed))
+            rendered_hidden.append({"blinded_output_id": rec["blinded_output_id"],
+                                    "arm": rec["arm"], "prompt": rec["prompt"]})
+        else:
+            failures.append({"blinded_output_id": rec["blinded_output_id"], "item_id": rec["item_id"],
+                             "status": status, "reasons": rs})
 
+    subset = bool(item_ids) or bool(limit_items)
+    run_label = EXPLORATORY_LABEL if mode == EXPLORATORY_MODE else "B1_6_PILOT_FULL_GENERATION"
     manifest = {
         "artifact_type": "b1_6_pilot_generation_run_manifest",
         "mode": "MOCK" if mock else "REAL",
+        "declared_freeze_mode": mode,
+        "run_label": run_label,
+        "subset": subset,
         "judging_performed": False,
-        "n_targets": len(targets_doc["targets"]),
+        "generator_meta": gen_meta,
+        "n_targets": len(chosen),
         "n_arms": len(ACTIVE_ARMS),
         "n_prompts": len(records),
+        "n_success": len(judge_visible),
+        "n_failures": len(failures),
+        "failures": failures,
         "arms": ACTIVE_ARMS,
         "seed": seed,
+        "item_ids": [t["item_id"] for t in chosen],
+        "frozen_input_hashes": {
+            "target_scaffolds": _sha_file(TARGETS_FILE),
+            "scaffold_manifest": _sha_file(SCAFFOLD_MANIFEST_FILE),
+            "randomized_control": _sha_file(RANDCTL_FILE),
+            "prompt_rubric": _sha_file(PROMPT_RUBRIC_FILE),
+        },
+        "declaration_sha256": _sha_file(decl_path) if decl_path.exists() else None,
         "b1_4b_prime_status": B1_4B_PRIME_STATUS,
-        "note": "No judging performed by this driver. Blinded outputs and hidden metadata are NOT committed.",
+        "note": "No judging performed by this driver. Blinded outputs and hidden metadata are NOT committed. "
+                "No GENUTILITY_* label is emitted by generation.",
     }
 
     if write:
@@ -348,17 +431,48 @@ def run(mock: bool,
             json.dumps(manifest, ensure_ascii=False, indent=2))
 
     return {"manifest": manifest, "judge_visible": judge_visible,
-            "hidden_meta": hidden_meta, "records": records}
+            "hidden_meta": hidden_meta, "records": records, "failures": failures}
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="B1.6 pilot generation driver (gated; mock-tested).")
     ap.add_argument("--mock", action="store_true", help="deterministic placeholder text (tests/plumbing only)")
+    ap.add_argument("--local-model", help="HF model path/id for a real transformers run (model-access host)")
+    ap.add_argument("--base-url", help="LOCAL OpenAI-compatible server (e.g. vLLM) for a real run")
+    ap.add_argument("--adapter-config", help="path to a JSON GenerationSettings config for a real run")
+    ap.add_argument("--mode", default=MODE, choices=list(VALID_MODES),
+                    help="freeze mode: full pilot_generation or exploratory_10_sample_generation_probe")
+    ap.add_argument("--limit-items", type=int, default=None, help="e.g. 10 for the exploratory probe")
+    ap.add_argument("--item-ids", nargs="*", default=None, help="explicit deterministic subset of item ids")
     ap.add_argument("--out", default=str(RUN_OUT))
     args = ap.parse_args(argv)
-    if not args.mock:
-        raise SystemExit("Real generation requires an operator-supplied model adapter; not runnable from CLI. "
-                         "Use --mock for plumbing only.")
+
+    if args.mock:
+        res = run(mock=True, mode=args.mode, limit_items=args.limit_items, item_ids=args.item_ids,
+                  out_dir=pathlib.Path(args.out))
+        print(json.dumps(res["manifest"], indent=2))
+        return
+
+    # REAL: build an adapter (only on a model-access host); still gated by the freeze declaration.
+    from b1_6_llm_adapter import GenerationSettings, build_adapter, model_backend_readiness
+    if args.adapter_config:
+        cfg = json.loads(pathlib.Path(args.adapter_config).read_text())
+        settings = GenerationSettings(**cfg)
+    elif args.base_url:
+        settings = GenerationSettings(model_id=args.local_model or "local", backend="openai_compat_local",
+                                      base_url=args.base_url)
+    elif args.local_model:
+        settings = GenerationSettings(model_id=args.local_model, backend="transformers")
+    else:
+        raise SystemExit("Real generation needs --local-model, --base-url, or --adapter-config "
+                         "(and a matching operator evidence-freeze declaration). Use --mock for plumbing.")
+    ready = model_backend_readiness()
+    if settings.backend == "transformers" and not ready.get("cuda_available"):
+        raise SystemExit(f"REFUSED: no CUDA/transformers backend on this host. readiness={ready}")
+    adapter = build_adapter(settings)
+    res = run(mock=False, adapter=adapter, settings=settings, mode=args.mode,
+              limit_items=args.limit_items, item_ids=args.item_ids, out_dir=pathlib.Path(args.out))
+    print(json.dumps(res["manifest"], indent=2))
     res = run(mock=True, out_dir=pathlib.Path(args.out))
     print(json.dumps(res["manifest"], indent=2))
 
