@@ -1,0 +1,162 @@
+# B1.6 — Pilot Blind Judging Runbook (Two-Phase; Mock-Tested)
+
+**Status:** Operator runbook + gated two-phase judging harness (mock-tested). **No real judging. No external LLM
+API call. No generation. No ratings freeze created by the assistant. No `GENUTILITY_*` terminal label.**
+**B1.4b′ remains `NULL_RETURN_BOTTOM` and is not reinterpreted. No ontology, no Sanskrit privilege, no validated
+meaning, no `ONTOLOGICAL_SIGNAL`. Original B1.4b remains blocked. Track B remains blocked. Structure, not
+validated meaning.**
+
+**Readiness label: `B1_6_PILOT_JUDGING_HARNESS_READY_MOCK_TESTED`.**
+
+Harness: `judge_b1_6_pilot_outputs.py`. Tests: `test_judge_b1_6_pilot_outputs.py` (17/17).
+Schema: `frozen/b1_6_pilot_judging_schema.json`. Consumes the generation driver's outputs (`cc56eb1`).
+
+---
+
+## 1. Purpose
+
+Make pilot judging **mechanical and blinded**: verify the generated outputs carry no arm identity, hand judges a
+rating template, and — **only after ratings are frozen** — join ratings with the hidden arm metadata to compute
+arm-level composites and pairwise preferences. **The pilot emits only plumbing labels; it never emits a
+`GENUTILITY_*` verdict.**
+
+## 2. Blind rating workflow (Phase A)
+
+```bash
+cd experiments/primitive_sequence_recovery
+python3 judge_b1_6_pilot_outputs.py --phase A
+```
+
+Phase A reads `run_out/b1_6_pilot_generation/judge_visible_outputs.jsonl`, runs the **blindness check** (§ Blind
+checks), and writes `run_out/b1_6_pilot_judging/judge_rating_template.csv` +
+`blindness_check_report.json`. If the outputs are not blind, it returns `B1_6_PILOT_JUDGING_INVALID_BLINDING`
+and writes no template. If the outputs file is missing, it returns
+`B1_6_PILOT_JUDGING_BLOCKED_NO_GENERATED_OUTPUTS`.
+
+**Blind checks (reject if any present):** arm names; `Symbol-U`/`varṇa`/`KCPR` labels; scaffold metadata
+fields (`VARNA_PROFILE_TABLE`, `VARNA_SEQUENCE`, `KCPR_DUAL_POLE_FRAME`, …); hidden-metadata fields
+(`true_arm`, `prompt`, `scaffold_hash`, `randomization_seed`); generator prompt text; any field revealing the
+true arm; forbidden tokens in `generation_text`. **Target text and neutral context MUST be present** (needed
+for specificity scoring).
+
+## 3. Human judge workflow
+
+- Judges receive **only** `judge_rating_template.csv` (blinded id + target + empty rating columns).
+- Each row rated on the **1–7** rubric: positive dims — coherence, specificity_to_target, interpretive_richness,
+  practical_usefulness, non_genericity, creativity_aesthetic, internal_consistency, caution_epistemic_humility;
+  penalty dims — overclaim_penalty, hallucination_penalty (1 = none/best, 7 = worst).
+- Judges do **not** see arm identity, the scaffold, or the hidden metadata. Randomize row order per item before
+  handing out. ≥3 independent judges recommended for a real run; IRR reported.
+
+## 4. LLM-as-judge pilot-only workflow (placeholder)
+
+Permitted **for the pilot only**, as a triage/plumbing signal, using a model **different from the generator**.
+**No external API is wired into this harness.** An operator supplies ratings in the schema shape (a JSONL/JSON
+list of rating rows) from their own harness. **No terminal claim** may be drawn from an LLM-judge pilot.
+
+## 5. Ratings-freeze declaration
+
+Operator creates `run_out/b1_6_pilot_generation/b1_6_pilot_RATINGS_FROZEN.json` (**NOT committed**) **before**
+unblinding:
+
+```json
+{
+  "artifact": "b1_6_pilot_RATINGS_FROZEN",
+  "ratings_frozen": true,
+  "mode": "pilot_judging",
+  "judge_visible_outputs_sha256": "<sha256 of judge_visible_outputs.jsonl>",
+  "ratings_file_sha256": "<sha256 of the frozen ratings file>",
+  "declared_by": "<operator id>",
+  "declared_at_utc": "<ISO-8601>",
+  "attestation": "B1.6 pilot ratings frozen before unblinding; pilot only; no terminal GENUTILITY verdict; no semantic truth claim."
+}
+```
+
+> **⚠ OPERATOR ACTION — DO NOT RUN UNLESS AUTHORIZING UNBLINDING.** The assistant never creates this.
+
+The harness refuses Phase B on: missing declaration, `mode != pilot_judging`, any missing field, wrong
+attestation, or a hash mismatch on the judge-visible outputs or the ratings file.
+
+## 6. Unblinding step (Phase B)
+
+Phase B is not CLI-runnable without an operator ratings file + freeze declaration. In an operator harness:
+
+```python
+from judge_b1_6_pilot_outputs import aggregate
+import json, pathlib
+ratings = json.loads(pathlib.Path("run_out/b1_6_pilot_generation/ratings.json").read_text())
+hidden  = json.loads(pathlib.Path("run_out/b1_6_pilot_generation/hidden_arm_metadata.json").read_text())
+res = aggregate(ratings, hidden, require_freeze=True, write=True)   # gated on RATINGS_FROZEN
+print(res["label"])
+```
+
+Hidden arm metadata is joined **only here**, after the freeze. Before the freeze the refusal result contains no
+arm mapping and no summary.
+
+## 7. Aggregation commands / outputs
+
+After freeze, Phase B writes to `run_out/b1_6_pilot_judging/` (NOT committed):
+
+- `pilot_judging_summary.json` — per-arm mean **raw** composite + mean **penalty-adjusted** composite, bootstrap
+  95% CIs, item-level variance, mean penalties; `terminal_genutility_label_emitted: false`.
+- `pairwise_preference_summary.json` — Symbol-U vs plain / generic-structured / randomized-Symbol-U /
+  semantic-LLM (win/tie/loss + win rate, paired by item on the penalty-adjusted composite).
+- `unblinded_arm_summary.json` — the `blinded_output_id → true_arm` map used for aggregation (marked
+  `MOCK_JUDGING_ONLY_DO_NOT_INTERPRET` in mock runs).
+
+## 8. What must not be committed
+
+- `run_out/` (gitignored) — templates, reports, summaries, unblinded map.
+- The ratings-freeze declaration.
+- Any ratings file, generated output, or hidden metadata.
+- Verify with `git status --short` before any commit.
+
+## 9. Why the pilot cannot emit `GENUTILITY_*`
+
+Per prereg §13/§15, the pilot validates **plumbing and rubric discrimination only**. It has too few items/judges
+for a real claim, may use an LLM-judge triage, and (in mock) uses fabricated ratings. The harness therefore
+emits only `B1_6_PILOT_JUDGING_*` plumbing labels and sets `terminal_genutility_label_emitted: false`. A real
+`GENUTILITY_*` verdict requires the **full run**: frozen targets/prompts/scaffold, an evidence freeze, a
+generator **independent** of the judge, blind (preferably human) judges with adequate IRR, and the prereg's
+thresholds and multiple-comparison correction.
+
+## 10. Guardrails
+
+No real judging; no external API; no generation; no evidence freeze; no ratings freeze created by the assistant;
+no generated outputs committed; no semantic-truth claim; no `ONTOLOGICAL_SIGNAL`; no Sanskrit privilege; no
+target-specific pole selection; KCPR caveat `THEORY_NONCANONICAL_INPUT_POLARITY` remains active; **B1.4b′ remains
+`NULL_RETURN_BOTTOM`**; original B1.4b remains blocked; Track B remains blocked. **Structure, not validated
+meaning.**
+
+## Validation
+
+```bash
+python3 -m pytest test_judge_b1_6_pilot_outputs.py -q      # 17 passed
+python3 -m pytest test_run_b1_6_pilot_generation.py -q     # 22 passed (generation driver)
+```
+
+Judging tests prove: blind package passes when clean; fails on arm-name key, on scaffold field, and on
+Symbol-U/KCPR token in text; blocked when no generated outputs; complete rating validates; incomplete and
+out-of-range ratings rejected; penalty reduces the adjusted composite; aggregation refuses before the freeze;
+succeeds after a mock freeze; hash mismatch refuses; incomplete ratings raise in aggregation; hidden metadata
+used only after freeze; no `GENUTILITY_*` verdict emitted; pairwise contrasts present; B1.4b′ referenced as
+`NULL_RETURN_BOTTOM`.
+
+---
+
+## Final report
+
+- **Files created:** `judge_b1_6_pilot_outputs.py`, `test_judge_b1_6_pilot_outputs.py`,
+  `B1_6_PILOT_BLIND_JUDGING_RUNBOOK.md`, `frozen/b1_6_pilot_judging_schema.json`. No prior artifact modified.
+- **Commit hash:** (recorded on commit below).
+- **Readiness label:** **`B1_6_PILOT_JUDGING_HARNESS_READY_MOCK_TESTED`**.
+- **Tests run:** `test_judge_b1_6_pilot_outputs.py` **17/17**; `test_run_b1_6_pilot_generation.py` **22/22**.
+- **No real judging was performed.**
+- **No generation was run.**
+- **No ratings freeze was declared.**
+- **No `GENUTILITY_*` terminal label was emitted.**
+- **B1.4b′ remains `NULL_RETURN_BOTTOM`.**
+
+> B1.6 blind judging harness/runbook drafted and mock-tested only. No generation run. No real judging. No ratings
+> freeze. No GENUTILITY terminal label. B1.4b′ remains NULL_RETURN_BOTTOM. Original B1.4b remains blocked. Track B
+> remains blocked. Structure, not validated meaning.

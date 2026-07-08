@@ -1,0 +1,63 @@
+{
+  "artifact_type": "b1_6_pilot_judging_schema",
+  "schema_version": "1.0",
+  "status": "SCHEMA_ONLY_NO_DATA",
+  "real_judging_run": false,
+  "ratings_frozen": false,
+  "terminal_genutility_label_emitted": false,
+  "purpose": "Documents the JSON/CSV shapes the B1.6 blind judging harness consumes/produces. Descriptive only; contains no ratings, no generated text, no operator declaration.",
+  "phase_a_inputs": {
+    "judge_visible_outputs": "run_out/b1_6_pilot_generation/judge_visible_outputs.jsonl (from the generation driver; NOT committed)",
+    "allowed_fields": ["item_id", "target_text", "neutral_context", "blinded_output_id", "generation_text", "output_format"],
+    "forbidden_fields": ["arm", "true_arm", "prompt", "prompt_sha256", "scaffold", "scaffold_hash", "VARNA_PROFILE_TABLE", "VARNA_SEQUENCE", "KCPR_DUAL_POLE_FRAME", "randomization_seed", "profile_from"],
+    "forbidden_tokens_in_generation_text": ["SYMBOLU", "Symbol-U", "varna", "KCPR", "scaffold", "RANDOMIZED_SYMBOLU", "polarity", "dual-pole", "worldly/binding"]
+  },
+  "rating_schema": {
+    "scale": "1-7 integer per dimension",
+    "positive_dimensions": ["coherence", "specificity_to_target", "interpretive_richness", "practical_usefulness", "non_genericity", "creativity_aesthetic", "internal_consistency", "caution_epistemic_humility"],
+    "penalty_dimensions": ["overclaim_penalty", "hallucination_penalty"],
+    "penalty_convention": "1 = none/best, 7 = worst; penalty-adjusted composite subtracts mean(penalty-1)",
+    "composites": ["raw_composite = mean(positives)", "penalty_adjusted_composite = raw - mean(penalty-1)"],
+    "rating_row_fields": ["blinded_output_id", "<each positive dim 1-7>", "<each penalty dim 1-7>"]
+  },
+  "ratings_freeze_declaration": {
+    "file": "run_out/b1_6_pilot_generation/b1_6_pilot_RATINGS_FROZEN.json (operator-created; NOT committed)",
+    "required_fields": {
+      "artifact": "b1_6_pilot_RATINGS_FROZEN",
+      "ratings_frozen": true,
+      "mode": "pilot_judging",
+      "judge_visible_outputs_sha256": "sha256 of judge_visible_outputs.jsonl",
+      "ratings_file_sha256": "sha256 of the frozen ratings file",
+      "declared_by": "operator id",
+      "declared_at_utc": "ISO-8601",
+      "attestation": "B1.6 pilot ratings frozen before unblinding; pilot only; no terminal GENUTILITY verdict; no semantic truth claim."
+    }
+  },
+  "phase_b_outputs": {
+    "dir": "run_out/b1_6_pilot_judging/ (NOT committed)",
+    "files": ["judge_rating_template.csv", "blindness_check_report.json", "pilot_judging_summary.json", "pairwise_preference_summary.json", "unblinded_arm_summary.json"]
+  },
+  "pairwise_contrasts": [
+    "SYMBOLU_SCAFFOLD_vs_PLAIN_PROMPT_BASELINE",
+    "SYMBOLU_SCAFFOLD_vs_GENERIC_STRUCTURED_PROMPT_BASELINE",
+    "SYMBOLU_SCAFFOLD_vs_RANDOMIZED_SYMBOLU_CONTROL",
+    "SYMBOLU_SCAFFOLD_vs_SEMANTIC_LLM_BASELINE"
+  ],
+  "pilot_labels": [
+    "B1_6_PILOT_JUDGING_HARNESS_READY_MOCK_TESTED",
+    "B1_6_PILOT_JUDGING_BLOCKED_NO_GENERATED_OUTPUTS",
+    "B1_6_PILOT_JUDGING_BLOCKED_RATINGS_NOT_FROZEN",
+    "B1_6_PILOT_JUDGING_INVALID_BLINDING",
+    "B1_6_PILOT_JUDGING_INVALID_LEAKAGE"
+  ],
+  "guardrails": {
+    "no_real_judging_in_this_module": true,
+    "no_external_api_call": true,
+    "no_generation": true,
+    "pilot_emits_no_genutility_terminal_label": true,
+    "b1_4b_prime": "NULL_RETURN_BOTTOM",
+    "original_b1_4b": "blocked",
+    "track_b": "blocked",
+    "motto": "Structure, not validated meaning."
+  }
+}
