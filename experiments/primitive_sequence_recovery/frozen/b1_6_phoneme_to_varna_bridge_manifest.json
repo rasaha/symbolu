@@ -3,7 +3,9 @@
   "schema_version": "1.0",
   "status": "SPEC_MANIFEST_NOT_A_FREEZE",
   "bridge_mode": "CONSONANT_ONLY_BRIDGE",
-  "readiness_label": "B1_6_PHONEME_VARNA_BRIDGE_SPEC_READY",
+  "readiness_label": "B1_6_PHONEME_VARNA_BRIDGE_SPEC_READY_ENGLISH_POLICY_AMENDED",
+  "amends": "B1_6_PHONEME_TO_VARNA_BRIDGE_SPEC.md (b680063); adds explicit English-mode aspirate policy per B1_6_PHONEME_TO_VARNA_BRIDGE_ENGLISH_ASPIRATE_AMENDMENT.md",
+  "fa_in_profile_table": false,
   "generation_run": false,
   "evidence_freeze_declared": false,
   "target_scaffolds_instantiated": false,
@@ -91,7 +93,13 @@
     "unsupported_policy": "UNSUPPORTED_SEGMENT: f, z, zh (and any future unmatched phoneme) are retained in the sequence, marked UNSUPPORTED_NO_VARNA, excluded from the profile lookup, and reported visibly; never silently dropped or coerced.",
     "ambiguity_policy": "Map only single phonemes that resolve to exactly one existing varna key. Aspiration-bearing distinctions the decomposer does not carry are recorded as collapses (not silently merged into a new key). No conservative default is used where it would fabricate a distinction.",
     "no_target_tuning": "The bridge is frozen before any B1.6 target freeze and must not change after seeing target outputs or judge scores.",
-    "english_vs_sanskrit": "Same bridge for both tracks (both decompose to the shared 39-phoneme inventory). A_PRIME_SA transliteration may preserve retroflex/palatal/sibilant distinctions that A_PRIME_EN collapses, but neither recovers aspiration for velar/labial/palatal stops. Any language-specific rule must be frozen before target selection; none is added here."
+    "english_vs_sanskrit": "Same core bridge for both tracks (both decompose to the shared 39-phoneme inventory). A_PRIME_SA transliteration may preserve retroflex/palatal/sibilant distinctions that A_PRIME_EN collapses, but neither recovers aspiration for velar/labial/palatal stops. Any language-specific rule must be frozen before target selection.",
+    "language_mode_policy": {
+      "english_mode": "A_PRIME_EN targets (default for ordinary English words). English 'ph' is interpreted as /f/ (the decomposer already maps ph->['f']); /f/ has no varna key so it is recorded UNSUPPORTED_NO_VARNA. English digraphs are NOT forced into Sanskrit aspirated varnas. The 9 aspirated/conjunct keys (kha,gha,cha,jha,ttha,ddha,pha,bha,ksha) remain UNREACHABLE in English mode.",
+      "sanskrit_transliteration_mode": "Only for items explicitly marked sanskrit/transliteration. Aspirated/conjunct keys may be reached ONLY where the selected profile table actually contains the key AND the IAST input carries the distinction: kh->kha, gh->gha, jh->jha, retroflex Th->ttha, retroflex Dh->ddha, ph->pha, bh->bha, ksh/ksa->ksha; ch/cch only if the table key is present. Not applied to ordinary English words.",
+      "fa_profile": "No 'fa' (or any f-) key exists in track_g_varna_polarity_table.json; none invented. English /f/ stays UNSUPPORTED_NO_VARNA.",
+      "note": "Language mode = decomposer track (A_PRIME_EN -> english_mode; A_PRIME_SA -> sanskrit_transliteration_mode), overridable by an explicit per-item mode tag, frozen before target selection."
+    }
   },
   "downstream_still_required": [
     "final B1.6 pilot target freeze",
