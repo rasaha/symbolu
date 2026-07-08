@@ -1,0 +1,20 @@
+{
+  "artifact": "g_style_tell_audit",
+  "method": "leave-one-out nearest-centroid on style-only surface features (counts/lengths/punct; content-blind)",
+  "balanced_accuracy": 0.5625,
+  "threshold": 0.55,
+  "pass": false,
+  "revision_applied": 1,
+  "n_signatures": 16,
+  "per_class_recall_counts": {
+    "V": [
+      3,
+      8
+    ],
+    "G": [
+      6,
+      8
+    ]
+  },
+  "note": "Provisional/NOT_EVIDENCE; small-N, indicative only. Real audit runs on the frozen B1.2 set. pass = balanced accuracy <= 0.55 (source type not detectable)."
+}

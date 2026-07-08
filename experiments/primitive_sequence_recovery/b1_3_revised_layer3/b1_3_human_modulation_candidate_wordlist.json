@@ -1,0 +1,752 @@
+{
+  "artifact": "b1_3_human_modulation_candidate_wordlist",
+  "status": "CANDIDATE_DRAFT_NOT_FROZEN",
+  "evidence": false,
+  "n_candidates": 72,
+  "n_eligible": 71,
+  "n_primary_analyzable": 66,
+  "n_high_confound_diagnostic": 5,
+  "categories": {
+    "concrete_object": 9,
+    "body_nature": 12,
+    "relational_social": 9,
+    "action_verb": 9,
+    "affect_emotion": 9,
+    "abstract_ethical": 10,
+    "spiritual_contemplative": 9,
+    "kinship_high_confound": 5
+  },
+  "policy": "broad diverse pool; kinship/register terms flagged high_confound and EXCLUDED from primary analysis (diagnostic subset only, reported separately); final frozen list + full eligibility screen is a downstream blocker; no cherry-picking after output inspection.",
+  "items": [
+    {
+      "word": "stone",
+      "category": "concrete_object",
+      "dictionary_anchor": "a hard solid piece of mineral matter",
+      "neutral_context": "Consider the word \"stone\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "bridge",
+      "category": "concrete_object",
+      "dictionary_anchor": "a structure carrying a path across an obstacle",
+      "neutral_context": "Consider the word \"bridge\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "sword",
+      "category": "concrete_object",
+      "dictionary_anchor": "a weapon with a long metal blade",
+      "neutral_context": "Consider the word \"sword\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "lamp",
+      "category": "concrete_object",
+      "dictionary_anchor": "a device that gives light",
+      "neutral_context": "Consider the word \"lamp\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "boat",
+      "category": "concrete_object",
+      "dictionary_anchor": "a small vessel for travelling on water",
+      "neutral_context": "Consider the word \"boat\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "book",
+      "category": "concrete_object",
+      "dictionary_anchor": "a set of written or printed pages bound together",
+      "neutral_context": "Consider the word \"book\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "mirror",
+      "category": "concrete_object",
+      "dictionary_anchor": "a surface that reflects an image",
+      "neutral_context": "Consider the word \"mirror\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "door",
+      "category": "concrete_object",
+      "dictionary_anchor": "a movable barrier closing an entrance",
+      "neutral_context": "Consider the word \"door\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "anchor",
+      "category": "concrete_object",
+      "dictionary_anchor": "a heavy object that holds a vessel in place",
+      "neutral_context": "Consider the word \"anchor\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "fire",
+      "category": "body_nature",
+      "dictionary_anchor": "the process of burning that gives heat and light",
+      "neutral_context": "Consider the word \"fire\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "water",
+      "category": "body_nature",
+      "dictionary_anchor": "the clear liquid that forms rivers and seas",
+      "neutral_context": "Consider the word \"water\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "wind",
+      "category": "body_nature",
+      "dictionary_anchor": "the natural movement of air",
+      "neutral_context": "Consider the word \"wind\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "storm",
+      "category": "body_nature",
+      "dictionary_anchor": "a violent disturbance of the atmosphere",
+      "neutral_context": "Consider the word \"storm\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "cloud",
+      "category": "body_nature",
+      "dictionary_anchor": "a visible mass of water droplets in the sky",
+      "neutral_context": "Consider the word \"cloud\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "mountain",
+      "category": "body_nature",
+      "dictionary_anchor": "a large natural elevation of the earth's surface",
+      "neutral_context": "Consider the word \"mountain\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "river",
+      "category": "body_nature",
+      "dictionary_anchor": "a large natural stream of flowing water",
+      "neutral_context": "Consider the word \"river\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "ocean",
+      "category": "body_nature",
+      "dictionary_anchor": "a very large expanse of sea",
+      "neutral_context": "Consider the word \"ocean\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "tree",
+      "category": "body_nature",
+      "dictionary_anchor": "a tall plant with a trunk and branches",
+      "neutral_context": "Consider the word \"tree\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "flower",
+      "category": "body_nature",
+      "dictionary_anchor": "the seed-bearing part of a plant",
+      "neutral_context": "Consider the word \"flower\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "star",
+      "category": "body_nature",
+      "dictionary_anchor": "a luminous point in the night sky",
+      "neutral_context": "Consider the word \"star\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "shadow",
+      "category": "body_nature",
+      "dictionary_anchor": "a dark area where light is blocked",
+      "neutral_context": "Consider the word \"shadow\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "friend",
+      "category": "relational_social",
+      "dictionary_anchor": "a person one knows and likes",
+      "neutral_context": "Consider the word \"friend\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "teacher",
+      "category": "relational_social",
+      "dictionary_anchor": "a person who instructs others",
+      "neutral_context": "Consider the word \"teacher\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "doctor",
+      "category": "relational_social",
+      "dictionary_anchor": "a person qualified to treat the sick",
+      "neutral_context": "Consider the word \"doctor\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "stranger",
+      "category": "relational_social",
+      "dictionary_anchor": "a person one does not know",
+      "neutral_context": "Consider the word \"stranger\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "guardian",
+      "category": "relational_social",
+      "dictionary_anchor": "a person who protects or looks after another",
+      "neutral_context": "Consider the word \"guardian\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "leader",
+      "category": "relational_social",
+      "dictionary_anchor": "a person who guides or commands a group",
+      "neutral_context": "Consider the word \"leader\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "servant",
+      "category": "relational_social",
+      "dictionary_anchor": "a person who performs duties for another",
+      "neutral_context": "Consider the word \"servant\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "guest",
+      "category": "relational_social",
+      "dictionary_anchor": "a person invited to visit or stay",
+      "neutral_context": "Consider the word \"guest\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "soldier",
+      "category": "relational_social",
+      "dictionary_anchor": "a person who serves in an army",
+      "neutral_context": "Consider the word \"soldier\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "guard",
+      "category": "action_verb",
+      "dictionary_anchor": "to watch over and protect",
+      "neutral_context": "Consider the word \"guard\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "gather",
+      "category": "action_verb",
+      "dictionary_anchor": "to bring or come together",
+      "neutral_context": "Consider the word \"gather\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "break",
+      "category": "action_verb",
+      "dictionary_anchor": "to separate into pieces by force",
+      "neutral_context": "Consider the word \"break\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "bind",
+      "category": "action_verb",
+      "dictionary_anchor": "to tie or fasten together",
+      "neutral_context": "Consider the word \"bind\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "release",
+      "category": "action_verb",
+      "dictionary_anchor": "to set free or let go",
+      "neutral_context": "Consider the word \"release\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "strike",
+      "category": "action_verb",
+      "dictionary_anchor": "to hit forcibly",
+      "neutral_context": "Consider the word \"strike\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "offer",
+      "category": "action_verb",
+      "dictionary_anchor": "to present for acceptance",
+      "neutral_context": "Consider the word \"offer\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "seek",
+      "category": "action_verb",
+      "dictionary_anchor": "to try to find or obtain",
+      "neutral_context": "Consider the word \"seek\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "carry",
+      "category": "action_verb",
+      "dictionary_anchor": "to hold and move something",
+      "neutral_context": "Consider the word \"carry\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "fear",
+      "category": "affect_emotion",
+      "dictionary_anchor": "an unpleasant feeling caused by threat",
+      "neutral_context": "Consider the word \"fear\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "anger",
+      "category": "affect_emotion",
+      "dictionary_anchor": "a strong feeling of displeasure",
+      "neutral_context": "Consider the word \"anger\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "joy",
+      "category": "affect_emotion",
+      "dictionary_anchor": "a feeling of great pleasure",
+      "neutral_context": "Consider the word \"joy\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "sorrow",
+      "category": "affect_emotion",
+      "dictionary_anchor": "a feeling of deep sadness",
+      "neutral_context": "Consider the word \"sorrow\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "grief",
+      "category": "affect_emotion",
+      "dictionary_anchor": "deep sorrow, especially from loss",
+      "neutral_context": "Consider the word \"grief\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "envy",
+      "category": "affect_emotion",
+      "dictionary_anchor": "resentful longing for another's advantages",
+      "neutral_context": "Consider the word \"envy\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "hope",
+      "category": "affect_emotion",
+      "dictionary_anchor": "a feeling of expectation and desire",
+      "neutral_context": "Consider the word \"hope\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "dread",
+      "category": "affect_emotion",
+      "dictionary_anchor": "great fear or apprehension",
+      "neutral_context": "Consider the word \"dread\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "calm",
+      "category": "affect_emotion",
+      "dictionary_anchor": "a state of being free from disturbance",
+      "neutral_context": "Consider the word \"calm\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "justice",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "fair treatment according to what is right",
+      "neutral_context": "Consider the word \"justice\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "freedom",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "the power to act or think without restraint",
+      "neutral_context": "Consider the word \"freedom\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "order",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "an arrangement in accordance with rule",
+      "neutral_context": "Consider the word \"order\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "honesty",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "the quality of being truthful",
+      "neutral_context": "Consider the word \"honesty\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "duty",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "a moral or legal obligation",
+      "neutral_context": "Consider the word \"duty\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "mercy",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "compassion shown toward another",
+      "neutral_context": "Consider the word \"mercy\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "courage",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "the ability to face danger or difficulty",
+      "neutral_context": "Consider the word \"courage\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "patience",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "the capacity to endure without complaint",
+      "neutral_context": "Consider the word \"patience\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "truth",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "that which is in accordance with fact",
+      "neutral_context": "Consider the word \"truth\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "integrity",
+      "category": "abstract_ethical",
+      "dictionary_anchor": "the quality of being morally upright",
+      "neutral_context": "Consider the word \"integrity\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "surrender",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "the act of yielding or giving up control",
+      "neutral_context": "Consider the word \"surrender\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "devotion",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "earnest dedication or loyalty",
+      "neutral_context": "Consider the word \"devotion\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "silence",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "the absence of sound or speech",
+      "neutral_context": "Consider the word \"silence\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "stillness",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "the state of being quiet and motionless",
+      "neutral_context": "Consider the word \"stillness\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "discipline",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "trained control of one's conduct",
+      "neutral_context": "Consider the word \"discipline\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "attachment",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "an affectionate or dependent bond",
+      "neutral_context": "Consider the word \"attachment\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "longing",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "a strong persistent desire",
+      "neutral_context": "Consider the word \"longing\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "awe",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "a feeling of reverential wonder",
+      "neutral_context": "Consider the word \"awe\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": false,
+      "exclusion_reason": "no_varna_routing",
+      "notes": ""
+    },
+    {
+      "word": "grace",
+      "category": "spiritual_contemplative",
+      "dictionary_anchor": "simple elegance or unearned favor",
+      "neutral_context": "Consider the word \"grace\" in an ordinary, plain sentence.",
+      "high_confound": false,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "mother",
+      "category": "kinship_high_confound",
+      "dictionary_anchor": "a female parent",
+      "neutral_context": "Consider the word \"mother\" in an ordinary, plain sentence.",
+      "high_confound": true,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "mama",
+      "category": "kinship_high_confound",
+      "dictionary_anchor": "an intimate/childlike word for mother",
+      "neutral_context": "Consider the word \"mama\" in an ordinary, plain sentence.",
+      "high_confound": true,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "father",
+      "category": "kinship_high_confound",
+      "dictionary_anchor": "a male parent",
+      "neutral_context": "Consider the word \"father\" in an ordinary, plain sentence.",
+      "high_confound": true,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "papa",
+      "category": "kinship_high_confound",
+      "dictionary_anchor": "an intimate/childlike word for father",
+      "neutral_context": "Consider the word \"papa\" in an ordinary, plain sentence.",
+      "high_confound": true,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    },
+    {
+      "word": "dad",
+      "category": "kinship_high_confound",
+      "dictionary_anchor": "an informal word for father",
+      "neutral_context": "Consider the word \"dad\" in an ordinary, plain sentence.",
+      "high_confound": true,
+      "eligible": true,
+      "exclusion_reason": null,
+      "notes": ""
+    }
+  ],
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "candidate list, not frozen",
+    "not evidence",
+    "no positive label"
+  ]
+}

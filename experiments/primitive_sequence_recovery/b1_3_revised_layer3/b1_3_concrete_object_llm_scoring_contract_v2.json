@@ -1,0 +1,118 @@
+{
+  "artifact": "b1_3_concrete_object_llm_scoring_contract_v2",
+  "status": "CONTRACT_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "version": 2,
+  "supersedes": "b1_3_concrete_object_llm_scoring_protocol_draft.json (single R_deranged) for the deranged arms and primary endpoint",
+  "why_v2": "scoring must reflect near/mid/far deranged stratification; single R_deranged obsolete; primary endpoint changed to A_real vs R_deranged_mid; near/far required diagnostics",
+  "scoring_input_contract": {
+    "input_files": ["stimulus_file (frozen rendered options + private truth-map)", "judge_output_file"],
+    "required_columns": [
+      "item_id", "target_word", "primary_or_secondary_or_diagnostic", "object_family",
+      "comparison_id", "arm_left", "arm_right", "deranged_stratum",
+      "selected_option", "model_id", "parse_status", "invalid_flag", "position_seed", "generation_seed"
+    ],
+    "deranged_stratum_values": ["near", "mid", "far", null]
+  },
+  "required_comparisons": [
+    "A_real_vs_R_deranged_mid",
+    "A_real_vs_R_deranged_far",
+    "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled",
+    "A_real_vs_R_random",
+    "A_real_vs_X_neutral",
+    "A_real_vs_semantic_only_baseline"
+  ],
+  "optional_comparisons": ["A_real_vs_R_semantic_near (if not duplicative of R_deranged_near)", "A_real_vs_R_varna_near (if not duplicative)"],
+  "primary_endpoint": "A_real win-rate vs R_deranged_mid on the primary concrete-object set",
+  "primary_endpoint_reason": "mid deranged is the practical object-specificity test: not trivially far, not unfairly near",
+  "required_success_criteria": [
+    "A_real beats R_deranged_mid",
+    "A_real beats R_deranged_far",
+    "A_real beats R_scrambled",
+    "A_real beats R_random",
+    "A_real beats X_neutral",
+    "A_real beats or adds beyond semantic_only_baseline",
+    "style/denotation/quality audits pass",
+    "result holds on primary concrete-object set",
+    "not driven by secondary/diagnostic words",
+    "not driven by one model family"
+  ],
+  "near_deranged_interpretation": {
+    "required_reporting": true,
+    "strong_claim_requires": "A_real > R_deranged_near",
+    "fail_near_pass_mid_far": "label weaker/category-level or function-family signal; do NOT overclaim word-specificity"
+  },
+  "far_only_interpretation": {
+    "beats_far_only": "weak/category-only; cannot earn full signal",
+    "fails_far": "STOP",
+    "flat_or_inverted_gradient": "flag red"
+  },
+  "other_controls": {
+    "R_scrambled": "order/structure",
+    "R_random": "generic symbolic tags",
+    "X_neutral": "whether modulation adds value",
+    "semantic_only_baseline": "whether dictionary object-function semantics explain the result"
+  },
+  "semantic_baseline_gate": {
+    "required": true,
+    "fail_rule": "if semantic_only_baseline matches or beats A_real -> Symbol-U-specific claim FAILS (LLM_OBJECT_MODULATION_SEMANTIC_BASELINE_EXPLAINS)",
+    "note": "even if A_real beats deranged/random, baseline parity means result is ordinary object semantics"
+  },
+  "draft_thresholds": {
+    "primary_A_real_vs_R_deranged_mid_lower_CI": "> 0.50",
+    "A_real_vs_R_deranged_far_lower_CI": "> 0.50",
+    "directional_vs_scrambled_random_neutral_baseline": "> 0.50",
+    "near_deranged": "reported with CI and interpretation tier (strong vs category-limited)",
+    "significance_rule": "corrected significance or preregistered CI rule",
+    "no_single_item_family_dominance": true,
+    "no_single_model_family_dominance": true,
+    "semantic_only_baseline_must_not_match_A_real": true,
+    "note": "DRAFT until explicit EVIDENCE_FREEZE"
+  },
+  "statistical_methods": {
+    "outcome": "forced-choice binary",
+    "aggregate": "win rate with confidence intervals",
+    "exact_test": "binomial/exact where used",
+    "model": "mixed-effects logistic (item + judge random effects) if sample/model count supports it",
+    "stratified_reporting": ["model-family", "item-family", "tier (primary/secondary/diagnostic)", "deranged stratum (near/mid/far)"],
+    "multiplicity_correction": "across required comparisons (Holm or equivalent)"
+  },
+  "invalid_response_handling": {
+    "categories": ["parse_failure", "tie", "refusal", "malformed_output", "repeated_answer_artifact"],
+    "max_invalid_rate_before_stop_draft": 0.10,
+    "on_exceed": "LLM_OBJECT_MODULATION_INVALID_RUN / STOP",
+    "manual_correction": "none unless predeclared"
+  },
+  "style_audit_gate": {
+    "must_pass_before_evidence_run": ["style_parity", "style_tell", "denotation_leakage", "quality_parity"],
+    "on_fail": "no evidence run; global template-level fixes only; no per-item rescue",
+    "post_hoc_style_tell_fail": "LLM_OBJECT_MODULATION_STYLE_CONFOUNDED"
+  },
+  "output_report_contract": [
+    "overall_decision_label", "per_comparison_win_rates", "confidence_intervals", "p_values_if_used",
+    "near_mid_far_gradient_report", "model_family_breakdown", "item_family_breakdown",
+    "primary_only_result", "secondary_diagnostic_result_separate", "invalid_rate_summary",
+    "audit_pass_fail_summary", "threshold_pass_fail_summary"
+  ],
+  "possible_future_scoring_decisions": [
+    "LLM_OBJECT_MODULATION_SIGNAL_EARNED_STRONG",
+    "LLM_OBJECT_MODULATION_SIGNAL_EARNED_CATEGORY_LIMITED",
+    "LLM_OBJECT_MODULATION_NULL",
+    "LLM_OBJECT_MODULATION_STYLE_CONFOUNDED",
+    "LLM_OBJECT_MODULATION_SEMANTIC_BASELINE_EXPLAINS",
+    "LLM_OBJECT_MODULATION_INVALID_RUN"
+  ],
+  "interpretation_labels": {
+    "strong_success": "A_real beats near, mid, and far",
+    "moderate_category_limited": "A_real beats mid and far but not near",
+    "weak_category_only": "A_real beats far only",
+    "failure": "A_real fails against mid or far"
+  },
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "llm_judges_run": false, "scoring_run": false},
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["scoring contract draft, not frozen", "not evidence", "no scoring run", "no positive label earned"]
+}

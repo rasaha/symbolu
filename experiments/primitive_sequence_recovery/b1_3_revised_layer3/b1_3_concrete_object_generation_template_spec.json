@@ -1,0 +1,41 @@
+{
+  "artifact": "b1_3_concrete_object_generation_template_spec",
+  "status": "SPEC_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "purpose": "Fixed, arm-agnostic 4-tag template that renders a modulation OPTION around a FIXED dictionary anchor for a concrete object. Same template for every arm; only the four field tags differ. Denotation never altered.",
+  "stimulus_unit_fields": [
+    "item_id", "target_word", "dictionary_anchor", "neutral_context", "comparison_id",
+    "left_option", "right_option", "left_arm (hidden)", "right_arm (hidden)", "position_seed", "metadata"
+  ],
+  "metadata_fields": ["tier", "object_family", "generation_seed", "source_files"],
+  "option_template": "Within the fixed meaning, this object is modulated by {tag1}, {tag2}, {tag3}, and {tag4}.",
+  "template_rules": {
+    "exactly_four_tags": true,
+    "no_full_poetic_paragraph": true,
+    "no_sanskrit_or_varna_terminology_visible": true,
+    "no_target_word_repeated_inside_option": true,
+    "no_dictionary_definition_restatement": true,
+    "no_arm_specific_syntax": true,
+    "same_punctuation_and_structure_all_arms": true,
+    "tag_max_words_each": 2,
+    "tags_lowercase_plain_register": true
+  },
+  "rater_facing_layout": {
+    "target_word": "<word>",
+    "dictionary_meaning": "<fixed dictionary_anchor — identical across arms>",
+    "context": "<fixed neutral object-function context — identical across arms>",
+    "prompt_primary": "Given the dictionary meaning of the object, which option gives a more fitting inner tendency or field around this object without changing what it is?",
+    "prompt_plain_variant": "Which option is more naturally suited to the object's ordinary function?",
+    "option_left": "<rendered template, tags from arm at left position>",
+    "option_right": "<rendered template, tags from arm at right position>"
+  },
+  "field_tag_source": "arm construction spec supplies the 4 tags per (word, arm); template is identical",
+  "style_audit_hook": "after rendering, all options feed the style-parity / style-tell / denotation-leakage / quality-parity audits; NO judging until all pass; global template-level fixes only",
+  "reproducibility": {"json_serializable": true, "seeds_recorded": true, "source_files_recorded": true, "hash_bound_at_evidence_freeze": true, "no_manual_mutation_after_hash": true},
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "audit_run": false, "llm_judges_run": false},
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["template spec draft, not frozen", "not evidence", "no stimuli generated"]
+}

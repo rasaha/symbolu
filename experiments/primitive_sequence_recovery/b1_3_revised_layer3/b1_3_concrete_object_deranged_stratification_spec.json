@@ -1,0 +1,91 @@
+{
+  "artifact": "b1_3_concrete_object_deranged_stratification_spec",
+  "status": "SPEC_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "revision": "replace single R_deranged with near/mid/far stratified deranged controls; move primary endpoint to A_real vs R_deranged_mid",
+  "rationale": "R_deranged tests object-specificity, but the semantic/object-function distance of the source word changes difficulty: far is easy (category-only win), near is hard (strongest specificity), mid is the best primary practical test.",
+  "deranged_strata": {
+    "R_deranged_near": {
+      "definition": "source word semantically/functionally close to target; same or adjacent concrete-object family; similar object-function where possible",
+      "examples_not_final": {"knife": ["needle", "scissors", "blade"], "cup": ["bowl", "bottle"], "bridge": ["road", "gate"]},
+      "role": "hard specificity test; strong-form success requires A_real > R_deranged_near"
+    },
+    "R_deranged_mid": {
+      "definition": "source word concrete and stable but different function family; not obviously opposite or absurd",
+      "examples_not_final": {"knife": ["rope", "key", "cup"], "cup": ["lamp", "box"], "wall": ["table", "rope"]},
+      "role": "PRIMARY endpoint control"
+    },
+    "R_deranged_far": {
+      "definition": "source word concrete but very different function family",
+      "examples_not_final": {"knife": ["pillow", "river", "mountain"], "cup": ["wall", "stone"], "bridge": ["bowl", "lamp"]},
+      "role": "easy control; beating far only = category-level, not word-specific"
+    }
+  },
+  "selection_method": {
+    "categories": "frozen concrete-object families from b1_3_human_modulation_concrete_object_candidate_wordlist.json",
+    "distance_metric": "WordNet path / Wu-Palmer similarity (or simple category-distance); thresholds recorded",
+    "deterministic": true,
+    "seeded_tie_breaks": true,
+    "frozen_before_judging": true,
+    "no_cherry_picking": true,
+    "no_source_selection_after_seeing_tags": true,
+    "no_comical_or_nonsensical_far_pairings": true
+  },
+  "matching_features": ["object family (frozen categories)", "WordNet path/WuP similarity", "object-function proximity", "length band where deterministic"],
+  "arm_list_after_revision": {
+    "replaced": "R_deranged",
+    "new_deranged_arms": ["R_deranged_near", "R_deranged_mid", "R_deranged_far"],
+    "retained": ["A_real", "R_scrambled", "R_random", "X_neutral", "semantic_only_baseline"],
+    "optional": ["R_semantic_near (only if not duplicative of R_deranged_near)", "R_varna_near (only if not duplicative)"]
+  },
+  "primary_endpoint": "A_real win-rate vs R_deranged_mid on the primary concrete-object set",
+  "required_secondary_deranged_endpoints": ["A_real vs R_deranged_far", "A_real vs R_deranged_near"],
+  "required_comparisons": [
+    "A_real_vs_R_deranged_mid",
+    "A_real_vs_R_deranged_far",
+    "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled",
+    "A_real_vs_R_random",
+    "A_real_vs_X_neutral",
+    "A_real_vs_semantic_only_baseline"
+  ],
+  "success_criteria": [
+    "A_real beats R_deranged_mid",
+    "A_real beats R_deranged_far",
+    "A_real beats R_scrambled",
+    "A_real beats R_random",
+    "A_real beats X_neutral",
+    "A_real beats or adds beyond semantic_only_baseline",
+    "A_real vs R_deranged_near reported as hard specificity test; strong form requires A_real > R_deranged_near",
+    "if A_real fails near but passes mid/far -> label weaker/category-level, do NOT overclaim word-specificity"
+  ],
+  "kill_criteria": [
+    "A_real ~ R_deranged_mid",
+    "A_real ~ R_deranged_far",
+    "R_scrambled matches or beats A_real",
+    "R_random matches or beats A_real",
+    "X_neutral matches or beats A_real",
+    "semantic_only_baseline matches or beats A_real",
+    "effect appears only against far deranged",
+    "near/mid/far sources cherry-picked after tag inspection",
+    "style or denotation leakage fails"
+  ],
+  "interpretation_labels": {
+    "strong_success": "A_real beats near, mid, and far",
+    "moderate_success": "A_real beats mid and far; near remains close",
+    "weak_category_only": "A_real beats far only",
+    "failure": "A_real fails against mid or far"
+  },
+  "statistical_reporting": {
+    "report_separately": ["near_deranged", "mid_deranged", "far_deranged", "gradient_pattern"],
+    "expected_gradient_if_real": "far strongest, mid moderate, near weakest",
+    "required_minimum": "A_real must beat mid AND far",
+    "red_flag": "flat or inverted gradient (e.g. beats near but not far)"
+  },
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "deranged_source_map_frozen": false, "llm_judges_run": false, "scoring_run": false},
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["stratification spec draft, not frozen", "not evidence", "no arms constructed", "no positive label earned"]
+}

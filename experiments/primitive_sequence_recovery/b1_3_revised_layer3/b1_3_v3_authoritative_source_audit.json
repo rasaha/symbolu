@@ -1,0 +1,54 @@
+{
+  "artifact": "b1_3_v3_authoritative_source_audit",
+  "status": "AUDIT_COMPLETE",
+  "evidence": false,
+  "verifies": "authoritative lexicon -> authoritative bridge pool -> v3 stimuli chain",
+  "provenance_chain": {
+    "authoritative_lexicon": "varna_lens/lexicon_authoritative_varna.json (AUTHORITATIVE)",
+    "authoritative_bridge_pool": "b1_3_authoritative_varna_bridge_pool.json",
+    "v3_stimuli": "b1_3_concrete_object_final_stimuli_draft_v3_authoritative.jsonl",
+    "generation_seed": "b1_3_concrete_object_stimgen_v3_authoritative"
+  },
+  "checks": {
+    "all_34_keys_covered": true,
+    "no_pole_flips_provenance_intact": true,
+    "pole_flip_keys": [],
+    "all_bridges_nonempty": true,
+    "bridge_status_declared": true,
+    "all_53_objects_route_authoritative": true,
+    "bad_route_objects": [],
+    "all_controls_present_per_object": true,
+    "missing_comparisons": {},
+    "no_denotation_leakage": true,
+    "no_arm_label_exposure_in_options": true,
+    "answer_fields_present_for_scorer": true,
+    "judge_facing_fields_present": true,
+    "blinding_supported": true,
+    "no_four_sphere_integration": true,
+    "n_records": 371,
+    "n_objects": 53,
+    "expected_records": 371
+  },
+  "decision": "V3_AUTHORITATIVE_SOURCE_AUDIT_PASS",
+  "hashes_sha256": {
+    "b1_3_authoritative_varna_bridge_pool.json": "7f6a6e34e4ae66190f8851d0cb4b321f151b22ffeb7b995a3b0a3c23981ff976",
+    "b1_3_concrete_object_final_stimuli_draft_v3_authoritative.jsonl": "1b869bf2ebd7a9d057580ac6bd4f48e24cd0c5a02c1875c566f8e20275171e02",
+    "b1_3_concrete_object_style_audit_report_v3_authoritative.json": "3ee562518de12bcaca33a688c67d43bc1bbb94540150ac4f71652dd714e754ca"
+  },
+  "v2_preserved": true,
+  "authoritative_lexicon_edited": false,
+  "evidence_freeze_declared": false,
+  "ran_model_or_scorer": false,
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "source-integrity audit only",
+    "not evidence",
+    "no scoring",
+    "no model call",
+    "no positive label earned"
+  ]
+}

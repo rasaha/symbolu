@@ -1,0 +1,75 @@
+{
+  "artifact": "b1_3_concrete_object_stimulus_generation_manifest_v2",
+  "status": "STIMULI_REGENERATED_V2_AUDITS_PASS_PRE_FREEZE",
+  "evidence": false,
+  "version": 2,
+  "supersedes": {
+    "stimuli": "b1_3_concrete_object_final_stimuli_draft.jsonl (v1, preserved as previous draft)",
+    "audit_report_json": "b1_3_concrete_object_style_audit_report.json (v1, preserved)",
+    "audit_report_md": "b1_3_concrete_object_style_audit_report.md (v1, preserved)",
+    "generation_manifest": "b1_3_concrete_object_stimulus_generation_manifest.json (v1, preserved)"
+  },
+  "generation_seed": "b1_3_concrete_object_stimgen_v2",
+  "determinism": "sha256-seeded, no random/Date; fully reproducible",
+  "global_register_polish_rule": {
+    "problem_fixed": "v1 reducer fell back to an out-of-band token (e.g. 'garrulous', 9 chars, from tower's gloss) when no in-band token existed",
+    "rule": "gloss reducer returns ONLY an in-band (4..8 char) plain-English token or None; NO out-of-band fallback; None -> caller backfills from the all-in-band global pool",
+    "constraints_enforced_in_normal_and_fallback": [
+      "prefer 4..6 char content words, else any 4..8",
+      "no tag longer than the 4..8 band (0 unavoidable over-band emitted; if ever needed, would be logged)",
+      "ban Sanskrit / source-marker terms",
+      "ban target/synonym leakage",
+      "dedupe within option",
+      "applied uniformly to A_real, deranged, scrambled, random, neutral, semantic baseline",
+      "no per-item hand tuning"
+    ]
+  },
+  "outputs": {
+    "stimuli_draft_v2": {"path": "b1_3_concrete_object_final_stimuli_draft_v2.jsonl",
+      "sha256": "20f1ab619e1bc5ef5f06bb9f1b42e1221e941636e8387bd78fc853b0b64a04e9"},
+    "style_audit_report_v2_json": {"path": "b1_3_concrete_object_style_audit_report_v2.json",
+      "sha256": "f27666313692a325f239aeaea901b16c2318868a2121410c03a6288efd4f273a"},
+    "style_audit_report_v2_md": {"path": "b1_3_concrete_object_style_audit_report_v2.md"}
+  },
+  "n_stimuli_records": 371,
+  "n_targets": 53,
+  "comparisons_generated": [
+    "A_real_vs_R_deranged_mid", "A_real_vs_R_deranged_far", "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled", "A_real_vs_R_random", "A_real_vs_X_neutral", "A_real_vs_semantic_only_baseline"
+  ],
+  "audit_results": {
+    "style_parity": {"pass": true, "mean_abs_charlen_diff": 1.871},
+    "style_tell": {"pass": true, "balanced_accuracy": 0.5318, "threshold_draft": 0.55},
+    "denotation_leakage": {"pass": true},
+    "quality_parity": {"pass": true},
+    "semantic_baseline": {"pass": true},
+    "forbidden_token_scan": {"pass": true, "n_sanskrit": 0, "n_over_band": 0, "distinct_over_band": []},
+    "duplicate_tag_scan": {"pass": true, "options_with_duplicates": 0},
+    "tag_length_parity_by_arm": {"pass": true, "max_minus_min": 0.557,
+      "per_arm_mean_tag_len": {"A_real": 5.288, "R_deranged_mid": 5.373, "R_deranged_far": 5.193,
+        "R_deranged_near": 5.288, "R_scrambled": 5.288, "R_random": 5.368, "X_neutral": 5.75,
+        "semantic_only_baseline": 5.642}},
+    "overall_pass": true
+  },
+  "garrulous_verification": {"over_band_tokens_in_v2": 0, "garrulous_occurrences": 0,
+    "tower_a_real_v2": ["truth", "giving", "malice", "spell"]},
+  "decision": "GLOBAL_REGISTER_POLISH_PASS_READY_FOR_FREEZE_REVIEW",
+  "evidence_judge_run": false,
+  "scoring_run": false,
+  "evidence_freeze_declared": false,
+  "prior_results_preserved": {
+    "B1.1": "LLM null (RANDOM_OR_SCRAMBLED_MATCHES)", "B1.2_B1.3_automated": "nulls (scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED", "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)", "Track_F": "CORRECTNESS_DEGRADED", "Track_B": "BLOCKED"
+  },
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "note_for_freeze": "the freeze review must now bind the v2 stimuli + v2 audit report (these hashes) instead of the v1 versions",
+  "remaining_blockers": [
+    "final judge model list", "re-bind v2 hashes in updated freeze manifest",
+    "re-run freeze review -> operator confirmation -> explicit EVIDENCE_FREEZE", "actual evidence judge run"
+  ],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["v2 draft stimuli + mechanical audits only", "not evidence", "no judge run", "no scoring", "no positive label earned"]
+}

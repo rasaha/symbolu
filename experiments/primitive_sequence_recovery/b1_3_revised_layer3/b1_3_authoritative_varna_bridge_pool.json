@@ -1,0 +1,330 @@
+{
+  "artifact": "b1_3_authoritative_varna_bridge_pool",
+  "source_lexicon": "varna_lens/lexicon_authoritative_varna.json",
+  "source_status": "AUTHORITATIVE",
+  "source_provenance": "Sanskrit_letters_full.docx (user-confirmed AUTHORITATIVE set)",
+  "bridge_status": "source_preserved_counter_rewritten",
+  "local_rewrite_note": "binding_bridge/liberating_bridge = authoritative english_sharpened with Sanskrit-label parentheticals stripped for the local experimental packet; pole direction preserved (binding_state->binding_bridge, liberating_state->liberating_bridge); no flips by construction",
+  "not_validated_meaning": true,
+  "not_ontological_evidence": true,
+  "n_consonants": 34,
+  "entries": [
+    {
+      "lexicon_key": "ka",
+      "varna": "Ka",
+      "binding_bridge": "expectant hope-clinging",
+      "liberating_bridge": "release of expectation",
+      "source_binding_english": "Hope",
+      "source_liberating_english": "Detachment",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "kha",
+      "varna": "Kha",
+      "binding_bridge": "anxious worry",
+      "liberating_bridge": "trust that dissolves worry",
+      "source_binding_english": "Worry",
+      "source_liberating_english": "Trust",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ga",
+      "varna": "Ga",
+      "binding_bridge": "Action",
+      "liberating_bridge": "Stillness",
+      "source_binding_english": "Action",
+      "source_liberating_english": "Stillness",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "gha",
+      "varna": "Gha",
+      "binding_bridge": "possessive attachment",
+      "liberating_bridge": "non-possessive openness",
+      "source_binding_english": "Attachment",
+      "source_liberating_english": "Non-attachment",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "nga",
+      "varna": "Ṅa",
+      "binding_bridge": "ostentatious pride",
+      "liberating_bridge": "modesty countering ostentation",
+      "source_binding_english": "Vanity",
+      "source_liberating_english": "Humility",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ca",
+      "varna": "Ca",
+      "binding_bridge": "confused non-discernment",
+      "liberating_bridge": "discriminative clarity from confusion",
+      "source_binding_english": "lack of discrimination / confused discernment",
+      "source_liberating_english": "conscience / discriminative clarity",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "cha",
+      "varna": "Cha",
+      "binding_bridge": "Nervous breakdown",
+      "liberating_bridge": "Emotional firmness",
+      "source_binding_english": "Nervous breakdown",
+      "source_liberating_english": "Emotional firmness",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ja",
+      "varna": "Ja",
+      "binding_bridge": "I-centred ego",
+      "liberating_bridge": "ego-dissolution countering I-ness",
+      "source_binding_english": "ego inflation / I-centeredness",
+      "source_liberating_english": "humility / ego-softening",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "jha",
+      "varna": "Jha",
+      "binding_bridge": "acquisitive greed",
+      "liberating_bridge": "contentment/non-possession",
+      "source_binding_english": "Greed / Avarice",
+      "source_liberating_english": "Contentment / Non-possession",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "nya",
+      "varna": "Ña",
+      "binding_bridge": "Hypocrisy",
+      "liberating_bridge": "Straightforwardness / Integrity",
+      "source_binding_english": "Hypocrisy",
+      "source_liberating_english": "Straightforwardness / Integrity",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "tta",
+      "varna": "Ṭa",
+      "binding_bridge": "Overstatement",
+      "liberating_bridge": "Silence / Objectivity",
+      "source_binding_english": "Overstatement",
+      "source_liberating_english": "Silence / Objectivity",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ttha",
+      "varna": "Ṭha",
+      "binding_bridge": "repentant remorse",
+      "liberating_bridge": "self-forgiveness/self-acceptance",
+      "source_binding_english": "Repentance",
+      "source_liberating_english": "Forgiveness / Self-acceptance",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "dda",
+      "varna": "Ḍa",
+      "binding_bridge": "shame/shyness",
+      "liberating_bridge": "self-acceptance/poise countering shame",
+      "source_binding_english": "Shyness",
+      "source_liberating_english": "Fearlessness / Self-acceptance",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ddha",
+      "varna": "Ḍha",
+      "binding_bridge": "malice/slander",
+      "liberating_bridge": "compassion transmuting malice",
+      "source_binding_english": "Sadistic cruelty",
+      "source_liberating_english": "Compassion",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "nna",
+      "varna": "Ṇa",
+      "binding_bridge": "envy",
+      "liberating_bridge": "sympathetic joy at others' good",
+      "source_binding_english": "Envy",
+      "source_liberating_english": "Sympathetic joy",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ta",
+      "varna": "Ta",
+      "binding_bridge": "torpor/deep sleep",
+      "liberating_bridge": "alert wakefulness from torpor",
+      "source_binding_english": "Inertia, deep sleep",
+      "source_liberating_english": "Awakening / Alertness",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "tha",
+      "varna": "Tha",
+      "binding_bridge": "melancholy",
+      "liberating_bridge": "joy/affection",
+      "source_binding_english": "Melancholy",
+      "source_liberating_english": "Joy / Affection",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "da",
+      "varna": "Da",
+      "binding_bridge": "irritable peevishness",
+      "liberating_bridge": "forbearance/patience toward provocation",
+      "source_binding_english": "Peevishness / Irritability",
+      "source_liberating_english": "Patience / Forgiveness",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "dha",
+      "varna": "Dha",
+      "binding_bridge": "restless craving",
+      "liberating_bridge": "contented renunciation countering craving",
+      "source_binding_english": "Craving",
+      "source_liberating_english": "Renunciation / Contentment",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "na",
+      "varna": "Na",
+      "binding_bridge": "delusive clinging",
+      "liberating_bridge": "discerning detachment from delusion",
+      "source_binding_english": "Blind attachment",
+      "source_liberating_english": "Discriminative detachment",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "pa",
+      "varna": "Pa",
+      "binding_bridge": "aversive hatred",
+      "liberating_bridge": "friendliness/warm approach",
+      "source_binding_english": "Hatred / Revulsion",
+      "source_liberating_english": "Friendliness / Affection",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "pha",
+      "varna": "Pha",
+      "binding_bridge": "fear",
+      "liberating_bridge": "fearlessness countering fear",
+      "source_binding_english": "Fear",
+      "source_liberating_english": "Fearlessness",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ba",
+      "varna": "Ba",
+      "binding_bridge": "Indifference",
+      "liberating_bridge": "Respect / Reverence",
+      "source_binding_english": "Indifference",
+      "source_liberating_english": "Respect / Reverence",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "bha",
+      "varna": "Bha",
+      "binding_bridge": "deluded stupor",
+      "liberating_bridge": "lucid awareness from delusion",
+      "source_binding_english": "Deluded obsession",
+      "source_liberating_english": "Awareness / awakening",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ma",
+      "varna": "Ma",
+      "binding_bridge": "indulgence / annihilating collapse",
+      "liberating_bridge": "disciplined restraint / containment",
+      "source_binding_english": "indulgence / annihilating collapse",
+      "source_liberating_english": "disciplined restraint / containment",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ya",
+      "varna": "Ya",
+      "binding_bridge": "diffidence/self-doubt",
+      "liberating_bridge": "self-confidence countering diffidence",
+      "source_binding_english": "Lack of confidence",
+      "source_liberating_english": "Confidence",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ra",
+      "varna": "Ra",
+      "binding_bridge": "annihilation-thought / defeatist destruction",
+      "liberating_bridge": "vitality / creative fire",
+      "source_binding_english": "annihilation-thought / defeatist destruction",
+      "source_liberating_english": "vitality / creative fire",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "la",
+      "varna": "La",
+      "binding_bridge": "ruthless harshness",
+      "liberating_bridge": "tender gentleness transmuting harshness",
+      "source_binding_english": "Cruelty",
+      "source_liberating_english": "Compassion / Gentleness",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "va",
+      "varna": "Va",
+      "binding_bridge": "deviation from original stance / loss of sustaining order",
+      "liberating_bridge": "original stance, sustaining righteousness / liquid coherence",
+      "source_binding_english": "deviation from original stance / loss of sustaining order",
+      "source_liberating_english": "original stance, sustaining righteousness / liquid coherence",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "sha",
+      "varna": "Śa",
+      "binding_bridge": "rajasic material acquisitiveness",
+      "liberating_bridge": "directed purposeful accomplishment",
+      "source_binding_english": "Restless acquisition / material greed (rajasic overdrive)",
+      "source_liberating_english": "Directed energy / purposeful material pursuit (dynamic accomplishment)",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ssa",
+      "varna": "Ṣa",
+      "binding_bridge": "sensory desire",
+      "liberating_bridge": "grounded transmutation of desire",
+      "source_binding_english": "physical desire / inertia / confusion",
+      "source_liberating_english": "Transmutation of desire / grounded containment",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "sa",
+      "varna": "Sa",
+      "binding_bridge": "premature escapist withdrawal",
+      "liberating_bridge": "liberation/clarity",
+      "source_binding_english": "Escapism (premature detachment / static withdrawal)",
+      "source_liberating_english": "liberation / clarity",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ha",
+      "varna": "Ha",
+      "binding_bridge": "obscuring ignorance/inertia",
+      "liberating_bridge": "spiritual knowledge",
+      "source_binding_english": "Darkness / Night / Inertia",
+      "source_liberating_english": "Spiritual knowledge",
+      "bridge_status": "source_preserved_counter_rewritten"
+    },
+    {
+      "lexicon_key": "ksha",
+      "varna": "Kṣa",
+      "binding_bridge": "dogmatic false knowledge",
+      "liberating_bridge": "mundane/relative knowledge",
+      "source_binding_english": "False knowledge, Dogma",
+      "source_liberating_english": "Mundane knowledge",
+      "bridge_status": "source_preserved_counter_rewritten"
+    }
+  ],
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "authoritative-sourced bridge pool",
+    "not validated meaning",
+    "not ontological evidence",
+    "no lexicon edit"
+  ]
+}

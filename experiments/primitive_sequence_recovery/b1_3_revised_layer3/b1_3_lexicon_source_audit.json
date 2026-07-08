@@ -1,0 +1,385 @@
+{
+  "artifact": "b1_3_lexicon_source_audit",
+  "status": "AUDIT_COMPLETE",
+  "evidence": false,
+  "question": "Was B1.3 v2 built on the authoritative varṇa lexicon, and does the bridge pool it WAS built on faithfully represent it?",
+  "provenance": {
+    "b1_3_v2_built_on": "b1_2_varna_bridge_pool.json (via ArmBuilder)",
+    "bridge_pool_source_lexicon": "b1_1_experimental_contrastive_lexicon_draft.json",
+    "bridge_pool_qualification": "FALLBACK_QUALIFIED (generated under weaker LOCAL lexical fallback; real embedding gate BLOCKED_DEPENDENCY_UNAVAILABLE)",
+    "authoritative_lexicon": "varna_lens/lexicon_authoritative_varna.json (source: Sanskrit_letters_full.docx, user-confirmed AUTHORITATIVE)",
+    "built_on_authoritative": false
+  },
+  "pole_direction_check": "PRESERVED across all 34 consonants — no binding/liberating SWAP (2 heuristic flip-flags were dda=false-positive and ha=construct-reframe, not swaps)",
+  "construct_fidelity": {
+    "faithful_paraphrase": 29,
+    "construct_drift": 5,
+    "pole_flip": 0
+  },
+  "construct_drift_varnas": [
+    "ca",
+    "va",
+    "ha",
+    "ra",
+    "sa"
+  ],
+  "objects_affected": "28 of 53 primary concrete objects route through >=1 construct-drifted varṇa (ca/va/ha/ra/sa)",
+  "comparison": [
+    {
+      "varna": "ka",
+      "auth_binding": "Hope",
+      "auth_liberating": "Detachment",
+      "bp_binding": "hope as grasping / clinging to a specific outcome",
+      "bp_liberating": "forward-orientation held without attachment to the outcome",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "kha",
+      "auth_binding": "Worry",
+      "auth_liberating": "Trust",
+      "bp_binding": "anxious impersonal rumination over open contingencies",
+      "bp_liberating": "composed openness within unresolved impersonal uncertainty",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ga",
+      "auth_binding": "Action",
+      "auth_liberating": "Stillness",
+      "bp_binding": "striving driven by restlessness that cannot stop",
+      "bp_liberating": "effort that can rest — poised, alert stillness when action completes",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "gha",
+      "auth_binding": "Attachment",
+      "auth_liberating": "Non-attachment",
+      "bp_binding": "love owned as possession and mine-ness",
+      "bp_liberating": "care that holds the loved on an open hand",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "nga",
+      "auth_binding": "Vanity",
+      "auth_liberating": "Humility",
+      "bp_binding": "self displayed and performed for others' eyes",
+      "bp_liberating": "conduct that stands without outward performance",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ca",
+      "auth_binding": "lack of discrimination / confused discernment",
+      "auth_liberating": "conscience / discriminative clarity",
+      "bp_binding": "discernment hardening into judgment / separation-pride",
+      "bp_liberating": "falsehood-discerning insight without egoic superiority",
+      "pole_direction": "preserved",
+      "verdict": "CONSTRUCT_DRIFT",
+      "drift_note": "auth binding = confused / lack-of-discrimination; BP binding = discernment hardened into judgment/pride (different distortion)"
+    },
+    {
+      "varna": "cha",
+      "auth_binding": "Nervous breakdown",
+      "auth_liberating": "Emotional firmness",
+      "bp_binding": "collapse of mental function under strain",
+      "bp_liberating": "steadiness that keeps function intact under load",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ja",
+      "auth_binding": "ego inflation / I-centeredness",
+      "auth_liberating": "humility / ego-softening",
+      "bp_binding": "the inflated 'I did / I control this'",
+      "bp_liberating": "agency exercised without inflating the I",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "jha",
+      "auth_binding": "Greed / Avarice",
+      "auth_liberating": "Contentment / Non-possession",
+      "bp_binding": "hoarding accumulation without limit",
+      "bp_liberating": "sufficiency — appetite that releases at enough",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "nya",
+      "auth_binding": "Hypocrisy",
+      "auth_liberating": "Straightforwardness / Integrity",
+      "bp_binding": "concealment — inner and outer diverging",
+      "bp_liberating": "transparency — inner intent and outer act coincide",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "tta",
+      "auth_binding": "Overstatement",
+      "auth_liberating": "Silence / Objectivity",
+      "bp_binding": "garrulous exaggeration beyond the warranted",
+      "bp_liberating": "measured speech saying only what is warranted",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ttha",
+      "auth_binding": "Repentance",
+      "auth_liberating": "Forgiveness / Self-acceptance",
+      "bp_binding": "remorse that grips and repeats over one's own past act",
+      "bp_liberating": "self-directed release of remorse into acceptance",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "dda",
+      "auth_binding": "Shyness",
+      "auth_liberating": "Fearlessness / Self-acceptance",
+      "bp_binding": "action inhibited by others' regard",
+      "bp_liberating": "acting unhindered by social shame",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ddha",
+      "auth_binding": "Sadistic cruelty",
+      "auth_liberating": "Compassion",
+      "bp_binding": "malice — sadistic cruelty toward the maligned",
+      "bp_liberating": "compassion that shields the maligned",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "nna",
+      "auth_binding": "Envy",
+      "auth_liberating": "Sympathetic joy",
+      "bp_binding": "the sting at another's success",
+      "bp_liberating": "sympathetic gladness at another's fortune",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ta",
+      "auth_binding": "Inertia, deep sleep",
+      "auth_liberating": "Awakening / Alertness",
+      "bp_binding": "dullness, torpor, deep sleep of mind",
+      "bp_liberating": "alert wakefulness rising from torpor",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "tha",
+      "auth_binding": "Melancholy",
+      "auth_liberating": "Joy / Affection",
+      "bp_binding": "dejection that sinks one's own mood",
+      "bp_liberating": "warm buoyancy lifting one's own dejection",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "da",
+      "auth_binding": "Peevishness / Irritability",
+      "auth_liberating": "Patience / Forgiveness",
+      "bp_binding": "reactive irritability discharged at others",
+      "bp_liberating": "forbearance that absorbs provocation",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "dha",
+      "auth_binding": "Craving",
+      "auth_liberating": "Renunciation / Contentment",
+      "bp_binding": "limitless thirst to acquire",
+      "bp_liberating": "the acquisitive thirst quenched at its root",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "na",
+      "auth_binding": "Blind attachment",
+      "auth_liberating": "Discriminative detachment",
+      "bp_binding": "infatuation that fixates on a compulsive attraction",
+      "bp_liberating": "de-fascination from false attraction",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "pa",
+      "auth_binding": "Hatred / Revulsion",
+      "auth_liberating": "Friendliness / Affection",
+      "bp_binding": "revulsion turned against another",
+      "bp_liberating": "goodwill that dissolves revulsion",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "pha",
+      "auth_binding": "Fear",
+      "auth_liberating": "Fearlessness",
+      "bp_binding": "collapse or flight before danger",
+      "bp_liberating": "steadiness meeting a genuine threat",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ba",
+      "auth_binding": "Indifference",
+      "auth_liberating": "Respect / Reverence",
+      "bp_binding": "neglect of what actually has value",
+      "bp_liberating": "regard that recognizes and attends to worth",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "bha",
+      "auth_binding": "Deluded obsession",
+      "auth_liberating": "Awareness / awakening",
+      "bp_binding": "hypnotic entrancement, loss of common sense",
+      "bp_liberating": "breaking the entrancing spell into clear sense",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ma",
+      "auth_binding": "indulgence / annihilating collapse",
+      "auth_liberating": "disciplined restraint / containment",
+      "bp_binding": "giving latitude to the point of dissolution",
+      "bp_liberating": "disciplined containment that holds form",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ya",
+      "auth_binding": "Lack of confidence",
+      "auth_liberating": "Confidence",
+      "bp_binding": "self-doubt that cannot commit",
+      "bp_liberating": "self-efficacy to commit and to rely",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ra",
+      "auth_binding": "annihilation-thought / defeatist destruction",
+      "auth_liberating": "vitality / creative fire",
+      "bp_binding": "rajasic activation driven by compulsion, desire, projection, or destructive collapse",
+      "bp_liberating": "directed energy without bondage",
+      "pole_direction": "preserved",
+      "verdict": "CONSTRUCT_DRIFT",
+      "drift_note": "auth binding = annihilation-thought / defeatist destruction; BP binding adds compulsion / desire / projection"
+    },
+    {
+      "varna": "la",
+      "auth_binding": "Cruelty",
+      "auth_liberating": "Compassion / Gentleness",
+      "bp_binding": "physical harm inflicted on the weak",
+      "bp_liberating": "compassion that protects the physically vulnerable",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "va",
+      "auth_binding": "deviation from original stance / loss of sustaining order",
+      "auth_liberating": "original stance, sustaining righteousness / liquid coherence",
+      "bp_binding": "accepting-as-true without sufficient discernment",
+      "bp_liberating": "truth-assent purified by discernment, installing only what is non-bindingly recognized",
+      "pole_direction": "preserved",
+      "verdict": "CONSTRUCT_DRIFT",
+      "drift_note": "auth axis = Dharma / sustaining-order / righteousness; BP reframes axis to truth-assent / discernment"
+    },
+    {
+      "varna": "sha",
+      "auth_binding": "Restless acquisition / material greed (rajasic overdrive)",
+      "auth_liberating": "Directed energy / purposeful material pursuit (dynamic accomplishment)",
+      "bp_binding": "worldly purpose possessed as acquisition, status, or control",
+      "bp_liberating": "purposeful action without possessive bondage",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "ssa",
+      "auth_binding": "physical desire / inertia / confusion",
+      "auth_liberating": "Transmutation of desire / grounded containment",
+      "bp_binding": "sensory craving bound to inertia",
+      "bp_liberating": "raw desire transmuted into grounded, contained drive",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    },
+    {
+      "varna": "sa",
+      "auth_binding": "Escapism (premature detachment / static withdrawal)",
+      "auth_liberating": "liberation / clarity",
+      "bp_binding": "sattvic clarity/order owned as purity, superiority, or attachment to harmony",
+      "bp_liberating": "clarity without attachment to clarity",
+      "pole_direction": "preserved",
+      "verdict": "CONSTRUCT_DRIFT",
+      "drift_note": "auth binding = Escapism / premature-detachment / static-withdrawal; BP binding = sattvic-clarity-owned-as-superiority"
+    },
+    {
+      "varna": "ha",
+      "auth_binding": "Darkness / Night / Inertia",
+      "auth_liberating": "Spiritual knowledge",
+      "bp_binding": "higher knowledge owned as spiritual identity or subtle pride",
+      "bp_liberating": "realized knowing without ownership",
+      "pole_direction": "preserved",
+      "verdict": "CONSTRUCT_DRIFT",
+      "drift_note": "auth binding = Darkness / Night / Inertia (tamas); BP binding = higher-knowledge-owned-as-pride (different construct)"
+    },
+    {
+      "varna": "ksha",
+      "auth_binding": "False knowledge, Dogma",
+      "auth_liberating": "Mundane knowledge",
+      "bp_binding": "structured knowledge owned as control, dogma, or intellectual identity",
+      "bp_liberating": "instrumental knowledge released from possession",
+      "pole_direction": "preserved",
+      "verdict": "FAITHFUL_PARAPHRASE",
+      "drift_note": null
+    }
+  ],
+  "decision": "LEXICON_SOURCE_REBUILD_ON_AUTHORITATIVE_REQUIRED",
+  "decision_rationale": "The bridge pool is self-labeled FALLBACK_QUALIFIED and derives from an experimental draft, not the authoritative lexicon; an authoritative lexicon exists; 5 varṇas show genuine construct drift touching 28/53 objects. Freezing the primary evidence line on a fallback source when an authoritative source is available is not defensible. NOTE: pole direction is intact, so the current study is not wrong-direction, and rebuild is UNLIKELY to change the outcome (semantic baseline still names object-function; prior still low) — rebuild is about using the correct source, not improving A_real odds.",
+  "next_step": "Build an authoritative-sourced pool from lexicon_authoritative_varna.json binding_state/liberating_state, regenerate B1.3 stimuli (v3-authoritative) with the same deterministic pipeline + global register polish, re-audit, then freeze review.",
+  "evidence_freeze_declared": false,
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "audit only",
+    "not evidence",
+    "no lexicon edit",
+    "no v2 change",
+    "no positive label earned"
+  ]
+}

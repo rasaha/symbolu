@@ -1,0 +1,85 @@
+{
+  "artifact": "b1_3_concrete_object_llm_scoring_script_manifest",
+  "status": "SCORING_SCRIPT_IMPLEMENTED_TESTED_NOT_RUN_ON_EVIDENCE",
+  "evidence_freeze_declared": false,
+  "evidence_judge_run": false,
+  "real_judge_outputs_scored": false,
+  "prior_results_preserved": true,
+  "implements": "b1_3_concrete_object_llm_scoring_contract_v2.json",
+  "files": {
+    "scorer": {"path": "score_b1_3_concrete_object_llm.py",
+      "sha256": "dbdf6f4b36fe70a175a428caac048fb0e492dc683331c4cf5d105195d38fe8d7"},
+    "tests": {"path": "test_score_b1_3_concrete_object_llm.py",
+      "sha256": "6b9fc03a0b9d315384225fe65158cdf1809ee6bd768662f17ac327513a74c41c"},
+    "implementation_memo": {"path": "B1_3_CONCRETE_OBJECT_LLM_SCORING_SCRIPT_IMPLEMENTATION.md"}
+  },
+  "cli_inputs": ["--stimuli", "--judge-outputs", "--style-audit", "--contract", "--out-json", "--out-md"],
+  "required_judge_fields": ["item_id", "comparison_id", "arm_left", "arm_right", "selected_option"],
+  "supported_judge_fields": ["target_word", "primary_or_secondary_or_diagnostic", "object_family", "model_id",
+    "parse_status", "invalid_flag", "deranged_stratum", "confidence", "option_left", "option_right"],
+  "required_comparisons": [
+    "A_real_vs_R_deranged_mid", "A_real_vs_R_deranged_far", "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled", "A_real_vs_R_random", "A_real_vs_X_neutral", "A_real_vs_semantic_only_baseline"],
+  "primary_endpoint": "A_real win-rate vs R_deranged_mid on the primary concrete-object set",
+  "statistical_method": {
+    "decision_interval": "Wilson score (lower bound > 0.50 rule)",
+    "reported_exact_interval": "Clopper-Pearson via regularized incomplete beta (Lentz CF) inverted by bisection",
+    "validated_against_references": {"CP_8_of_10": [0.4439, 0.9748], "Wilson_8_of_10": [0.4902, 0.9433],
+      "CP_0_of_10": [0.0, 0.3085], "CP_10_of_10": [0.6915, 1.0], "beta_cdf_half_a_a": 0.5},
+    "p_values": "deterministic normal-approx two-sided binomial vs 0.5 (ordering/reporting aid)",
+    "multiplicity_correction": "Holm-Bonferroni across required comparisons, monotonic"
+  },
+  "thresholds_encoded": {
+    "ci_lower_threshold": 0.50, "directional_threshold": 0.50, "invalid_rate_cap": 0.10,
+    "model_family_dominance_frac": 0.60, "baseline_tie_guard": 0.45
+  },
+  "terminal_labels": [
+    "LLM_OBJECT_MODULATION_SIGNAL_EARNED_STRONG",
+    "LLM_OBJECT_MODULATION_SIGNAL_EARNED_CATEGORY_LIMITED",
+    "LLM_OBJECT_MODULATION_NULL",
+    "LLM_OBJECT_MODULATION_STYLE_CONFOUNDED",
+    "LLM_OBJECT_MODULATION_SEMANTIC_BASELINE_EXPLAINS",
+    "LLM_OBJECT_MODULATION_INVALID_RUN"
+  ],
+  "decision_order": [
+    "INVALID_RUN (no judgments / missing required comparison / invalid rate > 10%)",
+    "STYLE_CONFOUNDED (any pre-judge audit did not pass)",
+    "SEMANTIC_BASELINE_EXPLAINS (baseline matches or beats A_real)",
+    "NULL (fails mid or far lower-CI, any directional control, or single-model-family dominance)",
+    "STRONG (beats near, mid, far + controls + baseline)",
+    "CATEGORY_LIMITED (beats mid/far + controls/baseline but not near)"
+  ],
+  "report_outputs": ["terminal_label", "decision_reasons", "primary_endpoint", "comparison_results",
+    "near_mid_far_gradient", "model_family_breakdown", "single_model_family_dominates", "item_family_breakdown",
+    "secondary_diagnostic_results", "invalid_summary", "audit_summary", "threshold_summary", "warnings", "inputs"],
+  "tests": {
+    "command": "python3 test_score_b1_3_concrete_object_llm.py",
+    "result": "10/10 PASS",
+    "fixtures": ["strong", "category_limited", "semantic_baseline_explains", "null_mid_fail",
+      "model_family_dominance_null", "invalid_run_rate", "invalid_run_missing_comparison",
+      "style_confounded", "selection_mapping", "ci_and_holm_helpers"],
+    "all_fixtures_synthetic": true
+  },
+  "limitations": [
+    "model-family dominance uses model_id as family key; final judge list must supply meaningful family ids",
+    "p-values are normal-approx for Holm ordering; the DECISION uses the (exact-capable) CI lower-bound rule",
+    "encoded thresholds are frozen constants; changing them post-freeze spawns a new version"
+  ],
+  "remaining_blockers": [
+    "final judge model list (pinned identifiers + temperature + run config), hash-bound",
+    "re-bind all artifact hashes (incl. scorer + tests) in updated freeze manifest",
+    "re-run freeze review -> operator confirmation -> explicit EVIDENCE_FREEZE",
+    "actual evidence judge run + real scoring"
+  ],
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL",
+    "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "prior_results": {
+    "B1.1": "LLM null (RANDOM_OR_SCRAMBLED_MATCHES)", "B1.2_B1.3_automated": "nulls (scrambled~real 0.967)",
+    "B1.3_register_field": "CLOSED", "B1.4_vritti": "CLOSED",
+    "Track_G": "RANDOM_POLARITY_EXPLAINS (1fe5562)", "Track_F": "CORRECTNESS_DEGRADED", "Track_B": "BLOCKED"
+  },
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["scorer implemented + unit-tested only", "not evidence", "no judge run", "no real scoring",
+    "no positive label earned", "scorer earns no label by itself"]
+}

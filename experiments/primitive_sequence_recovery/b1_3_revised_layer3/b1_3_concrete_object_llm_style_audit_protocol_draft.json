@@ -1,0 +1,70 @@
+{
+  "artifact": "b1_3_concrete_object_llm_style_audit_protocol_draft",
+  "status": "PROTOCOL_DRAFT_NOT_FROZEN_NOT_RUN",
+  "evidence": false,
+  "purpose": "Gate the concrete-object LLM judged-modulation study BEFORE any evidence judging: ensure a win reflects object-function modulation-fit, not prose/style/denotation/quality advantage in A_real.",
+  "stimulus_format": "Within the fixed meaning, this object is modulated by [tag1], [tag2], [tag3], and [tag4].",
+  "audits_required": [
+    "style_parity_audit",
+    "style_tell_audit",
+    "denotation_leakage_audit",
+    "quality_parity_audit"
+  ],
+  "style_parity_audit": {
+    "checks": [
+      "same number of tags (4) in every arm",
+      "similar tag length across arms",
+      "similar abstraction/concreteness across arms",
+      "no visible arm markers",
+      "no Sanskrit/varṇa vocabulary",
+      "no poetic language",
+      "no denotation change",
+      "no arm-specific explanation advantage"
+    ]
+  },
+  "style_tell_audit": {
+    "procedure": "an auditor (or LLM style-tell judge) attempts to identify which option is A_real from surface style alone, arm labels hidden",
+    "metric": "balanced identification accuracy of A_real from style",
+    "style_tell_threshold_draft": 0.55,
+    "fail_rule": "if A_real identifiable above threshold by style -> STOP or revise GLOBALLY before evidence judging",
+    "no_per_item_hand_rescue": true,
+    "global_template_fixes_only_before_freeze": true,
+    "note": "DRAFT threshold, revisable until explicit EVIDENCE_FREEZE"
+  },
+  "leakage_checks": {
+    "no_option_changes_the_object": true,
+    "no_option_introduces_function_not_in_anchor": true,
+    "no_option_uses_target_word_or_obvious_synonym_as_tag": true,
+    "no_arm_reveals_dictionary_meaning_more_directly": true,
+    "fail_rule": "any leakage -> global fix or exclusion before freeze"
+  },
+  "quality_parity_checks": {
+    "grammar_parity": true,
+    "length_parity": true,
+    "tag_clarity": true,
+    "no_nonsense_control_arms": true,
+    "no_A_real_fluency_advantage": true,
+    "no_control_arm_degradation": true,
+    "rationale": "controls must be plausible, not straw men; a degraded control would manufacture a false A_real win"
+  },
+  "pass_fail_rules": {
+    "all_audits_must_pass_before_evidence_judging": true,
+    "style_tell_pass": "A_real style-identification balanced accuracy <= style_tell_threshold_draft (0.55)",
+    "leakage_pass": "all leakage_checks satisfied",
+    "quality_parity_pass": "all quality_parity_checks satisfied",
+    "on_fail": "STOP or global template-level revision; NO per-item hand rescue; re-audit before proceeding"
+  },
+  "order_of_operations": [
+    "1. build arms per arm-construction spec",
+    "2. render stimuli in the fixed 4-tag format",
+    "3. run style_parity + style_tell + denotation_leakage + quality_parity audits",
+    "4. only if ALL pass (and after EVIDENCE_FREEZE) -> proceed to evidence judging",
+    "5. any fail -> global fix, re-audit; never per-item rescue"
+  ],
+  "evidence_freeze_declared": false,
+  "run_state": {"final_stimuli_generated": false, "audit_run": false, "llm_judges_run": false},
+  "allowed_future_label": "LLM_OBJECT_MODULATION_SIGNAL",
+  "disallowed_labels": ["HUMAN_PROPENSITY_MODULATION_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "LLM_PROPENSITY_FIELD_DISCRIMINATION", "LIMITED_GENERATION_UTILITY", "MAPPING_FIDELITY_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["protocol draft, not frozen", "not evidence", "no audit run", "no stimuli generated", "no positive label earned"]
+}

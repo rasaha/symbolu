@@ -1,0 +1,16 @@
+{
+  "artifact": "g_audit_report",
+  "status": "STOP_NOW_G_IMPLEMENTATION_BLOCKED",
+  "reason": "hard gate(s) failed after build",
+  "stop_now_flags": [
+    "R3_STYLE_TELL_FAILED"
+  ],
+  "evidence": false,
+  "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES (unchanged)",
+  "track_b": "BLOCKED",
+  "extra": {
+    "style_balanced_accuracy": 0.5625,
+    "independence_ok": true,
+    "leak_hits": []
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "artifact": "b1_3_orthographic_latent_ablation_prereg",
+  "status": "PRE_REGISTRATION_ONLY_NOT_RUN",
+  "evidence_freeze_declared": false,
+  "run_completed": false,
+  "supersedes_active_b1_3": false,
+  "active_b1_3_v2_evidence_path": "UNCHANGED (spoken-only; freeze-ready; not touched by this ablation)",
+  "lexicon_changed": false,
+  "decision_by_operator": "pre-registered ablation chosen over modifying B1.3 (keeps v2 evidence path intact)",
+  "motivation": "Objection: spoken-only routing ignores word-INITIAL silent consonants. Operator rule under test: a word-initial silent consonant routes to its varṇa's LIBERATING pole. Ad hoc validation (initial-silent-liberating) conformed on ~1/22 words and inverted on 5 -> LOW prior. This pre-registers a fair, uniform test with the same controls, so a null is believable and a positive is not cherry-picked.",
+  "honest_scope_caveat": "The word-initial-silent-consonant set is mostly NON-object words (know, write, honest, wrong, ...); only knife/wreath are concrete objects. So this is a GENERAL-WORD modulation ablation, NOT a concrete-object study; the introspection/loaded-word confounds we moved away from partially return. Its evidentiary status is therefore WEAKER than the concrete-object study, and it CANNOT feed the concrete-object evidence path.",
+  "word_set": "b1_3_orthographic_latent_ablation_candidate_wordlist.json (30 eligible; high_confound flags on religious/ethical/mental/social/valence words; a null-and-drop-confound sensitivity analysis is pre-specified)",
+  "hypothesis": "Does ANY single fixed orthographic-latent routing rule for word-initial silent consonants make A_real beat the controls AND the semantic baseline better than spoken-only, uniformly across the set?",
+  "arms_A_real_variants_one_fixed_rule_each": {
+    "A_spoken": "spoken-only route (reference; the active B1.3 rule)",
+    "A_ortho_additive": "add the initial silent consonant at its natural read_op pole",
+    "A_silent_liberating": "add the initial silent consonant at the LIBERATING pole (the operator's focal rule)",
+    "A_silent_binding": "add the initial silent consonant at the BINDING pole",
+    "A_silent_dual_or_weighted": "add both poles weakly / attenuated weight (hybrid)"
+  },
+  "controls_same_as_b1_3": ["R_deranged_near", "R_deranged_mid", "R_deranged_far", "R_scrambled", "R_random", "X_neutral", "semantic_only_baseline"],
+  "instrument": "same blinded LLM-judge config as B1.3 (b1_3_concrete_object_llm_judge_model_config_v2), forced A/B, temp 0.0, cross-family; general-word framing (not object-function) since most words are non-objects",
+  "primary_comparison": "for each rule-arm: A_rule vs A_spoken (does the rule beat spoken-only?) AND A_rule vs semantic_only_baseline (does it beat ordinary meaning?)",
+  "success_condition_focal_rule": "A_silent_liberating beats A_spoken, beats semantic_only_baseline, and beats deranged/scrambled/random/neutral, UNIFORMLY across the set, surviving drop-high-confound sensitivity and no single model-family dominance",
+  "kill_condition": "if NO fixed orthographic rule beats spoken-only AND the semantic baseline across the set, the orthographic-latent rescue is CLOSED and spoken-only stands; per-word wins (e.g. knife only) do NOT count",
+  "thresholds": {
+    "win_rate_rule": "Wilson lower CI > 0.50 for A_rule vs A_spoken and vs semantic_only_baseline",
+    "uniformity": "not carried by a single word or single silent-letter class (K/G/W/P/H/M reported separately)",
+    "multiplicity": "Holm across arms x comparisons",
+    "no_single_model_family_dominance": true,
+    "drop_high_confound_sensitivity": "result must hold after removing religious/ethical/mental/social/valence words"
+  },
+  "decision_labels_future_run": [
+    "ORTHOGRAPHIC_LATENT_RULE_BEATS_SPOKEN_AND_BASELINE",
+    "ORTHOGRAPHIC_LATENT_RULE_NULL_SPOKEN_STANDS",
+    "ORTHOGRAPHIC_LATENT_SEMANTIC_BASELINE_EXPLAINS",
+    "ORTHOGRAPHIC_LATENT_STYLE_CONFOUNDED",
+    "ORTHOGRAPHIC_LATENT_INVALID_RUN"
+  ],
+  "this_gate_decision": "ORTHOGRAPHIC_LATENT_ABLATION_PREREGISTERED_READY",
+  "kosha_stratified_variant_note": {
+    "idea": "operator proposal: a four-kosha (annamaya/pranamaya/manomaya/vijnanamaya) model where a varṇa's meaning is layer-dependent (e.g. ka = 'cutting' for physical-kosha words, 'detachment' for mental-kosha words)",
+    "status": "NOT included in this ablation; NOT implemented",
+    "hard_blockers": [
+      "the frozen lexicon has NO kosha-stratified glosses; ka = hope/āśā only; there is NO 'cutting' reading of ka in the source -> using 'cutting' would be INVENTING a gloss to fit knife (fabrication / lexicon change)",
+      "4 koshas x 2 poles = up to 8 readings per varṇa -> massive free-parameter explosion; unfalsifiable unless (a) each word's kosha is assigned by an INDEPENDENT rule not chosen to fit, and (b) the full kosha x varṇa x pole table is fixed and pre-registered BEFORE any run",
+      "the motivation is output-first (we want knife=cutting, so posit a physical-kosha layer that yields cutting)"
+    ],
+    "only_legitimate_path": "specify a COMPLETE, independent kosha lexicon (all varṇas x all koshas) with an independent per-word kosha-assignment rule, pre-registered, then test against the same controls -> its own separate gate, never a knife-rescue"
+  },
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "disallowed_labels": ["LLM_OBJECT_MODULATION_SIGNAL", "MAPPING_FIDELITY_SIGNAL", "PROPENSITY_MODULATION_SIGNAL", "HUMAN_PROPENSITY_MODULATION_SIGNAL", "ontology_validation", "Sanskrit_privilege", "semantic_truth"],
+  "non_claims": ["pre-registration only", "not run", "not evidence", "no active B1.3 change", "no lexicon change", "no positive label earned", "honest prior is LOW"]
+}

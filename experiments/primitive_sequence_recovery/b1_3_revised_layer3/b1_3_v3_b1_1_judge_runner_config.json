@@ -1,0 +1,47 @@
+{
+  "artifact": "b1_3_v3_b1_1_judge_runner_config",
+  "status": "CONFIG_READY_PROBE_DEFAULT_NOT_FROZEN",
+  "purpose": "Config for run_b1_3_v3_with_b1_1_judges.py — reuses the B1.1 judge EXECUTION layer with B1.3 packets/parser and the FROZEN B1.3 scorer.",
+  "evidence_freeze_declared": false,
+  "run_mode_default": "probe-only",
+  "b1_1_judge_layer_reference": {
+    "harness": "run_b1_llm_judge.py (reused: LlamaJudgeAdapter, MockJudgeAdapter pattern, validate_judge, DECLARED_JUDGES)",
+    "panel_config": "b1_1_judge_panel_config.json",
+    "reused_only": ["model loading / adapter call path", "open-weight panel + validate_judge", "structured-JSON / retry / refusal plumbing pattern"],
+    "NOT_reused": ["B1.1 prompt", "output_1/output_2/tie/both_bad vocabulary", "packet builder", "arms", "scorer", "thresholds", "terminal labels", "tie->0.5 semantics"]
+  },
+  "judge_model_ids": [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "meta-llama/Meta-Llama-3-8B-Instruct",
+    "google/gemma-2-9b-it"
+  ],
+  "judge_families": {
+    "meta-llama/Llama-3.1-8B-Instruct": "Meta / Llama (open-weight)",
+    "meta-llama/Meta-Llama-3-8B-Instruct": "Meta / Llama (open-weight)",
+    "google/gemma-2-9b-it": "Google / Gemma (open-weight)"
+  },
+  "cross_family_note": "Llama + Gemma = two open-weight vendor families, non-Claude (not generator-adjacent); satisfies the cross-family requirement in a model-access (RunPod) environment where these weights are callable",
+  "v3_artifact_manifest": "b1_3_concrete_object_llm_freeze_review_manifest_v3_authoritative.json",
+  "v3_freeze_manifest": "b1_3_concrete_object_llm_freeze_review_manifest_v3_authoritative.json",
+  "v3_stimuli_path": "b1_3_concrete_object_final_stimuli_draft_v3_authoritative.jsonl",
+  "v3_style_audit_path": "b1_3_concrete_object_style_audit_report_v3_authoritative.json",
+  "v3_source_audit_path": "b1_3_v3_authoritative_source_audit.json",
+  "b1_3_scorer_reference": {
+    "scorer": "score_b1_3_concrete_object_llm.py (FROZEN B1.3 scorer; own arms/thresholds/labels)",
+    "scoring_contract": "b1_3_concrete_object_llm_scoring_contract_v2.json"
+  },
+  "choice_vocabulary": "forced A|B + optional confidence 1-5 (B1.3 own); B1.1 tie/preference vocabulary REJECTED by parser",
+  "malformed_refusal": {"max_invalid_rate": 0.10, "tie_maps_to_half": false, "no_hand_repair": true},
+  "output_paths": {
+    "probe_report": "<OUT_DIR>/b1_3_v3_probe_report.json",
+    "judge_outputs_jsonl": "<OUT_DIR>/b1_3_v3_judge_outputs.jsonl",
+    "score_report_json": "<OUT_DIR>/b1_3_v3_score_report.json",
+    "score_report_md": "<OUT_DIR>/b1_3_v3_score_report.md"
+  },
+  "freeze_gate": {
+    "score_frozen_requires": "operator-created b1_3_v3_EVIDENCE_FREEZE_DECLARED.json with evidence_freeze_declared=true; the runner NEVER creates it",
+    "on_missing": "score-frozen REFUSES; nothing run or scored"
+  },
+  "anchors": {"b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES", "track_b": "BLOCKED", "evidence_freeze": "NONE"},
+  "non_claims": ["config only", "no run", "no scoring", "no model call at setup", "no positive label earned"]
+}

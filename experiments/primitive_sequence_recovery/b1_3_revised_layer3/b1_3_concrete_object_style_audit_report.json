@@ -1,0 +1,85 @@
+{
+  "artifact": "b1_3_concrete_object_style_audit_report",
+  "status": "AUDIT_COMPLETE_PRE_FREEZE",
+  "evidence": false,
+  "generation_seed": "b1_3_concrete_object_stimgen_v1",
+  "n_stimuli_records": 371,
+  "n_targets": 53,
+  "comparisons": [
+    "A_real_vs_R_deranged_mid",
+    "A_real_vs_R_deranged_far",
+    "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled",
+    "A_real_vs_R_random",
+    "A_real_vs_X_neutral",
+    "A_real_vs_semantic_only_baseline"
+  ],
+  "style_parity_audit": {
+    "all_options_4_tags": true,
+    "tag_count_distribution": {
+      "4": 742
+    },
+    "mean_abs_charlen_diff": 2.113,
+    "max_abs_charlen_diff": 10,
+    "mean_abs_tag_len_diff": 0.528,
+    "identical_syntax_template": true,
+    "pass": true
+  },
+  "style_tell_audit": {
+    "method": "mechanical leave-one-out nearest-centroid on FORMAT features [char_len, mean_tag_len] only (not content/fit)",
+    "balanced_accuracy": 0.3779,
+    "tpr_a_real": 0.3077,
+    "tnr_other": 0.4481,
+    "n_a_real": 52,
+    "n_other": 212,
+    "threshold_draft": 0.55,
+    "pass": true,
+    "note": "this is the pre-judge style-tell gate, NOT the evidence judge (fit-to-object) task"
+  },
+  "denotation_leakage_audit": {
+    "option_repeats_target": 0,
+    "option_uses_target_synonym": 0,
+    "pass": true
+  },
+  "quality_parity_audit": {
+    "empty_tags": 0,
+    "nonascii_or_garbage": 0,
+    "within_option_duplicate_tags": 0,
+    "sanskrit_or_varna_tokens": 0,
+    "all_render_ok": true,
+    "pass": true
+  },
+  "semantic_baseline_audit": {
+    "present_for_every_primary_item": true,
+    "same_4_tag_format": true,
+    "no_varna_input": true,
+    "separated_from_X_neutral": true,
+    "not_used_as_A_real_or_control": true,
+    "pass": true
+  },
+  "overall_audit_pass": true,
+  "decision": "STIMULI_AND_STYLE_AUDIT_PASS_READY_FOR_FREEZE_REVIEW",
+  "evidence_judge_run": false,
+  "scoring_run": false,
+  "evidence_freeze_declared": false,
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "draft stimuli + mechanical audits only",
+    "not evidence",
+    "no evidence judge run",
+    "no positive label earned"
+  ],
+  "near_mid_far_map_sanity_pass": {
+    "method": "non-outcome sanity pass over the frozen deranged source map; NO inspection of generated tags or expected judge outcomes used for any replacement",
+    "family_separation": "near same-family 53/53; mid & far different-family 53/53 (from final screen)",
+    "aggregate_similarity_gradient": "near 0.597 > mid 0.510 > far 0.362; mid >= far 53/53",
+    "obvious_mislabels_found": 0,
+    "replacements_applied": 0,
+    "wup_coarseness_caveat": "13/53 targets have same-family near with lower WuP than cross-family mid; near defined by same-family membership (hard specificity), not raw WuP; documented, no replacement made",
+    "result": "MAP_ACCEPTED_NO_REPLACEMENTS"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "artifact": "b1_3_varna_meaning_signal_probe",
+  "evidence": false,
+  "development_only": true,
+  "n_pairs": 2412,
+  "n_targets": 70,
+  "spearman_rho_varnaDist_vs_semanticDist": 0.0079,
+  "pearson_r": 0.0056,
+  "permutation_rho_baseline": [
+    -0.0275,
+    -0.0248,
+    -0.0257,
+    0.0285,
+    0.0058
+  ],
+  "varna_nearest_neighbor_semantic_lift": 0.0105,
+  "interpretation_rule": "positive rho => similar var\u1e47a sequences tend to have similar meaning (signal to learn). rho ~ 0 and nn_lift ~ 0 => NO raw-var\u1e47a->meaning signal; learned model would be null.",
+  "note": "DEVELOPMENT-ONLY feasibility probe. NOT evidence. No model, no judge. Morphological/substring pairs excluded. Structure, not validated meaning."
+}

@@ -1,0 +1,112 @@
+{
+  "artifact": "b1_3_concrete_object_style_audit_report_v3_authoritative",
+  "status": "AUDIT_COMPLETE_PRE_FREEZE",
+  "evidence": false,
+  "version": 3,
+  "source": "authoritative",
+  "generation_seed": "b1_3_concrete_object_stimgen_v3_authoritative",
+  "bridge_pool": "b1_3_authoritative_varna_bridge_pool.json (source: varna_lens/lexicon_authoritative_varna.json, AUTHORITATIVE)",
+  "global_register_polish": "reducer returns ONLY an in-band (4..8) plain-English token or None; NO out-of-band fallback; None -> caller backfills from the all-in-band global pool. Applied uniformly to every arm. Same as v2.",
+  "n_stimuli_records": 371,
+  "n_targets": 53,
+  "comparisons": [
+    "A_real_vs_R_deranged_mid",
+    "A_real_vs_R_deranged_far",
+    "A_real_vs_R_deranged_near",
+    "A_real_vs_R_scrambled",
+    "A_real_vs_R_random",
+    "A_real_vs_X_neutral",
+    "A_real_vs_semantic_only_baseline"
+  ],
+  "style_parity_audit": {
+    "all_options_4_tags": true,
+    "tag_count_distribution": {
+      "4": 742
+    },
+    "mean_abs_charlen_diff": 2.577,
+    "max_abs_charlen_diff": 10,
+    "mean_abs_tag_len_diff": 0.644,
+    "identical_syntax_template": true,
+    "pass": true
+  },
+  "style_tell_audit": {
+    "method": "mechanical leave-one-out nearest-centroid on FORMAT features [char_len, mean_tag_len] only (not content/fit)",
+    "balanced_accuracy": 0.5294,
+    "tpr_a_real": 0.5094,
+    "tnr_other": 0.5493,
+    "n_a_real": 53,
+    "n_other": 213,
+    "threshold_draft": 0.55,
+    "pass": true,
+    "note": "this is the pre-judge style-tell gate, NOT the evidence judge (fit-to-object) task"
+  },
+  "denotation_leakage_audit": {
+    "option_repeats_target": 0,
+    "option_uses_target_synonym": 0,
+    "pass": true
+  },
+  "quality_parity_audit": {
+    "empty_tags": 0,
+    "nonascii_or_garbage": 0,
+    "within_option_duplicate_tags": 0,
+    "sanskrit_or_varna_tokens": 0,
+    "all_render_ok": true,
+    "pass": true
+  },
+  "semantic_baseline_audit": {
+    "present_for_every_primary_item": true,
+    "same_4_tag_format": true,
+    "no_varna_input": true,
+    "separated_from_X_neutral": true,
+    "not_used_as_A_real_or_control": true,
+    "pass": true
+  },
+  "forbidden_token_scan": {
+    "sanskrit_tokens": [],
+    "over_band_tokens": [],
+    "band": [
+      4,
+      8
+    ],
+    "n_sanskrit": 0,
+    "n_over_band": 0,
+    "distinct_over_band": [],
+    "pass": true
+  },
+  "duplicate_tag_scan": {
+    "options_with_duplicates": 0,
+    "pass": true
+  },
+  "tag_length_parity_by_arm": {
+    "per_arm_mean_tag_len": {
+      "A_real": 6.217,
+      "R_deranged_mid": 6.193,
+      "R_deranged_far": 6.137,
+      "R_deranged_near": 6.217,
+      "R_scrambled": 6.217,
+      "R_random": 6.288,
+      "X_neutral": 5.75,
+      "semantic_only_baseline": 5.651
+    },
+    "max_minus_min": 0.637,
+    "pass": true
+  },
+  "overall_audit_pass": true,
+  "decision": "V3_AUTHORITATIVE_AUDIT_PASS",
+  "evidence_judge_run": false,
+  "scoring_run": false,
+  "evidence_freeze_declared": false,
+  "supersedes_for_source": "v2 (FALLBACK_QUALIFIED bridge pool); v1 and v2 preserved as historical",
+  "anchors": {
+    "b1_1_verdict": "RANDOM_OR_SCRAMBLED_MATCHES",
+    "track_b": "BLOCKED",
+    "evidence_freeze": "NONE"
+  },
+  "non_claims": [
+    "draft stimuli + mechanical audits only",
+    "not evidence",
+    "no evidence judge run",
+    "no positive label earned",
+    "source-integrity rebuild, not a rescue"
+  ]
+}
