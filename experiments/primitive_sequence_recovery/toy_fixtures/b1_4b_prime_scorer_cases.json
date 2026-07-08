@@ -1,0 +1,31 @@
+{
+  "_purpose": "SYNTHETIC-ONLY fixtures for the B1.4b′ scorer. No real McRae Y. Pipeline regimes exercise the real extract+CV machinery; injected-score cases exercise the remaining terminal-label branches. Nothing here is evidence.",
+  "_not_for": ["real B1.4b' evidence run", "Track B unblocking", "ontological claims", "Sanskrit privilege", "reinterpreting prior negatives"],
+  "pipeline_regimes": {
+    "f3": "L1_L2_L3_ATTRIBUTE_SIGNAL",
+    "phonology": "F_COLLAPSES_TO_PHONOLOGY",
+    "bag": "BAG_OR_SHUFFLE_EXPLAINS",
+    "sentiment": "SEMANTIC_OR_SENTIMENT_BASELINE_EXPLAINS",
+    "null": "NULL_RETURN_BOTTOM"
+  },
+  "injected_score_cases": [
+    {"name": "random_relabel_explains",
+     "scores": {"f3": 0.70, "phonology": 0.22, "phon_similarity": 0.24, "bag": 0.25, "shuffled": 0.30, "random_relabel": 0.68, "length_frequency": 0.15, "sentiment": 0.15, "chance": 0.20},
+     "flags": {}, "expected_label": "RANDOM_RELABEL_EXPLAINS"},
+    {"name": "inconclusive_borderline",
+     "scores": {"f3": 0.48, "phonology": 0.34, "phon_similarity": 0.33, "bag": 0.30, "shuffled": 0.29, "random_relabel": 0.28, "length_frequency": 0.25, "sentiment": 0.24, "chance": 0.20},
+     "flags": {}, "expected_label": "INCONCLUSIVE"},
+    {"name": "y_not_independent",
+     "scores": {"f3": 0.80, "phonology": 0.20, "phon_similarity": 0.20, "bag": 0.20, "shuffled": 0.20, "random_relabel": 0.20, "length_frequency": 0.20, "sentiment": 0.20, "chance": 0.20},
+     "flags": {"y_not_independent": true}, "expected_label": "Y_NOT_INDEPENDENT"},
+    {"name": "decoder_leakage_invalid",
+     "scores": {"f3": 0.80, "phonology": 0.20, "phon_similarity": 0.20, "bag": 0.20, "shuffled": 0.20, "random_relabel": 0.20, "length_frequency": 0.20, "sentiment": 0.20, "chance": 0.20},
+     "flags": {"decoder_leak": true}, "expected_label": "DECODER_LEAKAGE_INVALID"},
+    {"name": "signal_clean_injected",
+     "scores": {"f3": 0.85, "phonology": 0.25, "phon_similarity": 0.24, "bag": 0.22, "shuffled": 0.21, "random_relabel": 0.23, "length_frequency": 0.20, "sentiment": 0.18, "chance": 0.20},
+     "flags": {}, "expected_label": "L1_L2_L3_ATTRIBUTE_SIGNAL"},
+    {"name": "phonology_similarity_ties",
+     "scores": {"f3": 0.60, "phonology": 0.30, "phon_similarity": 0.58, "bag": 0.25, "shuffled": 0.24, "random_relabel": 0.26, "length_frequency": 0.20, "sentiment": 0.20, "chance": 0.20},
+     "flags": {}, "expected_label": "F_COLLAPSES_TO_PHONOLOGY"}
+  ]
+}
