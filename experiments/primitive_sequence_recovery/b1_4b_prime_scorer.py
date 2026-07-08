@@ -283,6 +283,90 @@ def score(records, Y, flags=None):
 
 
 # =====================================================================================
+# B1.4b′ ARM STRUCTURE.  These are PREDICTOR-FEATURE arms (each produces a feature matrix
+# for the SAME retained concepts; the SAME matched-capacity decoder predicts the SAME
+# McRae Y). They are NOT B1.3-style LLM prompt/rendering/judge arms — no text is generated
+# and no judge preference is elicited.
+# =====================================================================================
+ARMS = [
+    {"id": "A_F3_REAL",            "key": "f3",               "role": "candidate_structural_interaction"},
+    {"id": "B_PHONOLOGY_PLAIN",    "key": "phonology",        "role": "primary_baseline_phonology"},
+    {"id": "C_PHONOLOGY_SIMILARITY","key": "phon_similarity", "role": "baseline_phonology_similarity"},
+    {"id": "D_BAG_OF_PHONEMES",    "key": "bag",              "role": "co_primary_order_ablation"},
+    {"id": "E_SHUFFLED_ORDER_F3",  "key": "shuffled",         "role": "co_primary_order_ablation"},
+    {"id": "F_RANDOM_RELABEL_F3",  "key": "random_relabel",   "role": "co_primary_operator_identity"},
+    {"id": "G_LENGTH_FREQUENCY",   "key": "length_frequency", "role": "baseline_length_frequency"},
+    {"id": "H_SENTIMENT_LEXICON",  "key": "sentiment",        "role": "baseline_sentiment"},
+    {"id": "I_NULL_CHANCE",        "key": "chance",           "role": "null_chance"},
+]
+ARM_TO_KEY = {a["id"]: a["key"] for a in ARMS}
+KEY_TO_ARM = {a["key"]: a["id"] for a in ARMS}
+CANDIDATE_ARM = "A_F3_REAL"
+PHONOLOGY_ARMS = ("B_PHONOLOGY_PLAIN", "C_PHONOLOGY_SIMILARITY")
+ORDER_ARMS = ("D_BAG_OF_PHONEMES", "E_SHUFFLED_ORDER_F3")
+RELABEL_ARM = "F_RANDOM_RELABEL_F3"
+SENTIMENT_ARM = "H_SENTIMENT_LEXICON"
+
+
+def score_arms(records, Y):
+    """Populate every available B1.4b′ arm (rows aligned to the same concept list, same CV
+    folds, matched decoder capacity). Pending-source arms are returned explicitly, not
+    silently dropped."""
+    scores, pending = score_all(records, Y)
+    arm_scores, pending_arms = {}, {}
+    for a in ARMS:
+        if a["key"] in scores:
+            arm_scores[a["id"]] = scores[a["key"]]
+        else:
+            pending_arms[a["id"]] = BASELINE_PENDING_SOURCE     # e.g. H when no sentiment source
+    if "sentiment" in pending:
+        pending_arms["H_SENTIMENT_LEXICON"] = BASELINE_PENDING_SOURCE
+    if "length_frequency" in pending:                            # length present, frequency pending
+        pending_arms["G_LENGTH_FREQUENCY"] = "FREQ_" + BASELINE_PENDING_SOURCE
+    return arm_scores, pending_arms
+
+
+def decide_label_arms(arm_scores, flags=None, margin=MARGIN, chance=CHANCE):
+    """Terminal label from the ARM scores. A_F3_REAL is the candidate; every other arm is a
+    control it must beat. Phonology (B/C) is primary; order (D/E) and relabel (F) co-primary."""
+    flags = flags or {}
+    strong = chance + margin
+    if flags.get("y_not_independent"):
+        return "Y_NOT_INDEPENDENT"
+    if flags.get("decoder_leak"):
+        return "DECODER_LEAKAGE_INVALID"
+    if CANDIDATE_ARM not in arm_scores:
+        return "INCONCLUSIVE"
+    A = arm_scores[CANDIDATE_ARM]
+    controls = {k: v for k, v in arm_scores.items() if k != CANDIDATE_ARM}
+    if not controls or all(v <= strong for v in arm_scores.values()):
+        return "NULL_RETURN_BOTTOM"
+    explainers = {k: v for k, v in controls.items() if v >= strong and v >= A - margin}
+    if A >= strong and not explainers and (A - max(controls.values()) > margin):
+        return "L1_L2_L3_ATTRIBUTE_SIGNAL"
+    if explainers.keys() & set(PHONOLOGY_ARMS):
+        return "F_COLLAPSES_TO_PHONOLOGY"
+    if explainers.keys() & set(ORDER_ARMS):
+        return "BAG_OR_SHUFFLE_EXPLAINS"
+    if RELABEL_ARM in explainers:
+        return "RANDOM_RELABEL_EXPLAINS"
+    if SENTIMENT_ARM in explainers:
+        return "SEMANTIC_OR_SENTIMENT_BASELINE_EXPLAINS"
+    return "INCONCLUSIVE"
+
+
+def score_run_arms(records, Y, flags=None):
+    """Arm-based generic scorer. SYNTHETIC/interface use only — NOT the real evidence run."""
+    arm_scores, pending_arms = score_arms(records, Y)
+    label = decide_label_arms(arm_scores, flags)
+    return {"arm_scores": arm_scores, "pending_arms": pending_arms, "label": label,
+            "candidate_arm": CANDIDATE_ARM,
+            "primary_control": "B_PHONOLOGY_PLAIN",
+            "co_primary_controls": ["D_BAG_OF_PHONEMES", "E_SHUFFLED_ORDER_F3", "F_RANDOM_RELABEL_F3"],
+            "arms_are": "predictor_feature_arms_not_llm_prompt_arms"}
+
+
+# =====================================================================================
 # synthetic self-check (NO real McRae Y). Records use the real Stage A′ inventory.
 # =====================================================================================
 def _rand_records(n, seed, alphabet=None, length=(3, 7), covars=False):
@@ -332,13 +416,16 @@ SYNTH_REGIMES = {"f3": "L1_L2_L3_ATTRIBUTE_SIGNAL", "phonology": "F_COLLAPSES_TO
 
 
 def run_selfcheck():
-    print("B1.4b′ scorer synthetic self-check (NO real McRae Y):")
+    print("B1.4b′ scorer synthetic self-check — PREDICTOR-FEATURE ARMS (NO real McRae Y):")
+    print("  arms:", ", ".join(a["id"] for a in ARMS))
     for regime, exp in SYNTH_REGIMES.items():
         recs, Y = make_synthetic(regime)
-        res = score(recs, Y)
+        res = score_run_arms(recs, Y)
         ok = res["label"] == exp
-        print(f"  {'OK ' if ok else 'XX '} {regime:10s} -> {res['label']:40s} (expect {exp})  {res['scores']}")
-    print("SYNTHETIC ONLY — no real evidence run, no real McRae Y, no evidence freeze.")
+        top = sorted(res["arm_scores"].items(), key=lambda kv: -kv[1])[:3]
+        print(f"  {'OK ' if ok else 'XX '} {regime:10s} -> {res['label']:40s} (expect {exp})  top={top}")
+    print("SYNTHETIC ONLY — arms are predictor-feature arms (not B1.3 LLM prompt arms).")
+    print("No real evidence run, no real McRae Y, no evidence freeze.")
 
 
 if __name__ == "__main__":

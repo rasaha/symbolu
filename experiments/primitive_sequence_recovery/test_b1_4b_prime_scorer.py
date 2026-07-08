@@ -131,6 +131,67 @@ def test_no_raw_mcrae_data_tracked():
         assert not [t for t in tracked if pat in pathlib.Path(t).name], pat
 
 
+def test_arm_registry_is_predictor_feature_arms():
+    ids = [a["id"] for a in S.ARMS]
+    assert ids == ["A_F3_REAL", "B_PHONOLOGY_PLAIN", "C_PHONOLOGY_SIMILARITY", "D_BAG_OF_PHONEMES",
+                   "E_SHUFFLED_ORDER_F3", "F_RANDOM_RELABEL_F3", "G_LENGTH_FREQUENCY",
+                   "H_SENTIMENT_LEXICON", "I_NULL_CHANCE"]
+    assert S.CANDIDATE_ARM == "A_F3_REAL"
+    # candidate is F-3; primary control is plain phonology
+    assert S.ARM_TO_KEY["A_F3_REAL"] == "f3" and S.ARM_TO_KEY["B_PHONOLOGY_PLAIN"] == "phonology"
+
+
+def test_arms_rows_aligned_and_matched():
+    recs = [{"phonemes": ["k", "a", "t"], "covars": {"freq": 1.0, "sentiment": 0.2}} for _ in range(30)]
+    Y = np.random.default_rng(1).normal(size=(30, 4))
+    arm_scores, pending = S.score_arms(recs, Y)
+    # every non-pending arm produced a scalar score for the same 30 concepts
+    for a in S.ARMS:
+        assert (a["id"] in arm_scores) or (a["id"] in pending)
+    assert "A_F3_REAL" in arm_scores and "B_PHONOLOGY_PLAIN" in arm_scores
+
+
+def test_arm_pending_source_visible_not_silent():
+    # no covars -> H sentiment pending; G frequency component pending; both must be VISIBLE
+    recs = [{"phonemes": ["k", "a", "t"], "covars": {}} for _ in range(30)]
+    Y = np.random.default_rng(2).normal(size=(30, 3))
+    arm_scores, pending = S.score_arms(recs, Y)
+    assert pending.get("H_SENTIMENT_LEXICON") == S.BASELINE_PENDING_SOURCE
+    assert "H_SENTIMENT_LEXICON" not in arm_scores
+    assert pending.get("G_LENGTH_FREQUENCY", "").endswith(S.BASELINE_PENDING_SOURCE)
+
+
+def test_arm_decide_all_nine_labels_reachable():
+    m, ch = S.MARGIN, S.CHANCE
+    hi = ch + 3 * m; lo = 0.05
+    base = {x: lo for x in ("B_PHONOLOGY_PLAIN", "C_PHONOLOGY_SIMILARITY", "D_BAG_OF_PHONEMES",
+                            "E_SHUFFLED_ORDER_F3", "F_RANDOM_RELABEL_F3", "G_LENGTH_FREQUENCY",
+                            "H_SENTIMENT_LEXICON", "I_NULL_CHANCE")}
+    D = S.decide_label_arms
+    assert D({"A_F3_REAL": hi, **base}) == "L1_L2_L3_ATTRIBUTE_SIGNAL"
+    assert D({"A_F3_REAL": hi, **{**base, "B_PHONOLOGY_PLAIN": hi}}) == "F_COLLAPSES_TO_PHONOLOGY"
+    assert D({"A_F3_REAL": hi, **{**base, "C_PHONOLOGY_SIMILARITY": hi}}) == "F_COLLAPSES_TO_PHONOLOGY"
+    assert D({"A_F3_REAL": hi, **{**base, "D_BAG_OF_PHONEMES": hi}}) == "BAG_OR_SHUFFLE_EXPLAINS"
+    assert D({"A_F3_REAL": hi, **{**base, "E_SHUFFLED_ORDER_F3": hi}}) == "BAG_OR_SHUFFLE_EXPLAINS"
+    assert D({"A_F3_REAL": hi, **{**base, "F_RANDOM_RELABEL_F3": hi}}) == "RANDOM_RELABEL_EXPLAINS"
+    assert D({"A_F3_REAL": hi, **{**base, "H_SENTIMENT_LEXICON": hi}}) == "SEMANTIC_OR_SENTIMENT_BASELINE_EXPLAINS"
+    assert D({"A_F3_REAL": lo, **base}) == "NULL_RETURN_BOTTOM"
+    inc = {"A_F3_REAL": 0.48, "B_PHONOLOGY_PLAIN": 0.34, "C_PHONOLOGY_SIMILARITY": 0.33,
+           "D_BAG_OF_PHONEMES": 0.30, "E_SHUFFLED_ORDER_F3": 0.29, "F_RANDOM_RELABEL_F3": 0.28,
+           "G_LENGTH_FREQUENCY": 0.25, "H_SENTIMENT_LEXICON": 0.24, "I_NULL_CHANCE": 0.20}
+    assert D(inc) == "INCONCLUSIVE"
+    assert D({"A_F3_REAL": hi, **base}, {"y_not_independent": True}) == "Y_NOT_INDEPENDENT"
+    assert D({"A_F3_REAL": hi, **base}, {"decoder_leak": True}) == "DECODER_LEAKAGE_INVALID"
+
+
+def test_arm_pipeline_regimes_match_expected():
+    for regime, exp in CASES["pipeline_regimes"].items():
+        recs, Y = S.make_synthetic(regime)
+        res = S.score_run_arms(recs, Y)
+        assert res["label"] == exp, f"{regime}: {res['label']} != {exp}"
+        assert res["arms_are"] == "predictor_feature_arms_not_llm_prompt_arms"
+
+
 def run_all():
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     for t in tests:
