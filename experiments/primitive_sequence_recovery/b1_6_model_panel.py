@@ -84,7 +84,8 @@ def run_panel(panel: Dict,
               decl_path: pathlib.Path = drv.DECL_FILE,
               out_dir: pathlib.Path = None,
               write: bool = False,
-              reblind_seed: int = 20260708) -> Dict:
+              reblind_seed: int = 20260708,
+              representation: str = drv.DEFAULT_REPRESENTATION) -> Dict:
     """Run each generator over the (subset) scaffolds via the gated driver, then re-blind the merged pool.
 
     adapter_factory(generator_entry) -> adapter (FakeAdapter in tests; a real adapter on a model host).
@@ -106,7 +107,7 @@ def run_panel(panel: Dict,
             adapter = adapter_factory(gen)
         res = drv.run(mock=mock, adapter=adapter, mode=mode, limit_items=limit_items,
                       decl_path=decl_path, out_dir=(out_dir / code) if (out_dir and write) else drv.RUN_OUT,
-                      write=False, gen_code=code)
+                      write=False, gen_code=code, representation=representation)
         jv_by_id = {p["blinded_output_id"]: p for p in res["judge_visible"]}
         for hm in res["hidden_meta"]:
             p = jv_by_id[hm["blinded_output_id"]]
@@ -138,6 +139,7 @@ def run_panel(panel: Dict,
         "artifact_type": "b1_6_model_panel_manifest",
         "status": "PANEL_MANIFEST_NOT_A_FREEZE",
         "run_label": drv.EXPLORATORY_LABEL if mode == drv.EXPLORATORY_MODE else "B1_6_PILOT_FULL_GENERATION",
+        "representation_version": representation,
         "mock": mock,
         "judging_performed": False,
         "generator_models": panel["generator_models"],
@@ -179,6 +181,8 @@ def main(argv=None):
     ap.add_argument("--mock", action="store_true", help="deterministic placeholder text (plumbing only)")
     ap.add_argument("--mode", default=drv.EXPLORATORY_MODE, choices=list(drv.VALID_MODES))
     ap.add_argument("--limit-items", type=int, default=10)
+    ap.add_argument("--representation-version", default=drv.DEFAULT_REPRESENTATION,
+                    choices=list(drv.REPRESENTATIONS))
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
     panel = json.loads(pathlib.Path(args.panel).read_text()) if args.panel else B1_1_REFERENCE_PANEL
@@ -187,6 +191,7 @@ def main(argv=None):
                          "(adapter_factory) + a matching operator declaration; not runnable from CLI. "
                          "Use --mock for plumbing.")
     res = run_panel(panel, mock=True, mode=args.mode, limit_items=args.limit_items,
+                    representation=args.representation_version,
                     out_dir=pathlib.Path(args.out) if args.out else None, write=bool(args.out))
     print(json.dumps(res["panel_manifest"], indent=2))
 

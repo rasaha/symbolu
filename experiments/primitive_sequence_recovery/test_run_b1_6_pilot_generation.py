@@ -15,14 +15,16 @@ def _sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def _valid_decl(mode="pilot_generation"):
+def _valid_decl(mode="pilot_generation", representation="v2_named_vritti"):
+    r = drv.REPRESENTATIONS[representation]
     return {
         "artifact": "b1_6_pilot_EVIDENCE_FREEZE_DECLARED",
         "evidence_freeze_declared": True,
         "mode": mode,
-        "scaffold_manifest_sha256": _sha(drv.SCAFFOLD_MANIFEST_FILE),
-        "target_scaffold_sha256": _sha(drv.TARGETS_FILE),
-        "randomized_control_manifest_sha256": _sha(drv.RANDCTL_FILE),
+        "representation_version": representation,
+        "scaffold_manifest_sha256": _sha(r["manifest"]),
+        "target_scaffold_sha256": _sha(r["targets"]),
+        "randomized_control_manifest_sha256": _sha(r["randctl"]),
         "prompt_rubric_sha256": _sha(drv.PROMPT_RUBRIC_FILE),
         "declared_by": "operator-test",
         "declared_at_utc": "2026-07-08T00:00:00Z",
@@ -284,3 +286,62 @@ def test_balanced_subset_covers_all_strata():
     assert len(picked) == 10
     cats = {t["category"] for t in picked}
     assert len(cats) == 6                       # all six strata represented
+
+
+# ---- v2 named-vṛtti wiring ------------------------------------------------------------
+def test_default_run_loads_v2_scaffold(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl())          # default representation = v2
+    res = drv.run(mock=True, decl_path=decl, out_dir=tmp_path / "o", write=False)
+    m = res["manifest"]
+    assert m["representation_version"] == "v2_named_vritti"
+    assert m["representation_status"] == "ACTIVE"
+    assert "_v2_named_vritti" in m["scaffold_files"]["targets"]
+    assert "_v2_named_vritti" in m["scaffold_files"]["randomized_control"]
+    assert m["seed"] == 20260709                          # v2 deranged control seed
+
+
+def test_v1_only_loads_when_explicitly_requested(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(representation="v1_directional"))
+    res = drv.run(mock=True, representation="v1_directional", decl_path=decl,
+                  out_dir=tmp_path / "o", write=False)
+    m = res["manifest"]
+    assert m["representation_version"] == "v1_directional"
+    assert m["representation_status"] == "SUPERSEDED_HISTORICAL"
+    assert "_v2_named_vritti" not in m["scaffold_files"]["targets"]
+    assert m["seed"] == 20260708                          # v1 control seed
+
+
+def test_v2_symbolu_prompt_uses_named_vritti(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl())
+    res = drv.run(mock=True, decl_path=decl, out_dir=tmp_path / "o", write=False)
+    sym = [r for r in res["records"] if r["arm"] == "SYMBOLU_SCAFFOLD"]
+    joined = " ".join(r["prompt"] for r in sym)
+    assert "named =" in joined                            # v2 named-vṛtti rendering
+    assert "dharma" in joined or "mokṣa" in joined or "sattva" in joined
+
+
+def test_freeze_gate_rejects_v1_hashes_when_v2_requested(tmp_path):
+    # a v1 declaration (v1 hashes + representation_version v1) cannot authorize a v2 run
+    decl = _write_decl(tmp_path, _valid_decl(representation="v1_directional"))
+    ok, reasons = drv.verify_freeze_gate(decl, expected_mode="pilot_generation",
+                                         representation="v2_named_vritti")
+    assert not ok
+    assert any("representation_version mismatch" in r for r in reasons)
+
+
+def test_freeze_gate_rejects_v1_hashes_no_repr_field_when_v2_requested(tmp_path):
+    # even without representation_version, v1 file hashes mismatch the v2 files -> refuse
+    d = _valid_decl(representation="v1_directional")
+    d.pop("representation_version")
+    ok, reasons = drv.verify_freeze_gate(_write_decl(tmp_path, d), expected_mode="pilot_generation",
+                                         representation="v2_named_vritti")
+    assert not ok and any("mismatch" in r for r in reasons)
+
+
+def test_v2_fake_adapter_10x5(tmp_path):
+    decl = _write_decl(tmp_path, _valid_decl(mode=drv.EXPLORATORY_MODE))
+    res = drv.run(mock=False, adapter=A.FakeAdapter(), mode=drv.EXPLORATORY_MODE, limit_items=10,
+                  decl_path=decl, out_dir=tmp_path / "o", write=False)
+    m = res["manifest"]
+    assert m["representation_version"] == "v2_named_vritti"
+    assert m["n_prompts"] == 50 and m["n_success"] == 50

@@ -24,6 +24,20 @@ a model-access host.
 - **No generation. No judging. No evidence freeze. No ratings freeze.**
 - **B1.4b′ remains `NULL_RETURN_BOTTOM`.**
 
+## 2b. Representation: use B1.6-v2 named-vṛtti (NOT v1)
+
+The active scaffold is **B1.6-v2 named-vṛtti**. The driver/panel now default to
+`--representation-version v2_named_vritti`; **do not run v1** (`v1_directional` is superseded/historical,
+accessible only if explicitly requested). All hashes below are the **v2** files:
+
+- `frozen/b1_6_pilot_targets_scaffolds_v2_named_vritti.json`
+- `frozen/b1_6_pilot_scaffold_manifest_v2_named_vritti.json`
+- `frozen/b1_6_pilot_randomized_control_manifest_v2_named_vritti.json`
+- table: `track_g_varna_polarity_table_v2_named_vritti.json`
+
+The evidence-freeze declaration must carry `"representation_version": "v2_named_vritti"` and hash the **v2**
+files; a v1 declaration (or v1 hashes) is **refused loudly** when a v2 run is requested.
+
 ## 3. Model panel (B1.1-style; IDs/revisions operator-frozen at run time)
 
 - **Generators:** `mistralai/Mistral-7B-Instruct-v0.3`, `Qwen/Qwen2.5-7B-Instruct`.
@@ -144,9 +158,10 @@ decl = {
   "artifact": "b1_6_pilot_EVIDENCE_FREEZE_DECLARED",
   "evidence_freeze_declared": True,
   "mode": "exploratory_10_sample_generation_probe",
-  "scaffold_manifest_sha256": sha("frozen/b1_6_pilot_scaffold_manifest.json"),
-  "target_scaffold_sha256": sha("frozen/b1_6_pilot_targets_scaffolds.json"),
-  "randomized_control_manifest_sha256": sha("frozen/b1_6_pilot_randomized_control_manifest.json"),
+  "representation_version": "v2_named_vritti",
+  "scaffold_manifest_sha256": sha("frozen/b1_6_pilot_scaffold_manifest_v2_named_vritti.json"),
+  "target_scaffold_sha256": sha("frozen/b1_6_pilot_targets_scaffolds_v2_named_vritti.json"),
+  "randomized_control_manifest_sha256": sha("frozen/b1_6_pilot_randomized_control_manifest_v2_named_vritti.json"),
   "prompt_rubric_sha256": sha("B1_6_SYMBOLU_GENERATIVE_UTILITY_PROMPTS_AND_RUBRIC.md"),
   "declared_by": "REPLACE_WITH_OPERATOR_ID",
   "declared_at_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),

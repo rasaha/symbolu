@@ -10,6 +10,12 @@ blocked. Structure, not validated meaning.**
 
 **Readiness label: `B1_6_PILOT_GENERATION_OPERATOR_COMMANDS_DOCUMENTED`.**
 
+> **⚠ SUPERSEDED PATHS BELOW (v1).** The active representation is now **B1.6-v2 named-vṛtti** — the driver
+> defaults to `--representation-version v2_named_vritti`. The v1 file paths and hashes in this doc are
+> **historical**; for a real run use the **v2** files and add `"representation_version": "v2_named_vritti"` to
+> the declaration (see `B1_6_10_SAMPLE_RUNPOD_GENERATION_COMMANDS.md` §2b/§9 and
+> `B1_6_V1_SUPERSEDED_V2_REFREEZE_REPORT.md`). A v1 declaration is refused loudly when a v2 run is requested.
+
 Driver: `run_b1_6_pilot_generation.py` (`cc56eb1`). Runbook: `B1_6_PILOT_GENERATION_RUNBOOK.md`.
 
 ---

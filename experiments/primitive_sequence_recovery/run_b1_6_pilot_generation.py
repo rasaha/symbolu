@@ -25,11 +25,33 @@ from typing import Callable, Dict, List, Optional, Tuple
 HERE = pathlib.Path(__file__).resolve().parent
 FROZEN = HERE / "frozen"
 
+# v1 (directional-axis) — SUPERSEDED before execution; preserved, accessible only if explicitly requested.
 TARGETS_FILE = FROZEN / "b1_6_pilot_targets_scaffolds.json"
 SCAFFOLD_MANIFEST_FILE = FROZEN / "b1_6_pilot_scaffold_manifest.json"
 RANDCTL_FILE = FROZEN / "b1_6_pilot_randomized_control_manifest.json"
+# v2 (named-vṛtti) — ACTIVE default representation for future runs.
+V2_TARGETS_FILE = FROZEN / "b1_6_pilot_targets_scaffolds_v2_named_vritti.json"
+V2_SCAFFOLD_MANIFEST_FILE = FROZEN / "b1_6_pilot_scaffold_manifest_v2_named_vritti.json"
+V2_RANDCTL_FILE = FROZEN / "b1_6_pilot_randomized_control_manifest_v2_named_vritti.json"
+V2_TABLE_FILE = HERE / "track_g_varna_polarity_table_v2_named_vritti.json"
+
+REPRESENTATIONS = {
+    "v2_named_vritti": {"targets": V2_TARGETS_FILE, "manifest": V2_SCAFFOLD_MANIFEST_FILE,
+                        "randctl": V2_RANDCTL_FILE, "status": "ACTIVE"},
+    "v1_directional": {"targets": TARGETS_FILE, "manifest": SCAFFOLD_MANIFEST_FILE,
+                       "randctl": RANDCTL_FILE, "status": "SUPERSEDED_HISTORICAL"},
+}
+DEFAULT_REPRESENTATION = "v2_named_vritti"
+
 PROMPT_RUBRIC_FILE = HERE / "B1_6_SYMBOLU_GENERATIVE_UTILITY_PROMPTS_AND_RUBRIC.md"
 DECL_FILE = FROZEN / "b1_6_pilot_EVIDENCE_FREEZE_DECLARED.json"
+
+
+def _repr_files(representation: str):
+    if representation not in REPRESENTATIONS:
+        raise ValueError(f"unknown representation {representation!r}; choices {list(REPRESENTATIONS)}")
+    r = REPRESENTATIONS[representation]
+    return r["targets"], r["manifest"], r["randctl"]
 
 RUN_OUT = HERE / "run_out" / "b1_6_pilot_generation"
 
@@ -96,9 +118,12 @@ def _sha_text(s: str) -> str:
 # Evidence-freeze gate
 # --------------------------------------------------------------------------------------
 def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE,
-                       expected_mode: str = MODE) -> Tuple[bool, List[str]]:
+                       expected_mode: str = MODE,
+                       representation: str = DEFAULT_REPRESENTATION) -> Tuple[bool, List[str]]:
     """Return (ok, reasons). Refuses unless a valid operator declaration exists whose mode matches
-    expected_mode (MODE for the full pilot, EXPLORATORY_MODE for the 10-sample probe)."""
+    expected_mode and whose hashes match the REQUESTED representation's scaffold files. If the declaration
+    hashes the wrong representation (e.g. v1 while v2 is requested), it is refused loudly."""
+    targets_file, manifest_file, randctl_file = _repr_files(representation)
     reasons: List[str] = []
     if not decl_path.exists():
         return False, ["no EVIDENCE_FREEZE_DECLARED file (operator must create it)"]
@@ -116,13 +141,18 @@ def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE,
         reasons.append("evidence_freeze_declared != true")
     if decl.get("mode") != expected_mode:
         reasons.append(f"mode != {expected_mode}")
+    # representation_version, if declared, MUST match the requested representation (loud refusal on mismatch)
+    decl_repr = decl.get("representation_version")
+    if decl_repr is not None and decl_repr != representation:
+        reasons.append(f"representation_version mismatch: declaration says {decl_repr!r} but run requested "
+                       f"{representation!r} (a v1 declaration cannot authorize a v2 run, or vice versa)")
     if reasons:
         return False, reasons
 
     checks = [
-        ("scaffold_manifest_sha256", SCAFFOLD_MANIFEST_FILE),
-        ("target_scaffold_sha256", TARGETS_FILE),
-        ("randomized_control_manifest_sha256", RANDCTL_FILE),
+        ("scaffold_manifest_sha256", manifest_file),
+        ("target_scaffold_sha256", targets_file),
+        ("randomized_control_manifest_sha256", randctl_file),
         ("prompt_rubric_sha256", PROMPT_RUBRIC_FILE),
     ]
     for field, path in checks:
@@ -131,7 +161,9 @@ def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE,
             continue
         actual = _sha_file(path)
         if decl.get(field) != actual:
-            reasons.append(f"{field} mismatch (declared {decl.get(field)!r} != actual {actual})")
+            reasons.append(f"{field} mismatch for representation {representation!r} "
+                           f"(declared {decl.get(field)!r} != actual {actual}); "
+                           f"wrong-representation declaration is refused")
 
     if decl.get("attestation") != ATTESTATIONS.get(expected_mode):
         reasons.append("attestation text mismatch")
@@ -142,12 +174,21 @@ def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE,
 # Prompt rendering (uses the frozen scaffold data; no CSR/STL, no Kosha)
 # --------------------------------------------------------------------------------------
 def _render_kcpr_dual_pole(kcpr_frame: Dict) -> str:
+    """Render both poles per varṇa. Handles v1 (directional-axis: list of axis dicts) and
+    v2 (named-vṛtti: dict with worldly_binding_pole / spiritual_liberating_pole / named_attribute)."""
     lines = []
-    for varna, axlist in kcpr_frame.items():
-        for ax in axlist:
+    for varna, val in kcpr_frame.items():
+        if isinstance(val, list):                       # v1 directional-axis
+            for ax in val:
+                lines.append(
+                    f"{varna}: axis = {ax['axis']}; worldly/binding pole = {ax['worldly_binding_pole']}; "
+                    f"liberating/counter pole = {ax['liberating_counter_pole']}; table_lean = {ax['table_lean']}"
+                )
+        elif isinstance(val, dict):                     # v2 named-vṛtti
+            named = val.get("named_attribute", "")
             lines.append(
-                f"{varna}: axis = {ax['axis']}; worldly/binding pole = {ax['worldly_binding_pole']}; "
-                f"liberating/counter pole = {ax['liberating_counter_pole']}; table_lean = {ax['table_lean']}"
+                f"{varna}: named = {named}; worldly/binding pole = {val.get('worldly_binding_pole')}; "
+                f"liberating/counter pole = {val.get('spiritual_liberating_pole')}"
             )
     return "\n".join(lines) if lines else "(no supported varṇa profiles)"
 
@@ -362,13 +403,16 @@ def run(mock: bool = False,
         decl_path: pathlib.Path = DECL_FILE,
         write: bool = True,
         validate_real: bool = True,
-        gen_code: Optional[str] = None) -> Dict:
-    """Gated run. Refuses without a valid operator declaration whose mode matches `mode`.
-    Real generation uses `adapter` (b1_6_llm_adapter) or a bare `generator` callable, with output-format
-    validation + retry. `mock` is unchanged deterministic placeholder text. No judging."""
+        gen_code: Optional[str] = None,
+        representation: str = DEFAULT_REPRESENTATION) -> Dict:
+    """Gated run. Refuses without a valid operator declaration whose mode matches `mode` and whose hashes
+    match the requested `representation` (default v2_named_vritti; v1_directional is superseded/historical).
+    Real generation uses `adapter` or a bare `generator`, with output-format validation + retry. `mock` is
+    unchanged deterministic placeholder text. No judging."""
     if mode not in VALID_MODES:
         raise ValueError(f"unknown mode {mode!r}")
-    ok, reasons = verify_freeze_gate(decl_path, expected_mode=mode)
+    targets_file, manifest_file, randctl_file = _repr_files(representation)
+    ok, reasons = verify_freeze_gate(decl_path, expected_mode=mode, representation=representation)
     if not ok:
         raise PermissionError("EVIDENCE_FREEZE gate refused: " + "; ".join(reasons))
 
@@ -376,9 +420,16 @@ def run(mock: bool = False,
     settings = settings or GenerationSettings()
     emit, gen_meta = _make_emit(mock, adapter, generator, settings, validate_real)
 
-    targets_doc = json.loads(TARGETS_FILE.read_text())
-    randctl_doc = json.loads(RANDCTL_FILE.read_text())
+    targets_doc = json.loads(targets_file.read_text())
+    randctl_doc = json.loads(randctl_file.read_text())
     seed = randctl_doc.get("seed")
+    # normalize v2 named-vṛtti frame key -> the common render key (handles both representations)
+    for t in targets_doc["targets"]:
+        if "KCPR_NAMED_DUAL_POLE_FRAME" in t and "KCPR_DUAL_POLE_FRAME" not in t:
+            t["KCPR_DUAL_POLE_FRAME"] = t["KCPR_NAMED_DUAL_POLE_FRAME"]
+    for r in randctl_doc.get("randomized_scaffolds", []):
+        if "KCPR_NAMED_DUAL_POLE_FRAME" in r and "KCPR_DUAL_POLE_FRAME" not in r:
+            r["KCPR_DUAL_POLE_FRAME"] = r["KCPR_NAMED_DUAL_POLE_FRAME"]
     chosen = select_items(targets_doc, item_ids=item_ids, limit_items=limit_items)
     records = build_records(chosen, randctl_doc)
 
@@ -399,6 +450,8 @@ def run(mock: bool = False,
     manifest = {
         "artifact_type": "b1_6_pilot_generation_run_manifest",
         "mode": "MOCK" if mock else "REAL",
+        "representation_version": representation,
+        "representation_status": REPRESENTATIONS[representation]["status"],
         "declared_freeze_mode": mode,
         "run_label": run_label,
         "subset": subset,
@@ -414,11 +467,13 @@ def run(mock: bool = False,
         "seed": seed,
         "item_ids": [t["item_id"] for t in chosen],
         "frozen_input_hashes": {
-            "target_scaffolds": _sha_file(TARGETS_FILE),
-            "scaffold_manifest": _sha_file(SCAFFOLD_MANIFEST_FILE),
-            "randomized_control": _sha_file(RANDCTL_FILE),
+            "target_scaffolds": _sha_file(targets_file),
+            "scaffold_manifest": _sha_file(manifest_file),
+            "randomized_control": _sha_file(randctl_file),
             "prompt_rubric": _sha_file(PROMPT_RUBRIC_FILE),
         },
+        "scaffold_files": {"targets": str(targets_file.name), "manifest": str(manifest_file.name),
+                           "randomized_control": str(randctl_file.name)},
         "declaration_sha256": _sha_file(decl_path) if decl_path.exists() else None,
         "b1_4b_prime_status": B1_4B_PRIME_STATUS,
         "note": "No judging performed by this driver. Blinded outputs and hidden metadata are NOT committed. "
@@ -450,12 +505,15 @@ def main(argv=None):
                     help="freeze mode: full pilot_generation or exploratory_10_sample_generation_probe")
     ap.add_argument("--limit-items", type=int, default=None, help="e.g. 10 for the exploratory probe")
     ap.add_argument("--item-ids", nargs="*", default=None, help="explicit deterministic subset of item ids")
+    ap.add_argument("--representation-version", default=DEFAULT_REPRESENTATION, choices=list(REPRESENTATIONS),
+                    help="active scaffold representation (default v2_named_vritti; v1_directional is "
+                         "superseded/historical and must be requested explicitly)")
     ap.add_argument("--out", default=str(RUN_OUT))
     args = ap.parse_args(argv)
 
     if args.mock:
         res = run(mock=True, mode=args.mode, limit_items=args.limit_items, item_ids=args.item_ids,
-                  out_dir=pathlib.Path(args.out))
+                  representation=args.representation_version, out_dir=pathlib.Path(args.out))
         print(json.dumps(res["manifest"], indent=2))
         return
 
@@ -477,9 +535,8 @@ def main(argv=None):
         raise SystemExit(f"REFUSED: no CUDA/transformers backend on this host. readiness={ready}")
     adapter = build_adapter(settings)
     res = run(mock=False, adapter=adapter, settings=settings, mode=args.mode,
-              limit_items=args.limit_items, item_ids=args.item_ids, out_dir=pathlib.Path(args.out))
-    print(json.dumps(res["manifest"], indent=2))
-    res = run(mock=True, out_dir=pathlib.Path(args.out))
+              limit_items=args.limit_items, item_ids=args.item_ids,
+              representation=args.representation_version, out_dir=pathlib.Path(args.out))
     print(json.dumps(res["manifest"], indent=2))
 
 

@@ -14,12 +14,14 @@ def _sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 
-def _decl(tmp_path, mode):
+def _decl(tmp_path, mode, representation="v2_named_vritti"):
+    r = drv.REPRESENTATIONS[representation]
     decl = {
         "artifact": "b1_6_pilot_EVIDENCE_FREEZE_DECLARED", "evidence_freeze_declared": True, "mode": mode,
-        "scaffold_manifest_sha256": _sha(drv.SCAFFOLD_MANIFEST_FILE),
-        "target_scaffold_sha256": _sha(drv.TARGETS_FILE),
-        "randomized_control_manifest_sha256": _sha(drv.RANDCTL_FILE),
+        "representation_version": representation,
+        "scaffold_manifest_sha256": _sha(r["manifest"]),
+        "target_scaffold_sha256": _sha(r["targets"]),
+        "randomized_control_manifest_sha256": _sha(r["randctl"]),
         "prompt_rubric_sha256": _sha(drv.PROMPT_RUBRIC_FILE),
         "declared_by": "operator-test", "declared_at_utc": "2026-07-08T00:00:00Z",
         "attestation": drv.ATTESTATIONS[mode],
@@ -79,6 +81,7 @@ def test_two_generators_10_sample_output_count(tmp_path):
     assert m["expected_outputs"] == 100          # 10 targets x 5 arms x 2 generators
     assert m["n_outputs"] == 100
     assert m["per_generator_counts"] == {"M1": 50, "M2": 50}
+    assert m["representation_version"] == "v2_named_vritti"   # panel defaults to v2
 
 
 def test_mock_panel_count(tmp_path):
