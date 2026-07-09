@@ -193,6 +193,31 @@ benefit across 4 controls × 2 models × averaged-and-paired views. The `specifi
 only thread worth a follow-up: a **preregistered, powered** run with `SYMBOLU vs RANDOMIZED` on
 `specificity_to_target` as the single primary endpoint, fixed N and analysis committed before looking.
 
+## 11b. Critical scope limitation — NO context-conditioned pole resolution (both poles shown)
+
+**The single most important caveat on this null.** The `SYMBOLU_SCAFFOLD` arm did **not** perform any
+context-conditioned "Layer 1" selection of the appropriate pole for a given word. The rendered prompt presented
+**both** poles of every varṇa as an undifferentiated menu — verbatim: *"pole frame (both poles shown; do not
+treat either as correct) … let each element's pole-pair color the reading as a tension field"* — with only a
+stub context ("A common noun.") and the **resolution left entirely to the LLM** ("synthesize a specific reading
+of THIS item"). No frozen field selects a pole from context; the pole-frame sub-keys are only
+`worldly_binding_pole`, `spiritual_liberating_pole`, `named_attribute`.
+
+Consequently this probe tests the **unresolved, both-poles varṇa dump**, not a context-resolving Symbol-U. The
+honest scope of the finding is therefore: *the unresolved dual-pole scaffold confers no benefit and does not
+beat scrambling.* It does **not** refute a hypothetical context-conditioned version, because that version was
+**never operationalized** — and could not be, since the resolution mechanism (KCPR / Kosha-Context Pole
+Resolution) is **unspecified in the sources** (`KCPR_EXPANSION_NOT_FOUND`, Kosha/CSR/STL `DEFERRED`).
+
+Three reasons this narrows rather than nullifies the result: (1) an unspecifiable resolution mechanism is itself
+a theory-level problem, not a mere implementation gap; (2) presenting both poles gives a capable LLM *more*
+signal, not less — if real word-specific signal existed it should have let the model out-select a *scrambled*
+both-poles menu, and it did not; (3) B1.4b′ upstream already found the primitive attributions carry no
+*recoverable* signal, leaving a resolution layer nothing to resolve. **Design caveat for any Layer-1 follow-up:**
+if the LLM resolves the pole from context the meaning comes from the model (circular); if a fixed rule resolves
+it, the rule is a researcher addition the theory does not supply. B1.7's `VARNA_SPHERE_LENS` (which selects one
+plane's gloss rather than dumping all four) is a partial step toward testing the "selection made" case.
+
 ## 12. Guardrails
 
 No prereg `GENUTILITY_*` terminal verdict is emitted (exploratory probe). No semantic-truth claim. No ontology,
