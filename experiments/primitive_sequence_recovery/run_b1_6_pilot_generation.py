@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import re
 from typing import Callable, Dict, List, Optional, Tuple
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -98,8 +99,30 @@ OUTPUT_FORMAT_SPEC = (
 )
 
 # words/markers that must NEVER appear in judge-visible outputs
-FORBIDDEN_IN_JUDGE_VIEW = ("SYMBOLU", "Symbol-U", "varṇa", "varna", "KCPR", "scaffold",
-                           "RANDOMIZED", "arm", "polarity")
+# Tokens that would identify the Symbol-U method or a specific experimental arm if they leaked into a
+# judge-visible generation. Matched as WHOLE WORDS, case-insensitively — a naive substring test wrongly
+# flagged ordinary words (a bare "arm" matched "warm"/"harm"/"charm"/"arm of the river"). The bare "arm"
+# and bare "RANDOMIZED" are replaced by the explicit arm identifiers; generic structural metaphors are
+# intentionally not word-blocked beyond the method's own terms ("scaffold", "polarity").
+FORBIDDEN_IN_JUDGE_VIEW = ("SYMBOLU", "Symbol-U", "varṇa", "varna", "KCPR", "scaffold", "polarity",
+                           "dual-pole", "SYMBOLU_SCAFFOLD", "PLAIN_PROMPT_BASELINE",
+                           "GENERIC_STRUCTURED_PROMPT_BASELINE", "RANDOMIZED_SYMBOLU_CONTROL",
+                           "SEMANTIC_LLM_BASELINE")
+# whole-word, case-insensitive; hyphen counts as a boundary char so "Symbol-U"/"dual-pole" match cleanly.
+_FORBIDDEN_RE = re.compile(
+    r"(?<![\w-])(?:" + "|".join(re.escape(t) for t in FORBIDDEN_IN_JUDGE_VIEW) + r")(?![\w-])",
+    re.IGNORECASE)
+
+
+def leaked_tokens(text: str) -> List[str]:
+    """Return the distinct forbidden method/arm tokens present in `text` as whole words (case-insensitive)."""
+    seen, out = set(), []
+    for m in _FORBIDDEN_RE.finditer(text or ""):
+        low = m.group(0).lower()
+        if low not in seen:
+            seen.add(low)
+            out.append(m.group(0))
+    return out
 
 
 def _sha_bytes(b: bytes) -> str:
@@ -359,10 +382,9 @@ def assert_blind(pkg: Dict) -> None:
     bad = forbidden_keys & set(pkg.keys())
     if bad:
         raise ValueError(f"INVALID_BLINDING: forbidden keys in judge-visible package: {sorted(bad)}")
-    gen = pkg.get("generation_text", "")
-    for tok in FORBIDDEN_IN_JUDGE_VIEW:
-        if tok in gen:
-            raise ValueError(f"INVALID_LEAKAGE: forbidden token {tok!r} in generation_text")
+    leaked = leaked_tokens(pkg.get("generation_text", ""))
+    if leaked:
+        raise ValueError(f"INVALID_LEAKAGE: forbidden token(s) {leaked} in generation_text")
 
 
 # --------------------------------------------------------------------------------------
@@ -436,7 +458,12 @@ def run(mock: bool = False,
     judge_visible, hidden_meta, rendered_hidden, failures = [], [], [], []
     for rec in records:
         text, status, rs = emit(rec)
-        if status in ("ok", "mock") and text is not None:
+        leaked = leaked_tokens(text) if (status in ("ok", "mock") and text is not None) else []
+        if leaked:
+            # A generation that echoes Symbol-U/arm terms must never reach judges. Drop THIS output
+            # (recorded) rather than aborting the whole run; blindness stays intact for the rest.
+            status, rs = "blindness_leak", [f"forbidden token(s): {leaked}"]
+        if status in ("ok", "mock") and text is not None and not leaked:
             judge_visible.append(make_judge_visible(rec, text))
             hidden_meta.append(make_hidden_meta(rec, seed, gen_code))
             rendered_hidden.append({"blinded_output_id": rec["blinded_output_id"],

@@ -184,6 +184,26 @@ def test_assert_blind_catches_leakage():
                           "generation_text": "ok"})
 
 
+def test_blindness_matcher_no_substring_false_positives():
+    # whole-word matching: ordinary words containing "arm" must NOT be flagged (was a substring bug)
+    for s in ["a warm current at dawn", "no harm, only charm", "the arm of the river",
+              "a farm, a swarm, an alarm", "held at arm's length", "harmony"]:
+        assert drv.leaked_tokens(s) == [], (s, drv.leaked_tokens(s))
+    # genuine method/arm leaks are still caught (case-insensitive)
+    assert drv.leaked_tokens("uses a Symbol-U scaffold") == ["Symbol-U", "scaffold"]
+    assert drv.leaked_tokens("the varna polarity and KCPR dual-pole") == \
+        ["varna", "polarity", "KCPR", "dual-pole"]
+    assert drv.leaked_tokens("RANDOMIZED_SYMBOLU_CONTROL") == ["RANDOMIZED_SYMBOLU_CONTROL"]
+    assert drv.leaked_tokens("a Symbolu framing") == ["Symbolu"]
+
+
+def test_blindness_leak_drops_single_output_not_whole_run(tmp_path):
+    # a leaking generation is dropped into failures; the run does not abort
+    pkg_ok = {"blinded_output_id": "G1", "generation_text": "a warm reading"}
+    drv.assert_blind(pkg_ok)                       # does not raise
+    assert drv.leaked_tokens("the varna scaffold") != []
+
+
 def test_mock_outputs_are_marked_not_to_score(tmp_path):
     res = _run(tmp_path)
     for pkg in res["judge_visible"]:
