@@ -206,12 +206,22 @@ def run_single_generator_panel_part(panel: Dict, gen_index: int,
     gen = panel["generator_models"][gen_index]
     code = f"M{gen_index + 1}"
     adapter = None
+    settings = None
     if not mock:
         if adapter_factory is None:
             raise ValueError("real part run requires adapter_factory(generator_entry)->adapter")
         adapter = adapter_factory(gen)
-    res = drv.run(mock=mock, adapter=adapter, mode=mode, limit_items=limit_items, decl_path=decl_path,
-                  write=False, gen_code=code, representation=representation)
+        # Thread the panel's real generation params into the driver: adapter.generate() uses the settings
+        # the driver passes, so without this the panel's max_tokens/temperature/seed are silently ignored.
+        from b1_6_llm_adapter import GenerationSettings
+        settings = GenerationSettings(
+            model_id=gen["id"], backend=panel.get("backend", "transformers"),
+            revision=gen.get("revision") if panel.get("backend") == "transformers" else None,
+            base_url=gen.get("endpoint"),
+            temperature=panel.get("temperature", 0.7), max_tokens=panel.get("max_tokens", 600),
+            seed=panel.get("seed", 1101))
+    res = drv.run(mock=mock, adapter=adapter, settings=settings, mode=mode, limit_items=limit_items,
+                  decl_path=decl_path, write=False, gen_code=code, representation=representation)
     m = res["manifest"]
     part = {
         "artifact_type": "b1_6_panel_part",

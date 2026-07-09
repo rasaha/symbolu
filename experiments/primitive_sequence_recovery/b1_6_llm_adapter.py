@@ -16,7 +16,7 @@ import hashlib
 import json
 import time
 import urllib.request
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, replace
 from typing import Dict, List, Optional, Tuple
 
 
@@ -27,7 +27,7 @@ class GenerationSettings:
     backend: str = "transformers"          # "transformers" | "openai_compat_local" | "fake"
     temperature: float = 0.7
     top_p: float = 0.95
-    max_tokens: int = 320
+    max_tokens: int = 600          # room for Title + 120-180w Interpretation + 2 bullets + Caution
     seed: int = 0
     timeout_s: int = 120
     max_attempts: int = 3
@@ -187,8 +187,11 @@ def generate_with_retry(adapter, prompt: str, settings: GenerationSettings,
     last_reasons: List[str] = []
     had_exception = False
     for attempt in range(settings.max_attempts):
+        # Vary the seed per attempt so a retry is a genuinely different generation, not an identical
+        # (set_seed-pinned) repeat of the same format-failing output.
+        attempt_settings = settings if attempt == 0 else replace(settings, seed=settings.seed + attempt)
         try:
-            text = adapter.generate(prompt, settings)
+            text = adapter.generate(prompt, attempt_settings)
             had_exception = False
         except Exception as e:                              # noqa: BLE001
             had_exception = True

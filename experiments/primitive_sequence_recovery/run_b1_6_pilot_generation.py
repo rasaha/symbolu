@@ -99,13 +99,17 @@ OUTPUT_FORMAT_SPEC = (
 )
 
 # words/markers that must NEVER appear in judge-visible outputs
-# Tokens that would identify the Symbol-U method or a specific experimental arm if they leaked into a
-# judge-visible generation. Matched as WHOLE WORDS, case-insensitively — a naive substring test wrongly
-# flagged ordinary words (a bare "arm" matched "warm"/"harm"/"charm"/"arm of the river"). The bare "arm"
-# and bare "RANDOMIZED" are replaced by the explicit arm identifiers; generic structural metaphors are
-# intentionally not word-blocked beyond the method's own terms ("scaffold", "polarity").
-FORBIDDEN_IN_JUDGE_VIEW = ("SYMBOLU", "Symbol-U", "varṇa", "varna", "KCPR", "scaffold", "polarity",
-                           "dual-pole", "SYMBOLU_SCAFFOLD", "PLAIN_PROMPT_BASELINE",
+# Tokens that would DE-ANONYMIZE an output: method proper-nouns and explicit experimental-arm labels.
+# These essentially never occur in an ordinary interpretive reading, so blocking them protects blindness
+# without biasing which arm survives. Matched as WHOLE WORDS, case-insensitively — a naive substring test
+# wrongly flagged ordinary words (a bare "arm" matched "warm"/"harm"/"charm"/"arm of the river").
+#
+# Deliberately NOT blocked: generic structural vocabulary such as "scaffold", "polarity", "pole", "arm".
+# The blind LLM judges receive only a quality rubric — never the experimental design or the method name —
+# so such words carry no arm signal to them; blocking them would only cause arm-correlated attrition
+# (e.g. selectively deleting Symbol-U-arm outputs that use the word "scaffold") and bias the comparison.
+FORBIDDEN_IN_JUDGE_VIEW = ("SYMBOLU", "Symbol-U", "varṇa", "varna", "KCPR",
+                           "SYMBOLU_SCAFFOLD", "PLAIN_PROMPT_BASELINE",
                            "GENERIC_STRUCTURED_PROMPT_BASELINE", "RANDOMIZED_SYMBOLU_CONTROL",
                            "SEMANTIC_LLM_BASELINE")
 # whole-word, case-insensitive; hyphen counts as a boundary char so "Symbol-U"/"dual-pole" match cleanly.

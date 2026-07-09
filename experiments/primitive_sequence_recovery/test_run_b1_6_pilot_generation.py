@@ -189,10 +189,13 @@ def test_blindness_matcher_no_substring_false_positives():
     for s in ["a warm current at dawn", "no harm, only charm", "the arm of the river",
               "a farm, a swarm, an alarm", "held at arm's length", "harmony"]:
         assert drv.leaked_tokens(s) == [], (s, drv.leaked_tokens(s))
-    # genuine method/arm leaks are still caught (case-insensitive)
-    assert drv.leaked_tokens("uses a Symbol-U scaffold") == ["Symbol-U", "scaffold"]
-    assert drv.leaked_tokens("the varna polarity and KCPR dual-pole") == \
-        ["varna", "polarity", "KCPR", "dual-pole"]
+    # generic structural vocabulary is NOT blocked (would bias arm-correlated attrition; no arm signal
+    # to a blind quality-rater who never sees the experimental design)
+    for s in ["built on a sturdy scaffold", "the polarity of the tides", "two poles in tension"]:
+        assert drv.leaked_tokens(s) == [], (s, drv.leaked_tokens(s))
+    # genuine method proper-nouns / arm labels are still caught (case-insensitive)
+    assert drv.leaked_tokens("uses a Symbol-U scaffold") == ["Symbol-U"]
+    assert drv.leaked_tokens("the varna and KCPR framing") == ["varna", "KCPR"]
     assert drv.leaked_tokens("RANDOMIZED_SYMBOLU_CONTROL") == ["RANDOMIZED_SYMBOLU_CONTROL"]
     assert drv.leaked_tokens("a Symbolu framing") == ["Symbolu"]
 

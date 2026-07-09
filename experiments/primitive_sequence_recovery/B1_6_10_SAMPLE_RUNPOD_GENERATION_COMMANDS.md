@@ -256,7 +256,7 @@ Write `run_out/b1_6_10_sample_probe/model_panel_manifest.json` (operator-authore
     {"id": "google/gemma-2-9b-it", "family": "Gemma", "revision": "<frozen>"}
   ],
   "temperature": 0.7,
-  "max_tokens": 320,
+  "max_tokens": 600,
   "seed": 1101,
   "declared_by": "<operator>",
   "declared_at_utc": "<ISO-8601>"
