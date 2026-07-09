@@ -101,6 +101,58 @@ curl -s http://localhost:8002/v1/models | head -c 400; echo
 The adapter posts to `<base_url>/v1/chat/completions`, so `base_url` is `http://localhost:8001` /
 `http://localhost:8002`.
 
+## 6b. Option B — Sequential single-GPU generation (one model server at a time)
+
+If a single GPU can't host both generators at once, run them **sequentially** with
+`run_b1_6_v2_sequential_panel_generation.py` (verified subcommands: `part`, `merge`). Each `part` needs only
+**one** server live; `merge` re-blinds both partials into the same 100-output package (same seed ⇒ identical
+final ids as the simultaneous panel). Uses the §3 v2 panel manifest and the §9 v2 exploratory declaration.
+
+```bash
+cd experiments/primitive_sequence_recovery
+PROBE=run_out/b1_6_10_sample_probe
+PANEL=$PROBE/model_panel_manifest_v2_named_vritti.json
+DECL=$PROBE/b1_6_10_sample_EVIDENCE_FREEZE_DECLARED.json
+
+# --- generator 1: Mistral ---
+python3 -m vllm.entrypoints.openai.api_server --model mistralai/Mistral-7B-Instruct-v0.3 \
+  --download-dir <MODEL_CACHE> --gpu-memory-utilization <FRAC> --max-model-len <MAXLEN> --port 8001 &
+MISTRAL_PID=$!
+curl -s http://localhost:8001/v1/models >/dev/null && echo "Mistral ready"
+
+python3 run_b1_6_v2_sequential_panel_generation.py part \
+  --panel "$PANEL" --generator-index 0 \
+  --mode exploratory_10_sample_generation_probe --limit-items 10 \
+  --representation-version v2_named_vritti \
+  --decl "$DECL" --out "$PROBE/generation_partial_M1"      # expect n_outputs: 50
+
+kill $MISTRAL_PID          # stop Mistral to free the GPU
+
+# --- generator 2: Qwen ---
+python3 -m vllm.entrypoints.openai.api_server --model Qwen/Qwen2.5-7B-Instruct \
+  --download-dir <MODEL_CACHE> --gpu-memory-utilization <FRAC> --max-model-len <MAXLEN> --port 8002 &
+QWEN_PID=$!
+curl -s http://localhost:8002/v1/models >/dev/null && echo "Qwen ready"
+
+python3 run_b1_6_v2_sequential_panel_generation.py part \
+  --panel "$PANEL" --generator-index 1 \
+  --mode exploratory_10_sample_generation_probe --limit-items 10 \
+  --representation-version v2_named_vritti \
+  --decl "$DECL" --out "$PROBE/generation_partial_M2"      # expect n_outputs: 50
+
+kill $QWEN_PID
+
+# --- merge + re-blind into the final 100-output panel package ---
+python3 run_b1_6_v2_sequential_panel_generation.py merge \
+  --parts "$PROBE/generation_partial_M1" "$PROBE/generation_partial_M2" \
+  --out "$PROBE/generation"                                 # expect n_outputs: 100
+```
+
+The `merge` step **refuses** if the two parts disagree on mode, representation_version, target subset, arm set,
+scaffold hashes, or the evidence-declaration hash — so a mismatched pair cannot be silently stitched. Verify the
+final package with §13 (100 judge-visible outputs; no arm/generator leak; `representation_version:
+v2_named_vritti`).
+
 ## 7. Backend option B — transformers local model
 
 Single-process, per-generator (slower than vLLM; needs enough VRAM):
