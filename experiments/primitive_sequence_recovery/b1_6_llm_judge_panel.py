@@ -155,11 +155,14 @@ def run_single_judge(judge: Dict, judge_visible_file: pathlib.Path,
     settings = settings or A.GenerationSettings(model_id=judge["id"], max_tokens=200, temperature=0.0)
     ratings: List[Dict] = []
     errors: List[Dict] = []
+    def _json_ok(t):                       # retry on unparseable/out-of-range judge JSON (varied seed)
+        dims, rs = parse_judge_json(t)
+        return dims is not None, rs
     for it in items:
         prompt = build_judge_prompt(it)
         if adapter is None:
             raise ValueError("run_single_judge requires an adapter (FakeJudgeAdapter in tests; real on a host)")
-        text, status, rs = A.generate_with_retry(adapter, prompt, settings, validate=False)
+        text, status, rs = A.generate_with_retry(adapter, prompt, settings, validate=True, validator=_json_ok)
         dims, preasons = (None, ["adapter error"]) if text is None else parse_judge_json(text)
         if dims is None:
             errors.append({"blinded_output_id": it["blinded_output_id"], "reasons": (rs or []) + preasons})

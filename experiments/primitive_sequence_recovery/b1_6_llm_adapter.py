@@ -181,9 +181,12 @@ class FakeAdapter:
 # Retry (mirrors B1.1 _gen_with_retry) + validation
 # --------------------------------------------------------------------------------------
 def generate_with_retry(adapter, prompt: str, settings: GenerationSettings,
-                        validate: bool = True, sleep=time.sleep) -> Tuple[Optional[str], str, List[str]]:
-    """Frozen retry policy: up to max_attempts; validate format (never edit); on repeated failure return
-    a failure status. Returns (text|None, status, reasons). status in {ok, format_invalid, error}."""
+                        validate: bool = True, sleep=time.sleep,
+                        validator=None) -> Tuple[Optional[str], str, List[str]]:
+    """Frozen retry policy: up to max_attempts; validate (never edit); on repeated failure return a
+    failure status. Returns (text|None, status, reasons). status in {ok, format_invalid, error}.
+    `validator(text)->(ok, reasons)` overrides the default output-format check (e.g. a judge-JSON check)."""
+    check = validator or validate_output_format
     last_reasons: List[str] = []
     had_exception = False
     for attempt in range(settings.max_attempts):
@@ -201,7 +204,7 @@ def generate_with_retry(adapter, prompt: str, settings: GenerationSettings,
             continue
         if not validate:
             return text, "ok", []
-        ok, reasons = validate_output_format(text)
+        ok, reasons = check(text)
         if ok:
             return text, "ok", []
         last_reasons = reasons          # do NOT edit output to fix it; retry a fresh generation
