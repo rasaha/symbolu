@@ -1,0 +1,54 @@
+{
+  "artifact_type": "b1_6_pilot_scaffold_manifest_v2_named_vritti",
+  "schema_version": "1.0",
+  "representation_version": "B1.6-v2_named_vritti",
+  "status": "SPEC_MANIFEST_NOT_A_FREEZE",
+  "readiness_label": "B1_6_V2_NAMED_VRTTI_SCAFFOLD_READY",
+  "supersedes_v1": {
+    "targets_scaffolds": "frozen/b1_6_pilot_targets_scaffolds.json",
+    "randomized_control": "frozen/b1_6_pilot_randomized_control_manifest.json",
+    "scaffold_manifest": "frozen/b1_6_pilot_scaffold_manifest.json",
+    "note": "v1 preserved unchanged; v2 is a NEW representation line, not v1 evidence."
+  },
+  "generation_run": false,
+  "evidence_freeze_declared": false,
+  "n_targets": 24,
+  "all_targets_covered": true,
+  "source_insufficient_varnas": [],
+  "global_scaffold_metadata": {
+    "REPRESENTATION_VERSION": "B1.6-v2_named_vritti",
+    "KCPR_POLICY": "NAMED_VRTTI_DUAL_POLE_RENDERING",
+    "KCPR_THEORY_STATUS": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "KOSHA": "DEFERRED",
+    "CSR_STL": "DEFERRED",
+    "POLARITY_INPUT_STATUS": "READOUT_SCAFFOLD_ONLY",
+    "STAGE_A_OPERATOR_POLARITY_STATUS": "POLARITY_FREE"
+  },
+  "active_scaffold_frames": [
+    "{TARGET_TEXT}",
+    "{VARNA_SEQUENCE}",
+    "{NAMED_VRTTI_PROFILE_TABLE}",
+    "{KCPR_NAMED_DUAL_POLE_FRAME}"
+  ],
+  "deferred_frames": [
+    "{CSR_STL_FRAME}"
+  ],
+  "hashes": {
+    "v2_named_vritti_table": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+    "v2_target_scaffolds": "7f331deb845bbd26b6e2392e538bcffa6b206bbfae748085b34ed6d8365cf0dc",
+    "v2_randomized_control": "f6bc91d5d23afeff83abcbae58231908f13355095b446bd0207ab0cb30add997",
+    "kcpr_v2_rule": "0923ad6ee7f08aeb565cb4e8b0b1acd649a3b423ba7913c6413c288f4a526ebd",
+    "phoneme_to_varna_bridge_manifest": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed",
+    "source_track_e": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+    "source_realization_en_gloss": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+    "source_assignment": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+    "prompt_rubric_doc": "080a67086c8631568c53c57a02d76f75a8a25f5ce3f8f8bc4f3205655b0ecc5b"
+  },
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "validation",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM"
+  ]
+}

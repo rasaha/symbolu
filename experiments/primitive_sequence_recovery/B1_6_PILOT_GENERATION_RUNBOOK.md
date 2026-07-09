@@ -87,6 +87,22 @@ python3 run_b1_6_pilot_generation.py --mock
 #     Still gated by the evidence-freeze declaration; see §13 (local LLM adapter).
 ```
 
+## 12b. B1.6-v2 supersession (named-vṛtti) — READ BEFORE RUNNING
+
+**B1.6-v1 (directional-axis) is superseded before execution and was never run.** The active representation going
+forward is **B1.6-v2 named-vṛtti** (`B1_6_V1_SUPERSEDED_V2_REFREEZE_REPORT.md`). Future runs should target the
+**v2** files:
+
+- `frozen/b1_6_pilot_targets_scaffolds_v2_named_vritti.json`
+- `frozen/b1_6_pilot_randomized_control_manifest_v2_named_vritti.json`
+- `frozen/b1_6_pilot_scaffold_manifest_v2_named_vritti.json`
+- table: `track_g_varna_polarity_table_v2_named_vritti.json`
+
+**v1 files are preserved unchanged for audit.** The generation driver/gate currently default to the **v1**
+constants; wiring them to accept the v2 paths (and hashing the v2 files in the evidence-freeze declaration) is a
+**separate, not-yet-done** step. **No run has occurred on either v1 or v2.** Do not run v1; when v2 wiring lands,
+point all generation commands and the declaration hashes at the v2 files above.
+
 ## 13. Local LLM adapter (real generation on a model host)
 
 Real generation is provided by `b1_6_llm_adapter.py` (modeled on the B1.1 run pattern):

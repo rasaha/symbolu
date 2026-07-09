@@ -1,0 +1,809 @@
+{
+  "artifact_type": "b1_6_varna_named_vritti_table_v2",
+  "schema_version": "1.0",
+  "representation_version": "B1.6-v2_named_vritti",
+  "authoring_status": "researcher_authored_candidate_representation",
+  "validation_status": "unvalidated_candidate_representation",
+  "evidence_status": "not_ontological_evidence",
+  "supersedes": "track_g_varna_polarity_table.json (directional-axis; B1.6-v1) — NOT a correction to run evidence",
+  "provenance": "Named vrtti/root extracted from the frozen sources: named_attribute + spiritual reading from track_e_varna_sphere_lexicon.json (root/spiritual), worldly-binding distortion from the realization_en_gloss binding-sense gloss (via assignment.json varna->atom). va/sa use the B1_6_VA_SA_SOURCE_AUDIT.md cleaned wording with interpretive glosses tagged. No invented meanings.",
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "validation",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM"
+  ],
+  "kcpr_v2_rule": {
+    "worldly_grosser_distortion": "binding pole",
+    "spiritual_subtler_reading": "liberating pole",
+    "both_poles_shown": true,
+    "per_target_pole_selection": false,
+    "post_output_editing": false,
+    "note": "The named root is not 'bad'; it binds when distorted at the worldly layer and liberates when expressed at the subtler layer. Both poles shown unless a FUTURE frozen mechanical context rule selects one."
+  },
+  "source_hashes": {
+    "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+    "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+    "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+    "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+  },
+  "n_varnas": 25,
+  "varnas": {
+    "ba": {
+      "named_attribute": "avajna / indifference, neglect",
+      "worldly_binding_distortion": "indifference / neglect",
+      "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction",
+      "interpretive_gloss": null,
+      "varna": "ba",
+      "root_source": "avajna / indifference, neglect",
+      "atom_id": "atom_22",
+      "source_binding_gloss_verbatim": "indifference / neglect",
+      "spheres": {
+        "physical": "neglect of what has value",
+        "mental": "disregard, carelessness",
+        "intellectual": "failure to assign proper value",
+        "spiritual": "spiritual dullness through neglect; respect/attention is correction"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: avajna (indifference). Flat binding gloss: 'indifference / neglect'."
+    },
+    "ca": {
+      "named_attribute": "viveka / conscience",
+      "worldly_binding_distortion": "lack of discrimination / confused discernment",
+      "spiritual_liberating_reading": "conscience as inner dharmic compass",
+      "interpretive_gloss": null,
+      "varna": "ca",
+      "root_source": "viveka / conscience",
+      "atom_id": "atom_05",
+      "source_binding_gloss_verbatim": "lack of discrimination / confused discernment",
+      "spheres": {
+        "physical": "restraint in action; ethical pause before doing",
+        "mental": "moral sensitivity",
+        "intellectual": "discrimination between right and wrong",
+        "spiritual": "conscience as inner dharmic compass"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: viveka (conscience/discrimination). Flat binding gloss: 'lack of discrimination / confused discernment' (binding/opposite sense)."
+    },
+    "da": {
+      "named_attribute": "peevishness / irritability",
+      "worldly_binding_distortion": "peevishness / irritability",
+      "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+      "interpretive_gloss": null,
+      "varna": "da",
+      "root_source": "peevishness / irritability",
+      "atom_id": "atom_17",
+      "source_binding_gloss_verbatim": "peevishness / irritability",
+      "spheres": {
+        "physical": "reactive body-language, irritability",
+        "mental": "peevishness, touchiness",
+        "intellectual": "adversarial interpretation of others",
+        "spiritual": "small egoic contraction; patience softens it"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: peevishness. Flat binding gloss: 'peevishness / irritability'."
+    },
+    "dda": {
+      "named_attribute": "lajja / shyness",
+      "worldly_binding_distortion": "shyness",
+      "spiritual_liberating_reading": "humility if purified; blockage if fear-based",
+      "interpretive_gloss": null,
+      "varna": "dda",
+      "root_source": "lajja / shyness",
+      "atom_id": "atom_12",
+      "source_binding_gloss_verbatim": "shyness",
+      "spheres": {
+        "physical": "withdrawal, hiding, lowered expression",
+        "mental": "shyness, embarrassment",
+        "intellectual": "inhibition of self-expression",
+        "spiritual": "humility if purified; blockage if fear-based"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: lajja (shyness). Flat binding gloss: 'shyness'. Retroflex da."
+    },
+    "dha": {
+      "named_attribute": "trishna / thirst for acquisition",
+      "worldly_binding_distortion": "craving / thirst for acquisition",
+      "spiritual_liberating_reading": "bondage through endless acquisition; spiritual ideation redirects it",
+      "interpretive_gloss": null,
+      "varna": "dha",
+      "root_source": "trishna / thirst for acquisition",
+      "atom_id": "atom_18",
+      "source_binding_gloss_verbatim": "craving / thirst for acquisition",
+      "spheres": {
+        "physical": "acquisition, hoarding, pursuit of wealth / name / power",
+        "mental": "craving, limitless wanting",
+        "intellectual": "instrumental calculation for gain",
+        "spiritual": "bondage through endless acquisition; spiritual ideation redirects it"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: trishna (thirst/craving). Flat binding gloss: 'craving / thirst for acquisition'."
+    },
+    "ga": {
+      "named_attribute": "ceshta / effort to arouse dormant potential",
+      "worldly_binding_distortion": "effort / striving",
+      "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+      "interpretive_gloss": null,
+      "varna": "ga",
+      "root_source": "ceshta / effort to arouse dormant potential",
+      "atom_id": "atom_02",
+      "source_binding_gloss_verbatim": "effort / striving",
+      "spheres": {
+        "physical": "action, effort, mobilization, activation of dormant power",
+        "mental": "striving, will, motivation",
+        "intellectual": "applied effort, disciplined development",
+        "spiritual": "effort as path to mundane development and spiritual elevation"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: ceshta (effort). Flat binding gloss: 'effort / striving'."
+    },
+    "ha": {
+      "named_attribute": "ether, daytime, sun, svarloka, paravidya; hao = Shiva dancing tandava",
+      "worldly_binding_distortion": "night / darkness (the contractive opposite of ha = day / sun / light)",
+      "spiritual_liberating_reading": "svarloka, solar ascent, Shivaic dynamism, tandava force",
+      "interpretive_gloss": null,
+      "varna": "ha",
+      "root_source": "ether, daytime, sun, svarloka, paravidya; hao = Shiva dancing tandava",
+      "atom_id": "atom_32",
+      "source_binding_gloss_verbatim": "night / darkness (the contractive opposite of ha = day / sun / light)",
+      "spheres": {
+        "physical": "ether, open sky, day, solar radiance",
+        "mental": "clarity, wakefulness, expansion out of darkness",
+        "intellectual": "intuitional science, higher insight (paravidya)",
+        "spiritual": "svarloka, solar ascent, Shivaic dynamism, tandava force"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: ether / day / sun / svarloka / paravidya. Flat binding gloss: 'night / darkness (the contractive opposite of ha = day/sun/light)'."
+    },
+    "ja": {
+      "named_attribute": "ahamkara / ego",
+      "worldly_binding_distortion": "ego / inflated I-feeling",
+      "spiritual_liberating_reading": "identity bondage; false doership",
+      "interpretive_gloss": null,
+      "varna": "ja",
+      "root_source": "ahamkara / ego",
+      "atom_id": "atom_07",
+      "source_binding_gloss_verbatim": "ego / inflated I-feeling",
+      "spheres": {
+        "physical": "self-assertive action, control-posture",
+        "mental": "'I did it', self-importance",
+        "intellectual": "ego-centered interpretation",
+        "spiritual": "identity bondage; false doership"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: ahamkara (ego). Flat binding gloss: 'ego / inflated I-feeling'."
+    },
+    "ka": {
+      "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+      "worldly_binding_distortion": "hope / forward-grasping desire",
+      "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation",
+      "interpretive_gloss": null,
+      "varna": "ka",
+      "root_source": "asha / hope; creation; karya brahma; flowing water-sound",
+      "atom_id": "atom_00",
+      "source_binding_gloss_verbatim": "hope / forward-grasping desire",
+      "spheres": {
+        "physical": "flow, survival movement, water, visible creation and manifestation",
+        "mental": "hope, expectation, longing for possibility",
+        "intellectual": "projection of future possibility; constructive imagination",
+        "spiritual": "expressed universe, creation-field, emergence into manifestation"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: aasha (hope) / creation / Karya Brahma. Flat binding gloss: 'hope / forward-grasping desire'."
+    },
+    "la": {
+      "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+      "worldly_binding_distortion": "cruelty",
+      "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+      "interpretive_gloss": null,
+      "varna": "la",
+      "root_source": "krurata / cruelty; kshiti-tattva / solid factor",
+      "atom_id": "atom_27",
+      "source_binding_gloss_verbatim": "cruelty",
+      "spheres": {
+        "physical": "solidity, hardness, earth, physical rigidity",
+        "mental": "harshness, cruelty",
+        "intellectual": "rigid judgment",
+        "spiritual": "earth-bound hardness; compassion softens it"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: krurata (cruelty) / kshiti (solid factor). Flat binding gloss: 'cruelty'."
+    },
+    "ma": {
+      "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+      "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+      "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed",
+      "interpretive_gloss": null,
+      "varna": "ma",
+      "root_source": "pranasha / annihilation; prashraya / indulgent latitude",
+      "atom_id": "atom_24",
+      "source_binding_gloss_verbatim": "annihilation / indulgence (giving latitude)",
+      "spheres": {
+        "physical": "dissolution, collapse, over-permissiveness",
+        "mental": "indulgence, emotional giving-in",
+        "intellectual": "boundary failure, permissive distortion",
+        "spiritual": "annihilation if unrestrained; discipline / sublimation needed"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: pranasha (annihilation) / prashraya (indulgence). Flat binding gloss: 'annihilation / indulgence (giving latitude)'."
+    },
+    "na": {
+      "named_attribute": "moha / blind attachment, infatuation",
+      "worldly_binding_distortion": "blind attachment / infatuation",
+      "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+      "interpretive_gloss": null,
+      "varna": "na",
+      "root_source": "moha / blind attachment, infatuation",
+      "atom_id": "atom_19",
+      "source_binding_gloss_verbatim": "blind attachment / infatuation",
+      "spheres": {
+        "physical": "clinging to person / place / object / time",
+        "mental": "fascination, possessive attachment",
+        "intellectual": "loss of rational discrimination",
+        "spiritual": "bondage through infatuation; indifference and spiritual ideation free it"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: moha (delusion/infatuation). Flat binding gloss: 'blind attachment / infatuation'."
+    },
+    "nga": {
+      "named_attribute": "dambha / vanity",
+      "worldly_binding_distortion": "vanity / pride-display",
+      "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+      "interpretive_gloss": null,
+      "varna": "nga",
+      "root_source": "dambha / vanity",
+      "atom_id": "atom_04",
+      "source_binding_gloss_verbatim": "vanity / pride-display",
+      "spheres": {
+        "physical": "display, self-inflation, status projection",
+        "mental": "pride, vanity, self-importance",
+        "intellectual": "distorted self-evaluation",
+        "spiritual": "egoic obstruction; humility is its spiritual correction"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: dambha (vanity). Flat binding gloss: 'vanity / pride-display'. Key 'nga' per assignment.json."
+    },
+    "nna": {
+      "named_attribute": "irshya / envy",
+      "worldly_binding_distortion": "envy",
+      "spiritual_liberating_reading": "bondage through comparison; sympathetic joy (mudita) is its correction",
+      "interpretive_gloss": null,
+      "varna": "nna",
+      "root_source": "irshya / envy",
+      "atom_id": "atom_14",
+      "source_binding_gloss_verbatim": "envy",
+      "spheres": {
+        "physical": "competitive tension, bodily agitation",
+        "mental": "envy, comparison-pain",
+        "intellectual": "distorted evaluation of another's good",
+        "spiritual": "bondage through comparison; sympathetic joy (mudita) is its correction"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: irshya (envy). Flat binding gloss: 'envy'. Retroflex na."
+    },
+    "nya": {
+      "named_attribute": "kapatata / hypocrisy",
+      "worldly_binding_distortion": "hypocrisy / deceit",
+      "spiritual_liberating_reading": "spiritual falseness; split between outer virtue and inner conduct",
+      "interpretive_gloss": null,
+      "varna": "nya",
+      "root_source": "kapatata / hypocrisy",
+      "atom_id": "atom_09",
+      "source_binding_gloss_verbatim": "hypocrisy / deceit",
+      "spheres": {
+        "physical": "deceptive conduct, masking",
+        "mental": "duplicity, hidden motive",
+        "intellectual": "false moral reasoning, self-justification",
+        "spiritual": "spiritual falseness; split between outer virtue and inner conduct"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: kapatata (hypocrisy). Flat binding gloss: 'hypocrisy / deceit'. Key 'nya' per assignment.json."
+    },
+    "pa": {
+      "named_attribute": "ghrina / hatred, revulsion",
+      "worldly_binding_distortion": "hatred / revulsion",
+      "spiritual_liberating_reading": "fetter of hatred; related to moha and fear",
+      "interpretive_gloss": null,
+      "varna": "pa",
+      "root_source": "ghrina / hatred, revulsion",
+      "atom_id": "atom_20",
+      "source_binding_gloss_verbatim": "hatred / revulsion",
+      "spheres": {
+        "physical": "rejection, pushing away, aversive action",
+        "mental": "hatred, disgust, revulsion",
+        "intellectual": "devaluation of the other",
+        "spiritual": "fetter of hatred; related to moha and fear"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: ghrina (hatred/revulsion). Flat binding gloss: 'hatred / revulsion'."
+    },
+    "ra": {
+      "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+      "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+      "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+      "interpretive_gloss": null,
+      "varna": "ra",
+      "root_source": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+      "atom_id": "atom_26",
+      "source_binding_gloss_verbatim": "defeatist annihilation-thought ('everything is gone, I am undone')",
+      "spheres": {
+        "physical": "fire, heat, vitality, energy",
+        "mental": "intensity, urgency, frustration if blocked",
+        "intellectual": "decisive force; destructive or illuminating cognition",
+        "spiritual": "fire of life-force; can become defeatism or spiritual energy"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: agni/prana (fire, vitality) and sarvanasha (annihilation-thought). Flat binding gloss: \"defeatist annihilation-thought ('everything is gone, I am undone')\"."
+    },
+    "sa": {
+      "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+      "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+      "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+      "interpretive_gloss": "'goodness / purity' = interpretive gloss of sattva-guṇa (NOT source text)",
+      "varna": "sa",
+      "root_source": "moksha; sattva-guna",
+      "atom_id": "atom_31",
+      "source_binding_gloss_verbatim": "escapism / premature static withdrawal",
+      "spheres": {
+        "physical": "lightness, release from binding action",
+        "mental": "clarity, peace, release",
+        "intellectual": "sentient discrimination, liberation-oriented thought",
+        "spiritual": "moksha, salvation, unqualified liberation, sattva"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: moksha / sattva-guna. Flat binding gloss: 'escapism / premature static withdrawal' (binding/opposite sense)."
+    },
+    "sha": {
+      "named_attribute": "rajo-guna; artha / psychic longing",
+      "worldly_binding_distortion": "mutative drive / material pursuit",
+      "spiritual_liberating_reading": "rajas; artha as psychic longing and worldly movement",
+      "interpretive_gloss": null,
+      "varna": "sha",
+      "root_source": "rajo-guna; artha / psychic longing",
+      "atom_id": "atom_29",
+      "source_binding_gloss_verbatim": "mutative drive / material pursuit",
+      "spheres": {
+        "physical": "activity, dynamism, outward motion",
+        "mental": "ambition, restlessness, want-removal",
+        "intellectual": "goal-seeking, resource intelligence",
+        "spiritual": "rajas; artha as psychic longing and worldly movement"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: rajo-guna / artha (psychic longing). Flat binding gloss: 'mutative drive / material pursuit'."
+    },
+    "ssa": {
+      "named_attribute": "tamo-guna; kama / physical worldly desire",
+      "worldly_binding_distortion": "static inertia / worldly desire",
+      "spiritual_liberating_reading": "tamas-bound kama; physical / worldly longing",
+      "interpretive_gloss": null,
+      "varna": "ssa",
+      "root_source": "tamo-guna; kama / physical worldly desire",
+      "atom_id": "atom_30",
+      "source_binding_gloss_verbatim": "static inertia / worldly desire",
+      "spheres": {
+        "physical": "physical longing, material desire, sensual pursuit",
+        "mental": "desire, attraction, craving for status / pleasure",
+        "intellectual": "desire-shaped thought",
+        "spiritual": "tamas-bound kama; physical / worldly longing"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: tamo-guna / kama (physical desire). Flat binding gloss: 'static inertia / worldly desire'. Key 'ssa' per assignment.json; source distinguishes sha/sa/ssa."
+    },
+    "ta": {
+      "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+      "worldly_binding_distortion": "inertia / staticity / dullness",
+      "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+      "interpretive_gloss": null,
+      "varna": "ta",
+      "root_source": "staticity, deep sleep, dullness, spiritual inertness",
+      "atom_id": "atom_15",
+      "source_binding_gloss_verbatim": "inertia / staticity / dullness",
+      "spheres": {
+        "physical": "heaviness, sleep, inertia",
+        "mental": "dullness, tamasic lethargy",
+        "intellectual": "intellectual dullness",
+        "spiritual": "spiritual inertness that discipline seeks to liberate from"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: staticity / long sleep / dullness. Flat binding gloss: 'inertia / staticity / dullness'."
+    },
+    "tha": {
+      "named_attribute": "vishada / melancholy",
+      "worldly_binding_distortion": "melancholy / dejection",
+      "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+      "interpretive_gloss": null,
+      "varna": "tha",
+      "root_source": "vishada / melancholy",
+      "atom_id": "atom_16",
+      "source_binding_gloss_verbatim": "melancholy / dejection",
+      "spheres": {
+        "physical": "drooping, low vitality",
+        "mental": "sadness, melancholy",
+        "intellectual": "pessimistic interpretation",
+        "spiritual": "depressive contraction; needs upward movement"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: vishada (melancholy). Flat binding gloss: 'melancholy / dejection'."
+    },
+    "tta": {
+      "named_attribute": "vitarka / overstatement, angry garrulousness",
+      "worldly_binding_distortion": "overstatement / garrulousness",
+      "spiritual_liberating_reading": "misuse of speech; needs silence / balanced speech",
+      "interpretive_gloss": null,
+      "varna": "tta",
+      "root_source": "vitarka / overstatement, angry garrulousness",
+      "atom_id": "atom_10",
+      "source_binding_gloss_verbatim": "overstatement / garrulousness",
+      "spheres": {
+        "physical": "excessive speech, reactive expression",
+        "mental": "irritability, argumentativeness",
+        "intellectual": "over-arguing, distortion through exaggeration",
+        "spiritual": "misuse of speech; needs silence / balanced speech"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: vitarka (overstatement). Flat binding gloss: 'overstatement / garrulousness'. Retroflex ta."
+    },
+    "va": {
+      "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+      "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+      "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+      "interpretive_gloss": "'order / right order' = interpretive gloss of dharma / rightness / sustaining principle (NOT source text); 'possession' removed (source is holding/ensconcement, explicitly non-moral)",
+      "varna": "va",
+      "root_source": "dharma; jala-tattva / liquid factor; Varuna",
+      "atom_id": "atom_28",
+      "source_binding_gloss_verbatim": "holding / ensconcement in original stance (BINDS — dhṛ = to hold; non-moral)",
+      "spheres": {
+        "physical": "water / liquid, sustaining flow",
+        "mental": "natural movement toward happiness and rightness",
+        "intellectual": "alignment with sustaining principle",
+        "spiritual": "dharma; movement toward subtlety; ensconcement in original stance"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "medium",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: dharma / jala (liquid factor) / Varuna. Flat binding gloss: 'holding / ensconcement in original stance (BINDS)'."
+    },
+    "ya": {
+      "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+      "worldly_binding_distortion": "lack of confidence / wavering movement",
+      "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+      "interpretive_gloss": null,
+      "varna": "ya",
+      "root_source": "avishvasa / lack of confidence; constant air-like movement",
+      "atom_id": "atom_25",
+      "source_binding_gloss_verbatim": "lack of confidence / wavering movement",
+      "spheres": {
+        "physical": "restless movement, instability",
+        "mental": "lack of confidence, uncertainty",
+        "intellectual": "doubt in self and others",
+        "spiritual": "unstable faith; needs trust and inner steadiness"
+      },
+      "source_path": [
+        "track_e_varna_sphere_lexicon.json",
+        "frozen/realization_en_gloss.json",
+        "frozen/assignment.json",
+        "track_g_varna_polarity_table.json"
+      ],
+      "source_hash": {
+        "track_e_varna_sphere_lexicon.json": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+        "frozen/realization_en_gloss.json": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+        "frozen/assignment.json": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+        "track_g_varna_polarity_table.json": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742"
+      },
+      "leak_risk": "high",
+      "coverage": "SOURCE_SUPPORTED",
+      "notes": "Classical root: avishvasa (lack of confidence). Flat binding gloss: 'lack of confidence / wavering movement'."
+    }
+  }
+}
