@@ -26,7 +26,7 @@ def _valid_decl(mode="pilot_generation"):
         "prompt_rubric_sha256": _sha(drv.PROMPT_RUBRIC_FILE),
         "declared_by": "operator-test",
         "declared_at_utc": "2026-07-08T00:00:00Z",
-        "attestation": drv.ATTESTATION,
+        "attestation": drv.ATTESTATIONS[mode],
     }
 
 
@@ -210,6 +210,14 @@ def test_exploratory_mode_requires_exploratory_declaration(tmp_path):
     with pytest.raises(PermissionError):
         drv.run(mock=True, mode=drv.EXPLORATORY_MODE, limit_items=10,
                 decl_path=decl, out_dir=tmp_path / "o", write=False)
+
+
+def test_exploratory_requires_exploratory_attestation(tmp_path):
+    # exploratory-mode declaration carrying the PILOT attestation must be refused
+    d = _valid_decl(mode=drv.EXPLORATORY_MODE)
+    d["attestation"] = drv.ATTESTATION            # wrong (pilot) attestation for exploratory mode
+    ok, reasons = drv.verify_freeze_gate(_write_decl(tmp_path, d), expected_mode=drv.EXPLORATORY_MODE)
+    assert not ok and any("attestation" in r for r in reasons)
 
 
 def test_10_sample_exploratory_mock(tmp_path):

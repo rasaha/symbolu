@@ -22,7 +22,7 @@ def _decl(tmp_path, mode):
         "randomized_control_manifest_sha256": _sha(drv.RANDCTL_FILE),
         "prompt_rubric_sha256": _sha(drv.PROMPT_RUBRIC_FILE),
         "declared_by": "operator-test", "declared_at_utc": "2026-07-08T00:00:00Z",
-        "attestation": drv.ATTESTATION,
+        "attestation": drv.ATTESTATIONS[mode],
     }
     p = tmp_path / "decl.json"; p.write_text(json.dumps(decl))
     return p

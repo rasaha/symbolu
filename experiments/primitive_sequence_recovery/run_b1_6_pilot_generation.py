@@ -63,6 +63,10 @@ REQUIRED_DECL_FIELDS = (
 )
 ATTESTATION = ("B1.6 pilot generation only; no judging; no semantic truth claim; "
                "Symbol-U utility test only; B1.4b′ remains NULL_RETURN_BOTTOM.")
+EXPLORATORY_ATTESTATION = ("B1.6 10-sample exploratory generation probe only; no judging; "
+                           "no semantic truth claim; no GENUTILITY terminal label; "
+                           "B1.4b′ remains NULL_RETURN_BOTTOM.")
+ATTESTATIONS = {MODE: ATTESTATION, EXPLORATORY_MODE: EXPLORATORY_ATTESTATION}
 
 OUTPUT_FORMAT_SPEC = (
     "Title: <one short phrase>\n"
@@ -129,7 +133,7 @@ def verify_freeze_gate(decl_path: pathlib.Path = DECL_FILE,
         if decl.get(field) != actual:
             reasons.append(f"{field} mismatch (declared {decl.get(field)!r} != actual {actual})")
 
-    if decl.get("attestation") != ATTESTATION:
+    if decl.get("attestation") != ATTESTATIONS.get(expected_mode):
         reasons.append("attestation text mismatch")
     return (not reasons), reasons
 
