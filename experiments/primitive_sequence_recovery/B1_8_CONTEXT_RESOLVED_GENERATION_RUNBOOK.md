@@ -4,9 +4,10 @@
 generation. No evidence freeze. No judging. No `GENUTILITY_*`.** Defines how the frozen B1.8 selected-pole
 scaffolds are rendered, gated, generated, blinded, judged, and aggregated.
 
-**Readiness label: `B1_8_GENERATION_RUNBOOK_READY`** (the *specification* is complete). **Execution is
-currently gated: a B1.8 driver module has not yet been implemented** — attempting a run now would be
-`B1_8_GENERATION_BLOCKED_DRIVER_WIRING` (see §13). This runbook does **not** implement it.
+**Readiness label: `B1_8_GENERATION_RUNBOOK_READY`** (spec complete). **The driver is now implemented and
+mock-tested** — `run_b1_8_context_resolved_generation.py` (`B1_8_GENERATION_DRIVER_READY_MOCK_TESTED`, 16
+tests), commands in §13b. Execution remains gated on an operator evidence-freeze declaration; no real
+generation has run.
 
 **B1.4b′ remains `NULL_RETURN_BOTTOM`.** Original B1.4b blocked; Track B blocked. Structure, not validated meaning.
 
@@ -185,6 +186,55 @@ it (fixed N and the primary endpoint pre-committed before looking). Until then, 
 The B1.6-v2 generation driver **cannot** be reused directly for the resolved arms — it renders both poles from
 `KCPR_DUAL_POLE_FRAME`, does not know B1.8's 7 arms, the `CONTEXT_TEXT` field, or the B1.8 frozen files. Hence a
 new driver, but built entirely on the reused adapter/judge/scorer stack.
+
+## 13b. Driver commands (IMPLEMENTED, mock-tested)
+
+Driver: `run_b1_8_context_resolved_generation.py` (+ `test_run_b1_8_context_resolved_generation.py`, 16 tests).
+Subcommands `part` (one generator over all 12×7 records → 84 outputs) and `merge` (re-blind parts → final
+package). Reuses `b1_6_llm_adapter` (transformers/openai_compat_local/fake) and the shared leak matcher.
+
+**Mock plumbing (no model, no gate — plumbing only):**
+```bash
+python3 run_b1_8_context_resolved_generation.py part --mock --gen-code M1 --out run_out/b1_8/M1   # n_outputs 84
+python3 run_b1_8_context_resolved_generation.py part --mock --gen-code M2 --out run_out/b1_8/M2   # n_outputs 84
+python3 run_b1_8_context_resolved_generation.py merge --parts run_out/b1_8/M1 run_out/b1_8/M2 \
+        --out run_out/b1_8/generation                                                             # n_outputs 168
+```
+
+**Evidence-freeze declaration template** (operator action; gitignored; NOT created here):
+```bash
+python3 - <<'PY'
+import hashlib, json, os, pathlib
+import run_b1_8_context_resolved_generation as D
+def sha(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+decl = {"artifact": "b1_8_context_resolved_EVIDENCE_FREEZE_DECLARED", "evidence_freeze_declared": True,
+        "mode": D.MODE, "representation_version": D.REPRESENTATION,
+        "declared_by": os.environ.get("USER","operator"), "declared_at_utc": "2026-07-09T00:00:00Z",
+        "attestation": D.ATTESTATION,
+        **{k: sha(v) for k, v in D.HASH_INPUTS.items()}}
+pathlib.Path("run_out/b1_8/b1_8_EVIDENCE_FREEZE_DECLARED.json").write_text(json.dumps(decl, indent=2))
+print("declared")
+PY
+```
+
+**Real RunPod run (transformers; sequential single-GPU; gated):**
+```bash
+export HF_HOME=/workspace/.cache/huggingface; export DECL=run_out/b1_8/b1_8_EVIDENCE_FREEZE_DECLARED.json
+python3 run_b1_8_context_resolved_generation.py part --decl "$DECL" --gen-code M1 \
+        --backend transformers --model-id mistralai/Mistral-7B-Instruct-v0.3 --out run_out/b1_8/M1   # 84
+python3 run_b1_8_context_resolved_generation.py part --decl "$DECL" --gen-code M2 \
+        --backend transformers --model-id Qwen/Qwen2.5-7B-Instruct --out run_out/b1_8/M2             # 84
+python3 run_b1_8_context_resolved_generation.py merge --parts run_out/b1_8/M1 run_out/b1_8/M2 \
+        --out run_out/b1_8/generation                                                               # 168
+```
+Expected total: **12 × 7 × 2 = 168 outputs**. The `part` command **refuses** without a valid declaration
+(mode `b1_8_context_resolved_generation_probe`, representation `B1.8_context_resolved_layer1`, matching B1.8
+hashes, exact attestation) — a B1.6-v2 declaration is rejected loudly.
+
+**Next step: blind judging only after generation** — reuse `run_b1_6_v2_llm_judge_panel.py` on
+`run_out/b1_8/generation/panel_judge_visible_outputs.jsonl` (Llama/Gemma judges ≠ Mistral/Qwen generators),
+then a ratings-freeze, then `judge_b1_6_pilot_outputs.aggregate` with the B1.8 hidden metadata. **168 × 3 = 504
+ratings.** No judging is performed here.
 
 ## 14. Readiness labels
 
