@@ -1,7 +1,7 @@
 """B1.6 pilot BLIND judging harness (two-phase; mock-tested only).
 
 Phase A (blind rating package): reads the generation driver's judge-visible outputs,
-verifies blindness (no arm names / Symbol-U / KCPR / scaffold / hidden-metadata fields),
+verifies blindness (no arm names / Symbol-U / KCPR method proper-nouns / hidden-metadata fields),
 and exports a rating template. NO arm identity is available in Phase A.
 
 Phase B (post-rating aggregation): ONLY after a ratings-freeze declaration exists and
@@ -22,6 +22,8 @@ import io
 import json
 import pathlib
 from typing import Dict, List, Optional, Tuple
+
+import run_b1_6_pilot_generation as _gen   # single source of truth for the blindness token matcher
 
 HERE = pathlib.Path(__file__).resolve().parent
 GEN_OUT = HERE / "run_out" / "b1_6_pilot_generation"
@@ -78,9 +80,11 @@ ALLOWED_JUDGE_KEYS = {"item_id", "target_text", "neutral_context",
 FORBIDDEN_JUDGE_KEYS = {"arm", "true_arm", "prompt", "prompt_sha256", "scaffold", "scaffold_hash",
                         "VARNA_PROFILE_TABLE", "VARNA_SEQUENCE", "KCPR_DUAL_POLE_FRAME",
                         "randomization_seed", "profile_from"}
-# tokens that must not appear in generation_text
-FORBIDDEN_TOKENS = ("SYMBOLU", "Symbol-U", "varṇa", "varna", "KCPR", "scaffold",
-                    "RANDOMIZED_SYMBOLU", "polarity", "dual-pole", "worldly/binding")
+# tokens that must not appear in generation_text — SHARED with the generator side to avoid drift.
+# Whole-word, case-insensitive: method proper-nouns + explicit arm labels only. Generic words like
+# "scaffold"/"polarity" are intentionally NOT blocked (no arm signal to a blind judge; blocking them
+# would bias arm-correlated attrition). See run_b1_6_pilot_generation.FORBIDDEN_IN_JUDGE_VIEW.
+FORBIDDEN_TOKENS = _gen.FORBIDDEN_IN_JUDGE_VIEW
 
 PILOT_LABELS = (
     "B1_6_PILOT_JUDGING_HARNESS_READY_MOCK_TESTED",
@@ -127,9 +131,8 @@ def check_blindness(judge_visible: List[Dict]) -> Tuple[bool, List[str]]:
         if "neutral_context" not in pkg:
             reasons.append(f"[{i}] neutral_context missing")
         gen = str(pkg.get("generation_text", ""))
-        for tok in FORBIDDEN_TOKENS:
-            if tok in gen:
-                reasons.append(f"[{i}] forbidden token {tok!r} in generation_text")
+        for tok in _gen.leaked_tokens(gen):          # whole-word, case-insensitive (shared matcher)
+            reasons.append(f"[{i}] forbidden token {tok!r} in generation_text")
     return (not reasons), reasons
 
 
