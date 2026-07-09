@@ -164,9 +164,26 @@ readings) is a property of the **scaffold format** and is fully reproduced by sh
 also costs ~3× the tokens. This is a clean **null** for the varṇa-specific hypothesis, fully consistent with
 B1.4b′.
 
-**The one honest, non-hypothesis takeaway:** as a *creativity/divergence scaffold*, the format reliably moves a
-model off its default reading — usable as a brainstorming aid, sold as what it is (a structured imagery prompt),
-with no dependence on the meanings being real.
+## 10b. The one usable positive finding — creativity / divergence (format, not meaning)
+
+Set apart because it is the only positive, actionable result in the probe, and it must not be mis-sold. The
+Symbol-U scaffold produced **markedly more creative, evocative readings** than plain or semantic prompts —
+creativity_aesthetic ≈ **5.55 vs ~3.8–4.0** (a ~1.5-point jump on a 7-point scale, the single largest effect
+anywhere in the data) — and an independent embedding measure confirms it as **content**, not just judge
+impression: a Symbol-U reading sits **~0.42 cosine distance** from the plain reading of the same word, about
+**60% of the way** to a completely different word/topic (calibration 0.73). In other words, the scaffold reliably
+knocks a model off its default reading and toward a fresh, imagery-laden angle. **However, this is a property of
+the scaffold *format* — feeding the model rich imagery and two opposing poles to riff on — and not of the varṇa
+meanings:** the scrambled control reproduces ~88% of the divergence (0.371 vs 0.419) and matches the creativity
+score (5.58 vs 5.55), and Symbol-U is closer to its own scramble (0.314) than to a plain reading (0.419). The
+honest, usable conclusion is therefore narrow and real: **Symbol-U works as a creativity / reframing scaffold —
+a structured way to make a model free-associate and produce a different perspective on the same concept** —
+useful for brainstorming, ideation, teaching, or breaking a model out of a generic answer. It is **not** a
+decoder of hidden meaning, it costs ~3× the tokens and a small dip in fluency to get there, and shuffling the
+mapping does the same job. Sold as what it is (a divergence prompt), it has value; sold as evidence the varṇa
+meanings are real, it has none. This finding is the direct seed of the B1.7 perspective-lens probe, which tests
+whether that divergence can be *steered* (physical↔mental↔intellectual↔spiritual) and whether the varṇa content
+adds anything over a plain plane-instruction.
 
 ## 11. Limits (what this does and does not license)
 
