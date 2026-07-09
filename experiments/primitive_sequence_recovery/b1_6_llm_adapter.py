@@ -125,9 +125,13 @@ class TransformersAdapter:
         enc = self.tok.apply_chat_template(
             msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True).to(self.model.device)
         in_len = enc["input_ids"].shape[1]
+        gen_kwargs = dict(max_new_tokens=s.max_tokens, pad_token_id=self.tok.eos_token_id)
+        if s.temperature and s.temperature > 0:            # sampling; greedy (do_sample=False) when temp<=0
+            gen_kwargs.update(do_sample=True, temperature=s.temperature, top_p=s.top_p)
+        else:
+            gen_kwargs.update(do_sample=False)             # temperature=0 must NOT pair with do_sample=True
         with torch.no_grad():
-            out = self.model.generate(**enc, do_sample=True, temperature=s.temperature, top_p=s.top_p,
-                                      max_new_tokens=s.max_tokens, pad_token_id=self.tok.eos_token_id)
+            out = self.model.generate(**enc, **gen_kwargs)
         return self.tok.decode(out[0][in_len:], skip_special_tokens=True).strip()
 
 
@@ -190,9 +194,16 @@ def generate_with_retry(adapter, prompt: str, settings: GenerationSettings,
     last_reasons: List[str] = []
     had_exception = False
     for attempt in range(settings.max_attempts):
-        # Vary the seed per attempt so a retry is a genuinely different generation, not an identical
-        # (set_seed-pinned) repeat of the same format-failing output.
-        attempt_settings = settings if attempt == 0 else replace(settings, seed=settings.seed + attempt)
+        # Attempt 0 is verbatim (a greedy/temperature-0 first pass stays deterministic + reproducible).
+        # Retries vary the seed so they aren't an identical repeat; if the base pass is greedy (temp<=0),
+        # a retry also enables light sampling — otherwise a greedy retry would reproduce the same failure.
+        if attempt == 0:
+            attempt_settings = settings
+        else:
+            bump = {"seed": settings.seed + attempt}
+            if not (settings.temperature and settings.temperature > 0):
+                bump["temperature"] = 0.5
+            attempt_settings = replace(settings, **bump)
         try:
             text = adapter.generate(prompt, attempt_settings)
             had_exception = False
