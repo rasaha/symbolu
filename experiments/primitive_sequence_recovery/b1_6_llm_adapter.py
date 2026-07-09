@@ -202,7 +202,9 @@ def generate_with_retry(adapter, prompt: str, settings: GenerationSettings,
         else:
             bump = {"seed": settings.seed + attempt}
             if not (settings.temperature and settings.temperature > 0):
-                bump["temperature"] = 0.5
+                # greedy base: escalate temperature across retries (0.6, 0.8, 0.9, ...) for more diverse
+                # samples so a stubborn omission (e.g. a dropped rubric key) gets a fresh chance.
+                bump["temperature"] = min(0.4 + 0.2 * attempt, 0.9)
             attempt_settings = replace(settings, **bump)
         try:
             text = adapter.generate(prompt, attempt_settings)

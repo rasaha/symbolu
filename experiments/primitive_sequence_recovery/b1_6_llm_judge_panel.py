@@ -156,7 +156,7 @@ def run_single_judge(judge: Dict, judge_visible_file: pathlib.Path,
     if limit_outputs:
         items = items[:limit_outputs]
     settings = settings or A.GenerationSettings(model_id=judge["id"], max_tokens=512, temperature=0.0,
-                                                max_attempts=5)
+                                                max_attempts=8)
     ratings: List[Dict] = []
     errors: List[Dict] = []
     def _json_ok(t):                       # retry on unparseable/out-of-range judge JSON (varied seed)
