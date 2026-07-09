@@ -1,0 +1,128 @@
+{
+  "artifact_type": "b1_6_kcpr_pole_selection_manifest",
+  "schema_version": "1.0",
+  "status": "SPEC_MANIFEST_NOT_A_FREEZE",
+  "readiness_label": "B1_6_KCPR_THEORY_AMENDED_READY",
+  "theory_accommodation": {
+    "audit": "B1_6_KCPR_THEORY_ACCOMMODATION_AUDIT.md",
+    "amendment": "B1_6_KCPR_THEORY_AMENDMENT.md",
+    "decision": "KCPR_THEORY_AMENDMENT_REQUIRED",
+    "kcpr_named_theory_doc": "NOT_FOUND (KCPR acronym confined to the experiment track; never expanded in a theory doc)",
+    "governing_theory_docs": {
+      "PRIMITIVE_VRTTI_WITHOUT_POLARITY.md": "43ab478894bb184e01a7bd17b9e4da2cf4dc21438d824aadbc6055570cb79143",
+      "PREREG_CRS_POLE_SELECTION.md": "06e38428b719e88da625ce905426e32e06bf103dc780066e40cf099b7de528ad",
+      "VARNA_STATE_OPERATOR_THEORY.md": "16d9eeda9b6644b3c94db11bd0b6842a9e2845a71fd3b842a54949cdead0ae3e",
+      "SYMBOL_U_THEORY_V1_FREEZE.md": "7862c2837244e8d93efe7ca885bade03badfb1559aef45521ffe4d4715bd044d"
+    },
+    "pole_selection_theory": "SATISFIED (DUAL_POLE_RENDERING selects no pole, flips no pole; CRS prereg forbids semantic pole selection/flipping)",
+    "conflict": "per-varna polarity used as scaffold INPUT vs PRIMITIVE_VRTTI 'polarity emergent after composition, never an input; no counter-pole grounding'",
+    "resolution_guard": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "resolution_notes": [
+      "dual-pole frame is an admittedly theory-noncanonical candidate READOUT scaffold for a utility test; not a claim polarity is a real per-varna input; not validated",
+      "operator layer L (Stage A-prime) stays polarity-free; polarity enters only the downstream readout scaffold, never operator composition (PRIMITIVE_VRTTI core prohibition honored)",
+      "no pole selection, no pole flip (CRS prereg satisfied)"
+    ],
+    "kosha": "DEFERRED_NOT_USED (no mechanical Kosha->pole rule in any theory source; not required for dual-pole rendering)",
+    "mechanism_changed": false,
+    "policy_sha256_unchanged": true
+  },
+  "generation_run": false,
+  "evidence_freeze_declared": false,
+  "target_scaffolds_instantiated": false,
+  "tuned_to_any_target_set": false,
+  "kcpr_expansion_in_repo": "KCPR_EXPANSION_NOT_FOUND",
+  "kcpr_operational_expansion_b1_6_only": "Kosha-Context Pole Resolution",
+  "kcpr_operational_expansion_note": "B1.6 operational expansion only; NOT a historical repo expansion. The acronym KCPR is used but never expanded anywhere in the repo.",
+  "selected_policy": "DUAL_POLE_RENDERING",
+  "kosha": "DEFERRED_NOT_USED",
+  "csr_stl": "DEFERRED",
+  "policy_sha256": "e74068f0ff141e7e3ca6b99a85a89f111d87972efd32607b0d26ca6e0869d51e",
+  "purpose": "Defines how the existing varna polarity table is rendered into poles for the B1.6 Symbol-U generative scaffold, without any per-target pole selection. Conservative dual-pole rendering: each supported consonant-varna shows BOTH poles of each axis it contributes to, plus the candidate table's signed lean; the generator is never told which pole is 'correct'.",
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "Track B unblocking",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM",
+    "any evidence claim"
+  ],
+  "sources": {
+    "varna_polarity_profile_table": {
+      "path": "experiments/primitive_sequence_recovery/track_g_varna_polarity_table.json",
+      "sha256": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742",
+      "role": "per-varna signed axis contributions (source_basis = frozen_realization_en_gloss_vrtti_binding_sense)",
+      "self_declared_status": "researcher_authored_candidate_representation; unvalidated; not_ontological_evidence; high_degrees_of_freedom"
+    },
+    "polarity_axes": {
+      "path": "experiments/primitive_sequence_recovery/track_g_polarity_axes.json",
+      "sha256": "37631d84eb50a611fde43fb1cf38d88832d5508cab92b3d0f56f7c02893dca8b",
+      "role": "named positive_pole / negative_pole per axis (dual-pole source); leak_risk=low"
+    },
+    "varna_four_sphere_lexicon": {
+      "path": "experiments/primitive_sequence_recovery/track_e_varna_sphere_lexicon.json",
+      "sha256": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+      "role": "companion four-sphere lexicon (not required for pole rendering)"
+    },
+    "governing_rules": {
+      "path": "experiments/primitive_sequence_recovery/VARNA_ATTRIBUTE_KCPR_EXPERIMENT_RULES.md",
+      "sha256": "acfff4043db5b2f13f6413c26023756081d25bd985cb926a79aaaf25dd8922cc",
+      "role": "KCPR framed as a decoder-side pole-selection rule; kosha condition experimentally assigned, not from a lexicon"
+    },
+    "governing_rulebook": {
+      "path": "experiments/primitive_sequence_recovery/SYMBOL_U_L2_VALIDATION_RULEBOOK.md",
+      "sha256": "b0bcce75039b30ca033b03123854a816d781fb70cae0bb27f49dce2881a1dc7f"
+    },
+    "phoneme_to_varna_bridge": {
+      "path": "experiments/primitive_sequence_recovery/frozen/b1_6_phoneme_to_varna_bridge_manifest.json",
+      "role": "supplies which consonant varna keys are reachable (25/34); vowels VOWEL_NO_PROFILE; f/z/zh UNSUPPORTED_NO_VARNA"
+    }
+  },
+  "axis_poles": {
+    "expansion_contraction": {"positive_pole": "expansion", "negative_pole": "contraction"},
+    "clarity_obscuration": {"positive_pole": "clarity", "negative_pole": "obscuration"},
+    "binding_release": {"positive_pole": "binding", "negative_pole": "release"},
+    "desire_contentment": {"positive_pole": "desire", "negative_pole": "contentment"},
+    "fear_courage": {"positive_pole": "courage", "negative_pole": "fear"},
+    "attachment_freedom": {"positive_pole": "freedom", "negative_pole": "attachment"},
+    "activity_inertia": {"positive_pole": "activity", "negative_pole": "inertia"},
+    "ascent_descent": {"positive_pole": "ascent", "negative_pole": "descent"},
+    "illumination_darkness": {"positive_pole": "illumination", "negative_pole": "darkness"},
+    "integration_fragmentation": {"positive_pole": "integration", "negative_pole": "fragmentation"}
+  },
+  "pole_rendering_rule": {
+    "per_varna": "for each axis the varna contributes to, render BOTH named poles of that axis; mark the table's signed lean (worldly/binding pole = the pole matching the sign; liberating/counter pole = the opposite); show axis id and source files.",
+    "sign_convention": "+1 -> worldly/binding pole = axis positive_pole; -1 -> worldly/binding pole = axis negative_pole (per track_g source_basis = vrtti binding-sense).",
+    "both_poles_always_shown": true,
+    "generator_told_correct_pole": false,
+    "target_specific_selection": false,
+    "leak_control": "only low-leak axis pole NAMES are used; per-varna vrtti gloss 'notes' (high leak_risk) are NOT sent to the generator/judge.",
+    "asymmetry": "if only one pole is available for some reason, the asymmetry is recorded explicitly; poles are never fabricated to balance."
+  },
+  "example_ka": {
+    "varna": "ka",
+    "contributing_axes": {
+      "desire_contentment": {"lean_sign": 1, "worldly_pole": "desire", "counter_pole": "contentment"},
+      "expansion_contraction": {"lean_sign": 1, "worldly_pole": "expansion", "counter_pole": "contraction"},
+      "activity_inertia": {"lean_sign": 1, "worldly_pole": "activity", "counter_pole": "inertia"},
+      "ascent_descent": {"lean_sign": 1, "worldly_pole": "ascent", "counter_pole": "descent"}
+    },
+    "note": "Rendered from track_g axis_contributions + track_g_polarity_axes pole names. Illustrative; unvalidated candidate representation; not evidence."
+  },
+  "scaffold_impact": {
+    "new_scaffold_frames": ["{VARNA_SEQUENCE}", "{VARNA_PROFILE_TABLE}", "{KCPR_DUAL_POLE_FRAME}"],
+    "csr_stl_frame": "DEFERRED / REMOVED until a frozen CSR/STL rulebook is separately created"
+  },
+  "randomized_control": "must randomize the varna->profile association (per the frozen randomization seed) but preserve the IDENTICAL KCPR dual-pole rendering FORMAT, so format is not a giveaway.",
+  "guardrails": {
+    "b1_4b_prime": "NULL_RETURN_BOTTOM (unchanged)",
+    "original_b1_4b": "blocked",
+    "track_b": "blocked",
+    "no_ontological_signal": true,
+    "no_sanskrit_privilege": true,
+    "no_semantic_truth_claim": true,
+    "no_varna_meaning_invented": true,
+    "no_kosha_layer_invented": true,
+    "no_target_specific_pole_selection": true,
+    "motto": "Structure, not validated meaning."
+  }
+}

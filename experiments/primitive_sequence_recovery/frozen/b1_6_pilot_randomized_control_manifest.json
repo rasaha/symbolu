@@ -1,0 +1,2822 @@
+{
+  "artifact_type": "b1_6_pilot_randomized_control_manifest",
+  "schema_version": "1.0",
+  "status": "FROZEN_DATA_NOT_AN_EVIDENCE_FREEZE",
+  "generation_run": false,
+  "note": "RANDOMIZED_SYMBOLU_CONTROL. Shuffles the supported-varna->profile association under a fixed seed, preserving scaffold format, sequence length, entry count, dual-pole rendering format, and output budget. Presented to the generator exactly as a scaffold; NOT revealed as randomized to generator or judges.",
+  "seed": 20260708,
+  "relabel_map_varna_to_donor": {
+    "ba": "da",
+    "ca": "ta",
+    "da": "na",
+    "ga": "ga",
+    "ka": "sa",
+    "la": "va",
+    "ma": "pa",
+    "na": "ra",
+    "nga": "ka",
+    "pa": "la",
+    "ra": "tha",
+    "sa": "ma",
+    "sha": "ba",
+    "ta": "nga",
+    "tha": "sha",
+    "va": "ca"
+  },
+  "relabel_map_sha256": "4109bc5be2e9cc4d6ff661d1230d81e513c5cdbd7231409c9e80adb0a904ccc4",
+  "source_polarity_table_sha256": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742",
+  "n_items": 24,
+  "randomized_scaffolds": [
+    {
+      "item_id": "b16-01",
+      "TARGET_TEXT": "river",
+      "supported_varna_sequence": [
+        "ra",
+        "va",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "va",
+          "profile_from": "ca"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "va": {
+          "axis_contributions": {
+            "clarity_obscuration": -1
+          },
+          "profile_from": "ca"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "va": [
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-02",
+      "TARGET_TEXT": "bridge",
+      "supported_varna_sequence": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ba",
+          "profile_from": "da"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "ga",
+          "profile_from": "ga"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ba": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          },
+          "profile_from": "da"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "da": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          },
+          "profile_from": "na"
+        },
+        "ga": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ga"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ba": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-03",
+      "TARGET_TEXT": "lantern",
+      "supported_varna_sequence": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "ta": {
+          "axis_contributions": {
+            "ascent_descent": 1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "nga"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-04",
+      "TARGET_TEXT": "mirror",
+      "supported_varna_sequence": [
+        "ma",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ma",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ma": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "pa"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ma": [
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-05",
+      "TARGET_TEXT": "balance",
+      "supported_varna_sequence": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ba",
+          "profile_from": "da"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "ka",
+          "profile_from": "sa"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ba": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          },
+          "profile_from": "da"
+        },
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "ka": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          },
+          "profile_from": "sa"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ba": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-06",
+      "TARGET_TEXT": "freedom",
+      "supported_varna_sequence": [
+        "ra",
+        "da",
+        "ma"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "ma",
+          "profile_from": "pa"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "da": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          },
+          "profile_from": "na"
+        },
+        "ma": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ma": [
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-07",
+      "TARGET_TEXT": "patience",
+      "supported_varna_sequence": [
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "pa",
+          "profile_from": "la"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "ka",
+          "profile_from": "sa"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "pa": {
+          "axis_contributions": {
+            "binding_release": 1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "la"
+        },
+        "ta": {
+          "axis_contributions": {
+            "ascent_descent": 1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "nga"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "ka": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          },
+          "profile_from": "sa"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "pa": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-08",
+      "TARGET_TEXT": "threshold",
+      "supported_varna_sequence": [
+        "tha",
+        "ra",
+        "sha",
+        "la",
+        "da"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "tha",
+          "profile_from": "sha"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "sha",
+          "profile_from": "ba"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "na"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "tha": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "desire_contentment": 1,
+            "expansion_contraction": 1
+          },
+          "profile_from": "sha"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "sha": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "ascent_descent": -1
+          },
+          "profile_from": "ba"
+        },
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "da": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          },
+          "profile_from": "na"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "tha": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "sha": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-09",
+      "TARGET_TEXT": "Maya",
+      "supported_varna_sequence": [
+        "ma"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ma",
+          "profile_from": "pa"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ma": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "pa"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ma": [
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-10",
+      "TARGET_TEXT": "Rowan",
+      "supported_varna_sequence": [
+        "ra",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-11",
+      "TARGET_TEXT": "Nova",
+      "supported_varna_sequence": [
+        "na",
+        "va"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "va",
+          "profile_from": "ca"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "va": {
+          "axis_contributions": {
+            "clarity_obscuration": -1
+          },
+          "profile_from": "ca"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "va": [
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-12",
+      "TARGET_TEXT": "Ira",
+      "supported_varna_sequence": [
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-13",
+      "TARGET_TEXT": "lotus",
+      "supported_varna_sequence": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "nga"
+        },
+        {
+          "varna_position_key": "sa",
+          "profile_from": "ma"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "ta": {
+          "axis_contributions": {
+            "ascent_descent": 1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "nga"
+        },
+        "sa": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          },
+          "profile_from": "ma"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "sa": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-14",
+      "TARGET_TEXT": "dawn",
+      "supported_varna_sequence": [
+        "da",
+        "va",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "da",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "va",
+          "profile_from": "ca"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "da": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          },
+          "profile_from": "na"
+        },
+        "va": {
+          "axis_contributions": {
+            "clarity_obscuration": -1
+          },
+          "profile_from": "ca"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "da": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "va": [
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-15",
+      "TARGET_TEXT": "anchor",
+      "supported_varna_sequence": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "ca",
+          "profile_from": "ta"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "ca": {
+          "axis_contributions": {
+            "activity_inertia": -1,
+            "clarity_obscuration": -1,
+            "ascent_descent": -1
+          },
+          "profile_from": "ta"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ca": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-16",
+      "TARGET_TEXT": "mandala",
+      "supported_varna_sequence": [
+        "ma",
+        "na",
+        "da",
+        "la"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ma",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ma": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "pa"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "da": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          },
+          "profile_from": "na"
+        },
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ma": [
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-17",
+      "TARGET_TEXT": "Lumen",
+      "supported_varna_sequence": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "ma",
+          "profile_from": "pa"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "ma": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "pa"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ma": [
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-18",
+      "TARGET_TEXT": "Verba",
+      "supported_varna_sequence": [
+        "va",
+        "ra",
+        "ba"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "va",
+          "profile_from": "ca"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "ba",
+          "profile_from": "da"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "va": {
+          "axis_contributions": {
+            "clarity_obscuration": -1
+          },
+          "profile_from": "ca"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "ba": {
+          "axis_contributions": {
+            "integration_fragmentation": -1
+          },
+          "profile_from": "da"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "va": [
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ba": [
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-19",
+      "TARGET_TEXT": "Solace",
+      "supported_varna_sequence": [
+        "sa",
+        "la",
+        "ka"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "sa",
+          "profile_from": "ma"
+        },
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "ka",
+          "profile_from": "sa"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "sa": {
+          "axis_contributions": {
+            "integration_fragmentation": -1,
+            "ascent_descent": -1
+          },
+          "profile_from": "ma"
+        },
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "ka": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          },
+          "profile_from": "sa"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "sa": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-20",
+      "TARGET_TEXT": "Kite",
+      "supported_varna_sequence": [
+        "ka",
+        "ta"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ka",
+          "profile_from": "sa"
+        },
+        {
+          "varna_position_key": "ta",
+          "profile_from": "nga"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ka": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          },
+          "profile_from": "sa"
+        },
+        "ta": {
+          "axis_contributions": {
+            "ascent_descent": 1,
+            "integration_fragmentation": -1
+          },
+          "profile_from": "nga"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ta": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "fragmentation",
+            "liberating_counter_pole": "integration",
+            "table_lean": -1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-21",
+      "TARGET_TEXT": "grief",
+      "supported_varna_sequence": [
+        "ga",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ga",
+          "profile_from": "ga"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ga": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ga"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-22",
+      "TARGET_TEXT": "wonder",
+      "supported_varna_sequence": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "va",
+          "profile_from": "ca"
+        },
+        {
+          "varna_position_key": "na",
+          "profile_from": "ra"
+        },
+        {
+          "varna_position_key": "da",
+          "profile_from": "na"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "va": {
+          "axis_contributions": {
+            "clarity_obscuration": -1
+          },
+          "profile_from": "ca"
+        },
+        "na": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "expansion_contraction": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ra"
+        },
+        "da": {
+          "axis_contributions": {
+            "attachment_freedom": -1,
+            "binding_release": 1,
+            "clarity_obscuration": -1
+          },
+          "profile_from": "na"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "va": [
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "na": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "da": [
+          {
+            "axis": "attachment_freedom",
+            "worldly_binding_pole": "attachment",
+            "liberating_counter_pole": "freedom",
+            "table_lean": -1,
+            "both_poles": [
+              "freedom",
+              "attachment"
+            ]
+          },
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "clarity_obscuration",
+            "worldly_binding_pole": "obscuration",
+            "liberating_counter_pole": "clarity",
+            "table_lean": -1,
+            "both_poles": [
+              "clarity",
+              "obscuration"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-23",
+      "TARGET_TEXT": "longing",
+      "supported_varna_sequence": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "la",
+          "profile_from": "va"
+        },
+        {
+          "varna_position_key": "nga",
+          "profile_from": "ka"
+        },
+        {
+          "varna_position_key": "nga",
+          "profile_from": "ka"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "la": {
+          "axis_contributions": {
+            "integration_fragmentation": 1,
+            "binding_release": 1
+          },
+          "profile_from": "va"
+        },
+        "nga": {
+          "axis_contributions": {
+            "desire_contentment": 1,
+            "expansion_contraction": 1,
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ka"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "la": [
+          {
+            "axis": "binding_release",
+            "worldly_binding_pole": "binding",
+            "liberating_counter_pole": "release",
+            "table_lean": 1,
+            "both_poles": [
+              "binding",
+              "release"
+            ]
+          },
+          {
+            "axis": "integration_fragmentation",
+            "worldly_binding_pole": "integration",
+            "liberating_counter_pole": "fragmentation",
+            "table_lean": 1,
+            "both_poles": [
+              "integration",
+              "fragmentation"
+            ]
+          }
+        ],
+        "nga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "desire_contentment",
+            "worldly_binding_pole": "desire",
+            "liberating_counter_pole": "contentment",
+            "table_lean": 1,
+            "both_poles": [
+              "desire",
+              "contentment"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "expansion",
+            "liberating_counter_pole": "contraction",
+            "table_lean": 1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b16-24",
+      "TARGET_TEXT": "courage",
+      "supported_varna_sequence": [
+        "ka",
+        "ra",
+        "ga"
+      ],
+      "randomized_profile_map": [
+        {
+          "varna_position_key": "ka",
+          "profile_from": "sa"
+        },
+        {
+          "varna_position_key": "ra",
+          "profile_from": "tha"
+        },
+        {
+          "varna_position_key": "ga",
+          "profile_from": "ga"
+        }
+      ],
+      "VARNA_PROFILE_TABLE": {
+        "ka": {
+          "axis_contributions": {
+            "expansion_contraction": -1,
+            "activity_inertia": -1
+          },
+          "profile_from": "sa"
+        },
+        "ra": {
+          "axis_contributions": {
+            "ascent_descent": -1,
+            "expansion_contraction": -1
+          },
+          "profile_from": "tha"
+        },
+        "ga": {
+          "axis_contributions": {
+            "activity_inertia": 1,
+            "ascent_descent": 1
+          },
+          "profile_from": "ga"
+        }
+      },
+      "KCPR_DUAL_POLE_FRAME": {
+        "ka": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "inertia",
+            "liberating_counter_pole": "activity",
+            "table_lean": -1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ra": [
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "descent",
+            "liberating_counter_pole": "ascent",
+            "table_lean": -1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          },
+          {
+            "axis": "expansion_contraction",
+            "worldly_binding_pole": "contraction",
+            "liberating_counter_pole": "expansion",
+            "table_lean": -1,
+            "both_poles": [
+              "expansion",
+              "contraction"
+            ]
+          }
+        ],
+        "ga": [
+          {
+            "axis": "activity_inertia",
+            "worldly_binding_pole": "activity",
+            "liberating_counter_pole": "inertia",
+            "table_lean": 1,
+            "both_poles": [
+              "activity",
+              "inertia"
+            ]
+          },
+          {
+            "axis": "ascent_descent",
+            "worldly_binding_pole": "ascent",
+            "liberating_counter_pole": "descent",
+            "table_lean": 1,
+            "both_poles": [
+              "ascent",
+              "descent"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

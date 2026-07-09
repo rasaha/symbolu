@@ -1,0 +1,56 @@
+{
+  "artifact_type": "b1_6_pilot_generation_schema",
+  "schema_version": "1.0",
+  "status": "SCHEMA_ONLY_NO_DATA",
+  "generation_run": false,
+  "evidence_freeze_declared": false,
+  "purpose": "Documents the JSON shapes the B1.6 pilot generation driver consumes/produces. Descriptive only; contains no generated text and no operator declaration.",
+  "evidence_freeze_declaration": {
+    "file": "frozen/b1_6_pilot_EVIDENCE_FREEZE_DECLARED.json (operator-created; gitignored; NEVER committed)",
+    "required_fields": {
+      "artifact": "b1_6_pilot_EVIDENCE_FREEZE_DECLARED",
+      "evidence_freeze_declared": true,
+      "mode": "pilot_generation",
+      "scaffold_manifest_sha256": "sha256 of frozen/b1_6_pilot_scaffold_manifest.json",
+      "target_scaffold_sha256": "sha256 of frozen/b1_6_pilot_targets_scaffolds.json",
+      "randomized_control_manifest_sha256": "sha256 of frozen/b1_6_pilot_randomized_control_manifest.json",
+      "prompt_rubric_sha256": "sha256 of B1_6_SYMBOLU_GENERATIVE_UTILITY_PROMPTS_AND_RUBRIC.md",
+      "declared_by": "operator identifier",
+      "declared_at_utc": "ISO-8601 timestamp",
+      "attestation": "B1.6 pilot generation only; no judging; no semantic truth claim; Symbol-U utility test only; B1.4b′ remains NULL_RETURN_BOTTOM."
+    }
+  },
+  "judge_visible_output": {
+    "file": "run_out/b1_6_pilot_generation/judge_visible_outputs.jsonl (NOT committed)",
+    "fields": ["item_id", "target_text", "neutral_context", "blinded_output_id", "generation_text", "output_format"],
+    "forbidden_fields": ["arm", "true_arm", "prompt", "scaffold", "VARNA_PROFILE_TABLE", "VARNA_SEQUENCE", "KCPR_DUAL_POLE_FRAME"],
+    "forbidden_tokens_in_generation_text": ["SYMBOLU", "Symbol-U", "varna", "KCPR", "scaffold", "RANDOMIZED", "arm", "polarity"]
+  },
+  "hidden_arm_metadata": {
+    "file": "run_out/b1_6_pilot_generation/hidden_arm_metadata.json (NOT committed)",
+    "fields": ["blinded_output_id", "true_arm", "item_id", "prompt_sha256", "scaffold_hash", "randomization_seed"]
+  },
+  "generation_run_manifest": {
+    "file": "run_out/b1_6_pilot_generation/generation_run_manifest.json (NOT committed)",
+    "fields": ["artifact_type", "mode", "judging_performed", "n_targets", "n_arms", "n_prompts", "arms", "seed", "b1_4b_prime_status", "note"]
+  },
+  "active_arms": ["SYMBOLU_SCAFFOLD", "PLAIN_PROMPT_BASELINE", "GENERIC_STRUCTURED_PROMPT_BASELINE", "RANDOMIZED_SYMBOLU_CONTROL", "SEMANTIC_LLM_BASELINE"],
+  "disabled_arms": ["SYMBOLIC_SYSTEM_BASELINE"],
+  "deferred_frames": ["{CSR_STL_FRAME}"],
+  "kcpr_status": {
+    "policy": "DUAL_POLE_RENDERING",
+    "theory_status": "THEORY_NONCANONICAL_INPUT_POLARITY",
+    "polarity_input_status": "READOUT_SCAFFOLD_ONLY",
+    "stage_a_operator_polarity_status": "POLARITY_FREE",
+    "kosha": "DEFERRED"
+  },
+  "guardrails": {
+    "no_real_generation_in_this_module": true,
+    "no_external_api_call": true,
+    "no_judging": true,
+    "b1_4b_prime": "NULL_RETURN_BOTTOM",
+    "original_b1_4b": "blocked",
+    "track_b": "blocked",
+    "motto": "Structure, not validated meaning."
+  }
+}

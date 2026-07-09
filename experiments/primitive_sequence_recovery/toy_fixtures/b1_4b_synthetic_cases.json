@@ -1,0 +1,128 @@
+{
+  "_purpose": "SYNTHETIC-ONLY fixtures for the B1.4b synthetic harness. No real words, no real norms, no dataset. Toy synthetic operators/targets exercise pipeline mechanics + terminal-label logic. Nothing here is evidence.",
+  "_not_for": ["real B1.4b run", "Track B unblocking", "ontological claims", "Sanskrit privilege", "reinterpretation of any prior negative"],
+  "_labels": [
+    "L1_L2_L3_ATTRIBUTE_SIGNAL", "F_COLLAPSES_TO_PHONOLOGY", "BAG_OR_SHUFFLE_EXPLAINS",
+    "RANDOM_RELABEL_EXPLAINS", "SEMANTIC_OR_SENTIMENT_BASELINE_EXPLAINS", "Y_NOT_INDEPENDENT",
+    "DECODER_LEAKAGE_INVALID", "WORD_LEAKAGE_INVALID", "NULL_RETURN_BOTTOM", "INCONCLUSIVE"
+  ],
+  "cases": [
+    {
+      "name": "pipeline_interaction_signal",
+      "mode": "pipeline",
+      "regime": "interaction",
+      "seed": 11,
+      "k_units": 5,
+      "n_words": 60,
+      "flags": {},
+      "expected_label": "L1_L2_L3_ATTRIBUTE_SIGNAL",
+      "_note": "POSITIVE CONTROL: Y planted from F-3 non-commutativity feature; pipeline must detect it."
+    },
+    {
+      "name": "pipeline_phonology_collapses_f3",
+      "mode": "pipeline",
+      "regime": "phonology",
+      "seed": 12,
+      "k_units": 5,
+      "n_words": 60,
+      "flags": {},
+      "expected_label": "F_COLLAPSES_TO_PHONOLOGY",
+      "_note": "Y planted from pooled phonological features; phonology (primary) must win, F-3 must NOT false-positive."
+    },
+    {
+      "name": "pipeline_bag_order_insensitive",
+      "mode": "pipeline",
+      "regime": "bag",
+      "seed": 13,
+      "k_units": 8,
+      "n_words": 120,
+      "flags": {},
+      "expected_label": "BAG_OR_SHUFFLE_EXPLAINS",
+      "_note": "Y = count(unit0) - count(unit1) of two phonological-twin units (identical phonology, distinct identity); pooled phonology is structurally blind to it while the unit histogram (bag) predicts it. Order-insensitive."
+    },
+    {
+      "name": "scores_sentiment_baseline_explains",
+      "mode": "scores",
+      "scores": {"f3": 0.30, "phonology": 0.28, "bag": 0.30, "shuffle": 0.25, "random_relabel": 0.26, "sentiment": 0.75},
+      "flags": {},
+      "expected_label": "SEMANTIC_OR_SENTIMENT_BASELINE_EXPLAINS",
+      "_note": "Injected scores: a concept-level sentiment covariate (not reducible to the varṇa bag) explains Y while F-3 does not. Driven at the decision layer because pooled-phonology/bag span any per-unit-mean in the synthetic setup."
+    },
+    {
+      "name": "pipeline_pure_null",
+      "mode": "pipeline",
+      "regime": "null",
+      "seed": 15,
+      "k_units": 5,
+      "n_words": 60,
+      "flags": {},
+      "expected_label": "NULL_RETURN_BOTTOM",
+      "_note": "Y is pure noise; every method at chance -> bottom."
+    },
+    {
+      "name": "pipeline_decoder_gloss_leak_invalid",
+      "mode": "pipeline",
+      "regime": "interaction",
+      "seed": 16,
+      "k_units": 5,
+      "n_words": 60,
+      "flags": {"decoder_gloss_leak": true},
+      "expected_label": "DECODER_LEAKAGE_INVALID",
+      "_note": "Even with a planted interaction signal, a gloss leak into the decoder invalidates the run."
+    },
+    {
+      "name": "pipeline_word_leak_invalid",
+      "mode": "pipeline",
+      "regime": "interaction",
+      "seed": 17,
+      "k_units": 5,
+      "n_words": 60,
+      "flags": {"word_leak": true},
+      "expected_label": "WORD_LEAKAGE_INVALID",
+      "_note": "Generator saw the target word -> invalid regardless of scores."
+    },
+    {
+      "name": "pipeline_y_not_independent",
+      "mode": "pipeline",
+      "regime": "interaction",
+      "seed": 18,
+      "k_units": 5,
+      "n_words": 60,
+      "flags": {"y_not_independent": true},
+      "expected_label": "Y_NOT_INDEPENDENT",
+      "_note": "Y not independently sourced -> gate trips before scoring is trusted."
+    },
+    {
+      "name": "scores_random_relabel_explains",
+      "mode": "scores",
+      "scores": {"f3": 0.70, "phonology": 0.22, "bag": 0.25, "shuffle": 0.30, "random_relabel": 0.68, "sentiment": 0.15},
+      "flags": {},
+      "expected_label": "RANDOM_RELABEL_EXPLAINS",
+      "_note": "Random operator relabeling ties F-3 -> the true operator->unit assignment carries no special signal."
+    },
+    {
+      "name": "scores_inconclusive_borderline",
+      "mode": "scores",
+      "scores": {"f3": 0.48, "phonology": 0.34, "bag": 0.30, "shuffle": 0.29, "random_relabel": 0.28, "sentiment": 0.25},
+      "flags": {},
+      "expected_label": "INCONCLUSIVE",
+      "_note": "F-3 leads but does not beat the runner-up by the required margin, and the runner-up is itself in the gray zone (below strong), so no baseline credibly explains -> ambiguous."
+    },
+    {
+      "name": "scores_signal_clean",
+      "mode": "scores",
+      "scores": {"f3": 0.80, "phonology": 0.25, "bag": 0.22, "shuffle": 0.20, "random_relabel": 0.24, "sentiment": 0.18},
+      "flags": {},
+      "expected_label": "L1_L2_L3_ATTRIBUTE_SIGNAL",
+      "_note": "Decision-logic check: F-3 beats every baseline by margin and none explains."
+    },
+    {
+      "name": "scores_phonology_ties_f3",
+      "mode": "scores",
+      "scores": {"f3": 0.60, "phonology": 0.58, "bag": 0.25, "shuffle": 0.24, "random_relabel": 0.26, "sentiment": 0.20},
+      "flags": {},
+      "expected_label": "F_COLLAPSES_TO_PHONOLOGY",
+      "_note": "Decision-logic check: phonology within margin of F-3 -> collapse (primary control)."
+    }
+  ]
+}

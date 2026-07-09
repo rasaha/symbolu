@@ -1,0 +1,101 @@
+{
+  "artifact": "b1_4b_prime_mcrae_y_prep_manifest",
+  "status": "DRAFT_Y_PREP_ONLY_NO_RUN",
+  "provenance": {
+    "source": "McRae, Cree, Seidenberg & McNorgan (2005), Behavior Research Methods 37(4):547-559",
+    "archive": "Psychonomic Society Web Archive (operator-provided private files)",
+    "terms_of_use": "non-commercial research/education WITH citation; rights remain with authors; redistribution NOT granted; raw data NOT committed"
+  },
+  "private_source_file_sha256": {
+    "CONCS_brm.txt": "a2cf1005d9e01d9818c7260d4aad912f0070563d9d9ca022c3ba1a5f7da7a4c0",
+    "CONCS_FEATS_concstats_brm.txt": "fe796831232b164635c258095749320665c18c40186778e8d8baf4b0c4cdba23",
+    "FEATS_brm.txt": "c73f3284bef2afd449046047d2f38c10ca3b1e823d9093b6c4ceb0fe1b3b64ed",
+    "READ_ME.txt": "8384ec7e9068ab07587feca2b52873db5a67e4515c6c000bef1e19efb4137551",
+    "ReadMe_Terms_of_Use.txt": "2f52993903af2ba93ecb2729fcc09d9b7f3b02534a7ef18142ad61917ba660b0"
+  },
+  "derived_concept_list_sha256": "3cdbb521529ac3e7fc33061f709a2c6d7cdb581f05cfbbffbcc7ae263af0e1e6",
+  "attribute_list_sha256": "716c0e6054f46e2a18f966fed12487cdf988311705f6e86e28a59b329ec0fa2d",
+  "y_matrix_sha256": "2922fce28044c2615ed6fb9c84dcbe9762d8e136ab7c93b33a7abedd41d69367",
+  "y_matrix_shape": [
+    521,
+    242
+  ],
+  "y_preprocessing_config": {
+    "case": "lower",
+    "tag_strip_rule": "_?\\([^)]*\\)$",
+    "min_prod_freq": 5,
+    "exclude_taxonomic": true,
+    "min_concepts_per_feature": 5,
+    "absence_is_zero": true,
+    "homograph_rule": "exclude_all_collapsed_members",
+    "false_collision_rule": "exclude_all_collapsed_members",
+    "stage_a_prime_track": "A_PRIME_EN",
+    "min_retained_concepts": 100
+  },
+  "y_preprocessing_config_sha256": "e2f6a36e2d75270886dead5dfaa904fcf413261a59a69cbd9e7ab04f8359b1d6",
+  "exclusion_list_sha256": "ca7f86abc104de4f686f5dc29a02686c640f69af78cd9d1d09611e6fb6597516",
+  "stage_a_prime_module_sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+  "f3_feature_spec": {
+    "layer": "L2",
+    "features": [
+      "adjacent_commutator_mean",
+      "adjacent_commutator_max",
+      "ordered_vs_reversed_noncommutativity"
+    ],
+    "excluded": [
+      "state_norm",
+      "magnitude",
+      "energy"
+    ],
+    "reversal_symmetry_invariant": true,
+    "oriented_extension": "requires_separate_prereg",
+    "stage_a_prime_module": "stage_a_prime_coverage.py"
+  },
+  "f3_feature_spec_sha256": "fffe69ecc9f5953f154ac685c1d76049d0ff5714faa0e818e2174a65450093e1",
+  "baseline_spec": {
+    "baselines": [
+      "plain_phonological",
+      "phonological_similarity",
+      "bag_of_phonemes",
+      "shuffled_order",
+      "random_relabel_operators",
+      "length_frequency",
+      "sentiment_lexicon",
+      "chance_null"
+    ],
+    "capacity": "matched_to_f3"
+  },
+  "baseline_spec_sha256": "d88448ff87341783616de3bba5967a161523c191c2a5019720b90d1a428c8dec",
+  "decoder_metric_config": {
+    "decoder": "regularized_linear_first_pass",
+    "cv": "concept_level_kfold",
+    "capacity_parity": true,
+    "primary_endpoint": "delta_vs_phonology",
+    "co_primary": "delta_vs_bag_shuffle_random",
+    "correction": "holm",
+    "labels": [
+      "L1_L2_L3_ATTRIBUTE_SIGNAL",
+      "F_COLLAPSES_TO_PHONOLOGY",
+      "BAG_OR_SHUFFLE_EXPLAINS",
+      "RANDOM_RELABEL_EXPLAINS",
+      "SEMANTIC_OR_SENTIMENT_BASELINE_EXPLAINS",
+      "Y_NOT_INDEPENDENT",
+      "DECODER_LEAKAGE_INVALID",
+      "NULL_RETURN_BOTTOM",
+      "INCONCLUSIVE"
+    ]
+  },
+  "decoder_metric_config_sha256": "5e31cd7a2245e5fd28264b2b402864295aee0d0457dfd2b93236f45de06f714d",
+  "counts": {
+    "total_concepts": 541,
+    "retained_concepts": 521,
+    "attribute_features": 242
+  },
+  "no_run_guarantees": {
+    "decoder_trained": false,
+    "f3_scored": false,
+    "baselines_compared": false,
+    "evidence_freeze": false
+  },
+  "manifest_self_sha256": "35da9ad2228dbcc6c444e1e61d891e091c028156429606b8837f95f565152436"
+}

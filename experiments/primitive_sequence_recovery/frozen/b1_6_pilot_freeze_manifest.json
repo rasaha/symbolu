@@ -1,0 +1,153 @@
+{
+  "artifact_type": "b1_6_pilot_freeze_manifest",
+  "schema_version": "1.0",
+  "status": "AUDIT_ONLY_NOT_A_FREEZE",
+  "generation_run": false,
+  "judging_run": false,
+  "evidence_freeze_declared": false,
+  "scaffold_values_instantiated": false,
+  "randomized_control_frozen": false,
+  "readiness_label": "B1_6_PILOT_BLOCKED_TARGET_DECOMPOSITION",
+  "concurrent_blockers": [
+    "B1_6_PILOT_BLOCKED_TARGET_DECOMPOSITION",
+    "B1_6_PILOT_BLOCKED_CSR_STL_RULEBOOK_AMBIGUOUS",
+    "B1_6_PILOT_BLOCKED_KCPR_KOSHA_RULEBOOK_AMBIGUOUS"
+  ],
+  "kcpr_expansion": "KCPR_EXPANSION_NOT_FOUND",
+  "authoritative_varna_source_found": true,
+  "purpose": "Records the docs/manifest-only audit of whether the actual project varna/Kosha/KCPR/CSR-STL sources can instantiate the B1.6 Symbol-U scaffold for a frozen pilot. They cannot, without inventing mappings and resolving acronym ambiguity; this manifest records the sources, their hashes, and the blocking findings. No generation, no judging, no evidence freeze.",
+  "not_for": [
+    "ontological claims",
+    "Sanskrit privilege",
+    "semantic-truth claims",
+    "Track B unblocking",
+    "reinterpreting B1.4b-prime NULL_RETURN_BOTTOM",
+    "any evidence claim"
+  ],
+  "prior_b1_6_docs": {
+    "prereg": {
+      "path": "experiments/primitive_sequence_recovery/B1_6_SYMBOLU_GENERATIVE_UTILITY_PREREG.md",
+      "sha256": "66db9e67a6f300f0fd46f0c8e3b0e2e9cb88fa93a30abbf8e261715e7a2be2cb",
+      "commit": "c1f5028"
+    },
+    "prompts_and_rubric": {
+      "path": "experiments/primitive_sequence_recovery/B1_6_SYMBOLU_GENERATIVE_UTILITY_PROMPTS_AND_RUBRIC.md",
+      "sha256": "080a67086c8631568c53c57a02d76f75a8a25f5ce3f8f8bc4f3205655b0ecc5b",
+      "commit": "17a5ea0"
+    },
+    "pilot_target_scaffold_freeze_plan": {
+      "path": "experiments/primitive_sequence_recovery/B1_6_PILOT_TARGET_SET_AND_SCAFFOLD_FREEZE_PLAN.md",
+      "sha256": "196763a368566059fd24ecd97f060e872e21f690c8362d2f0e3bb3ae9150237a",
+      "commit": "1244335"
+    }
+  },
+  "candidate_scaffold_sources": [
+    {
+      "role": "varna_polarity_profile_table",
+      "path": "experiments/primitive_sequence_recovery/track_g_varna_polarity_table.json",
+      "sha256": "5f78224c068507889f95c009d0cf388480622dc4fa3e4d8a4164c53da0eea742",
+      "provenance_commit": "8bc3731",
+      "frozen": false,
+      "versioned": true,
+      "key_space": "34 Sanskrit consonant varnas (ka, kha, ga ... ksha); no vowels",
+      "contains_varna_polarity": true,
+      "contains_kosha_context": false,
+      "contains_kcpr_rules": false,
+      "contains_csr_stl_frame": false,
+      "self_declared_status": "researcher_authored_candidate_representation; validation_status=unvalidated; source_supplies_polarity=false; evidence_status=not_ontological_evidence; high_degrees_of_freedom",
+      "semantic_leakage_note": "per-varna 'notes' carry vrtti gloss phrases (e.g. 'hope / forward-grasping desire'); leak_risk=high; must never be sent verbatim to a judge; scaffold would use axis contributions, not gloss text"
+    },
+    {
+      "role": "varna_four_sphere_lexicon",
+      "path": "experiments/primitive_sequence_recovery/track_e_varna_sphere_lexicon.json",
+      "sha256": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+      "provenance_commit": "55dce09",
+      "frozen": false,
+      "versioned": true,
+      "key_space": "34 Sanskrit consonant varnas (matches assignment.json)",
+      "contains_varna_meanings": true,
+      "contains_kosha_context": false,
+      "contains_kcpr_rules": false,
+      "contains_csr_stl_frame": false,
+      "self_declared_status": "researcher_interpretive_extraction; unvalidated_candidate_representation; source_supplies_four_spheres=false; must_freeze_before_run (shipped as unfrozen draft)",
+      "semantic_leakage_note": "root names (moha/bhaya/kama/trishna/lobha) are high leak risk and must be stripped before any judge exposure"
+    },
+    {
+      "role": "polarity_axes_definition",
+      "path": "experiments/primitive_sequence_recovery/track_g_polarity_axes.json",
+      "sha256": "37631d84eb50a611fde43fb1cf38d88832d5508cab92b3d0f56f7c02893dca8b",
+      "frozen": false,
+      "versioned": true,
+      "contains": "the 10 signed polarity axes used by the polarity table"
+    },
+    {
+      "role": "varna_atom_assignment",
+      "path": "experiments/primitive_sequence_recovery/frozen/assignment.json",
+      "sha256": "b7218e911c625f26854bc6f800ba3f8730e43bbc84b89f2a092055a00dbc2bd4",
+      "frozen": true,
+      "versioned": true,
+      "key_space": "34 Sanskrit consonant varnas -> atom ids"
+    },
+    {
+      "role": "vrtti_gloss_reference_frozen",
+      "path": "experiments/primitive_sequence_recovery/frozen/realization_en_gloss.json",
+      "sha256": "8883bcbf61e910d2c8b4096798d8ba37e2ec1bcbb849008bc5e326ce956d2853",
+      "frozen": true,
+      "versioned": true,
+      "note": "the frozen vrtti glosses the polarity table was authored from; semantic-leakage source (dictionary-like gloss) - excluded from any judge-facing text"
+    },
+    {
+      "role": "decomposer_named_by_pilot_plan",
+      "path": "experiments/primitive_sequence_recovery/stage_a_prime_coverage.py",
+      "sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+      "frozen": true,
+      "versioned": true,
+      "output_key_space": "39 phoneme keys (a, aa, ax, b, ch, d, ... zh); bare phonemes/vowels",
+      "note": "Stage A-prime is the decomposer named by B1_6_PILOT_TARGET_SET_AND_SCAFFOLD_FREEZE_PLAN.md sec 7"
+    }
+  ],
+  "decomposition_join_audit": {
+    "decomposer_output_keys": "39 phoneme keys from stage_a_prime_coverage.PHONEMES",
+    "profile_table_keys": "34 Sanskrit consonant varna keys",
+    "overlap_count": 0,
+    "vowels_in_profile_table": 0,
+    "frozen_bridge_phoneme_to_varna_exists": false,
+    "conclusion": "No frozen mapping joins the decomposer's phoneme sequence to the varna profile/polarity/sphere tables. Building VARNA_PROFILE_TABLE for any target would require inventing a phoneme->varna bridge (and vowels have no varna entry at all), which the pilot plan forbids. Also true for the original Stage A 14-grapheme chart (also no ka/kha keys)."
+  },
+  "csr_stl_audit": {
+    "csr_expansions_found_in_repo": [
+      "Context x Semantic x Resonance",
+      "Coherent Semantic Resonance",
+      "Consonant-Syllable Resonance",
+      "Constraint-Structure-Resonance",
+      "Phonemic Mental Resonance",
+      "contextual semantic resonance"
+    ],
+    "stl_expansions_found_in_repo": [
+      "Signal -> Transformation -> Laya",
+      "Symbolic Reasoning (10D)",
+      "Symbolic Transfer Learning"
+    ],
+    "single_authoritative_definition": false,
+    "csr_stl_fields_in_varna_sources": false,
+    "conclusion": "CSR and STL each carry multiple conflicting expansions across the repo; none is anchored in the frozen primitive_sequence_recovery varna sources, and those sources contain no CSR/STL fields. A frozen {CSR_STL_FRAME} cannot be derived without a choice the frozen sources do not make."
+  },
+  "kcpr_kosha_audit": {
+    "kcpr_expansion_in_repo": "KCPR_EXPANSION_NOT_FOUND",
+    "kcpr_defined_as": "a decoder-side pole-selection rule (VARNA_ATTRIBUTE_KCPR_EXPERIMENT_RULES.md); kosha condition is experimentally assigned and frozen before generation, not read from a lexicon",
+    "kosha_to_varna_lexicon_exists": false,
+    "per_target_kosha_assignment_source_exists": false,
+    "conclusion": "No frozen kosha->varna lexicon and no per-target kosha assignment source exist; KCPR is never expanded in-repo. A frozen {KCPR_CONTEXT_FRAME} cannot be instantiated per target without inventing an assignment rule."
+  },
+  "guardrails": {
+    "b1_4b_prime": "NULL_RETURN_BOTTOM (unchanged)",
+    "original_b1_4b": "blocked",
+    "track_b": "blocked",
+    "no_ontological_signal": true,
+    "no_sanskrit_privilege": true,
+    "no_semantic_truth_claim": true,
+    "no_varna_meaning_invented": true,
+    "no_posthoc_mapping_patched": true,
+    "motto": "Structure, not validated meaning."
+  }
+}
