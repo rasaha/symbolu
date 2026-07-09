@@ -169,6 +169,72 @@ PY
 The transformers adapter loads each generator at its frozen revision (`AutoModelForCausalLM.from_pretrained(id,
 revision=...)`).
 
+## 7b. NO-vLLM sequential run (transformers direct-load) — use this when vLLM fails
+
+If vLLM crashes on the image (e.g. `AttributeError: TokenizersBackend has no attribute
+all_special_tokens_extended` in `get_cached_tokenizer` — a vLLM/transformers version clash inside vLLM's own
+tokenizer wrapper), **skip vLLM entirely.** The adapter's `transformers` backend loads each generator directly
+via `AutoModelForCausalLM`/`AutoTokenizer` (plain HF tokenizer code path — never vLLM's wrapper), so it does not
+hit that bug. **No server to launch, no port, no readiness curl.** Each `part` is its own process that loads the
+model, generates, then exits and frees the GPU before the next generator loads — naturally sequential on one GPU.
+
+Prereqs: torch with CUDA (already confirmed `2.6.0+cu124`, `cuda_available True`) and `accelerate` (required by
+`device_map="auto"`). This does **not** need vLLM installed.
+
+```bash
+cd experiments/primitive_sequence_recovery
+python3 -m pip install accelerate            # required for device_map="auto"; does not touch torch
+
+export PROBE=run_out/b1_6_10_sample_probe
+export PANEL=$PROBE/model_panel_manifest_v2_named_vritti.json
+export DECL=$PROBE/b1_6_10_sample_EVIDENCE_FREEZE_DECLARED.json
+
+# 0) sanity: torch+CUDA present, transformers importable (NO vLLM needed)
+python3 - <<'PY'
+import b1_6_llm_adapter as A
+r = A.model_backend_readiness()
+assert r["torch_importable"] and r["cuda_available"], r
+print("CUDA OK; transformers", r["transformers_version"])
+PY
+
+# 1) switch the panel manifest to the transformers backend (direct HF load; bypasses the vLLM tokenizer bug)
+python3 - <<'PY'
+import json, os, pathlib
+p = pathlib.Path(os.environ["PANEL"])
+m = json.loads(p.read_text())
+m["backend"] = "transformers"
+for g in m["generator_models"]:
+    g.pop("endpoint", None)                  # endpoints unused by the transformers backend
+p.write_text(json.dumps(m, indent=2, ensure_ascii=False))
+print("backend ->", m["backend"], "| generators:", [g["id"] for g in m["generator_models"]])
+PY
+
+# 2) generator 1 (Mistral) — loads directly, no server; process exits and frees the GPU when done
+python3 run_b1_6_v2_sequential_panel_generation.py part \
+  --panel "$PANEL" --generator-index 0 \
+  --mode exploratory_10_sample_generation_probe --limit-items 10 \
+  --representation-version v2_named_vritti \
+  --decl "$DECL" --out "$PROBE/generation_partial_M1"      # expect n_outputs: 50
+
+# 3) generator 2 (Qwen) — fresh process, GPU already free
+python3 run_b1_6_v2_sequential_panel_generation.py part \
+  --panel "$PANEL" --generator-index 1 \
+  --mode exploratory_10_sample_generation_probe --limit-items 10 \
+  --representation-version v2_named_vritti \
+  --decl "$DECL" --out "$PROBE/generation_partial_M2"      # expect n_outputs: 50
+
+# 4) merge + re-blind into the final 100-output panel package
+python3 run_b1_6_v2_sequential_panel_generation.py merge \
+  --parts "$PROBE/generation_partial_M1" "$PROBE/generation_partial_M2" \
+  --out "$PROBE/generation"                                 # expect n_outputs: 100
+```
+
+Same gating as Option B: each `part` still verifies the §9 v2 exploratory evidence-freeze declaration and the
+frozen v2 scaffold hashes; `merge` still refuses on any mode / representation / target / arm / scaffold-hash /
+declaration mismatch. Verify the final package with §13 (100 blind outputs, no arm/generator leak). The judging
+step (later) can use the **same** transformers backend — set `"backend": "transformers"` in the judge panel
+manifest and drop the judge endpoints; `run_b1_6_v2_llm_judge_panel.py judge` then loads each judge directly.
+
 ## 8. Model panel manifest
 
 Write `run_out/b1_6_10_sample_probe/model_panel_manifest.json` (operator-authored; gitignored):
