@@ -29,9 +29,10 @@
   ],
   "source_hashes": {
     "b1_6_targets": "7f331deb845bbd26b6e2392e538bcffa6b206bbfae748085b34ed6d8365cf0dc",
-    "sphere_lexicon": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29"
+    "sphere_lexicon": "cf5f8a33d472cae7e6d404e1b2a34ffbf449c964f8f5b5fdd67e86d0c252fb29",
+    "phoneme_bridge": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed"
   },
-  "n_targets": 8,
+  "n_targets": 12,
   "targets": [
     {
       "item_id": "b17-01",
@@ -43,7 +44,7 @@
         "va",
         "ra"
       ],
-      "source_item_id": "b16-01"
+      "source": "b1_6:b16-01"
     },
     {
       "item_id": "b17-02",
@@ -56,7 +57,7 @@
         "ra",
         "ra"
       ],
-      "source_item_id": "b16-04"
+      "source": "b1_6:b16-04"
     },
     {
       "item_id": "b17-03",
@@ -67,7 +68,7 @@
         "ga",
         "ra"
       ],
-      "source_item_id": "b16-21"
+      "source": "b1_6:b16-21"
     },
     {
       "item_id": "b17-04",
@@ -80,7 +81,7 @@
         "da",
         "ra"
       ],
-      "source_item_id": "b16-22"
+      "source": "b1_6:b16-22"
     },
     {
       "item_id": "b17-05",
@@ -93,7 +94,7 @@
         "na",
         "ka"
       ],
-      "source_item_id": "b16-05"
+      "source": "b1_6:b16-05"
     },
     {
       "item_id": "b17-06",
@@ -105,7 +106,7 @@
         "da",
         "ma"
       ],
-      "source_item_id": "b16-06"
+      "source": "b1_6:b16-06"
     },
     {
       "item_id": "b17-07",
@@ -117,7 +118,7 @@
         "ta",
         "sa"
       ],
-      "source_item_id": "b16-13"
+      "source": "b1_6:b16-13"
     },
     {
       "item_id": "b17-08",
@@ -129,7 +130,85 @@
         "va",
         "na"
       ],
-      "source_item_id": "b16-14"
+      "source": "b1_6:b16-14"
+    },
+    {
+      "item_id": "b17-09",
+      "TARGET_TEXT": "chair",
+      "native_plane": "physical",
+      "neutral_context": "A word.",
+      "supported_varna_sequence": [
+        "ca",
+        "ra"
+      ],
+      "source": "decomposed:A_PRIME_EN+frozen_bridge",
+      "phoneme_sequence": [
+        "ch",
+        "e",
+        "r"
+      ]
+    },
+    {
+      "item_id": "b17-10",
+      "TARGET_TEXT": "dread",
+      "native_plane": "mental",
+      "neutral_context": "A word.",
+      "supported_varna_sequence": [
+        "da",
+        "ra",
+        "da"
+      ],
+      "source": "decomposed:A_PRIME_EN+frozen_bridge",
+      "phoneme_sequence": [
+        "d",
+        "r",
+        "ii",
+        "d"
+      ]
+    },
+    {
+      "item_id": "b17-11",
+      "TARGET_TEXT": "justice",
+      "native_plane": "intellectual",
+      "neutral_context": "A word.",
+      "supported_varna_sequence": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "source": "decomposed:A_PRIME_EN+frozen_bridge",
+      "phoneme_sequence": [
+        "jh",
+        "u",
+        "s",
+        "t",
+        "i",
+        "k",
+        "e"
+      ]
+    },
+    {
+      "item_id": "b17-12",
+      "TARGET_TEXT": "sacred",
+      "native_plane": "spiritual",
+      "neutral_context": "A word.",
+      "supported_varna_sequence": [
+        "sa",
+        "ka",
+        "ra",
+        "da"
+      ],
+      "source": "decomposed:A_PRIME_EN+frozen_bridge",
+      "phoneme_sequence": [
+        "s",
+        "a",
+        "k",
+        "r",
+        "e",
+        "d"
+      ]
     }
-  ]
+  ],
+  "decomposition_note": "4 words (chair/dread/justice/sacred) decomposed via stage_a_prime_coverage.normalize (A_PRIME_EN) + the frozen phoneme->varna bridge; not tuned to any output."
 }

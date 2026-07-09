@@ -37,7 +37,7 @@ control surface"), **not** a claim that the phoneme→meaning mapping is real. T
 | `NO_LENS_BASELINE` | no target plane ("Interpret the word …") | reference (not scored for controllability) |
 
 All three lens arms **name the target plane**, so the *only* manipulated variable is whether varṇa glosses
-(real vs shuffled vs none) are added. Grid: 8 words × (3 lens arms × 4 lenses + 1 no‑lens) = **104 records**.
+(real vs shuffled vs none) are added. Grid: 12 words × (3 lens arms × 4 lenses + 1 no‑lens) = **156 records**.
 
 ## 4. Measures + the decisive contrasts
 
@@ -74,9 +74,11 @@ This would leave B1.4b′ exactly where it is.
 
 ## 6. Frozen inputs
 
-- `frozen/b1_7_perspective_lens_targets_v1.json` — 8 words, 2 per native plane (river/mirror=physical,
-  grief/wonder=mental, balance/freedom=intellectual, lotus/dawn=spiritual), varṇa sequences reused from the
-  frozen B1.6 targets; `randomization_seed = 20260709`; source hashes pinned.
+- `frozen/b1_7_perspective_lens_targets_v1.json` — 12 words, 3 per native plane: physical
+  (river/mirror/**chair**), mental (grief/wonder/**dread**), intellectual (balance/freedom/**justice**),
+  spiritual (lotus/dawn/**sacred**). The first 8 reuse frozen B1.6 varṇa sequences; the 4 added words
+  (chair/dread/justice/sacred) are decomposed via `stage_a_prime_coverage.normalize` (A_PRIME_EN) + the frozen
+  phoneme→varṇa bridge (not tuned to any output). `randomization_seed = 20260709`; source hashes pinned.
 - `track_e_varna_sphere_lexicon.json` — the four‑plane gloss table (hash‑pinned by the gate).
 
 ## 7. RunPod runbook (transformers backend; no vLLM)
