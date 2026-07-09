@@ -294,11 +294,12 @@ def make_judge_visible(record: Dict, generation_text: str) -> Dict:
     return pkg
 
 
-def make_hidden_meta(record: Dict, seed: int) -> Dict:
+def make_hidden_meta(record: Dict, seed: int, gen_code: Optional[str] = None) -> Dict:
     return {
         "blinded_output_id": record["blinded_output_id"],
         "true_arm": record["arm"],
         "item_id": record["item_id"],
+        "generator_code": gen_code,          # opaque generator code (panel); HIDDEN side only
         "prompt_sha256": record["prompt_sha256"],
         "scaffold_hash": record.get("prompt_sha256") if record["arm"] in
         ("SYMBOLU_SCAFFOLD", "RANDOMIZED_SYMBOLU_CONTROL") else None,
@@ -356,7 +357,8 @@ def run(mock: bool = False,
         out_dir: pathlib.Path = RUN_OUT,
         decl_path: pathlib.Path = DECL_FILE,
         write: bool = True,
-        validate_real: bool = True) -> Dict:
+        validate_real: bool = True,
+        gen_code: Optional[str] = None) -> Dict:
     """Gated run. Refuses without a valid operator declaration whose mode matches `mode`.
     Real generation uses `adapter` (b1_6_llm_adapter) or a bare `generator` callable, with output-format
     validation + retry. `mock` is unchanged deterministic placeholder text. No judging."""
@@ -381,7 +383,7 @@ def run(mock: bool = False,
         text, status, rs = emit(rec)
         if status in ("ok", "mock") and text is not None:
             judge_visible.append(make_judge_visible(rec, text))
-            hidden_meta.append(make_hidden_meta(rec, seed))
+            hidden_meta.append(make_hidden_meta(rec, seed, gen_code))
             rendered_hidden.append({"blinded_output_id": rec["blinded_output_id"],
                                     "arm": rec["arm"], "prompt": rec["prompt"]})
         else:
