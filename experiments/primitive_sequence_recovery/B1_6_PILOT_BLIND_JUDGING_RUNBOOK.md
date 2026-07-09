@@ -75,11 +75,39 @@ for specificity scoring).
 - Judges do **not** see arm identity, the scaffold, or the hidden metadata. Randomize row order per item before
   handing out. ≥3 independent judges recommended for a real run; IRR reported.
 
-## 4. LLM-as-judge pilot-only workflow (placeholder)
+## 4. LLM-as-judge pilot-only workflow (automated; sequential single-GPU)
 
-Permitted **for the pilot only**, as a triage/plumbing signal, using a model **different from the generator**.
-**No external API is wired into this harness.** An operator supplies ratings in the schema shape (a JSONL/JSON
-list of rating rows) from their own harness. **No terminal claim** may be drawn from an LLM-judge pilot.
+An automated 3-judge LLM panel is available: `b1_6_llm_judge_panel.py` + `run_b1_6_v2_llm_judge_panel.py`
+(verified subcommands `judge`, `merge`). Judges read **only** the blind judge-visible file (never hidden
+metadata), rate each output on the frozen 1-7 rubric, return strict JSON, and the runner merges the three parts
+into scorer-ready ratings. Judges (Llama×2 + Gemma) must differ in **model and family** from the generators
+(Mistral/Qwen) — `detect_judge_generator_conflicts` refuses a same-model judge. **No terminal claim** may be
+drawn from an LLM-judge pilot; ratings still go through the §5 ratings-freeze gate before §6 unblinding.
+
+**Sequential single-GPU** (one judge server live at a time; blind judge-visible file = the panel output):
+
+```bash
+cd experiments/primitive_sequence_recovery
+PROBE=run_out/b1_6_10_sample_probe
+JV=$PROBE/generation/panel_judge_visible_outputs.jsonl
+JPANEL=$PROBE/judge_panel.json     # {"judge_models":[{id,family,endpoint}...], "generator_models":[...]}
+
+# for each judge index 0,1,2:  start its vLLM server, run one part, stop it
+python3 -m vllm.entrypoints.openai.api_server --model meta-llama/Llama-3.1-8B-Instruct --port 8101 & JPID=$!
+python3 run_b1_6_v2_llm_judge_panel.py judge --panel "$JPANEL" --judge-index 0 \
+        --judge-visible "$JV" --out "$PROBE/judging_partial_J1"    # 100 ratings
+kill $JPID
+#   ...repeat --judge-index 1 (port 8102) -> judging_partial_J2, --judge-index 2 -> judging_partial_J3...
+
+# merge the three judge parts into scorer-ready ratings (refuses on duplicate judge / incomplete grid)
+python3 run_b1_6_v2_llm_judge_panel.py merge \
+        --parts "$PROBE/judging_partial_J1" "$PROBE/judging_partial_J2" "$PROBE/judging_partial_J3" \
+        --out "$PROBE/judging"                                     # 300 ratings (100 x 3)
+```
+
+Then create the §5 `RATINGS_FROZEN` declaration over `$PROBE/judging/llm_judge_ratings_raw.jsonl` and the
+judge-visible file, and aggregate/unblind (§6) with the panel hidden metadata + `representation_version=
+v2_named_vritti`.
 
 ## 5. Ratings-freeze declaration
 
