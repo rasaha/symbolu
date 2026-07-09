@@ -204,3 +204,65 @@ def test_pairwise_contrasts_present(tmp_path):
 
 def test_b1_4b_prime_status_referenced():
     assert J.B1_4B_PRIME_STATUS == "NULL_RETURN_BOTTOM"
+
+
+# ---- v2 panel package support -------------------------------------------------------
+def _panel_hidden(jv):
+    arms = ("SYMBOLU_SCAFFOLD", "PLAIN_PROMPT_BASELINE", "GENERIC_STRUCTURED_PROMPT_BASELINE",
+            "RANDOMIZED_SYMBOLU_CONTROL", "SEMANTIC_LLM_BASELINE")
+    return [{"blinded_output_id": p["blinded_output_id"], "true_arm": arms[i % 5],
+             "item_id": p["item_id"], "generator_code": "M1" if i % 2 == 0 else "M2",
+             "generator_id": "mistralai/X" if i % 2 == 0 else "Qwen/Y"} for i, p in enumerate(jv)]
+
+
+def test_locate_panel_package(tmp_path):
+    (tmp_path / "panel_judge_visible_outputs.jsonl").write_text("{}\n")
+    (tmp_path / "panel_run_manifest.json").write_text(json.dumps({"representation_version": "v2_named_vritti"}))
+    info = J.locate_generation_package(tmp_path)
+    assert info["kind"] == "panel"
+    assert info["judge_visible"].name == "panel_judge_visible_outputs.jsonl"
+    assert info["hidden"].name == "panel_hidden_arm_generator_metadata.json"
+    assert info["representation_version"] == "v2_named_vritti"
+
+
+def test_locate_single_package(tmp_path):
+    (tmp_path / "judge_visible_outputs.jsonl").write_text("{}\n")
+    info = J.locate_generation_package(tmp_path)
+    assert info["kind"] == "single" and info["judge_visible"].name == "judge_visible_outputs.jsonl"
+
+
+def test_locate_no_package(tmp_path):
+    assert J.locate_generation_package(tmp_path)["kind"] is None
+
+
+def test_panel_blind_check_passes(tmp_path):
+    jv = _jv(20)
+    f = tmp_path / "panel_judge_visible_outputs.jsonl"; _write_jsonl(f, jv)
+    rep = J.phase_a_blind_package(f, out_dir=tmp_path / "o", write=False)
+    assert rep["blind_ok"] and rep["label"] == "B1_6_PILOT_JUDGING_BLIND_PACKAGE_OK"
+
+
+def test_aggregate_generator_dimension(tmp_path):
+    jv = _jv(20); f = tmp_path / "panel_judge_visible_outputs.jsonl"; _write_jsonl(f, jv)
+    hm = _panel_hidden(jv); ratings = J.mock_ratings(jv)
+    rf = tmp_path / "ratings.json"; rf.write_text(json.dumps(ratings))
+    fz = _valid_freeze(tmp_path, f, rf)
+    res = J.aggregate(ratings, hm, freeze_path=fz, judge_visible_file=f, ratings_file=rf,
+                      representation_version="v2_named_vritti", out_dir=tmp_path / "o", write=True)
+    s = res["summary"]
+    assert s["representation_version"] == "v2_named_vritti"
+    assert set(s["generator_summary"].keys()) == {"M1", "M2"}
+    # arm x generator keys present, e.g. SYMBOLU_SCAFFOLD|M1
+    assert any(k.startswith("SYMBOLU_SCAFFOLD|") for k in s["arm_x_generator_summary"])
+    assert "generator_of_blinded_id" in res["unblinded"]
+
+
+def test_single_model_has_no_generator_dimension(tmp_path):
+    # backward-compat: hidden metadata without generator_code -> generator summaries are None
+    jv = _jv(10); f = tmp_path / "jv.jsonl"; _write_jsonl(f, jv)
+    hm = _hidden(jv); ratings = J.mock_ratings(jv)
+    rf = tmp_path / "ratings.json"; rf.write_text(json.dumps(ratings))
+    fz = _valid_freeze(tmp_path, f, rf)
+    res = J.aggregate(ratings, hm, freeze_path=fz, judge_visible_file=f, ratings_file=rf)
+    assert res["summary"]["generator_summary"] is None
+    assert res["summary"]["arm_x_generator_summary"] is None

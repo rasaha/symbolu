@@ -20,6 +20,33 @@ rating template, and — **only after ratings are frozen** — join ratings with
 arm-level composites and pairwise preferences. **The pilot emits only plumbing labels; it never emits a
 `GENUTILITY_*` verdict.**
 
+## 1b. After a v2 panel/sequential generation — exact next steps
+
+The multi-model / sequential path writes **`panel_*`** files (not the single-model names). The judging harness
+now auto-detects them via `locate_generation_package(gen_dir)`:
+
+- `panel_judge_visible_outputs.jsonl` (100 outputs for the 10-sample probe),
+- `panel_hidden_arm_generator_metadata.json` (carries `true_arm` **and** `generator_code`/`generator_id`),
+- `panel_run_manifest.json` (`representation_version: v2_named_vritti`).
+
+Next steps: **(1) verify the generation package** (§13 checks: 100 outputs, no arm/generator leak);
+**(2) export the blind rating template** with Phase A pointed at the panel judge-visible file;
+**(3) collect ratings** — from a **manual/CSV** panel or an operator-run **LLM-judge** (a model **different**
+from the generators; the harness does **not** run LLM judges itself — ratings are operator-supplied);
+**(4) freeze ratings** (operator `RATINGS_FROZEN` declaration); **(5) aggregate/unblind** with
+`representation_version="v2_named_vritti"` and the panel hidden metadata. Aggregation then emits **arm-level**,
+**generator-level**, and **arm×generator** summaries plus the pairwise contrasts — exploratory labels only.
+
+```bash
+cd experiments/primitive_sequence_recovery
+GEN=run_out/b1_6_10_sample_probe/generation
+# Phase A on the panel judge-visible file:
+python3 -c "import judge_b1_6_pilot_outputs as J, pathlib; \
+info=J.locate_generation_package(pathlib.Path('$GEN')); print(info['kind'], info['representation_version']); \
+print(J.phase_a_blind_package(info['judge_visible'], out_dir=pathlib.Path('run_out/b1_6_pilot_judging'), write=True)['label'])"
+# ... then collect + freeze ratings (operator), then aggregate (Phase B) with the panel hidden metadata.
+```
+
 ## 2. Blind rating workflow (Phase A)
 
 ```bash

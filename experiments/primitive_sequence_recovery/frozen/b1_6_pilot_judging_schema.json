@@ -6,8 +6,19 @@
   "ratings_frozen": false,
   "terminal_genutility_label_emitted": false,
   "purpose": "Documents the JSON/CSV shapes the B1.6 blind judging harness consumes/produces. Descriptive only; contains no ratings, no generated text, no operator declaration.",
+  "generation_package_filenames": {
+    "single_model": {"judge_visible": "judge_visible_outputs.jsonl", "hidden": "hidden_arm_metadata.json", "manifest": "generation_run_manifest.json"},
+    "panel_or_sequential": {"judge_visible": "panel_judge_visible_outputs.jsonl", "hidden": "panel_hidden_arm_generator_metadata.json", "manifest": "panel_run_manifest.json"},
+    "auto_detect": "judge_b1_6_pilot_outputs.locate_generation_package(gen_dir)"
+  },
+  "generator_dimension": {
+    "present_when": "hidden metadata carries generator_code (panel/sequential)",
+    "summaries": ["arm_summary", "generator_summary", "arm_x_generator_summary"],
+    "single_model": "generator_summary / arm_x_generator_summary are null"
+  },
+  "llm_judge_status": "NOT IMPLEMENTED in the harness; ratings are operator-supplied (manual/CSV or an operator-run LLM-judge using a model different from the generators). The 3-judge panel is a generation-time reference; judging aggregation scores whatever ratings are provided.",
   "phase_a_inputs": {
-    "judge_visible_outputs": "run_out/b1_6_pilot_generation/judge_visible_outputs.jsonl (from the generation driver; NOT committed)",
+    "judge_visible_outputs": "single: run_out/b1_6_pilot_generation/judge_visible_outputs.jsonl OR panel: run_out/b1_6_10_sample_probe/generation/panel_judge_visible_outputs.jsonl (NOT committed)",
     "allowed_fields": ["item_id", "target_text", "neutral_context", "blinded_output_id", "generation_text", "output_format"],
     "forbidden_fields": ["arm", "true_arm", "prompt", "prompt_sha256", "scaffold", "scaffold_hash", "VARNA_PROFILE_TABLE", "VARNA_SEQUENCE", "KCPR_DUAL_POLE_FRAME", "randomization_seed", "profile_from"],
     "forbidden_tokens_in_generation_text": ["SYMBOLU", "Symbol-U", "varna", "KCPR", "scaffold", "RANDOMIZED_SYMBOLU", "polarity", "dual-pole", "worldly/binding"]

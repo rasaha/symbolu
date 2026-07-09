@@ -31,6 +31,35 @@ JUDGE_VISIBLE_FILE = GEN_OUT / "judge_visible_outputs.jsonl"
 HIDDEN_META_FILE = GEN_OUT / "hidden_arm_metadata.json"
 RATINGS_FROZEN_FILE = GEN_OUT / "b1_6_pilot_RATINGS_FROZEN.json"
 
+# Filenames differ by orchestration: single-model driver vs multi-model / sequential panel.
+PACKAGE_FILENAMES = {
+    "panel": {"judge_visible": "panel_judge_visible_outputs.jsonl",
+              "hidden": "panel_hidden_arm_generator_metadata.json",
+              "manifest": "panel_run_manifest.json"},
+    "single": {"judge_visible": "judge_visible_outputs.jsonl",
+               "hidden": "hidden_arm_metadata.json",
+               "manifest": "generation_run_manifest.json"},
+}
+
+
+def locate_generation_package(gen_dir: pathlib.Path) -> Dict:
+    """Detect a panel (b1_6_model_panel / sequential) or single-model generation package in gen_dir.
+    Returns {kind, judge_visible, hidden, manifest, representation_version} or {kind: None} if absent."""
+    for kind, names in PACKAGE_FILENAMES.items():
+        jv = gen_dir / names["judge_visible"]
+        if jv.exists():
+            man = gen_dir / names["manifest"]
+            rep = None
+            if man.exists():
+                try:
+                    rep = json.loads(man.read_text()).get("representation_version")
+                except Exception:                       # pragma: no cover - defensive
+                    rep = None
+            return {"kind": kind, "judge_visible": jv, "hidden": gen_dir / names["hidden"],
+                    "manifest": man, "representation_version": rep}
+    return {"kind": None, "judge_visible": None, "hidden": None, "manifest": None,
+            "representation_version": None}
+
 MODE = "pilot_judging"
 B1_4B_PRIME_STATUS = "NULL_RETURN_BOTTOM"
 MOCK_MARK = "MOCK_JUDGING_ONLY_DO_NOT_INTERPRET"
@@ -254,7 +283,8 @@ def aggregate(ratings: List[Dict], hidden_meta: List[Dict],
               ratings_file: pathlib.Path = None,
               require_freeze: bool = True,
               out_dir: pathlib.Path = JUDGE_OUT,
-              write: bool = False) -> Dict:
+              write: bool = False,
+              representation_version: Optional[str] = None) -> Dict:
     if require_freeze:
         ok, reasons = verify_ratings_freeze(freeze_path, judge_visible_file,
                                             ratings_file or freeze_path)
@@ -317,13 +347,42 @@ def aggregate(ratings: List[Dict], hidden_meta: List[Dict],
         pairwise[f"{a}_vs_{b}"] = {"win": win, "tie": tie, "loss": loss,
                                    "win_rate": round(win / n, 4) if n else None, "n": n}
 
+    # generator dimension (present only when hidden metadata carries generator_code, i.e. panel/sequential)
+    gen_of = {m["blinded_output_id"]: m.get("generator_code") for m in hidden_meta}
+    has_gen = any(gen_of.values())
+    by_gen_raw: Dict[str, List[float]] = {}
+    by_gen_adj: Dict[str, List[float]] = {}
+    by_armgen_adj: Dict[Tuple[str, str], List[float]] = {}
+    if has_gen:
+        for bid, adj in adj_by_id.items():
+            g = gen_of.get(bid); arm = arm_of.get(bid)
+            if not g or arm is None:
+                continue
+            by_gen_raw.setdefault(g, []).append(raw_by_id[bid])
+            by_gen_adj.setdefault(g, []).append(adj)
+            by_armgen_adj.setdefault((arm, g), []).append(adj)
+    generator_summary = {
+        g: {"n": len(by_gen_adj[g]),
+            "mean_raw_composite": round(_mean(by_gen_raw[g]), 4),
+            "mean_penalty_adjusted_composite": round(_mean(by_gen_adj[g]), 4),
+            "adj_ci95": _bootstrap_ci(by_gen_adj[g])}
+        for g in by_gen_adj
+    } if has_gen else None
+    arm_x_generator_summary = {
+        f"{arm}|{g}": {"n": len(v), "mean_penalty_adjusted_composite": round(_mean(v), 4)}
+        for (arm, g), v in by_armgen_adj.items()
+    } if has_gen else None
+
     summary = {
         "artifact_type": "b1_6_pilot_judging_summary",
         "pilot_label": "B1_6_PILOT_JUDGING_HARNESS_READY_MOCK_TESTED",
         "note": "PILOT PLUMBING ONLY. No prereg GENUTILITY_* terminal verdict is emitted from the pilot.",
         "terminal_genutility_label_emitted": False,
+        "representation_version": representation_version,
         "b1_4b_prime_status": B1_4B_PRIME_STATUS,
         "arm_summary": arm_summary,
+        "generator_summary": generator_summary,                 # None for single-model packages
+        "arm_x_generator_summary": arm_x_generator_summary,     # None for single-model packages
         "item_level_variance": {
             arm: round(_variance(by_arm_adj[arm]), 4) for arm in by_arm_adj
         },
@@ -331,6 +390,8 @@ def aggregate(ratings: List[Dict], hidden_meta: List[Dict],
     pairwise_summary = {"pairwise_penalty_adjusted": pairwise,
                         "note": "pairwise preference is descriptive plumbing; NOT a terminal verdict."}
     unblinded = {"arm_of_blinded_id": arm_of, "mark": MOCK_MARK}
+    if has_gen:
+        unblinded["generator_of_blinded_id"] = {bid: g for bid, g in gen_of.items() if g}
 
     if write:
         out_dir.mkdir(parents=True, exist_ok=True)
