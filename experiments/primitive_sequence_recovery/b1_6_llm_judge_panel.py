@@ -67,15 +67,18 @@ def build_judge_prompt(item: Dict) -> str:
     dims = ", ".join(POSITIVE_DIMS)
     pens = ", ".join(PENALTY_DIMS)
     return (
-        "You are a blind evaluator. Rate the interpretation of the target on a 1-7 integer scale per dimension. "
-        "Do NOT guess which method/system/model produced it; do not mention any system. Reward specific, "
-        "coherent, useful, non-generic readings; penalize overclaiming and hallucination.\n"
+        "You are a blind evaluator. Rate the interpretation of the target on each dimension using an INTEGER "
+        f"from {SCALE_MIN} to {SCALE_MAX} (never 0, never blank). Do NOT guess which method/system/model "
+        "produced it; do not mention any system. Reward specific, coherent, useful, non-generic readings; "
+        "penalize overclaiming and hallucination.\n"
         f"Target: {item['target_text']}\nContext: {item.get('neutral_context','')}\n"
         f"Interpretation:\n{item['generation_text']}\n\n"
-        f"Positive dimensions (1-7): {dims}\n"
-        f"Penalty dimensions (1-7, higher=worse): {pens}\n"
-        "Respond with ONLY a JSON object of exactly this shape and nothing else:\n"
-        "{" + ", ".join(f'\"{d}\": <1-7>' for d in ALL_DIMS) + "}"
+        f"Positive dimensions, {SCALE_MIN}-{SCALE_MAX} ({SCALE_MAX}=best): {dims}\n"
+        f"Penalty dimensions, {SCALE_MIN}-{SCALE_MAX} ({SCALE_MIN}=none/best, {SCALE_MAX}=worst; "
+        f"use {SCALE_MIN} when absent, NEVER 0): {pens}\n"
+        f"Output ONLY a single JSON object containing ALL {len(ALL_DIMS)} keys below, each an integer "
+        f"{SCALE_MIN}-{SCALE_MAX} — no prose, no code fence. Begin with '{{' and end with '}}':\n"
+        "{" + ", ".join(f'\"{d}\": <{SCALE_MIN}-{SCALE_MAX}>' for d in ALL_DIMS) + "}"
     )
 
 
@@ -152,7 +155,8 @@ def run_single_judge(judge: Dict, judge_visible_file: pathlib.Path,
     items = sorted(items, key=lambda r: r["blinded_output_id"])   # deterministic ordering
     if limit_outputs:
         items = items[:limit_outputs]
-    settings = settings or A.GenerationSettings(model_id=judge["id"], max_tokens=320, temperature=0.0)
+    settings = settings or A.GenerationSettings(model_id=judge["id"], max_tokens=512, temperature=0.0,
+                                                max_attempts=5)
     ratings: List[Dict] = []
     errors: List[Dict] = []
     def _json_ok(t):                       # retry on unparseable/out-of-range judge JSON (varied seed)

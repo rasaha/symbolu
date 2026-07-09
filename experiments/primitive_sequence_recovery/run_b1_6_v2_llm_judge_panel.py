@@ -23,7 +23,7 @@ def _adapter_for(judge, panel):
     return A.build_adapter(A.GenerationSettings(
         model_id=judge["id"], backend=backend, base_url=judge.get("endpoint"),
         revision=judge.get("revision") if backend == "transformers" else None,
-        temperature=0.0, max_tokens=320))
+        temperature=0.0, max_tokens=512))
 
 
 def main(argv=None):
