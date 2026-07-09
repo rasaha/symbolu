@@ -1,0 +1,1216 @@
+{
+  "artifact_type": "b1_8_context_resolved_targets_scaffolds",
+  "representation_version": "B1.8_context_resolved_layer1",
+  "status": "FROZEN_CANDIDATE",
+  "validation_status": "unvalidated_candidate_representation",
+  "resolver_rulebook": "B1_8_KCPR_LAYER1_RESOLVER_RULEBOOK.md",
+  "prereg": "B1_8_CONTEXT_RESOLVED_KCPR_LAYER1_PREREG.md",
+  "neutral_contexts": "EXCLUDED (rulebook §7)",
+  "n_targets": 12,
+  "strata": [
+    "brand_name",
+    "concrete_object",
+    "emotional_nonclinical",
+    "ethical_action",
+    "psychological_mental",
+    "spiritual_contemplative"
+  ],
+  "not_for": [
+    "semantic-truth claim",
+    "ontology",
+    "GENUTILITY verdict",
+    "sending scaffold to judges"
+  ],
+  "targets": [
+    {
+      "item_id": "b18-01",
+      "TARGET_TEXT": "bridge",
+      "CONTEXT_TEXT": "The rebuilt bridge holds a steady sustaining flow across the river; its spans keep an easy alignment and let the crossing find its peace.",
+      "STRATUM": "concrete_object",
+      "VARNA_SEQUENCE": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "SELECTED_PLANE": "physical",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 0,
+        "liberating": 4,
+        "binding_hits": [],
+        "liberating_hits": [
+          "alignment",
+          "sustaining",
+          "peace",
+          "flow"
+        ]
+      },
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "ba": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "physical",
+          "plane_gloss": "neglect of what has value"
+        },
+        "ra": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "physical",
+          "plane_gloss": "fire, heat, vitality, energy"
+        },
+        "da": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "physical",
+          "plane_gloss": "reactive body-language, irritability"
+        },
+        "ga": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "plane": "physical",
+          "plane_gloss": "action, effort, mobilization, activation of dormant power"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "ba": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "physical",
+          "plane_gloss": "neglect of what has value"
+        },
+        "ra": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "physical",
+          "plane_gloss": "fire, heat, vitality, energy"
+        },
+        "da": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "physical",
+          "plane_gloss": "reactive body-language, irritability"
+        },
+        "ga": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "plane": "physical",
+          "plane_gloss": "action, effort, mobilization, activation of dormant power"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "ba": {
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "physical",
+          "plane_gloss": "neglect of what has value"
+        },
+        "ra": {
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "physical",
+          "plane_gloss": "fire, heat, vitality, energy"
+        },
+        "da": {
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "physical",
+          "plane_gloss": "reactive body-language, irritability"
+        },
+        "ga": {
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "plane": "physical",
+          "plane_gloss": "action, effort, mobilization, activation of dormant power"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-02",
+      "TARGET_TEXT": "lantern",
+      "CONTEXT_TEXT": "The lantern is stuck on a rigid hook, its glow blocked by grime, an obstacle no one can shift.",
+      "STRATUM": "concrete_object",
+      "VARNA_SEQUENCE": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "SELECTED_PLANE": "physical",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 4,
+        "liberating": 0,
+        "binding_hits": [
+          "obstacle",
+          "stuck",
+          "rigid",
+          "blocked"
+        ],
+        "liberating_hits": []
+      },
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "la": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "cruelty",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "physical",
+          "plane_gloss": "solidity, hardness, earth, physical rigidity"
+        },
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "blind attachment / infatuation",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "physical",
+          "plane_gloss": "clinging to person / place / object / time"
+        },
+        "ta": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "inertia / staticity / dullness",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "physical",
+          "plane_gloss": "heaviness, sleep, inertia"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "physical",
+          "plane_gloss": "fire, heat, vitality, energy"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "la": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "cruelty",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "physical",
+          "plane_gloss": "solidity, hardness, earth, physical rigidity"
+        },
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "blind attachment / infatuation",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "physical",
+          "plane_gloss": "clinging to person / place / object / time"
+        },
+        "ta": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "inertia / staticity / dullness",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "physical",
+          "plane_gloss": "heaviness, sleep, inertia"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "physical",
+          "plane_gloss": "fire, heat, vitality, energy"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "physical",
+          "plane_gloss": "solidity, hardness, earth, physical rigidity"
+        },
+        "na": {
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "physical",
+          "plane_gloss": "clinging to person / place / object / time"
+        },
+        "ta": {
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "physical",
+          "plane_gloss": "heaviness, sleep, inertia"
+        },
+        "ra": {
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "physical",
+          "plane_gloss": "fire, heat, vitality, energy"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-03",
+      "TARGET_TEXT": "grief",
+      "CONTEXT_TEXT": "In his grief he stays clinging to what was, trapped by a loss he cannot release.",
+      "STRATUM": "psychological_mental",
+      "VARNA_SEQUENCE": [
+        "ga",
+        "ra"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 3,
+        "liberating": 1,
+        "binding_hits": [
+          "clinging",
+          "loss",
+          "trapped"
+        ],
+        "liberating_hits": [
+          "release"
+        ]
+      },
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "ga": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "effort / striving",
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "plane": "mental",
+          "plane_gloss": "striving, will, motivation"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "ga": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "effort / striving",
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "plane": "mental",
+          "plane_gloss": "striving, will, motivation"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "ga": {
+          "worldly_binding_distortion": "effort / striving",
+          "spiritual_liberating_reading": "effort as path to mundane development and spiritual elevation",
+          "named_attribute": "ceshta / effort to arouse dormant potential",
+          "plane": "mental",
+          "plane_gloss": "striving, will, motivation"
+        },
+        "ra": {
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-04",
+      "TARGET_TEXT": "longing",
+      "CONTEXT_TEXT": "Her longing eased into quiet reflection and a peace that let the ache find release.",
+      "STRATUM": "psychological_mental",
+      "VARNA_SEQUENCE": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 0,
+        "liberating": 3,
+        "binding_hits": [],
+        "liberating_hits": [
+          "release",
+          "reflection",
+          "peace"
+        ]
+      },
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty"
+        },
+        "nga": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty"
+        },
+        "nga": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty"
+        },
+        "nga": {
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-05",
+      "TARGET_TEXT": "justice",
+      "CONTEXT_TEXT": "She pursued justice with clarity, in alignment with a sustaining fairness, a contemplative movement toward what is right.",
+      "STRATUM": "ethical_action",
+      "VARNA_SEQUENCE": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "SELECTED_PLANE": "intellectual",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 0,
+        "liberating": 5,
+        "binding_hits": [],
+        "liberating_hits": [
+          "clarity",
+          "contemplative",
+          "alignment",
+          "sustaining",
+          "movement toward"
+        ]
+      },
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "ja": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "identity bondage; false doership",
+          "named_attribute": "ahamkara / ego",
+          "plane": "intellectual",
+          "plane_gloss": "ego-centered interpretation"
+        },
+        "sa": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "intellectual",
+          "plane_gloss": "sentient discrimination, liberation-oriented thought"
+        },
+        "ta": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "intellectual",
+          "plane_gloss": "intellectual dullness"
+        },
+        "ka": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "intellectual",
+          "plane_gloss": "projection of future possibility; constructive imagination"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "ja": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "identity bondage; false doership",
+          "named_attribute": "ahamkara / ego",
+          "plane": "intellectual",
+          "plane_gloss": "ego-centered interpretation"
+        },
+        "sa": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "intellectual",
+          "plane_gloss": "sentient discrimination, liberation-oriented thought"
+        },
+        "ta": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "intellectual",
+          "plane_gloss": "intellectual dullness"
+        },
+        "ka": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "intellectual",
+          "plane_gloss": "projection of future possibility; constructive imagination"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "ja": {
+          "worldly_binding_distortion": "ego / inflated I-feeling",
+          "spiritual_liberating_reading": "identity bondage; false doership",
+          "named_attribute": "ahamkara / ego",
+          "plane": "intellectual",
+          "plane_gloss": "ego-centered interpretation"
+        },
+        "sa": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "intellectual",
+          "plane_gloss": "sentient discrimination, liberation-oriented thought"
+        },
+        "ta": {
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "intellectual",
+          "plane_gloss": "intellectual dullness"
+        },
+        "ka": {
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "intellectual",
+          "plane_gloss": "projection of future possibility; constructive imagination"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-06",
+      "TARGET_TEXT": "balance",
+      "CONTEXT_TEXT": "The committee stayed in conflict, each side rigid and clinging to advantage, the fair path blocked by fear.",
+      "STRATUM": "ethical_action",
+      "VARNA_SEQUENCE": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "SELECTED_PLANE": "intellectual",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 5,
+        "liberating": 0,
+        "binding_hits": [
+          "conflict",
+          "fear",
+          "clinging",
+          "rigid",
+          "blocked"
+        ],
+        "liberating_hits": []
+      },
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "ba": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "indifference / neglect",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "intellectual",
+          "plane_gloss": "failure to assign proper value"
+        },
+        "la": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "cruelty",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "intellectual",
+          "plane_gloss": "rigid judgment"
+        },
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "blind attachment / infatuation",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "intellectual",
+          "plane_gloss": "loss of rational discrimination"
+        },
+        "ka": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "hope / forward-grasping desire",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "intellectual",
+          "plane_gloss": "projection of future possibility; constructive imagination"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "ba": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "indifference / neglect",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "intellectual",
+          "plane_gloss": "failure to assign proper value"
+        },
+        "la": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "cruelty",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "intellectual",
+          "plane_gloss": "rigid judgment"
+        },
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "blind attachment / infatuation",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "intellectual",
+          "plane_gloss": "loss of rational discrimination"
+        },
+        "ka": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "hope / forward-grasping desire",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "intellectual",
+          "plane_gloss": "projection of future possibility; constructive imagination"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "ba": {
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "intellectual",
+          "plane_gloss": "failure to assign proper value"
+        },
+        "la": {
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "intellectual",
+          "plane_gloss": "rigid judgment"
+        },
+        "na": {
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "intellectual",
+          "plane_gloss": "loss of rational discrimination"
+        },
+        "ka": {
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "intellectual",
+          "plane_gloss": "projection of future possibility; constructive imagination"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-07",
+      "TARGET_TEXT": "lotus",
+      "CONTEXT_TEXT": "At dawn the lotus opens in stillness, a contemplative clarity, release, and peace.",
+      "STRATUM": "spiritual_contemplative",
+      "VARNA_SEQUENCE": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "SELECTED_PLANE": "spiritual",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 0,
+        "liberating": 4,
+        "binding_hits": [],
+        "liberating_hits": [
+          "clarity",
+          "release",
+          "contemplative",
+          "peace"
+        ]
+      },
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "spiritual",
+          "plane_gloss": "earth-bound hardness; compassion softens it"
+        },
+        "ta": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual inertness that discipline seeks to liberate from"
+        },
+        "sa": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "spiritual",
+          "plane_gloss": "earth-bound hardness; compassion softens it"
+        },
+        "ta": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual inertness that discipline seeks to liberate from"
+        },
+        "sa": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "spiritual",
+          "plane_gloss": "earth-bound hardness; compassion softens it"
+        },
+        "ta": {
+          "worldly_binding_distortion": "inertia / staticity / dullness",
+          "spiritual_liberating_reading": "spiritual inertness that discipline seeks to liberate from",
+          "named_attribute": "staticity, deep sleep, dullness, spiritual inertness",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual inertness that discipline seeks to liberate from"
+        },
+        "sa": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-08",
+      "TARGET_TEXT": "sacred",
+      "CONTEXT_TEXT": "He treated the sacred as an escape, a static withdrawal and rigid avoidance of the world's demands.",
+      "STRATUM": "spiritual_contemplative",
+      "VARNA_SEQUENCE": [
+        "sa",
+        "ka",
+        "ra",
+        "da"
+      ],
+      "SELECTED_PLANE": "spiritual",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 4,
+        "liberating": 0,
+        "binding_hits": [
+          "avoidance",
+          "rigid",
+          "withdrawal",
+          "escape"
+        ],
+        "liberating_hits": []
+      },
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "sa": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "escapism; premature static withdrawal; inert / static withdrawal",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva"
+        },
+        "ka": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "hope / forward-grasping desire",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "spiritual",
+          "plane_gloss": "expressed universe, creation-field, emergence into manifestation"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "spiritual",
+          "plane_gloss": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "da": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "peevishness / irritability",
+          "named_attribute": "peevishness / irritability",
+          "plane": "spiritual",
+          "plane_gloss": "small egoic contraction; patience softens it"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "sa": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "escapism; premature static withdrawal; inert / static withdrawal",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva"
+        },
+        "ka": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "hope / forward-grasping desire",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "spiritual",
+          "plane_gloss": "expressed universe, creation-field, emergence into manifestation"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "spiritual",
+          "plane_gloss": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "da": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "peevishness / irritability",
+          "named_attribute": "peevishness / irritability",
+          "plane": "spiritual",
+          "plane_gloss": "small egoic contraction; patience softens it"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "sa": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva"
+        },
+        "ka": {
+          "worldly_binding_distortion": "hope / forward-grasping desire",
+          "spiritual_liberating_reading": "expressed universe, creation-field, emergence into manifestation",
+          "named_attribute": "asha / hope; creation; karya brahma; flowing water-sound",
+          "plane": "spiritual",
+          "plane_gloss": "expressed universe, creation-field, emergence into manifestation"
+        },
+        "ra": {
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "spiritual",
+          "plane_gloss": "fire of life-force; can become defeatism or spiritual energy"
+        },
+        "da": {
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "spiritual",
+          "plane_gloss": "small egoic contraction; patience softens it"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-09",
+      "TARGET_TEXT": "Lumen",
+      "CONTEXT_TEXT": "The Lumen brand promises clarity and an easy flow, a calm alignment for everyday focus.",
+      "STRATUM": "brand_name",
+      "VARNA_SEQUENCE": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "SELECTED_PLANE": "mental",
+      "SELECTED_PLANE_SECONDARY": "physical",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 0,
+        "liberating": 3,
+        "binding_hits": [],
+        "liberating_hits": [
+          "clarity",
+          "alignment",
+          "flow"
+        ]
+      },
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty"
+        },
+        "ma": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "plane": "mental",
+          "plane_gloss": "indulgence, emotional giving-in"
+        },
+        "na": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty"
+        },
+        "ma": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "plane": "mental",
+          "plane_gloss": "indulgence, emotional giving-in"
+        },
+        "na": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty"
+        },
+        "ma": {
+          "worldly_binding_distortion": "annihilation / indulgence (giving latitude)",
+          "spiritual_liberating_reading": "annihilation if unrestrained; discipline / sublimation needed",
+          "named_attribute": "pranasha / annihilation; prashraya / indulgent latitude",
+          "plane": "mental",
+          "plane_gloss": "indulgence, emotional giving-in"
+        },
+        "na": {
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-10",
+      "TARGET_TEXT": "Nova",
+      "CONTEXT_TEXT": "Nova's launch felt stuck in conflict, its message blocked and its momentum trapped.",
+      "STRATUM": "brand_name",
+      "VARNA_SEQUENCE": [
+        "na",
+        "va"
+      ],
+      "SELECTED_PLANE": "mental",
+      "SELECTED_PLANE_SECONDARY": "physical",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 4,
+        "liberating": 0,
+        "binding_hits": [
+          "conflict",
+          "stuck",
+          "blocked",
+          "trapped"
+        ],
+        "liberating_hits": []
+      },
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "blind attachment / infatuation",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        },
+        "va": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "plane": "mental",
+          "plane_gloss": "natural movement toward happiness and rightness"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "blind attachment / infatuation",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        },
+        "va": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "plane": "mental",
+          "plane_gloss": "natural movement toward happiness and rightness"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "na": {
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        },
+        "va": {
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "plane": "mental",
+          "plane_gloss": "natural movement toward happiness and rightness"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-11",
+      "TARGET_TEXT": "wonder",
+      "CONTEXT_TEXT": "The child's wonder opened into reflection and a bright clarity, a peace that let the moment flow.",
+      "STRATUM": "emotional_nonclinical",
+      "VARNA_SEQUENCE": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 0,
+        "liberating": 4,
+        "binding_hits": [],
+        "liberating_hits": [
+          "clarity",
+          "reflection",
+          "peace",
+          "flow"
+        ]
+      },
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "va": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "plane": "mental",
+          "plane_gloss": "natural movement toward happiness and rightness"
+        },
+        "na": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        },
+        "da": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness"
+        },
+        "ra": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "va": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "plane": "mental",
+          "plane_gloss": "natural movement toward happiness and rightness"
+        },
+        "na": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        },
+        "da": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness"
+        },
+        "ra": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "va": {
+          "worldly_binding_distortion": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding",
+          "spiritual_liberating_reading": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety",
+          "named_attribute": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow",
+          "plane": "mental",
+          "plane_gloss": "natural movement toward happiness and rightness"
+        },
+        "na": {
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "mental",
+          "plane_gloss": "fascination, possessive attachment"
+        },
+        "da": {
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness"
+        },
+        "ra": {
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    },
+    {
+      "item_id": "b18-12",
+      "TARGET_TEXT": "dread",
+      "CONTEXT_TEXT": "A cold dread of failure kept him clinging and rigid, trapped by fear and unable to move.",
+      "STRATUM": "emotional_nonclinical",
+      "VARNA_SEQUENCE": [
+        "da",
+        "ra",
+        "da"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_CUE_COUNTS": {
+        "binding": 4,
+        "liberating": 0,
+        "binding_hits": [
+          "fear",
+          "clinging",
+          "rigid",
+          "trapped"
+        ],
+        "liberating_hits": []
+      },
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "REFUSAL_STATUS": "RESOLVED",
+      "SELECTED_POLE_PROFILE_TABLE": {
+        "da": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "peevishness / irritability",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "KCPR_LAYER1_SELECTED_FRAME": {
+        "da": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "peevishness / irritability",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "UNRESOLVED_BOTH_POLES_FRAME": {
+        "da": {
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness"
+        },
+        "ra": {
+          "worldly_binding_distortion": "defeatist annihilation-thought ('everything is gone, I am undone')",
+          "spiritual_liberating_reading": "fire of life-force; can become defeatism or spiritual energy",
+          "named_attribute": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought",
+          "plane": "mental",
+          "plane_gloss": "intensity, urgency, frustration if blocked"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1"
+    }
+  ]
+}

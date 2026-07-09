@@ -1,0 +1,917 @@
+{
+  "artifact_type": "b1_8_context_resolved_randomized_control_manifest",
+  "representation_version": "B1.8_context_resolved_layer1_scrambled",
+  "status": "FROZEN_CANDIDATE",
+  "control_design": "same resolver, same contexts, same selected pole polarity; shuffled varna->vrtti content via seeded derangement (no fixed points); same sequence length + selected-pole count",
+  "derangement_seed": 20260709,
+  "derangement_no_fixed_points": true,
+  "full_derangement_map": {
+    "ba": "tha",
+    "ca": "tta",
+    "da": "sa",
+    "dda": "pa",
+    "dha": "ga",
+    "ga": "da",
+    "ha": "ma",
+    "ja": "na",
+    "ka": "ssa",
+    "la": "nna",
+    "ma": "ba",
+    "na": "dha",
+    "nga": "la",
+    "nna": "ha",
+    "nya": "ca",
+    "pa": "va",
+    "ra": "ya",
+    "sa": "nya",
+    "sha": "ssa",
+    "ssa": "ra",
+    "ta": "tha",
+    "tha": "ka",
+    "tta": "dda",
+    "va": "nga",
+    "ya": "ja"
+  },
+  "n_items": 12,
+  "items": [
+    {
+      "item_id": "b18-01",
+      "TARGET_TEXT": "bridge",
+      "STRATUM": "concrete_object",
+      "VARNA_SEQUENCE": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "SELECTED_PLANE": "physical",
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "varna_content_map": {
+        "ba": "tha",
+        "ra": "ya",
+        "da": "sa",
+        "ga": "da"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "ba": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "physical",
+          "plane_gloss": "drooping, low vitality",
+          "content_from_varna": "tha"
+        },
+        "ra": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "physical",
+          "plane_gloss": "restless movement, instability",
+          "content_from_varna": "ya"
+        },
+        "da": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "physical",
+          "plane_gloss": "lightness, release from binding action",
+          "content_from_varna": "sa"
+        },
+        "ga": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "physical",
+          "plane_gloss": "reactive body-language, irritability",
+          "content_from_varna": "da"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "ba": {
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "physical",
+          "plane_gloss": "drooping, low vitality",
+          "content_from_varna": "tha"
+        },
+        "ra": {
+          "worldly_binding_distortion": "lack of confidence / wavering movement",
+          "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "physical",
+          "plane_gloss": "restless movement, instability",
+          "content_from_varna": "ya"
+        },
+        "da": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "physical",
+          "plane_gloss": "lightness, release from binding action",
+          "content_from_varna": "sa"
+        },
+        "ga": {
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "physical",
+          "plane_gloss": "reactive body-language, irritability",
+          "content_from_varna": "da"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-02",
+      "TARGET_TEXT": "lantern",
+      "STRATUM": "concrete_object",
+      "VARNA_SEQUENCE": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "SELECTED_PLANE": "physical",
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "varna_content_map": {
+        "la": "nna",
+        "na": "dha",
+        "ta": "tha",
+        "ra": "ya"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "la": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "envy",
+          "named_attribute": "irshya / envy",
+          "plane": "physical",
+          "plane_gloss": "competitive tension, bodily agitation",
+          "content_from_varna": "nna"
+        },
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "craving / thirst for acquisition",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "physical",
+          "plane_gloss": "acquisition, hoarding, pursuit of wealth / name / power",
+          "content_from_varna": "dha"
+        },
+        "ta": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "melancholy / dejection",
+          "named_attribute": "vishada / melancholy",
+          "plane": "physical",
+          "plane_gloss": "drooping, low vitality",
+          "content_from_varna": "tha"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "lack of confidence / wavering movement",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "physical",
+          "plane_gloss": "restless movement, instability",
+          "content_from_varna": "ya"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "envy",
+          "spiritual_liberating_reading": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "physical",
+          "plane_gloss": "competitive tension, bodily agitation",
+          "content_from_varna": "nna"
+        },
+        "na": {
+          "worldly_binding_distortion": "craving / thirst for acquisition",
+          "spiritual_liberating_reading": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "physical",
+          "plane_gloss": "acquisition, hoarding, pursuit of wealth / name / power",
+          "content_from_varna": "dha"
+        },
+        "ta": {
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "physical",
+          "plane_gloss": "drooping, low vitality",
+          "content_from_varna": "tha"
+        },
+        "ra": {
+          "worldly_binding_distortion": "lack of confidence / wavering movement",
+          "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "physical",
+          "plane_gloss": "restless movement, instability",
+          "content_from_varna": "ya"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-03",
+      "TARGET_TEXT": "grief",
+      "STRATUM": "psychological_mental",
+      "VARNA_SEQUENCE": [
+        "ga",
+        "ra"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "varna_content_map": {
+        "ga": "da",
+        "ra": "ya"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "ga": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "peevishness / irritability",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness",
+          "content_from_varna": "da"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "lack of confidence / wavering movement",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "mental",
+          "plane_gloss": "lack of confidence, uncertainty",
+          "content_from_varna": "ya"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "ga": {
+          "worldly_binding_distortion": "peevishness / irritability",
+          "spiritual_liberating_reading": "small egoic contraction; patience softens it",
+          "named_attribute": "peevishness / irritability",
+          "plane": "mental",
+          "plane_gloss": "peevishness, touchiness",
+          "content_from_varna": "da"
+        },
+        "ra": {
+          "worldly_binding_distortion": "lack of confidence / wavering movement",
+          "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "mental",
+          "plane_gloss": "lack of confidence, uncertainty",
+          "content_from_varna": "ya"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-04",
+      "TARGET_TEXT": "longing",
+      "STRATUM": "psychological_mental",
+      "VARNA_SEQUENCE": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "varna_content_map": {
+        "la": "nna",
+        "nga": "la"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "mental",
+          "plane_gloss": "envy, comparison-pain",
+          "content_from_varna": "nna"
+        },
+        "nga": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty",
+          "content_from_varna": "la"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "envy",
+          "spiritual_liberating_reading": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "mental",
+          "plane_gloss": "envy, comparison-pain",
+          "content_from_varna": "nna"
+        },
+        "nga": {
+          "worldly_binding_distortion": "cruelty",
+          "spiritual_liberating_reading": "earth-bound hardness; compassion softens it",
+          "named_attribute": "krurata / cruelty; kshiti-tattva / solid factor",
+          "plane": "mental",
+          "plane_gloss": "harshness, cruelty",
+          "content_from_varna": "la"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-05",
+      "TARGET_TEXT": "justice",
+      "STRATUM": "ethical_action",
+      "VARNA_SEQUENCE": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "SELECTED_PLANE": "intellectual",
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "varna_content_map": {
+        "ja": "na",
+        "sa": "nya",
+        "ta": "tha",
+        "ka": "ssa"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "ja": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "intellectual",
+          "plane_gloss": "loss of rational discrimination",
+          "content_from_varna": "na"
+        },
+        "sa": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual falseness; split between outer virtue and inner conduct",
+          "named_attribute": "kapatata / hypocrisy",
+          "plane": "intellectual",
+          "plane_gloss": "false moral reasoning, self-justification",
+          "content_from_varna": "nya"
+        },
+        "ta": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "intellectual",
+          "plane_gloss": "pessimistic interpretation",
+          "content_from_varna": "tha"
+        },
+        "ka": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "tamas-bound kama; physical / worldly longing",
+          "named_attribute": "tamo-guna; kama / physical worldly desire",
+          "plane": "intellectual",
+          "plane_gloss": "desire-shaped thought",
+          "content_from_varna": "ssa"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "ja": {
+          "worldly_binding_distortion": "blind attachment / infatuation",
+          "spiritual_liberating_reading": "bondage through infatuation; indifference and spiritual ideation free it",
+          "named_attribute": "moha / blind attachment, infatuation",
+          "plane": "intellectual",
+          "plane_gloss": "loss of rational discrimination",
+          "content_from_varna": "na"
+        },
+        "sa": {
+          "worldly_binding_distortion": "hypocrisy / deceit",
+          "spiritual_liberating_reading": "spiritual falseness; split between outer virtue and inner conduct",
+          "named_attribute": "kapatata / hypocrisy",
+          "plane": "intellectual",
+          "plane_gloss": "false moral reasoning, self-justification",
+          "content_from_varna": "nya"
+        },
+        "ta": {
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "intellectual",
+          "plane_gloss": "pessimistic interpretation",
+          "content_from_varna": "tha"
+        },
+        "ka": {
+          "worldly_binding_distortion": "static inertia / worldly desire",
+          "spiritual_liberating_reading": "tamas-bound kama; physical / worldly longing",
+          "named_attribute": "tamo-guna; kama / physical worldly desire",
+          "plane": "intellectual",
+          "plane_gloss": "desire-shaped thought",
+          "content_from_varna": "ssa"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-06",
+      "TARGET_TEXT": "balance",
+      "STRATUM": "ethical_action",
+      "VARNA_SEQUENCE": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "SELECTED_PLANE": "intellectual",
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "varna_content_map": {
+        "ba": "tha",
+        "la": "nna",
+        "na": "dha",
+        "ka": "ssa"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "ba": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "melancholy / dejection",
+          "named_attribute": "vishada / melancholy",
+          "plane": "intellectual",
+          "plane_gloss": "pessimistic interpretation",
+          "content_from_varna": "tha"
+        },
+        "la": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "envy",
+          "named_attribute": "irshya / envy",
+          "plane": "intellectual",
+          "plane_gloss": "distorted evaluation of another's good",
+          "content_from_varna": "nna"
+        },
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "craving / thirst for acquisition",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "intellectual",
+          "plane_gloss": "instrumental calculation for gain",
+          "content_from_varna": "dha"
+        },
+        "ka": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "static inertia / worldly desire",
+          "named_attribute": "tamo-guna; kama / physical worldly desire",
+          "plane": "intellectual",
+          "plane_gloss": "desire-shaped thought",
+          "content_from_varna": "ssa"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "ba": {
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "intellectual",
+          "plane_gloss": "pessimistic interpretation",
+          "content_from_varna": "tha"
+        },
+        "la": {
+          "worldly_binding_distortion": "envy",
+          "spiritual_liberating_reading": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "intellectual",
+          "plane_gloss": "distorted evaluation of another's good",
+          "content_from_varna": "nna"
+        },
+        "na": {
+          "worldly_binding_distortion": "craving / thirst for acquisition",
+          "spiritual_liberating_reading": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "intellectual",
+          "plane_gloss": "instrumental calculation for gain",
+          "content_from_varna": "dha"
+        },
+        "ka": {
+          "worldly_binding_distortion": "static inertia / worldly desire",
+          "spiritual_liberating_reading": "tamas-bound kama; physical / worldly longing",
+          "named_attribute": "tamo-guna; kama / physical worldly desire",
+          "plane": "intellectual",
+          "plane_gloss": "desire-shaped thought",
+          "content_from_varna": "ssa"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-07",
+      "TARGET_TEXT": "lotus",
+      "STRATUM": "spiritual_contemplative",
+      "VARNA_SEQUENCE": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "SELECTED_PLANE": "spiritual",
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "varna_content_map": {
+        "la": "nna",
+        "ta": "tha",
+        "sa": "nya"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "spiritual",
+          "plane_gloss": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "content_from_varna": "nna"
+        },
+        "ta": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "spiritual",
+          "plane_gloss": "depressive contraction; needs upward movement",
+          "content_from_varna": "tha"
+        },
+        "sa": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual falseness; split between outer virtue and inner conduct",
+          "named_attribute": "kapatata / hypocrisy",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual falseness; split between outer virtue and inner conduct",
+          "content_from_varna": "nya"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "envy",
+          "spiritual_liberating_reading": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "spiritual",
+          "plane_gloss": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "content_from_varna": "nna"
+        },
+        "ta": {
+          "worldly_binding_distortion": "melancholy / dejection",
+          "spiritual_liberating_reading": "depressive contraction; needs upward movement",
+          "named_attribute": "vishada / melancholy",
+          "plane": "spiritual",
+          "plane_gloss": "depressive contraction; needs upward movement",
+          "content_from_varna": "tha"
+        },
+        "sa": {
+          "worldly_binding_distortion": "hypocrisy / deceit",
+          "spiritual_liberating_reading": "spiritual falseness; split between outer virtue and inner conduct",
+          "named_attribute": "kapatata / hypocrisy",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual falseness; split between outer virtue and inner conduct",
+          "content_from_varna": "nya"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-08",
+      "TARGET_TEXT": "sacred",
+      "STRATUM": "spiritual_contemplative",
+      "VARNA_SEQUENCE": [
+        "sa",
+        "ka",
+        "ra",
+        "da"
+      ],
+      "SELECTED_PLANE": "spiritual",
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "varna_content_map": {
+        "sa": "nya",
+        "ka": "ssa",
+        "ra": "ya",
+        "da": "sa"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "sa": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "hypocrisy / deceit",
+          "named_attribute": "kapatata / hypocrisy",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual falseness; split between outer virtue and inner conduct",
+          "content_from_varna": "nya"
+        },
+        "ka": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "static inertia / worldly desire",
+          "named_attribute": "tamo-guna; kama / physical worldly desire",
+          "plane": "spiritual",
+          "plane_gloss": "tamas-bound kama; physical / worldly longing",
+          "content_from_varna": "ssa"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "lack of confidence / wavering movement",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "spiritual",
+          "plane_gloss": "unstable faith; needs trust and inner steadiness",
+          "content_from_varna": "ya"
+        },
+        "da": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "escapism; premature static withdrawal; inert / static withdrawal",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva",
+          "content_from_varna": "sa"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "sa": {
+          "worldly_binding_distortion": "hypocrisy / deceit",
+          "spiritual_liberating_reading": "spiritual falseness; split between outer virtue and inner conduct",
+          "named_attribute": "kapatata / hypocrisy",
+          "plane": "spiritual",
+          "plane_gloss": "spiritual falseness; split between outer virtue and inner conduct",
+          "content_from_varna": "nya"
+        },
+        "ka": {
+          "worldly_binding_distortion": "static inertia / worldly desire",
+          "spiritual_liberating_reading": "tamas-bound kama; physical / worldly longing",
+          "named_attribute": "tamo-guna; kama / physical worldly desire",
+          "plane": "spiritual",
+          "plane_gloss": "tamas-bound kama; physical / worldly longing",
+          "content_from_varna": "ssa"
+        },
+        "ra": {
+          "worldly_binding_distortion": "lack of confidence / wavering movement",
+          "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "spiritual",
+          "plane_gloss": "unstable faith; needs trust and inner steadiness",
+          "content_from_varna": "ya"
+        },
+        "da": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "spiritual",
+          "plane_gloss": "moksha, salvation, unqualified liberation, sattva",
+          "content_from_varna": "sa"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-09",
+      "TARGET_TEXT": "Lumen",
+      "STRATUM": "brand_name",
+      "VARNA_SEQUENCE": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "varna_content_map": {
+        "la": "nna",
+        "ma": "ba",
+        "na": "dha"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "la": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "mental",
+          "plane_gloss": "envy, comparison-pain",
+          "content_from_varna": "nna"
+        },
+        "ma": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "mental",
+          "plane_gloss": "disregard, carelessness",
+          "content_from_varna": "ba"
+        },
+        "na": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "mental",
+          "plane_gloss": "craving, limitless wanting",
+          "content_from_varna": "dha"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "la": {
+          "worldly_binding_distortion": "envy",
+          "spiritual_liberating_reading": "bondage through comparison; sympathetic joy (mudita) is its correction",
+          "named_attribute": "irshya / envy",
+          "plane": "mental",
+          "plane_gloss": "envy, comparison-pain",
+          "content_from_varna": "nna"
+        },
+        "ma": {
+          "worldly_binding_distortion": "indifference / neglect",
+          "spiritual_liberating_reading": "spiritual dullness through neglect; respect/attention is correction",
+          "named_attribute": "avajna / indifference, neglect",
+          "plane": "mental",
+          "plane_gloss": "disregard, carelessness",
+          "content_from_varna": "ba"
+        },
+        "na": {
+          "worldly_binding_distortion": "craving / thirst for acquisition",
+          "spiritual_liberating_reading": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "mental",
+          "plane_gloss": "craving, limitless wanting",
+          "content_from_varna": "dha"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-10",
+      "TARGET_TEXT": "Nova",
+      "STRATUM": "brand_name",
+      "VARNA_SEQUENCE": [
+        "na",
+        "va"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "varna_content_map": {
+        "na": "dha",
+        "va": "nga"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "na": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "craving / thirst for acquisition",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "mental",
+          "plane_gloss": "craving, limitless wanting",
+          "content_from_varna": "dha"
+        },
+        "va": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "vanity / pride-display",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance",
+          "content_from_varna": "nga"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "na": {
+          "worldly_binding_distortion": "craving / thirst for acquisition",
+          "spiritual_liberating_reading": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "mental",
+          "plane_gloss": "craving, limitless wanting",
+          "content_from_varna": "dha"
+        },
+        "va": {
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance",
+          "content_from_varna": "nga"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-11",
+      "TARGET_TEXT": "wonder",
+      "STRATUM": "emotional_nonclinical",
+      "VARNA_SEQUENCE": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_DECISION": "spiritual_liberating_reading",
+      "varna_content_map": {
+        "va": "nga",
+        "na": "dha",
+        "da": "sa",
+        "ra": "ya"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "va": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance",
+          "content_from_varna": "nga"
+        },
+        "na": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "mental",
+          "plane_gloss": "craving, limitless wanting",
+          "content_from_varna": "dha"
+        },
+        "da": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "mental",
+          "plane_gloss": "clarity, peace, release",
+          "content_from_varna": "sa"
+        },
+        "ra": {
+          "selected_pole": "spiritual_liberating_reading",
+          "text": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "mental",
+          "plane_gloss": "lack of confidence, uncertainty",
+          "content_from_varna": "ya"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "va": {
+          "worldly_binding_distortion": "vanity / pride-display",
+          "spiritual_liberating_reading": "egoic obstruction; humility is its spiritual correction",
+          "named_attribute": "dambha / vanity",
+          "plane": "mental",
+          "plane_gloss": "pride, vanity, self-importance",
+          "content_from_varna": "nga"
+        },
+        "na": {
+          "worldly_binding_distortion": "craving / thirst for acquisition",
+          "spiritual_liberating_reading": "bondage through endless acquisition; spiritual ideation redirects it",
+          "named_attribute": "trishna / thirst for acquisition",
+          "plane": "mental",
+          "plane_gloss": "craving, limitless wanting",
+          "content_from_varna": "dha"
+        },
+        "da": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "mental",
+          "plane_gloss": "clarity, peace, release",
+          "content_from_varna": "sa"
+        },
+        "ra": {
+          "worldly_binding_distortion": "lack of confidence / wavering movement",
+          "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "mental",
+          "plane_gloss": "lack of confidence, uncertainty",
+          "content_from_varna": "ya"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    },
+    {
+      "item_id": "b18-12",
+      "TARGET_TEXT": "dread",
+      "STRATUM": "emotional_nonclinical",
+      "VARNA_SEQUENCE": [
+        "da",
+        "ra",
+        "da"
+      ],
+      "SELECTED_PLANE": "mental",
+      "RESOLVER_DECISION": "worldly_binding_distortion",
+      "varna_content_map": {
+        "da": "sa",
+        "ra": "ya"
+      },
+      "SCRAMBLED_SELECTED_POLE_FRAME": {
+        "da": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "escapism; premature static withdrawal; inert / static withdrawal",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "mental",
+          "plane_gloss": "clarity, peace, release",
+          "content_from_varna": "sa"
+        },
+        "ra": {
+          "selected_pole": "worldly_binding_distortion",
+          "text": "lack of confidence / wavering movement",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "mental",
+          "plane_gloss": "lack of confidence, uncertainty",
+          "content_from_varna": "ya"
+        }
+      },
+      "SCRAMBLED_UNRESOLVED_BOTH_POLES_FRAME": {
+        "da": {
+          "worldly_binding_distortion": "escapism; premature static withdrawal; inert / static withdrawal",
+          "spiritual_liberating_reading": "sattva; clarity; peace; release; mokṣa; unqualified liberation",
+          "named_attribute": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought",
+          "plane": "mental",
+          "plane_gloss": "clarity, peace, release",
+          "content_from_varna": "sa"
+        },
+        "ra": {
+          "worldly_binding_distortion": "lack of confidence / wavering movement",
+          "spiritual_liberating_reading": "unstable faith; needs trust and inner steadiness",
+          "named_attribute": "avishvasa / lack of confidence; constant air-like movement",
+          "plane": "mental",
+          "plane_gloss": "lack of confidence, uncertainty",
+          "content_from_varna": "ya"
+        }
+      },
+      "REPRESENTATION_VERSION": "B1.8_context_resolved_layer1_scrambled"
+    }
+  ]
+}
