@@ -152,7 +152,7 @@ def run_single_judge(judge: Dict, judge_visible_file: pathlib.Path,
     items = sorted(items, key=lambda r: r["blinded_output_id"])   # deterministic ordering
     if limit_outputs:
         items = items[:limit_outputs]
-    settings = settings or A.GenerationSettings(model_id=judge["id"], max_tokens=200, temperature=0.0)
+    settings = settings or A.GenerationSettings(model_id=judge["id"], max_tokens=320, temperature=0.0)
     ratings: List[Dict] = []
     errors: List[Dict] = []
     def _json_ok(t):                       # retry on unparseable/out-of-range judge JSON (varied seed)
