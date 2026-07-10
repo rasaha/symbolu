@@ -217,6 +217,44 @@ to make it primary. This is the same B1.9 track — same generation-free, judge-
 same statistics — with the control content source corrected so the control side reuses no varṇa mapping. The
 real test has still **not** been run; the runner emits only `B1_9_CONTENT_DISTANCE_RUNNER_READY_MOCK_TESTED`.
 
+## 12d. Correction note — distant-source-word control (docs-only; NOT yet implemented or run)
+
+**This is a docs-only pointer to a corrected control design. No code, test, config, or data has been changed for
+it; nothing has been run; the prior B1.9 result record is unchanged; no B1.10 file is created. No rescue is
+claimed.** The corrected control **supersedes** the out-of-pool lexicon control of §8b as the intended primary
+control once implemented (in a later, separate turn).
+
+**Why the §8b out-of-pool lexicon control is not the right control.** It reuses no varṇa mapping (good), but its
+glosses are a *different register* (concrete/sensory vs abstract-psychological), so a positive delta against it
+is confounded by register (§8b already flags this). The corrected control removes that confound by keeping the
+control on the **same varṇa-mapping construction** as authentic.
+
+**Corrected control — another real word's own authentic varṇa-derived mapping, chosen distant.** For each target
+word `W` (with its context):
+
+- **authentic** = facets from `W`'s **own** varṇa mapping (unchanged);
+- **control** = facets from a **different real source word `W′`'s own** authentic varṇa mapping — i.e. `W′`'s
+  full varṇa-derived facet set, constructed exactly as authentic is (same pipeline, same register);
+- **`W′` is selected as semantically DISTANT from `W`'s target/context**, using **only** target/context
+  embedding distance — **never** facet distance (this preserves the §6 anti-circularity rule: the control choice
+  never references `d_auth` or facet-space outcomes);
+- **freeze the `W → W′` assignment before computing any outcome** (frozen alongside the item set and hashes);
+- **endpoint:** `delta = distance(rep(W), facets(W′)) − distance(rep(W), facets(W))`; positive favors authentic,
+  identical in form to §4.
+
+**Source pool for `W′`.** A frozen word list (e.g. the B1.9 targets themselves and/or a larger frozen vocabulary
+with varṇa mappings), so that `W′` is a genuine word with a genuine mapping — not a random within-pool facet
+scramble and not an out-of-register lexicon gloss.
+
+**Anti-circularity, restated for this control.** `W′` is chosen by **target/context distance only**; the facet
+distances that enter the endpoint are computed **after** the `W → W′` map is frozen. Selecting a *distant word*
+by context is **not** selecting on `d_auth`, so it does not self-fulfill the outcome (contrast with the B1.8
+clean-subset flip, which selected on `d_auth < d_scram` and was circular).
+
+**Status:** design note only. `B1_9_CONTENT_DISTANCE_NOT_RUN` still holds; runner still emits only
+`B1_9_CONTENT_DISTANCE_RUNNER_READY_MOCK_TESTED`. Implementation and any run are deferred to a later turn on
+explicit request. B1.4b′ remains `NULL_RETURN_BOTTOM`.
+
 ## 13. Guardrails
 
 - **No test run.** No embeddings computed here (beyond reproducing the already-pasted B1.8 diagnostic numbers in
