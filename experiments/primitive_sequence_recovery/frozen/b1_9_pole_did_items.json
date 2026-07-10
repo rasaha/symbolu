@@ -1,0 +1,385 @@
+{
+  "artifact_type": "b1_9_pole_did_items",
+  "status": "DRAFT_REQUIRES_OPERATOR_SIGNOFF",
+  "representation_version": "B1.9_pole_did",
+  "classification_approved": false,
+  "rule": "correct pole from the referent-ontology rule (physical/objectified/contraction -> binding; subjective release/realization/transformation -> liberating). valence NOT used.",
+  "varna_derivation": "CANONICAL: stage_a_prime_coverage.normalize(word,'A_PRIME_EN') + b1_6_phoneme_to_varna_bridge_manifest.json mapping (consonant-only; vowels dropped; reproduces all 12 existing B1.8/B1.9 sequences). NO dedup. NO invented vowel meanings.",
+  "vowel_omission_limitation": "Consonant-only. Vowels are VOWEL_NO_PROFILE and dropped; this may underrepresent Sanskrit svara. Adding vowels requires a sourced vowel table, a new representation version, a new bridge, and a separate prereg — NOT done here.",
+  "wprime_selection": "frozen seeded derangement (seed 20260712), no fixed point, NO use of any output/score.",
+  "anti_circularity": "Approve (classification_approved=true) BEFORE any generation. Do not revise after seeing output.",
+  "source_hashes": {
+    "stage_a_prime_coverage.py": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+    "b1_6_phoneme_to_varna_bridge_manifest.json": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed",
+    "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694"
+  },
+  "n_items": 24,
+  "n_liberating": 12,
+  "n_binding": 12,
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "items": [
+    {
+      "item_id": "pd-01",
+      "target_text": "surrender",
+      "context_text": "After years of resisting, his surrender softened the fear and opened him to peace.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "sa",
+        "ra",
+        "ra",
+        "na",
+        "da",
+        "ra"
+      ]
+    },
+    {
+      "item_id": "pd-02",
+      "target_text": "release",
+      "context_text": "With one quiet breath, release moved through her body and the old clinging fell away.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ra",
+        "la",
+        "sa"
+      ]
+    },
+    {
+      "item_id": "pd-03",
+      "target_text": "forgiveness",
+      "context_text": "Forgiveness arose in him, not as approval of the wound, but as freedom from carrying it.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ra",
+        "ga",
+        "va",
+        "na",
+        "sa",
+        "sa"
+      ]
+    },
+    {
+      "item_id": "pd-04",
+      "target_text": "awakening",
+      "context_text": "The awakening came silently, as if a veil had lifted and the mind became clear.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "va",
+        "ka",
+        "na",
+        "nga"
+      ]
+    },
+    {
+      "item_id": "pd-05",
+      "target_text": "acceptance",
+      "context_text": "Acceptance settled in her heart, and the struggle against what had happened began to dissolve.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ka",
+        "ka",
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ]
+    },
+    {
+      "item_id": "pd-06",
+      "target_text": "clarity",
+      "context_text": "In stillness, clarity appeared, and the tangled fear no longer ruled his choices.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "intellectual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ka",
+        "la",
+        "ra",
+        "ta",
+        "ya"
+      ]
+    },
+    {
+      "item_id": "pd-07",
+      "target_text": "insight",
+      "context_text": "The insight broke through his old pattern, showing him he was not bound by the thought.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "intellectual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "na",
+        "sa",
+        "ga",
+        "ta"
+      ]
+    },
+    {
+      "item_id": "pd-08",
+      "target_text": "letting-go",
+      "context_text": "Letting-go was not defeat; it was the moment the grip of craving loosened.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "la",
+        "ta",
+        "ta",
+        "nga",
+        "ga"
+      ]
+    },
+    {
+      "item_id": "pd-09",
+      "target_text": "peace",
+      "context_text": "Peace arose within him when the need to win finally disappeared.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "pa",
+        "ka"
+      ]
+    },
+    {
+      "item_id": "pd-10",
+      "target_text": "compassion",
+      "context_text": "Compassion opened where judgment had been, and the heart no longer felt closed.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ka",
+        "ma",
+        "pa",
+        "sa",
+        "sa",
+        "na"
+      ]
+    },
+    {
+      "item_id": "pd-11",
+      "target_text": "equanimity",
+      "context_text": "Equanimity held steady even as praise and blame rose and passed.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "mental",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "ka",
+        "va",
+        "na",
+        "ma",
+        "ta",
+        "ya"
+      ]
+    },
+    {
+      "item_id": "pd-12",
+      "target_text": "liberation",
+      "context_text": "Liberation was felt as the end of inner bondage, not as escape from the world.",
+      "referent_type": "subjectified-mental (release/realization)",
+      "plane": "spiritual",
+      "correct_pole": "spiritual_liberating_reading",
+      "flipped_pole": "worldly_binding_distortion",
+      "varna_sequence": [
+        "la",
+        "ba",
+        "ra",
+        "ta",
+        "na"
+      ]
+    },
+    {
+      "item_id": "pd-13",
+      "target_text": "anchor",
+      "context_text": "The iron anchor lay embedded in the seabed, its heavy flukes gripping the mud and holding the hull fast.",
+      "referent_type": "physical",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "na",
+        "ca",
+        "ra"
+      ]
+    },
+    {
+      "item_id": "pd-14",
+      "target_text": "cage",
+      "context_text": "The steel cage stood bolted to the floor, its bars fixed and immovable.",
+      "referent_type": "physical",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ka",
+        "ga"
+      ]
+    },
+    {
+      "item_id": "pd-15",
+      "target_text": "chain",
+      "context_text": "The rusted chain bound the gate shut, each link clamped hard to the next.",
+      "referent_type": "physical",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ca",
+        "na"
+      ]
+    },
+    {
+      "item_id": "pd-16",
+      "target_text": "wall",
+      "context_text": "The concrete wall sealed off the yard, blocking every path through it.",
+      "referent_type": "physical",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "va",
+        "la",
+        "la"
+      ]
+    },
+    {
+      "item_id": "pd-17",
+      "target_text": "lock",
+      "context_text": "The padlock held the door shut, its bolt seized and unyielding.",
+      "referent_type": "physical",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "la",
+        "ka"
+      ]
+    },
+    {
+      "item_id": "pd-18",
+      "target_text": "weight",
+      "context_text": "The lead weight pressed down on the lid, pinning it in place.",
+      "referent_type": "physical",
+      "plane": "physical",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "va",
+        "ga",
+        "ta"
+      ]
+    },
+    {
+      "item_id": "pd-19",
+      "target_text": "terror",
+      "context_text": "Terror seized him and froze him at the threshold, unable to step forward.",
+      "referent_type": "subjectified-mental (contraction)",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ta",
+        "ra",
+        "ra",
+        "ra"
+      ]
+    },
+    {
+      "item_id": "pd-20",
+      "target_text": "craving",
+      "context_text": "Craving gnawed at her, driving one grasping purchase after another.",
+      "referent_type": "subjectified-mental (contraction)",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ka",
+        "ra",
+        "va",
+        "nga"
+      ]
+    },
+    {
+      "item_id": "pd-21",
+      "target_text": "dread",
+      "context_text": "A cold dread of failure kept him clinging and rigid, unable to move.",
+      "referent_type": "subjectified-mental (contraction)",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "da",
+        "ra",
+        "da"
+      ]
+    },
+    {
+      "item_id": "pd-22",
+      "target_text": "resentment",
+      "context_text": "Resentment hardened in him, replaying the wrong and refusing to let it go.",
+      "referent_type": "subjectified-mental (contraction)",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ra",
+        "sa",
+        "na",
+        "ta",
+        "ma",
+        "na",
+        "ta"
+      ]
+    },
+    {
+      "item_id": "pd-23",
+      "target_text": "obsession",
+      "context_text": "The obsession fixed his mind on a single thought he could not release.",
+      "referent_type": "subjectified-mental (contraction)",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "ba",
+        "sa",
+        "sa",
+        "sa",
+        "na"
+      ]
+    },
+    {
+      "item_id": "pd-24",
+      "target_text": "panic",
+      "context_text": "Panic seized the crowd, each person gripping toward the exit in blind urgency.",
+      "referent_type": "subjectified-mental (contraction)",
+      "plane": "mental",
+      "correct_pole": "worldly_binding_distortion",
+      "flipped_pole": "spiritual_liberating_reading",
+      "varna_sequence": [
+        "pa",
+        "na",
+        "ka"
+      ]
+    }
+  ]
+}

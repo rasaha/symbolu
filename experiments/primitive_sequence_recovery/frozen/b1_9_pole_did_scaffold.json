@@ -1,0 +1,2158 @@
+{
+  "artifact_type": "b1_9_pole_did_scaffold",
+  "status": "FROZEN",
+  "representation_version": "B1.9_pole_did",
+  "primary_statistic": "DiD = (OWN_CORRECT - OWN_FLIPPED) - (CONTROL_CORRECT - CONTROL_FLIPPED)",
+  "classification_approved": false,
+  "wprime_seed": 20260712,
+  "source_hashes": {
+    "b1_9_pole_did_items.json": "6e05917585681929d3b85f827254d501f6db29072d1369ae8523ad3824422499",
+    "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694"
+  },
+  "note": "4-arm diff-in-diff; canonical consonant-only varṇas; W′ frozen distant word (seeded derangement). NO generation. B1.4b′ NULL_RETURN_BOTTOM.",
+  "n_items": 24,
+  "items": [
+    {
+      "item_id": "pd-01",
+      "TARGET_TEXT": "surrender",
+      "CONTEXT_TEXT": "After years of resisting, his surrender softened the fear and opened him to peace.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "sa",
+        "ra",
+        "ra",
+        "na",
+        "da",
+        "ra"
+      ],
+      "wprime_item_id": "pd-10",
+      "wprime_target_text": "compassion",
+      "wprime_varnas": [
+        "ka",
+        "ma",
+        "pa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          },
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-02",
+      "TARGET_TEXT": "release",
+      "CONTEXT_TEXT": "With one quiet breath, release moved through her body and the old clinging fell away.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ra",
+        "la",
+        "sa"
+      ],
+      "wprime_item_id": "pd-14",
+      "wprime_target_text": "cage",
+      "wprime_varnas": [
+        "ka",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-03",
+      "TARGET_TEXT": "forgiveness",
+      "CONTEXT_TEXT": "Forgiveness arose in him, not as approval of the wound, but as freedom from carrying it.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ra",
+        "ga",
+        "va",
+        "na",
+        "sa",
+        "sa"
+      ],
+      "wprime_item_id": "pd-07",
+      "wprime_target_text": "insight",
+      "wprime_varnas": [
+        "na",
+        "sa",
+        "ga",
+        "ta"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-04",
+      "TARGET_TEXT": "awakening",
+      "CONTEXT_TEXT": "The awakening came silently, as if a veil had lifted and the mind became clear.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "va",
+        "ka",
+        "na",
+        "nga"
+      ],
+      "wprime_item_id": "pd-20",
+      "wprime_target_text": "craving",
+      "wprime_varnas": [
+        "ka",
+        "ra",
+        "va",
+        "nga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-05",
+      "TARGET_TEXT": "acceptance",
+      "CONTEXT_TEXT": "Acceptance settled in her heart, and the struggle against what had happened began to dissolve.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "ka",
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "wprime_item_id": "pd-19",
+      "wprime_target_text": "terror",
+      "wprime_varnas": [
+        "ta",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-06",
+      "TARGET_TEXT": "clarity",
+      "CONTEXT_TEXT": "In stillness, clarity appeared, and the tangled fear no longer ruled his choices.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "intellectual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "la",
+        "ra",
+        "ta",
+        "ya"
+      ],
+      "wprime_item_id": "pd-12",
+      "wprime_target_text": "liberation",
+      "wprime_varnas": [
+        "la",
+        "ba",
+        "ra",
+        "ta",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ya",
+            "text": "unstable faith; needs trust and inner steadiness"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ya",
+            "text": "lack of confidence / wavering movement"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-07",
+      "TARGET_TEXT": "insight",
+      "CONTEXT_TEXT": "The insight broke through his old pattern, showing him he was not bound by the thought.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "intellectual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "na",
+        "sa",
+        "ga",
+        "ta"
+      ],
+      "wprime_item_id": "pd-03",
+      "wprime_target_text": "forgiveness",
+      "wprime_varnas": [
+        "ra",
+        "ga",
+        "va",
+        "na",
+        "sa",
+        "sa"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-08",
+      "TARGET_TEXT": "letting-go",
+      "CONTEXT_TEXT": "Letting-go was not defeat; it was the moment the grip of craving loosened.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "la",
+        "ta",
+        "ta",
+        "nga",
+        "ga"
+      ],
+      "wprime_item_id": "pd-16",
+      "wprime_target_text": "wall",
+      "wprime_varnas": [
+        "va",
+        "la",
+        "la"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-09",
+      "TARGET_TEXT": "peace",
+      "CONTEXT_TEXT": "Peace arose within him when the need to win finally disappeared.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "pa",
+        "ka"
+      ],
+      "wprime_item_id": "pd-13",
+      "wprime_target_text": "anchor",
+      "wprime_varnas": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ca",
+            "text": "conscience as inner dharmic compass"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ca",
+            "text": "lack of discrimination / confused discernment"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-10",
+      "TARGET_TEXT": "compassion",
+      "CONTEXT_TEXT": "Compassion opened where judgment had been, and the heart no longer felt closed.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "ma",
+        "pa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "wprime_item_id": "pd-01",
+      "wprime_target_text": "surrender",
+      "wprime_varnas": [
+        "sa",
+        "ra",
+        "ra",
+        "na",
+        "da",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          },
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-11",
+      "TARGET_TEXT": "equanimity",
+      "CONTEXT_TEXT": "Equanimity held steady even as praise and blame rose and passed.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "va",
+        "na",
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "wprime_item_id": "pd-17",
+      "wprime_target_text": "lock",
+      "wprime_varnas": [
+        "la",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ya",
+            "text": "unstable faith; needs trust and inner steadiness"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ya",
+            "text": "lack of confidence / wavering movement"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-12",
+      "TARGET_TEXT": "liberation",
+      "CONTEXT_TEXT": "Liberation was felt as the end of inner bondage, not as escape from the world.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "la",
+        "ba",
+        "ra",
+        "ta",
+        "na"
+      ],
+      "wprime_item_id": "pd-06",
+      "wprime_target_text": "clarity",
+      "wprime_varnas": [
+        "ka",
+        "la",
+        "ra",
+        "ta",
+        "ya"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ya",
+            "text": "unstable faith; needs trust and inner steadiness"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ya",
+            "text": "lack of confidence / wavering movement"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-13",
+      "TARGET_TEXT": "anchor",
+      "CONTEXT_TEXT": "The iron anchor lay embedded in the seabed, its heavy flukes gripping the mud and holding the hull fast.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "wprime_item_id": "pd-09",
+      "wprime_target_text": "peace",
+      "wprime_varnas": [
+        "pa",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ca",
+            "text": "lack of discrimination / confused discernment"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ca",
+            "text": "conscience as inner dharmic compass"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-14",
+      "TARGET_TEXT": "cage",
+      "CONTEXT_TEXT": "The steel cage stood bolted to the floor, its bars fixed and immovable.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ka",
+        "ga"
+      ],
+      "wprime_item_id": "pd-02",
+      "wprime_target_text": "release",
+      "wprime_varnas": [
+        "ra",
+        "la",
+        "sa"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-15",
+      "TARGET_TEXT": "chain",
+      "CONTEXT_TEXT": "The rusted chain bound the gate shut, each link clamped hard to the next.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ca",
+        "na"
+      ],
+      "wprime_item_id": "pd-21",
+      "wprime_target_text": "dread",
+      "wprime_varnas": [
+        "da",
+        "ra",
+        "da"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ca",
+            "text": "lack of discrimination / confused discernment"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ca",
+            "text": "conscience as inner dharmic compass"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-16",
+      "TARGET_TEXT": "wall",
+      "CONTEXT_TEXT": "The concrete wall sealed off the yard, blocking every path through it.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "va",
+        "la",
+        "la"
+      ],
+      "wprime_item_id": "pd-08",
+      "wprime_target_text": "letting-go",
+      "wprime_varnas": [
+        "la",
+        "ta",
+        "ta",
+        "nga",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-17",
+      "TARGET_TEXT": "lock",
+      "CONTEXT_TEXT": "The padlock held the door shut, its bolt seized and unyielding.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "la",
+        "ka"
+      ],
+      "wprime_item_id": "pd-11",
+      "wprime_target_text": "equanimity",
+      "wprime_varnas": [
+        "ka",
+        "va",
+        "na",
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ya",
+            "text": "lack of confidence / wavering movement"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ya",
+            "text": "unstable faith; needs trust and inner steadiness"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-18",
+      "TARGET_TEXT": "weight",
+      "CONTEXT_TEXT": "The lead weight pressed down on the lid, pinning it in place.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "va",
+        "ga",
+        "ta"
+      ],
+      "wprime_item_id": "pd-22",
+      "wprime_target_text": "resentment",
+      "wprime_varnas": [
+        "ra",
+        "sa",
+        "na",
+        "ta",
+        "ma",
+        "na",
+        "ta"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-19",
+      "TARGET_TEXT": "terror",
+      "CONTEXT_TEXT": "Terror seized him and froze him at the threshold, unable to step forward.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ta",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "wprime_item_id": "pd-05",
+      "wprime_target_text": "acceptance",
+      "wprime_varnas": [
+        "ka",
+        "ka",
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-20",
+      "TARGET_TEXT": "craving",
+      "CONTEXT_TEXT": "Craving gnawed at her, driving one grasping purchase after another.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ka",
+        "ra",
+        "va",
+        "nga"
+      ],
+      "wprime_item_id": "pd-04",
+      "wprime_target_text": "awakening",
+      "wprime_varnas": [
+        "va",
+        "ka",
+        "na",
+        "nga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-21",
+      "TARGET_TEXT": "dread",
+      "CONTEXT_TEXT": "A cold dread of failure kept him clinging and rigid, unable to move.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "da",
+        "ra",
+        "da"
+      ],
+      "wprime_item_id": "pd-15",
+      "wprime_target_text": "chain",
+      "wprime_varnas": [
+        "ca",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ca",
+            "text": "lack of discrimination / confused discernment"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ca",
+            "text": "conscience as inner dharmic compass"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-22",
+      "TARGET_TEXT": "resentment",
+      "CONTEXT_TEXT": "Resentment hardened in him, replaying the wrong and refusing to let it go.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ra",
+        "sa",
+        "na",
+        "ta",
+        "ma",
+        "na",
+        "ta"
+      ],
+      "wprime_item_id": "pd-18",
+      "wprime_target_text": "weight",
+      "wprime_varnas": [
+        "va",
+        "ga",
+        "ta"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-23",
+      "TARGET_TEXT": "obsession",
+      "CONTEXT_TEXT": "The obsession fixed his mind on a single thought he could not release.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ba",
+        "sa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "wprime_item_id": "pd-24",
+      "wprime_target_text": "panic",
+      "wprime_varnas": [
+        "pa",
+        "na",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-24",
+      "TARGET_TEXT": "panic",
+      "CONTEXT_TEXT": "Panic seized the crowd, each person gripping toward the exit in blind urgency.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "pa",
+        "na",
+        "ka"
+      ],
+      "wprime_item_id": "pd-23",
+      "wprime_target_text": "obsession",
+      "wprime_varnas": [
+        "ba",
+        "sa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "hatred / revulsion"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "fetter of hatred; related to moha and fear"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ]
+      }
+    }
+  ]
+}
