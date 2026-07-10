@@ -30,13 +30,13 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "4dc5b2a882b861cc7851572f5278bdfd226d469570f505850ead100a1bceee81"
+    "b1_2_varna_classical_verifications.json": "c69539fa07e2229d63359f79f32737eae160f7a54384ddc79005e98a3f6fe0ce"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
   "n_practically_reachable": 19,
-  "n_primary_text_verified": 26,
-  "n_pending_classical_verification": 8,
+  "n_primary_text_verified": 27,
+  "n_pending_classical_verification": 7,
   "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
   "motto": "Structure, not validated meaning.",
   "varnas": {
@@ -871,25 +871,25 @@
       "transliteration": "ya",
       "bridge_reachable": true,
       "practically_reachable": true,
-      "sanskrit_label": "Aviśvāsa",
+      "sanskrit_label": "Aviśvāsa (lack of confidence / faith)",
       "english_rendering": "Lack of confidence",
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of aviśvāsa vrtti (lack of confidence in oneself and others).",
-      "source_quote_verified": null,
-      "worldly_binding_distortion": "self-doubt that cannot commit",
-      "spiritual_liberating_reading": "self-efficacy to commit and to rely",
-      "classical_associations": null,
+      "source_quote_verified": "Sarkar: Ya is the acoustic root of aviśvāsa vṛtti (lack of confidence), and also the acoustic root of constant movement (like the movement of air). People with no self-confidence say to the end of their lives 'Shall I be able to do it?' and can never accomplish anything great; as they also lack confidence in others, others have no confidence in them.",
+      "worldly_binding_distortion": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+      "spiritual_liberating_reading": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+      "classical_associations": "Also the acoustic root of CONSTANT MOVEMENT (like the movement of air / vāyu) — a motion/tattva association, distinct from the aviśvāsa pole.",
       "functional_operation": "musters the self-trust needed to commit to an action",
       "contrast_boundary": "not composure under impersonal uncertainty (Kha), not threat-steadiness (Pha)",
-      "attested_vs_authored": "Attested side = classical_side below; the OTHER pole is largely author counter-rewritten (lexicon rewrite_status='source_preserved_counter_rewritten') — flagged, not validated.",
-      "primary_text_scope": null,
-      "english_equivalent": null,
-      "classical_review_status": "LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION",
-      "provenance": "b1_2_source_lexicon (Sarkar-attributed)",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + movement association. ATTESTED: ya = aviśvāsa vṛtti (lack of confidence), illustrated; and the association with constant movement (air/vāyu). BINDING pole attested. AUTHORED: the LIBERATING pole (self-efficacy) is lexicon-supplied.",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "palatal approximant /j/ ('y') -> ya; BRIDGE-REACHABLE (yes/young/yoga/beyond).",
+      "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
+      "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": "lack of confidence / wavering movement",
       "v2_liberating": "unstable faith; needs trust and inner steadiness",
       "differs_from_v2": true,
-      "v2_drift_note": null
+      "v2_drift_note": "v2 makes TWO errors: (1) v2 binding='lack of confidence / wavering movement' FOLDS the movement ASSOCIATION into the pole (association-as-pole, as ha/ka/ga); (2) v2 liberating='unstable faith; needs trust and inner steadiness' RESTATES the problem + corrective (problem-as-pole, 11th instance). v3 keeps constant-movement as an association and uses the lexicon's 'self-efficacy to commit and to rely.' ya is bridge-reachable (yes/young/yoga)."
     }
   }
 }

@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **26**, pending **8**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **27**, pending **7**
 
 ## Fidelity caveats
 
@@ -38,7 +38,7 @@
 | `ta` | ★ | Jāḍya / Nidrā (bindi… | **P** |  | jāḍya — inertia, staticity, dullness, torpor… | the cessation of dullness/staticity — awaken… |
 | `tha` | ★ | Viṣāda (binding) | **P** | name+def | viśāda — melancholy, dejection that sinks on… | warm buoyancy lifting one's own dejection — … |
 | `va` | ★ | Dharma(liberating_or… | pend |  | accepting-as-true without sufficient discern… | truth-assent purified by discernment, instal… |
-| `ya` | ★ | Aviśvāsa(binding) | pend |  | self-doubt that cannot commit | self-efficacy to commit and to rely |
+| `ya` | ★ | Aviśvāsa (binding) | **P** | name+def | aviśvāsa — self-doubt that cannot commit: la… | self-efficacy — the confidence to commit and… |
 | `dda` | ✧ | Lajjā (binding) | **P** | name | lajjā as inhibition — action held back by ot… | acting unhindered by social shame — natural,… |
 | `dha` | ✧ | Tṛṣṇā (binding) | **P** |  | tṛṣṇā — limitless thirst to acquire: unquenc… | the acquisitive thirst quenched at its root … |
 | `nna` | ✧ | Īrṣyā (binding) | **P** | name | envy — the sting at another's success; covet… | muditā — sympathetic gladness at another's f… |

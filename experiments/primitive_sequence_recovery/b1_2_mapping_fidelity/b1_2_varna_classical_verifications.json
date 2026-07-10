@@ -299,6 +299,18 @@
       "classical_associations": "Two linked vṛttis on one root: praṇāśa (annihilation) and prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — unchecked latitude running to dissolution.",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME(s) + gloss. ATTESTED: ma = praṇāśa (annihilation) AND prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — the BINDING pole (indulgence-to-dissolution). AUTHORED: the LIBERATING pole (disciplined containment that holds form) is lexicon-supplied.",
       "v2_drift_note": "v2 binding='annihilation / indulgence (giving latitude)' is fine; v2 liberating='annihilation if unrestrained; discipline / sublimation needed' RESTATES the problem ('annihilation if unrestrained') + names the corrective ('discipline/sublimation needed') rather than the liberated MODE — problem-as-pole AGAIN (10th instance). v3 uses the lexicon's 'disciplined containment that holds form.' ma is bridge-reachable and common (/m/)."
+    },
+    {
+      "varna": "ya",
+      "sanskrit_label": "Aviśvāsa (lack of confidence / faith)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "palatal approximant /j/ ('y') -> ya; BRIDGE-REACHABLE (yes/young/yoga/beyond).",
+      "source_quote": "Sarkar: Ya is the acoustic root of aviśvāsa vṛtti (lack of confidence), and also the acoustic root of constant movement (like the movement of air). People with no self-confidence say to the end of their lives 'Shall I be able to do it?' and can never accomplish anything great; as they also lack confidence in others, others have no confidence in them.",
+      "binding": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+      "liberating": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+      "classical_associations": "Also the acoustic root of CONSTANT MOVEMENT (like the movement of air / vāyu) — a motion/tattva association, distinct from the aviśvāsa pole.",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + movement association. ATTESTED: ya = aviśvāsa vṛtti (lack of confidence), illustrated; and the association with constant movement (air/vāyu). BINDING pole attested. AUTHORED: the LIBERATING pole (self-efficacy) is lexicon-supplied.",
+      "v2_drift_note": "v2 makes TWO errors: (1) v2 binding='lack of confidence / wavering movement' FOLDS the movement ASSOCIATION into the pole (association-as-pole, as ha/ka/ga); (2) v2 liberating='unstable faith; needs trust and inner steadiness' RESTATES the problem + corrective (problem-as-pole, 11th instance). v3 keeps constant-movement as an association and uses the lexicon's 'self-efficacy to commit and to rely.' ya is bridge-reachable (yes/young/yoga)."
     }
   ]
 }
