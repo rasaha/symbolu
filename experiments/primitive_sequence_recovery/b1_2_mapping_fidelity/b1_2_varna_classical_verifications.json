@@ -182,6 +182,18 @@
       "classical_associations": "Distinctions: piśunatā (sadistic torture) is NOT ordinary least-pain killing; it is a sharper/darker sibling of krūratā (la — cruelty / physical harm to the weak) and ENTIRELY DIFFERENT from dha (dental aspirate = tṛṣṇā / craving — operator-flagged 'different from Dha'). Held contrary to the spirit of Neohumanism.",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION/illustration. ATTESTED: ddha = piśunatā vṛtti (sadistic cruelty), vividly illustrated (torturous slaughter; the tortoise; impaling/flaying) — the BINDING pole; plus the attested contrast that least-pain killing is NOT piśunatā. AUTHORED: the LIBERATING pole (compassion shielding the maligned) is lexicon-supplied, though the passage's least-pain / Neohumanism contrast supports it.",
       "v2_drift_note": "ddha is ABSENT from v2 (reference-only — retroflex AND aspirate, doubly unreachable). DISTINCT from dha (dental aspirate = tṛṣṇā / craving) — a different vṛtti entirely (operator note); and distinct from la (krūratā, general cruelty), of which piśunatā is the sadistic-torture intensification."
+    },
+    {
+      "varna": "nna",
+      "sanskrit_label": "Īrṣyā (envy)",
+      "primary_text_scope": "NAME_ONLY",
+      "english_equivalent": "retroflex nasal ṇa. A bridge TARGET exists (phoneme 'nr' -> nna) but the English G2P never emits 'nr', so nna is PRACTICALLY UNREACHABLE (retroflex series).",
+      "source_quote": "Sarkar: 'Ṇa is the acoustic root of īrṣā vṛtti [the propensity of envy].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
+      "binding": "envy — the sting at another's success; covetous resentment at another's good fortune",
+      "liberating": "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+      "classical_associations": null,
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: nna = īrṣā vṛtti (envy). AUTHORED (fully): BOTH poles are lexicon-supplied — the one-line passage gives no binding/liberating contrast.",
+      "v2_drift_note": "v2 binding='envy' is the bare vṛtti NAME; v2 liberating='bondage through comparison; sympathetic joy (mudita) is its correction' restates the PROBLEM + names the corrective rather than the liberated MODE — the same problem/corrective-as-pole error as nga/ja/nya. v3 uses the lexicon's 'muditā — sympathetic gladness at another's fortune.' PRACTICALLY UNREACHABLE (retroflex nasal; 'nr' never emitted)."
     }
   ]
 }

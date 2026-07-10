@@ -3,10 +3,9 @@
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
 - varṇas **34** · bridge-target **25** · **practically reachable 20** · reference-only 14
-- verified **16**, pending **18**
-- R: ★ reachable · ✧ target-but-unreachable · · reference-only · scope name/name+def = poles authored
+- verified **17**, pending **17**
 
-## Varṇas (⚑ differs from v2)
+## Varṇas (R: ★ reachable ✧ target-but-unreachable · reference-only · ⚑ differs from v2 · scope name/name+def=poles authored)
 
 | varṇa | R | Sanskrit (side) | rev | scope | binding (v3) | liberating (v3) |
 |---|---|---|---|---|---|---|
@@ -31,7 +30,7 @@
 | `va` | ★ | Dharma(liberating_or… | pend |  | accepting-as-true without sufficient discern… | truth-assent purified by discernment, instal… |
 | `ya` | ★ | Aviśvāsa(binding) | pend |  | self-doubt that cannot commit | self-efficacy to commit and to rely |
 | `dda` | ✧ | Lajjā (binding) | **P** | name | lajjā as inhibition — action held back by ot… | acting unhindered by social shame — natural,… |
-| `nna` | ✧ | Īrṣyā(binding) | pend |  | the sting at another's success | sympathetic gladness at another's fortune |
+| `nna` | ✧ | Īrṣyā (binding) | **P** | name | envy — the sting at another's success; covet… | muditā — sympathetic gladness at another's f… |
 | `nya` | ✧ | Kapaṭatā (binding) | **P** | name+def | hypocrisy / concealment — inner and outer di… | transparency — inner intent and outer act co… |
 | `ssa` | ✧ | Kāma / Tamoguṇa(bind… | pend |  | sensory craving bound to inertia | raw desire transmuted into grounded, contain… |
 | `tta` | ✧ | Vitarka (binding) | **P** |  | vitarka — overstating one's case to the poin… | pramita vāk — balanced, measured speech usin… |
