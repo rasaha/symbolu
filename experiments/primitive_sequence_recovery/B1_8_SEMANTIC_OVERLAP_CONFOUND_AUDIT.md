@@ -90,7 +90,7 @@ dread semantic coincidence favoring the scramble), not evidence of word-specific
 step is **not** to run the powered test as previously designed, but to first adopt the semantic-distance-
 constrained control above; otherwise the primary endpoint measures overlap, not meaning.
 
-## 4b. Post-hoc "clean-subset" flip — and why it does NOT rescue B1.8 (circular selection)
+## 4b. Post-hoc clean-subset flip and circular-selection warning
 
 A follow-up asked whether restricting the primary contrast to items with a *valid* (semantically distant)
 scramble would flip the result. Using an embedding distance `d = 1 − cos(target+context, facet-aggregate)` and a
@@ -121,14 +121,21 @@ confirmatory**, and — more importantly — **the selection rule is circular:**
 - Approximate lean: **~0.026 cosine distance** (8/12, sign-test p ≈ 0.19).
 - Interpretation: **weak, non-significant, consistent with the B1.4b′ null.**
 
-**Conclusion:**
-- The post-hoc flip **does not rescue B1.8.** It is partly a circular selection artifact and is non-significant
-  even at the tightest cut (composite 5–3; specificity 5–1 of 6 decisive).
-- It shows concretely **why B1.8's scramble control was not semantically distance-controlled**, and it motivates
-  a **prospective, generation-free** B1.9 design (`B1_9_CONTENT_LEVEL_SEMANTIC_DISTANCE_PREREG.md`) that measures
-  the mapping directly and **forbids** selecting the analysis subset with a variable upstream of the outcome.
-- **B1.8 remains null/negative for broad generation utility.** The `specificity_to_target` thread remains
-  **exploratory and methodologically unresolved — not evidence.** B1.4b′ remains `NULL_RETURN_BOTTOM`.
+**Required B1.8 conclusion (unchanged results):**
+- **B1.8 remains null/negative for broad generation utility.**
+- `KCPR_SELECTED_POLE` **tied** with `SCRAMBLED_SELECTED_POLE` on the composite (11–2–10; +0.08).
+- `KCPR_SELECTED_POLE` showed **no gain over `UNRESOLVED_BOTH_POLES`** (mean_diff −0.002; paired 9–1–13) —
+  context-conditioned Layer-1 resolution added nothing over the both-poles dump.
+- `KCPR_SELECTED_POLE` **underperformed the generic / semantic / plain baselines** (vs GENERIC 4–17, vs SEMANTIC
+  2–14, vs PLAIN 4–9), **with the plain-baseline Qwen-coverage caveat preserved** (PLAIN survived only 13/24
+  outputs — Qwen wrote sub-60-word readings — so `KCPR vs PLAIN` is Mistral-dominated; `vs GENERIC`/`vs SEMANTIC`
+  are fuller and tell the same story).
+- The **`specificity_to_target` lean is exploratory and confounded** by semantic-overlap / control design (§1–§4),
+  and the clean-subset flip that appears to strengthen it is a **circular selection artifact** (above), not
+  evidence.
+- The post-hoc clean-subset flip **motivates B1.9** (`B1_9_CONTENT_LEVEL_SEMANTIC_DISTANCE_PREREG.md`) **but does
+  not rescue B1.8.**
+- **B1.4b′ remains `NULL_RETURN_BOTTOM`.**
 
 ## 5. Guardrails
 

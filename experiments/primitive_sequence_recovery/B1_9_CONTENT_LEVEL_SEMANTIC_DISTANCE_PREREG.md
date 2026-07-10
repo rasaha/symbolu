@@ -64,6 +64,10 @@ Authentic varṇa facet aggregate **vs** distance-matched random/control varṇa
   preprocessing** (tokenization/normalization, stopword policy, facet-aggregation rule: mean-of-facet-embeddings
   vs concatenation — chosen and frozen in advance).
 - **Fixed random seeds**; **fixed number of controls per item** (`K`, preregistered).
+- **Freeze all inclusion/exclusion criteria before running.** If, under a prospective distance constraint on the
+  control pool (§6), an item has **no valid control**, mark it **`REFUSE_UNSEPARABLE` before outcome analysis**
+  and exclude it — never relax the constraint or drop/keep an item based on its observed authentic-vs-control
+  outcome.
 - Analysis by **bootstrap / permutation / sign-test**; report **effect size + confidence interval**.
 - Include the negative controls of §8.
 
@@ -91,6 +95,7 @@ Authentic varṇa facet aggregate **vs** distance-matched random/control varṇa
 - **Bootstrap CI** over items (fixed seed, preregistered iterations).
 - **Permutation test** over item↔control assignment (control 5) to build the null.
 - Report **exact p-values** where feasible, and **effect size** (mean `delta_distance` + CI) per control family.
+- **Report results for ALL control families (1–6), not only the most favorable one.**
 - **Define the success threshold before execution** (e.g. mean `delta_distance ≥ δ*` with permutation
   p < preregistered α, robust across control families 1–4). `δ*` and α are fixed in the freeze.
 - **No terminal ontology label** under any outcome.
