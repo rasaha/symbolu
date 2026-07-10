@@ -2,8 +2,8 @@
 
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** (25 bridge-reachable, 9 reference-only); verified **9**, pending **25**
-- `scope`: NAME_ONLY / NAME_PLUS_DEFINITION = source gives no pole contrast (poles authored).
+- varṇas **34** (25 bridge-reachable, 9 reference-only); verified **10**, pending **24**
+- `scope`: name / name+def = source gives no pole contrast (poles authored).
 
 ## Varṇas (★ bridge-reachable · ⚑ differs from v2)
 
@@ -16,7 +16,7 @@
 | ★`dha` | Tṛṣṇā(binding) | pend |  | limitless thirst to acquire | the acquisitive thirst quenched at its root | ⚑ craving / thirst for a… |
 | ★`ga` | Ceṣṭā (binding) | **P** |  | restless striving that cannot stop — effort co… | will-force applied to arouse one's dormant hig… | ⚑ effort / striving |
 | ★`ha` | Parā-vidyā (liberati… | **P** |  | outward / visible vision — fixation on the man… | intuitional vision (parā-vidyā) — inner, subtl… | ⚑ night / darkness (the … |
-| ★`ja` | Ahaṁkāra(binding) | pend |  | the inflated 'I did / I control this' | agency exercised without inflating the I | ⚑ ego / inflated I-feeli… |
+| ★`ja` | Ahaṃkāra (binding) | **P** | name+def | the inflated 'I did / I control this' — the 'I… | agency exercised WITHOUT inflating the 'I' — a… | ⚑ ego / inflated I-feeli… |
 | ★`ka` | Āśā (binding) | **P** |  | āśā as grasping / clinging hope — goaded towar… | aspiring hope held WITHOUT attachment — forwar… | ⚑ hope / forward-graspin… |
 | ★`la` | Krūratā(binding) | pend |  | physical harm inflicted on the weak | compassion that protects the physically vulner… | ⚑ cruelty |
 | ★`ma` | Praśraya / Praṇāśa(b… | pend |  | giving latitude to the point of dissolution | disciplined containment that holds form | ⚑ annihilation / indulge… |

@@ -99,6 +99,18 @@
       "classical_associations": null,
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: cha = vikalatā vṛtti (nervous breakdown), defined as a properly-functioning mind that starts malfunctioning or ceases — this MATCHES the binding pole. AUTHORED: the LIBERATING pole (steadiness that keeps function intact under load) is lexicon/framework-supplied; the passage defines the breakdown state but gives no liberating pole.",
       "v2_drift_note": "cha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English has no aspirated palatal; /tʃ/ ('ch') maps to ca (unaspirated), so cha cannot arise in an English varṇa sequence."
+    },
+    {
+      "varna": "ja",
+      "sanskrit_label": "Ahaṃkāra (ego / I-inflation)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "the affricate /dʒ/ — the 'j' sound (judge, jam, joy); G2P emits the 'jh' phoneme -> bridge maps jh -> ja. BRIDGE-REACHABLE (judge -> ja, da, ga; joy -> ja).",
+      "source_quote": "Sarkar: Ja is the acoustic root of ahaṃkāra vṛtti (ego). The ego becomes inflated when one allows one's 'I' feeling to take a predominant role. 'Since I was there, I was able to control the situation... had I not been there the world would have met its final destruction.' — so spoke Aurangzeb; it is an expression of ahaṃkāra vṛtti. [Attests the vṛtti name + an illustration of the INFLATED (binding) form; no liberating pole is given.]",
+      "binding": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+      "liberating": "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+      "classical_associations": null,
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + ILLUSTRATION. ATTESTED: ja = ahaṃkāra vṛtti (ego), with the Aurangzeb illustration of the inflated 'I' — matching the BINDING pole. AUTHORED: the LIBERATING pole (agency without inflating the I) is lexicon-supplied; the passage illustrates only the inflated (binding) form.",
+      "v2_drift_note": "v2 binding='ego / inflated I-feeling' is fine; but v2 liberating='identity bondage; false doership' RESTATES the ego PROBLEM rather than a liberated mode — the same problem-as-pole error seen at nga and elsewhere. v3 uses the lexicon's 'agency exercised without inflating the I.' ja is bridge-reachable (j-words: judge/jam/joy)."
     }
   ]
 }
