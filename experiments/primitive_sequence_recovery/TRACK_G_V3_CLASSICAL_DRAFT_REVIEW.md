@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **33**, pending **1**
+- varṇas **34** · practically reachable **19** · reference-only 15 · **verified 34/34**, pending **0**
 
 ## Fidelity caveats
 
@@ -52,7 +52,7 @@
 | `gha` | · | Mamatā (binding) | **P** |  | mamatā bounded by the relative factors (time… | mamatā made to TRANSCEND time, space and ind… |
 | `jha` | · | Lolupatā / Lobha / Lol… | **P** | name+def | greed / avarice — hoarding accumulation with… | sufficiency — appetite that releases at 'eno… |
 | `kha` | · | Cintā (binding) | **P** |  | cintā as anxious rumination — the mind churn… | cintā as composed, impersonal reflection — h… |
-| `ksha` | · | Aparā-vidyā(liberating… | pend |  | structured knowledge owned as control, dogma… | instrumental knowledge released from possess… |
+| `ksha` | · | Aparā-vidyā (liberatin… | **P** | name+def | aparā-vidyā — mundane / material knowledge o… | instrumental knowledge released from possess… |
 | `pha` | · | Bhaya (binding) | **P** | name+def | bhaya — fear: collapse or flight before dang… | abhaya — steadiness meeting a genuine threat… |
 | `ttha` | · | Anutāpa / Paścāttāpa (… | **P** | name+def | anutāpa as gripping remorse — the 'after-hea… | repentance discharged into acceptance — the … |
 

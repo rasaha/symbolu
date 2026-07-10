@@ -380,6 +380,18 @@
       "classical_associations": "ṣa = rajoguṇa (the mutative principle); artha = the psychic longing / the means that removes worldly wants. Part of the four-varga sibilant scheme (śa=tamoguṇa/kāma, ṣa=rajoguṇa/artha, sa=sattva/mokṣa).",
       "attested_vs_authored": "ATTESTED (primary text): ṣa = artha (psychic longing / worldly purpose, 'removal of worldly wants') + rajoguṇa (mutative principle). AUTHORED: the binding/liberating split (possessive acquisition vs purposeful action without bondage) is lexicon-supplied — and these pole texts are taken from the lexicon's MIS-FILED 'sha' entry (see swap).",
       "v2_drift_note": "SIBILANT SWAP CONFIRMED. Primary text: retroflex ṣa (ssa) = artha + RAJOGUṆA; palatal śa (sha) = kāma + TAMOGUṆA. But BOTH derived tables SWAP them: they file kāma/tamoguṇa under ssa (v2 'static inertia / tamas-bound kama'; lexicon 'Kāma/Tamoguṇa') and rajoguṇa/artha under sha. v3 corrects by following the primary text: ssa = artha/rajoguṇa (pole texts from the lexicon's mis-filed 'sha' content), sha = kāma/tamoguṇa. ssa is PRACTICALLY UNREACHABLE (retroflex; 'shr' never emitted)."
+    },
+    {
+      "varna": "ksha",
+      "sanskrit_label": "Aparā-vidyā (mundane knowledge / material science)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "compound kṣa (क् + ष). Reference-only — not a bridge target; English 'ksh' decomposes to k + s(h) -> ka + sha, so the compound kṣa never arises as a unit.",
+      "source_quote": "Sarkar: Kṣa is the acoustic root of mundane knowledge, and also of material science. [Complement to ha = parā-vidyā (intuitional / higher knowledge). In the kha passage, kṣa also represents the sphere of heaven that TRANSCENDS the crude, while kha = the crude aspects of heaven.]",
+      "binding": "aparā-vidyā — mundane / material knowledge owned as control, dogma or intellectual identity (materialism, intellectual pride; knowledge treated as an end and a possession)",
+      "liberating": "instrumental knowledge released from possession — material science / mundane knowledge held as a tool without clinging, in service of the higher (parā-vidyā), for welfare not bondage",
+      "classical_associations": "kṣa = the complement of ha (parā-vidyā, intuitional knowledge): kṣa is aparā-vidyā (mundane / material knowledge). In the kha passage kṣa also = the sphere of heaven that TRANSCENDS the crude (kha = crude heaven). Structurally kṣa = ka (Kārya Brahma) + ṣa. Classical side liberating-oriented.",
+      "attested_vs_authored": "ATTESTED (primary text): kṣa = aparā-vidyā (mundane knowledge / material science); complement to ha (parā-vidyā); plus the kha-passage association (the transcendent sphere of heaven). Classical side liberating-oriented. AUTHORED: the binding/liberating split (knowledge owned as control/dogma vs instrumental knowledge released from possession) is lexicon-supplied but a standard aparā/parā-vidyā reading.",
+      "v2_drift_note": "ksha is ABSENT from v2 (reference-only compound). NOT bridge-reachable: English 'ksh' decomposes to k + s(h) -> ka, sha, so the compound kṣa never arises as a unit. Complements ha: pairs mundane (kṣa / aparā-vidyā) vs intuitional (ha / parā-vidyā) knowledge."
     }
   ]
 }
