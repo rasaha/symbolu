@@ -42,25 +42,40 @@ word's own varṇa facets?*
 - **Judges + aggregation:** the B1.6-v2 3-judge panel and `judge_b1_6_pilot_outputs.aggregate`, **reused
   unchanged** (arm-agnostic).
 
-## 3. Arms (6)
+## 3. Arms (8)
 
-Every arm receives the **identical `CONTEXT_TEXT`** for a given item; only the scaffold varies.
+Every arm receives the **identical `CONTEXT_TEXT`** for a given item; only the scaffold varies. There are **two
+facet families** — resolver-free (`named_attribute` root gloss, no pole selected) and context-resolved (B1.8's
+frozen resolver picks one pole per word from context) — each with an authentic and a corrected distant-source
+control arm.
 
 | arm | facet content | role |
 |---|---|---|
-| **`AUTHENTIC_MAPPING`** | `W`'s own varṇa `named_attribute` facets | authentic |
-| **`DISTANT_SOURCE_MAPPING`** | `W′`'s own varṇa `named_attribute` facets (`W′` = frozen distant source) | **PRIMARY control (corrected)** |
+| **`AUTHENTIC_MAPPING`** | `W`'s own varṇa `named_attribute` facets (resolver-free) | authentic (resolver-free) |
+| **`DISTANT_SOURCE_MAPPING`** | `W′`'s own varṇa `named_attribute` facets (`W′` = frozen distant source) | **PRIMARY control (resolver-free)** |
+| **`AUTHENTIC_RESOLVED_POLE`** | `W`'s varṇas at `W`'s context-selected pole (== B1.8 KCPR_SELECTED) | authentic (resolved) |
+| **`DISTANT_SOURCE_RESOLVED_POLE`** | `W′`'s varṇas at `W`'s **same** selected pole | **PRIMARY control (resolved)** |
 | `SCRAMBLED_WITHIN_POOL` | seeded within-pool derangement of `W`'s varṇas | old B1.8-style control, comparison only |
 | `PLAIN_PROMPT_BASELINE` | none | floor |
 | `GENERIC_STRUCTURED_PROMPT_BASELINE` | none | structure without varṇa content |
 | `SEMANTIC_LLM_BASELINE` | none | strong content ceiling |
 
-## 4. Primary contrast (make-or-break)
+**Resolved-arm construction.** `W`'s pole (`worldly_binding_distortion` or `spiritual_liberating_reading`) and
+plane are taken **verbatim** from the frozen B1.8 resolver decision for that item (no new resolution). The
+authentic-resolved facets are asserted equal to B1.8's `KCPR_LAYER1_SELECTED_FRAME` text. The distant-resolved
+control applies the **same selected pole** to `W′`'s varṇas — so the pair differs in exactly one thing (whose
+varṇas), holding polarity constant, mirroring B1.8's `KCPR_SELECTED` vs `SCRAMBLED_SELECTED` but with a *distant
+real word* instead of a derangement.
 
-**`AUTHENTIC_MAPPING` vs `DISTANT_SOURCE_MAPPING`**, paired by item. Both share the same context, same plane,
-same facet-construction pipeline and register; they differ in **exactly one thing** — whether the facets are
-`W`'s own or a *distant real word's* own. Endpoints: penalty-adjusted composite (primary) and
-`specificity_to_target` (pre-registered secondary — the one dimension that leaned in B1.6).
+## 4. Primary contrasts (make-or-break) — two, reported together
+
+- **Resolver-free:** **`AUTHENTIC_MAPPING` vs `DISTANT_SOURCE_MAPPING`**, paired by item.
+- **Resolved:** **`AUTHENTIC_RESOLVED_POLE` vs `DISTANT_SOURCE_RESOLVED_POLE`**, paired by item.
+
+Each pair shares the same context, plane, facet-construction pipeline and register; they differ in **exactly one
+thing** — whether the facets are `W`'s own or a *distant real word's* own (with polarity held constant in the
+resolved pair). Endpoints: penalty-adjusted composite (primary) and `specificity_to_target` (pre-registered
+secondary — the one dimension that leaned in B1.6). Both contrasts are reported; neither is cherry-picked.
 
 ## 5. Secondary contrasts
 
@@ -82,8 +97,8 @@ contrast — same policy as B1.8). A leaking output is dropped and recorded, nev
 
 Generators **Mistral-7B-Instruct-v0.3** (M1) and **Qwen2.5-7B-Instruct** (M2); judges **Llama-3.1-8B-Instruct**,
 **Meta-Llama-3-8B-Instruct**, **Gemma-2-9b-it** (families disjoint from generators; no model judges its own
-output). Backend `transformers` (no vLLM), sequential single-GPU. **Expected: 12 items × 6 arms × 2 generators =
-144 outputs; × 3 judges = 432 ratings.** A few may drop to format/blindness filters (recorded as failures).
+output). Backend `transformers` (no vLLM), sequential single-GPU. **Expected: 12 items × 8 arms × 2 generators =
+192 outputs; × 3 judges = 576 ratings.** A few may drop to format/blindness filters (recorded as failures).
 
 ## 8. Freeze gate (operator action; NOT created here)
 
@@ -119,7 +134,7 @@ blocked; Track B blocked. Structure, not validated meaning.
   `frozen/b1_9_gen_targets_scaffolds.json`; RunPod commands in `B1_9_GENERATION_RUNPOD_COMMANDS.md`.
 - **Readiness label:** `B1_9_GENERATION_DRIVER_READY_MOCK_TESTED`.
 - **Primary contrast:** `AUTHENTIC_MAPPING` vs `DISTANT_SOURCE_MAPPING` (corrected distant-source control).
-- **Expected outputs / ratings:** 144 / 432.
+- **Expected outputs / ratings:** 192 / 576.
 - **Real generation run?** No. **Judging?** No. **`run_out/` committed?** No. **B1.10 created?** No.
 - **B1.4b′ remains `NULL_RETURN_BOTTOM`.**
 

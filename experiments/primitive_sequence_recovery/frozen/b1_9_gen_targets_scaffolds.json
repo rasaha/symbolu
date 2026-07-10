@@ -3,14 +3,16 @@
   "status": "FROZEN",
   "representation_version": "B1.9_generation_corrected_control",
   "facet_field": "named_attribute",
-  "primary_contrast": "AUTHENTIC_MAPPING vs DISTANT_SOURCE_MAPPING",
+  "primary_contrast_resolver_free": "AUTHENTIC_MAPPING vs DISTANT_SOURCE_MAPPING",
+  "primary_contrast_resolved": "AUTHENTIC_RESOLVED_POLE vs DISTANT_SOURCE_RESOLVED_POLE",
   "scramble_seed": 20260710,
   "source_hashes": {
     "b1_9_targets.json": "b69cb2cd4e94ce6c00c986a85122e960184c00bc67242419d711c46545cb19cc",
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
-    "b1_9_gen_distant_source_map.json": "36312af6edce9e722ded834e746c6d9972f03dc5eb4d15a22b49013dd521e715"
+    "b1_9_gen_distant_source_map.json": "36312af6edce9e722ded834e746c6d9972f03dc5eb4d15a22b49013dd521e715",
+    "b1_8_context_resolved_targets_scaffolds.json": "b7925ff2aa19a77276b81043d8a019a1c34e8fa754c7fd264e658440edb25015"
   },
-  "note": "AUTHENTIC vs DISTANT_SOURCE is the corrected primary control (W′ = frozen distant source word, its OWN authentic varṇa facets). SCRAMBLED_WITHIN_POOL is the old near-synonym control, kept for comparison only. Baselines carry no facets. NO generation performed. B1.4b′ NULL_RETURN_BOTTOM.",
+  "note": "Two corrected primary contrasts: (resolver-free) AUTHENTIC_MAPPING vs DISTANT_SOURCE_MAPPING on named_attribute, and (resolved) AUTHENTIC_RESOLVED_POLE vs DISTANT_SOURCE_RESOLVED_POLE where W's context-selected pole (from B1.8) is applied to W's vs W′'s varṇas. SCRAMBLED_WITHIN_POOL is the old near-synonym control. Baselines carry no facets. NO generation. B1.4b′ NULL_RETURN_BOTTOM.",
   "n_items": 12,
   "items": [
     {
@@ -19,6 +21,8 @@
       "CONTEXT_TEXT": "The rebuilt bridge holds a steady sustaining flow across the river; its spans keep an easy alignment and let the crossing find its peace.",
       "STRATUM": "concrete_object",
       "PLANE": "physical",
+      "SELECTED_POLE": "spiritual_liberating_reading",
+      "SELECTED_PLANE": "physical",
       "authentic_varnas": [
         "ba",
         "ra",
@@ -60,6 +64,34 @@
             "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "ha",
@@ -86,6 +118,8 @@
       "CONTEXT_TEXT": "The lantern is stuck on a rigid hook, its glow blocked by grime, an obstacle no one can shift.",
       "STRATUM": "concrete_object",
       "PLANE": "physical",
+      "SELECTED_POLE": "worldly_binding_distortion",
+      "SELECTED_PLANE": "physical",
       "authentic_varnas": [
         "la",
         "na",
@@ -137,6 +171,42 @@
             "text": "asha / hope; creation; karya brahma; flowing water-sound"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "ja",
+            "text": "ego / inflated I-feeling"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "nga",
@@ -163,6 +233,8 @@
       "CONTEXT_TEXT": "In his grief he stays clinging to what was, trapped by a loss he cannot release.",
       "STRATUM": "psychological_mental",
       "PLANE": "mental",
+      "SELECTED_POLE": "worldly_binding_distortion",
+      "SELECTED_PLANE": "mental",
       "authentic_varnas": [
         "ga",
         "ra"
@@ -199,6 +271,30 @@
             "text": "moha / blind attachment, infatuation"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "tha",
@@ -217,6 +313,8 @@
       "CONTEXT_TEXT": "Her longing eased into quiet reflection and a peace that let the ache find release.",
       "STRATUM": "psychological_mental",
       "PLANE": "mental",
+      "SELECTED_POLE": "spiritual_liberating_reading",
+      "SELECTED_PLANE": "mental",
       "authentic_varnas": [
         "la",
         "nga"
@@ -258,6 +356,34 @@
             "text": "asha / hope; creation; karya brahma; flowing water-sound"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "ra",
@@ -276,6 +402,8 @@
       "CONTEXT_TEXT": "She pursued justice with clarity, in alignment with a sustaining fairness, a contemplative movement toward what is right.",
       "STRATUM": "ethical_action",
       "PLANE": "intellectual",
+      "SELECTED_POLE": "spiritual_liberating_reading",
+      "SELECTED_PLANE": "intellectual",
       "authentic_varnas": [
         "ja",
         "sa",
@@ -327,6 +455,42 @@
             "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "ja",
+            "text": "identity bondage; false doership"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "la",
@@ -353,6 +517,8 @@
       "CONTEXT_TEXT": "The committee stayed in conflict, each side rigid and clinging to advantage, the fair path blocked by fear.",
       "STRATUM": "ethical_action",
       "PLANE": "intellectual",
+      "SELECTED_POLE": "worldly_binding_distortion",
+      "SELECTED_PLANE": "intellectual",
       "authentic_varnas": [
         "ba",
         "la",
@@ -399,6 +565,38 @@
             "text": "moha / blind attachment, infatuation"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "nga",
@@ -425,6 +623,8 @@
       "CONTEXT_TEXT": "At dawn the lotus opens in stillness, a contemplative clarity, release, and peace.",
       "STRATUM": "spiritual_contemplative",
       "PLANE": "spiritual",
+      "SELECTED_POLE": "spiritual_liberating_reading",
+      "SELECTED_PLANE": "spiritual",
       "authentic_varnas": [
         "la",
         "ta",
@@ -471,6 +671,38 @@
             "text": "ceshta / effort to arouse dormant potential"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "sha",
@@ -493,6 +725,8 @@
       "CONTEXT_TEXT": "He treated the sacred as an escape, a static withdrawal and rigid avoidance of the world's demands.",
       "STRATUM": "spiritual_contemplative",
       "PLANE": "spiritual",
+      "SELECTED_POLE": "worldly_binding_distortion",
+      "SELECTED_PLANE": "spiritual",
       "authentic_varnas": [
         "sa",
         "ka",
@@ -539,6 +773,38 @@
             "text": "moha / blind attachment, infatuation"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "nya",
@@ -565,6 +831,8 @@
       "CONTEXT_TEXT": "The Lumen brand promises clarity and an easy flow, a calm alignment for everyday focus.",
       "STRATUM": "brand_name",
       "PLANE": "mental",
+      "SELECTED_POLE": "spiritual_liberating_reading",
+      "SELECTED_PLANE": "mental",
       "authentic_varnas": [
         "la",
         "ma",
@@ -601,6 +869,30 @@
             "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "va",
@@ -623,6 +915,8 @@
       "CONTEXT_TEXT": "Nova's launch felt stuck in conflict, its message blocked and its momentum trapped.",
       "STRATUM": "brand_name",
       "PLANE": "mental",
+      "SELECTED_POLE": "worldly_binding_distortion",
+      "SELECTED_PLANE": "mental",
       "authentic_varnas": [
         "na",
         "va"
@@ -664,6 +958,34 @@
             "text": "ceshta / effort to arouse dormant potential"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "pa",
@@ -682,6 +1004,8 @@
       "CONTEXT_TEXT": "The child's wonder opened into reflection and a bright clarity, a peace that let the moment flow.",
       "STRATUM": "emotional_nonclinical",
       "PLANE": "mental",
+      "SELECTED_POLE": "spiritual_liberating_reading",
+      "SELECTED_PLANE": "mental",
       "authentic_varnas": [
         "va",
         "na",
@@ -723,6 +1047,34 @@
             "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
           }
         ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          }
+        ],
         "SCRAMBLED_WITHIN_POOL": [
           {
             "varna": "pa",
@@ -749,6 +1101,8 @@
       "CONTEXT_TEXT": "A cold dread of failure kept him clinging and rigid, trapped by fear and unable to move.",
       "STRATUM": "emotional_nonclinical",
       "PLANE": "mental",
+      "SELECTED_POLE": "worldly_binding_distortion",
+      "SELECTED_PLANE": "mental",
       "authentic_varnas": [
         "da",
         "ra"
@@ -783,6 +1137,30 @@
           {
             "varna": "na",
             "text": "moha / blind attachment, infatuation"
+          }
+        ],
+        "AUTHENTIC_RESOLVED_POLE": [
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "DISTANT_SOURCE_RESOLVED_POLE": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
           }
         ],
         "SCRAMBLED_WITHIN_POOL": [

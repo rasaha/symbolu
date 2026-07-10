@@ -40,10 +40,15 @@ ATTESTATION = ("B1.9 generation probe with corrected distant-source-word control
                "real word's own authentic varṇa facets; no semantic-truth claim; no GENUTILITY terminal label; "
                "B1.4b′ remains NULL_RETURN_BOTTOM.")
 
-ARMS = ("AUTHENTIC_MAPPING", "DISTANT_SOURCE_MAPPING", "SCRAMBLED_WITHIN_POOL",
+ARMS = ("AUTHENTIC_MAPPING", "DISTANT_SOURCE_MAPPING",
+        "AUTHENTIC_RESOLVED_POLE", "DISTANT_SOURCE_RESOLVED_POLE",
+        "SCRAMBLED_WITHIN_POOL",
         "PLAIN_PROMPT_BASELINE", "GENERIC_STRUCTURED_PROMPT_BASELINE", "SEMANTIC_LLM_BASELINE")
-FACET_ARMS = ("AUTHENTIC_MAPPING", "DISTANT_SOURCE_MAPPING", "SCRAMBLED_WITHIN_POOL")
+FACET_ARMS = ("AUTHENTIC_MAPPING", "DISTANT_SOURCE_MAPPING",
+              "AUTHENTIC_RESOLVED_POLE", "DISTANT_SOURCE_RESOLVED_POLE", "SCRAMBLED_WITHIN_POOL")
+# two corrected primary contrasts: resolver-free (named_attribute) and context-resolved pole
 PRIMARY_CONTRAST = ("AUTHENTIC_MAPPING", "DISTANT_SOURCE_MAPPING")
+RESOLVED_CONTRAST = ("AUTHENTIC_RESOLVED_POLE", "DISTANT_SOURCE_RESOLVED_POLE")
 
 HASH_INPUTS = {
     "prereg_sha256": PREREG_FILE, "scaffold_sha256": SCAFFOLD_FILE,
@@ -261,6 +266,7 @@ def run_part(mock: bool = False, adapter=None, settings=None, decl_path: Optiona
         "artifact_type": "b1_9_generation_part", "mode": "MOCK" if mock else "REAL",
         "representation_version": REPRESENTATION, "generator_code": gen_code, "generator_id": gen_id,
         "arms": list(ARMS), "primary_contrast": list(PRIMARY_CONTRAST),
+        "resolved_contrast": list(RESOLVED_CONTRAST),
         "n_records": len(records), "n_outputs": len(outputs), "n_failures": len(failures),
         "failures": failures, "generator_meta": gen_meta, "b1_4b_prime_status": B1_4B_PRIME_STATUS,
         "input_hashes": {k: _sha_file(v) for k, v in HASH_INPUTS.items()},
@@ -312,7 +318,8 @@ def merge_parts(parts: List[Dict], out_dir: Optional[pathlib.Path] = None, write
     manifest = {
         "artifact_type": "b1_9_generation_run_manifest", "mode": parts[0].get("mode"),
         "representation_version": REPRESENTATION, "run_label": "B1_9_GENERATION_CORRECTED_CONTROL_PROBE",
-        "arms": list(ARMS), "primary_contrast": list(PRIMARY_CONTRAST), "n_generators": len(parts),
+        "arms": list(ARMS), "primary_contrast": list(PRIMARY_CONTRAST),
+        "resolved_contrast": list(RESOLVED_CONTRAST), "n_generators": len(parts),
         "generator_codes": {p["generator_code"]: p["generator_id"] for p in parts},
         "n_targets": len({o["item_id"] for o in merged}), "n_outputs": len(merged),
         "expected_full": 12 * len(ARMS) * len(parts),

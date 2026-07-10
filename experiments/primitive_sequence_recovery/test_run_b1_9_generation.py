@@ -58,10 +58,25 @@ def test_gate_panel_manifest_required_when_panel(tmp_path):
 # ---- rendering ----------------------------------------------------------------------
 def test_all_arms_render_all_items():
     recs = D.build_records(D.load_scaffold())
-    assert len(recs) == 12 * len(D.ARMS)                 # 12 items x 6 arms = 72
+    assert len(recs) == 12 * len(D.ARMS)                 # 12 items x 8 arms = 96
     assert {r["arm"] for r in recs} == set(D.ARMS)
+    assert set(D.RESOLVED_CONTRAST) <= set(D.ARMS)
     for r in recs:
         assert r["prompt"] and r["target_text"] and r["context_text"]
+
+def test_resolved_arms_use_selected_pole_and_differ_from_named_attribute():
+    scaf = D.load_scaffold()
+    for it in scaf["items"]:
+        pole = it["SELECTED_POLE"]
+        assert pole in ("worldly_binding_distortion", "spiritual_liberating_reading")
+        # resolved arms are NOT the same content as the resolver-free named_attribute arms
+        assert it["ARM_FACETS"]["AUTHENTIC_RESOLVED_POLE"] != it["ARM_FACETS"]["AUTHENTIC_MAPPING"]
+        # DISTANT_RESOLVED applies W's SAME pole to the distant word's varṇas
+        src = next(x for x in scaf["items"] if x["item_id"] == it["distant_source_item_id"])
+        # same selected pole polarity as authentic-resolved (the corrected control holds pole constant)
+        aR = D.render_prompt("AUTHENTIC_RESOLVED_POLE", it)
+        dR = D.render_prompt("DISTANT_SOURCE_RESOLVED_POLE", it)
+        assert aR != dR and it["CONTEXT_TEXT"] in aR and it["CONTEXT_TEXT"] in dR
 
 def test_authentic_vs_distant_share_context_differ_content():
     scaf = D.load_scaffold(); it = scaf["items"][0]                 # b18-01 bridge -> distant b18-10 Nova
@@ -88,7 +103,7 @@ def test_distant_source_is_a_different_words_own_mapping():
 # ---- mock single-generator part (72) ------------------------------------------------
 def test_mock_part_72_outputs_blind(tmp_path):
     part = D.run_part(mock=True, gen_code="M1", out_dir=tmp_path, write=True)
-    assert part["mode"] == "MOCK" and part["n_outputs"] == 72 and part["n_failures"] == 0
+    assert part["mode"] == "MOCK" and part["n_outputs"] == 96 and part["n_failures"] == 0
     assert part["b1_4b_prime_status"] == "NULL_RETURN_BOTTOM"
     assert part["primary_contrast"] == ["AUTHENTIC_MAPPING", "DISTANT_SOURCE_MAPPING"]
     assert (tmp_path / "b1_9_part.json").exists()
@@ -104,8 +119,8 @@ def test_mock_two_generator_merge_144(tmp_path):
     res = D.merge_parts([p1, p2], out_dir=tmp_path, write=True)
     assert res["label"] == "B1_9_GENERATION_DRIVER_READY_MOCK_TESTED"
     m = res["manifest"]
-    assert m["n_outputs"] == 144 and m["expected_full"] == 144 and m["n_generators"] == 2
-    assert m["per_generator_counts"] == {"M1": 72, "M2": 72}
+    assert m["n_outputs"] == 192 and m["expected_full"] == 192 and m["n_generators"] == 2
+    assert m["per_generator_counts"] == {"M1": 96, "M2": 96}
     assert m["unblinded"] is False and m["judging_performed"] is False
     jv = (tmp_path / "panel_judge_visible_outputs.jsonl").read_text()
     for line in jv.splitlines():
@@ -138,5 +153,5 @@ def test_leak_in_output_is_dropped(monkeypatch):
     monkeypatch.setattr(D, "_mock_text", lambda rec: "Title: x\nInterpretation: uses a varna KCPR scaffold "
                         + "word " * 60 + "\nPractical reflection:\n- a\n- b\nCaution: limited.")
     part = D.run_part(mock=True, gen_code="M1")
-    assert part["n_outputs"] == 0 and part["n_failures"] == 72
+    assert part["n_outputs"] == 0 and part["n_failures"] == 96
     assert all(f["status"] == "blindness_leak" for f in part["failures"])

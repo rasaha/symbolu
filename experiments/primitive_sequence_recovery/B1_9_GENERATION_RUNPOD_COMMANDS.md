@@ -2,15 +2,15 @@
 
 **Docs-only.** No generation/judging performed here. Runs on an operator GPU host (RunPod), transformers
 backend, sequential single-GPU. Primary contrast **`AUTHENTIC_MAPPING` vs `DISTANT_SOURCE_MAPPING`** (the
-corrected distant-source-word control). Expected **144 outputs** (12 items × 6 arms × 2 generators) and **432
-ratings** (144 × 3 judges). Every stage is gated/blinded; `run_out/` is gitignored.
+corrected distant-source-word control). Expected **192 outputs** (12 items × 8 arms × 2 generators) and **576
+ratings** (192 × 3 judges). Every stage is gated/blinded; `run_out/` is gitignored.
 
 **Honest gating caveat (from the prereg §0):** the upstream B1.9 embedding gate returned **null** on the
 corrected control. This generation probe is a **confirmatory re-test**, and its interpretation rules are
 asymmetric — a null is expected/consistent; a positive is *not credible* until blinding/register/leakage are
 re-audited and a powered run confirms it. No terminal `GENUTILITY_*` label may be emitted.
 
-Driver: `run_b1_9_generation.py` (+ `test_run_b1_9_generation.py`, 17 tests) — mock-tested. Judges + aggregation
+Driver: `run_b1_9_generation.py` (+ `test_run_b1_9_generation.py`, 18 tests) — mock-tested. Judges + aggregation
 reuse `run_b1_6_v2_llm_judge_panel.py` and `judge_b1_6_pilot_outputs.aggregate` **unchanged** (arm-agnostic).
 
 ---
@@ -42,11 +42,11 @@ PY
 # ── 2. Generation (sequential single-GPU; one model live at a time) ───────────
 export DECL=run_out/b1_9_gen/b1_9_gen_EVIDENCE_FREEZE_DECLARED.json
 python3 run_b1_9_generation.py part --decl "$DECL" --gen-code M1 \
-        --backend transformers --model-id mistralai/Mistral-7B-Instruct-v0.3 --out run_out/b1_9_gen/M1   # 72
+        --backend transformers --model-id mistralai/Mistral-7B-Instruct-v0.3 --out run_out/b1_9_gen/M1      # 96
 python3 run_b1_9_generation.py part --decl "$DECL" --gen-code M2 \
-        --backend transformers --model-id Qwen/Qwen2.5-7B-Instruct        --out run_out/b1_9_gen/M2      # 72
+        --backend transformers --model-id Qwen/Qwen2.5-7B-Instruct        --out run_out/b1_9_gen/M2         # 96
 python3 run_b1_9_generation.py merge --parts run_out/b1_9_gen/M1 run_out/b1_9_gen/M2 \
-        --out run_out/b1_9_gen/generation                                                                # 144
+        --out run_out/b1_9_gen/generation                                                                # 192
 
 # ── 3. Blind judging (Llama/Gemma judges ≠ Mistral/Qwen generators) ───────────
 cat > run_out/b1_9_gen/judge_panel.json <<'JSON'
@@ -59,11 +59,11 @@ JSON
 JV=run_out/b1_9_gen/generation/panel_judge_visible_outputs.jsonl
 for i in 0 1 2; do
   python3 run_b1_6_v2_llm_judge_panel.py judge --panel run_out/b1_9_gen/judge_panel.json \
-          --judge-index $i --judge-visible "$JV" --out run_out/b1_9_gen/J$i          # 144 ratings each
+          --judge-index $i --judge-visible "$JV" --out run_out/b1_9_gen/J$i          # 192 ratings each
 done
 python3 run_b1_6_v2_llm_judge_panel.py merge \
         --parts run_out/b1_9_gen/J0 run_out/b1_9_gen/J1 run_out/b1_9_gen/J2 \
-        --out run_out/b1_9_gen/judging                                               # llm_judge_ratings_raw.jsonl (432)
+        --out run_out/b1_9_gen/judging                                               # llm_judge_ratings_raw.jsonl (576)
 
 # ── 4. Ratings-freeze declaration (reused B1.6 freeze; required before unblinding)
 python3 - <<'PY'
@@ -119,10 +119,13 @@ def paired(a1, a2, table):
             w+= m1>m2; l+= m1<m2; t+= m1==m2
     md = sum(diffs)/len(diffs) if diffs else float("nan")
     return w,l,t,round(md,3)
+PAIRS = [("AUTHENTIC_MAPPING","DISTANT_SOURCE_MAPPING"),          # PRIMARY (resolver-free)
+         ("AUTHENTIC_RESOLVED_POLE","DISTANT_SOURCE_RESOLVED_POLE"),# PRIMARY (context-resolved pole)
+         ("AUTHENTIC_MAPPING","SCRAMBLED_WITHIN_POOL")]            # secondary (old within-pool control)
 for lbl, tab in (("penalty_adjusted_composite", adj), ("specificity_to_target", spec)):
-    for ctrl in ("DISTANT_SOURCE_MAPPING","SCRAMBLED_WITHIN_POOL"):
-        w,l,t,md = paired("AUTHENTIC_MAPPING", ctrl, tab)
-        print(f"[{lbl:28}] AUTHENTIC vs {ctrl:22} win/lose/tie={w}/{l}/{t}  mean_diff={md:+}")
+    for a1, a2 in PAIRS:
+        w,l,t,md = paired(a1, a2, tab)
+        print(f"[{lbl:26}] {a1:24} vs {a2:26} win/lose/tie={w}/{l}/{t}  mean_diff={md:+}")
 PY
 
 # ── 6. Confirm run_out/ untracked ─────────────────────────────────────────────
@@ -131,9 +134,9 @@ git check-ignore run_out && echo "OK: run_out/ git-ignored"; echo "tracked under
 
 ## Expected files (all under gitignored `run_out/b1_9_gen/`)
 - `b1_9_gen_EVIDENCE_FREEZE_DECLARED.json` — 6 frozen-input hashes + attestation.
-- `M1/b1_9_part.json`, `M2/b1_9_part.json` — 72 outputs each (hidden side).
-- `generation/panel_judge_visible_outputs.jsonl` (144, blind), `panel_hidden_arm_generator_metadata.json`, `panel_run_manifest.json`.
-- `J0|J1|J2/judge_part_*.json`; `judging/llm_judge_ratings_raw.jsonl` (432).
+- `M1/b1_9_part.json`, `M2/b1_9_part.json` — 96 outputs each (hidden side).
+- `generation/panel_judge_visible_outputs.jsonl` (192, blind), `panel_hidden_arm_generator_metadata.json`, `panel_run_manifest.json`.
+- `J0|J1|J2/judge_part_*.json`; `judging/llm_judge_ratings_raw.jsonl` (576).
 - `judging/b1_9_gen_RATINGS_FROZEN.json`.
 
 ## Notes
