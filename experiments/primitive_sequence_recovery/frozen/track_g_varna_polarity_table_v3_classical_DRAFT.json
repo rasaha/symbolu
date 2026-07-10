@@ -26,12 +26,12 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "6456a792973699f0cd0cf72e9d13ca7eac85340b494751977a0853bd36af7a48"
+    "b1_2_varna_classical_verifications.json": "9f73e6af33db6fb7f30fb287c917f268648875f024b1a511f9c79ec9d49430e0"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
-  "n_primary_text_verified": 3,
-  "n_pending_classical_verification": 31,
+  "n_primary_text_verified": 4,
+  "n_pending_classical_verification": 30,
   "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
   "motto": "Structure, not validated meaning.",
   "varnas": {
@@ -347,23 +347,23 @@
       "varna": "Kha",
       "transliteration": "kha",
       "bridge_reachable": false,
-      "sanskrit_label": "Cintā",
+      "sanskrit_label": "Cintā (worry / reflective-consequential, objective thought)",
       "english_rendering": "Worry",
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of cintā vrtti (worry / impersonal, objective thought).",
-      "source_quote_verified": null,
-      "worldly_binding_distortion": "anxious impersonal rumination over open contingencies",
-      "spiritual_liberating_reading": "composed openness within unresolved impersonal uncertainty",
-      "classical_associations": null,
+      "source_quote_verified": "Sarkar: The acoustic root of āśā vṛtti is ka; that of cintā vṛtti (the propensity of worry) is kha. If your train runs late you think not only of the delay but of the probable inconveniences (the host, arriving late for food, deciding to eat near the station) — such consequential thoughts are symbolized by kha. Travelling elsewhere you might reflect on a collapsing brassware industry and whether it could be revived, though you are 'not personally affected' and 'not a direct player in your own thoughts' — such impersonal thoughts are also kha. Kha MEANS 'sky' but is NOT the acoustic root of the sky (that is ha); kha also means 'heaven', but only its CRUDE aspects — the sphere of heaven that transcends the crude is kṣa. Ka = Kārya Brahma is the first consonant; and since ka + ha = kha, kha immediately follows ka in the Indo-Aryan alphabet.",
+      "worldly_binding_distortion": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+      "spiritual_liberating_reading": "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip",
+      "classical_associations": "Paired with ka: ka = āśā (hope) goads action; kha = cintā (worry / objective thought) reflects. kha MEANS 'sky' and 'heaven' but is NOT their acoustic root — the SKY's root is ha; kha = the CRUDE aspects of heaven, while the transcendent sphere = kṣa (ksha). Structurally ka + ha = kha (hence kha follows ka, the first consonant / Kārya Brahma, in the alphabet). These are meanings/associations, NOT poles.",
       "functional_operation": "holds an unsettled impersonal situation open without forcing premature closure",
       "contrast_boundary": "not self-efficacy (Ya), not threat-steadiness (Pha), not firmness-under-strain (Cha)",
-      "attested_vs_authored": "Attested side = classical_side below; the OTHER pole is largely author counter-rewritten (lexicon rewrite_status='source_preserved_counter_rewritten') — flagged, not validated.",
-      "classical_review_status": "LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION",
-      "provenance": "b1_2_source_lexicon (Sarkar-attributed)",
+      "attested_vs_authored": "ATTESTED: kha = cintā vṛtti; the personal (train) vs impersonal (industry) modes; kha ≠ the sky's root (ha is), kha = crude heaven vs kṣa = transcendent heaven; ka + ha = kha. AUTHORED: labelling anxious/gripping rumination as binding and composed impersonal openness as liberating applies the framework's fixation-vs-detachment principle (consistent with the source lexicon); the passage describes both modes as cintā without itself labelling them binding/liberating.",
+      "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
+      "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": null,
       "v2_liberating": null,
       "differs_from_v2": true,
-      "v2_drift_note": null
+      "v2_drift_note": "kha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P renders written 'kh' as ka + ha (two SEPARATE roots = hope + vision), which does NOT reconstruct cintā — a semantic mismatch, even though ka + ha = kha holds structurally in the classical alphabet."
     },
     "ksha": {
       "varna": "Kṣa",
