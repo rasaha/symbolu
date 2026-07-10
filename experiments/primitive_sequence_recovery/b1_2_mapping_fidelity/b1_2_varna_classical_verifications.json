@@ -287,6 +287,18 @@
       "classical_associations": "Cure / liberating direction: pratyāhāra yoga (directing the mind along righteousness); or, for those without the technique, kīrtana / devotional singing. NOTE: mūrcchā here is NOT fainting/senselessness — it is losing common sense under a ripu's hypnotic spell.",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + cure. ATTESTED: bha = mūrcchā vṛtti (losing common sense under a ripu's spell, explicitly NOT fainting); and the LIBERATING DIRECTION (pratyāhāra / kīrtana) is the attested remedy. AUTHORED: the exact liberated-mode wording ('breaking the entrancing spell into clear sense') is lexicon-supplied but aligned with the attested cure.",
       "v2_drift_note": "bha is ABSENT from v2 (reference-only aspirate). English has no /bʱ/; /b/ -> ba, so bha cannot arise in an English varṇa sequence."
+    },
+    {
+      "varna": "ma",
+      "sanskrit_label": "Praśraya / Praṇāśa (indulgence / annihilating collapse)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "labial nasal /m/ -> ma; BRIDGE-REACHABLE and common (any /m/).",
+      "source_quote": "Sarkar: Ma is the acoustic root of praṇāśa (the propensity of annihilation). It is also the acoustic root of prashraya vṛtti — giving latitude / treating with indulgence (Hindi: baṛhvā denā).",
+      "binding": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+      "liberating": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+      "classical_associations": "Two linked vṛttis on one root: praṇāśa (annihilation) and prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — unchecked latitude running to dissolution.",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME(s) + gloss. ATTESTED: ma = praṇāśa (annihilation) AND prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — the BINDING pole (indulgence-to-dissolution). AUTHORED: the LIBERATING pole (disciplined containment that holds form) is lexicon-supplied.",
+      "v2_drift_note": "v2 binding='annihilation / indulgence (giving latitude)' is fine; v2 liberating='annihilation if unrestrained; discipline / sublimation needed' RESTATES the problem ('annihilation if unrestrained') + names the corrective ('discipline/sublimation needed') rather than the liberated MODE — problem-as-pole AGAIN (10th instance). v3 uses the lexicon's 'disciplined containment that holds form.' ma is bridge-reachable and common (/m/)."
     }
   ]
 }

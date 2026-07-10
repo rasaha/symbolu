@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **25**, pending **9**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **26**, pending **8**
 
 ## Fidelity caveats
 
@@ -28,7 +28,7 @@
 | `ja` | ★ | Ahaṃkāra (binding) | **P** | name+def | the inflated 'I did / I control this' — the … | agency exercised WITHOUT inflating the 'I' —… |
 | `ka` | ★ | Āśā (binding) | **P** |  | āśā as grasping / clinging hope — goaded tow… | aspiring hope held WITHOUT attachment — forw… |
 | `la` | ★ | Krūratā(binding) | pend |  | physical harm inflicted on the weak | compassion that protects the physically vuln… |
-| `ma` | ★ | Praśraya / Praṇāśa(b… | pend |  | giving latitude to the point of dissolution | disciplined containment that holds form |
+| `ma` | ★ | Praśraya / Praṇāśa (… | **P** | name+def | praśraya / praṇāśa — giving latitude to the … | disciplined containment that holds form — la… |
 | `na` | ★ | Moha (binding) | **P** |  | moha — blind attachment / infatuation: the m… | de-fascination from false attraction — super… |
 | `nga` | ★ | Dambha (binding) | **P** |  | dambha as vanity — the self displayed and pe… | conduct that stands without outward performa… |
 | `pa` | ★ | Ghṛṇā (binding) | **P** |  | attraction toward the crude / objects — the … | revulsion OF the ripus — ghṛṇā redirected ag… |
