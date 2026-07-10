@@ -1,0 +1,29 @@
+{
+  "artifact_type": "b1_9_pole_referent_classification",
+  "status": "DRAFT_REQUIRES_OPERATOR_SIGNOFF",
+  "representation_version": "B1.9_pole_sensitivity",
+  "classification_approved": false,
+  "rule": {
+    "statement": "The CORRECT pole is decided by the REFERENT'S ontology, NOT by the emotional valence of the context wording. Step 1: is the referent physical/objectified or subjective-mental? Step 2 (if mental): is it objectified (treated as an external thing) or subjectified (lived as first-person experience)? Assignment: physical -> binding; mental & objectified -> binding; mental & subjectified -> liberating.",
+    "binding_pole_field": "worldly_binding_distortion",
+    "liberating_pole_field": "spiritual_liberating_reading",
+    "valence_is_NOT_used": true,
+    "note": "Pole is an ontological-plane choice (gross/objectified = binding; subtle/subjective = liberating), independent of whether the emotion is 'positive' or 'negative'. So a subjectively-lived dread maps to the liberating pole under this rule even though dread is a negative emotion. This is intentional and is exactly what distinguishes this rule from B1.8's keyword-valence resolver."
+  },
+  "anti_circularity": "This classification is authored from the REFERENT ONTOLOGY only, and must be frozen and operator-approved BEFORE any generation output is produced or seen. Do not revise a row after seeing any reading. The gate refuses the real run unless classification_approved == true.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "items": [
+    {"item_id": "b18-01", "target_text": "bridge",  "referent_type": "physical", "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": false, "rationale": "a rebuilt physical bridge over a river -> physical referent -> binding"},
+    {"item_id": "b18-02", "target_text": "lantern", "referent_type": "physical", "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": false, "rationale": "a physical lantern object -> physical -> binding"},
+    {"item_id": "b18-03", "target_text": "grief",   "referent_type": "mental",   "objectified": false, "correct_pole": "spiritual_liberating_reading", "debatable": true,  "rationale": "an emotion lived by a subject ('in his grief he...') -> subjectified-mental -> liberating (valence NOT used)"},
+    {"item_id": "b18-04", "target_text": "longing", "referent_type": "mental",   "objectified": false, "correct_pole": "spiritual_liberating_reading", "debatable": true,  "rationale": "a lived subjective emotion -> subjectified -> liberating"},
+    {"item_id": "b18-05", "target_text": "justice", "referent_type": "mental",   "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": true,  "rationale": "an abstract principle invoked/pursued as an external ideal -> objectified-mental -> binding"},
+    {"item_id": "b18-06", "target_text": "balance", "referent_type": "mental",   "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": true,  "rationale": "an abstract state treated as a thing to achieve -> objectified-mental -> binding"},
+    {"item_id": "b18-07", "target_text": "lotus",   "referent_type": "physical", "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": true,  "rationale": "a physical flower as referent -> physical -> binding (BUT lotus is also a spiritual symbol; if you read it as a subjectified spiritual symbol -> liberating)"},
+    {"item_id": "b18-08", "target_text": "sacred",  "referent_type": "mental",   "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": true,  "rationale": "'the sacred' treated as an external quality/thing -> objectified-mental -> binding"},
+    {"item_id": "b18-09", "target_text": "Lumen",   "referent_type": "physical", "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": false, "rationale": "a brand/product name (an object) -> objectified -> binding"},
+    {"item_id": "b18-10", "target_text": "Nova",    "referent_type": "physical", "objectified": true,  "correct_pole": "worldly_binding_distortion",   "debatable": false, "rationale": "a brand/product name (an object) -> objectified -> binding"},
+    {"item_id": "b18-11", "target_text": "wonder",  "referent_type": "mental",   "objectified": false, "correct_pole": "spiritual_liberating_reading", "debatable": true,  "rationale": "a lived subjective emotion -> subjectified -> liberating"},
+    {"item_id": "b18-12", "target_text": "dread",   "referent_type": "mental",   "objectified": false, "correct_pole": "spiritual_liberating_reading", "debatable": true,  "rationale": "a lived subjective emotion -> subjectified -> liberating (valence NOT used; negative emotion still maps liberating under the rule)"}
+  ]
+}

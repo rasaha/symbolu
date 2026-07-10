@@ -1,0 +1,562 @@
+{
+  "artifact_type": "b1_9_pole_scaffold",
+  "status": "FROZEN",
+  "representation_version": "B1.9_pole_sensitivity",
+  "primary_contrast": "POLE_CORRECT vs POLE_FLIPPED",
+  "classification_approved": false,
+  "source_hashes": {
+    "b1_9_targets.json": "b69cb2cd4e94ce6c00c986a85122e960184c00bc67242419d711c46545cb19cc",
+    "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+    "b1_9_pole_referent_classification.json": "712c21ca1a0c1682a9d2e9b212e12d6393fc44edb03f5171652986042eb114cb"
+  },
+  "note": "POLE_CORRECT vs POLE_FLIPPED differ ONLY in pole (same word/varṇas/context/plane). Correct pole from the frozen referent-ontology classification. NO generation. B1.4b′ NULL_RETURN_BOTTOM.",
+  "n_items": 12,
+  "items": [
+    {
+      "item_id": "b18-01",
+      "TARGET_TEXT": "bridge",
+      "CONTEXT_TEXT": "The rebuilt bridge holds a steady sustaining flow across the river; its spans keep an easy alignment and let the crossing find its peace.",
+      "STRATUM": "concrete_object",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-02",
+      "TARGET_TEXT": "lantern",
+      "CONTEXT_TEXT": "The lantern is stuck on a rigid hook, its glow blocked by grime, an obstacle no one can shift.",
+      "STRATUM": "concrete_object",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "la",
+        "na",
+        "ta",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-03",
+      "TARGET_TEXT": "grief",
+      "CONTEXT_TEXT": "In his grief he stays clinging to what was, trapped by a loss he cannot release.",
+      "STRATUM": "psychological_mental",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ga",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "ga",
+            "text": "effort as path to mundane development and spiritual elevation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "ga",
+            "text": "effort / striving"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-04",
+      "TARGET_TEXT": "longing",
+      "CONTEXT_TEXT": "Her longing eased into quiet reflection and a peace that let the ache find release.",
+      "STRATUM": "psychological_mental",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "la",
+        "nga"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "nga",
+            "text": "egoic obstruction; humility is its spiritual correction"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "nga",
+            "text": "vanity / pride-display"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-05",
+      "TARGET_TEXT": "justice",
+      "CONTEXT_TEXT": "She pursued justice with clarity, in alignment with a sustaining fairness, a contemplative movement toward what is right.",
+      "STRATUM": "ethical_action",
+      "PLANE": "intellectual",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "ja",
+            "text": "ego / inflated I-feeling"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "ja",
+            "text": "identity bondage; false doership"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-06",
+      "TARGET_TEXT": "balance",
+      "CONTEXT_TEXT": "The committee stayed in conflict, each side rigid and clinging to advantage, the fair path blocked by fear.",
+      "STRATUM": "ethical_action",
+      "PLANE": "intellectual",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "ba",
+            "text": "indifference / neglect"
+          },
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "ba",
+            "text": "spiritual dullness through neglect; respect/attention is correction"
+          },
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-07",
+      "TARGET_TEXT": "lotus",
+      "CONTEXT_TEXT": "At dawn the lotus opens in stillness, a contemplative clarity, release, and peace.",
+      "STRATUM": "spiritual_contemplative",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ta",
+            "text": "inertia / staticity / dullness"
+          },
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ta",
+            "text": "spiritual inertness that discipline seeks to liberate from"
+          },
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-08",
+      "TARGET_TEXT": "sacred",
+      "CONTEXT_TEXT": "He treated the sacred as an escape, a static withdrawal and rigid avoidance of the world's demands.",
+      "STRATUM": "spiritual_contemplative",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "sa",
+        "ka",
+        "ra",
+        "da"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "sa",
+            "text": "escapism; premature static withdrawal; inert / static withdrawal"
+          },
+          {
+            "varna": "ka",
+            "text": "hope / forward-grasping desire"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "sa",
+            "text": "sattva; clarity; peace; release; mokṣa; unqualified liberation"
+          },
+          {
+            "varna": "ka",
+            "text": "expressed universe, creation-field, emergence into manifestation"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-09",
+      "TARGET_TEXT": "Lumen",
+      "CONTEXT_TEXT": "The Lumen brand promises clarity and an easy flow, a calm alignment for everyday focus.",
+      "STRATUM": "brand_name",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "la",
+            "text": "cruelty"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation / indulgence (giving latitude)"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "la",
+            "text": "earth-bound hardness; compassion softens it"
+          },
+          {
+            "varna": "ma",
+            "text": "annihilation if unrestrained; discipline / sublimation needed"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-10",
+      "TARGET_TEXT": "Nova",
+      "CONTEXT_TEXT": "Nova's launch felt stuck in conflict, its message blocked and its momentum trapped.",
+      "STRATUM": "brand_name",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "na",
+        "va"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-11",
+      "TARGET_TEXT": "wonder",
+      "CONTEXT_TEXT": "The child's wonder opened into reflection and a bright clarity, a peace that let the moment flow.",
+      "STRATUM": "emotional_nonclinical",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "va",
+            "text": "dharma; sustaining flow; alignment with sustaining principle; movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "bondage through infatuation; indifference and spiritual ideation free it"
+          },
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "va",
+            "text": "rigid holding; stuck ensconcement in original stance; over-holding; clinging to holding"
+          },
+          {
+            "varna": "na",
+            "text": "blind attachment / infatuation"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-12",
+      "TARGET_TEXT": "dread",
+      "CONTEXT_TEXT": "A cold dread of failure kept him clinging and rigid, trapped by fear and unable to move.",
+      "STRATUM": "emotional_nonclinical",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "da",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "POLE_CORRECT": [
+          {
+            "varna": "da",
+            "text": "small egoic contraction; patience softens it"
+          },
+          {
+            "varna": "ra",
+            "text": "fire of life-force; can become defeatism or spiritual energy"
+          }
+        ],
+        "POLE_FLIPPED": [
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "defeatist annihilation-thought ('everything is gone, I am undone')"
+          }
+        ]
+      }
+    }
+  ]
+}
