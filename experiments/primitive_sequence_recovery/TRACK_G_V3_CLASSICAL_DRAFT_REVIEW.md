@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **29**, pending **5**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **30**, pending **4**
 
 ## Fidelity caveats
 
@@ -37,7 +37,7 @@
 | `sha` | ★ | rajoguṇa + artha(neutr… | pend |  | worldly purpose possessed as acquisition, st… | purposeful action without possessive bondage |
 | `ta` | ★ | Jāḍya / Nidrā (binding… | **P** |  | jāḍya — inertia, staticity, dullness, torpor… | the cessation of dullness/staticity — awaken… |
 | `tha` | ★ | Viṣāda (binding) | **P** | name+def | viśāda — melancholy, dejection that sinks on… | warm buoyancy lifting one's own dejection — … |
-| `va` | ★ | Dharma(liberating_orie… | pend |  | accepting-as-true without sufficient discern… | truth-assent purified by discernment, instal… |
+| `va` | ★ | Dharma (liberating_ori… | **P** |  | ensconcement gone rigid — over-holding, clin… | dharma — ensconcement in one's original (tru… |
 | `ya` | ★ | Aviśvāsa (binding) | **P** | name+def | aviśvāsa — self-doubt that cannot commit: la… | self-efficacy — the confidence to commit and… |
 | `dda` | ✧ | Lajjā (binding) | **P** | name | lajjā as inhibition — action held back by ot… | acting unhindered by social shame — natural,… |
 | `dha` | ✧ | Tṛṣṇā (binding) | **P** |  | tṛṣṇā — limitless thirst to acquire: unquenc… | the acquisitive thirst quenched at its root … |
