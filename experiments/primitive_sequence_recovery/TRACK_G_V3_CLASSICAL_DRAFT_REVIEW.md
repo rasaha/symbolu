@@ -2,7 +2,7 @@
 
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** (25 bridge-reachable, 9 reference-only); verified **10**, pending **24**
+- varṇas **34** (25 bridge-reachable, 9 reference-only); verified **11**, pending **23**
 - `scope`: name / name+def = source gives no pole contrast (poles authored).
 
 ## Varṇas (★ bridge-reachable · ⚑ differs from v2)
@@ -38,7 +38,7 @@
 | ·`cha` | Vikalatā (binding) | **P** | name+def | collapse of mental function under strain — the… | steadiness that keeps mental function intact u… | ⚑  |
 | ·`ddha` | Piśunatā(binding) | pend |  | malice — sadistic cruelty toward the maligned | compassion that shields the maligned | ⚑  |
 | ·`gha` | Mamatā (binding) | **P** |  | mamatā bounded by the relative factors (time, … | mamatā made to TRANSCEND time, space and indiv… | ⚑  |
-| ·`jha` | Lolupatā / Lobha(bin… | pend |  | hoarding accumulation without limit | sufficiency — appetite that releases at enough | ⚑  |
+| ·`jha` | Lolupatā / Lobha / L… | **P** | name+def | greed / avarice — hoarding accumulation withou… | sufficiency — appetite that releases at 'enoug… | ⚑  |
 | ·`kha` | Cintā (binding) | **P** |  | cintā as anxious rumination — the mind churnin… | cintā as composed, impersonal reflection — hol… | ⚑  |
 | ·`ksha` | Aparā-vidyā(liberati… | pend |  | structured knowledge owned as control, dogma, … | instrumental knowledge released from possessio… | ⚑  |
 | ·`pha` | Bhaya(binding) | pend |  | collapse or flight before danger | steadiness meeting a genuine threat | ⚑  |

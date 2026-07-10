@@ -111,6 +111,18 @@
       "classical_associations": null,
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + ILLUSTRATION. ATTESTED: ja = ahaṃkāra vṛtti (ego), with the Aurangzeb illustration of the inflated 'I' — matching the BINDING pole. AUTHORED: the LIBERATING pole (agency without inflating the I) is lexicon-supplied; the passage illustrates only the inflated (binding) form.",
       "v2_drift_note": "v2 binding='ego / inflated I-feeling' is fine; but v2 liberating='identity bondage; false doership' RESTATES the ego PROBLEM rather than a liberated mode — the same problem-as-pole error seen at nga and elsewhere. v3 uses the lexicon's 'agency exercised without inflating the I.' ja is bridge-reachable (j-words: judge/jam/joy)."
+    },
+    {
+      "varna": "jha",
+      "sanskrit_label": "Lolupatā / Lobha / Lolatā (greed / avarice)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "none — aspirated palatal affricate (झ). English /dʒ/ emits the 'jh' phoneme, but the bridge maps 'jh' -> ja (unaspirated), so the aspirate jha is NOT bridge-reachable.",
+      "source_quote": "Sarkar: Jha is the acoustic root of lolupatā, lobha (greed) and lolatā (avarice) vṛttis. The Bengali word nolā (the greedy fascination of a cat or a dog) is derived from lola / lolatā.",
+      "binding": "greed / avarice — hoarding accumulation without limit; the insatiable greedy fascination (nolā) that always wants more",
+      "liberating": "sufficiency — appetite that releases at 'enough'; wanting stilled at contentment, the surplus grip let go",
+      "classical_associations": "Etymology: the Bengali nolā (a cat's or dog's greedy fascination) derives from lola / lolatā. (An etymological illustration of the vṛtti — not a separate association or pole.)",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + ETYMOLOGY. ATTESTED: jha = lolupatā/lobha/lolatā vṛttis (greed/avarice), illustrated by nolā. AUTHORED: the binding/liberating split (limitless hoarding vs sufficiency-that-releases) is lexicon/framework-supplied; the passage names the vṛtti and its etymology but gives no pole contrast.",
+      "v2_drift_note": "jha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English /dʒ/ emits phoneme 'jh' but the bridge maps 'jh' -> ja (unaspirated), so the aspirate jha cannot arise in an English varṇa sequence."
     }
   ]
 }
