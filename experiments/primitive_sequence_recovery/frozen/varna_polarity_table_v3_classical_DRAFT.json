@@ -14,7 +14,8 @@
     "ha's binding/liberating SPLIT is researcher-authored over attested associations; motivated partly by making 'happy' cohere — MUST be frozen + pre-registered before any pole-test word/context authoring.",
     "ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.",
     "Only 25 of 34 keys are bridge TARGETS; the 9 aspirates are reference-only.",
-    "Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas."
+    "Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas.",
+    "RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here."
   ],
   "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
   "to_go_live_checklist": [
@@ -27,7 +28,7 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "15d68fa490b3f879bd332b7a508d2323882dfe598bcc39b85373f9d73123cedb"
+    "b1_2_varna_classical_verifications.json": "f54b35b22c6c884c30791cea0dc2d4fa904072978e3bcee0d86e2e9ab7b29513"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
@@ -179,7 +180,7 @@
       "contrast_boundary": "not threat-steadiness (Pha), not remorse-release (Ṭha)",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: dda = lajjā vṛtti (shyness); and (from the pa passage) lajjā is one of the eight pāshas/fetters. AUTHORED (fully): BOTH poles are lexicon-supplied — this one-line passage gives no binding/liberating contrast.",
       "primary_text_scope": "NAME_ONLY",
-      "english_equivalent": "retroflex ḍa. A bridge TARGET exists (phoneme 'dr' -> dda) but the English G2P never emits 'dr' (splits d+r: drum -> da, ra), so dda is PRACTICALLY UNREACHABLE (retroflex series).",
+      "english_equivalent": "retroflex ḍa. A bridge TARGET exists (phoneme 'dr' -> dda) but the English G2P never emits 'dr' (splits d+r: drum -> da, ra), so dda is PRACTICALLY UNREACHABLE (retroflex series). PHONETIC NOTE: English 'dr' (drum/drive/dragon) IS retroflex-flavored — classically the d in 'drum' would be ḍa (THIS varṇa), and the bridge even encodes 'dr'->dda. But because the G2P pre-splits 'dr' into d+r, drum maps to da (DENTAL, krodha/irritability), ra, ma — so ḍa is never produced. Capturing it would need a decomposer rule treating d/t-before-r as retroflex ḍ/ṭ (a G2P change, NOT retrofitted here). This is an UNDER-representation of retroflexes, not just unreachability.",
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": "shyness",
@@ -804,7 +805,7 @@
       "contrast_boundary": "not honesty of intent (Ña), not containment (Ma), not poised rest (Ga)",
       "attested_vs_authored": "ATTESTED — BOTH poles: the passage explicitly contrasts uncontrolled vitarka (garrulous, bad-tempered overstatement — the abusive gentleman) with pramita vāk (balanced speech, only relevant words — the helpful gentleman), and distinguishes vitarka from kaśāya. Light authored component (the pole split is in the source).",
       "primary_text_scope": null,
-      "english_equivalent": "retroflex ṭa. A bridge TARGET exists (phoneme 'tr' -> tta) but the English G2P never emits 'tr' (it splits t+r: train -> ta, ra, na), so tta is PRACTICALLY UNREACHABLE — reference-only in practice, like the rest of the retroflex series.",
+      "english_equivalent": "retroflex ṭa. A bridge TARGET exists (phoneme 'tr' -> tta) but the English G2P never emits 'tr' (it splits t+r: train -> ta, ra, na), so tta is PRACTICALLY UNREACHABLE. PHONETIC NOTE (same as ḍa/dr): English 'tr' (train/tree/truck) is retroflex-flavored — classically the t would be ṭa (THIS varṇa), and the bridge encodes 'tr'->tta, but the G2P pre-splits 'tr' into t+r so train maps to ta (DENTAL), ra, na and ṭa is never produced. Under-representation of retroflexes; capturing it needs a decomposer rule for d/t-before-r.",
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": "overstatement / garrulousness",

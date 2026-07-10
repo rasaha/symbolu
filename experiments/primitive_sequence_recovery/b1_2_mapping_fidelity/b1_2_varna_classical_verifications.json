@@ -139,7 +139,7 @@
     {
       "varna": "tta",
       "sanskrit_label": "Vitarka (overstatement / garrulous over-argument)",
-      "english_equivalent": "retroflex ṭa. A bridge TARGET exists (phoneme 'tr' -> tta) but the English G2P never emits 'tr' (it splits t+r: train -> ta, ra, na), so tta is PRACTICALLY UNREACHABLE — reference-only in practice, like the rest of the retroflex series.",
+      "english_equivalent": "retroflex ṭa. A bridge TARGET exists (phoneme 'tr' -> tta) but the English G2P never emits 'tr' (it splits t+r: train -> ta, ra, na), so tta is PRACTICALLY UNREACHABLE. PHONETIC NOTE (same as ḍa/dr): English 'tr' (train/tree/truck) is retroflex-flavored — classically the t would be ṭa (THIS varṇa), and the bridge encodes 'tr'->tta, but the G2P pre-splits 'tr' into t+r so train maps to ta (DENTAL), ra, na and ṭa is never produced. Under-representation of retroflexes; capturing it needs a decomposer rule for d/t-before-r.",
       "source_quote": "Sarkar: Ṭa is the acoustic root of vitarka vṛtti (overstating one's case). Vitarka is not merely debating; it means overstating one's case to the point of garrulousness — a combination of bad temper and garrulousness. It is NOT synonymous with kaśāya vṛtti (speaking harshly to hurt others). Example (Howrah station): asked whether the Uluberia local has left, one gentleman snaps abusively ('Am I a railway timetable?... People like you make life hell...') — uncontrolled vitarka; a second replies helpfully with just the relevant facts (platform eleven, five minutes) — pramita vāk (balanced statement, only relevant words).",
       "binding": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
       "liberating": "pramita vāk — balanced, measured speech using only relevant words; saying just what is warranted (the helpful, to-the-point reply)",
@@ -163,7 +163,7 @@
       "varna": "dda",
       "sanskrit_label": "Lajjā (shyness / bashful inhibition)",
       "primary_text_scope": "NAME_ONLY",
-      "english_equivalent": "retroflex ḍa. A bridge TARGET exists (phoneme 'dr' -> dda) but the English G2P never emits 'dr' (splits d+r: drum -> da, ra), so dda is PRACTICALLY UNREACHABLE (retroflex series).",
+      "english_equivalent": "retroflex ḍa. A bridge TARGET exists (phoneme 'dr' -> dda) but the English G2P never emits 'dr' (splits d+r: drum -> da, ra), so dda is PRACTICALLY UNREACHABLE (retroflex series). PHONETIC NOTE: English 'dr' (drum/drive/dragon) IS retroflex-flavored — classically the d in 'drum' would be ḍa (THIS varṇa), and the bridge even encodes 'dr'->dda. But because the G2P pre-splits 'dr' into d+r, drum maps to da (DENTAL, krodha/irritability), ra, ma — so ḍa is never produced. Capturing it would need a decomposer rule treating d/t-before-r as retroflex ḍ/ṭ (a G2P change, NOT retrofitted here). This is an UNDER-representation of retroflexes, not just unreachability.",
       "source_quote": "Sarkar: 'Ḍa is the acoustic root of lajjā vṛtti [the propensity of shyness].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
       "binding": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
       "liberating": "acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition",

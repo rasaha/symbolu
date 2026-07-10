@@ -135,6 +135,10 @@ def build():
             "Only 25 of 34 keys are bridge TARGETS; the 9 aspirates are reference-only.",
             "Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English "
             "G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas.",
+            "RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — "
+            "the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those "
+            "words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer "
+            "rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here.",
         ],
         "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no "
                              "Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
