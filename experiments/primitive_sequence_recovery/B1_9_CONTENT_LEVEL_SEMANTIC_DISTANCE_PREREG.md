@@ -125,6 +125,33 @@ not because a positive is expected.
 `B1_9_CONTENT_DISTANCE_NULL`, `B1_9_CONTENT_DISTANCE_WEAK_EXPLORATORY`,
 `B1_9_CONTENT_DISTANCE_ROBUST_PROSPECTIVE`. **This commit uses only `B1_9_CONTENT_DISTANCE_PREREG_READY`.**
 
+## 12b. Runner (implemented, mock-tested — NOT run)
+
+`run_b1_9_content_distance.py` (+ `test_run_b1_9_content_distance.py`, 19 tests). Generation-free, judge-free.
+Frozen inputs: `frozen/b1_9_targets.json`, the v2 facet table, `frozen/b1_9_control_sampler_config.json`,
+`frozen/b1_9_preprocessing_config.json`, `frozen/b1_9_embedding_config.json`. Reads **no** `run_out/`; imports
+**no** generation/judging module. Label emitted: **`B1_9_CONTENT_DISTANCE_RUNNER_READY_MOCK_TESTED`** only.
+
+Control-family status (reported in full; not cherry-picked):
+`completely_random_facet` **IMPLEMENTED (primary)**, `same_plane_random_varna_facet` **IMPLEMENTED**,
+`permuted_target_label` **IMPLEMENTED**, `random_word_context_decoy` **IMPLEMENTED**,
+`frequency_length_matched_facet` **IMPLEMENTED_LENGTH_ONLY** (no corpus frequencies),
+`same_polarity_random_varna_facet` **BLOCKED_NOT_AVAILABLE** — a resolver-free, neutral `named_attribute` test
+has no polarity dimension; reinstating poles would reintroduce the resolver confound B1.9 exists to avoid.
+
+**Mock plumbing (fake embeddings; no model; no gate):**
+```bash
+python3 run_b1_9_content_distance.py --mock --out run_out/b1_9_mock   # fake numbers, plumbing only
+```
+**Real run (later; requires the pinned model + a B1.9 declaration):**
+```bash
+python3 run_b1_9_content_distance.py --decl run_out/b1_9/b1_9_DECLARED.json --out run_out/b1_9/result
+```
+**Declaration template** (`artifact: b1_9_content_distance_DECLARED`, `b1_9_declared: true`, `mode`,
+`representation_version`, `declared_by`, `declared_at_utc`, `attestation` = the §5 exact string, plus sha256 of
+each of the six frozen inputs — built from `run_b1_9_content_distance.HASH_INPUTS`). The gate refuses any B1.6/
+B1.8 mode, wrong representation, missing attestation, or hash mismatch. **The real test has NOT been run.**
+
 ## 13. Guardrails
 
 - **No test run.** No embeddings computed here (beyond reproducing the already-pasted B1.8 diagnostic numbers in

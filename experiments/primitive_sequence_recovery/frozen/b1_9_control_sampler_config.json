@@ -1,0 +1,29 @@
+{
+  "artifact_type": "b1_9_control_sampler_config",
+  "control_families": [
+    "same_polarity_random_varna_facet",
+    "same_plane_random_varna_facet",
+    "frequency_length_matched_facet",
+    "completely_random_facet",
+    "permuted_target_label",
+    "random_word_context_decoy"
+  ],
+  "primary_family": "completely_random_facet",
+  "K": 5,
+  "seed": 20260709,
+  "prospective_distance_constraint": {
+    "enabled": false,
+    "min_control_target_distance": 0.3,
+    "applies_to": [
+      "completely_random_facet",
+      "frequency_length_matched_facet"
+    ],
+    "note": "prospective constraint on the CONTROL pool only; NEVER references d_auth. Disabled by default; enable in a frozen declaration to run the distance-matched variant."
+  },
+  "success_threshold": {
+    "min_mean_delta": 0.05,
+    "alpha": 0.05,
+    "require_robust_across_families": true
+  },
+  "note": "same_polarity requires poles (resolver) -> BLOCKED under resolver-free named_attribute mode; frequency portion unavailable -> length_only."
+}
