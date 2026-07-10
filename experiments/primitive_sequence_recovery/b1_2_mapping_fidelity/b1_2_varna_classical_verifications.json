@@ -263,6 +263,18 @@
       "classical_associations": "Cross-ref: bhaya (fear) is one of the eight pāshas (listed under pa) and, like the fetter of hatred (pa), is mainly born of the moha ripu — moha 'makes others the objects of fear.' (Etiology, not a pole.)",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + ETIOLOGY. ATTESTED: pha = bhaya vṛtti (fear), born mainly of moha; and (from pa passage) bhaya is one of the eight pāshas. AUTHORED: both poles are lexicon-supplied (binding=collapse/flight matches the name; liberating=steadiness authored).",
       "v2_drift_note": "pha is ABSENT from v2 (reference-only aspirate). DOUBLY absent in English: its modern reflex /f/ is a dropped/unsupported bridge phoneme, so /f/ words (fear/phone/fun) lose the f entirely — 'fear' (= bhaya) -> 'ra'. Cross-refs the moha ripu (na) and the hatred fetter (pa)."
+    },
+    {
+      "varna": "ba",
+      "sanskrit_label": "Avajñā (indifference / neglect of what has value)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "labial /b/ -> ba; BRIDGE-REACHABLE and common (any /b/).",
+      "source_quote": "Sarkar: Ba is the acoustic root of avajñā vṛtti (indifference). Ignoring something actually UNACCEPTABLE is upekṣā; NEGLECTING something which may actually have VALUE is avajñā (~ avahelā, a negative term; upekṣā is not always bad). The Yoga-sūtra four attitudes (maitrī-karuṇā-muditā-upekṣā): develop maitrī (benign gladness) toward the happy ('may he stay that way'), karuṇā (compassion) toward the miserable, muditā (goodwill) toward the virtuous ('let his intellect inspire him'), and upekṣā (indifference — 'that's his own business') toward the wicked — BUT if the person's sinful actions harm society, one can no longer afford to be indifferent.",
+      "binding": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+      "liberating": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)",
+      "classical_associations": "Distinctions: avajñā (neglect of the valuable) vs upekṣā (ignoring the unacceptable — not always bad) vs avahelā (negative disregard). The brahmavihāra four attitudes: maitrī (happy), karuṇā (suffering), muditā (virtuous), upekṣā (wicked) — with the caveat that indifference to SOCIALLY-HARMFUL wickedness is not acceptable.",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION. ATTESTED: ba = avajñā vṛtti (neglect of what has value), sharply distinguished from upekṣā/avahelā, with the brahmavihāra frame — BINDING pole attested. AUTHORED: the LIBERATING pole (regard that attends to worth) is lexicon-supplied but supported by the passage's proper-attitude ideal.",
+      "v2_drift_note": "v2 binding='indifference / neglect' is fine; v2 liberating='spiritual dullness through neglect; respect/attention is correction' RESTATES the problem + names the corrective rather than the liberated MODE — problem-as-pole AGAIN (9th instance). v3 uses the lexicon's 'regard that recognizes and attends to worth.' ba is bridge-reachable and common (/b/)."
     }
   ]
 }

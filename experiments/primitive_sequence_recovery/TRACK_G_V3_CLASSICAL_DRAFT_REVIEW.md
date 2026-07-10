@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **23**, pending **11**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **24**, pending **10**
 
 ## Fidelity caveats
 
@@ -20,7 +20,7 @@
 
 | varṇa | R | Sanskrit (side) | rev | scope | binding (v3) | liberating (v3) |
 |---|---|---|---|---|---|---|
-| `ba` | ★ | Avajñā(binding) | pend |  | neglect of what actually has value | regard that recognizes and attends to worth |
+| `ba` | ★ | Avajñā (binding) | **P** | name+def | avajñā — neglect / disregard of what actuall… | regard that recognizes and attends to worth … |
 | `ca` | ★ | Viveka (liberating_o… | **P** | name | viveka distorted — discernment hardening int… | falsehood-discerning insight without egoic s… |
 | `da` | ★ | Krodha / Karkaśatā (… | **P** | name+def | peevishness / reactive irritability — perver… | forbearance that absorbs provocation — an ev… |
 | `ga` | ★ | Ceṣṭā (binding) | **P** |  | restless striving that cannot stop — effort … | will-force applied to arouse one's dormant h… |
