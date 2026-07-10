@@ -1,8 +1,8 @@
 # Track-G v3 (classical-grounded) — DRAFT review companion
 
-**Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json` — edit the ledger/builder and regenerate.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`, `wired_into_tests=False`.
+**Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`, `wired_into_tests=False`.
 
-- varṇas **34** (25 bridge-reachable, 9 reference-only aspirates); verified **6**, pending **28**
+- varṇas **34** (25 bridge-reachable, 9 reference-only aspirates); verified **7**, pending **27**
 
 ## Caveats
 
@@ -28,7 +28,7 @@
 | ★`la` | Krūratā (binding) | pending | physical harm inflicted on the weak | compassion that protects the physically vulnerab… |  | ⚑ cruelty |
 | ★`ma` | Praśraya / Praṇāśa (bind… | pending | giving latitude to the point of dissolution | disciplined containment that holds form |  | ⚑ annihilation / indulgence … |
 | ★`na` | Moha (binding) | pending | infatuation that fixates on a compulsive attract… | de-fascination from false attraction |  | ⚑ blind attachment / infatua… |
-| ★`nga` | Dambha (binding) | pending | self displayed and performed for others' eyes | conduct that stands without outward performance |  | ⚑ vanity / pride-display |
+| ★`nga` | Dambha (vanity / self-di… | **PRIMARY** | dambha as vanity — the self displayed and perfor… | conduct that stands without outward performance … | Phonetic-historical (NOT poles): per t… | ⚑ vanity / pride-display |
 | ★`nna` | Īrṣyā (binding) | pending | the sting at another's success | sympathetic gladness at another's fortune |  | ⚑ envy |
 | ★`nya` | Kapaṭatā (binding) | pending | concealment — inner and outer diverging | transparency — inner intent and outer act coinci… |  | ⚑ hypocrisy / deceit |
 | ★`pa` | Ghṛṇā (hatred / revulsio… | **PRIMARY** | attraction toward the crude / objects — the down… | revulsion OF the ripus — ghṛṇā redirected agains… | ghṛṇā = the fetter of hatred (one of t… | ⚑ hatred / revulsion |
@@ -59,6 +59,7 @@
 - **kha**: kha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P renders written 'kh' as ka + ha (two SEPARATE roots = hope + vision), which does NOT reconstruct cintā — a semantic mismatch, even though ka + ha = kha holds structurally in the classical alphabet.
 - **ga**: v2 binding='effort / striving' is the bare vṛtti NAME, not a binding distortion; v2 liberating='effort as path to mundane development and spiritual elevation' paraphrases the passage's general VALUE statement about ceṣṭā (both spheres) rather than a distinct liberated mode — a mild value/association-into-pole conflation. v3 adopts the lexicon's crisper restless-vs-poised polarity.
 - **gha**: gha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P has no /gh/ phoneme; written 'gh' yields /g/ -> ga (or is silent, e.g. 'rough'), so gha cannot arise in an English varṇa sequence.
+- **nga**: v2 binding='vanity / pride-display' is close to attested, but v2 liberating='egoic obstruction; humility is its spiritual correction' restates the vṛtti's PROBLEM and names its corrective (humility) rather than giving the liberated MODE of conduct. v3 adopts the lexicon's crisper 'conduct that stands without outward performance.' (nga is bridge-reachable — this revises packets for ng-words such as longing/king/song.)
 
 _RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL._
 

@@ -26,12 +26,12 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "8b4aa06deeaf29414369b2e2b5d1600a791a9643dfae3e16a84baca971c736d0"
+    "b1_2_varna_classical_verifications.json": "06bf2bc542b925722cc17deee29e5ca045c16c18bdd5ecec05d0bda90f3d6e81"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
-  "n_primary_text_verified": 6,
-  "n_pending_classical_verification": 28,
+  "n_primary_text_verified": 7,
+  "n_pending_classical_verification": 27,
   "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
   "motto": "Structure, not validated meaning.",
   "varnas": {
@@ -457,23 +457,23 @@
       "varna": "Ṅa",
       "transliteration": "ṅa",
       "bridge_reachable": true,
-      "sanskrit_label": "Dambha",
+      "sanskrit_label": "Dambha (vanity / self-display)",
       "english_rendering": "Vanity",
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of dambha vrtti (vanity).",
-      "source_quote_verified": null,
-      "worldly_binding_distortion": "self displayed and performed for others' eyes",
-      "spiritual_liberating_reading": "conduct that stands without outward performance",
-      "classical_associations": null,
+      "source_quote_verified": "Sarkar: Uṋa (ṅa) is the acoustic root of dambha vṛtti (vanity). The popular story: the sage Vashiṣṭha travelled to China to learn the Chinese school of Tantra, learned the use of una in Tantric mantras, and introduced it in India; una is used extensively across the Indo-Chinese languages (Tibetan, Ladakhi, Sherpa, Manpa). Its transmission is linked to the Tárā cult, trifurcated as Ugra/Vajra Tárā (India), Nīla Tárā / Nīla Sarasvatī (Tibet), and Bhrāmarī / Kṛṣṇa Tárā (China). The acoustic root of Vajra Tárā and Nīla Tárā is aeṃ; that of the black Bhrāmarī Tárā (= Kālī in Varṇāśrama Dharma) is krīṃ (ka = Kārya Brahma + ra = the luminous factor).",
+      "worldly_binding_distortion": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+      "spiritual_liberating_reading": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause",
+      "classical_associations": "Phonetic-historical (NOT poles): per the legend, una was learned by Vashiṣṭha in China and introduced to India, and is used across the Indo-Chinese languages (Tibetan/Ladakhi/Sherpa/Manpa). Its transmission is tied to the Tárā cult — but the Tárā deities have their OWN acoustic roots (aeṃ for Vajra/Nīla Tárā; krīṃ = ka[Kārya Brahma] + ra[luminous factor] for Bhrāmarī Tárā / Kālī), NOT una. Record as history/association; do not fold aeṃ/krīṃ/Tárā into nga's poles.",
       "functional_operation": "acts without staging the self for approval",
       "contrast_boundary": "not inner I-claim deflation (Ja), not inner/outer honesty (Ña)",
-      "attested_vs_authored": "Attested side = classical_side below; the OTHER pole is largely author counter-rewritten (lexicon rewrite_status='source_preserved_counter_rewritten') — flagged, not validated.",
-      "classical_review_status": "LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION",
-      "provenance": "b1_2_source_lexicon (Sarkar-attributed)",
+      "attested_vs_authored": "ATTESTED: nga (uṋa/ṅa) = dambha vṛtti (vanity); the phonetic history (Chinese-origin legend, Indo-Chinese usage) and the Tárā-cult context with the deities' SEPARATE roots aeṃ/krīṃ. AUTHORED: the binding/liberating split (displayed-for-others vs conduct-without-performance) applies the framework's display-vs-unselfconscious principle (consistent with the source lexicon); the passage states the vṛtti but does not itself split it into poles.",
+      "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
+      "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": "vanity / pride-display",
       "v2_liberating": "egoic obstruction; humility is its spiritual correction",
       "differs_from_v2": true,
-      "v2_drift_note": null
+      "v2_drift_note": "v2 binding='vanity / pride-display' is close to attested, but v2 liberating='egoic obstruction; humility is its spiritual correction' restates the vṛtti's PROBLEM and names its corrective (humility) rather than giving the liberated MODE of conduct. v3 adopts the lexicon's crisper 'conduct that stands without outward performance.' (nga is bridge-reachable — this revises packets for ng-words such as longing/king/song.)"
     },
     "nna": {
       "varna": "Ṇa",
