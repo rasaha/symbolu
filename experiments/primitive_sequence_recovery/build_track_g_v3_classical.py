@@ -139,6 +139,12 @@ def build():
             "the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those "
             "words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer "
             "rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here.",
+            "TH MIS-MAPPING: the English 'th' grapheme is the dental FRICATIVES /θ/ (think) and /ð/ (this/the/that) "
+            "— sounds Sanskrit LACKS — but the bridge maps 'th' -> tha (viṣāda/melancholy, an aspirated STOP थ). So "
+            "the most frequent English words (the/this/that) inject a spurious 'melancholy' varṇa. Genuine थ (t+h, "
+            "ant-hill) coincides only by accident. This is a MIS-mapping, not merely under-representation.",
+            "ASPIRATION COLLAPSE: English aspirated word-initial /tʰ/ (top) vs unaspirated /t/ (stop) both -> ta; "
+            "classically initial tʰ is closer to tha. Aspiration is ignored across the stop series.",
         ],
         "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no "
                              "Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",

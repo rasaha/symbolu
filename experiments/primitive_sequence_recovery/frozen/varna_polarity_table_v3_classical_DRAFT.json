@@ -15,7 +15,9 @@
     "ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.",
     "Only 25 of 34 keys are bridge TARGETS; the 9 aspirates are reference-only.",
     "Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas.",
-    "RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here."
+    "RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here.",
+    "TH MIS-MAPPING: the English 'th' grapheme is the dental FRICATIVES /θ/ (think) and /ð/ (this/the/that) — sounds Sanskrit LACKS — but the bridge maps 'th' -> tha (viṣāda/melancholy, an aspirated STOP थ). So the most frequent English words (the/this/that) inject a spurious 'melancholy' varṇa. Genuine थ (t+h, ant-hill) coincides only by accident. This is a MIS-mapping, not merely under-representation.",
+    "ASPIRATION COLLAPSE: English aspirated word-initial /tʰ/ (top) vs unaspirated /t/ (stop) both -> ta; classically initial tʰ is closer to tha. Aspiration is ignored across the stop series."
   ],
   "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
   "to_go_live_checklist": [
@@ -28,13 +30,13 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "93f5a21dfb406d2038a029430bf618e2df228a246f2292913e7d2198cab448b5"
+    "b1_2_varna_classical_verifications.json": "ac38c3f4351aa3b2b893b49df0cbebfc9b23af8351068aa98bc819dce50bf6f7"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
   "n_practically_reachable": 20,
-  "n_primary_text_verified": 18,
-  "n_pending_classical_verification": 16,
+  "n_primary_text_verified": 19,
+  "n_pending_classical_verification": 15,
   "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
   "motto": "Structure, not validated meaning.",
   "varnas": {
@@ -768,25 +770,25 @@
       "transliteration": "tha",
       "bridge_reachable": true,
       "practically_reachable": true,
-      "sanskrit_label": "Viṣāda",
+      "sanskrit_label": "Viṣāda (melancholy / dejection)",
       "english_rendering": "Melancholy",
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of viṣāda vrtti (melancholy).",
-      "source_quote_verified": null,
-      "worldly_binding_distortion": "dejection that sinks one's own mood",
-      "spiritual_liberating_reading": "warm buoyancy lifting one's own dejection",
+      "source_quote_verified": "Sarkar: Tha is the acoustic root of viśāda vṛtti — melancholy (melancholiness, melancholia). [Phonetic note (operator): थ is the ASPIRATED DENTAL STOP (ant-hill/pot-hole/light-house), NOT the English 'th' of think/this — Sanskrit lacks those fricatives.]",
+      "worldly_binding_distortion": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+      "spiritual_liberating_reading": "warm buoyancy lifting one's own dejection — the mood rising out of melancholy into brightness",
       "classical_associations": null,
       "functional_operation": "raises one's own dejection into affectionate uplift",
       "contrast_boundary": "not gladness at others' good (Ṇa), not goodwill toward others (Pa)",
-      "attested_vs_authored": "Attested side = classical_side below; the OTHER pole is largely author counter-rewritten (lexicon rewrite_status='source_preserved_counter_rewritten') — flagged, not validated.",
-      "primary_text_scope": null,
-      "english_equivalent": null,
-      "classical_review_status": "LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION",
-      "provenance": "b1_2_source_lexicon (Sarkar-attributed)",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: tha = viśāda vṛtti (melancholy); and (operator phonetic note) थ = aspirated dental stop, NOT the English /θ/,/ð/ fricatives. AUTHORED: both poles are lexicon-supplied (binding=dejection matches the name; liberating=buoyancy authored).",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "aspirated dental STOP थ (t + h pronounced, as across compound boundaries: ant-hill, pot-hole, light-house). *** MAJOR MIS-MAPPING ***: the bridge maps English 'th' -> tha, but the English 'th' grapheme is overwhelmingly the dental FRICATIVES /θ/ (think, path, three, both) and /ð/ (this, the, that, they) — sounds Sanskrit LACKS and which are NOT थ. The G2P emits the SAME 'th' phoneme for the fricatives AND the rare compound t+h, so essentially ALL English 'th' words — including the/this/that (the most frequent words in English) — are MIS-ASSIGNED to tha = viṣāda/melancholy. The genuine थ (anthill) coincides only by accident. This over-triggers 'melancholy' across a huge fraction of English text.",
+      "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
+      "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": "melancholy / dejection",
       "v2_liberating": "depressive contraction; needs upward movement",
       "differs_from_v2": true,
-      "v2_drift_note": null
+      "v2_drift_note": "v2 binding='melancholy / dejection' is fine; v2 liberating='depressive contraction; needs upward movement' RESTATES the problem + names a corrective rather than the liberated MODE — problem-as-pole again. v3 uses the lexicon's 'warm buoyancy lifting one's own dejection.' MAJOR MIS-MAPPING (see english_equivalent): tha is fed by English /θ/,/ð/ (think/this/the/that) which are NOT थ, so tha=melancholy is massively over-triggered. Distinct from ta (dental unaspirated, jāḍya/inertia) and from retroflex tta (vitarka)."
     },
     "tta": {
       "varna": "Ṭa",

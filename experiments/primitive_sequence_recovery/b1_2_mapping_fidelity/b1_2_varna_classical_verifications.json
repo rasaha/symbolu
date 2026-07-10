@@ -205,6 +205,18 @@
       "classical_associations": "Etymology of Tantra: 'Taṃ jāḍyāt tārayet yastu sa tantraḥ' — that which liberates (tārayet) from jāḍya (staticity/dullness) is Tantra; and tan = 'to expand' — as a rope-bound body expands to snap the ropes, that which liberates through expansion (vistāra) is also Tantra. (Etymological association naming the liberating DIRECTION — not a separate pole.)",
       "attested_vs_authored": "ATTESTED: ta = jāḍya/nidrā (staticity, long/deep sleep, intellectual dullness, spiritual inertness) — BINDING pole richly attested; and the LIBERATING DIRECTION (liberation from jāḍya via expansion) is attested through the Tantra etymology. AUTHORED: the specific liberated-mode wording ('alert wakefulness rising from torpor') is lexicon-supplied but well-aligned with the attested direction.",
       "v2_drift_note": "v2 binding='inertia / staticity / dullness' is fine; v2 liberating='spiritual inertness that discipline seeks to liberate from' RESTATES the inertness PROBLEM + corrective direction rather than the liberated MODE — the same problem-as-pole error (5th instance: nga/ja/nya/nna/ta). v3 uses the lexicon's 'alert wakefulness rising from torpor,' aligned with the attested Tantra (liberation-from-jāḍya) direction. ta is bridge-reachable and very common (/t/)."
+    },
+    {
+      "varna": "tha",
+      "sanskrit_label": "Viṣāda (melancholy / dejection)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "aspirated dental STOP थ (t + h pronounced, as across compound boundaries: ant-hill, pot-hole, light-house). *** MAJOR MIS-MAPPING ***: the bridge maps English 'th' -> tha, but the English 'th' grapheme is overwhelmingly the dental FRICATIVES /θ/ (think, path, three, both) and /ð/ (this, the, that, they) — sounds Sanskrit LACKS and which are NOT थ. The G2P emits the SAME 'th' phoneme for the fricatives AND the rare compound t+h, so essentially ALL English 'th' words — including the/this/that (the most frequent words in English) — are MIS-ASSIGNED to tha = viṣāda/melancholy. The genuine थ (anthill) coincides only by accident. This over-triggers 'melancholy' across a huge fraction of English text.",
+      "source_quote": "Sarkar: Tha is the acoustic root of viśāda vṛtti — melancholy (melancholiness, melancholia). [Phonetic note (operator): थ is the ASPIRATED DENTAL STOP (ant-hill/pot-hole/light-house), NOT the English 'th' of think/this — Sanskrit lacks those fricatives.]",
+      "binding": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+      "liberating": "warm buoyancy lifting one's own dejection — the mood rising out of melancholy into brightness",
+      "classical_associations": null,
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: tha = viśāda vṛtti (melancholy); and (operator phonetic note) थ = aspirated dental stop, NOT the English /θ/,/ð/ fricatives. AUTHORED: both poles are lexicon-supplied (binding=dejection matches the name; liberating=buoyancy authored).",
+      "v2_drift_note": "v2 binding='melancholy / dejection' is fine; v2 liberating='depressive contraction; needs upward movement' RESTATES the problem + names a corrective rather than the liberated MODE — problem-as-pole again. v3 uses the lexicon's 'warm buoyancy lifting one's own dejection.' MAJOR MIS-MAPPING (see english_equivalent): tha is fed by English /θ/,/ð/ (think/this/the/that) which are NOT थ, so tha=melancholy is massively over-triggered. Distinct from ta (dental unaspirated, jāḍya/inertia) and from retroflex tta (vitarka)."
     }
   ]
 }
