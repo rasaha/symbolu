@@ -1,0 +1,146 @@
+{
+  "artifact_type": "b1_10_pole_context_microtest_items",
+  "mapping_era": "fidelity_bundle_v1",
+  "table": "v3",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "aspiration_applied": false,
+  "status": "FROZEN_MICROTEST_MOCK_ONLY",
+  "representation_version": "B1.10_pole_context",
+  "words_included": [
+    "happy",
+    "peace",
+    "love"
+  ],
+  "excluded_words": [
+    "longing",
+    "devotion"
+  ],
+  "excluded_reason": "longing: asymmetric discriminating power; devotion: too many off-axis facets (approval table 3632c92).",
+  "judge_question": "How well does this packet describe the inner experiential weather or source-condition underlying this word in this context?",
+  "rating_scale": {
+    "min": 0,
+    "max": 6,
+    "meaning": "0 = not at all, 6 = extremely well"
+  },
+  "packet_invariance_note": "Each word's binding/liberating packets are fixed by its varṇas and are context-invariant; only the context changes and sets which pole SHOULD fit. Packet text is copied verbatim from the frozen v3 table.",
+  "source_hashes": {
+    "varna_polarity_table_v3.json": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3",
+    "varna_polarity_bridge_v3.json": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102",
+    "stage_a_prime_coverage.py": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd"
+  },
+  "interpretation_note": "No result label is emitted by this test. A positive context_pole_margin would show only source-condition / resonance legibility to judges — NOT ontology, semantic truth, Sanskrit privilege, generation utility, or word-specific varṇa mapping. A null means the pole-context distinction is not legible under this rating design.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "track_b_status": "BLOCKED",
+  "n_words": 3,
+  "words": [
+    {
+      "word": "happy",
+      "varna_sequence": [
+        "ha",
+        "pa",
+        "pa",
+        "ya"
+      ],
+      "contexts": {
+        "binding": "He was happy only because he had beaten his rival and could watch the man's face fall.",
+        "liberating": "She was happy sitting alone at dawn, wanting nothing and comparing herself to no one."
+      },
+      "packets": {
+        "binding": [
+          {
+            "varna": "ha",
+            "text": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world"
+          },
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "ya",
+            "text": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+          }
+        ],
+        "liberating": [
+          {
+            "varna": "ha",
+            "text": "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing"
+          },
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "ya",
+            "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+          }
+        ]
+      }
+    },
+    {
+      "word": "peace",
+      "varna_sequence": [
+        "pa",
+        "ka"
+      ],
+      "contexts": {
+        "binding": "He felt peace only once his opponents were silenced and no one could challenge him.",
+        "liberating": "Peace settled in her on its own, needing no victory and no one's permission."
+      },
+      "packets": {
+        "binding": [
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ],
+        "liberating": [
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ]
+      }
+    },
+    {
+      "word": "love",
+      "varna_sequence": [
+        "la",
+        "va"
+      ],
+      "contexts": {
+        "binding": "His love demanded she prove it daily, and curdled into jealousy whenever she looked away.",
+        "liberating": "Her love asked for nothing back; it simply wished the other well and let him go."
+      },
+      "packets": {
+        "binding": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          }
+        ],
+        "liberating": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          }
+        ]
+      }
+    }
+  ]
+}
