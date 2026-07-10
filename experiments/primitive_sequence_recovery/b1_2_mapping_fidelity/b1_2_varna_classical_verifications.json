@@ -146,6 +146,18 @@
       "classical_associations": "Vitarka = bad temper + garrulousness; explicitly NOT kaśāya vṛtti (speaking harshly to hurt others). Its liberated contrast term is pramita vāk (balanced statement). (Distinctions/illustration, not a separate cosmological association.)",
       "attested_vs_authored": "ATTESTED — BOTH poles: the passage explicitly contrasts uncontrolled vitarka (garrulous, bad-tempered overstatement — the abusive gentleman) with pramita vāk (balanced speech, only relevant words — the helpful gentleman), and distinguishes vitarka from kaśāya. Light authored component (the pole split is in the source).",
       "v2_drift_note": "v2 binding='overstatement / garrulousness' is fine; v2 liberating='misuse of speech; needs silence / balanced speech' restates the PROBLEM ('misuse of speech') and names a corrective ('needs silence') rather than the liberated MODE. v3 uses the attested 'pramita vāk — measured speech saying only what is warranted.' PRACTICALLY UNREACHABLE: tta's source phoneme 'tr' is never emitted by the G2P (retroflex series)."
+    },
+    {
+      "varna": "ttha",
+      "sanskrit_label": "Anutāpa / Paścāttāpa (repentance — 'after-heat')",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "none — retroflex aspirate (ठ); doubly unreachable (aspirate AND retroflex), not a bridge target.",
+      "source_quote": "Sarkar: Ṭha is the acoustic root of anutāpa vṛtti (repentance). One is seized by repentance on realizing (from within, or with a second person's help) the impropriety of one's action. In northern India anutāpa is called paścāttāpa. Anu and paschāt both mean 'later / after'; tāpa means 'heat' (so repentance = 'after-heat').",
+      "binding": "anutāpa as gripping remorse — the 'after-heat' that torments, replaying one's own past wrong without release",
+      "liberating": "repentance discharged into acceptance — the remorse over one's past act released, the realization-of-impropriety turned into amendment rather than endless self-torment",
+      "classical_associations": "COSMOLOGICAL (from the ha passage): ṭha is the acoustic root of nighttime, the moon, bhúvarloka, and the kāmamaya kośa — the contractive OPPOSITE of ha (day/sun/svarloka/parā-vidyā). ETYMOLOGY: anutāpa = anu ('after') + tāpa ('heat'); N. Indian paścāttāpa = paschāt ('after') + tāpa ('heat') = 'after-heat'. This RESOLVES the earlier ttha discrepancy: night/moon are ṭha's ASSOCIATIONS; its VṚTTI is anutāpa (repentance) — associations vs pole, as with ha/ka.",
+      "attested_vs_authored": "ATTESTED: ṭha = anutāpa vṛtti (repentance); its definition (remorse on realizing impropriety); the anutāpa/paścāttāpa='after-heat' etymology; and (from the ha passage) its cosmological associations night/moon/bhúvarloka/kāmamaya kośa as ha's opposite. AUTHORED: the binding/liberating split (gripping remorse vs remorse-released-into-acceptance) is lexicon-supplied; this passage defines the state, not a pole contrast.",
+      "v2_drift_note": "ttha is ABSENT from v2 (reference-only — retroflex AND aspirate, doubly unreachable). RESOLVES the earlier v3 'ttha discrepancy': the ha passage's night/moon are ṭha's ASSOCIATIONS (its cosmological opposite-of-ha domain), while its VṚTTI is anutāpa (repentance). Corollary: v2's ha binding='night' was doubly wrong — night belongs to ṭha, and even for ṭha it is an association, not the pole."
     }
   ]
 }

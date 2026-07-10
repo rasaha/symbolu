@@ -2,9 +2,9 @@
 
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · bridge-target **25** · **practically reachable 20** (5 retroflex/palatal targets fed by never-emitted clusters) · reference-only 14
-- verified **13**, pending **21**
-- `R`: ★ practically reachable · ✧ bridge-target-but-unreachable · · reference-only. `scope` name/name+def = poles authored.
+- varṇas **34** · bridge-target **25** · **practically reachable 20** · reference-only 14
+- verified **14**, pending **20**
+- R: ★ reachable · ✧ bridge-target-but-unreachable · · reference-only · scope name/name+def = poles authored
 
 ## Varṇas (⚑ differs from v2)
 
@@ -43,7 +43,7 @@
 | `kha` | · | Cintā (binding) | **P** |  | cintā as anxious rumination — the mind churn… | cintā as composed, impersonal reflection — h… |
 | `ksha` | · | Aparā-vidyā(liberati… | pend |  | structured knowledge owned as control, dogma… | instrumental knowledge released from possess… |
 | `pha` | · | Bhaya(binding) | pend |  | collapse or flight before danger | steadiness meeting a genuine threat |
-| `ttha` | · | Anutāpa(binding) | pend |  | remorse that grips and repeats over one's ow… | self-directed release of remorse into accept… |
+| `ttha` | · | Anutāpa / Paścāttāpa… | **P** | name+def | anutāpa as gripping remorse — the 'after-hea… | repentance discharged into acceptance — the … |
 
 _RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL._
 

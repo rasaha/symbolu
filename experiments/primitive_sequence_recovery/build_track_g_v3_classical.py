@@ -30,11 +30,12 @@ LEX_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_varna_source_lexicon.json"
 LEDGER_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_varna_classical_verifications.json"
 OUT_FILE = FROZEN / "varna_polarity_table_v3_classical_DRAFT.json"
 
-# classical ha↔ṭha note (primary text the operator supplied earlier); ṭha = ttha key
-TTHA_CLASSICAL_NOTE = ("Classical (Sarkar): ṭha (ttha) is the acoustic root of nighttime, of the moon, of "
-                       "bhúvarloka, and of the kāmamaya kośa — the OPPOSITE of ha (day/sun/svarloka/parā-vidyā). "
-                       "The source lexicon instead glosses ttha as 'Repentance'; this discrepancy needs primary "
-                       "verification before ttha's poles are fixed.")
+# classical ha↔ṭha note — NOW RESOLVED via the ṭha (anutāpa) primary text in the ledger
+TTHA_CLASSICAL_NOTE = ("RESOLVED (see ledger): the ha passage associates ṭha (ttha) with nighttime/moon/bhúvarloka/"
+                       "kāmamaya kośa — the cosmological OPPOSITE of ha; its VṚTTI is anutāpa (repentance). "
+                       "Night/moon are ṭha's ASSOCIATIONS; anutāpa is its pole axis — associations vs pole, not a "
+                       "contradiction. (v2's ha binding='night' was doubly wrong: night is ṭha's, and even there an "
+                       "association, not a pole.)")
 
 
 def _sha(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
