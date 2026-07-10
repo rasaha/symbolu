@@ -60,7 +60,7 @@
   },
   "sequence_impact": {
     "changed_words": ["dread"],
-    "dread": {"v2_v1": ["da", "ra", "da"], "bundle_v1": ["ḍa", "ra", "da"], "cause": "retroflex t/d-before-r rule"},
+    "dread": {"v2_v1": ["da", "ra", "da"], "bundle_v1": ["dda", "ra", "da"], "token_note": "'dda' is the ASCII token for the retroflex ḍa (IAST ḍa) used throughout the frozen artifacts and v3 table keys.", "cause": "retroflex t/d-before-r rule"},
     "all_other_frozen_sequences": "identical under the bundle",
     "theta_eth_impact_on_frozen_items": "zero (no frozen pole-DiD / target / pole-sanity word contains 'th')"
   },
