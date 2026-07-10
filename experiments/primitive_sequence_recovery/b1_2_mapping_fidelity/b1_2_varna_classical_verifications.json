@@ -123,6 +123,29 @@
       "classical_associations": "Etymology: the Bengali nolā (a cat's or dog's greedy fascination) derives from lola / lolatā. (An etymological illustration of the vṛtti — not a separate association or pole.)",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + ETYMOLOGY. ATTESTED: jha = lolupatā/lobha/lolatā vṛttis (greed/avarice), illustrated by nolā. AUTHORED: the binding/liberating split (limitless hoarding vs sufficiency-that-releases) is lexicon/framework-supplied; the passage names the vṛtti and its etymology but gives no pole contrast.",
       "v2_drift_note": "jha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English /dʒ/ emits phoneme 'jh' but the bridge maps 'jh' -> ja (unaspirated), so the aspirate jha cannot arise in an English varṇa sequence."
+    },
+    {
+      "varna": "nya",
+      "sanskrit_label": "Kapaṭatā (hypocrisy / duplicity)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "the palatal nasal /ɲ/ (ña). A bridge TARGET exists (phoneme 'ny' -> nya), BUT the English G2P NEVER emits 'ny' (canyon -> ...na, ya...; lasagna/señor/vignette -> g+n or plain n), so nya is PRACTICALLY UNREACHABLE — effectively reference-only for English despite being one of v2's 25 keys.",
+      "source_quote": "Sarkar: Iṋa (ña) is the acoustic root of kapaṭatā vṛtti (hypocrisy). Another Sanskrit word for hypocrite is páśaṇḍa; in Hindi, pākhaṇḍī. Hypocrisy takes many forms; three common ones: (1) getting one's purpose served by exploiting or cheating others; (2) unnecessarily dominating somebody to conceal one's own ignorance or weakness; (3) pretending to be moral by criticizing the sins of others which one secretly commits oneself.",
+      "binding": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+      "liberating": "transparency — inner intent and outer act coincide; no pretense, being what one appears",
+      "classical_associations": "Sanskrit páśaṇḍa / Hindi pākhaṇḍī = hypocrite. Three illustrated forms of hypocrisy (all of the BINDING pole): exploit/cheat to serve one's purpose; dominate to conceal one's ignorance/weakness; feign morality by condemning others' secretly-shared sins.",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + FORMS. ATTESTED: nya = kapaṭatā vṛtti (hypocrisy), with three illustrated forms — all of the BINDING pole. AUTHORED: the LIBERATING pole (transparency, inner=outer) is lexicon-supplied; the passage illustrates only the hypocritical (binding) form.",
+      "v2_drift_note": "v2 binding='hypocrisy / deceit' is fine; v2 liberating='spiritual falseness; split between outer virtue and inner conduct' RESTATES the hypocrisy PROBLEM (the split) as the liberating pole — the same problem-as-pole error as nga/ja. v3 uses the lexicon's 'transparency — inner intent and outer act coincide.' Also PRACTICALLY UNREACHABLE in English (G2P never emits 'ny')."
+    },
+    {
+      "varna": "tta",
+      "sanskrit_label": "Vitarka (overstatement / garrulous over-argument)",
+      "english_equivalent": "retroflex ṭa. A bridge TARGET exists (phoneme 'tr' -> tta) but the English G2P never emits 'tr' (it splits t+r: train -> ta, ra, na), so tta is PRACTICALLY UNREACHABLE — reference-only in practice, like the rest of the retroflex series.",
+      "source_quote": "Sarkar: Ṭa is the acoustic root of vitarka vṛtti (overstating one's case). Vitarka is not merely debating; it means overstating one's case to the point of garrulousness — a combination of bad temper and garrulousness. It is NOT synonymous with kaśāya vṛtti (speaking harshly to hurt others). Example (Howrah station): asked whether the Uluberia local has left, one gentleman snaps abusively ('Am I a railway timetable?... People like you make life hell...') — uncontrolled vitarka; a second replies helpfully with just the relevant facts (platform eleven, five minutes) — pramita vāk (balanced statement, only relevant words).",
+      "binding": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+      "liberating": "pramita vāk — balanced, measured speech using only relevant words; saying just what is warranted (the helpful, to-the-point reply)",
+      "classical_associations": "Vitarka = bad temper + garrulousness; explicitly NOT kaśāya vṛtti (speaking harshly to hurt others). Its liberated contrast term is pramita vāk (balanced statement). (Distinctions/illustration, not a separate cosmological association.)",
+      "attested_vs_authored": "ATTESTED — BOTH poles: the passage explicitly contrasts uncontrolled vitarka (garrulous, bad-tempered overstatement — the abusive gentleman) with pramita vāk (balanced speech, only relevant words — the helpful gentleman), and distinguishes vitarka from kaśāya. Light authored component (the pole split is in the source).",
+      "v2_drift_note": "v2 binding='overstatement / garrulousness' is fine; v2 liberating='misuse of speech; needs silence / balanced speech' restates the PROBLEM ('misuse of speech') and names a corrective ('needs silence') rather than the liberated MODE. v3 uses the attested 'pramita vāk — measured speech saying only what is warranted.' PRACTICALLY UNREACHABLE: tta's source phoneme 'tr' is never emitted by the G2P (retroflex series)."
     }
   ]
 }

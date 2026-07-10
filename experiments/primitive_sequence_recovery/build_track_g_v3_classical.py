@@ -46,7 +46,11 @@ def build():
     lex_entries = json.loads(LEX_FILE.read_text())["entries"]
     lex = {e["lexicon_key"]: e for e in lex_entries}
     corr = {c["varna"]: c for c in json.loads(LEDGER_FILE.read_text())["verifications"]}
-    bridge_reachable = set(v2v.keys())   # the 25 keys the English G2P bridge can actually produce (test-relevant)
+    bridge_reachable = set(v2v.keys())   # the 25 keys present as bridge TARGETS (in v2's key set)
+    # ...but 5 of those targets are fed ONLY by cluster phonemes (tr/dr/nr/ny/shr) that the English G2P NEVER
+    # emits (it splits them: tr->t+r, ny->n+y, ...), so no English word actually produces them. They are bridge
+    # targets that are PRACTICALLY UNREACHABLE — reference-only in practice. Verified empirically over the G2P.
+    CLUSTER_UNREACHABLE = {"tta", "dda", "nna", "nya", "ssa"}
 
     varnas = {}
     for key in sorted(lex):
@@ -85,6 +89,7 @@ def build():
         entry = {
             "varna": e.get("varna", key), "transliteration": e.get("transliteration", key),
             "bridge_reachable": key in bridge_reachable,
+            "practically_reachable": (key in bridge_reachable) and (key not in CLUSTER_UNREACHABLE),
             "sanskrit_label": corr.get(key, {}).get("sanskrit_label") or sap.get("sanskrit_label"),
             "english_rendering": sap.get("english_rendering"),
             "classical_side_attested": sap.get("classical_side"),
@@ -106,6 +111,7 @@ def build():
         varnas[key] = entry
 
     n_reach = sum(1 for k in varnas if varnas[k]["bridge_reachable"])
+    n_practical = sum(1 for k in varnas if varnas[k]["practically_reachable"])
     n_primary = sum(1 for k in varnas if varnas[k]["classical_review_status"].startswith("PRIMARY_TEXT"))
     doc = {
         "artifact_type": "track_g_varna_polarity_table",
@@ -125,7 +131,9 @@ def build():
             "ha's binding/liberating SPLIT is researcher-authored over attested associations; motivated partly by "
             "making 'happy' cohere — MUST be frozen + pre-registered before any pole-test word/context authoring.",
             "ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.",
-            "Only 25 of 34 keys are bridge_reachable from English G2P; the 9 aspirates are reference-only.",
+            "Only 25 of 34 keys are bridge TARGETS; the 9 aspirates are reference-only.",
+            "Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English "
+            "G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas.",
         ],
         "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no "
                              "Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
@@ -139,7 +147,8 @@ def build():
         "source_hashes": {"track_g_varna_polarity_table_v2_named_vritti.json": _sha(V2_FILE),
                           "b1_2_varna_source_lexicon.json": _sha(LEX_FILE),
                           "b1_2_varna_classical_verifications.json": _sha(LEDGER_FILE)},
-        "n_varnas": len(varnas), "n_bridge_reachable": n_reach, "n_primary_text_verified": n_primary,
+        "n_varnas": len(varnas), "n_bridge_reachable": n_reach, "n_practically_reachable": n_practical,
+        "n_primary_text_verified": n_primary,
         "n_pending_classical_verification": len(varnas) - n_primary,
         "b1_4b_prime_status": "NULL_RETURN_BOTTOM", "motto": "Structure, not validated meaning.",
         "varnas": varnas,
