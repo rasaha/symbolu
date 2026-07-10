@@ -48,10 +48,12 @@ def build():
     lex = {e["lexicon_key"]: e for e in lex_entries}
     corr = {c["varna"]: c for c in json.loads(LEDGER_FILE.read_text())["verifications"]}
     bridge_reachable = set(v2v.keys())   # the 25 keys present as bridge TARGETS (in v2's key set)
-    # ...but 5 of those targets are fed ONLY by cluster phonemes (tr/dr/nr/ny/shr) that the English G2P NEVER
-    # emits (it splits them: tr->t+r, ny->n+y, ...), so no English word actually produces them. They are bridge
-    # targets that are PRACTICALLY UNREACHABLE — reference-only in practice. Verified empirically over the G2P.
-    CLUSTER_UNREACHABLE = {"tta", "dda", "nna", "nya", "ssa"}
+    # ...but 6 of those targets are PRACTICALLY UNREACHABLE — their source phonemes are never emitted by the
+    # English G2P (verified empirically by direct phoneme testing):
+    #   tta<-tr, dda<-dr, nna<-nr, nya<-ny, ssa<-shr  (cluster phonemes; the G2P splits them: tr->t+r, ny->n+y)
+    #   dha<-dh                                         (no English /dʱ/; the voiced dental fricative /ð/ this/the/
+    #                                                    that is emitted as 'th'->tha, so 'dh'->dha is dead)
+    CLUSTER_UNREACHABLE = {"tta", "dda", "nna", "nya", "ssa", "dha"}
 
     varnas = {}
     for key in sorted(lex):
@@ -133,8 +135,9 @@ def build():
             "making 'happy' cohere — MUST be frozen + pre-registered before any pole-test word/context authoring.",
             "ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.",
             "Only 25 of 34 keys are bridge TARGETS; the 9 aspirates are reference-only.",
-            "Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English "
-            "G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas.",
+            "Of those 25, SIX (tta/dda/nna/nya/ssa + dha) are fed only by phonemes the English G2P never emits "
+            "(clusters tr/dr/nr/ny/shr, and dh — since /ð/ this/the/that is emitted as th->tha), so they are "
+            "PRACTICALLY UNREACHABLE. Real English coverage is ~19 of 34 varṇas.",
             "RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — "
             "the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those "
             "words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer "

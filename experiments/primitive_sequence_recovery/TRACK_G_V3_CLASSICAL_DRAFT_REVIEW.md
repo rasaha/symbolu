@@ -2,7 +2,7 @@
 
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **20** · reference-only 14 · verified **20**, pending **14**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **21**, pending **13**
 
 ## Fidelity caveats
 
@@ -11,7 +11,7 @@
 - ha's binding/liberating SPLIT is researcher-authored over attested associations; motivated partly by making 'happy' cohere — MUST be frozen + pre-registered before any pole-test word/context authoring.
 - ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.
 - Only 25 of 34 keys are bridge TARGETS; the 9 aspirates are reference-only.
-- Of those 25, FIVE (tta/dda/nna/nya/ssa) are fed only by cluster phonemes (tr/dr/nr/ny/shr) the English G2P never emits, so they are PRACTICALLY UNREACHABLE. Real English coverage is ~20 of 34 varṇas.
+- Of those 25, SIX (tta/dda/nna/nya/ssa + dha) are fed only by phonemes the English G2P never emits (clusters tr/dr/nr/ny/shr, and dh — since /ð/ this/the/that is emitted as th->tha), so they are PRACTICALLY UNREACHABLE. Real English coverage is ~19 of 34 varṇas.
 - RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here.
 - TH MIS-MAPPING: the English 'th' grapheme is the dental FRICATIVES /θ/ (think) and /ð/ (this/the/that) — sounds Sanskrit LACKS — but the bridge maps 'th' -> tha (viṣāda/melancholy, an aspirated STOP थ). So the most frequent English words (the/this/that) inject a spurious 'melancholy' varṇa. Genuine थ (t+h, ant-hill) coincides only by accident. This is a MIS-mapping, not merely under-representation.
 - ASPIRATION COLLAPSE: English aspirated word-initial /tʰ/ (top) vs unaspirated /t/ (stop) both -> ta; classically initial tʰ is closer to tha. Aspiration is ignored across the stop series.
@@ -23,7 +23,6 @@
 | `ba` | ★ | Avajñā(binding) | pend |  | neglect of what actually has value | regard that recognizes and attends to worth |
 | `ca` | ★ | Viveka (liberating_o… | **P** | name | viveka distorted — discernment hardening int… | falsehood-discerning insight without egoic s… |
 | `da` | ★ | Krodha / Karkaśatā (… | **P** | name+def | peevishness / reactive irritability — perver… | forbearance that absorbs provocation — an ev… |
-| `dha` | ★ | Tṛṣṇā(binding) | pend |  | limitless thirst to acquire | the acquisitive thirst quenched at its root |
 | `ga` | ★ | Ceṣṭā (binding) | **P** |  | restless striving that cannot stop — effort … | will-force applied to arouse one's dormant h… |
 | `ha` | ★ | Parā-vidyā (liberati… | **P** |  | outward / visible vision — fixation on the m… | intuitional vision (parā-vidyā) — inner, sub… |
 | `ja` | ★ | Ahaṃkāra (binding) | **P** | name+def | the inflated 'I did / I control this' — the … | agency exercised WITHOUT inflating the 'I' —… |
@@ -41,6 +40,7 @@
 | `va` | ★ | Dharma(liberating_or… | pend |  | accepting-as-true without sufficient discern… | truth-assent purified by discernment, instal… |
 | `ya` | ★ | Aviśvāsa(binding) | pend |  | self-doubt that cannot commit | self-efficacy to commit and to rely |
 | `dda` | ✧ | Lajjā (binding) | **P** | name | lajjā as inhibition — action held back by ot… | acting unhindered by social shame — natural,… |
+| `dha` | ✧ | Tṛṣṇā (binding) | **P** |  | tṛṣṇā — limitless thirst to acquire: unquenc… | the acquisitive thirst quenched at its root … |
 | `nna` | ✧ | Īrṣyā (binding) | **P** | name | envy — the sting at another's success; covet… | muditā — sympathetic gladness at another's f… |
 | `nya` | ✧ | Kapaṭatā (binding) | **P** | name+def | hypocrisy / concealment — inner and outer di… | transparency — inner intent and outer act co… |
 | `ssa` | ✧ | Kāma / Tamoguṇa(bind… | pend |  | sensory craving bound to inertia | raw desire transmuted into grounded, contain… |
