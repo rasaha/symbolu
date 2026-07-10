@@ -87,6 +87,18 @@
       "classical_associations": null,
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: ca = viveka (conscience/discernment), a LIBERATING-oriented faculty (its natural pole is the clear-conscience side; the binding pole is its DISTORTION, not its absence). AUTHORED (fully): BOTH pole texts are supplied by the source lexicon / framework — the one-line passage gives no binding/liberating contrast. Highest authored component so far; treat the poles as lexicon-supplied, not primary-verified.",
       "v2_drift_note": "v2 binding='lack of discrimination / confused discernment' sets the binding pole as the ABSENCE of viveka rather than its DISTORTION — a category error for a liberating-oriented faculty (binding = the faculty MISUSED, not missing). v3 (lexicon) uses 'discernment hardening into judgment / separation-pride.' v2 liberating ('conscience as inner dharmic compass') is acceptable. ca is bridge-reachable (ch-words: church/chair/match)."
+    },
+    {
+      "varna": "cha",
+      "sanskrit_label": "Vikalatā (nervous breakdown / mental incapacitation)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "none — aspirated palatal (छ). English has no aspirated palatal; /tʃ/ ('ch') maps to ca (unaspirated). NOT bridge-reachable.",
+      "source_quote": "Sarkar: Cha is the acoustic root of vikalatā vṛtti (nervous breakdown). A nervous breakdown occurs when one's mind, which had previously been functioning properly, either starts malfunctioning or stops functioning altogether. [Attests the vṛtti name + a definition of the state — no binding/liberating contrast is given; the poles below are lexicon/framework-supplied.]",
+      "binding": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+      "liberating": "steadiness that keeps mental function intact under load — holding the mind operational under a strain that would otherwise break it",
+      "classical_associations": null,
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: cha = vikalatā vṛtti (nervous breakdown), defined as a properly-functioning mind that starts malfunctioning or ceases — this MATCHES the binding pole. AUTHORED: the LIBERATING pole (steadiness that keeps function intact under load) is lexicon/framework-supplied; the passage defines the breakdown state but gives no liberating pole.",
+      "v2_drift_note": "cha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English has no aspirated palatal; /tʃ/ ('ch') maps to ca (unaspirated), so cha cannot arise in an English varṇa sequence."
     }
   ]
 }
