@@ -63,6 +63,9 @@ def build():
         classical_associations = None    # cosmological/etymological associations, kept SEPARATE from the poles
         source_quote = None
         v2_drift_note = None
+        # NAME_ONLY = the passage attests only the vṛtti name; both poles are authored (lexicon/framework)
+        primary_text_scope = None
+        english_equivalent = None
         # operator PRIMARY-TEXT verifications from the ledger (ha, pa, ka, ...)
         if key in corr:
             c = corr[key]
@@ -70,6 +73,8 @@ def build():
             classical_associations = c.get("classical_associations")
             source_quote = c.get("source_quote")
             v2_drift_note = c.get("v2_drift_note")
+            primary_text_scope = c.get("primary_text_scope")
+            english_equivalent = c.get("english_equivalent")
             authored_note = c.get("attested_vs_authored", authored_note)
             review = "PRIMARY_TEXT_PROVIDED_BY_OPERATOR"
             provenance = "operator primary-text verification (b1_2_varna_classical_verifications.json)"
@@ -90,6 +95,8 @@ def build():
             "functional_operation": e.get("functional_operation"),
             "contrast_boundary": e.get("contrast_boundary"),
             "attested_vs_authored": authored_note,
+            "primary_text_scope": primary_text_scope,   # NAME_ONLY => both poles authored, source attests only the name
+            "english_equivalent": english_equivalent,
             "classical_review_status": review, "provenance": provenance,
             "v2_binding": v2_binding, "v2_liberating": v2_liberating, "differs_from_v2": differs,
             "v2_drift_note": v2_drift_note,

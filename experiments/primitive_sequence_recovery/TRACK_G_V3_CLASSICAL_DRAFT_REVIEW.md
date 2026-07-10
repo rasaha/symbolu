@@ -2,54 +2,47 @@
 
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`, `wired_into_tests=False`.
 
-- varṇas **34** (25 bridge-reachable, 9 reference-only aspirates); verified **7**, pending **27**
+- varṇas **34** (25 bridge-reachable, 9 reference-only); verified **8**, pending **26**
+- `scope=NAME_ONLY` marks entries whose source attests only the vṛtti name (both poles authored).
 
-## Caveats
+## Varṇas (★ bridge-reachable · ⚑ differs from v2 · assoc kept OUT of poles)
 
-- The LIBERATING pole is author counter-rewritten for most varṇas (lexicon rewrite_status) — not attested.
-- pa's operator reading PARTIALLY INVERTS the source-attested pole (ghṛṇā = the binding fetter). Recorded.
-- ha's binding/liberating SPLIT is researcher-authored over attested associations; motivated partly by making 'happy' cohere — MUST be frozen + pre-registered before any pole-test word/context authoring.
-- ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.
-- Only 25 of 34 keys are bridge_reachable from English G2P; the 9 aspirates are reference-only.
-
-## Varṇas (★ bridge-reachable · ⚑ differs from v2 · associations kept OUT of poles)
-
-| varṇa | Sanskrit (attested side) | review | binding (v3) | liberating (v3) | associations (NOT a pole) | v2 → drift |
+| varṇa | Sanskrit (side) | review | scope | binding (v3) | liberating (v3) | v2 → drift |
 |---|---|---|---|---|---|---|
-| ★`ba` | Avajñā (binding) | pending | neglect of what actually has value | regard that recognizes and attends to worth |  | ⚑ indifference / neglect |
-| ★`ca` | Viveka (liberating_orien… | pending | discernment hardening into judgment / separation… | falsehood-discerning insight without egoic super… |  | ⚑ lack of discrimination / c… |
-| ★`da` | Krodha / Karkaśatā (bind… | pending | reactive irritability discharged at others | forbearance that absorbs provocation |  | ⚑ peevishness / irritability |
-| ★`dda` | Lajjā (binding) | pending | action inhibited by others' regard | acting unhindered by social shame |  | ⚑ shyness |
-| ★`dha` | Tṛṣṇā (binding) | pending | limitless thirst to acquire | the acquisitive thirst quenched at its root |  | ⚑ craving / thirst for acqui… |
-| ★`ga` | Ceṣṭā (effort / striving… | **PRIMARY** | restless striving that cannot stop — effort comp… | will-force applied to arouse one's dormant highe… | ceṣṭā = the effort to arouse dormant p… | ⚑ effort / striving |
-| ★`ha` | Parā-vidyā (intuitional … | **PRIMARY** | outward / visible vision — fixation on the manif… | intuitional vision (parā-vidyā) — inner, subtle … | ether (ākāśa) factor; daytime; sun; sv… | ⚑ night / darkness (the cont… |
-| ★`ja` | Ahaṁkāra (binding) | pending | the inflated 'I did / I control this' | agency exercised without inflating the I |  | ⚑ ego / inflated I-feeling |
-| ★`ka` | Āśā (abhiipśātmaka āśā v… | **PRIMARY** | āśā as grasping / clinging hope — goaded toward … | aspiring hope held WITHOUT attachment — forward-… | ka = Kārya Brahma (the expressed / cre… | ⚑ hope / forward-grasping de… |
-| ★`la` | Krūratā (binding) | pending | physical harm inflicted on the weak | compassion that protects the physically vulnerab… |  | ⚑ cruelty |
-| ★`ma` | Praśraya / Praṇāśa (bind… | pending | giving latitude to the point of dissolution | disciplined containment that holds form |  | ⚑ annihilation / indulgence … |
-| ★`na` | Moha (binding) | pending | infatuation that fixates on a compulsive attract… | de-fascination from false attraction |  | ⚑ blind attachment / infatua… |
-| ★`nga` | Dambha (vanity / self-di… | **PRIMARY** | dambha as vanity — the self displayed and perfor… | conduct that stands without outward performance … | Phonetic-historical (NOT poles): per t… | ⚑ vanity / pride-display |
-| ★`nna` | Īrṣyā (binding) | pending | the sting at another's success | sympathetic gladness at another's fortune |  | ⚑ envy |
-| ★`nya` | Kapaṭatā (binding) | pending | concealment — inner and outer diverging | transparency — inner intent and outer act coinci… |  | ⚑ hypocrisy / deceit |
-| ★`pa` | Ghṛṇā (hatred / revulsio… | **PRIMARY** | attraction toward the crude / objects — the down… | revulsion OF the ripus — ghṛṇā redirected agains… | ghṛṇā = the fetter of hatred (one of t… | ⚑ hatred / revulsion |
-| ★`ra` | Prāṇaśakti/Agnitattva + … | pending | rajasic activation driven by compulsion, desire,… | directed energy without bondage |  | ⚑ defeatist annihilation-tho… |
-| ★`sa` | Mokṣa / Sattvaguṇa (libe… | pending | sattvic clarity/order owned as purity, superiori… | clarity without attachment to clarity |  | ⚑ escapism; premature static… |
-| ★`sha` | rajoguṇa + artha (neutra… | pending | worldly purpose possessed as acquisition, status… | purposeful action without possessive bondage |  | ⚑ mutative drive / material … |
-| ★`ssa` | Kāma / Tamoguṇa (binding… | pending | sensory craving bound to inertia | raw desire transmuted into grounded, contained d… |  | ⚑ static inertia / worldly d… |
-| ★`ta` | Jāḍya / Nidrā (binding) | pending | dullness, torpor, deep sleep of mind | alert wakefulness rising from torpor |  | ⚑ inertia / staticity / dull… |
-| ★`tha` | Viṣāda (binding) | pending | dejection that sinks one's own mood | warm buoyancy lifting one's own dejection |  | ⚑ melancholy / dejection |
-| ★`tta` | Vitarka (binding) | pending | garrulous exaggeration beyond the warranted | measured speech saying only what is warranted |  | ⚑ overstatement / garrulousn… |
-| ★`va` | Dharma (liberating_orien… | pending | accepting-as-true without sufficient discernment | truth-assent purified by discernment, installing… |  | ⚑ rigid holding; stuck ensco… |
-| ★`ya` | Aviśvāsa (binding) | pending | self-doubt that cannot commit | self-efficacy to commit and to rely |  | ⚑ lack of confidence / waver… |
-| ·`bha` | Mūrcchā (binding) | pending | hypnotic entrancement, loss of common sense | breaking the entrancing spell into clear sense |  | ⚑  |
-| ·`cha` | Vikalatā (binding) | pending | collapse of mental function under strain | steadiness that keeps function intact under load |  | ⚑  |
-| ·`ddha` | Piśunatā (binding) | pending | malice — sadistic cruelty toward the maligned | compassion that shields the maligned |  | ⚑  |
-| ·`gha` | Mamatā (love / possessiv… | **PRIMARY** | mamatā bounded by the relative factors (time, sp… | mamatā made to TRANSCEND time, space and individ… | mamatā is related to time, space and i… | ⚑  |
-| ·`jha` | Lolupatā / Lobha (bindin… | pending | hoarding accumulation without limit | sufficiency — appetite that releases at enough |  | ⚑  |
-| ·`kha` | Cintā (worry / reflectiv… | **PRIMARY** | cintā as anxious rumination — the mind churning … | cintā as composed, impersonal reflection — holdi… | Paired with ka: ka = āśā (hope) goads … | ⚑  |
-| ·`ksha` | Aparā-vidyā (liberating_… | pending | structured knowledge owned as control, dogma, or… | instrumental knowledge released from possession |  | ⚑  |
-| ·`pha` | Bhaya (binding) | pending | collapse or flight before danger | steadiness meeting a genuine threat |  | ⚑  |
-| ·`ttha` | Anutāpa (binding) | pending | remorse that grips and repeats over one's own pa… | self-directed release of remorse into acceptance |  | ⚑  |
+| ★`ba` | Avajñā (binding) | pend |  | neglect of what actually has value | regard that recognizes and attends to worth | ⚑ indifference / neglect |
+| ★`ca` | Viveka (conscience / d… | **PRIM** | NAME_ONLY | viveka distorted — discernment hardening into … | falsehood-discerning insight without egoic sup… | ⚑ lack of discrimination /… |
+| ★`da` | Krodha / Karkaśatā (bi… | pend |  | reactive irritability discharged at others | forbearance that absorbs provocation | ⚑ peevishness / irritabili… |
+| ★`dda` | Lajjā (binding) | pend |  | action inhibited by others' regard | acting unhindered by social shame | ⚑ shyness |
+| ★`dha` | Tṛṣṇā (binding) | pend |  | limitless thirst to acquire | the acquisitive thirst quenched at its root | ⚑ craving / thirst for acq… |
+| ★`ga` | Ceṣṭā (effort / strivi… | **PRIM** |  | restless striving that cannot stop — effort co… | will-force applied to arouse one's dormant hig… | ⚑ effort / striving |
+| ★`ha` | Parā-vidyā (intuitiona… | **PRIM** |  | outward / visible vision — fixation on the man… | intuitional vision (parā-vidyā) — inner, subtl… | ⚑ night / darkness (the co… |
+| ★`ja` | Ahaṁkāra (binding) | pend |  | the inflated 'I did / I control this' | agency exercised without inflating the I | ⚑ ego / inflated I-feeling |
+| ★`ka` | Āśā (abhiipśātmaka āśā… | **PRIM** |  | āśā as grasping / clinging hope — goaded towar… | aspiring hope held WITHOUT attachment — forwar… | ⚑ hope / forward-grasping … |
+| ★`la` | Krūratā (binding) | pend |  | physical harm inflicted on the weak | compassion that protects the physically vulner… | ⚑ cruelty |
+| ★`ma` | Praśraya / Praṇāśa (bi… | pend |  | giving latitude to the point of dissolution | disciplined containment that holds form | ⚑ annihilation / indulgenc… |
+| ★`na` | Moha (binding) | pend |  | infatuation that fixates on a compulsive attra… | de-fascination from false attraction | ⚑ blind attachment / infat… |
+| ★`nga` | Dambha (vanity / self-… | **PRIM** |  | dambha as vanity — the self displayed and perf… | conduct that stands without outward performanc… | ⚑ vanity / pride-display |
+| ★`nna` | Īrṣyā (binding) | pend |  | the sting at another's success | sympathetic gladness at another's fortune | ⚑ envy |
+| ★`nya` | Kapaṭatā (binding) | pend |  | concealment — inner and outer diverging | transparency — inner intent and outer act coin… | ⚑ hypocrisy / deceit |
+| ★`pa` | Ghṛṇā (hatred / revuls… | **PRIM** |  | attraction toward the crude / objects — the do… | revulsion OF the ripus — ghṛṇā redirected agai… | ⚑ hatred / revulsion |
+| ★`ra` | Prāṇaśakti/Agnitattva … | pend |  | rajasic activation driven by compulsion, desir… | directed energy without bondage | ⚑ defeatist annihilation-t… |
+| ★`sa` | Mokṣa / Sattvaguṇa (li… | pend |  | sattvic clarity/order owned as purity, superio… | clarity without attachment to clarity | ⚑ escapism; premature stat… |
+| ★`sha` | rajoguṇa + artha (neut… | pend |  | worldly purpose possessed as acquisition, stat… | purposeful action without possessive bondage | ⚑ mutative drive / materia… |
+| ★`ssa` | Kāma / Tamoguṇa (bindi… | pend |  | sensory craving bound to inertia | raw desire transmuted into grounded, contained… | ⚑ static inertia / worldly… |
+| ★`ta` | Jāḍya / Nidrā (binding… | pend |  | dullness, torpor, deep sleep of mind | alert wakefulness rising from torpor | ⚑ inertia / staticity / du… |
+| ★`tha` | Viṣāda (binding) | pend |  | dejection that sinks one's own mood | warm buoyancy lifting one's own dejection | ⚑ melancholy / dejection |
+| ★`tta` | Vitarka (binding) | pend |  | garrulous exaggeration beyond the warranted | measured speech saying only what is warranted | ⚑ overstatement / garrulou… |
+| ★`va` | Dharma (liberating_ori… | pend |  | accepting-as-true without sufficient discernme… | truth-assent purified by discernment, installi… | ⚑ rigid holding; stuck ens… |
+| ★`ya` | Aviśvāsa (binding) | pend |  | self-doubt that cannot commit | self-efficacy to commit and to rely | ⚑ lack of confidence / wav… |
+| ·`bha` | Mūrcchā (binding) | pend |  | hypnotic entrancement, loss of common sense | breaking the entrancing spell into clear sense | ⚑  |
+| ·`cha` | Vikalatā (binding) | pend |  | collapse of mental function under strain | steadiness that keeps function intact under lo… | ⚑  |
+| ·`ddha` | Piśunatā (binding) | pend |  | malice — sadistic cruelty toward the maligned | compassion that shields the maligned | ⚑  |
+| ·`gha` | Mamatā (love / possess… | **PRIM** |  | mamatā bounded by the relative factors (time, … | mamatā made to TRANSCEND time, space and indiv… | ⚑  |
+| ·`jha` | Lolupatā / Lobha (bind… | pend |  | hoarding accumulation without limit | sufficiency — appetite that releases at enough | ⚑  |
+| ·`kha` | Cintā (worry / reflect… | **PRIM** |  | cintā as anxious rumination — the mind churnin… | cintā as composed, impersonal reflection — hol… | ⚑  |
+| ·`ksha` | Aparā-vidyā (liberatin… | pend |  | structured knowledge owned as control, dogma, … | instrumental knowledge released from possessio… | ⚑  |
+| ·`pha` | Bhaya (binding) | pend |  | collapse or flight before danger | steadiness meeting a genuine threat | ⚑  |
+| ·`ttha` | Anutāpa (binding) | pend |  | remorse that grips and repeats over one's own … | self-directed release of remorse into acceptan… | ⚑  |
 
 ## Drift notes (verified entries)
 
@@ -60,6 +53,7 @@
 - **ga**: v2 binding='effort / striving' is the bare vṛtti NAME, not a binding distortion; v2 liberating='effort as path to mundane development and spiritual elevation' paraphrases the passage's general VALUE statement about ceṣṭā (both spheres) rather than a distinct liberated mode — a mild value/association-into-pole conflation. v3 adopts the lexicon's crisper restless-vs-poised polarity.
 - **gha**: gha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P has no /gh/ phoneme; written 'gh' yields /g/ -> ga (or is silent, e.g. 'rough'), so gha cannot arise in an English varṇa sequence.
 - **nga**: v2 binding='vanity / pride-display' is close to attested, but v2 liberating='egoic obstruction; humility is its spiritual correction' restates the vṛtti's PROBLEM and names its corrective (humility) rather than giving the liberated MODE of conduct. v3 adopts the lexicon's crisper 'conduct that stands without outward performance.' (nga is bridge-reachable — this revises packets for ng-words such as longing/king/song.)
+- **ca**: v2 binding='lack of discrimination / confused discernment' sets the binding pole as the ABSENCE of viveka rather than its DISTORTION — a category error for a liberating-oriented faculty (binding = the faculty MISUSED, not missing). v3 (lexicon) uses 'discernment hardening into judgment / separation-pride.' v2 liberating ('conscience as inner dharmic compass') is acceptable. ca is bridge-reachable (ch-words: church/chair/match).
 
 _RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL._
 
