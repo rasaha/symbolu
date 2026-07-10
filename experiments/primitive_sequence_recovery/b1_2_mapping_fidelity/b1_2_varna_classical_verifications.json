@@ -158,6 +158,18 @@
       "classical_associations": "COSMOLOGICAL (from the ha passage): ṭha is the acoustic root of nighttime, the moon, bhúvarloka, and the kāmamaya kośa — the contractive OPPOSITE of ha (day/sun/svarloka/parā-vidyā). ETYMOLOGY: anutāpa = anu ('after') + tāpa ('heat'); N. Indian paścāttāpa = paschāt ('after') + tāpa ('heat') = 'after-heat'. This RESOLVES the earlier ttha discrepancy: night/moon are ṭha's ASSOCIATIONS; its VṚTTI is anutāpa (repentance) — associations vs pole, as with ha/ka.",
       "attested_vs_authored": "ATTESTED: ṭha = anutāpa vṛtti (repentance); its definition (remorse on realizing impropriety); the anutāpa/paścāttāpa='after-heat' etymology; and (from the ha passage) its cosmological associations night/moon/bhúvarloka/kāmamaya kośa as ha's opposite. AUTHORED: the binding/liberating split (gripping remorse vs remorse-released-into-acceptance) is lexicon-supplied; this passage defines the state, not a pole contrast.",
       "v2_drift_note": "ttha is ABSENT from v2 (reference-only — retroflex AND aspirate, doubly unreachable). RESOLVES the earlier v3 'ttha discrepancy': the ha passage's night/moon are ṭha's ASSOCIATIONS (its cosmological opposite-of-ha domain), while its VṚTTI is anutāpa (repentance). Corollary: v2's ha binding='night' was doubly wrong — night belongs to ṭha, and even for ṭha it is an association, not the pole."
+    },
+    {
+      "varna": "dda",
+      "sanskrit_label": "Lajjā (shyness / bashful inhibition)",
+      "primary_text_scope": "NAME_ONLY",
+      "english_equivalent": "retroflex ḍa. A bridge TARGET exists (phoneme 'dr' -> dda) but the English G2P never emits 'dr' (splits d+r: drum -> da, ra), so dda is PRACTICALLY UNREACHABLE (retroflex series).",
+      "source_quote": "Sarkar: 'Ḍa is the acoustic root of lajjā vṛtti [the propensity of shyness].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
+      "binding": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+      "liberating": "acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition",
+      "classical_associations": "Cross-reference: lajjā is one of the eight pāshas (fetters) listed under pa (hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism). (Not a pole.)",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: dda = lajjā vṛtti (shyness); and (from the pa passage) lajjā is one of the eight pāshas/fetters. AUTHORED (fully): BOTH poles are lexicon-supplied — this one-line passage gives no binding/liberating contrast.",
+      "v2_drift_note": "v2 binding='shyness' is the bare vṛtti NAME (not a distortion); v2 liberating='humility if purified; blockage if fear-based' is a hedged conditional, not a clean liberated MODE. v3 uses the lexicon's 'acting unhindered by social shame.' PRACTICALLY UNREACHABLE (retroflex; 'dr' never emitted)."
     }
   ]
 }
