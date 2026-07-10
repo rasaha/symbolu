@@ -1,0 +1,54 @@
+{
+  "artifact_type": "b1_8_context_resolved_scaffold_manifest",
+  "representation_version": "B1.8_context_resolved_layer1",
+  "readiness_label": "B1_8_CONTEXT_RESOLVED_SCAFFOLD_READY",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "arms": [
+    "KCPR_SELECTED_POLE",
+    "SCRAMBLED_SELECTED_POLE",
+    "UNRESOLVED_BOTH_POLES",
+    "SCRAMBLED_UNRESOLVED",
+    "PLAIN_PROMPT_BASELINE",
+    "GENERIC_STRUCTURED_PROMPT_BASELINE",
+    "SEMANTIC_LLM_BASELINE"
+  ],
+  "primary_contrast": "KCPR_SELECTED_POLE vs SCRAMBLED_SELECTED_POLE",
+  "n_targets": 12,
+  "strata_coverage": {
+    "brand_name": 2,
+    "concrete_object": 2,
+    "emotional_nonclinical": 2,
+    "ethical_action": 2,
+    "psychological_mental": 2,
+    "spiritual_contemplative": 2
+  },
+  "pole_balance": {
+    "binding": 6,
+    "liberating": 6
+  },
+  "refused_or_tie": 0,
+  "seeds": {
+    "derangement_seed": 20260709
+  },
+  "hashes": {
+    "prereg": "87456bfcfbcda2076377fd249c4afbae62a0711a10d41742728ecf85deb84b35",
+    "resolver_rulebook": "a7c53b8ecf9902671a8a4457e5d4b4912f59f4d756b95078b5393d09212f2f2a",
+    "v2_named_vritti_table": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+    "target_scaffolds": "b7925ff2aa19a77276b81043d8a019a1c34e8fa754c7fd264e658440edb25015",
+    "randomized_control": "eef41543bdfec63acd4dc118cf78ecd7930fe20fbf2e0b8e52e656d148f121f6",
+    "phoneme_bridge": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed",
+    "prompt_rubric": "080a67086c8631568c53c57a02d76f75a8a25f5ce3f8f8bc4f3205655b0ecc5b"
+  },
+  "guardrails": {
+    "no_generation": true,
+    "no_evidence_freeze": true,
+    "no_judging": true,
+    "no_genutility": true,
+    "no_semantic_truth": true,
+    "no_ontology": true,
+    "no_sanskrit_privilege": true,
+    "original_b1_4b": "blocked",
+    "track_b": "blocked",
+    "motto": "Structure, not validated meaning."
+  }
+}
