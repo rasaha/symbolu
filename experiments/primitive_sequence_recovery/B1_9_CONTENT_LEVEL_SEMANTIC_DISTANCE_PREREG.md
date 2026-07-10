@@ -73,13 +73,43 @@ Authentic varṇa facet aggregate **vs** distance-matched random/control varṇa
 
 ## 8. Controls (facet aggregates compared to authentic)
 
+0. **Out-of-pool lexicon control (PRIMARY)** — control facets drawn from a frozen lexicon
+   (`frozen/b1_9_out_of_pool_lexicon.json`) that reuses **NO varṇa→meaning mapping**. This is **not** a
+   within-pool derangement: the control content is authored independently of the 25-varṇa attribution pool, so
+   the control side carries none of the varṇa mappings. See §8b for why this is the primary control and its
+   honest register caveat.
 1. **Same-polarity random varṇa facet control** — random other varṇas' facets, same selected pole.
-2. **Same-plane random varṇa facet control** — random facets drawn within the same sphere/plane.
+   *(BLOCKED — resolver-free; see §12b/§12c.)*
+2. **Same-plane random varṇa facet control** — random facets drawn within the same sphere/plane. *(within-pool)*
 3. **Frequency/length-matched facet control** — matched on token length / word frequency where available.
-4. **Completely random facet control** — any pole, any varṇa.
+   *(within-pool, length-only)*
+4. **Completely random facet control** — any varṇa. *(within-pool; secondary/triangulation)*
 5. **Permuted target labels** — shuffle target↔facet-set assignment across items (null distribution).
 6. **Random word/context decoy** — authentic facets vs an unrelated word/context (upper-bound sanity that the
    metric can detect gross mismatch).
+
+## 8b. Out-of-pool control — motivation and honest caveat (reopened fix)
+
+Controls 2–4 all draw content from the **same 25-varṇa pool**. Because that pool is a small set of broadly
+applicable psychological/spiritual attributions, a within-pool "scramble" is often a **paraphrase-level
+near-synonym** of the authentic facet — operator's framing: *"doctor studies medicine" is the same as "medicine
+is study done by doctors"; if the scramble carries the same meaning there is nothing to differentiate.* That
+biases every within-pool contrast toward NULL by construction.
+
+**The fix (applied in place, not a new track):** the **primary** control is now the **out-of-pool lexicon
+control**. Its content is drawn from `frozen/b1_9_out_of_pool_lexicon.json`, authored **independently** of the
+varṇa table — no entry is a varṇa `named_attribute`, sphere gloss, binding gloss, or near-synonym of one. The
+control side therefore reuses **no varṇa mapping at all.**
+
+**Honest caveat (recorded, not hidden):** the out-of-pool glosses are **concrete/sensory/natural/craft/geometric**
+— a *different register* from the abstract-psychological varṇa attributions. So a positive `delta_distance`
+against this control could reflect a **register difference** (abstract vs concrete), **not** varṇa-specific
+meaning. Therefore the out-of-pool result **must be read together with the within-pool controls (2–4):**
+- authentic beating the out-of-pool control **but not** the within-pool controls → **register-appropriateness,
+  not varṇa specificity** (still consistent with NULL for the hypothesis);
+- authentic beating **both** → a stronger (still low-level, non-ontological) content-proximity signal worth a
+  separately-preregistered follow-up.
+All families (0, 2–6) are reported; none is cherry-picked.
 
 ## 9. Preprocessing (frozen before run)
 
@@ -90,7 +120,9 @@ Authentic varṇa facet aggregate **vs** distance-matched random/control varṇa
 
 ## 10. Statistical plan
 
-- **Primary statistic:** mean paired `delta_distance` (authentic vs same-polarity control, control family 1).
+- **Primary statistic:** mean paired `delta_distance` (authentic vs the **out-of-pool lexicon control**,
+  control family 0 — see §8b/§12c). *(Supersedes the earlier "same-polarity / family 1" phrasing, which is
+  blocked under the resolver-free named_attribute mode.)*
 - **Secondary:** sign count (authentic-closer vs control-closer) with an exact sign test.
 - **Bootstrap CI** over items (fixed seed, preregistered iterations).
 - **Permutation test** over item↔control assignment (control 5) to build the null.
@@ -127,15 +159,19 @@ not because a positive is expected.
 
 ## 12b. Runner (implemented, mock-tested — NOT run)
 
-`run_b1_9_content_distance.py` (+ `test_run_b1_9_content_distance.py`, 19 tests). Generation-free, judge-free.
-Frozen inputs: `frozen/b1_9_targets.json`, the v2 facet table, `frozen/b1_9_control_sampler_config.json`,
-`frozen/b1_9_preprocessing_config.json`, `frozen/b1_9_embedding_config.json`. Reads **no** `run_out/`; imports
+`run_b1_9_content_distance.py` (+ `test_run_b1_9_content_distance.py`, 23 tests). Generation-free, judge-free.
+Seven frozen inputs: `frozen/b1_9_targets.json`, the v2 facet table, `frozen/b1_9_control_sampler_config.json`,
+`frozen/b1_9_preprocessing_config.json`, `frozen/b1_9_embedding_config.json`, and
+`frozen/b1_9_out_of_pool_lexicon.json` (the out-of-pool control content). Reads **no** `run_out/`; imports
 **no** generation/judging module. Label emitted: **`B1_9_CONTENT_DISTANCE_RUNNER_READY_MOCK_TESTED`** only.
 
 Control-family status (reported in full; not cherry-picked):
-`completely_random_facet` **IMPLEMENTED (primary)**, `same_plane_random_varna_facet` **IMPLEMENTED**,
+`out_of_pool_lexicon_facet` **IMPLEMENTED (PRIMARY)** — control content from the frozen out-of-pool lexicon,
+reuses no varṇa mapping (§8b),
+`completely_random_facet` **IMPLEMENTED** (within-pool; secondary/triangulation),
+`same_plane_random_varna_facet` **IMPLEMENTED** (within-pool),
 `permuted_target_label` **IMPLEMENTED**, `random_word_context_decoy` **IMPLEMENTED**,
-`frequency_length_matched_facet` **IMPLEMENTED_LENGTH_ONLY** (no corpus frequencies),
+`frequency_length_matched_facet` **IMPLEMENTED_LENGTH_ONLY** (within-pool; no corpus frequencies),
 `same_polarity_random_varna_facet` **BLOCKED_NOT_AVAILABLE** — a resolver-free, neutral `named_attribute` test
 has no polarity dimension; reinstating poles would reintroduce the resolver confound B1.9 exists to avoid.
 
@@ -149,8 +185,9 @@ python3 run_b1_9_content_distance.py --decl run_out/b1_9/b1_9_DECLARED.json --ou
 ```
 **Declaration template** (`artifact: b1_9_content_distance_DECLARED`, `b1_9_declared: true`, `mode`,
 `representation_version`, `declared_by`, `declared_at_utc`, `attestation` = the §5 exact string, plus sha256 of
-each of the six frozen inputs — built from `run_b1_9_content_distance.HASH_INPUTS`). The gate refuses any B1.6/
-B1.8 mode, wrong representation, missing attestation, or hash mismatch. **The real test has NOT been run.**
+each of the **seven** frozen inputs (now including `frozen/b1_9_out_of_pool_lexicon.json`) — built from
+`run_b1_9_content_distance.HASH_INPUTS`). The gate refuses any B1.6/B1.8 mode, wrong representation, missing
+attestation, or hash mismatch. **The real test has NOT been run.**
 
 ## 12c. Runner/prereg consistency clarification (pre-execution)
 
@@ -162,13 +199,23 @@ change (nothing has been executed):
 - **B1.9 is resolver-free and does NOT perform binding/liberating pole selection.**
 - Therefore **`same_polarity_random_varna_facet` is blocked/reserved** unless a future **pole-bearing variant is
   explicitly preregistered** (which would reintroduce the resolver and must be a separate prereg).
-- **The primary executable control for this runner is `completely_random_facet`** (this supersedes the
-  "family 1 / same-polarity" phrasing in §10 for execution purposes; §10's endpoint definition is otherwise
-  unchanged).
-- **`same_plane_random_varna_facet`, `permuted_target_label`, `random_word_context_decoy`, and
-  `frequency_length_matched_facet` (length-only)** remain **secondary/control-family analyses**.
+- **The primary executable control for this runner is now `out_of_pool_lexicon_facet`** (§8b) — its content
+  reuses **no varṇa mapping**. This supersedes both the "family 1 / same-polarity" phrasing in §10 **and** the
+  earlier interim "`completely_random_facet` primary" clarification; `completely_random_facet` is retained as a
+  **within-pool secondary/triangulation** control. §10's endpoint definition is otherwise unchanged.
+- **`completely_random_facet`, `same_plane_random_varna_facet`, `frequency_length_matched_facet` (length-only),
+  `permuted_target_label`, and `random_word_context_decoy`** remain **secondary/control-family analyses**.
 - **All implemented controls must be reported** (not cherry-picked) — consistent with §10.
-- This is a **pre-execution clarification, not a post-hoc result change.** B1.4b′ remains `NULL_RETURN_BOTTOM`.
+- This is a **pre-execution clarification, not a post-hoc result change** (nothing has been executed under the
+  reopened design). B1.4b′ remains `NULL_RETURN_BOTTOM`.
+
+### 12c-i. Reopened-fix note (in place; NOT a new B1.10 track)
+
+Per the operator instruction to **reopen and fix B1.9 in place** (not increment to a new experiment), the runner,
+the frozen sampler config, and this prereg were amended to add the **out-of-pool** control (control 0, §8b) and
+to make it primary. This is the same B1.9 track — same generation-free, judge-free embedding design, same items,
+same statistics — with the control content source corrected so the control side reuses no varṇa mapping. The
+real test has still **not** been run; the runner emits only `B1_9_CONTENT_DISTANCE_RUNNER_READY_MOCK_TESTED`.
 
 ## 13. Guardrails
 

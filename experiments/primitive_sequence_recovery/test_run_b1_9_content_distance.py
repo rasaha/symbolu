@@ -74,6 +74,36 @@ def test_blocked_family_yields_no_deltas():
     assert res["status"] == "BLOCKED_NOT_AVAILABLE" and res["deltas"] == []
 
 
+# ---- out-of-pool control (the fix: control content reuses NO varṇa mapping) -----------
+def test_out_of_pool_is_primary_and_implemented():
+    f = D.load_frozen()
+    assert f["sampler"]["primary_family"] == "out_of_pool_lexicon_facet"
+    assert D.CONTROL_FAMILIES[0] == "out_of_pool_lexicon_facet"
+    assert D.FAMILY_STATUS["out_of_pool_lexicon_facet"][0] == "IMPLEMENTED"
+
+def test_out_of_pool_scores_all_items():
+    f = D.load_frozen()
+    res = D.compute_family(f["targets"]["targets"], "out_of_pool_lexicon_facet", f, D.FakeEmbedding())
+    scored = [p for p in res["per_item"] if "delta_distance" in p]
+    assert len(scored) == len(f["targets"]["targets"])
+    assert res["mean_delta"] is not None
+
+def test_out_of_pool_content_not_from_varna_pool():
+    # every sampled control gloss is a frozen out-of-pool lexicon entry, never a varṇa facet text
+    f = D.load_frozen()
+    lexicon = set(f["out_of_pool"]["glosses"])
+    varna_facet_texts = {D._varna_facet_text(v, f["facets"], f["preproc"]) for v in f["facets"]}
+    sampled = D._sample_out_of_pool("b18-01", f["out_of_pool"]["glosses"], f["sampler"]["K"], f["sampler"]["seed"])
+    assert sampled and all(g in lexicon for g in sampled)
+    assert all(g not in varna_facet_texts for g in sampled)   # control content is genuinely out-of-pool
+
+def test_out_of_pool_sampling_deterministic():
+    f = D.load_frozen()
+    a = D._sample_out_of_pool("b18-05", f["out_of_pool"]["glosses"], 5, 20260709)
+    b = D._sample_out_of_pool("b18-05", f["out_of_pool"]["glosses"], 5, 20260709)
+    assert a == b
+
+
 # ---- reproducibility with fixed seed -------------------------------------------------
 def test_fixed_seed_reproducible():
     f = D.load_frozen()

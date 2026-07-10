@@ -1,6 +1,7 @@
 {
   "artifact_type": "b1_9_control_sampler_config",
   "control_families": [
+    "out_of_pool_lexicon_facet",
     "same_polarity_random_varna_facet",
     "same_plane_random_varna_facet",
     "frequency_length_matched_facet",
@@ -8,7 +9,7 @@
     "permuted_target_label",
     "random_word_context_decoy"
   ],
-  "primary_family": "completely_random_facet",
+  "primary_family": "out_of_pool_lexicon_facet",
   "K": 5,
   "seed": 20260709,
   "prospective_distance_constraint": {
@@ -25,5 +26,6 @@
     "alpha": 0.05,
     "require_robust_across_families": true
   },
-  "note": "same_polarity requires poles (resolver) -> BLOCKED under resolver-free named_attribute mode; frequency portion unavailable -> length_only."
+  "primary_family_rationale": "out_of_pool_lexicon_facet is primary because the operator required that the scrambled/control meaning must NOT reuse the varṇa mappings. The prior within-pool controls (completely_random_facet, same_plane_random_varna_facet, frequency_length_matched_facet) draw from the same 25-varṇa pool and produce paraphrase-level near-synonyms; the out-of-pool control removes the varṇa mapping from the control side. The within-pool controls are retained and reported for triangulation, with the register caveat in b1_9_out_of_pool_lexicon.json.",
+  "note": "same_polarity requires poles (resolver) -> BLOCKED under resolver-free named_attribute mode; frequency portion unavailable -> length_only. out_of_pool_lexicon_facet content comes from the frozen b1_9_out_of_pool_lexicon.json and reuses NO varṇa mapping."
 }

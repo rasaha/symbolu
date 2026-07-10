@@ -26,6 +26,7 @@ TARGETS_FILE = FROZEN / "b1_9_targets.json"
 SAMPLER_CFG_FILE = FROZEN / "b1_9_control_sampler_config.json"
 PREPROC_CFG_FILE = FROZEN / "b1_9_preprocessing_config.json"
 EMBED_CFG_FILE = FROZEN / "b1_9_embedding_config.json"
+OUT_OF_POOL_FILE = FROZEN / "b1_9_out_of_pool_lexicon.json"
 
 MODE = "b1_9_content_level_semantic_distance"
 REPRESENTATION = "B1.9_content_distance_prereg"
@@ -38,13 +39,14 @@ HASH_INPUTS = {
     "prereg_sha256": PREREG_FILE, "facet_table_sha256": FACET_TABLE_FILE,
     "targets_sha256": TARGETS_FILE, "control_sampler_config_sha256": SAMPLER_CFG_FILE,
     "preprocessing_config_sha256": PREPROC_CFG_FILE, "embedding_config_sha256": EMBED_CFG_FILE,
+    "out_of_pool_lexicon_sha256": OUT_OF_POOL_FILE,
 }
 REQUIRED_DECL_FIELDS = ("artifact", "b1_9_declared", "mode", "representation_version",
                         "declared_by", "declared_at_utc", "attestation", *HASH_INPUTS.keys())
 
-CONTROL_FAMILIES = ("same_polarity_random_varna_facet", "same_plane_random_varna_facet",
-                    "frequency_length_matched_facet", "completely_random_facet",
-                    "permuted_target_label", "random_word_context_decoy")
+CONTROL_FAMILIES = ("out_of_pool_lexicon_facet", "same_polarity_random_varna_facet",
+                    "same_plane_random_varna_facet", "frequency_length_matched_facet",
+                    "completely_random_facet", "permuted_target_label", "random_word_context_decoy")
 BAD_MODES = {"pilot_generation", "exploratory_10_sample_generation_probe", "pilot_judging",
              "b1_8_context_resolved_generation_probe"}
 
@@ -99,6 +101,7 @@ def load_frozen() -> Dict:
         "sampler": json.loads(SAMPLER_CFG_FILE.read_text()),
         "preproc": json.loads(PREPROC_CFG_FILE.read_text()),
         "embed": json.loads(EMBED_CFG_FILE.read_text()),
+        "out_of_pool": json.loads(OUT_OF_POOL_FILE.read_text()),
     }
 
 
@@ -207,13 +210,19 @@ def _cos_dist(a: List[float], b: List[float]) -> float:
 # Control families
 # --------------------------------------------------------------------------------------
 FAMILY_STATUS = {
+    "out_of_pool_lexicon_facet": ("IMPLEMENTED",
+        "PRIMARY. Control facets drawn from the frozen out-of-pool lexicon (b1_9_out_of_pool_lexicon.json), "
+        "which reuses NO varṇa→meaning mapping — not a within-pool derangement. Carries a register caveat "
+        "(concrete/sensory vs abstract-psychological); read together with the within-pool controls."),
     "same_polarity_random_varna_facet": ("BLOCKED_NOT_AVAILABLE",
         "polarity requires a resolver/pole selection; B1.9 is resolver-free and uses neutral named_attribute "
         "facets — no polarity dimension. Reintroducing poles would reintroduce the resolver confound."),
     "same_plane_random_varna_facet": ("IMPLEMENTED", "uses per-item plane sphere gloss for authentic and controls."),
     "frequency_length_matched_facet": ("IMPLEMENTED_LENGTH_ONLY",
         "length-matched controls implemented; word-frequency matching unavailable (no corpus frequencies)."),
-    "completely_random_facet": ("IMPLEMENTED", "random varṇas' facets (primary family)."),
+    "completely_random_facet": ("IMPLEMENTED",
+        "within-pool: random OTHER varṇas' facets (same 25-varṇa pool). Retained as a secondary/triangulation "
+        "control; superseded as primary by out_of_pool_lexicon_facet."),
     "permuted_target_label": ("IMPLEMENTED", "authentic facet of a permuted item (null-distribution control)."),
     "random_word_context_decoy": ("IMPLEMENTED", "authentic facet vs a decoy target/context."),
 }
@@ -234,6 +243,16 @@ def _sample_control_varnas(item_id: str, exclude: List[str], all_varnas: List[st
         pool = scored[:max(k * 3, k)]                # nearest-length band, then sample
         rng.shuffle(pool)
         return pool[:k]
+    rng.shuffle(pool)
+    return pool[:k]
+
+
+def _sample_out_of_pool(item_id: str, glosses: List[str], k: int, seed: int) -> List[str]:
+    """Sample K glosses from the frozen OUT-OF-POOL lexicon (reuses NO varṇa mapping). Deterministic; never
+    references d_auth or any outcome. Mirrors _sample_control_varnas so out-of-pool vs within-pool is an
+    apples-to-apples swap of the content SOURCE only."""
+    pool = list(glosses)
+    rng = _rng(seed, "out_of_pool_lexicon_facet", item_id)
     rng.shuffle(pool)
     return pool[:k]
 
@@ -284,7 +303,10 @@ def compute_family(items: List[Dict], family: str, frozen: Dict, backend) -> Dic
         a_emb = backend.embed([facet_aggregate(auth_v, facets, preproc, plane)])[0]
         d_auth = _cos_dist(t_emb, a_emb)
 
-        if family == "permuted_target_label":
+        if family == "out_of_pool_lexicon_facet":
+            glosses = _sample_out_of_pool(it["item_id"], frozen["out_of_pool"]["glosses"], k, seed)
+            c_embs = [backend.embed([normalize(g, preproc)])[0] for g in glosses]   # content NOT from varṇa pool
+        elif family == "permuted_target_label":
             j = (i + 1 + _rng(seed, family, it["item_id"]).randint(0, max(len(items) - 2, 0))) % len(items)
             if j == i:
                 j = (i + 1) % len(items)
