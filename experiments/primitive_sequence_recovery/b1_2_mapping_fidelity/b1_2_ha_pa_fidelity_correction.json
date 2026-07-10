@@ -49,7 +49,7 @@
     "frozen/b1_9_pole_sanity_items.json / scaffold (unchanged)"
   ],
   "to_go_live_checklist": [
-    "1. Create track_g_varna_polarity_table_v3 (v2 + these two corrections), preserving the attested/authored flags.",
+    "1. Create varna_polarity_table_v3 (v2 + these two corrections), preserving the attested/authored flags.",
     "2. Re-point builders to v3; re-derive packets; re-freeze declarations (new hashes).",
     "3. Pre-register the pole test BEFORE authoring any target words/contexts (anti-circularity).",
     "4. Report results as RESONANCE legibility only — never validated meaning."

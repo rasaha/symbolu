@@ -18,7 +18,7 @@
   "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
   "to_go_live_checklist": [
     "1. Complete per-varṇa classical verification (fill PRIMARY_TEXT for the pending entries).",
-    "2. Operator sign-off (set status APPLIED); rename to track_g_varna_polarity_table_v3.json.",
+    "2. Operator sign-off (set status APPLIED); rename to varna_polarity_table_v3.json.",
     "3. Re-point builders (pole-DiD / pole-sanity) to v3; re-derive packets; re-freeze declarations.",
     "4. Pre-register the pole test BEFORE authoring any target words/contexts (anti-circularity).",
     "5. Report results as RESONANCE legibility only — never validated meaning."
@@ -26,12 +26,12 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "ede2fadcc9159e017232c516f22cc5903974b9a3598231d982c66cd39fa281be"
+    "b1_2_varna_classical_verifications.json": "8b4aa06deeaf29414369b2e2b5d1600a791a9643dfae3e16a84baca971c736d0"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
-  "n_primary_text_verified": 5,
-  "n_pending_classical_verification": 29,
+  "n_primary_text_verified": 6,
+  "n_pending_classical_verification": 28,
   "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
   "motto": "Structure, not validated meaning.",
   "varnas": {
@@ -237,23 +237,23 @@
       "varna": "Gha",
       "transliteration": "gha",
       "bridge_reachable": false,
-      "sanskrit_label": "Mamatā",
+      "sanskrit_label": "Mamatā (love / possessive attachment — 'mine-ness')",
       "english_rendering": "Attachment",
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of mamatā (love/attachment bound by time, space, individuality).",
-      "source_quote_verified": null,
-      "worldly_binding_distortion": "love owned as possession and mine-ness",
-      "spiritual_liberating_reading": "care that holds the loved on an open hand",
-      "classical_associations": null,
+      "source_quote_verified": "Sarkar: Mamatā, the vṛtti of love and attachment, is related to time, space and individuality. People praise even the poorest goods made in their own country and criticize the best goods made elsewhere — irrational attachment for a place, a psychic disease (SPACE). A mother who sacrifices everything for her child mercilessly slices living kai fish without feeling, deaf to their agony (INDIVIDUALITY). The mother cow who lovingly licks her calf today kicks it away when it grows tomorrow (TIME). Thus mamatā is limited by the relative factors. Only human beings can make mamatā TRANSCEND the boundaries of time, space and individuality, after persistent and intense effort — impossible for other beings. Gha is the acoustic root of mamatā vṛtti.",
+      "worldly_binding_distortion": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+      "spiritual_liberating_reading": "mamatā made to TRANSCEND time, space and individuality — love expanded past its relative boundaries into universal affection that holds the loved on an open hand (achievable only by human beings, through persistent, intense effort)",
+      "classical_associations": "mamatā is related to time, space and individuality; its bounded form shows as place-attachment (praising one's own poor goods over better foreign ones — a 'psychic disease'), individuality (the mother who cherishes her child yet slices kai fish unmoved), and time (the cow that licks its calf today, kicks it away grown tomorrow). (Illustrations/scope of the vṛtti — not a separate cosmological association.)",
       "functional_operation": "loves while relinquishing ownership of the object",
       "contrast_boundary": "not outcome-release (Ka), not thirst-cessation (Dha), not indifference (Ba)",
-      "attested_vs_authored": "Attested side = classical_side below; the OTHER pole is largely author counter-rewritten (lexicon rewrite_status='source_preserved_counter_rewritten') — flagged, not validated.",
-      "classical_review_status": "LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION",
-      "provenance": "b1_2_source_lexicon (Sarkar-attributed)",
+      "attested_vs_authored": "ATTESTED — and unusually so: gha = mamatā vṛtti (love/attachment); its limitation by time/space/individuality; and that only humans can make it TRANSCEND those boundaries through effort. The binding (bounded attachment) vs liberating (boundary-transcending universal love) split is directly SUPPORTED by the passage's own bounded-vs-transcendent contrast — lighter authored component than most entries.",
+      "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
+      "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": null,
       "v2_liberating": null,
       "differs_from_v2": true,
-      "v2_drift_note": null
+      "v2_drift_note": "gha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P has no /gh/ phoneme; written 'gh' yields /g/ -> ga (or is silent, e.g. 'rough'), so gha cannot arise in an English varṇa sequence."
     },
     "ha": {
       "varna": "Ha",

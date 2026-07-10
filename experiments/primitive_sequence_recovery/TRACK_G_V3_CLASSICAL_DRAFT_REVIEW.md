@@ -1,8 +1,8 @@
 # Track-G v3 (classical-grounded) — DRAFT review companion
 
-**Auto-rendered from the v3 JSON — edit the ledger/builder and regenerate.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`, `wired_into_tests=False`.
+**Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json` — edit the ledger/builder and regenerate.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`, `wired_into_tests=False`.
 
-- varṇas **34** (25 bridge-reachable, 9 reference-only aspirates); verified **5**, pending **29**
+- varṇas **34** (25 bridge-reachable, 9 reference-only aspirates); verified **6**, pending **28**
 
 ## Caveats
 
@@ -44,7 +44,7 @@
 | ·`bha` | Mūrcchā (binding) | pending | hypnotic entrancement, loss of common sense | breaking the entrancing spell into clear sense |  | ⚑  |
 | ·`cha` | Vikalatā (binding) | pending | collapse of mental function under strain | steadiness that keeps function intact under load |  | ⚑  |
 | ·`ddha` | Piśunatā (binding) | pending | malice — sadistic cruelty toward the maligned | compassion that shields the maligned |  | ⚑  |
-| ·`gha` | Mamatā (binding) | pending | love owned as possession and mine-ness | care that holds the loved on an open hand |  | ⚑  |
+| ·`gha` | Mamatā (love / possessiv… | **PRIMARY** | mamatā bounded by the relative factors (time, sp… | mamatā made to TRANSCEND time, space and individ… | mamatā is related to time, space and i… | ⚑  |
 | ·`jha` | Lolupatā / Lobha (bindin… | pending | hoarding accumulation without limit | sufficiency — appetite that releases at enough |  | ⚑  |
 | ·`kha` | Cintā (worry / reflectiv… | **PRIMARY** | cintā as anxious rumination — the mind churning … | cintā as composed, impersonal reflection — holdi… | Paired with ka: ka = āśā (hope) goads … | ⚑  |
 | ·`ksha` | Aparā-vidyā (liberating_… | pending | structured knowledge owned as control, dogma, or… | instrumental knowledge released from possession |  | ⚑  |
@@ -58,6 +58,7 @@
 - **ka**: v2 put the Kārya-Brahma ASSOCIATION ('expressed universe, creation-field, emergence into manifestation') into the LIBERATING POLE — conflating an attested cosmological association with the liberated form of hope (a category error). The liberating pole of āśā is non-attached aspiration, not 'the created universe.'
 - **kha**: kha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P renders written 'kh' as ka + ha (two SEPARATE roots = hope + vision), which does NOT reconstruct cintā — a semantic mismatch, even though ka + ha = kha holds structurally in the classical alphabet.
 - **ga**: v2 binding='effort / striving' is the bare vṛtti NAME, not a binding distortion; v2 liberating='effort as path to mundane development and spiritual elevation' paraphrases the passage's general VALUE statement about ceṣṭā (both spheres) rather than a distinct liberated mode — a mild value/association-into-pole conflation. v3 adopts the lexicon's crisper restless-vs-poised polarity.
+- **gha**: gha is ABSENT from v2 (bridge-unreachable aspirate — reference-only). English G2P has no /gh/ phoneme; written 'gh' yields /g/ -> ga (or is silent, e.g. 'rough'), so gha cannot arise in an English varṇa sequence.
 
 _RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL._
 

@@ -13,7 +13,7 @@ Method (honest, seeded — not a finished re-derivation):
     LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION — the careful update proceeds per-varṇa as the operator supplies
     primary classical text (exactly as was done for ha, pa).
 
-Output: frozen/track_g_varna_polarity_table_v3_classical_DRAFT.json — status DRAFT, applied=false. NOT wired into
+Output: frozen/varna_polarity_table_v3_classical_DRAFT.json — status DRAFT, applied=false. NOT wired into
 any test; promoting it requires operator per-varṇa sign-off, then re-point builders + re-freeze + pre-register
 (anti-circularity). RESONANCE refinement only — no ontology/semantic-truth/Sanskrit-privilege/GENUTILITY/
 ONTOLOGICAL_SIGNAL claim. B1.4b′ remains NULL_RETURN_BOTTOM. Structure, not validated meaning.
@@ -124,7 +124,7 @@ def build():
                              "Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
         "to_go_live_checklist": [
             "1. Complete per-varṇa classical verification (fill PRIMARY_TEXT for the pending entries).",
-            "2. Operator sign-off (set status APPLIED); rename to track_g_varna_polarity_table_v3.json.",
+            "2. Operator sign-off (set status APPLIED); rename to varna_polarity_table_v3.json.",
             "3. Re-point builders (pole-DiD / pole-sanity) to v3; re-derive packets; re-freeze declarations.",
             "4. Pre-register the pole test BEFORE authoring any target words/contexts (anti-circularity).",
             "5. Report results as RESONANCE legibility only — never validated meaning.",
