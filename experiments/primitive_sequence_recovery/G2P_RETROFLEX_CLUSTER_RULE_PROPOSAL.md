@@ -1,6 +1,11 @@
-# G2P Retroflex-Cluster Rule — SCOPING PROPOSAL (not implemented)
+# G2P Retroflex-Cluster Rule — APPROVED & IMPLEMENTED (not yet applied)
 
-**Status: PROPOSAL / scoping only. No code changed. No representation re-pointed. No test re-run.**
+**Status: operator-APPROVED (go) and IMPLEMENTED as `varna_bridge_v2.py` (+ `b1_6_phoneme_to_varna_bridge_v2.json`,
+`test_varna_bridge_v2.py`, 7 tests passing). Chosen options: Route B (context-aware bridge, G2P untouched) +
+`/r/` survives + Phase 1 (`dr`,`tr`) — the recommended defaults below. NOT YET APPLIED: the frozen v1 bridge and
+every hashed declaration/result are unchanged. Going live still requires the §6 checklist (re-derive `dread`,
+re-freeze, fresh prereg).** Verified: `drum -> ḍa,ra,ma`, `train -> ṭa,ra,na`, `dread -> ḍa,ra,da`; non-cluster
+words unchanged; among frozen items only `dread` changes.
 Resonance refinement only — no ontology/semantic-truth/Sanskrit-privilege claim, no `GENUTILITY_*`, no
 `ONTOLOGICAL_SIGNAL`. **B1.4b′ remains `NULL_RETURN_BOTTOM`.**
 
