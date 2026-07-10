@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **30**, pending **4**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **31**, pending **3**
 
 ## Fidelity caveats
 
@@ -34,7 +34,7 @@
 | `pa` | ★ | Ghṛṇā (binding) | **P** |  | attraction toward the crude / objects — the … | revulsion OF the ripus — ghṛṇā redirected ag… |
 | `ra` | ★ | Sarvanāśa (dual) | **P** |  | sarvanāśa — the defeatist annihilation-thoug… | prāṇaśakti — the fire of life-force directed… |
 | `sa` | ★ | Mokṣa / Sattvaguṇa(lib… | pend |  | sattvic clarity/order owned as purity, super… | clarity without attachment to clarity |
-| `sha` | ★ | rajoguṇa + artha(neutr… | pend |  | worldly purpose possessed as acquisition, st… | purposeful action without possessive bondage |
+| `sha` | ★ | Kāma (neutral) | **P** | name+def | kāma — worldly / physical desire and longing… | physical longing sublimated / redirected tow… |
 | `ta` | ★ | Jāḍya / Nidrā (binding… | **P** |  | jāḍya — inertia, staticity, dullness, torpor… | the cessation of dullness/staticity — awaken… |
 | `tha` | ★ | Viṣāda (binding) | **P** | name+def | viśāda — melancholy, dejection that sinks on… | warm buoyancy lifting one's own dejection — … |
 | `va` | ★ | Dharma (liberating_ori… | **P** |  | ensconcement gone rigid — over-holding, clin… | dharma — ensconcement in one's original (tru… |

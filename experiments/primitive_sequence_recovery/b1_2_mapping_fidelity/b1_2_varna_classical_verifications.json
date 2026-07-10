@@ -344,6 +344,18 @@
       "classical_associations": "va = jalatattva (the liquid factor — water and any liquid) and the rain-god Varuṇa Deva. Dharma = 'that which sustains' (dhriyate dharma); the innate longing for happiness is its origin ('sukhaṃ vāñchati sarvo hi'); diverging from dharma rushes toward annihilation. (Element/deity association, distinct from the dharma pole.)",
       "attested_vs_authored": "ATTESTED (primary text): va = dharma = ENSCONCEMENT in one's original stance + 'that which sustains' + movement toward subtlety/Parama Puruṣa; plus the jalatattva/water + Varuṇa association; classical side liberating-oriented. The binding (rigid over-holding) is the distortion of ensconcement. Light authored component.",
       "v2_drift_note": "REVERSAL — here v2 is MORE text-faithful than the lexicon. v2 (binding='rigid/stuck ensconcement, clinging to holding'; liberating='dharma, sustaining flow, movement toward subtlety') matches the primary text's dharma-as-ensconcement/sustaining. The LEXICON drifts (bind='accepting-as-true without discernment'; lib='truth-assent purified by discernment') — a narrower truth-assent framing NOT supported by THIS passage. v3 follows the PRIMARY TEXT (≈ v2). This corrects the earlier generalization that v2 is uniformly the weaker source: for va the LEXICON is the weaker one. va is bridge-reachable and common (/v/,/w/)."
+    },
+    {
+      "varna": "sha",
+      "sanskrit_label": "Kāma (physical / worldly desire) — with tamoguṇa (the static principle) association",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "palatal sibilant /ʃ/ ('sh') -> sha; BRIDGE-REACHABLE (ship/shine/wish).",
+      "source_quote": "Sarkar: Śa is the acoustic root of tamoguṇa (the static principle), and also of all kinds of worldly desires — wealth, opulence, name, fame, social position. The collective Sanskrit term is kāma. The four recognized longings of human life are dharma (psycho-spiritual), artha (psychic), kāma (PHYSICAL), and mokṣa (spiritual / liberation). kāma = all types of PHYSICAL longings.",
+      "binding": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+      "liberating": "physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released",
+      "classical_associations": "śa = tamoguṇa (the static principle). The four puruṣārthas (longings): dharma (psycho-spiritual), artha (psychic), kāma (physical), mokṣa (liberation) — kāma = all physical longings. (Guṇa association + longing-hierarchy frame.)",
+      "attested_vs_authored": "ATTESTED (primary text): śa = TAMOGUṆA (static principle) + KĀMA (all PHYSICAL worldly desires); the four-puruṣārtha frame. BINDING pole (kāma) attested. AUTHORED: the LIBERATING pole (sublimation toward mokṣa) is inferred from the puruṣārtha hierarchy, not stated as a pole.",
+      "v2_drift_note": "MAJOR DISCREPANCY — BOTH v2 AND the lexicon MIS-ASSIGN śa's guṇa and puruṣārtha. Primary text: śa = TAMOGUṆA (static) + KĀMA (physical longing). But the lexicon = 'rajoguṇa + artha' and v2 = 'mutative drive / rajas / artha' — i.e. BOTH say RAJAS (mutative) + ARTHA (psychic), a different guṇa AND a different puruṣārtha (artha=psychic ≠ kāma=physical). v3 follows the PRIMARY TEXT (tamoguṇa + kāma). FIRST both-tables-wrong case; the sibilant→guṇa assignments (śa/ṣa/sa) in the derived tables may be systematically off — flag to check ssa/sa. sha is bridge-reachable (/ʃ/)."
     }
   ]
 }
