@@ -1,0 +1,2177 @@
+{
+  "artifact_type": "b1_9_pole_did_scaffold",
+  "status": "FROZEN_BUNDLE_V1",
+  "mapping_era": "fidelity_bundle_v1",
+  "table": "v3",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "representation_version": "B1.9_pole_did",
+  "classification_approved": false,
+  "wprime_seed": 20260712,
+  "source_hashes": {
+    "b1_9_pole_did_items_bundle_v1.json": "b46d43f038607a86276cff5c6748a3b1165f3300961be61e80c902f71da6248b",
+    "varna_polarity_table_v3.json": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3"
+  },
+  "not_comparable_note": "Bundle-era packets differ from v2/v1-era packets; results are NOT direct deltas against v2/v1-era results. A more faithful mapping does not reopen prior nulls.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "n_items": 24,
+  "items": [
+    {
+      "item_id": "pd-01",
+      "TARGET_TEXT": "surrender",
+      "CONTEXT_TEXT": "After years of resisting, his surrender softened the fear and opened him to peace.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "sa",
+        "ra",
+        "ra",
+        "na",
+        "da",
+        "ra"
+      ],
+      "wprime_item_id": "pd-10",
+      "wprime_target_text": "compassion",
+      "wprime_varnas": [
+        "ka",
+        "ma",
+        "pa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "da",
+            "text": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "ma",
+            "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+          },
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "ma",
+            "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+          },
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-02",
+      "TARGET_TEXT": "release",
+      "CONTEXT_TEXT": "With one quiet breath, release moved through her body and the old clinging fell away.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ra",
+        "la",
+        "sa"
+      ],
+      "wprime_item_id": "pd-14",
+      "wprime_target_text": "cage",
+      "wprime_varnas": [
+        "ka",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-03",
+      "TARGET_TEXT": "forgiveness",
+      "CONTEXT_TEXT": "Forgiveness arose in him, not as approval of the wound, but as freedom from carrying it.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ra",
+        "ga",
+        "va",
+        "na",
+        "sa",
+        "sa"
+      ],
+      "wprime_item_id": "pd-07",
+      "wprime_target_text": "insight",
+      "wprime_varnas": [
+        "na",
+        "sa",
+        "ga",
+        "ta"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-04",
+      "TARGET_TEXT": "awakening",
+      "CONTEXT_TEXT": "The awakening came silently, as if a veil had lifted and the mind became clear.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "va",
+        "ka",
+        "na",
+        "nga"
+      ],
+      "wprime_item_id": "pd-20",
+      "wprime_target_text": "craving",
+      "wprime_varnas": [
+        "ka",
+        "ra",
+        "va",
+        "nga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "nga",
+            "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "nga",
+            "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-05",
+      "TARGET_TEXT": "acceptance",
+      "CONTEXT_TEXT": "Acceptance settled in her heart, and the struggle against what had happened began to dissolve.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "ka",
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "wprime_item_id": "pd-19",
+      "wprime_target_text": "terror",
+      "wprime_varnas": [
+        "ta",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-06",
+      "TARGET_TEXT": "clarity",
+      "CONTEXT_TEXT": "In stillness, clarity appeared, and the tangled fear no longer ruled his choices.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "intellectual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "la",
+        "ra",
+        "ta",
+        "ya"
+      ],
+      "wprime_item_id": "pd-12",
+      "wprime_target_text": "liberation",
+      "wprime_varnas": [
+        "la",
+        "ba",
+        "ra",
+        "ta",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ya",
+            "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ya",
+            "text": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ba",
+            "text": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ba",
+            "text": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-07",
+      "TARGET_TEXT": "insight",
+      "CONTEXT_TEXT": "The insight broke through his old pattern, showing him he was not bound by the thought.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "intellectual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "na",
+        "sa",
+        "ga",
+        "ta"
+      ],
+      "wprime_item_id": "pd-03",
+      "wprime_target_text": "forgiveness",
+      "wprime_varnas": [
+        "ra",
+        "ga",
+        "va",
+        "na",
+        "sa",
+        "sa"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-08",
+      "TARGET_TEXT": "letting-go",
+      "CONTEXT_TEXT": "Letting-go was not defeat; it was the moment the grip of craving loosened.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "la",
+        "ta",
+        "ta",
+        "nga",
+        "ga"
+      ],
+      "wprime_item_id": "pd-16",
+      "wprime_target_text": "wall",
+      "wprime_varnas": [
+        "va",
+        "la",
+        "la"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "nga",
+            "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-09",
+      "TARGET_TEXT": "peace",
+      "CONTEXT_TEXT": "Peace arose within him when the need to win finally disappeared.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "pa",
+        "ka"
+      ],
+      "wprime_item_id": "pd-13",
+      "wprime_target_text": "anchor",
+      "wprime_varnas": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ca",
+            "text": "falsehood-discerning insight without egoic superiority — clear conscience distinguishing real from unreal, held without pride"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ca",
+            "text": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-10",
+      "TARGET_TEXT": "compassion",
+      "CONTEXT_TEXT": "Compassion opened where judgment had been, and the heart no longer felt closed.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "ma",
+        "pa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "wprime_item_id": "pd-01",
+      "wprime_target_text": "surrender",
+      "wprime_varnas": [
+        "sa",
+        "ra",
+        "ra",
+        "na",
+        "da",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "ma",
+            "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+          },
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "ma",
+            "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+          },
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "da",
+            "text": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-11",
+      "TARGET_TEXT": "equanimity",
+      "CONTEXT_TEXT": "Equanimity held steady even as praise and blame rose and passed.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "ka",
+        "va",
+        "na",
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "wprime_item_id": "pd-17",
+      "wprime_target_text": "lock",
+      "wprime_varnas": [
+        "la",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ma",
+            "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ya",
+            "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ma",
+            "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ya",
+            "text": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-12",
+      "TARGET_TEXT": "liberation",
+      "CONTEXT_TEXT": "Liberation was felt as the end of inner bondage, not as escape from the world.",
+      "REFERENT_TYPE": "subjectified-mental (release/realization)",
+      "PLANE": "spiritual",
+      "CORRECT_POLE": "spiritual_liberating_reading",
+      "FLIPPED_POLE": "worldly_binding_distortion",
+      "varnas": [
+        "la",
+        "ba",
+        "ra",
+        "ta",
+        "na"
+      ],
+      "wprime_item_id": "pd-06",
+      "wprime_target_text": "clarity",
+      "wprime_varnas": [
+        "ka",
+        "la",
+        "ra",
+        "ta",
+        "ya"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ba",
+            "text": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ba",
+            "text": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ya",
+            "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ya",
+            "text": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-13",
+      "TARGET_TEXT": "anchor",
+      "CONTEXT_TEXT": "The iron anchor lay embedded in the seabed, its heavy flukes gripping the mud and holding the hull fast.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "na",
+        "ca",
+        "ra"
+      ],
+      "wprime_item_id": "pd-09",
+      "wprime_target_text": "peace",
+      "wprime_varnas": [
+        "pa",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ca",
+            "text": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ca",
+            "text": "falsehood-discerning insight without egoic superiority — clear conscience distinguishing real from unreal, held without pride"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-14",
+      "TARGET_TEXT": "cage",
+      "CONTEXT_TEXT": "The steel cage stood bolted to the floor, its bars fixed and immovable.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ka",
+        "ga"
+      ],
+      "wprime_item_id": "pd-02",
+      "wprime_target_text": "release",
+      "wprime_varnas": [
+        "ra",
+        "la",
+        "sa"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-15",
+      "TARGET_TEXT": "chain",
+      "CONTEXT_TEXT": "The rusted chain bound the gate shut, each link clamped hard to the next.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ca",
+        "na"
+      ],
+      "wprime_item_id": "pd-21",
+      "wprime_target_text": "dread",
+      "wprime_varnas": [
+        "dda",
+        "ra",
+        "da"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ca",
+            "text": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ca",
+            "text": "falsehood-discerning insight without egoic superiority — clear conscience distinguishing real from unreal, held without pride"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "dda",
+            "text": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "dda",
+            "text": "acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "da",
+            "text": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-16",
+      "TARGET_TEXT": "wall",
+      "CONTEXT_TEXT": "The concrete wall sealed off the yard, blocking every path through it.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "va",
+        "la",
+        "la"
+      ],
+      "wprime_item_id": "pd-08",
+      "wprime_target_text": "letting-go",
+      "wprime_varnas": [
+        "la",
+        "ta",
+        "ta",
+        "nga",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "nga",
+            "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-17",
+      "TARGET_TEXT": "lock",
+      "CONTEXT_TEXT": "The padlock held the door shut, its bolt seized and unyielding.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "la",
+        "ka"
+      ],
+      "wprime_item_id": "pd-11",
+      "wprime_target_text": "equanimity",
+      "wprime_varnas": [
+        "ka",
+        "va",
+        "na",
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "la",
+            "text": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "la",
+            "text": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ma",
+            "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ya",
+            "text": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ma",
+            "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ya",
+            "text": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-18",
+      "TARGET_TEXT": "weight",
+      "CONTEXT_TEXT": "The lead weight pressed down on the lid, pinning it in place.",
+      "REFERENT_TYPE": "physical",
+      "PLANE": "physical",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "va",
+        "ga",
+        "ta"
+      ],
+      "wprime_item_id": "pd-22",
+      "wprime_target_text": "resentment",
+      "wprime_varnas": [
+        "ra",
+        "sa",
+        "na",
+        "ta",
+        "ma",
+        "na",
+        "ta"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ma",
+            "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ma",
+            "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-19",
+      "TARGET_TEXT": "terror",
+      "CONTEXT_TEXT": "Terror seized him and froze him at the threshold, unable to step forward.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ta",
+        "ra",
+        "ra",
+        "ra"
+      ],
+      "wprime_item_id": "pd-05",
+      "wprime_target_text": "acceptance",
+      "wprime_varnas": [
+        "ka",
+        "ka",
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-20",
+      "TARGET_TEXT": "craving",
+      "CONTEXT_TEXT": "Craving gnawed at her, driving one grasping purchase after another.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ka",
+        "ra",
+        "va",
+        "nga"
+      ],
+      "wprime_item_id": "pd-04",
+      "wprime_target_text": "awakening",
+      "wprime_varnas": [
+        "va",
+        "ka",
+        "na",
+        "nga"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "nga",
+            "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "nga",
+            "text": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-21",
+      "TARGET_TEXT": "dread",
+      "CONTEXT_TEXT": "A cold dread of failure kept him clinging and rigid, unable to move.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "dda",
+        "ra",
+        "da"
+      ],
+      "wprime_item_id": "pd-15",
+      "wprime_target_text": "chain",
+      "wprime_varnas": [
+        "ca",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "dda",
+            "text": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct"
+          },
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "dda",
+            "text": "acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition"
+          },
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "da",
+            "text": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ca",
+            "text": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ca",
+            "text": "falsehood-discerning insight without egoic superiority — clear conscience distinguishing real from unreal, held without pride"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-22",
+      "TARGET_TEXT": "resentment",
+      "CONTEXT_TEXT": "Resentment hardened in him, replaying the wrong and refusing to let it go.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ra",
+        "sa",
+        "na",
+        "ta",
+        "ma",
+        "na",
+        "ta"
+      ],
+      "wprime_item_id": "pd-18",
+      "wprime_target_text": "weight",
+      "wprime_varnas": [
+        "va",
+        "ga",
+        "ta"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ra",
+            "text": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          },
+          {
+            "varna": "ma",
+            "text": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ra",
+            "text": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          },
+          {
+            "varna": "ma",
+            "text": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "va",
+            "text": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+          },
+          {
+            "varna": "ga",
+            "text": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+          },
+          {
+            "varna": "ta",
+            "text": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "va",
+            "text": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+          },
+          {
+            "varna": "ga",
+            "text": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+          },
+          {
+            "varna": "ta",
+            "text": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-23",
+      "TARGET_TEXT": "obsession",
+      "CONTEXT_TEXT": "The obsession fixed his mind on a single thought he could not release.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "ba",
+        "sa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "wprime_item_id": "pd-24",
+      "wprime_target_text": "panic",
+      "wprime_varnas": [
+        "pa",
+        "na",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "ba",
+            "text": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "ba",
+            "text": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "pd-24",
+      "TARGET_TEXT": "panic",
+      "CONTEXT_TEXT": "Panic seized the crowd, each person gripping toward the exit in blind urgency.",
+      "REFERENT_TYPE": "subjectified-mental (contraction)",
+      "PLANE": "mental",
+      "CORRECT_POLE": "worldly_binding_distortion",
+      "FLIPPED_POLE": "spiritual_liberating_reading",
+      "varnas": [
+        "pa",
+        "na",
+        "ka"
+      ],
+      "wprime_item_id": "pd-23",
+      "wprime_target_text": "obsession",
+      "wprime_varnas": [
+        "ba",
+        "sa",
+        "sa",
+        "sa",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "OWN_CORRECT_POLE": [
+          {
+            "varna": "pa",
+            "text": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          },
+          {
+            "varna": "ka",
+            "text": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+          }
+        ],
+        "OWN_FLIPPED_POLE": [
+          {
+            "varna": "pa",
+            "text": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          },
+          {
+            "varna": "ka",
+            "text": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+          }
+        ],
+        "CONTROL_CORRECT_POLE": [
+          {
+            "varna": "ba",
+            "text": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended"
+          },
+          {
+            "varna": "sa",
+            "text": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+          },
+          {
+            "varna": "na",
+            "text": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+          }
+        ],
+        "CONTROL_FLIPPED_POLE": [
+          {
+            "varna": "ba",
+            "text": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+          },
+          {
+            "varna": "na",
+            "text": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+          }
+        ]
+      }
+    }
+  ]
+}
