@@ -1,0 +1,24 @@
+{
+  "artifact": "varna_polarity_bridge_v3_active",
+  "status": "ACTIVE_APPLIED",
+  "mapping_era": "fidelity_bundle_v1",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "definition": "v1 base mapping ∘ retroflex (t/d before r -> ṭa/ḍa, r survives) ∘ /θ,ð/ (merged th->ta; dh->da). ASPIRATION EXCLUDED. G2P untouched.",
+  "implemented_by": [
+    "varna_bridge_active.py",
+    "varna_bridge_thfix.py",
+    "varna_bridge_v2.py"
+  ],
+  "supersedes_active": "b1_6_phoneme_to_varna_bridge_manifest.json (v1, KEPT byte-unchanged as historical)",
+  "source_hashes": {
+    "b1_6_phoneme_to_varna_bridge_manifest.json(v1 base)": "d1851c4abd431ead6ded545e1d2a6ecea29b0638d7f1c34394957439342d87ed",
+    "varna_bridge_v2.py": "148b01d39e8ea15733903baf0a939e101d13809526bc3078db568ac8b8704887",
+    "varna_bridge_thfix.py": "0ec9ce91a72c6b023cf8b22224af19b58c79c83c082789f3f911ba82647c270d",
+    "varna_bridge_active.py": "5d9f090fe7b656193ad880b8f2d928a3c407101f75e0943978aa1978fe38a6ef",
+    "stage_a_prime_coverage.py(UNCHANGED G2P)": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd"
+  },
+  "aspiration_applied": false,
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "track_b_status": "BLOCKED",
+  "motto": "Structure, not validated meaning."
+}
