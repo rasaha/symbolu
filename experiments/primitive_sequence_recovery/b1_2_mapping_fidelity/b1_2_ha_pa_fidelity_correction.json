@@ -1,0 +1,59 @@
+{
+  "artifact": "b1_2_ha_pa_fidelity_correction",
+  "status": "PROPOSED_NOT_APPLIED",
+  "scope": "Operator-directed fidelity re-reading of TWO varṇas (ha, pa). This is a RESONANCE refinement, not a validated-meaning claim. It is NOT applied to any frozen test table: track_g_varna_polarity_table_v2 and every hashed freeze declaration / prior result are LEFT UNCHANGED so reproducibility holds.",
+  "why_not_in_place": "track_g_varna_polarity_table_v2_named_vritti.json is a FROZEN input hashed by the pole-DiD, pole-sanity, and embedding experiments. Editing it in place would silently invalidate those hashes and results. To go live, promote this to a versioned v3 table + re-point the builders + re-freeze + pre-register BEFORE any word/context authoring (see anti_circularity).",
+  "resonance_framing": "Per operator: varṇa mapping is a RESONANCE (associative/interpretive) mapping, not exact science. These re-readings refine the resonance; they do NOT establish ontology, semantic truth, Sanskrit privilege, or language-independent validity. No GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
+  "anti_circularity": "The `ha` re-reading is motivated in part by making the word 'happy' cohere. Revising a pole gloss and THEN testing on words chosen for that gloss is circular. If promoted to a live table, it MUST be frozen and pre-registered before any pole-test word/context authoring, and the source-attested vs researcher-authored split below must be preserved.",
+  "corrections": [
+    {
+      "varna": "ha",
+      "classical_associations_attested": "Sarkar: Ha = acoustic root of the ethereal (ākāśa) factor, of daytime, of the sun, of svarloka, and of parā-vidyā (intuitional science). Its OPPOSITE is a SEPARATE varṇa, ṭha (night, moon, bhúvarloka, kāmamaya kośa). Ha + ao = hao = acoustic root of Shiva's táṇḍava (a COMPOUND).",
+      "prior_v2_gloss": {
+        "binding": "night / darkness (the contractive opposite of ha = day / sun / light)",
+        "liberating": "svarloka, solar ascent, Shivaic dynamism, tandava force"
+      },
+      "prior_v2_fidelity_problem": "v2 BINDING='night' imports the domain of the OPPOSITE varṇa ṭha into ha's own binding cell (category error), and folds the COMPOUND hao's táṇḍava into bare ha. Night is ṭha, not ha.",
+      "proposed_gloss": {
+        "binding": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "liberating": "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing"
+      },
+      "proposed_reading_basis": "ha's attested thread is light -> seeing. Split as outward physical visibility (bound) vs inner intuitional vision (free).",
+      "source_attested_vs_authored": "ATTESTED: ha ~ light/day/sun/svarloka/parā-vidyā (associations). AUTHORED: the binding/liberating SPLIT (outward-visible vs inner-intuitional) is researcher-imposed — the source gives associations + an opposite varṇa (ṭha), NOT an intra-ha binding/liberating polarity.",
+      "note": "Consonant-only convention: 'happy' -> h+p -> ha, pa (vowels dropped; 'pi' is NOT a table key)."
+    },
+    {
+      "varna": "pa",
+      "classical_source_quote": "Sarkar: Pa is the acoustic root of ghṛṇā vṛtti (the propensity of hatred/revulsion). The six ripus (enemies) are kāma, krodha, lobha, mada, moha, mātsarya; the eight pāshas (fetters) are hatred, doubt, fear, shyness, dissemblance, vanity of lineage, cultural-superiority, egotism. Pa is the acoustic root of the FETTER of hatred (stemming mainly from moha). 'When one's psychic attraction is toward the crude, the mind has a downward tendency (pat / patati) leading to downfall; when the mind moves upward it is anurakti (attraction for the Great), whose consummation is devotion (ūrdhva gam / ūrdhva gacchati).'",
+      "prior_v2_gloss": {
+        "binding": "hatred / revulsion",
+        "liberating": "fetter of hatred; related to moha and fear"
+      },
+      "prior_lexicon_gloss": {
+        "binding": "revulsion turned against another",
+        "liberating": "goodwill that dissolves revulsion",
+        "classical_side": "binding (ghṛṇā/hatred is itself a fetter = pāsha)"
+      },
+      "proposed_gloss": {
+        "binding": "attraction toward the crude / objects — the downward-pulling pull (pat / patati -> downfall)",
+        "liberating": "revulsion OF the ripus — ghṛṇā redirected against the crude/vices (vairāgya-like turning)"
+      },
+      "proposed_reading_basis": "Uses the passage's attraction axis: downward attraction to the crude = binding; and reads ghṛṇā (revulsion) as spiritually redirectable — revulsion aimed at the ripus/crude = liberating.",
+      "source_attested_vs_authored": "ATTESTED: pa = ghṛṇā (revulsion), classically a FETTER (binding); the downward-attraction=downfall vs upward-anurakti=devotion contrast. AUTHORED/REINTERPRETED: making revulsion the LIBERATING pole (revulsion-of-ripus) and attraction the BINDING pole PARTIALLY INVERTS the attested assignment (classically hatred/ghṛṇā = the binding fetter). Flagged as researcher reinterpretation.",
+      "caveat": "Because this inverts the source-attested pole of ghṛṇā, a pole test using it is testing the REINTERPRETATION, not the attested mapping — record which reading is in force."
+    }
+  ],
+  "not_applied_to": [
+    "track_g_varna_polarity_table_v2_named_vritti.json (unchanged)",
+    "frozen/b1_9_pole_did_items.json / scaffold (unchanged)",
+    "frozen/b1_9_pole_sanity_items.json / scaffold (unchanged)"
+  ],
+  "to_go_live_checklist": [
+    "1. Create track_g_varna_polarity_table_v3 (v2 + these two corrections), preserving the attested/authored flags.",
+    "2. Re-point builders to v3; re-derive packets; re-freeze declarations (new hashes).",
+    "3. Pre-register the pole test BEFORE authoring any target words/contexts (anti-circularity).",
+    "4. Report results as RESONANCE legibility only — never validated meaning."
+  ],
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "motto": "Structure, not validated meaning."
+}
