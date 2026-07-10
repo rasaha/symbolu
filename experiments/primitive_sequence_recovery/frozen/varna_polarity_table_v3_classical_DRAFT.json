@@ -31,7 +31,7 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "2b0ee36919ce897ed61846fb9d14bf6be4335a41ca72852b7ff18f57b587e3ba"
+    "b1_2_varna_classical_verifications.json": "a1ad271fae62514284123deb879e58973e82843d186f41aa175710dc9217e1b2"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
@@ -601,12 +601,12 @@
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of ghṛṇā vrtti (hatred / revulsion).",
       "source_quote_verified": "Sarkar: Pa = acoustic root of ghṛṇā vṛtti (hatred/revulsion), the FETTER of hatred (one of the eight pāshas), stemming mainly from moha. 'When one's psychic attraction is toward the crude, the mind has a downward tendency (pat/patati) leading to downfall; when the mind moves upward it is anurakti (attraction for the Great), whose consummation is devotion.'",
-      "worldly_binding_distortion": "attraction toward the crude / objects — the downward-pulling pull (pat / patati -> downfall)",
-      "spiritual_liberating_reading": "revulsion OF the ripus — ghṛṇā redirected against the crude/vices (vairāgya-like turning)",
-      "classical_associations": "ghṛṇā = the fetter of hatred (one of the eight pāshas: hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism); six ripus = kāma, krodha, lobha, mada, moha, mātsarya; downward attraction (pat) vs upward anurakti -> devotion.",
+      "worldly_binding_distortion": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+      "spiritual_liberating_reading": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)",
+      "classical_associations": "ghṛṇā = the fetter of hatred (one of the eight pāshas: hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism); six ripus = kāma, krodha, lobha, mada, moha, mātsarya; downward attraction (pat) -> downfall vs upward anurakti -> devotion. VAIRĀGYA NOTE (preserving the earlier option-A reading): ghṛṇā's energy CAN be redirected — revulsion turned against the crude/vices is a legitimate sublimation (vairāgya) path — but that is a sublimation ROUTE, not an inversion of the pole; hatred remains the binding fetter.",
       "functional_operation": "converts revulsion toward another into active goodwill",
       "contrast_boundary": "not compassion for the suffering (Ḍha/La), not gladness at fortune (Ṇa)",
-      "attested_vs_authored": "ATTESTED: pa = ghṛṇā (revulsion), classically a binding FETTER; the downward-attraction vs upward-anurakti contrast. AUTHORED/REINTERPRETED: making revulsion the LIBERATING pole and attraction the BINDING pole PARTIALLY INVERTS the attested assignment (ghṛṇā/hatred is classically the binding fetter).",
+      "attested_vs_authored": "ATTESTED (primary text) — v3 OPTION B: pa = ghṛṇā (hatred/revulsion), classically THE FETTER OF HATRED (a pāsha) = BINDING; its liberating direction is the upward anurakti -> devotion. v3 follows the attested assignment (hatred = binding, goodwill/anurakti = liberating), consistent with every other ripu/pāsha entry. SUPERSEDES the earlier option-A inversion (binding=attraction, liberating=revulsion-of-ripus); no inversion flag remains. The vairāgya insight is preserved as a note in classical_associations.",
       "primary_text_scope": null,
       "english_equivalent": null,
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
@@ -614,7 +614,7 @@
       "v2_binding": "hatred / revulsion",
       "v2_liberating": "fetter of hatred; related to moha and fear",
       "differs_from_v2": true,
-      "v2_drift_note": "v2 and the source lexicon both place revulsion on the binding side; this operator reading inverts it."
+      "v2_drift_note": "v2 binding='hatred / revulsion' and the source lexicon (bind='revulsion turned against another'; lib='goodwill that dissolves revulsion') BOTH place hatred on the binding side — which v3 (option B) now follows, matching the primary text (ghṛṇā = the fetter of hatred). The earlier option-A reading inverted the attested pole and was the SOLE inversion in the table; option B removes it. pa is bridge-reachable and common (/p/)."
     },
     "pha": {
       "varna": "Pha",
