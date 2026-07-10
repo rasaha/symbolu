@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **22**, pending **12**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **23**, pending **11**
 
 ## Fidelity caveats
 
@@ -52,7 +52,7 @@
 | `jha` | · | Lolupatā / Lobha / L… | **P** | name+def | greed / avarice — hoarding accumulation with… | sufficiency — appetite that releases at 'eno… |
 | `kha` | · | Cintā (binding) | **P** |  | cintā as anxious rumination — the mind churn… | cintā as composed, impersonal reflection — h… |
 | `ksha` | · | Aparā-vidyā(liberati… | pend |  | structured knowledge owned as control, dogma… | instrumental knowledge released from possess… |
-| `pha` | · | Bhaya(binding) | pend |  | collapse or flight before danger | steadiness meeting a genuine threat |
+| `pha` | · | Bhaya (binding) | **P** | name+def | bhaya — fear: collapse or flight before dang… | abhaya — steadiness meeting a genuine threat… |
 | `ttha` | · | Anutāpa / Paścāttāpa… | **P** | name+def | anutāpa as gripping remorse — the 'after-hea… | repentance discharged into acceptance — the … |
 
 _RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL._
