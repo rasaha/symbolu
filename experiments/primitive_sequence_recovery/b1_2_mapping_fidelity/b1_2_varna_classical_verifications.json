@@ -1,0 +1,39 @@
+{
+  "artifact": "b1_2_varna_classical_verifications",
+  "purpose": "Growing operator ledger of PRIMARY-TEXT-verified varṇa readings for the classically-grounded v3 table. Each entry supplies the classical source quote, the two poles, the cosmological/etymological ASSOCIATIONS (kept SEPARATE from the poles — v2's error was folding associations into the liberating pole), and an attested-vs-authored flag. The v3 builder reads this ledger; varṇas present here become classical_review_status=PRIMARY_TEXT_PROVIDED, the rest stay LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION.",
+  "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, semantic truth, Sanskrit privilege, GENUTILITY_*, or ONTOLOGICAL_SIGNAL.",
+  "anti_circularity": "Freeze + pre-register before authoring any pole-test words/contexts. Keep attested-vs-authored splits intact.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "verifications": [
+    {
+      "varna": "ha",
+      "sanskrit_label": "Parā-vidyā (intuitional science)",
+      "source_quote": "Sarkar: Ha = acoustic root of the ethereal (ākāśa) factor, of daytime, of the sun, of svarloka, and of parā-vidyā. Opposite to ha is ṭha, the acoustic root of nighttime, of the moon, of bhúvarloka, and of the kāmamaya kośa. Ha + ao = hao = acoustic root of Shiva in His táṇḍava posture.",
+      "binding": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+      "liberating": "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+      "classical_associations": "ether (ākāśa) factor; daytime; sun; svarloka; parā-vidyā. OPPOSITE varṇa = ṭha (night, moon, bhúvarloka, kāmamaya kośa). COMPOUND ha+ao = hao = Shiva's táṇḍava. (Associations + an opposite varṇa — NOT an intra-ha polarity.)",
+      "attested_vs_authored": "ATTESTED: the associations above. AUTHORED: the binding/liberating SPLIT (outward-visible vs inner-intuitional) is researcher-imposed; motivated partly by making 'happy' cohere — freeze + pre-register before word/context authoring.",
+      "v2_drift_note": "v2 binding='night/darkness' imported the OPPOSITE varṇa ṭha's domain into ha's cell (category error); v2 also folded the COMPOUND hao's táṇḍava into bare ha."
+    },
+    {
+      "varna": "pa",
+      "sanskrit_label": "Ghṛṇā (hatred / revulsion)",
+      "source_quote": "Sarkar: Pa = acoustic root of ghṛṇā vṛtti (hatred/revulsion), the FETTER of hatred (one of the eight pāshas), stemming mainly from moha. 'When one's psychic attraction is toward the crude, the mind has a downward tendency (pat/patati) leading to downfall; when the mind moves upward it is anurakti (attraction for the Great), whose consummation is devotion.'",
+      "binding": "attraction toward the crude / objects — the downward-pulling pull (pat / patati -> downfall)",
+      "liberating": "revulsion OF the ripus — ghṛṇā redirected against the crude/vices (vairāgya-like turning)",
+      "classical_associations": "ghṛṇā = the fetter of hatred (one of the eight pāshas: hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism); six ripus = kāma, krodha, lobha, mada, moha, mātsarya; downward attraction (pat) vs upward anurakti -> devotion.",
+      "attested_vs_authored": "ATTESTED: pa = ghṛṇā (revulsion), classically a binding FETTER; the downward-attraction vs upward-anurakti contrast. AUTHORED/REINTERPRETED: making revulsion the LIBERATING pole and attraction the BINDING pole PARTIALLY INVERTS the attested assignment (ghṛṇā/hatred is classically the binding fetter).",
+      "v2_drift_note": "v2 and the source lexicon both place revulsion on the binding side; this operator reading inverts it."
+    },
+    {
+      "varna": "ka",
+      "sanskrit_label": "Āśā (abhiipśātmaka āśā vṛtti — hope)",
+      "source_quote": "Sarkar: Ka = acoustic root of the abhiipśātmaka āśā vṛtti (the propensity of hope), which goads creatures — especially humans — to work in various ways. Ka is ALSO the acoustic root of Kārya Brahma (the expressed universe). Etymology: ka (kae + ḍa) = 'that which produces sound'; also 'water' (flowing water; va = water in general); also 'hair grown on the head' (kac = glossy). Ka + iisha = kesha (hair; also Nārāyaṇa). Kārya Brahma (Saguṇarasātmaka Brahma), represented by ka, is the controller of the living world; Buddhist Saṃvṛtti Bodhicitta = the created world = Kārya Brahma (kāpālika: 'Kaṃ saṃvṛtti bodhicittaṃ pālayati').",
+      "binding": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+      "liberating": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+      "classical_associations": "ka = Kārya Brahma (the expressed / created universe; Saguṇarasātmaka Brahma; controller of the living world); 'that which produces sound'; 'water' / flowing water (va = water in general); 'hair on the head' (kesha = ka+iisha, also a name of Nārāyaṇa); Buddhist Saṃvṛtti Bodhicitta. These are cosmological / etymological ASSOCIATIONS of ka, NOT poles.",
+      "attested_vs_authored": "ATTESTED: ka = āśā vṛtti (hope that goads action) AND ka = Kārya Brahma (expressed universe) + sound/water/hair associations. AUTHORED: the binding/liberating SPLIT of hope (grasping vs non-attached) applies the general attachment principle — the source states āśā goads action but does not itself split it into poles.",
+      "v2_drift_note": "v2 put the Kārya-Brahma ASSOCIATION ('expressed universe, creation-field, emergence into manifestation') into the LIBERATING POLE — conflating an attested cosmological association with the liberated form of hope (a category error). The liberating pole of āśā is non-attached aspiration, not 'the created universe.'"
+    }
+  ]
+}

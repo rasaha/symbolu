@@ -27,7 +27,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 FROZEN = HERE / "frozen"
 V2_FILE = HERE / "track_g_varna_polarity_table_v2_named_vritti.json"
 LEX_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_varna_source_lexicon.json"
-CORR_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_ha_pa_fidelity_correction.json"
+LEDGER_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_varna_classical_verifications.json"
 OUT_FILE = FROZEN / "track_g_varna_polarity_table_v3_classical_DRAFT.json"
 
 # classical ha↔ṭha note (primary text the operator supplied earlier); ṭha = ttha key
@@ -45,7 +45,7 @@ def build():
     v2v = v2["varnas"]
     lex_entries = json.loads(LEX_FILE.read_text())["entries"]
     lex = {e["lexicon_key"]: e for e in lex_entries}
-    corr = {c["varna"]: c for c in json.loads(CORR_FILE.read_text())["corrections"]}
+    corr = {c["varna"]: c for c in json.loads(LEDGER_FILE.read_text())["verifications"]}
     bridge_reachable = set(v2v.keys())   # the 25 keys the English G2P bridge can actually produce (test-relevant)
 
     varnas = {}
@@ -60,13 +60,19 @@ def build():
         provenance = "b1_2_source_lexicon (Sarkar-attributed)"
         authored_note = ("Attested side = classical_side below; the OTHER pole is largely author counter-rewritten "
                          f"(lexicon rewrite_status={e.get('rewrite_status')!r}) — flagged, not validated.")
-        # operator primary-text corrections for ha, pa
+        classical_associations = None    # cosmological/etymological associations, kept SEPARATE from the poles
+        source_quote = None
+        v2_drift_note = None
+        # operator PRIMARY-TEXT verifications from the ledger (ha, pa, ka, ...)
         if key in corr:
-            pg = corr[key]["proposed_gloss"]
-            binding, liberating = pg["binding"], pg["liberating"]
+            c = corr[key]
+            binding, liberating = c["binding"], c["liberating"]
+            classical_associations = c.get("classical_associations")
+            source_quote = c.get("source_quote")
+            v2_drift_note = c.get("v2_drift_note")
+            authored_note = c.get("attested_vs_authored", authored_note)
             review = "PRIMARY_TEXT_PROVIDED_BY_OPERATOR"
-            provenance = "operator primary-text correction (b1_2_ha_pa_fidelity_correction.json)"
-            authored_note = corr[key].get("source_attested_vs_authored", authored_note)
+            provenance = "operator primary-text verification (b1_2_varna_classical_verifications.json)"
 
         v2_binding = v2e.get("worldly_binding_distortion")
         v2_liberating = v2e.get("spiritual_liberating_reading")
@@ -74,21 +80,20 @@ def build():
         entry = {
             "varna": e.get("varna", key), "transliteration": e.get("transliteration", key),
             "bridge_reachable": key in bridge_reachable,
-            "sanskrit_label": sap.get("sanskrit_label"), "english_rendering": sap.get("english_rendering"),
+            "sanskrit_label": corr.get(key, {}).get("sanskrit_label") or sap.get("sanskrit_label"),
+            "english_rendering": sap.get("english_rendering"),
             "classical_side_attested": sap.get("classical_side"),
-            "source_note": e.get("source_note"),
+            "source_note": e.get("source_note"), "source_quote_verified": source_quote,
             "worldly_binding_distortion": binding,
             "spiritual_liberating_reading": liberating,
+            "classical_associations": classical_associations,   # NOT a pole — recorded separately (v2's error)
             "functional_operation": e.get("functional_operation"),
             "contrast_boundary": e.get("contrast_boundary"),
             "attested_vs_authored": authored_note,
             "classical_review_status": review, "provenance": provenance,
             "v2_binding": v2_binding, "v2_liberating": v2_liberating, "differs_from_v2": differs,
+            "v2_drift_note": v2_drift_note,
         }
-        if key == "ha":
-            entry["severe_v2_drift"] = ("v2 binding='night/darkness' imported the domain of the OPPOSITE varṇa ṭha "
-                                        "into ha's own cell (category error); v2 also folded the COMPOUND hao's "
-                                        "táṇḍava into bare ha.")
         if key == "ttha":
             entry["classical_discrepancy"] = TTHA_CLASSICAL_NOTE
         varnas[key] = entry
@@ -126,7 +131,7 @@ def build():
         ],
         "source_hashes": {"track_g_varna_polarity_table_v2_named_vritti.json": _sha(V2_FILE),
                           "b1_2_varna_source_lexicon.json": _sha(LEX_FILE),
-                          "b1_2_ha_pa_fidelity_correction.json": _sha(CORR_FILE)},
+                          "b1_2_varna_classical_verifications.json": _sha(LEDGER_FILE)},
         "n_varnas": len(varnas), "n_bridge_reachable": n_reach, "n_primary_text_verified": n_primary,
         "n_pending_classical_verification": len(varnas) - n_primary,
         "b1_4b_prime_status": "NULL_RETURN_BOTTOM", "motto": "Structure, not validated meaning.",
