@@ -194,6 +194,17 @@
       "classical_associations": null,
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: nna = īrṣā vṛtti (envy). AUTHORED (fully): BOTH poles are lexicon-supplied — the one-line passage gives no binding/liberating contrast.",
       "v2_drift_note": "v2 binding='envy' is the bare vṛtti NAME; v2 liberating='bondage through comparison; sympathetic joy (mudita) is its correction' restates the PROBLEM + names the corrective rather than the liberated MODE — the same problem/corrective-as-pole error as nga/ja/nya. v3 uses the lexicon's 'muditā — sympathetic gladness at another's fortune.' PRACTICALLY UNREACHABLE (retroflex nasal; 'nr' never emitted)."
+    },
+    {
+      "varna": "ta",
+      "sanskrit_label": "Jāḍya / Nidrā (inertia, staticity, dullness, sleep)",
+      "english_equivalent": "dental /t/ -> ta; BRIDGE-REACHABLE and very common (any /t/). PHONETIC NOTE: dental ta is the SOFT UNASPIRATED t (as in 'stop'/'star', or Spanish/Italian t; tongue on the upper teeth). English WORD-INITIAL t is aspirated [tʰ] (top/take), classically closer to tha (थ) — but the G2P/bridge collapse ALL English /t/ -> ta (aspiration ignored). A parallel UNDER-REPRESENTATION to the retroflex case; candidate for an aspiration rule (separate proposal).",
+      "source_quote": "Sarkar: Ta is the acoustic root of staticity, long sleep and deep sleep; also of intellectual dullness and spiritual inertness. That which brings about the cessation of dullness and staticity is Tantra — 'Taṃ jāḍyāt tārayet yastu sa tantraḥ'. The root-verb tan means 'to expand'; if a rope-bound person expands his body the ropes snap of themselves — that which liberates through tan (expansion) is also Tantra — 'Taṃ vistāreṇa tārayet yastu sah tantraḥ'.",
+      "binding": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+      "liberating": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+      "classical_associations": "Etymology of Tantra: 'Taṃ jāḍyāt tārayet yastu sa tantraḥ' — that which liberates (tārayet) from jāḍya (staticity/dullness) is Tantra; and tan = 'to expand' — as a rope-bound body expands to snap the ropes, that which liberates through expansion (vistāra) is also Tantra. (Etymological association naming the liberating DIRECTION — not a separate pole.)",
+      "attested_vs_authored": "ATTESTED: ta = jāḍya/nidrā (staticity, long/deep sleep, intellectual dullness, spiritual inertness) — BINDING pole richly attested; and the LIBERATING DIRECTION (liberation from jāḍya via expansion) is attested through the Tantra etymology. AUTHORED: the specific liberated-mode wording ('alert wakefulness rising from torpor') is lexicon-supplied but well-aligned with the attested direction.",
+      "v2_drift_note": "v2 binding='inertia / staticity / dullness' is fine; v2 liberating='spiritual inertness that discipline seeks to liberate from' RESTATES the inertness PROBLEM + corrective direction rather than the liberated MODE — the same problem-as-pole error (5th instance: nga/ja/nya/nna/ta). v3 uses the lexicon's 'alert wakefulness rising from torpor,' aligned with the attested Tantra (liberation-from-jāḍya) direction. ta is bridge-reachable and very common (/t/)."
     }
   ]
 }

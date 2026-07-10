@@ -3,7 +3,7 @@
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
 - varṇas **34** · bridge-target **25** · **practically reachable 20** · reference-only 14
-- verified **17**, pending **17**
+- verified **18**, pending **16**
 
 ## Varṇas (R: ★ reachable ✧ target-but-unreachable · reference-only · ⚑ differs from v2 · scope name/name+def=poles authored)
 
@@ -25,7 +25,7 @@
 | `ra` | ★ | Prāṇaśakti/Agnitattv… | pend |  | rajasic activation driven by compulsion, des… | directed energy without bondage |
 | `sa` | ★ | Mokṣa / Sattvaguṇa(l… | pend |  | sattvic clarity/order owned as purity, super… | clarity without attachment to clarity |
 | `sha` | ★ | rajoguṇa + artha(neu… | pend |  | worldly purpose possessed as acquisition, st… | purposeful action without possessive bondage |
-| `ta` | ★ | Jāḍya / Nidrā(bindin… | pend |  | dullness, torpor, deep sleep of mind | alert wakefulness rising from torpor |
+| `ta` | ★ | Jāḍya / Nidrā (bindi… | **P** |  | jāḍya — inertia, staticity, dullness, torpor… | the cessation of dullness/staticity — awaken… |
 | `tha` | ★ | Viṣāda(binding) | pend |  | dejection that sinks one's own mood | warm buoyancy lifting one's own dejection |
 | `va` | ★ | Dharma(liberating_or… | pend |  | accepting-as-true without sufficient discern… | truth-assent purified by discernment, instal… |
 | `ya` | ★ | Aviśvāsa(binding) | pend |  | self-doubt that cannot commit | self-efficacy to commit and to rely |
