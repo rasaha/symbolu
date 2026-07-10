@@ -26,12 +26,12 @@
   "source_hashes": {
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
     "b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
-    "b1_2_varna_classical_verifications.json": "9f73e6af33db6fb7f30fb287c917f268648875f024b1a511f9c79ec9d49430e0"
+    "b1_2_varna_classical_verifications.json": "ede2fadcc9159e017232c516f22cc5903974b9a3598231d982c66cd39fa281be"
   },
   "n_varnas": 34,
   "n_bridge_reachable": 25,
-  "n_primary_text_verified": 4,
-  "n_pending_classical_verification": 30,
+  "n_primary_text_verified": 5,
+  "n_pending_classical_verification": 29,
   "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
   "motto": "Structure, not validated meaning.",
   "varnas": {
@@ -215,23 +215,23 @@
       "varna": "Ga",
       "transliteration": "ga",
       "bridge_reachable": true,
-      "sanskrit_label": "Ceṣṭā",
+      "sanskrit_label": "Ceṣṭā (effort / striving to arouse dormant potential)",
       "english_rendering": "Effort / striving",
       "classical_side_attested": "binding",
       "source_note": "Sarkar: acoustic root of ceṣṭā vrtti (effort to arouse dormant potential).",
-      "source_quote_verified": null,
-      "worldly_binding_distortion": "striving driven by restlessness that cannot stop",
-      "spiritual_liberating_reading": "effort that can rest — poised, alert stillness when action completes",
-      "classical_associations": null,
+      "source_quote_verified": "Sarkar: Every entity has the potentiality of expression; an animate entity can arouse that dormant potentiality through both internal and external means. If poetic genius lies dormant in someone and he arouses it by applying his will-force, he becomes a renowned poet; if lethargy prevents it, the genius stays unexpressed. The effort made to arouse one's dormant potentiality is called ceṣṭā. Ceṣṭā is one of the psychic vṛttis and is the MAIN CAUSE of mundane development AND spiritual elevation — its value in the mundane and supramundane spheres is immense. Ga, the acoustic root of ceṣṭā, plays an important role in the physical, psychic and spiritual spheres.",
+      "worldly_binding_distortion": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+      "spiritual_liberating_reading": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation",
+      "classical_associations": "ceṣṭā = the effort to arouse dormant potentiality (latent genius -> applied will-force -> expression; else unexpressed). Described as the MAIN CAUSE of BOTH mundane development AND spiritual elevation, operating across the physical, psychic and spiritual spheres. (Scope/significance of the vṛtti — NOT a separate cosmological association.)",
       "functional_operation": "exerts, then ceases into stable alert repose without inertia",
       "contrast_boundary": "not dull inertia (Ta), not outcome-release (Ka), not containment (Ma)",
-      "attested_vs_authored": "Attested side = classical_side below; the OTHER pole is largely author counter-rewritten (lexicon rewrite_status='source_preserved_counter_rewritten') — flagged, not validated.",
-      "classical_review_status": "LEXICON_ATTESTED_PENDING_PRIMARY_VERIFICATION",
-      "provenance": "b1_2_source_lexicon (Sarkar-attributed)",
+      "attested_vs_authored": "ATTESTED: ga = ceṣṭā vṛtti (effort to arouse dormant potential); its immense value in BOTH the mundane and supramundane spheres. AUTHORED: the binding/liberating split (restless-can't-stop striving vs poised effort-that-rests / spiritually-elevating will-force) applies the framework's restlessness-vs-poise principle (consistent with the source lexicon); the passage frames ceṣṭā as valuable in both spheres and does not itself label a binding pole.",
+      "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
+      "provenance": "operator primary-text verification (b1_2_varna_classical_verifications.json)",
       "v2_binding": "effort / striving",
       "v2_liberating": "effort as path to mundane development and spiritual elevation",
       "differs_from_v2": true,
-      "v2_drift_note": null
+      "v2_drift_note": "v2 binding='effort / striving' is the bare vṛtti NAME, not a binding distortion; v2 liberating='effort as path to mundane development and spiritual elevation' paraphrases the passage's general VALUE statement about ceṣṭā (both spheres) rather than a distinct liberated mode — a mild value/association-into-pole conflation. v3 adopts the lexicon's crisper restless-vs-poised polarity."
     },
     "gha": {
       "varna": "Gha",
