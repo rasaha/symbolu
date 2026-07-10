@@ -75,6 +75,27 @@ def test_all_arms_render_all_items():
     assert len(recs) == 24 * 4 and {r["arm"] for r in recs} == set(D.ARMS)
 
 
+# ---- corrected rendering: direct-meaning rule, contrastive framing prohibited ---------
+def test_prompt_uses_direct_meaning_rule_not_lens():
+    it = D.load_scaffold()["items"][0]
+    p = D.render_prompt("OWN_CORRECT_POLE", it)
+    assert "direct inner meaning" in p
+    assert "obstacle, opposite, contrast, antidote" in p
+    assert "a lens only" not in p                       # permissive phrasing removed
+
+def test_contrastive_audit_diagnostic_only():
+    # markers detected but outputs are NOT dropped; audit reports per-arm rates
+    assert D.contrastive_markers("equanimity is a shield against grasping desire")   # detects
+    assert D.contrastive_markers("a direct steady presence") == []                    # clean
+    p1 = D.run_part(mock=True, gen_code="M1"); p2 = D.run_part(mock=True, gen_code="M2")
+    assert p1["n_outputs"] == 96 and p1["n_failures"] == 0                            # nothing dropped
+    res = D.merge_parts([p1, p2])
+    aud = res["manifest"]["contrastive_audit"]
+    assert set(aud) == set(D.ARMS)
+    for a in D.ARMS:
+        assert aud[a]["total"] == 48 and 0.0 <= aud[a]["rate"] <= 1.0                 # rate reported per arm
+
+
 # ---- mock part / merge / blinding ---------------------------------------------------
 def test_mock_part_96(tmp_path):
     part = D.run_part(mock=True, gen_code="M1", out_dir=tmp_path, write=True)

@@ -30,6 +30,26 @@ All four are readings **of `W`** (same target, same context, same plane); only t
 pole (correct/flipped) vary. `W′` is a **frozen seeded derangement** (no fixed point), selected with **no
 reference to any output/score**.
 
+## 1b. Rendering rule (CORRECTED) + contrastive audit
+
+The first (permissive) run of this same experiment was **inconclusive**: it rendered facets as "a lens" and the
+model frequently used the *flipped* pole **contrastively** (e.g. *"equanimity is a shield against grasping
+desire"*), so correct-vs-flipped did not cleanly vary pole correctness (see `B1_9_POLE_DID_RESULTS.md`;
+flipped-arm contrastive rate 60–67% vs correct 46–58%; 10/11 own-flipped wins were contrastive). This is the
+**same** `B1.9_pole_did` experiment (same items, varṇas, poles, `W′`, arms, DiD) with **only the rendering
+instruction corrected** — not a new representation.
+
+**Corrected render instruction (all four arms, identical):**
+> *"Render each facet as the word's **direct inner meaning** in this context. Do not frame any facet as the
+> word's obstacle, opposite, contrast, antidote, what it resists, what it overcomes, what it is free from, or
+> what it protects against."*
+
+**Contrastive-marker audit (diagnostic only):** every output is scanned for contrastive markers (`against`,
+`overcomes`, `resists`, `shield against`, `free from`, `freedom from`, `rather than`, `instead of`, `antidote`,
+`opposite`, `release from`, `letting go of`, …) and per-arm rates are reported in the run manifest. **No output is
+dropped and no score is penalized** on this basis (no post-hoc dropping unless a future prereg specifies it); the
+audit only confirms the corrected prompt reduced contrastive framing vs the permissive run.
+
 ## 2. Primary statistic
 
 `DiD = (OWN_CORRECT_POLE − OWN_FLIPPED_POLE) − (CONTROL_CORRECT_POLE − CONTROL_FLIPPED_POLE)`, paired by item
@@ -44,6 +64,8 @@ diffs, and the DiD with bootstrap CI + sign test.
   then it is **low-level only**: no ontology, no semantic truth, no Sanskrit privilege, no `GENUTILITY_*`.
 - **`DiD ≈ 0` (null) is informative** — the pole resolution adds nothing beyond generic valence.
 - **`DiD < 0`** would anti-support the mapping.
+- **If the contrastive audit shows framing is still high under the corrected prompt** (the instruction failed),
+  the run is again **inconclusive**, not a clean null — report and do not over-read.
 - No terminal verdict under any outcome.
 
 ## 4. Item set (24; balanced 12 liberating / 12 binding; no ambiguous items)

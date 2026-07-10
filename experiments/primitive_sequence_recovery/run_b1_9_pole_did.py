@@ -10,6 +10,11 @@ Only an EXCESS own-mapping correct-vs-flipped margin beyond the generic pole-val
 supports pole-specific varṇa resolution. A null is informative. A positive is low-level only: no ontology, no
 semantic truth, no Sanskrit privilege, no GENUTILITY.
 
+Rendering rule (corrected): each facet is rendered as the word's DIRECT inner meaning; contrastive/opposite
+framing is prohibited (closes the leakage that made the first, permissive run inconclusive — see
+B1_9_POLE_DID_RESULTS.md). Same experiment/representation; only the render instruction changed. A per-arm
+contrastive-marker audit is reported (diagnostic only: never drops or penalizes an output).
+
 Consonant-only canonical varṇas (Stage A′ + bridge; vowels dropped — see prereg §Vowel-omission limitation).
 Anti-circularity: correct pole fixed by the frozen referent classification, which must be operator-APPROVED
 (classification_approved==true) before any real run — the gate refuses otherwise. Reuses the B1.6 adapter + shared
@@ -20,6 +25,7 @@ import argparse
 import hashlib
 import json
 import pathlib
+import re
 from typing import Dict, List, Optional, Tuple
 
 import run_b1_6_pilot_generation as G
@@ -61,6 +67,16 @@ BAD_MODES = {"pilot_generation", "b1_8_context_resolved_generation_probe",
 HEADER = ("You are an interpreter using a structural lens as a heuristic scaffold - NOT as truth. Read the item "
           "in the given context. Do NOT claim this proves meaning, is true, ancient, or authoritative. Do NOT "
           "mention any system name.")
+# Corrected render rule (closes the contrastive-framing leakage found in the permissive run;
+# see B1_9_POLE_DID_RESULTS.md). Same experiment/representation — only the rendering instruction changed.
+DIRECT_RULE = ("Render each facet as the word's direct inner meaning in this context. Do not frame any facet as "
+               "the word's obstacle, opposite, contrast, antidote, what it resists, what it overcomes, what it "
+               "is free from, or what it protects against.")
+# Output-side contrastive-marker audit (diagnostic ONLY: never drops or penalizes an output).
+CONTRASTIVE = re.compile(
+    r"\b(shield(s|ed)? against|against|overcome(s|n)?|resist(s|ed|ing)?|free from|freedom from|"
+    r"not\s+\w+\s+but|protect(s|ed)? against|transcend(s|ing)?|counter(s|balance|ing)?|rather than|"
+    r"instead of|guard(s|ed)? against|antidote|opposite of|release from|letting go of|escape from)\b", re.I)
 OUTPUT_FORMAT = ("Respond in EXACTLY this format:\n"
                  "Title: <one short phrase>\n"
                  "Interpretation: <120-180 words>\n"
@@ -77,6 +93,11 @@ def _sha_file(p: pathlib.Path) -> str:
 
 def leaked(text: str) -> List[str]:
     return list(G.leaked_tokens(text))
+
+
+def contrastive_markers(text: str) -> List[str]:
+    """Diagnostic scan for contrastive/opposite framing. AUDIT ONLY — never used to drop or penalize an output."""
+    return [m.group(0) for m in CONTRASTIVE.finditer(text or "")]
 
 
 def classification_approved() -> bool:
@@ -144,7 +165,7 @@ def render_prompt(arm: str, item: Dict) -> str:
     if arm not in FACET_ARMS:
         raise ValueError(f"unknown arm {arm!r}")
     return (f"{HEADER}\nItem: {item['TARGET_TEXT']}\nContext: {item['CONTEXT_TEXT']}\n"
-            f"Emphasize the {item['PLANE']} plane. Read each element through the facets below (a lens only):\n"
+            f"Emphasize the {item['PLANE']} plane. {DIRECT_RULE}\n"
             f"{_facet_bullets(item['ARM_FACETS'][arm])}\n\n{OUTPUT_FORMAT}")
 
 
@@ -186,6 +207,7 @@ def make_hidden(rec: Dict, gen_code: Optional[str], gen_id: Optional[str]) -> Di
             "generator_code": gen_code, "generator_id": gen_id, "item_id": rec["item_id"],
             "referent_type": rec["referent_type"], "plane": rec["plane"], "correct_pole": rec["correct_pole"],
             "flipped_pole": rec["flipped_pole"], "wprime_item_id": rec["wprime_item_id"],
+            "contrastive_markers": rec.get("contrastive_markers", []),
             "representation_version": REPRESENTATION}
 
 
@@ -238,7 +260,8 @@ def run_part(mock: bool = False, adapter=None, settings=None, decl_path: Optiona
         if lk:
             status, rs = "blindness_leak", [f"tokens: {lk}"]
         if status in ("ok", "mock") and text is not None and not lk:
-            outputs.append({**rec, "generation_text": text, "generator_code": gen_code, "generator_id": gen_id})
+            outputs.append({**rec, "generation_text": text, "generator_code": gen_code, "generator_id": gen_id,
+                            "contrastive_markers": contrastive_markers(text)})   # AUDIT only; never dropped
         else:
             failures.append({"blinded_output_id": rec["blinded_output_id"], "item_id": rec["item_id"],
                              "arm": rec["arm"], "status": status, "reasons": rs})
@@ -263,6 +286,17 @@ def load_part(path: pathlib.Path) -> Dict:
     if p.is_dir():
         p = p / "b1_9_pole_did_part.json"
     return json.loads(p.read_text())
+
+
+def _contrastive_audit(outputs: List[Dict]) -> Dict:
+    """Per-arm contrastive-framing rate. Diagnostic ONLY — no output dropped, no score penalized."""
+    by = {a: [0, 0] for a in ARMS}
+    for o in outputs:
+        c = by.get(o["arm"])
+        if c is None:
+            continue
+        c[1] += 1; c[0] += 1 if o.get("contrastive_markers") else 0
+    return {a: {"contrastive": n, "total": t, "rate": (round(n / t, 3) if t else None)} for a, (n, t) in by.items()}
 
 
 def merge_parts(parts: List[Dict], out_dir: Optional[pathlib.Path] = None, write: bool = False,
@@ -296,12 +330,14 @@ def merge_parts(parts: List[Dict], out_dir: Optional[pathlib.Path] = None, write
         "n_targets": len({o["item_id"] for o in merged}), "n_outputs": len(merged),
         "expected_full": 24 * len(ARMS) * len(parts),
         "per_generator_counts": {p["generator_code"]: p["n_outputs"] for p in parts},
+        "contrastive_audit": _contrastive_audit(merged),            # diagnostic only; no drop / no penalty
         "reblind_seed": reblind_seed, "input_hashes": parts[0].get("input_hashes"),
         "classification_approved": parts[0].get("classification_approved"),
         "declaration_sha256": parts[0].get("declaration_sha256"),
         "judging_performed": False, "unblinded": False, "b1_4b_prime_status": B1_4B_PRIME_STATUS,
         "note": "4-arm diff-in-diff; pole is the manipulated variable, W′ (distant word) is the valence control. "
-                "Judge-visible re-blinded. No judging. No GENUTILITY_*.",
+                "Corrected direct-meaning render rule (no contrastive framing); contrastive audit is diagnostic "
+                "only (no drop/penalty). Judge-visible re-blinded. No judging. No GENUTILITY_*.",
     }
     if write and out_dir:
         out_dir = pathlib.Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)

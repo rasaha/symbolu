@@ -6,12 +6,17 @@ is fixed by the frozen referent classification, which **must be operator-approve
 runner refuses otherwise). Expected **192 outputs** (24 × 4 × 2) and **576 ratings**. Consonant-only canonical
 varṇas (Stage A′ + bridge; vowels dropped — prereg §5b).
 
-Driver: `run_b1_9_pole_did.py` (+ `test_run_b1_9_pole_did.py`, 13 tests) — mock-tested. Judges + aggregation reuse
+Driver: `run_b1_9_pole_did.py` (+ `test_run_b1_9_pole_did.py`, 15 tests) — mock-tested. Judges + aggregation reuse
 `run_b1_6_v2_llm_judge_panel.py` and `judge_b1_6_pilot_outputs.aggregate` unchanged.
 
-**Interpretation (fixed):** `DiD ≈ 0` → correct-vs-flipped is just generic pole-valence congruence, not
-varṇa-specific (informative null). `DiD > 0` robust → low-level pole-specific signal only (no ontology/truth/
-privilege/GENUTILITY). `DiD < 0` → anti-supports.
+**Corrected rendering (this run):** each facet is rendered as the word's **direct inner meaning**; contrastive/
+opposite framing is prohibited (closes the leakage that made the first run inconclusive — `B1_9_POLE_DID_RESULTS.md`).
+Same experiment/representation; only the prompt changed. The merge manifest reports a per-arm **contrastive-marker
+audit** (diagnostic only — no output dropped, no score penalized).
+
+**Interpretation (fixed):** `DiD ≈ 0` (with contrastive rates confirmed low) → clean null. `DiD > 0` robust →
+low-level pole-specific signal only (no ontology/truth/privilege/GENUTILITY). `DiD < 0` → anti-supports. If the
+contrastive audit is still high, the run is again **inconclusive**, not a null.
 
 ---
 
@@ -47,6 +52,9 @@ python3 run_b1_9_pole_did.py part --decl "$DECL" --gen-code M2 \
         --backend transformers --model-id Qwen/Qwen2.5-7B-Instruct        --out run_out/b1_9_pole_did/M2      # 96
 python3 run_b1_9_pole_did.py merge --parts run_out/b1_9_pole_did/M1 run_out/b1_9_pole_did/M2 \
         --out run_out/b1_9_pole_did/generation                                                                # 192
+
+# ── 2b. Contrastive-marker audit (diagnostic; confirm the corrected prompt reduced framing) ──
+python3 -c "import json;m=json.load(open('run_out/b1_9_pole_did/generation/panel_run_manifest.json'));a=m['contrastive_audit'];[print(f'  {k:22} {a[k][\"contrastive\"]}/{a[k][\"total\"]} = {a[k][\"rate\"]:.0%}') for k in m['arms']]"
 
 # ── 3. Blind judging ──────────────────────────────────────────────────────────
 cat > run_out/b1_9_pole_did/judge_panel.json <<'JSON'
