@@ -1,0 +1,22 @@
+{
+  "artifact_type": "b1_9_gen_distant_source_map",
+  "status": "FROZEN",
+  "representation_version": "B1.9_generation_corrected_control",
+  "provenance": "W->W' assignments produced by run_b1_9_content_distance._freeze_distant_source_map at commit c05a443, using target/context embeddings ONLY (MiniLM all-MiniLM-L6-v2, revision main) — never facet embeddings, never outcome/d_auth distances. Frozen here verbatim so the generation scaffold is reproducible without re-running the embedder. Each W' is the item whose target/context representation was most distant from W's.",
+  "selection_rule": "most target/context-distant DIFFERENT item; W' != W for all targets (verified in the embedding run).",
+  "note": "This is the corrected control's source-word assignment for the B1.9 GENERATION track. The control arm reads W''s OWN authentic varṇa-derived facets, NOT a within-pool derangement.",
+  "map": {
+    "b18-01": "b18-10",
+    "b18-02": "b18-05",
+    "b18-03": "b18-09",
+    "b18-04": "b18-06",
+    "b18-05": "b18-02",
+    "b18-06": "b18-09",
+    "b18-07": "b18-01",
+    "b18-08": "b18-09",
+    "b18-09": "b18-03",
+    "b18-10": "b18-01",
+    "b18-11": "b18-10",
+    "b18-12": "b18-09"
+  }
+}

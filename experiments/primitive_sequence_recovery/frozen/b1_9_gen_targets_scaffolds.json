@@ -1,0 +1,801 @@
+{
+  "artifact_type": "b1_9_gen_targets_scaffolds",
+  "status": "FROZEN",
+  "representation_version": "B1.9_generation_corrected_control",
+  "facet_field": "named_attribute",
+  "primary_contrast": "AUTHENTIC_MAPPING vs DISTANT_SOURCE_MAPPING",
+  "scramble_seed": 20260710,
+  "source_hashes": {
+    "b1_9_targets.json": "b69cb2cd4e94ce6c00c986a85122e960184c00bc67242419d711c46545cb19cc",
+    "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+    "b1_9_gen_distant_source_map.json": "36312af6edce9e722ded834e746c6d9972f03dc5eb4d15a22b49013dd521e715"
+  },
+  "note": "AUTHENTIC vs DISTANT_SOURCE is the corrected primary control (W′ = frozen distant source word, its OWN authentic varṇa facets). SCRAMBLED_WITHIN_POOL is the old near-synonym control, kept for comparison only. Baselines carry no facets. NO generation performed. B1.4b′ NULL_RETURN_BOTTOM.",
+  "n_items": 12,
+  "items": [
+    {
+      "item_id": "b18-01",
+      "TARGET_TEXT": "bridge",
+      "CONTEXT_TEXT": "The rebuilt bridge holds a steady sustaining flow across the river; its spans keep an easy alignment and let the crossing find its peace.",
+      "STRATUM": "concrete_object",
+      "PLANE": "physical",
+      "authentic_varnas": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "distant_source_item_id": "b18-10",
+      "distant_source_target_text": "Nova",
+      "distant_source_varnas": [
+        "na",
+        "va"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "ba",
+            "text": "avajna / indifference, neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "ha",
+            "text": "ether, daytime, sun, svarloka, paravidya; hao = Shiva dancing tandava"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha / vanity"
+          },
+          {
+            "varna": "nna",
+            "text": "irshya / envy"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-02",
+      "TARGET_TEXT": "lantern",
+      "CONTEXT_TEXT": "The lantern is stuck on a rigid hook, its glow blocked by grime, an obstacle no one can shift.",
+      "STRATUM": "concrete_object",
+      "PLANE": "physical",
+      "authentic_varnas": [
+        "la",
+        "na",
+        "ta",
+        "ra"
+      ],
+      "distant_source_item_id": "b18-05",
+      "distant_source_target_text": "justice",
+      "distant_source_varnas": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "ta",
+            "text": "staticity, deep sleep, dullness, spiritual inertness"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "ja",
+            "text": "ahamkara / ego"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+          },
+          {
+            "varna": "ta",
+            "text": "staticity, deep sleep, dullness, spiritual inertness"
+          },
+          {
+            "varna": "ka",
+            "text": "asha / hope; creation; karya brahma; flowing water-sound"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "nga",
+            "text": "dambha / vanity"
+          },
+          {
+            "varna": "ha",
+            "text": "ether, daytime, sun, svarloka, paravidya; hao = Shiva dancing tandava"
+          },
+          {
+            "varna": "tta",
+            "text": "vitarka / overstatement, angry garrulousness"
+          },
+          {
+            "varna": "sha",
+            "text": "rajo-guna; artha / psychic longing"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-03",
+      "TARGET_TEXT": "grief",
+      "CONTEXT_TEXT": "In his grief he stays clinging to what was, trapped by a loss he cannot release.",
+      "STRATUM": "psychological_mental",
+      "PLANE": "mental",
+      "authentic_varnas": [
+        "ga",
+        "ra"
+      ],
+      "distant_source_item_id": "b18-09",
+      "distant_source_target_text": "Lumen",
+      "distant_source_varnas": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "tha",
+            "text": "vishada / melancholy"
+          },
+          {
+            "varna": "ssa",
+            "text": "tamo-guna; kama / physical worldly desire"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-04",
+      "TARGET_TEXT": "longing",
+      "CONTEXT_TEXT": "Her longing eased into quiet reflection and a peace that let the ache find release.",
+      "STRATUM": "psychological_mental",
+      "PLANE": "mental",
+      "authentic_varnas": [
+        "la",
+        "nga"
+      ],
+      "distant_source_item_id": "b18-06",
+      "distant_source_target_text": "balance",
+      "distant_source_varnas": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha / vanity"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "ba",
+            "text": "avajna / indifference, neglect"
+          },
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "ka",
+            "text": "asha / hope; creation; karya brahma; flowing water-sound"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          },
+          {
+            "varna": "dha",
+            "text": "trishna / thirst for acquisition"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-05",
+      "TARGET_TEXT": "justice",
+      "CONTEXT_TEXT": "She pursued justice with clarity, in alignment with a sustaining fairness, a contemplative movement toward what is right.",
+      "STRATUM": "ethical_action",
+      "PLANE": "intellectual",
+      "authentic_varnas": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "distant_source_item_id": "b18-02",
+      "distant_source_target_text": "lantern",
+      "distant_source_varnas": [
+        "la",
+        "na",
+        "ta",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "ja",
+            "text": "ahamkara / ego"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+          },
+          {
+            "varna": "ta",
+            "text": "staticity, deep sleep, dullness, spiritual inertness"
+          },
+          {
+            "varna": "ka",
+            "text": "asha / hope; creation; karya brahma; flowing water-sound"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "ta",
+            "text": "staticity, deep sleep, dullness, spiritual inertness"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+          },
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          },
+          {
+            "varna": "nya",
+            "text": "kapatata / hypocrisy"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-06",
+      "TARGET_TEXT": "balance",
+      "CONTEXT_TEXT": "The committee stayed in conflict, each side rigid and clinging to advantage, the fair path blocked by fear.",
+      "STRATUM": "ethical_action",
+      "PLANE": "intellectual",
+      "authentic_varnas": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "distant_source_item_id": "b18-09",
+      "distant_source_target_text": "Lumen",
+      "distant_source_varnas": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "ba",
+            "text": "avajna / indifference, neglect"
+          },
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "ka",
+            "text": "asha / hope; creation; karya brahma; flowing water-sound"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "nga",
+            "text": "dambha / vanity"
+          },
+          {
+            "varna": "dha",
+            "text": "trishna / thirst for acquisition"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "ja",
+            "text": "ahamkara / ego"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-07",
+      "TARGET_TEXT": "lotus",
+      "CONTEXT_TEXT": "At dawn the lotus opens in stillness, a contemplative clarity, release, and peace.",
+      "STRATUM": "spiritual_contemplative",
+      "PLANE": "spiritual",
+      "authentic_varnas": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "distant_source_item_id": "b18-01",
+      "distant_source_target_text": "bridge",
+      "distant_source_varnas": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "ta",
+            "text": "staticity, deep sleep, dullness, spiritual inertness"
+          },
+          {
+            "varna": "sa",
+            "text": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "ba",
+            "text": "avajna / indifference, neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "sha",
+            "text": "rajo-guna; artha / psychic longing"
+          },
+          {
+            "varna": "ka",
+            "text": "asha / hope; creation; karya brahma; flowing water-sound"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-08",
+      "TARGET_TEXT": "sacred",
+      "CONTEXT_TEXT": "He treated the sacred as an escape, a static withdrawal and rigid avoidance of the world's demands.",
+      "STRATUM": "spiritual_contemplative",
+      "PLANE": "spiritual",
+      "authentic_varnas": [
+        "sa",
+        "ka",
+        "ra",
+        "da"
+      ],
+      "distant_source_item_id": "b18-09",
+      "distant_source_target_text": "Lumen",
+      "distant_source_varnas": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "sa",
+            "text": "mokṣa; sattva-guṇa; clarity; peace; release; liberation-oriented thought"
+          },
+          {
+            "varna": "ka",
+            "text": "asha / hope; creation; karya brahma; flowing water-sound"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "nya",
+            "text": "kapatata / hypocrisy"
+          },
+          {
+            "varna": "nga",
+            "text": "dambha / vanity"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "ya",
+            "text": "avishvasa / lack of confidence; constant air-like movement"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-09",
+      "TARGET_TEXT": "Lumen",
+      "CONTEXT_TEXT": "The Lumen brand promises clarity and an easy flow, a calm alignment for everyday focus.",
+      "STRATUM": "brand_name",
+      "PLANE": "mental",
+      "authentic_varnas": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "distant_source_item_id": "b18-03",
+      "distant_source_target_text": "grief",
+      "distant_source_varnas": [
+        "ga",
+        "ra"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "va",
+            "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+          },
+          {
+            "varna": "tta",
+            "text": "vitarka / overstatement, angry garrulousness"
+          },
+          {
+            "varna": "dda",
+            "text": "lajja / shyness"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-10",
+      "TARGET_TEXT": "Nova",
+      "CONTEXT_TEXT": "Nova's launch felt stuck in conflict, its message blocked and its momentum trapped.",
+      "STRATUM": "brand_name",
+      "PLANE": "mental",
+      "authentic_varnas": [
+        "na",
+        "va"
+      ],
+      "distant_source_item_id": "b18-01",
+      "distant_source_target_text": "bridge",
+      "distant_source_varnas": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "ba",
+            "text": "avajna / indifference, neglect"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "pa",
+            "text": "ghrina / hatred, revulsion"
+          },
+          {
+            "varna": "tta",
+            "text": "vitarka / overstatement, angry garrulousness"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-11",
+      "TARGET_TEXT": "wonder",
+      "CONTEXT_TEXT": "The child's wonder opened into reflection and a bright clarity, a peace that let the moment flow.",
+      "STRATUM": "emotional_nonclinical",
+      "PLANE": "mental",
+      "authentic_varnas": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "distant_source_item_id": "b18-10",
+      "distant_source_target_text": "Nova",
+      "distant_source_varnas": [
+        "na",
+        "va"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "va",
+            "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          },
+          {
+            "varna": "va",
+            "text": "dharma; holding (dhṛ = 'to hold'); jala-tattva (liquid factor); Varuṇa; sustaining flow"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "pa",
+            "text": "ghrina / hatred, revulsion"
+          },
+          {
+            "varna": "ga",
+            "text": "ceshta / effort to arouse dormant potential"
+          },
+          {
+            "varna": "ta",
+            "text": "staticity, deep sleep, dullness, spiritual inertness"
+          },
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          }
+        ]
+      }
+    },
+    {
+      "item_id": "b18-12",
+      "TARGET_TEXT": "dread",
+      "CONTEXT_TEXT": "A cold dread of failure kept him clinging and rigid, trapped by fear and unable to move.",
+      "STRATUM": "emotional_nonclinical",
+      "PLANE": "mental",
+      "authentic_varnas": [
+        "da",
+        "ra"
+      ],
+      "distant_source_item_id": "b18-09",
+      "distant_source_target_text": "Lumen",
+      "distant_source_varnas": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "ARM_FACETS": {
+        "AUTHENTIC_MAPPING": [
+          {
+            "varna": "da",
+            "text": "peevishness / irritability"
+          },
+          {
+            "varna": "ra",
+            "text": "agni-tattva, prana-shakti, vitality, fire; sarvanasha / annihilation-thought"
+          }
+        ],
+        "DISTANT_SOURCE_MAPPING": [
+          {
+            "varna": "la",
+            "text": "krurata / cruelty; kshiti-tattva / solid factor"
+          },
+          {
+            "varna": "ma",
+            "text": "pranasha / annihilation; prashraya / indulgent latitude"
+          },
+          {
+            "varna": "na",
+            "text": "moha / blind attachment, infatuation"
+          }
+        ],
+        "SCRAMBLED_WITHIN_POOL": [
+          {
+            "varna": "ca",
+            "text": "viveka / conscience"
+          },
+          {
+            "varna": "nya",
+            "text": "kapatata / hypocrisy"
+          }
+        ]
+      }
+    }
+  ]
+}
