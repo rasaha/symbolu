@@ -275,6 +275,18 @@
       "classical_associations": "Distinctions: avajñā (neglect of the valuable) vs upekṣā (ignoring the unacceptable — not always bad) vs avahelā (negative disregard). The brahmavihāra four attitudes: maitrī (happy), karuṇā (suffering), muditā (virtuous), upekṣā (wicked) — with the caveat that indifference to SOCIALLY-HARMFUL wickedness is not acceptable.",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION. ATTESTED: ba = avajñā vṛtti (neglect of what has value), sharply distinguished from upekṣā/avahelā, with the brahmavihāra frame — BINDING pole attested. AUTHORED: the LIBERATING pole (regard that attends to worth) is lexicon-supplied but supported by the passage's proper-attitude ideal.",
       "v2_drift_note": "v2 binding='indifference / neglect' is fine; v2 liberating='spiritual dullness through neglect; respect/attention is correction' RESTATES the problem + names the corrective rather than the liberated MODE — problem-as-pole AGAIN (9th instance). v3 uses the lexicon's 'regard that recognizes and attends to worth.' ba is bridge-reachable and common (/b/)."
+    },
+    {
+      "varna": "bha",
+      "sanskrit_label": "Mūrcchā (stupefaction / deluded obsession — losing common sense under a ripu's spell)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "none — aspirated labial भ, reference-only (not a bridge target). English has no /bʱ/; /b/ -> ba, so bha never arises.",
+      "source_quote": "Sarkar: Bha is the acoustic root of mūrcchā vṛtti. Here mūrcchā does NOT mean senselessness (fainting); it means to lose one's common sense under the hypnotic spell of a particular ripu. To avoid its unsalutary effects one should direct the mind along the path of righteousness through pratyāhāra yoga; those who have not learned pratyāhāra should do kīrtana aloud or sing devotional songs to escape the clutches of mūrcchā.",
+      "binding": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+      "liberating": "breaking the entrancing spell into clear sense — withdrawing the mind (pratyāhāra) along the path of righteousness, no longer spellbound (aided by kīrtana / devotional song)",
+      "classical_associations": "Cure / liberating direction: pratyāhāra yoga (directing the mind along righteousness); or, for those without the technique, kīrtana / devotional singing. NOTE: mūrcchā here is NOT fainting/senselessness — it is losing common sense under a ripu's hypnotic spell.",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + cure. ATTESTED: bha = mūrcchā vṛtti (losing common sense under a ripu's spell, explicitly NOT fainting); and the LIBERATING DIRECTION (pratyāhāra / kīrtana) is the attested remedy. AUTHORED: the exact liberated-mode wording ('breaking the entrancing spell into clear sense') is lexicon-supplied but aligned with the attested cure.",
+      "v2_drift_note": "bha is ABSENT from v2 (reference-only aspirate). English has no /bʱ/; /b/ -> ba, so bha cannot arise in an English varṇa sequence."
     }
   ]
 }

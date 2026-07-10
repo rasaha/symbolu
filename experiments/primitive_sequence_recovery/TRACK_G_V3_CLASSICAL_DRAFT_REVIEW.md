@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **24**, pending **10**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **25**, pending **9**
 
 ## Fidelity caveats
 
@@ -45,7 +45,7 @@
 | `nya` | ✧ | Kapaṭatā (binding) | **P** | name+def | hypocrisy / concealment — inner and outer di… | transparency — inner intent and outer act co… |
 | `ssa` | ✧ | Kāma / Tamoguṇa(bind… | pend |  | sensory craving bound to inertia | raw desire transmuted into grounded, contain… |
 | `tta` | ✧ | Vitarka (binding) | **P** |  | vitarka — overstating one's case to the poin… | pramita vāk — balanced, measured speech usin… |
-| `bha` | · | Mūrcchā(binding) | pend |  | hypnotic entrancement, loss of common sense | breaking the entrancing spell into clear sen… |
+| `bha` | · | Mūrcchā (binding) | **P** | name+def | mūrcchā — hypnotic entrancement, the loss of… | breaking the entrancing spell into clear sen… |
 | `cha` | · | Vikalatā (binding) | **P** | name+def | collapse of mental function under strain — t… | steadiness that keeps mental function intact… |
 | `ddha` | · | Piśunatā (binding) | **P** | name+def | piśunatā — senseless, sadistic cruelty: harm… | compassion that shields the maligned — restr… |
 | `gha` | · | Mamatā (binding) | **P** |  | mamatā bounded by the relative factors (time… | mamatā made to TRANSCEND time, space and ind… |
