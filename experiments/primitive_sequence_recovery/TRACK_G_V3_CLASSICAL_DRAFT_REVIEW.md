@@ -2,8 +2,7 @@
 
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · bridge-target **25** · **practically reachable 20** · reference-only 14
-- verified **19**, pending **15**
+- varṇas **34** · practically reachable **20** · reference-only 14 · verified **20**, pending **14**
 
 ## Fidelity caveats
 
@@ -23,7 +22,7 @@
 |---|---|---|---|---|---|---|
 | `ba` | ★ | Avajñā(binding) | pend |  | neglect of what actually has value | regard that recognizes and attends to worth |
 | `ca` | ★ | Viveka (liberating_o… | **P** | name | viveka distorted — discernment hardening int… | falsehood-discerning insight without egoic s… |
-| `da` | ★ | Krodha / Karkaśatā(b… | pend |  | reactive irritability discharged at others | forbearance that absorbs provocation |
+| `da` | ★ | Krodha / Karkaśatā (… | **P** | name+def | peevishness / reactive irritability — perver… | forbearance that absorbs provocation — an ev… |
 | `dha` | ★ | Tṛṣṇā(binding) | pend |  | limitless thirst to acquire | the acquisitive thirst quenched at its root |
 | `ga` | ★ | Ceṣṭā (binding) | **P** |  | restless striving that cannot stop — effort … | will-force applied to arouse one's dormant h… |
 | `ha` | ★ | Parā-vidyā (liberati… | **P** |  | outward / visible vision — fixation on the m… | intuitional vision (parā-vidyā) — inner, sub… |

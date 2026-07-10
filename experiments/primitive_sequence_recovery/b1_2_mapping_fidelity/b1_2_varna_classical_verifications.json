@@ -217,6 +217,18 @@
       "classical_associations": null,
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: tha = viśāda vṛtti (melancholy); and (operator phonetic note) थ = aspirated dental stop, NOT the English /θ/,/ð/ fricatives. AUTHORED: both poles are lexicon-supplied (binding=dejection matches the name; liberating=buoyancy authored).",
       "v2_drift_note": "v2 binding='melancholy / dejection' is fine; v2 liberating='depressive contraction; needs upward movement' RESTATES the problem + names a corrective rather than the liberated MODE — problem-as-pole again. v3 uses the lexicon's 'warm buoyancy lifting one's own dejection.' MAJOR MIS-MAPPING (see english_equivalent): tha is fed by English /θ/,/ð/ (think/this/the/that) which are NOT थ, so tha=melancholy is massively over-triggered. Distinct from ta (dental unaspirated, jāḍya/inertia) and from retroflex tta (vitarka)."
+    },
+    {
+      "varna": "da",
+      "sanskrit_label": "Krodha / Karkaśatā (peevishness / irritability)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "dental /d/ -> da; BRIDGE-REACHABLE and common (any /d/). PHONETIC NOTE: dental da is a hard stop with the tongue flat on the upper teeth (like Spanish/Italian d); English 'd' (dad) is ALVEOLAR (roof of mouth) — a close approximation, mapped to da. The retroflex ḍa is reserved for the 'dr' cluster (currently unreachable). The dental POSITION matches English /ð/ 'this', but that is a FRICATIVE -> mapped to tha, not da.",
+      "source_quote": "Sarkar: Da is the acoustic root of peevishness. If one speaks in a nice way to a peevish person, he or she reacts adversely; if one speaks in a harsh way, he or she takes it calmly.",
+      "binding": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+      "liberating": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+      "classical_associations": null,
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: da = peevishness/irritability (krodha/karkaśatā), with the contrary-reaction illustration — the BINDING pole. AUTHORED: the LIBERATING pole (forbearance) is lexicon-supplied.",
+      "v2_drift_note": "v2 binding='peevishness / irritability' is fine; v2 liberating='small egoic contraction; patience softens it' RESTATES the problem ('egoic contraction') + names a corrective ('patience softens it') rather than the liberated MODE — problem-as-pole AGAIN (6th instance: nga/ja/nya/nna/ta/da). v3 uses the lexicon's 'forbearance that absorbs provocation.' da is bridge-reachable and common (/d/)."
     }
   ]
 }
