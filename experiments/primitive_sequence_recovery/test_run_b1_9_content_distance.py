@@ -74,11 +74,52 @@ def test_blocked_family_yields_no_deltas():
     assert res["status"] == "BLOCKED_NOT_AVAILABLE" and res["deltas"] == []
 
 
-# ---- out-of-pool control (the fix: control content reuses NO varṇa mapping) -----------
-def test_out_of_pool_is_primary_and_implemented():
+# ---- corrected control: distant source word's OWN authentic varṇa mapping -------------
+def test_distant_source_is_primary_and_implemented():
     f = D.load_frozen()
-    assert f["sampler"]["primary_family"] == "out_of_pool_lexicon_facet"
-    assert D.CONTROL_FAMILIES[0] == "out_of_pool_lexicon_facet"
+    assert f["sampler"]["primary_family"] == "distant_source_word_mapping"
+    assert D.CONTROL_FAMILIES[0] == "distant_source_word_mapping"
+    assert D.FAMILY_STATUS["distant_source_word_mapping"][0] == "IMPLEMENTED"
+
+def test_distant_source_scores_all_items_with_a_different_source_word():
+    f = D.load_frozen()
+    items = f["targets"]["targets"]
+    res = D.compute_family(items, "distant_source_word_mapping", f, D.FakeEmbedding())
+    scored = [p for p in res["per_item"] if "delta_distance" in p]
+    assert len(scored) == len(items)
+    for p in scored:
+        assert p["source_word_id"] != p["item_id"]          # W′ is a DIFFERENT word
+        assert p["source_word_id"] in {it["item_id"] for it in items}
+
+def test_distant_source_map_uses_only_target_context_not_facets_or_outcomes():
+    import inspect
+    src = _strip_docstrings(inspect.getsource(D._freeze_distant_source_map))
+    assert "facet" not in src            # selection never touches facet content
+    assert "d_auth" not in src           # selection never references the outcome
+    # map is deterministic and each W′ is the most target/context-distant item
+    f = D.load_frozen(); items = f["targets"]["targets"]; be = D.FakeEmbedding()
+    m1 = D._freeze_distant_source_map(items, f["preproc"], be)
+    m2 = D._freeze_distant_source_map(items, f["preproc"], be)
+    assert m1 == m2
+    reps = [D.target_rep(it, f["preproc"]) for it in items]
+    embs = be.embed(reps)
+    for i, it in enumerate(items):
+        dists = {items[j]["item_id"]: D._cos_dist(embs[i], embs[j]) for j in range(len(items)) if j != i}
+        assert m1[it["item_id"]] == max(dists, key=lambda k: dists[k])
+
+def test_distant_source_endpoint_is_control_minus_auth():
+    f = D.load_frozen(); items = f["targets"]["targets"]
+    res = D.compute_family(items, "distant_source_word_mapping", f, D.FakeEmbedding())
+    p = next(x for x in res["per_item"] if "delta_distance" in x)
+    # each field independently rounded to 4dp -> compare within rounding tolerance
+    assert abs(p["delta_distance"] - (p["d_control"] - p["d_auth"])) < 2e-4
+
+
+# ---- out-of-pool control (secondary/external-register; reuses NO varṇa mapping) --------
+def test_out_of_pool_is_secondary_and_implemented():
+    f = D.load_frozen()
+    assert f["sampler"]["primary_family"] != "out_of_pool_lexicon_facet"
+    assert "out_of_pool_lexicon_facet" in D.CONTROL_FAMILIES
     assert D.FAMILY_STATUS["out_of_pool_lexicon_facet"][0] == "IMPLEMENTED"
 
 def test_out_of_pool_scores_all_items():

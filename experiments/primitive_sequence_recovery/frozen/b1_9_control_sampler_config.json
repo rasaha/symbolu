@@ -1,6 +1,7 @@
 {
   "artifact_type": "b1_9_control_sampler_config",
   "control_families": [
+    "distant_source_word_mapping",
     "out_of_pool_lexicon_facet",
     "same_polarity_random_varna_facet",
     "same_plane_random_varna_facet",
@@ -9,7 +10,7 @@
     "permuted_target_label",
     "random_word_context_decoy"
   ],
-  "primary_family": "out_of_pool_lexicon_facet",
+  "primary_family": "distant_source_word_mapping",
   "K": 5,
   "seed": 20260709,
   "prospective_distance_constraint": {
@@ -26,6 +27,6 @@
     "alpha": 0.05,
     "require_robust_across_families": true
   },
-  "primary_family_rationale": "out_of_pool_lexicon_facet is primary because the operator required that the scrambled/control meaning must NOT reuse the varṇa mappings. The prior within-pool controls (completely_random_facet, same_plane_random_varna_facet, frequency_length_matched_facet) draw from the same 25-varṇa pool and produce paraphrase-level near-synonyms; the out-of-pool control removes the varṇa mapping from the control side. The within-pool controls are retained and reported for triangulation, with the register caveat in b1_9_out_of_pool_lexicon.json.",
-  "note": "same_polarity requires poles (resolver) -> BLOCKED under resolver-free named_attribute mode; frequency portion unavailable -> length_only. out_of_pool_lexicon_facet content comes from the frozen b1_9_out_of_pool_lexicon.json and reuses NO varṇa mapping."
+  "primary_family_rationale": "distant_source_word_mapping is the corrected primary control: for target W, control = a DIFFERENT real source word W′'s OWN complete authentic varṇa-derived facet aggregate, where W′ is selected as semantically distant from W using target/context embeddings ONLY (never facet embeddings or outcome distances) and the W->W′ assignment is frozen before the endpoint. This keeps the control on the same varṇa-mapping construction and register as authentic (unlike the out-of-pool lexicon, which is a different register), while guaranteeing the source word is genuinely distant (unlike within-pool derangements, which are paraphrase-level near-synonyms). out_of_pool_lexicon_facet is retained as a SECONDARY external-register control; the within-pool families are retained for triangulation.",
+  "note": "same_polarity requires poles (resolver) -> BLOCKED under resolver-free named_attribute mode; frequency portion unavailable -> length_only. distant_source_word_mapping W′ pool = the frozen B1.9 target set; W→W′ frozen from target/context distance only. out_of_pool_lexicon_facet content comes from the frozen b1_9_out_of_pool_lexicon.json and reuses NO varṇa mapping."
 }

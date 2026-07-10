@@ -44,9 +44,10 @@ HASH_INPUTS = {
 REQUIRED_DECL_FIELDS = ("artifact", "b1_9_declared", "mode", "representation_version",
                         "declared_by", "declared_at_utc", "attestation", *HASH_INPUTS.keys())
 
-CONTROL_FAMILIES = ("out_of_pool_lexicon_facet", "same_polarity_random_varna_facet",
-                    "same_plane_random_varna_facet", "frequency_length_matched_facet",
-                    "completely_random_facet", "permuted_target_label", "random_word_context_decoy")
+CONTROL_FAMILIES = ("distant_source_word_mapping", "out_of_pool_lexicon_facet",
+                    "same_polarity_random_varna_facet", "same_plane_random_varna_facet",
+                    "frequency_length_matched_facet", "completely_random_facet",
+                    "permuted_target_label", "random_word_context_decoy")
 BAD_MODES = {"pilot_generation", "exploratory_10_sample_generation_probe", "pilot_judging",
              "b1_8_context_resolved_generation_probe"}
 
@@ -210,10 +211,16 @@ def _cos_dist(a: List[float], b: List[float]) -> float:
 # Control families
 # --------------------------------------------------------------------------------------
 FAMILY_STATUS = {
+    "distant_source_word_mapping": ("IMPLEMENTED",
+        "PRIMARY (corrected control). Control = a DIFFERENT real source word W′'s OWN complete authentic "
+        "varṇa-derived facet aggregate (same construction/register as authentic). W′ is frozen as the item whose "
+        "target/context embedding is MOST DISTANT from W's — selected using target/context embeddings ONLY, "
+        "never facet embeddings or outcome distances (anti-circular). Endpoint delta = d(target(W),facets(W′)) − "
+        "d(target(W),facets(W)); positive favors W's own mapping. W′ pool = the frozen B1.9 target set."),
     "out_of_pool_lexicon_facet": ("IMPLEMENTED",
-        "PRIMARY. Control facets drawn from the frozen out-of-pool lexicon (b1_9_out_of_pool_lexicon.json), "
-        "which reuses NO varṇa→meaning mapping — not a within-pool derangement. Carries a register caveat "
-        "(concrete/sensory vs abstract-psychological); read together with the within-pool controls."),
+        "SECONDARY (external-register control). Control facets drawn from the frozen out-of-pool lexicon "
+        "(b1_9_out_of_pool_lexicon.json), which reuses NO varṇa→meaning mapping. Carries a register caveat "
+        "(concrete/sensory vs abstract-psychological); an extra control, NOT the main correction."),
     "same_polarity_random_varna_facet": ("BLOCKED_NOT_AVAILABLE",
         "polarity requires a resolver/pole selection; B1.9 is resolver-free and uses neutral named_attribute "
         "facets — no polarity dimension. Reintroducing poles would reintroduce the resolver confound."),
@@ -257,6 +264,26 @@ def _sample_out_of_pool(item_id: str, glosses: List[str], k: int, seed: int) -> 
     return pool[:k]
 
 
+def _freeze_distant_source_map(items: List[Dict], preproc: Dict, backend) -> Dict[str, str]:
+    """Freeze the W -> W′ assignment for the distant_source_word_mapping control, using ONLY target/context
+    embeddings — never facet embeddings, never any outcome/d_auth distance (anti-circular, §6). For each target
+    W, W′ is the DIFFERENT item whose target/context representation is MOST DISTANT from W's. Deterministic:
+    ascending index scan, strict-greater update keeps the lowest-index winner on ties. Returns {W_id: W′_id}."""
+    reps = [target_rep(it, preproc) for it in items]     # target/context representation ONLY
+    embs = backend.embed(reps)
+    mapping: Dict[str, str] = {}
+    for i, it in enumerate(items):
+        best_j, best_d = None, -1.0
+        for j in range(len(items)):
+            if j == i:
+                continue
+            d = _cos_dist(embs[i], embs[j])
+            if d > best_d:
+                best_d, best_j = d, j
+        mapping[it["item_id"]] = items[best_j]["item_id"]
+    return mapping
+
+
 # --------------------------------------------------------------------------------------
 # Distance computation (paired; anti-circular)
 # --------------------------------------------------------------------------------------
@@ -291,6 +318,9 @@ def compute_family(items: List[Dict], family: str, frozen: Dict, backend) -> Dic
     k, seed = sampler["K"], sampler["seed"]
     constraint = sampler.get("prospective_distance_constraint", {})
     refusals = determine_refusals(items, family, frozen, backend, constraint)   # BEFORE outcomes
+    # W -> W′ frozen from target/context distance ONLY, before any facet/outcome distance (anti-circular)
+    distant_map = (_freeze_distant_source_map(items, preproc, backend)
+                   if family == "distant_source_word_mapping" else None)
 
     per_item, deltas = [], []
     for i, it in enumerate(items):
@@ -303,6 +333,18 @@ def compute_family(items: List[Dict], family: str, frozen: Dict, backend) -> Dic
         a_emb = backend.embed([facet_aggregate(auth_v, facets, preproc, plane)])[0]
         d_auth = _cos_dist(t_emb, a_emb)
 
+        if family == "distant_source_word_mapping":
+            src_id = distant_map[it["item_id"]]                         # frozen W′ (target/context-distance only)
+            src_it = next(x for x in items if x["item_id"] == src_id)
+            src_v = _supported_varnas(src_it, facets)                   # W′'s OWN authentic varṇa mapping
+            c_emb = backend.embed([facet_aggregate(src_v, facets, preproc)])[0]
+            d_control = _cos_dist(t_emb, c_emb)
+            delta = d_control - d_auth                                  # positive favors W's own mapping
+            deltas.append(delta)
+            per_item.append({"item_id": it["item_id"], "source_word_id": src_id,
+                             "d_auth": round(d_auth, 4), "d_control": round(d_control, 4),
+                             "delta_distance": round(delta, 4)})
+            continue
         if family == "out_of_pool_lexicon_facet":
             glosses = _sample_out_of_pool(it["item_id"], frozen["out_of_pool"]["glosses"], k, seed)
             c_embs = [backend.embed([normalize(g, preproc)])[0] for g in glosses]   # content NOT from varṇa pool
