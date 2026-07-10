@@ -170,6 +170,18 @@
       "classical_associations": "Cross-reference: lajjā is one of the eight pāshas (fetters) listed under pa (hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism). (Not a pole.)",
       "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: dda = lajjā vṛtti (shyness); and (from the pa passage) lajjā is one of the eight pāshas/fetters. AUTHORED (fully): BOTH poles are lexicon-supplied — this one-line passage gives no binding/liberating contrast.",
       "v2_drift_note": "v2 binding='shyness' is the bare vṛtti NAME (not a distortion); v2 liberating='humility if purified; blockage if fear-based' is a hedged conditional, not a clean liberated MODE. v3 uses the lexicon's 'acting unhindered by social shame.' PRACTICALLY UNREACHABLE (retroflex; 'dr' never emitted)."
+    },
+    {
+      "varna": "ddha",
+      "sanskrit_label": "Piśunatā (senseless / sadistic cruelty — torturous killing, malice)",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "none — retroflex aspirate (ढ); doubly unreachable (retroflex AND aspirate), not a bridge target.",
+      "source_quote": "Sarkar: Senseless, sadistic killing is called piśunatā vṛtti. Slaughtering in the way that inflicts the LEAST pain is NOT piśunatā; but killing slowly and cruelly — first chopping off legs, then tail, then head — is definitely piśunatā. (A live tortoise part-chopped and left crawling in its own blood; criminals impaled on spikes, half-buried and salted for dogs, or flayed alive — all examples of piśunatā.) The killing of animals, however done, is contrary to the spirit of Neohumanism.",
+      "binding": "piśunatā — senseless, sadistic cruelty: harming/killing with gratuitous torture (dismembering a creature piece by piece; impaling, flaying), inflicting maximal suffering for its own sake; malice toward the maligned",
+      "liberating": "compassion that shields the maligned — restraint from gratuitous cruelty; if life must be taken, with the minimum of pain (the spirit of Neohumanism)",
+      "classical_associations": "Distinctions: piśunatā (sadistic torture) is NOT ordinary least-pain killing; it is a sharper/darker sibling of krūratā (la — cruelty / physical harm to the weak) and ENTIRELY DIFFERENT from dha (dental aspirate = tṛṣṇā / craving — operator-flagged 'different from Dha'). Held contrary to the spirit of Neohumanism.",
+      "attested_vs_authored": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION/illustration. ATTESTED: ddha = piśunatā vṛtti (sadistic cruelty), vividly illustrated (torturous slaughter; the tortoise; impaling/flaying) — the BINDING pole; plus the attested contrast that least-pain killing is NOT piśunatā. AUTHORED: the LIBERATING pole (compassion shielding the maligned) is lexicon-supplied, though the passage's least-pain / Neohumanism contrast supports it.",
+      "v2_drift_note": "ddha is ABSENT from v2 (reference-only — retroflex AND aspirate, doubly unreachable). DISTINCT from dha (dental aspirate = tṛṣṇā / craving) — a different vṛtti entirely (operator note); and distinct from la (krūratā, general cruelty), of which piśunatā is the sadistic-torture intensification."
     }
   ]
 }

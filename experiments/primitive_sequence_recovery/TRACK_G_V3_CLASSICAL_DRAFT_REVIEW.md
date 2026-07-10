@@ -3,7 +3,7 @@
 **Auto-rendered from `frozen/varna_polarity_table_v3_classical_DRAFT.json`.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
 - varṇas **34** · bridge-target **25** · **practically reachable 20** · reference-only 14
-- verified **15**, pending **19**
+- verified **16**, pending **18**
 - R: ★ reachable · ✧ target-but-unreachable · · reference-only · scope name/name+def = poles authored
 
 ## Varṇas (⚑ differs from v2)
@@ -37,7 +37,7 @@
 | `tta` | ✧ | Vitarka (binding) | **P** |  | vitarka — overstating one's case to the poin… | pramita vāk — balanced, measured speech usin… |
 | `bha` | · | Mūrcchā(binding) | pend |  | hypnotic entrancement, loss of common sense | breaking the entrancing spell into clear sen… |
 | `cha` | · | Vikalatā (binding) | **P** | name+def | collapse of mental function under strain — t… | steadiness that keeps mental function intact… |
-| `ddha` | · | Piśunatā(binding) | pend |  | malice — sadistic cruelty toward the maligne… | compassion that shields the maligned |
+| `ddha` | · | Piśunatā (binding) | **P** | name+def | piśunatā — senseless, sadistic cruelty: harm… | compassion that shields the maligned — restr… |
 | `gha` | · | Mamatā (binding) | **P** |  | mamatā bounded by the relative factors (time… | mamatā made to TRANSCEND time, space and ind… |
 | `jha` | · | Lolupatā / Lobha / L… | **P** | name+def | greed / avarice — hoarding accumulation with… | sufficiency — appetite that releases at 'eno… |
 | `kha` | · | Cintā (binding) | **P** |  | cintā as anxious rumination — the mind churn… | cintā as composed, impersonal reflection — h… |
