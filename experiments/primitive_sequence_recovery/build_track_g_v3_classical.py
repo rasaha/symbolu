@@ -28,7 +28,7 @@ FROZEN = HERE / "frozen"
 V2_FILE = HERE / "track_g_varna_polarity_table_v2_named_vritti.json"
 LEX_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_varna_source_lexicon.json"
 LEDGER_FILE = HERE / "b1_2_mapping_fidelity" / "b1_2_varna_classical_verifications.json"
-OUT_FILE = FROZEN / "track_g_varna_polarity_table_v3_classical_DRAFT.json"
+OUT_FILE = FROZEN / "varna_polarity_table_v3_classical_DRAFT.json"
 
 # classical ha↔ṭha note (primary text the operator supplied earlier); ṭha = ttha key
 TTHA_CLASSICAL_NOTE = ("Classical (Sarkar): ṭha (ttha) is the acoustic root of nighttime, of the moon, of "
