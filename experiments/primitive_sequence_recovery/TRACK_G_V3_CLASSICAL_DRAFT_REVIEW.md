@@ -2,7 +2,7 @@
 
 **Auto-rendered.** Status **DRAFT_REQUIRES_PER_VARNA_CLASSICAL_SIGNOFF**, `applied=False`.
 
-- varṇas **34** · practically reachable **19** · reference-only 15 · verified **31**, pending **3**
+- varṇas **34** · practically reachable **19** · reference-only 15 · verified **33**, pending **1**
 
 ## Fidelity caveats
 
@@ -15,6 +15,7 @@
 - RETROFLEX UNDER-REPRESENTATION: English 'dr'/'tr' (drum, train) are phonetically retroflex-flavored — the bridge even maps dr->dda, tr->tta — but the G2P PRE-SPLITS the cluster into d+r / t+r, so those words map to DENTAL da/ta and the retroflex ḍa/ṭa are never produced. Capturing them needs a decomposer rule (d/t before r -> retroflex), which is a G2P change, not retrofitted here.
 - TH MIS-MAPPING: the English 'th' grapheme is the dental FRICATIVES /θ/ (think) and /ð/ (this/the/that) — sounds Sanskrit LACKS — but the bridge maps 'th' -> tha (viṣāda/melancholy, an aspirated STOP थ). So the most frequent English words (the/this/that) inject a spurious 'melancholy' varṇa. Genuine थ (t+h, ant-hill) coincides only by accident. This is a MIS-mapping, not merely under-representation.
 - ASPIRATION COLLAPSE: English aspirated word-initial /tʰ/ (top) vs unaspirated /t/ (stop) both -> ta; classically initial tʰ is closer to tha. Aspiration is ignored across the stop series.
+- SIBILANT SWAP (content error, both derived tables): per the primary text śa(sha, palatal)=tamoguṇa/kāma and ṣa(ssa, retroflex)=rajoguṇa/artha, but v2 AND the lexicon SWAP them (kāma/tamoguṇa filed under ssa, rajoguṇa/artha under sha). sa(dental)=sattva/mokṣa is correct. v3 follows the primary text.
 
 ## Varṇas (R: ★ reachable ✧ target-but-unreachable · reference-only · ⚑ differs from v2 · scope name/name+def=poles authored)
 
@@ -33,7 +34,7 @@
 | `nga` | ★ | Dambha (binding) | **P** |  | dambha as vanity — the self displayed and pe… | conduct that stands without outward performa… |
 | `pa` | ★ | Ghṛṇā (binding) | **P** |  | attraction toward the crude / objects — the … | revulsion OF the ripus — ghṛṇā redirected ag… |
 | `ra` | ★ | Sarvanāśa (dual) | **P** |  | sarvanāśa — the defeatist annihilation-thoug… | prāṇaśakti — the fire of life-force directed… |
-| `sa` | ★ | Mokṣa / Sattvaguṇa(lib… | pend |  | sattvic clarity/order owned as purity, super… | clarity without attachment to clarity |
+| `sa` | ★ | Mokṣa (liberating_orie… | **P** | name+def | the sentient / sattvic impulse clung to — cl… | mokṣa — unqualified liberation; sentient cla… |
 | `sha` | ★ | Kāma (neutral) | **P** | name+def | kāma — worldly / physical desire and longing… | physical longing sublimated / redirected tow… |
 | `ta` | ★ | Jāḍya / Nidrā (binding… | **P** |  | jāḍya — inertia, staticity, dullness, torpor… | the cessation of dullness/staticity — awaken… |
 | `tha` | ★ | Viṣāda (binding) | **P** | name+def | viśāda — melancholy, dejection that sinks on… | warm buoyancy lifting one's own dejection — … |
@@ -43,7 +44,7 @@
 | `dha` | ✧ | Tṛṣṇā (binding) | **P** |  | tṛṣṇā — limitless thirst to acquire: unquenc… | the acquisitive thirst quenched at its root … |
 | `nna` | ✧ | Īrṣyā (binding) | **P** | name | envy — the sting at another's success; covet… | muditā — sympathetic gladness at another's f… |
 | `nya` | ✧ | Kapaṭatā (binding) | **P** | name+def | hypocrisy / concealment — inner and outer di… | transparency — inner intent and outer act co… |
-| `ssa` | ✧ | Kāma / Tamoguṇa(bindin… | pend |  | sensory craving bound to inertia | raw desire transmuted into grounded, contain… |
+| `ssa` | ✧ | Artha (binding) | **P** | name+def | artha as possessive acquisition — worldly pu… | purposeful action without possessive bondage… |
 | `tta` | ✧ | Vitarka (binding) | **P** |  | vitarka — overstating one's case to the poin… | pramita vāk — balanced, measured speech usin… |
 | `bha` | · | Mūrcchā (binding) | **P** | name+def | mūrcchā — hypnotic entrancement, the loss of… | breaking the entrancing spell into clear sen… |
 | `cha` | · | Vikalatā (binding) | **P** | name+def | collapse of mental function under strain — t… | steadiness that keeps mental function intact… |

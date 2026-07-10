@@ -148,6 +148,9 @@ def build():
             "ant-hill) coincides only by accident. This is a MIS-mapping, not merely under-representation.",
             "ASPIRATION COLLAPSE: English aspirated word-initial /tʰ/ (top) vs unaspirated /t/ (stop) both -> ta; "
             "classically initial tʰ is closer to tha. Aspiration is ignored across the stop series.",
+            "SIBILANT SWAP (content error, both derived tables): per the primary text śa(sha, palatal)=tamoguṇa/"
+            "kāma and ṣa(ssa, retroflex)=rajoguṇa/artha, but v2 AND the lexicon SWAP them (kāma/tamoguṇa filed "
+            "under ssa, rajoguṇa/artha under sha). sa(dental)=sattva/mokṣa is correct. v3 follows the primary text.",
         ],
         "resonance_framing": "RESONANCE refinement, not validated meaning. No ontology, no semantic truth, no "
                              "Sanskrit privilege, no GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",

@@ -355,7 +355,31 @@
       "liberating": "physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released",
       "classical_associations": "śa = tamoguṇa (the static principle). The four puruṣārthas (longings): dharma (psycho-spiritual), artha (psychic), kāma (physical), mokṣa (liberation) — kāma = all physical longings. (Guṇa association + longing-hierarchy frame.)",
       "attested_vs_authored": "ATTESTED (primary text): śa = TAMOGUṆA (static principle) + KĀMA (all PHYSICAL worldly desires); the four-puruṣārtha frame. BINDING pole (kāma) attested. AUTHORED: the LIBERATING pole (sublimation toward mokṣa) is inferred from the puruṣārtha hierarchy, not stated as a pole.",
-      "v2_drift_note": "MAJOR DISCREPANCY — BOTH v2 AND the lexicon MIS-ASSIGN śa's guṇa and puruṣārtha. Primary text: śa = TAMOGUṆA (static) + KĀMA (physical longing). But the lexicon = 'rajoguṇa + artha' and v2 = 'mutative drive / rajas / artha' — i.e. BOTH say RAJAS (mutative) + ARTHA (psychic), a different guṇa AND a different puruṣārtha (artha=psychic ≠ kāma=physical). v3 follows the PRIMARY TEXT (tamoguṇa + kāma). FIRST both-tables-wrong case; the sibilant→guṇa assignments (śa/ṣa/sa) in the derived tables may be systematically off — flag to check ssa/sa. sha is bridge-reachable (/ʃ/)."
+      "v2_drift_note": "MAJOR DISCREPANCY — BOTH v2 AND the lexicon MIS-ASSIGN śa's guṇa and puruṣārtha. Primary text: śa = TAMOGUṆA (static) + KĀMA (physical longing). But the lexicon = 'rajoguṇa + artha' and v2 = 'mutative drive / rajas / artha' — i.e. BOTH say RAJAS (mutative) + ARTHA (psychic), a different guṇa AND a different puruṣārtha (artha=psychic ≠ kāma=physical). v3 follows the PRIMARY TEXT (tamoguṇa + kāma). SIBILANT SWAP CONFIRMED (see the sa/ssa passage): the derived tables SWAP palatal śa (sha, correctly kāma/tamoguṇa) and retroflex ṣa (ssa, correctly artha/rajoguṇa) — they filed rajoguṇa/artha under sha and kāma/tamoguṇa under ssa. sa (mokṣa/sattva) is correct in both. sha is bridge-reachable (/ʃ/)."
+    },
+    {
+      "varna": "sa",
+      "sanskrit_label": "Mokṣa (unqualified liberation / salvation) — with sattvaguṇa (the sentient principle) association; classical side liberating-oriented",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "dental sibilant /s/ -> sa; BRIDGE-REACHABLE and extremely common (any /s/).",
+      "source_quote": "Sarkar: Sa is the acoustic root of mokṣa (salvation, unqualified liberation) and of sattvaguṇa (the sentient principle). In the four-varga scheme: va = dharma (+ liquid factor); ṣa ('sha') = artha (removal of worldly wants) + rajoguṇa; śa = kāma (worldly/physical wants) + tamoguṇa; sa = mokṣa + sattvaguṇa.",
+      "binding": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+      "liberating": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+      "classical_associations": "sa = sattvaguṇa (the sentient principle) and mokṣa (unqualified liberation) — the highest of the four longings (dharma/artha/kāma/mokṣa). Part of the four-varga sibilant scheme: śa(sha)=tamoguṇa/kāma, ṣa(ssa)=rajoguṇa/artha, sa=sattvaguṇa/mokṣa.",
+      "attested_vs_authored": "ATTESTED (primary text): sa = mokṣa (unqualified liberation) + sattvaguṇa (sentient principle); classical side liberating-oriented. AUTHORED: the binding pole (sattva clung to as purity/superiority — the golden chain) is lexicon-supplied but a standard reading of sattvic attachment; liberating = mokṣa / clarity-without-attachment.",
+      "v2_drift_note": "v2 liberating='sattva; clarity; peace; release; mokṣa; unqualified liberation' is CORRECT (matches the primary text); v2 binding='escapism; premature static withdrawal; inert/static withdrawal' drifts toward a TAMASIC withdrawal reading rather than sattva's subtle attachment (the golden chain). v3 uses the lexicon's 'clarity without attachment to clarity.' sa is CORRECTLY assigned in both tables (unlike sha/ssa which are swapped). sa is bridge-reachable and extremely common (/s/)."
+    },
+    {
+      "varna": "ssa",
+      "sanskrit_label": "Artha (psychic longing / worldly purpose — removal of worldly wants) — with rajoguṇa (the mutative principle) association",
+      "primary_text_scope": "NAME_PLUS_DEFINITION",
+      "english_equivalent": "retroflex sibilant ṣa (ष). PRACTICALLY UNREACHABLE: bridge target fed by 'shr' (never emitted); English /ʃ/ -> sha (palatal), so the retroflex ṣa never arises.",
+      "source_quote": "Sarkar (four-varga passage): ṣa ('sha') is the acoustic root of artha — 'the removal of worldly wants' — and of rajoguṇa (the mutative principle). artha is the PSYCHIC longing among the four (dharma/artha/kāma/mokṣa).",
+      "binding": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+      "liberating": "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+      "classical_associations": "ṣa = rajoguṇa (the mutative principle); artha = the psychic longing / the means that removes worldly wants. Part of the four-varga sibilant scheme (śa=tamoguṇa/kāma, ṣa=rajoguṇa/artha, sa=sattva/mokṣa).",
+      "attested_vs_authored": "ATTESTED (primary text): ṣa = artha (psychic longing / worldly purpose, 'removal of worldly wants') + rajoguṇa (mutative principle). AUTHORED: the binding/liberating split (possessive acquisition vs purposeful action without bondage) is lexicon-supplied — and these pole texts are taken from the lexicon's MIS-FILED 'sha' entry (see swap).",
+      "v2_drift_note": "SIBILANT SWAP CONFIRMED. Primary text: retroflex ṣa (ssa) = artha + RAJOGUṆA; palatal śa (sha) = kāma + TAMOGUṆA. But BOTH derived tables SWAP them: they file kāma/tamoguṇa under ssa (v2 'static inertia / tamas-bound kama'; lexicon 'Kāma/Tamoguṇa') and rajoguṇa/artha under sha. v3 corrects by following the primary text: ssa = artha/rajoguṇa (pole texts from the lexicon's mis-filed 'sha' content), sha = kāma/tamoguṇa. ssa is PRACTICALLY UNREACHABLE (retroflex; 'shr' never emitted)."
     }
   ]
 }
