@@ -19,14 +19,20 @@ cd /workspace/symbolu/experiments/primitive_sequence_recovery
 git pull
 export HF_HOME=/workspace/.cache/huggingface
 
-# ── STEP A: CURATE + APPROVE the synonym/opposite table (REQUIRED before any run) ──────
-#   The DRAFT was auto-harvested from WordNet and HAS SENSE NOISE (e.g. lock->curl is hair,
-#   anchor->mainstay is the metaphor; some antonyms are verbs; 13 words are flagged for fill).
-#   1) Review frozen/b1_9_pole_sanity_items.json — check every synonym/opposite SENSE vs the word's context.
-#   2) Hand-edit weak entries (fix synonyms/opposites/glosses). Aim for 4 synonyms + 4 opposites/word.
-#   3) Set "word_groups_approved": true.  4) Re-run the builder to refresh hashes/scaffold:
-python3 build_b1_9_pole_sanity_scaffold.py            # idempotent; preserves your approval flag
-python3 -c "import json;d=json.load(open('frozen/b1_9_pole_sanity_items.json'));print('approved:',d['word_groups_approved'],'flags:',len(d['coverage_flags']));assert d['word_groups_approved'] is True,'CURATE + APPROVE first'"
+# ── STEP A: CURATE (curated-contrast mode) + APPROVE the table (REQUIRED before any run) ─
+#   CURATED-CONTRAST: synonyms = PRIMARY WordNet synset only (tight sense, no lock->curl/terror->brat);
+#   opposites = TRUE antonyms ONLY (the opposite-pole item-word pool is NOT used). WordNet coverage is
+#   sparse, so most of the 24 words are flagged NEEDS_MANUAL_REPLACEMENT — you curate them by hand:
+#   1) Edit frozen/b1_9_pole_sanity_overrides.json — for each word set
+#        "synonyms":  4 same-SENSE synonyms (as in the item context)
+#        "opposites": 4 TRUE antonyms / direct contrast words (NOT generic opposite-pole words)
+#      (the overrides file is merged, TAKES PRECEDENCE, and survives rebuilds; verb 'antonyms' are flagged).
+#   2) Rebuild and check nothing is still flagged:
+python3 build_b1_9_pole_sanity_scaffold.py            # idempotent; merges overrides; preserves approval flag
+python3 -c "import json;d=json.load(open('frozen/b1_9_pole_sanity_items.json'));print('fully_curated:',d['n_fully_curated'],'/',d['n_items'],'| need_manual:',d['n_need_manual']);assert d['n_need_manual']==0,'CURATE the NEEDS_MANUAL words in the overrides file first'"
+#   3) Set "word_groups_approved": true in b1_9_pole_sanity_items.json, then rebuild once more and verify:
+python3 build_b1_9_pole_sanity_scaffold.py
+python3 -c "import json;d=json.load(open('frozen/b1_9_pole_sanity_items.json'));assert d['word_groups_approved'] is True,'APPROVE after curation'"
 
 # ── STEP B: prepare the blind rating package (no model; shuffles; strips pole/role/item) ─
 python3 run_b1_9_pole_sanity.py prepare --out run_out/b1_9_pole_sanity   # prints n_items / n_rating_tasks / per_role
@@ -63,13 +69,16 @@ python3 run_b1_9_pole_sanity.py aggregate \
 git check-ignore run_out && echo "OK: run_out git-ignored"; echo "tracked under run_out: $(git ls-files run_out | wc -l)"
 ```
 
-**How to read it.** The four `reported_cells` are your 1–4:
-`1_correct_fit_to_target_synonyms` (expect high), `2_flipped_fit_to_target_synonyms` (expect low),
-`3_flipped_fit_to_opposites` (expect high), `4_correct_fit_to_opposites` (expect low). The make-or-break line is
-**`mean_INT`** with its CI: a CI straddling 0 → pole labels do no directional work (informative negative for
-coherence); a robust `INT > 0` → the pole labels ARE coherent, directional descriptors — a **sanity pass only**, no
-ontology / semantic truth / Sanskrit privilege / `GENUTILITY_*` / word-specific mapping. Check
-`anti_contrastive_audit`: if contrastive rates are high, discount any nonzero `INT`.
+**How to read it.** Read the **two `primary_diagnostics`** together, not INT alone:
+1. **`1_INT`** — coherence crossover. A CI straddling 0 → pole labels do no directional work (informative
+   negative); a robust `INT > 0` → pole-label / **valence** coherence — *necessary, not sufficient*.
+2. **`2_cell_1_correct_fit_to_target_synonyms`** — the word-level number. Word-level packet coherence needs this
+   **high** (well above `vs_neutral_midpoint_4 ≈ 0` and with a positive `minus_cell_2_flipped_to_target`).
+
+`verdict_logic`: **`INT>0` but `Cell① ` low ⇒ the test does NOT support word-level packet coherence** (the crossover
+is generic valence). Even `INT>0` **and** `Cell①` high is a **sanity pass only** — no ontology / semantic truth /
+Sanskrit privilege / `GENUTILITY_*` / word-specific mapping. Check `anti_contrastive_audit`; high contrastive rates
+discount any nonzero `INT`. The four `reported_cells` (① ② ③ ④) back these up.
 
 B1.9 pole-logic sanity command block documented only. No generation. No readings. No judging performed here. No
 B1.10. B1.4b′ remains NULL_RETURN_BOTTOM. Structure, not validated meaning.

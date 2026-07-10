@@ -45,23 +45,29 @@ For each `W`: two packets (`correct`, `flipped`) × candidate words in two role-
   choose senses and is **not** shown.
 - **Panel:** 3 judges, disjoint families (Llama-3.1-8B, Meta-Llama-3-8B, Gemma-2-9b), temperature 0.
 
-## 3. Primary statistic (fixed in advance)
+## 3. TWO primary diagnostics (fixed in advance)
 
 - `D_target   = mean(correct fit to W/synonyms) − mean(flipped fit to W/synonyms)`  — expect **> 0**
 - `D_opposite = mean(correct fit to opposites)  − mean(flipped fit to opposites)`   — expect **< 0**
-- **`INT = D_target − D_opposite`** — expect **> 0** (robust) if the pole logic is coherent.
+- **Diagnostic 1 — `INT = D_target − D_opposite`** — expect **> 0** (robust) if the pole labels are coherent.
+- **Diagnostic 2 — `Cell ①` = correct-pole packet fit to target/synonyms** — the word-level fit number, reported
+  with its own CI, its distance from the neutral midpoint 4, and its margin over `Cell ②` (flipped→target).
 
-Report the four cell means (① ② ③ ④), `D_target`, `D_opposite`, and `INT` with bootstrap CI95 + per-item sign
-test, plus the anti-contrastive audit rate per cell.
+Report the four cell means (① ② ③ ④), `D_target`, `D_opposite`, `INT` and `Cell ①` with bootstrap CI95 + per-item
+sign test, plus the anti-contrastive audit rate per cell.
 
-## 4. Interpretation (fixed in advance)
+## 4. Interpretation (fixed in advance — the INT-vs-Cell① rule)
 
-- **`D_target>0, D_opposite<0, INT>0` (robust):** the pole labels carry coherent directional meaning — a passed
-  **sanity** check only. **No** ontology, semantic truth, Sanskrit privilege, `GENUTILITY_*`, or word-specific
-  mapping claim follows.
-- **`INT ≈ 0` (CI straddles 0):** the pole labels do no directional work (packets fit everything, or nothing,
-  alike) — an informative negative for pole coherence.
-- **`INT < 0`:** anti-coherent (the "flipped" pole fits the word better than the "correct" one).
+- **`INT > 0` ALONE shows only pole-label / VALENCE coherence** (the two table columns carry opposite valence and
+  judges rate matching-valence text as fitting). Necessary, **not** sufficient for word-level fit.
+- **A HIGH `Cell ①` is REQUIRED** to claim the correct packet **directly fits the word-family** (well above the
+  neutral midpoint 4 AND above `Cell ②`).
+- **`INT > 0` but `Cell ① ` low ⇒ the test does NOT support word-level packet coherence** — the crossover is
+  generic valence, not the packet describing its own word.
+- **`INT ≈ 0` (CI straddles 0):** the pole labels do no directional work — informative negative.
+- **`INT < 0`:** anti-coherent (the "flipped" pole fits better than the "correct" one).
+- Even the strongest joint outcome (`INT>0` **and** `Cell①` high) is a **sanity/coherence pass only** — **no**
+  ontology, semantic truth, Sanskrit privilege, `GENUTILITY_*`, or word-specific varṇa-mapping claim.
 - **Audit caveat:** if the anti-contrastive audit shows high contrastive rates despite the instruction, a nonzero
   `INT` is discounted (contrastive credit, not direct fit). No terminal verdict under any outcome.
 
@@ -69,14 +75,17 @@ test, plus the anti-contrastive audit rate per cell.
 
 - **All 24 approved pole-DiD words** (`frozen/b1_9_pole_did_items.json`); packets reuse the approved canonical
   **consonant-only** varṇas at the two poles — **no new derivation**.
-- **Synonyms (target 4/word):** WordNet noun synsets (primary first, then fill; single-token; item words excluded;
-  sense-tagged). Words with fewer clean synonyms are **flagged for operator fill**, not dropped.
-- **Opposites (target 4/word):** WordNet antonyms of `W` and its synonyms first (direct contrast), then filled from
-  the **opposite-pole item-word pool** (a liberating word's opposites from the binding words, and vice versa). Each
-  tagged with its source.
-- **Operator curation & sign-off (anti-circularity):** WordNet fill can cross senses (`lock→curl`, `anchor→mainstay`)
-  and some antonyms are verbs — **the operator MUST review every synonym/opposite sense and hand-edit weak entries,
-  then set `word_groups_approved: true`.** The gate refuses to run until then; do not revise after seeing any rating.
+- **Synonyms (target 4/word):** **PRIMARY WordNet noun synset ONLY** — tight, same-sense. Cross-synset fill is
+  **deliberately not done** (that is what produced `lock→curl` / `terror→brat`, which came from *other* synsets).
+  Words with fewer primary-synset synonyms are **flagged `NEEDS_MANUAL_REPLACEMENT`**, not padded with wrong senses.
+- **Opposites (target 4/word):** **TRUE WordNet antonyms of `W` and its synonyms ONLY** — direct contrast. The
+  **opposite-pole item-word pool is NO LONGER used** (it made `INT` measure generic binding/liberating valence
+  rather than word-level contrast). Verb-only antonyms (e.g. `agitate`) are flagged for replacement with a noun.
+- **Operator curation via overrides (anti-circularity):** the operator curates same-sense synonyms + true antonyms
+  in **`frozen/b1_9_pole_sanity_overrides.json`** (`word → {synonyms:[…], opposites:[…]}`), which the builder
+  **merges and treats as authoritative, surviving rebuilds**. Every short / verb-antonym / wrong-sense slot is
+  flagged `NEEDS_MANUAL_REPLACEMENT` and must be resolved. Then set `word_groups_approved: true`. The gate refuses
+  to run until approval; do not revise after seeing any rating.
 
 ### 5b. Vowel-omission limitation (inherited)
 

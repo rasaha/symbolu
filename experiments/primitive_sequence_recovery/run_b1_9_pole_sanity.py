@@ -325,6 +325,11 @@ def aggregate(judge_parts: List[Dict], hidden: List[Dict]) -> Dict:
     d_target = [p["D_target"] for p in per_item]
     d_opp = [p["D_opposite"] for p in per_item]
     ints = [p["INT"] for p in per_item]
+    # Cell ① and Cell ② are computable for any item with target/synonym ratings (no opposites needed)
+    cell1_vals = [cell_mean(it, "correct", "target_synonyms") for it in items]
+    cell1_vals = [x for x in cell1_vals if x is not None]
+    cell2_vals = [cell_mean(it, "flipped", "target_synonyms") for it in items]
+    cell2_vals = [x for x in cell2_vals if x is not None]
 
     def boot(x, n=2000, seed=7):
         if not x:
@@ -332,6 +337,9 @@ def aggregate(judge_parts: List[Dict], hidden: List[Dict]) -> Dict:
         r = random.Random(seed)
         ms = sorted(sum(r.choice(x) for _ in range(len(x))) / len(x) for _ in range(n))
         return round(ms[int(.025 * n)], 3), round(ms[int(.975 * n)], 3)
+
+    def _m(x):
+        return round(st.mean(x), 3) if x else None
 
     def contr_rate(pole, grp):
         num = den = 0
@@ -343,10 +351,22 @@ def aggregate(judge_parts: List[Dict], hidden: List[Dict]) -> Dict:
 
     return {
         "label": "B1_9_POLE_SANITY_AGGREGATE", "representation_version": REPRESENTATION, "primary_statistic": INT_STAT,
+        "primary_diagnostics": {
+            "1_INT": {"mean": _m(ints), "CI95": boot(ints), "n_items_paired": len(per_item),
+                      "sign": {"pos": sum(1 for x in ints if x > 0), "neg": sum(1 for x in ints if x < 0)},
+                      "shows": "pole-label / VALENCE coherence only (necessary, not sufficient for word-level fit)"},
+            "2_cell_1_correct_fit_to_target_synonyms": {
+                "mean": _m(cell1_vals), "CI95": boot(cell1_vals), "n_items": len(cell1_vals),
+                "vs_neutral_midpoint_4": round(_m(cell1_vals) - 4, 3) if cell1_vals else None,
+                "minus_cell_2_flipped_to_target": round(_m(cell1_vals) - _m(cell2_vals), 3)
+                if (cell1_vals and cell2_vals) else None,
+                "required_for": "claiming the correct packet DIRECTLY fits the word-family"},
+        },
+        "verdict_logic": ("INT>0 ALONE => pole-label/valence coherence only. Word-level packet coherence REQUIRES "
+                          "Cell① HIGH (well above the neutral midpoint 4 AND above Cell② flipped→target). INT "
+                          "positive but Cell① low => the test does NOT support word-level packet coherence."),
         "reported_cells": cells,
-        "mean_D_target": round(st.mean(d_target), 3) if d_target else None,
-        "mean_D_opposite": round(st.mean(d_opp), 3) if d_opp else None,
-        "mean_INT": round(st.mean(ints), 3) if ints else None,
+        "mean_D_target": _m(d_target), "mean_D_opposite": _m(d_opp), "mean_INT": _m(ints),
         "INT_bootstrap_CI95": boot(ints), "n_items_paired": len(per_item),
         "INT_sign": {"pos": sum(1 for x in ints if x > 0), "neg": sum(1 for x in ints if x < 0)},
         "anti_contrastive_audit": {

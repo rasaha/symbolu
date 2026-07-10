@@ -35,6 +35,26 @@ def test_scaffold_all24_reuses_approved_packets():
         assert "target" in roles
 
 
+# ---- curated-contrast mode: no opposite-pole-pool fill; tight-sense synonyms -----------
+def test_opposites_are_antonyms_not_opposite_pole_pool():
+    for it in D.load_scaffold()["items"]:
+        for o in it["opposites"]:
+            assert o["source"] in ("wordnet_antonym", "operator_curated")   # NOT opposite_pole_pool
+    # a liberating word must NOT get the binding item-words as opposites by default
+    peace = next(it for it in D.load_scaffold()["items"] if it["target_text"] == "peace")
+    assert not ({"anchor", "cage", "chain", "wall"} & {o["word"] for o in peace["opposites"]})
+
+def test_synonyms_are_primary_synset_only_no_cross_sense_noise():
+    assert "curl" not in [s["word"] for s in B.harvest_synonyms("lock", set())]      # hair sense excluded
+    assert "brat" not in [s["word"] for s in B.harvest_synonyms("terror", set())]    # child sense excluded
+
+def test_needs_manual_flag_present_on_sparse_items():
+    idoc = json.load(open("frozen/b1_9_pole_sanity_items.json"))
+    assert idoc["n_need_manual"] >= 1 and idoc["coverage_flags"]
+    for f in idoc["coverage_flags"]:
+        assert f["status"] == "NEEDS_MANUAL_REPLACEMENT" and f["issues"]
+
+
 # ---- freeze gate ---------------------------------------------------------------------
 def test_gate_blocks_until_word_groups_approved(tmp_path, monkeypatch):
     monkeypatch.setattr(D, "word_groups_approved", lambda: False)
@@ -111,7 +131,16 @@ def test_mock_pipeline_and_int(tmp_path):
               "3_flipped_fit_to_opposites", "4_correct_fit_to_opposites"):
         assert agg["reported_cells"][k] is not None
     assert agg["mean_INT"] is not None and agg["INT_bootstrap_CI95"][0] is not None
-    assert agg["n_items_paired"] == 24
+    # only items that HAVE opposites can form D_opposite/INT (curated-contrast: no pool fill)
+    paired_expected = sum(1 for it in D.load_scaffold()["items"]
+                          if any(c["role"] == "opposite" for c in it["candidate_pool"]))
+    assert agg["n_items_paired"] == paired_expected
+    # two PRIMARY diagnostics exposed: INT + Cell ①
+    pd = agg["primary_diagnostics"]
+    assert pd["1_INT"]["mean"] is not None
+    assert pd["2_cell_1_correct_fit_to_target_synonyms"]["mean"] is not None
+    assert pd["2_cell_1_correct_fit_to_target_synonyms"]["vs_neutral_midpoint_4"] is not None
+    assert "Cell① HIGH" in agg["verdict_logic"]
     assert set(agg["anti_contrastive_audit"]) == {"correct_target_synonyms", "flipped_target_synonyms",
                                                   "flipped_opposites", "correct_opposites"}
 

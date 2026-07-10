@@ -2,13 +2,16 @@
   "artifact_type": "b1_9_pole_sanity_scaffold",
   "status": "FROZEN",
   "representation_version": "B1.9_pole_sanity",
-  "primary_statistic": "INT = D_target − D_opposite; D_target = mean(correct fit to W/syn) − mean(flipped fit to W/syn); D_opposite = mean(correct fit to opposites) − mean(flipped fit to opposites).",
+  "primary_diagnostics": {
+    "INT": "(correct→target/syn + flipped→opposites) − (flipped→target/syn + correct→opposites)",
+    "cell_1": "correct-pole packet fit to target/synonyms"
+  },
   "word_groups_approved": false,
   "source_hashes": {
-    "b1_9_pole_sanity_items.json": "eae65d6ca44266b260fc13c06edc1c32e48eb12e20d4d2a351f9de0529663405",
+    "b1_9_pole_sanity_items.json": "dae9497455e648860e50264a83e4924299801a94e737634a17d2d64b4fd79bab",
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694"
   },
-  "note": "Direct packet-rating sanity test (NO generation). Each of W's correct/flipped packets is rated 1-7 for DIRECT fit against W+synonyms and opposite words; anti-contrastive instruction. INT crossover = pole-label coherence. B1.4b′ NULL_RETURN_BOTTOM.",
+  "note": "Direct packet-rating sanity test (NO generation). Curated-contrast opposites (true antonyms, not opposite-pole item words). Two primary diagnostics: INT (coherence) + Cell① (word-level fit). B1.4b′ NULL_RETURN_BOTTOM.",
   "n_items": 24,
   "items": [
     {
@@ -75,28 +78,7 @@
           "role": "synonym",
           "gloss": "acceptance of despair",
           "synset": "resignation.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "yielding",
-          "role": "synonym",
-          "gloss": "a verbal act of admitting defeat",
-          "synset": "giving_up.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "capitulation",
-          "role": "synonym",
-          "gloss": "the act of surrendering (usually under agreed conditions)",
-          "synset": "capitulation.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "fall",
-          "role": "synonym",
-          "gloss": "the act of surrendering (usually under agreed conditions)",
-          "synset": "capitulation.n.03",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
       "opposites": [
@@ -105,28 +87,8 @@
           "role": "opposite",
           "gloss": "elude, especially in a baffling way",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "stand",
-          "role": "opposite",
-          "gloss": "a support or foundation",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "survive",
-          "role": "opposite",
-          "gloss": "continue to live through hardship or adversity",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "ascent",
-          "role": "opposite",
-          "gloss": "an upward slope or grade (as in a road)",
-          "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
       ],
       "candidate_pool": [
@@ -142,58 +104,23 @@
           "role": "synonym",
           "gloss": "acceptance of despair",
           "synset": "resignation.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "yielding",
-          "role": "synonym",
-          "gloss": "a verbal act of admitting defeat",
-          "synset": "giving_up.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "capitulation",
-          "role": "synonym",
-          "gloss": "the act of surrendering (usually under agreed conditions)",
-          "synset": "capitulation.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "fall",
-          "role": "synonym",
-          "gloss": "the act of surrendering (usually under agreed conditions)",
-          "synset": "capitulation.n.03",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "resist",
           "role": "opposite",
           "gloss": "elude, especially in a baffling way",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "stand",
-          "role": "opposite",
-          "gloss": "a support or foundation",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "survive",
-          "role": "opposite",
-          "gloss": "continue to live through hardship or adversity",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "ascent",
-          "role": "opposite",
-          "gloss": "an upward slope or grade (as in a road)",
-          "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 1/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['resist']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-02",
@@ -242,64 +169,39 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "freeing",
-          "role": "synonym",
-          "gloss": "the act of liberating someone or something",
-          "synset": "liberation.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "handout",
-          "role": "synonym",
-          "gloss": "an announcement distributed to members of the press in order to supplement or replace an oral presentation",
-          "synset": "handout.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismissal",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismission",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        }
-      ],
+      "synonyms": [],
       "opposites": [
         {
           "word": "hold",
           "role": "opposite",
           "gloss": "the act of grasping",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "confine",
           "role": "opposite",
           "gloss": "place limits on (extent or access)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "block",
           "role": "opposite",
           "gloss": "a solid piece of something (usually having flat rectangular sides)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "freeze",
           "role": "opposite",
           "gloss": "the withdrawal of heat to change something from a liquid to a solid",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
       ],
       "candidate_pool": [
@@ -311,62 +213,43 @@
           "source": "target"
         },
         {
-          "word": "freeing",
-          "role": "synonym",
-          "gloss": "the act of liberating someone or something",
-          "synset": "liberation.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "handout",
-          "role": "synonym",
-          "gloss": "an announcement distributed to members of the press in order to supplement or replace an oral presentation",
-          "synset": "handout.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismissal",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismission",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
           "word": "hold",
           "role": "opposite",
           "gloss": "the act of grasping",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "confine",
           "role": "opposite",
           "gloss": "place limits on (extent or access)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "block",
           "role": "opposite",
           "gloss": "a solid piece of something (usually having flat rectangular sides)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "freeze",
           "role": "opposite",
           "gloss": "the withdrawal of heat to change something from a liquid to a solid",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['confine']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-03",
@@ -434,45 +317,8 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "pardon",
-          "role": "synonym",
-          "gloss": "the act of excusing a mistake or offense",
-          "synset": "forgiveness.n.02",
-          "source": "wordnet_synset"
-        }
-      ],
-      "opposites": [
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "synonyms": [],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "forgiveness",
@@ -480,43 +326,14 @@
           "gloss": "compassionate feelings that support a willingness to forgive",
           "synset": null,
           "source": "target"
-        },
-        {
-          "word": "pardon",
-          "role": "synonym",
-          "gloss": "the act of excusing a mistake or offense",
-          "synset": "forgiveness.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-04",
@@ -580,39 +397,10 @@
           "role": "synonym",
           "gloss": "the act of waking",
           "synset": "awakening.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "awakening",
@@ -626,37 +414,15 @@
           "role": "synonym",
           "gloss": "the act of waking",
           "synset": "awakening.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-05",
@@ -722,28 +488,7 @@
           "role": "synonym",
           "gloss": "the mental attitude that something is believable and should be accepted as true",
           "synset": "credence.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "adoption",
-          "role": "synonym",
-          "gloss": "the act of accepting with approval; favorable reception",
-          "synset": "adoption.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "acceptation",
-          "role": "synonym",
-          "gloss": "the act of accepting with approval; favorable reception",
-          "synset": "adoption.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "espousal",
-          "role": "synonym",
-          "gloss": "the act of accepting with approval; favorable reception",
-          "synset": "adoption.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
       "opposites": [
@@ -752,28 +497,8 @@
           "role": "opposite",
           "gloss": "the act of rejecting something",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
       ],
       "candidate_pool": [
@@ -789,58 +514,22 @@
           "role": "synonym",
           "gloss": "the mental attitude that something is believable and should be accepted as true",
           "synset": "credence.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "adoption",
-          "role": "synonym",
-          "gloss": "the act of accepting with approval; favorable reception",
-          "synset": "adoption.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "acceptation",
-          "role": "synonym",
-          "gloss": "the act of accepting with approval; favorable reception",
-          "synset": "adoption.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "espousal",
-          "role": "synonym",
-          "gloss": "the act of accepting with approval; favorable reception",
-          "synset": "adoption.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "rejection",
           "role": "opposite",
           "gloss": "the act of rejecting something",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 1/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-06",
@@ -913,28 +602,28 @@
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "lucidness",
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "pellucidity",
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "clearness",
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
       "opposites": [
@@ -943,28 +632,24 @@
           "role": "opposite",
           "gloss": "the quality of being unclear or abstruse and hard to understand",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "unclearness",
           "role": "opposite",
           "gloss": "incomprehensibility as a result of not being clear",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "opacity",
           "role": "opposite",
           "gloss": "the phenomenon of not permitting the passage of electromagnetic radiation",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
       ],
       "candidate_pool": [
@@ -980,58 +665,58 @@
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "lucidness",
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "pellucidity",
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "clearness",
           "role": "synonym",
           "gloss": "free from obscurity and easy to understand; the comprehensibility of clear expression",
           "synset": "clarity.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "obscurity",
           "role": "opposite",
           "gloss": "the quality of being unclear or abstruse and hard to understand",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "unclearness",
           "role": "opposite",
           "gloss": "incomprehensibility as a result of not being clear",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "opacity",
           "role": "opposite",
           "gloss": "the phenomenon of not permitting the passage of electromagnetic radiation",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "opposites 3/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-07",
@@ -1095,60 +780,10 @@
           "role": "synonym",
           "gloss": "clear or deep perception of a situation",
           "synset": "penetration.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "perceptiveness",
-          "role": "synonym",
-          "gloss": "a feeling of understanding",
-          "synset": "insight.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "perceptivity",
-          "role": "synonym",
-          "gloss": "a feeling of understanding",
-          "synset": "insight.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "brainstorm",
-          "role": "synonym",
-          "gloss": "the clear (and often sudden) understanding of a complex situation",
-          "synset": "insight.n.03",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "unperceptiveness",
-          "role": "opposite",
-          "gloss": "the lack of insight and sympathetic understanding",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "insight",
@@ -1162,58 +797,15 @@
           "role": "synonym",
           "gloss": "clear or deep perception of a situation",
           "synset": "penetration.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "perceptiveness",
-          "role": "synonym",
-          "gloss": "a feeling of understanding",
-          "synset": "insight.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "perceptivity",
-          "role": "synonym",
-          "gloss": "a feeling of understanding",
-          "synset": "insight.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "brainstorm",
-          "role": "synonym",
-          "gloss": "the clear (and often sudden) understanding of a complex situation",
-          "synset": "insight.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "unperceptiveness",
-          "role": "opposite",
-          "gloss": "the lack of insight and sympathetic understanding",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-08",
@@ -1273,36 +865,7 @@
         "source": "target"
       },
       "synonyms": [],
-      "opposites": [
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "letting-go",
@@ -1310,36 +873,14 @@
           "gloss": "",
           "synset": null,
           "source": "target"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-09",
@@ -1379,64 +920,15 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "peacefulness",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "repose",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "serenity",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "heartsease",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        }
-      ],
+      "synonyms": [],
       "opposites": [
         {
           "word": "war",
           "role": "opposite",
           "gloss": "the waging of armed conflict against an enemy",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
       ],
       "candidate_pool": [
@@ -1448,62 +940,19 @@
           "source": "target"
         },
         {
-          "word": "peacefulness",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "repose",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "serenity",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "heartsease",
-          "role": "synonym",
-          "gloss": "the absence of mental stress or anxiety",
-          "synset": "peace.n.03",
-          "source": "wordnet_synset"
-        },
-        {
           "word": "war",
           "role": "opposite",
           "gloss": "the waging of armed conflict against an enemy",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 1/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-10",
@@ -1577,46 +1026,10 @@
           "role": "synonym",
           "gloss": "a deep awareness of and sympathy for another's suffering",
           "synset": "compassion.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "pity",
-          "role": "synonym",
-          "gloss": "the humane quality of understanding the suffering of others and wanting to do something about it",
-          "synset": "compassion.n.02",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "compassion",
@@ -1630,44 +1043,15 @@
           "role": "synonym",
           "gloss": "a deep awareness of and sympathy for another's suffering",
           "synset": "compassion.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "pity",
-          "role": "synonym",
-          "gloss": "the humane quality of understanding the suffering of others and wanting to do something about it",
-          "synset": "compassion.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "anchor",
-          "role": "opposite",
-          "gloss": "a mechanical device that prevents a vessel from moving",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "cage",
-          "role": "opposite",
-          "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "chain",
-          "role": "opposite",
-          "gloss": "a series of things depending on each other as if linked together",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "wall",
-          "role": "opposite",
-          "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-11",
@@ -1749,21 +1133,21 @@
           "role": "synonym",
           "gloss": "steadiness of mind under stress",
           "synset": "composure.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "calm",
           "role": "synonym",
           "gloss": "steadiness of mind under stress",
           "synset": "composure.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "calmness",
           "role": "synonym",
           "gloss": "steadiness of mind under stress",
           "synset": "composure.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
       "opposites": [
@@ -1772,28 +1156,32 @@
           "role": "opposite",
           "gloss": "anxious embarrassment",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "agitate",
           "role": "opposite",
           "gloss": "try to stir up public opinion",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "stimulate",
           "role": "opposite",
           "gloss": "act as a stimulant",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "stormy",
           "role": "opposite",
           "gloss": "(especially of weather) affected or characterized by storms or commotion",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
       ],
       "candidate_pool": [
@@ -1809,51 +1197,60 @@
           "role": "synonym",
           "gloss": "steadiness of mind under stress",
           "synset": "composure.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "calm",
           "role": "synonym",
           "gloss": "steadiness of mind under stress",
           "synset": "composure.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "calmness",
           "role": "synonym",
           "gloss": "steadiness of mind under stress",
           "synset": "composure.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "discomposure",
           "role": "opposite",
           "gloss": "anxious embarrassment",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "agitate",
           "role": "opposite",
           "gloss": "try to stir up public opinion",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "stimulate",
           "role": "opposite",
           "gloss": "act as a stimulant",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "stormy",
           "role": "opposite",
           "gloss": "(especially of weather) affected or characterized by storms or commotion",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 3/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['agitate', 'stimulate', 'stormy']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-12",
@@ -1926,28 +1323,7 @@
           "role": "synonym",
           "gloss": "the act of liberating someone or something",
           "synset": "liberation.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismissal",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismission",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "discharge",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
       "opposites": [
@@ -1956,28 +1332,32 @@
           "role": "opposite",
           "gloss": "place limits on (extent or access)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "lodge",
           "role": "opposite",
           "gloss": "English physicist who studied electromagnetic radiation and was a pioneer of radiotelegraphy (1851-1940)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "enforce",
           "role": "opposite",
           "gloss": "ensure observance of laws and rules",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "obstruct",
           "role": "opposite",
           "gloss": "hinder or prevent the progress or accomplishment of",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
       ],
       "candidate_pool": [
@@ -1993,58 +1373,46 @@
           "role": "synonym",
           "gloss": "the act of liberating someone or something",
           "synset": "liberation.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismissal",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "dismission",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "discharge",
-          "role": "synonym",
-          "gloss": "the termination of someone's employment (leaving them free to depart)",
-          "synset": "dismissal.n.04",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "confine",
           "role": "opposite",
           "gloss": "place limits on (extent or access)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "lodge",
           "role": "opposite",
           "gloss": "English physicist who studied electromagnetic radiation and was a pioneer of radiotelegraphy (1851-1940)",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": true
         },
         {
           "word": "enforce",
           "role": "opposite",
           "gloss": "ensure observance of laws and rules",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "obstruct",
           "role": "opposite",
           "gloss": "hinder or prevent the progress or accomplishment of",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['confine', 'enforce', 'obstruct']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-13",
@@ -2093,66 +1461,8 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "mainstay",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "keystone",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "backbone",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "linchpin",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        }
-      ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "synonyms": [],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "anchor",
@@ -2160,64 +1470,14 @@
           "gloss": "a mechanical device that prevents a vessel from moving",
           "synset": null,
           "source": "target"
-        },
-        {
-          "word": "mainstay",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "keystone",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "backbone",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "linchpin",
-          "role": "synonym",
-          "gloss": "a central cohesive source of support and stability",
-          "synset": "anchor.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-14",
@@ -2263,39 +1523,10 @@
           "role": "synonym",
           "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
           "synset": "cage.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "cage",
@@ -2309,37 +1540,15 @@
           "role": "synonym",
           "gloss": "an enclosure made or wire or metal bars in which birds or animals can be kept",
           "synset": "cage.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-15",
@@ -2385,28 +1594,7 @@
           "role": "synonym",
           "gloss": "a series of things depending on each other as if linked together",
           "synset": "chain.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "range",
-          "role": "synonym",
-          "gloss": "a series of hills or mountains",
-          "synset": "range.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "string",
-          "role": "synonym",
-          "gloss": "a necklace made by a stringing objects together",
-          "synset": "chain.n.10",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "strand",
-          "role": "synonym",
-          "gloss": "a necklace made by a stringing objects together",
-          "synset": "chain.n.10",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
       "opposites": [
@@ -2415,28 +1603,8 @@
           "role": "opposite",
           "gloss": "remove the chains from",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "unstring",
-          "role": "opposite",
-          "gloss": "remove the strings from",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
       ],
       "candidate_pool": [
@@ -2452,58 +1620,23 @@
           "role": "synonym",
           "gloss": "a series of things depending on each other as if linked together",
           "synset": "chain.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "range",
-          "role": "synonym",
-          "gloss": "a series of hills or mountains",
-          "synset": "range.n.04",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "string",
-          "role": "synonym",
-          "gloss": "a necklace made by a stringing objects together",
-          "synset": "chain.n.10",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "strand",
-          "role": "synonym",
-          "gloss": "a necklace made by a stringing objects together",
-          "synset": "chain.n.10",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "unchain",
           "role": "opposite",
           "gloss": "remove the chains from",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "unstring",
-          "role": "opposite",
-          "gloss": "remove the strings from",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 1/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['unchain']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-16",
@@ -2544,59 +1677,8 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "paries",
-          "role": "synonym",
-          "gloss": "(anatomy) a layer (a lining or membrane) that encloses a structure",
-          "synset": "wall.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "rampart",
-          "role": "synonym",
-          "gloss": "an embankment built around a space for defensive purposes",
-          "synset": "rampart.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "bulwark",
-          "role": "synonym",
-          "gloss": "an embankment built around a space for defensive purposes",
-          "synset": "rampart.n.01",
-          "source": "wordnet_synset"
-        }
-      ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "synonyms": [],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "wall",
@@ -2604,57 +1686,14 @@
           "gloss": "an architectural partition with a height and length greater than its thickness; used to divide or enclose an area or to support another structure",
           "synset": null,
           "source": "target"
-        },
-        {
-          "word": "paries",
-          "role": "synonym",
-          "gloss": "(anatomy) a layer (a lining or membrane) that encloses a structure",
-          "synset": "wall.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "rampart",
-          "role": "synonym",
-          "gloss": "an embankment built around a space for defensive purposes",
-          "synset": "rampart.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "bulwark",
-          "role": "synonym",
-          "gloss": "an embankment built around a space for defensive purposes",
-          "synset": "rampart.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-17",
@@ -2694,57 +1733,23 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "curl",
-          "role": "synonym",
-          "gloss": "a strand or cluster of hair",
-          "synset": "lock.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "ringlet",
-          "role": "synonym",
-          "gloss": "a strand or cluster of hair",
-          "synset": "lock.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "whorl",
-          "role": "synonym",
-          "gloss": "a strand or cluster of hair",
-          "synset": "lock.n.02",
-          "source": "wordnet_synset"
-        }
-      ],
+      "synonyms": [],
       "opposites": [
         {
           "word": "unlock",
           "role": "opposite",
           "gloss": "open the lock of",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "disengage",
           "role": "opposite",
           "gloss": "release from something that holds fast, connects, or entangles",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "uncoil",
-          "role": "opposite",
-          "gloss": "unwind or untwist",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
       ],
       "candidate_pool": [
@@ -2756,55 +1761,28 @@
           "source": "target"
         },
         {
-          "word": "curl",
-          "role": "synonym",
-          "gloss": "a strand or cluster of hair",
-          "synset": "lock.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "ringlet",
-          "role": "synonym",
-          "gloss": "a strand or cluster of hair",
-          "synset": "lock.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "whorl",
-          "role": "synonym",
-          "gloss": "a strand or cluster of hair",
-          "synset": "lock.n.02",
-          "source": "wordnet_synset"
-        },
-        {
           "word": "unlock",
           "role": "opposite",
           "gloss": "open the lock of",
           "synset": null,
-          "source": "wordnet_antonym"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         },
         {
           "word": "disengage",
           "role": "opposite",
           "gloss": "release from something that holds fast, connects, or entangles",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "uncoil",
-          "role": "opposite",
-          "gloss": "unwind or untwist",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 2/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['unlock', 'disengage']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-18",
@@ -2853,50 +1831,15 @@
         "synset": null,
         "source": "target"
       },
-      "synonyms": [
-        {
-          "word": "weightiness",
-          "role": "synonym",
-          "gloss": "the relative importance granted to something",
-          "synset": "weight.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "weighting",
-          "role": "synonym",
-          "gloss": "(statistics) a coefficient assigned to elements of a frequency distribution in order to represent their relative importance",
-          "synset": "weight.n.08",
-          "source": "wordnet_synset"
-        }
-      ],
+      "synonyms": [],
       "opposites": [
         {
           "word": "unburden",
           "role": "opposite",
           "gloss": "free or relieve (someone) of a burden",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "lightness",
-          "role": "opposite",
-          "gloss": "a feeling of joy and pride",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
       ],
       "candidate_pool": [
@@ -2908,48 +1851,20 @@
           "source": "target"
         },
         {
-          "word": "weightiness",
-          "role": "synonym",
-          "gloss": "the relative importance granted to something",
-          "synset": "weight.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "weighting",
-          "role": "synonym",
-          "gloss": "(statistics) a coefficient assigned to elements of a frequency distribution in order to represent their relative importance",
-          "synset": "weight.n.08",
-          "source": "wordnet_synset"
-        },
-        {
           "word": "unburden",
           "role": "opposite",
           "gloss": "free or relieve (someone) of a burden",
           "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "lightness",
-          "role": "opposite",
-          "gloss": "a feeling of joy and pride",
-          "synset": null,
-          "source": "wordnet_antonym"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_antonym",
+          "noun_sense": false
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 1/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "opposites lack a noun sense (verb antonyms?) — replace via overrides: ['unburden']"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-19",
@@ -2997,60 +1912,10 @@
           "role": "synonym",
           "gloss": "an overwhelming feeling of fear and anxiety",
           "synset": "panic.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "scourge",
-          "role": "synonym",
-          "gloss": "a person who inspires fear or dread",
-          "synset": "terror.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "threat",
-          "role": "synonym",
-          "gloss": "a person who inspires fear or dread",
-          "synset": "terror.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "brat",
-          "role": "synonym",
-          "gloss": "a very troublesome child",
-          "synset": "terror.n.03",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "terror",
@@ -3064,58 +1929,15 @@
           "role": "synonym",
           "gloss": "an overwhelming feeling of fear and anxiety",
           "synset": "panic.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "scourge",
-          "role": "synonym",
-          "gloss": "a person who inspires fear or dread",
-          "synset": "terror.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "threat",
-          "role": "synonym",
-          "gloss": "a person who inspires fear or dread",
-          "synset": "terror.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "brat",
-          "role": "synonym",
-          "gloss": "a very troublesome child",
-          "synset": "terror.n.03",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-20",
@@ -3174,36 +1996,7 @@
         "source": "target"
       },
       "synonyms": [],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "craving",
@@ -3211,36 +2004,14 @@
           "gloss": "an intense desire for some particular thing",
           "synset": null,
           "source": "target"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 0/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-21",
@@ -3287,46 +2058,17 @@
           "role": "synonym",
           "gloss": "fearful expectation or anticipation",
           "synset": "apprehension.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "apprehensiveness",
           "role": "synonym",
           "gloss": "fearful expectation or anticipation",
           "synset": "apprehension.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "dread",
@@ -3340,44 +2082,22 @@
           "role": "synonym",
           "gloss": "fearful expectation or anticipation",
           "synset": "apprehension.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "apprehensiveness",
           "role": "synonym",
           "gloss": "fearful expectation or anticipation",
           "synset": "apprehension.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 2/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-22",
@@ -3452,60 +2172,31 @@
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "gall",
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "rancor",
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "rancour",
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "resentment",
@@ -3519,58 +2210,35 @@
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "gall",
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "rancor",
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         },
         {
           "word": "rancour",
           "role": "synonym",
           "gloss": "a feeling of deep and bitter anger and ill-will",
           "synset": "resentment.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-23",
@@ -3627,46 +2295,10 @@
           "role": "synonym",
           "gloss": "an irrational motive for performing trivial or repetitive actions, even against your will",
           "synset": "compulsion.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "fixation",
-          "role": "synonym",
-          "gloss": "an unhealthy and compulsive preoccupation with something or someone",
-          "synset": "obsession.n.02",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "obsession",
@@ -3680,44 +2312,15 @@
           "role": "synonym",
           "gloss": "an irrational motive for performing trivial or repetitive actions, even against your will",
           "synset": "compulsion.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "fixation",
-          "role": "synonym",
-          "gloss": "an unhealthy and compulsive preoccupation with something or someone",
-          "synset": "obsession.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     },
     {
       "item_id": "pd-24",
@@ -3772,46 +2375,10 @@
           "role": "synonym",
           "gloss": "an overwhelming feeling of fear and anxiety",
           "synset": "panic.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "scare",
-          "role": "synonym",
-          "gloss": "sudden mass fear and anxiety over anticipated events",
-          "synset": "panic.n.02",
-          "source": "wordnet_synset"
+          "source": "wordnet_primary_synset"
         }
       ],
-      "opposites": [
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        }
-      ],
+      "opposites": [],
       "candidate_pool": [
         {
           "word": "panic",
@@ -3825,44 +2392,15 @@
           "role": "synonym",
           "gloss": "an overwhelming feeling of fear and anxiety",
           "synset": "panic.n.01",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "scare",
-          "role": "synonym",
-          "gloss": "sudden mass fear and anxiety over anticipated events",
-          "synset": "panic.n.02",
-          "source": "wordnet_synset"
-        },
-        {
-          "word": "surrender",
-          "role": "opposite",
-          "gloss": "acceptance of despair",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "release",
-          "role": "opposite",
-          "gloss": "merchandise issued for sale or public showing (especially a record or film)",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "forgiveness",
-          "role": "opposite",
-          "gloss": "compassionate feelings that support a willingness to forgive",
-          "synset": null,
-          "source": "opposite_pole_pool"
-        },
-        {
-          "word": "awakening",
-          "role": "opposite",
-          "gloss": "the act of waking",
-          "synset": null,
-          "source": "opposite_pole_pool"
+          "source": "wordnet_primary_synset"
         }
-      ]
+      ],
+      "needs_manual_replacement": [
+        "synonyms 1/4 (primary-synset only) — add same-sense synonyms via overrides",
+        "opposites 0/4 (WordNet antonyms only) — add TRUE antonyms/contrast via overrides",
+        "NO opposites — item cannot form D_opposite / INT until opposites are curated"
+      ],
+      "curation_status": "wordnet_draft_needs_curation"
     }
   ]
 }
