@@ -36,7 +36,9 @@ def test_items_all_in_table_and_not_thin():
 
 
 # ---- freeze gate --------------------------------------------------------------------
-def test_gate_blocks_until_classification_approved(tmp_path):
+def test_gate_blocks_until_classification_approved(tmp_path, monkeypatch):
+    # blocking logic is state-independent: force unapproved and confirm the gate refuses
+    monkeypatch.setattr(D, "classification_approved", lambda: False)
     ok, reasons = D.verify_freeze_gate(_valid_decl(tmp_path))
     assert not ok and any("classification NOT approved" in r for r in reasons)
 
@@ -77,7 +79,7 @@ def test_all_arms_render_all_items():
 def test_mock_part_96(tmp_path):
     part = D.run_part(mock=True, gen_code="M1", out_dir=tmp_path, write=True)
     assert part["mode"] == "MOCK" and part["n_outputs"] == 96 and part["n_failures"] == 0
-    assert part["classification_approved"] is False
+    assert part["classification_approved"] == D.classification_approved()   # reflects committed state
     assert (tmp_path / "b1_9_pole_did_part.json").exists()
 
 def test_real_part_refuses_without_declaration():

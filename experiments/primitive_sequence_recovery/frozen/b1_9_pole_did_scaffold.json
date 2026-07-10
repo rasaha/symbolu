@@ -3,10 +3,10 @@
   "status": "FROZEN",
   "representation_version": "B1.9_pole_did",
   "primary_statistic": "DiD = (OWN_CORRECT - OWN_FLIPPED) - (CONTROL_CORRECT - CONTROL_FLIPPED)",
-  "classification_approved": false,
+  "classification_approved": true,
   "wprime_seed": 20260712,
   "source_hashes": {
-    "b1_9_pole_did_items.json": "6e05917585681929d3b85f827254d501f6db29072d1369ae8523ad3824422499",
+    "b1_9_pole_did_items.json": "ea8e41d405f8c8aeb3264f778429a66db2df1cbdaa1372f8290970017fe068f1",
     "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694"
   },
   "note": "4-arm diff-in-diff; canonical consonant-only varṇas; W′ frozen distant word (seeded derangement). NO generation. B1.4b′ NULL_RETURN_BOTTOM.",

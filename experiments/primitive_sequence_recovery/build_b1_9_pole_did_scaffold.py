@@ -96,9 +96,21 @@ def _pole_facets(varnas, pole_field, table):
     return out
 
 
+def _prior_approval() -> bool:
+    """Preserve an existing operator approval across rebuilds (only classification_approved is mutable;
+    everything else is deterministic from ITEMS_SPEC + the canonical derivation)."""
+    if ITEMS_FILE.exists():
+        try:
+            return json.loads(ITEMS_FILE.read_text()).get("classification_approved") is True
+        except Exception:  # noqa: BLE001
+            return False
+    return False
+
+
 def build():
     table = json.loads(V2_TABLE_FILE.read_text())["varnas"]
     mapping = _bridge()["mapping"]
+    approved = _prior_approval()
 
     items = []
     for i, (word, ctx, rtype, plane, correct) in enumerate(ITEMS_SPEC, 1):
@@ -110,8 +122,9 @@ def build():
                       "flipped_pole": LIBERATING if correct == BINDING else BINDING, "varna_sequence": vs})
 
     items_doc = {
-        "artifact_type": "b1_9_pole_did_items", "status": "DRAFT_REQUIRES_OPERATOR_SIGNOFF",
-        "representation_version": "B1.9_pole_did", "classification_approved": False,
+        "artifact_type": "b1_9_pole_did_items",
+        "status": "APPROVED" if approved else "DRAFT_REQUIRES_OPERATOR_SIGNOFF",
+        "representation_version": "B1.9_pole_did", "classification_approved": approved,
         "rule": "correct pole from the referent-ontology rule (physical/objectified/contraction -> binding; "
                 "subjective release/realization/transformation -> liberating). valence NOT used.",
         "varna_derivation": "CANONICAL: stage_a_prime_coverage.normalize(word,'A_PRIME_EN') + "

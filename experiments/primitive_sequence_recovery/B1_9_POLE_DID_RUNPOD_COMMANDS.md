@@ -20,17 +20,11 @@ cd /workspace/symbolu/experiments/primitive_sequence_recovery
 git pull
 export HF_HOME=/workspace/.cache/huggingface
 
-# ── STEP A (MANDATORY FIRST): review + APPROVE the referent classification ─────
-#   Open frozen/b1_9_pole_did_items.json; check every item's correct_pole against your rule.
-#   Edit any correct_pole you disagree with, THEN approve (pre-commitment; do not touch after generating).
-python3 - <<'PY'
-import json, pathlib
-p = pathlib.Path("frozen/b1_9_pole_did_items.json"); c = json.loads(p.read_text())
-# >>> edit correct_pole rows above as needed, then approve: <<<
-c["classification_approved"] = True; c["status"] = "APPROVED"
-p.write_text(json.dumps(c, ensure_ascii=False, indent=2)); print("approved:", c["classification_approved"])
-PY
-python3 build_b1_9_pole_did_scaffold.py   # rebuild scaffold from the approved classification (hashes update)
+# ── STEP A: classification ALREADY APPROVED and committed — verify only ────────
+#   (The 24-item table was reviewed and approved as-is; classification_approved=true is in the repo.
+#    `git pull` above brings the approved frozen files. Just confirm; do NOT re-edit poles.)
+python3 -c "import json;d=json.load(open('frozen/b1_9_pole_did_items.json'));print('classification_approved:',d['classification_approved']);assert d['classification_approved'] is True,'NOT approved — git pull the approved commit'"
+python3 build_b1_9_pole_did_scaffold.py   # idempotent: preserves approval, reproduces the same scaffold (hashes unchanged)
 
 # ── 1. Evidence-freeze declaration ────────────────────────────────────────────
 python3 - <<'PY'

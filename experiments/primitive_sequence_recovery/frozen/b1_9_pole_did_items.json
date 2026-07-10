@@ -1,8 +1,8 @@
 {
   "artifact_type": "b1_9_pole_did_items",
-  "status": "DRAFT_REQUIRES_OPERATOR_SIGNOFF",
+  "status": "APPROVED",
   "representation_version": "B1.9_pole_did",
-  "classification_approved": false,
+  "classification_approved": true,
   "rule": "correct pole from the referent-ontology rule (physical/objectified/contraction -> binding; subjective release/realization/transformation -> liberating). valence NOT used.",
   "varna_derivation": "CANONICAL: stage_a_prime_coverage.normalize(word,'A_PRIME_EN') + b1_6_phoneme_to_varna_bridge_manifest.json mapping (consonant-only; vowels dropped; reproduces all 12 existing B1.8/B1.9 sequences). NO dedup. NO invented vowel meanings.",
   "vowel_omission_limitation": "Consonant-only. Vowels are VOWEL_NO_PROFILE and dropped; this may underrepresent Sanskrit svara. Adding vowels requires a sourced vowel table, a new representation version, a new bridge, and a separate prereg — NOT done here.",
