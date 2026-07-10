@@ -152,6 +152,24 @@ python3 run_b1_9_content_distance.py --decl run_out/b1_9/b1_9_DECLARED.json --ou
 each of the six frozen inputs — built from `run_b1_9_content_distance.HASH_INPUTS`). The gate refuses any B1.6/
 B1.8 mode, wrong representation, missing attestation, or hash mismatch. **The real test has NOT been run.**
 
+## 12c. Runner/prereg consistency clarification (pre-execution)
+
+A consistency audit (before any real execution) found that §10 still names the *primary statistic* as
+"authentic vs **same-polarity** control (family 1)", whereas the runner blocks that family and uses
+`completely_random_facet`. This clarification resolves that, prospectively — it is **not** a post-hoc result
+change (nothing has been executed):
+
+- **B1.9 is resolver-free and does NOT perform binding/liberating pole selection.**
+- Therefore **`same_polarity_random_varna_facet` is blocked/reserved** unless a future **pole-bearing variant is
+  explicitly preregistered** (which would reintroduce the resolver and must be a separate prereg).
+- **The primary executable control for this runner is `completely_random_facet`** (this supersedes the
+  "family 1 / same-polarity" phrasing in §10 for execution purposes; §10's endpoint definition is otherwise
+  unchanged).
+- **`same_plane_random_varna_facet`, `permuted_target_label`, `random_word_context_decoy`, and
+  `frequency_length_matched_facet` (length-only)** remain **secondary/control-family analyses**.
+- **All implemented controls must be reported** (not cherry-picked) — consistent with §10.
+- This is a **pre-execution clarification, not a post-hoc result change.** B1.4b′ remains `NULL_RETURN_BOTTOM`.
+
 ## 13. Guardrails
 
 - **No test run.** No embeddings computed here (beyond reproducing the already-pasted B1.8 diagnostic numbers in
