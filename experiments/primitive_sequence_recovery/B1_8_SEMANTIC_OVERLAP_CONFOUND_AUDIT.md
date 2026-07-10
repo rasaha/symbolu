@@ -90,6 +90,46 @@ dread semantic coincidence favoring the scramble), not evidence of word-specific
 step is **not** to run the powered test as previously designed, but to first adopt the semantic-distance-
 constrained control above; otherwise the primary endpoint measures overlap, not meaning.
 
+## 4b. Post-hoc "clean-subset" flip — and why it does NOT rescue B1.8 (circular selection)
+
+A follow-up asked whether restricting the primary contrast to items with a *valid* (semantically distant)
+scramble would flip the result. Using an embedding distance `d = 1 − cos(target+context, facet-aggregate)` and a
+"clean" cut `d_scram − d_auth > margin`, the paired `KCPR_SELECTED_POLE vs SCRAMBLED_SELECTED_POLE` result
+(all figures **exploratory, post-hoc**):
+
+| clean cut | items | composite (win-rate, mean_diff) | specificity (win-rate, mean_diff) |
+|---|---|---|---|
+| ALL | 12 | 0.478, +0.08 | 0.522, +0.29 |
+| `d_scr − d_auth > 0` | 8 | 0.533, +0.13 | 0.533, +0.36 |
+| `> 0.03` | 6 | 0.545, +0.16 | 0.545, +0.46 |
+| `> 0.06` | 4 | 0.625, +0.26 | 0.625, **+0.67** |
+
+**Directionally, authentic improves as the clean-control margin tightens.** But this is **post-hoc and not
+confirmatory**, and — more importantly — **the selection rule is circular:**
+
+- `d_auth < d_scram` selects items where the **authentic facet content is already closer** to the
+  target/context than the scrambled facet content.
+- `specificity_to_target` then measures whether the **output** is more target-specific.
+- Because the output is generated **from the selected input facets**, this mostly says *"more target-relevant
+  input yields more target-specific output."*
+- That is true for **any** content source and does **not** establish that the varṇa mapping carries meaning.
+  The specificity flip is expected under this selection whether or not the hypothesis is true.
+
+**Non-circular summary (measured over all 12 items, no selection):**
+- Mean `d_auth = 0.744`; mean `d_scram = 0.770`.
+- Authentic closer in **8/12** items.
+- Approximate lean: **~0.026 cosine distance** (8/12, sign-test p ≈ 0.19).
+- Interpretation: **weak, non-significant, consistent with the B1.4b′ null.**
+
+**Conclusion:**
+- The post-hoc flip **does not rescue B1.8.** It is partly a circular selection artifact and is non-significant
+  even at the tightest cut (composite 5–3; specificity 5–1 of 6 decisive).
+- It shows concretely **why B1.8's scramble control was not semantically distance-controlled**, and it motivates
+  a **prospective, generation-free** B1.9 design (`B1_9_CONTENT_LEVEL_SEMANTIC_DISTANCE_PREREG.md`) that measures
+  the mapping directly and **forbids** selecting the analysis subset with a variable upstream of the outcome.
+- **B1.8 remains null/negative for broad generation utility.** The `specificity_to_target` thread remains
+  **exploratory and methodologically unresolved — not evidence.** B1.4b′ remains `NULL_RETURN_BOTTOM`.
+
 ## 5. Guardrails
 
 Docs-only. Results not changed, not re-scored, not tuned. No generation run; no evidence freeze; no judging; no
