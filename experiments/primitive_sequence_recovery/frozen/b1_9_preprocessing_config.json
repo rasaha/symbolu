@@ -1,0 +1,15 @@
+{
+  "artifact_type": "b1_9_preprocessing_config",
+  "casing": "lower",
+  "punctuation": "strip_to_space",
+  "diacritics": "keep",
+  "stopwords": "none",
+  "target_context_concat_rule": "target_text + '. ' + context_text",
+  "facet_mode": "named_attribute",
+  "facet_fields": [
+    "named_attribute"
+  ],
+  "facet_join": " ; ",
+  "aggregation_rule": "concat_then_embed",
+  "note": "deterministic; no manual synonym removal; no post-hoc token filtering."
+}

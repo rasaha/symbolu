@@ -1,0 +1,159 @@
+{
+  "artifact_type": "b1_9_targets",
+  "status": "FROZEN_CANDIDATE",
+  "representation_version": "B1.9_content_distance_prereg",
+  "source": "extracted from frozen/b1_8_context_resolved_targets_scaffolds.json; plane=stratum map (resolver-free)",
+  "note": "content-level test target list; NO generation, NO ratings, NO run_out.",
+  "n_targets": 12,
+  "targets": [
+    {
+      "item_id": "b18-01",
+      "target_text": "bridge",
+      "context_text": "The rebuilt bridge holds a steady sustaining flow across the river; its spans keep an easy alignment and let the crossing find its peace.",
+      "varna_sequence": [
+        "ba",
+        "ra",
+        "da",
+        "ga"
+      ],
+      "plane": "physical",
+      "stratum": "concrete_object"
+    },
+    {
+      "item_id": "b18-02",
+      "target_text": "lantern",
+      "context_text": "The lantern is stuck on a rigid hook, its glow blocked by grime, an obstacle no one can shift.",
+      "varna_sequence": [
+        "la",
+        "na",
+        "ta",
+        "ra",
+        "na"
+      ],
+      "plane": "physical",
+      "stratum": "concrete_object"
+    },
+    {
+      "item_id": "b18-03",
+      "target_text": "grief",
+      "context_text": "In his grief he stays clinging to what was, trapped by a loss he cannot release.",
+      "varna_sequence": [
+        "ga",
+        "ra"
+      ],
+      "plane": "mental",
+      "stratum": "psychological_mental"
+    },
+    {
+      "item_id": "b18-04",
+      "target_text": "longing",
+      "context_text": "Her longing eased into quiet reflection and a peace that let the ache find release.",
+      "varna_sequence": [
+        "la",
+        "nga",
+        "nga"
+      ],
+      "plane": "mental",
+      "stratum": "psychological_mental"
+    },
+    {
+      "item_id": "b18-05",
+      "target_text": "justice",
+      "context_text": "She pursued justice with clarity, in alignment with a sustaining fairness, a contemplative movement toward what is right.",
+      "varna_sequence": [
+        "ja",
+        "sa",
+        "ta",
+        "ka"
+      ],
+      "plane": "intellectual",
+      "stratum": "ethical_action"
+    },
+    {
+      "item_id": "b18-06",
+      "target_text": "balance",
+      "context_text": "The committee stayed in conflict, each side rigid and clinging to advantage, the fair path blocked by fear.",
+      "varna_sequence": [
+        "ba",
+        "la",
+        "na",
+        "ka"
+      ],
+      "plane": "intellectual",
+      "stratum": "ethical_action"
+    },
+    {
+      "item_id": "b18-07",
+      "target_text": "lotus",
+      "context_text": "At dawn the lotus opens in stillness, a contemplative clarity, release, and peace.",
+      "varna_sequence": [
+        "la",
+        "ta",
+        "sa"
+      ],
+      "plane": "spiritual",
+      "stratum": "spiritual_contemplative"
+    },
+    {
+      "item_id": "b18-08",
+      "target_text": "sacred",
+      "context_text": "He treated the sacred as an escape, a static withdrawal and rigid avoidance of the world's demands.",
+      "varna_sequence": [
+        "sa",
+        "ka",
+        "ra",
+        "da"
+      ],
+      "plane": "spiritual",
+      "stratum": "spiritual_contemplative"
+    },
+    {
+      "item_id": "b18-09",
+      "target_text": "Lumen",
+      "context_text": "The Lumen brand promises clarity and an easy flow, a calm alignment for everyday focus.",
+      "varna_sequence": [
+        "la",
+        "ma",
+        "na"
+      ],
+      "plane": "mental",
+      "stratum": "brand_name"
+    },
+    {
+      "item_id": "b18-10",
+      "target_text": "Nova",
+      "context_text": "Nova's launch felt stuck in conflict, its message blocked and its momentum trapped.",
+      "varna_sequence": [
+        "na",
+        "va"
+      ],
+      "plane": "mental",
+      "stratum": "brand_name"
+    },
+    {
+      "item_id": "b18-11",
+      "target_text": "wonder",
+      "context_text": "The child's wonder opened into reflection and a bright clarity, a peace that let the moment flow.",
+      "varna_sequence": [
+        "va",
+        "na",
+        "da",
+        "ra"
+      ],
+      "plane": "mental",
+      "stratum": "emotional_nonclinical"
+    },
+    {
+      "item_id": "b18-12",
+      "target_text": "dread",
+      "context_text": "A cold dread of failure kept him clinging and rigid, trapped by fear and unable to move.",
+      "varna_sequence": [
+        "da",
+        "ra",
+        "da"
+      ],
+      "plane": "mental",
+      "stratum": "emotional_nonclinical"
+    }
+  ]
+}

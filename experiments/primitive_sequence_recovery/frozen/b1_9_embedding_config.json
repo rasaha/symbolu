@@ -1,0 +1,9 @@
+{
+  "artifact_type": "b1_9_embedding_config",
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "revision": "main",
+  "max_length": 256,
+  "pooling": "mean",
+  "normalize": true,
+  "note": "real backend loads this exact model; tests use a fake backend and never download."
+}
