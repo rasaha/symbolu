@@ -1,0 +1,5 @@
+courage
+A: Sarah felt a surge of courage when she saw her rival falter, knowing this was her moment to shine.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: In the silence of his meditation, Mark found the courage to face his fears without needing anyone's approval.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural

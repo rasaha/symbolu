@@ -1,0 +1,283 @@
+{
+  "artifact": "b1_10_official_contexts_v3_qwen_MANIFEST",
+  "classification": "NONCLAUDE_BLIND_AUTHORED_v3_PENDING_PACKET_AWARE_AUDIT",
+  "experiment": "B1.10 (unchanged; no new experiment number)",
+  "workflow_commit": "0785b1ec (per-word workflow) + 1b47c8f6 (--max-rung one-rung-per-process)",
+  "master_packet_sha256": "7e07e16bb160481c647b5f6e11ff166f63f2fa42e442ba16bfa6fcffe9c30628",
+  "authoring_ladder": [
+    "Qwen/Qwen2.5-14B-Instruct",
+    "Qwen/Qwen2.5-32B-Instruct",
+    "packet-naive human"
+  ],
+  "generation_settings": {
+    "backend": "transformers",
+    "dtype": "float16",
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 0,
+    "repetition_penalty": 1.0,
+    "do_sample": true,
+    "max_new_tokens": 400
+  },
+  "reason_for_escalation": "SURFACE_VALIDATION_FAILURE_ONLY",
+  "retry_budget_role": "operational safeguard only — NOT experimental, evidentiary, hypothesis-testing, or judging",
+  "official_context_file": "../B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md",
+  "official_context_file_sha256": "4e75d98ad5cbacca4e42ecc003154016a9bdf8c1f6d6994d31a32abffa27c78c",
+  "combined_context_block_sha256": "a0abccb89091578cc6ee81b22143bd2bcd82ee9eb8624ba6855224825a418bfc",
+  "n_ab_sentences": 12,
+  "independent_surface_revalidation": {
+    "all_pass": true,
+    "validator": "b1_10_surface_validator.py (frozen rules)",
+    "per_word": {
+      "pride": {
+        "surface_pass": true,
+        "issues": []
+      },
+      "freedom": {
+        "surface_pass": true,
+        "issues": []
+      },
+      "patience": {
+        "surface_pass": true,
+        "issues": []
+      },
+      "courage": {
+        "surface_pass": true,
+        "issues": []
+      },
+      "control": {
+        "surface_pass": true,
+        "issues": []
+      },
+      "doubt": {
+        "surface_pass": true,
+        "issues": []
+      }
+    }
+  },
+  "words": [
+    {
+      "word": "pride",
+      "word_index_1based": 1,
+      "accepted_ladder_rung": 0,
+      "accepted_model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "accepted_attempt_index": 0,
+      "accepted_seed": 20260720,
+      "accepted_raw_output_sha256_authoritative": "286f91d77d2421022167ccc9dd2bb0fb3ae4efa9c85362c486e575a281a6c9c0",
+      "delivered_prompt_sha256": "b07db65c6c615a45722de9547e24c7351710df18b81a3ec6561401a8cae88547",
+      "committed_accepted_transcription_file": "accepted/pride_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "f46eda1b34a7e5890becefe00e46d1970368d3204e69945db8df73e5041a2904",
+      "n_failed_attempts": 0,
+      "failed_attempts": [],
+      "first_passing_pair": true,
+      "edited_or_patched": false,
+      "mixed_A_B_across_attempts": false
+    },
+    {
+      "word": "freedom",
+      "word_index_1based": 2,
+      "accepted_ladder_rung": 0,
+      "accepted_model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "accepted_attempt_index": 0,
+      "accepted_seed": 20260721,
+      "accepted_raw_output_sha256_authoritative": "18a9c8e9837d02896eaf04d28b6bdc8a971f7b0ae9d20dc47fbfe2954b360377",
+      "delivered_prompt_sha256": "1f1a63873494c52d4549120c97ae9600cebcda5bab3833ae65894271df9444f3",
+      "committed_accepted_transcription_file": "accepted/freedom_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "4b8b5f8b3e75a7998335b3ebe619fb1c328a98ccc336cd14f62563af926c781c",
+      "n_failed_attempts": 0,
+      "failed_attempts": [],
+      "first_passing_pair": true,
+      "edited_or_patched": false,
+      "mixed_A_B_across_attempts": false
+    },
+    {
+      "word": "patience",
+      "word_index_1based": 3,
+      "accepted_ladder_rung": 1,
+      "accepted_model_id": "Qwen/Qwen2.5-32B-Instruct",
+      "revision_resolved": "5ede1c97bbab6ce5cda5812749b4c0bdf79b18dd",
+      "accepted_attempt_index": 2,
+      "accepted_seed": 20260724,
+      "accepted_raw_output_sha256_authoritative": "fa8366ea5b740821f7e2b7985571b74a4f96424198ff1404fd68f7462bb26175",
+      "delivered_prompt_sha256": "df5f06cd6d6df87568ebba9964818f2b8f69f8e20c8ab4595a453e74d156855a",
+      "committed_accepted_transcription_file": "accepted/patience_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "9220cb4e987e84ec5a28fc8f3a162b14b2723abd208e227979c5589f8f42d17a",
+      "n_failed_attempts": 8,
+      "failed_attempts": [
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260722,
+          "raw_output_sha256_authoritative": "6ecd53b983fafddc32091ee979f7527ec9530e7b336b2452a7c9f81d1f0d1896",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260723,
+          "raw_output_sha256_authoritative": "5365c74809466230ee7aedb6564c314f364ea50c2f7eff7ffc6155ac8ce63587",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260724,
+          "raw_output_sha256_authoritative": "b67ddee0066c7e4b175bd90cc821680d68068e4e3251fa3c38c6e594ff9a8265",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260725,
+          "raw_output_sha256_authoritative": "68c51df387d2ed7cb297c4ed1f09da2b111a7330d31871d2820496691fec5179",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260726,
+          "raw_output_sha256_authoritative": "a212c6eab331ac5089ac825762fb27ca28ce492f8e7676ed0aa7d8add2baa69b",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260727,
+          "raw_output_sha256_authoritative": "6ecd666b8f2e33da68346b69d8297a1a34f5898cdeb4ea301c7d24faf2ba01b3",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 1,
+          "model_id": "Qwen/Qwen2.5-32B-Instruct",
+          "seed": 20260722,
+          "raw_output_sha256_authoritative": "531e80ddfae2de109046ea2d28fef8c3e20cb1dd77d39dfef84170ac50f5455e",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 1,
+          "model_id": "Qwen/Qwen2.5-32B-Instruct",
+          "seed": 20260723,
+          "raw_output_sha256_authoritative": "17b2f00ed9ee2c850cf38a4d64a0163c6804a3d4531d04169a77fb14896f7e94",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        }
+      ],
+      "first_passing_pair": true,
+      "edited_or_patched": false,
+      "mixed_A_B_across_attempts": false
+    },
+    {
+      "word": "courage",
+      "word_index_1based": 4,
+      "accepted_ladder_rung": 0,
+      "accepted_model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "accepted_attempt_index": 5,
+      "accepted_seed": 20260728,
+      "accepted_raw_output_sha256_authoritative": "84cc92773d9cdadc5ec2cbd9f2f9fd82ac2b690112145c0969749e7219e53dcb",
+      "delivered_prompt_sha256": "8e289dbe5a520694b3eede108237eb0572dbb6f69c191d04435f1328a32deb58",
+      "committed_accepted_transcription_file": "accepted/courage_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "e4cef03366538319b5a855bf735d00375d3fb76deb860221763bfe8fac9c9184",
+      "n_failed_attempts": 5,
+      "failed_attempts": [
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260723,
+          "raw_output_sha256_authoritative": "0c7f6b88d3573a23b4ca23d340b0d483a35b7089043ba05e3f0d59f33be80b55",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260724,
+          "raw_output_sha256_authoritative": "7de0c706b9cdac1c78b26b61b50e5cd835cb9b98fe611dee8e603f9814cf7bc4",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260725,
+          "raw_output_sha256_authoritative": "339037665658376331e1e338aa7e1a58fbc71896f45f672e64ee34bcaaf89718",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260726,
+          "raw_output_sha256_authoritative": "cf99ad122edae3f675d7dd8f81356984f0fb7235544c92e173f9607c986cfa5c",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        },
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260727,
+          "raw_output_sha256_authoritative": "ce23bff3313cd0f9a350a0705b17d0eb16d46372ac8ce27600cd587aea339cf9",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        }
+      ],
+      "first_passing_pair": true,
+      "edited_or_patched": false,
+      "mixed_A_B_across_attempts": false
+    },
+    {
+      "word": "control",
+      "word_index_1based": 5,
+      "accepted_ladder_rung": 0,
+      "accepted_model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "accepted_attempt_index": 0,
+      "accepted_seed": 20260724,
+      "accepted_raw_output_sha256_authoritative": "3ba3f3df8b8ec18e1d9cb6f1111012d0bc918e6c121b70201ce6f234a717967b",
+      "delivered_prompt_sha256": "3af0131024aea31b2607847bfa043babde5487365083d31e507b63f42e889760",
+      "committed_accepted_transcription_file": "accepted/control_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "5b6689df81b2e86b59fec8ae8113a122b2f9af4773f885c3fce91ab5136fe3cd",
+      "n_failed_attempts": 0,
+      "failed_attempts": [],
+      "first_passing_pair": true,
+      "edited_or_patched": false,
+      "mixed_A_B_across_attempts": false
+    },
+    {
+      "word": "doubt",
+      "word_index_1based": 6,
+      "accepted_ladder_rung": 0,
+      "accepted_model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+      "accepted_attempt_index": 1,
+      "accepted_seed": 20260726,
+      "accepted_raw_output_sha256_authoritative": "84d4465d9aeba1dc3857daf73b969da70d0b2c64d72039ccb7a0c2bf89204bc9",
+      "delivered_prompt_sha256": "5ed568b3201f48451658e2854f26a5d09d56fd4be212b87011190285be9878e8",
+      "committed_accepted_transcription_file": "accepted/doubt_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "baff99f7d6de1016a8074e65e8c3d6c33c586e00cf0d37ae952738ec90186b3b",
+      "n_failed_attempts": 1,
+      "failed_attempts": [
+        {
+          "ladder_rung": 0,
+          "model_id": "Qwen/Qwen2.5-14B-Instruct",
+          "seed": 20260725,
+          "raw_output_sha256_authoritative": "49ac2536d03942aab340583e5cccc50ab5b91fc853217e3f1ad9f7ea25420c43",
+          "reason": "SURFACE_VALIDATION_FAILURE"
+        }
+      ],
+      "first_passing_pair": true,
+      "edited_or_patched": false,
+      "mixed_A_B_across_attempts": false
+    }
+  ],
+  "confirmations": {
+    "each_accepted_pair_was_first_passing_pair": true,
+    "no_pair_edited_patched_or_truncated": true,
+    "no_A_B_mixed_across_attempts": true,
+    "all_failed_attempts_and_hashes_recorded": true,
+    "escalation_only_on_surface_failure": true,
+    "packet_unchanged_hash_asserted": true,
+    "packet_aware_audit_run": false,
+    "judges_run": false,
+    "evidence_freeze_declaration_created": false,
+    "new_experiment_number_created": false
+  },
+  "byte_fidelity_caveat": "Box could not git push. Accepted sentence blocks and accepted/*.txt are terminal-paste transcriptions. Authoritative artifacts are the on-box files hashing to accepted_raw_output_sha256_authoritative; each pasted ACCEPTED.txt sha256sum matched its provenance hash on the box. Full FAILED raw outputs remain on-box (hashes recorded here); they can be added byte-exact if the box can push.",
+  "guardrails": "Resonance / phonetic-fidelity refinement only. No GENUTILITY_*; no ONTOLOGICAL_SIGNAL; no semantic-truth / ontology / Sanskrit-privilege claim. B1.4b' NULL_RETURN_BOTTOM; original B1.4b blocked; Track B blocked; structure, not validated meaning."
+}
