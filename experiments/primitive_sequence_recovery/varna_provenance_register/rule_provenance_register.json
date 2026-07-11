@@ -15,20 +15,20 @@
     {
       "rule_id": "consonant_clusters_presplit",
       "description": "G2P pre-splits clusters (tr→t+r, dr→d+r) before the bridge sees them.",
-      "provenance_status": "CONTRADICTORY",
-      "note": "The table caveat says clusters pre-split to DENTAL da/ta so retroflex ṭa/ḍa are 'never produced'; but the ACTIVE bridge's retroflex rule DOES emit ṭa/ḍa (true→ṭa, drum→ḍa). Code vs table conflict (D3)."
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "DEPRECATED ENGLISH-G2P BRIDGE property. D3 RESOLVED by the v3.1 metadata refreeze: reachability was scoped to the deprecated bridge; the native Stage-1 parser reaches ṭa/ḍa directly (native_parser_reachable=true)."
     },
     {
       "rule_id": "retroflex_before_r",
       "description": "d/t before r → retroflex ḍa/ṭa (bridge v2 retroflex rule).",
-      "provenance_status": "CONTRADICTORY",
-      "note": "Present and firing in varna_bridge_active, but the table declares it NOT retrofitted and marks ṭa/ḍa practically_reachable=False. Conflict (D3)."
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "DEPRECATED ENGLISH-G2P BRIDGE property. D3 RESOLVED: the native parser decomposes Devanāgarī ट/ड directly; the English-bridge retroflex-under-representation no longer describes the native input path."
     },
     {
       "rule_id": "th_to_ta",
       "description": "Merged English 'th' (/θ/ and /ð/) → ta (dental unaspirated stop).",
-      "provenance_status": "CONTRADICTORY",
-      "note": "The ACTIVE bridge (thfix) maps th→ta; the table's TH MIS-MAPPING caveat still says th→tha (viṣāda). Code vs meta-caveat conflict (D4). Also: /θ,ð/ are fricatives Sanskrit lacks — the target is a convention, not attested."
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "DEPRECATED ENGLISH-G2P BRIDGE property. D4 RESOLVED: under the native parser थ → tha (single aspirated dental stop) is correct and English 'th' never enters; the th→ta/th→tha bridge conflict is off the native path."
     },
     {
       "rule_id": "dh_inert",
@@ -104,10 +104,10 @@
     }
   ],
   "counts": {
-    "OUT_OF_SCOPE": 7,
-    "CONTRADICTORY": 4,
+    "OUT_OF_SCOPE": 10,
     "INFERRED": 2,
     "MISSING": 2,
-    "AUTHORED_PROVISIONAL": 2
+    "AUTHORED_PROVISIONAL": 2,
+    "CONTRADICTORY": 1
   }
 }

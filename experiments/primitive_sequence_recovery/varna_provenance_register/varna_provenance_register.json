@@ -3,9 +3,15 @@
   "schema_version": "1.0",
   "scope": "Part E Step 1 — provenance of the CURRENT active varṇa mechanism (docs/data-only).",
   "sources_read": {
-    "table": "frozen/varna_polarity_table_v3.json#varnas",
-    "active_bridge": "varna_bridge_active.word_to_varnas (bridge_v2_plus_theta_eth_ta)",
-    "facet_map": "build_b1_10_control_ext.VARNA_PLAIN (11 varṇas)"
+    "table": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas",
+    "reachability_authority": "varnas.<key>.native_parser_reachable (v3.1 metadata refreeze)",
+    "deprecated_english_bridge": "varna_bridge_active.word_to_varnas (historical; not the native input path)",
+    "facet_map": "build_b1_10_control_ext.VARNA_PLAIN (11 varṇas; deprecated English-prose packet layer)"
+  },
+  "d1_d4_refreeze": {
+    "applied_via": "varna_polarity_table_v3_1_metadata_refreeze.json",
+    "reconciliation_commit": "26d680c9",
+    "pole_content_changed": false
   },
   "status_definitions": {
     "PRIMARY_ATTESTED": "stated by the operator-supplied primary classical text",
@@ -30,8 +36,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -52,7 +58,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION. ATTESTED: ba = avajñā vṛtti (neglect of what has value), sharply distinguished from upekṣā/avahelā, with the brahmavihāra frame — BINDING pole attested. AUTHORED: the LIBERATING pole (regard that attends to worth) is lexicon-supplied but supported by the passage's proper-attitude ideal.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ba"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ba"
     },
     {
       "varna": "bha",
@@ -66,11 +72,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
@@ -88,7 +94,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + cure. ATTESTED: bha = mūrcchā vṛtti (losing common sense under a ripu's spell, explicitly NOT fainting); and the LIBERATING DIRECTION (pratyāhāra / kīrtana) is the attested remedy. AUTHORED: the exact liberated-mode wording ('breaking the entrancing spell into clear sense') is lexicon-supplied but aligned with the attested cure.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.bha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.bha"
     },
     {
       "varna": "ca",
@@ -102,8 +108,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -124,7 +130,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: ca = viveka (conscience/discernment), a LIBERATING-oriented faculty (its natural pole is the clear-conscience side; the binding pole is its DISTORTION, not its absence). AUTHORED (fully): BOTH pole texts are supplied by the source lexicon / framework — the one-line passage gives no binding/liberating contrast. Highest authored component so far; treat the poles as lexicon-supplied, not primary-verified.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ca"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ca"
     },
     {
       "varna": "cha",
@@ -138,11 +144,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
@@ -160,7 +166,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: cha = vikalatā vṛtti (nervous breakdown), defined as a properly-functioning mind that starts malfunctioning or ceases — this MATCHES the binding pole. AUTHORED: the LIBERATING pole (steadiness that keeps function intact under load) is lexicon/framework-supplied; the passage defines the breakdown state but gives no liberating pole.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.cha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.cha"
     },
     {
       "varna": "da",
@@ -174,8 +180,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -196,7 +202,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: da = peevishness/irritability (krodha/karkaśatā), with the contrary-reaction illustration — the BINDING pole. AUTHORED: the LIBERATING pole (forbearance) is lexicon-supplied.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.da"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.da"
     },
     {
       "varna": "dda",
@@ -210,9 +216,9 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": true,
-      "active_status": "ACTIVE_CONTRADICTS_TABLE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
@@ -232,7 +238,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: dda = lajjā vṛtti (shyness); and (from the pa passage) lajjā is one of the eight pāshas/fetters. AUTHORED (fully): BOTH poles are lexicon-supplied — this one-line passage gives no binding/liberating contrast.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.dda"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.dda"
     },
     {
       "varna": "ddha",
@@ -246,11 +252,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "piśunatā — senseless, sadistic cruelty: harming/killing with gratuitous torture (dismembering a creature piece by piece; impaling, flaying), inflicting maximal suffering for its own sake; malice toward the maligned",
@@ -268,7 +274,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION/illustration. ATTESTED: ddha = piśunatā vṛtti (sadistic cruelty), vividly illustrated (torturous slaughter; the tortoise; impaling/flaying) — the BINDING pole; plus the attested contrast that least-pain killing is NOT piśunatā. AUTHORED: the LIBERATING pole (compassion shielding the maligned) is lexicon-supplied, though the passage's least-pain / Neohumanism contrast supports it.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ddha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ddha"
     },
     {
       "varna": "dha",
@@ -282,11 +288,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
@@ -304,7 +310,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: dha = tṛṣṇā (limitless craving for wealth/name/fame/power/prestige, NOT thirst-for-water) — BINDING pole richly attested; and the LIBERATING DIRECTION (divert all thoughts to Parama Puruṣa) is the attested cure. AUTHORED: the exact liberated-mode wording ('quenched at its root') is lexicon-supplied but aligned with the attested cure.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.dha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.dha"
     },
     {
       "varna": "ga",
@@ -318,8 +324,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -340,7 +346,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: ga = ceṣṭā vṛtti (effort to arouse dormant potential); its immense value in BOTH the mundane and supramundane spheres. AUTHORED: the binding/liberating split (restless-can't-stop striving vs poised effort-that-rests / spiritually-elevating will-force) applies the framework's restlessness-vs-poise principle (consistent with the source lexicon); the passage frames ceṣṭā as valuable in both spheres and does not itself label a binding pole.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ga"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ga"
     },
     {
       "varna": "gha",
@@ -354,11 +360,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
@@ -376,7 +382,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED — and unusually so: gha = mamatā vṛtti (love/attachment); its limitation by time/space/individuality; and that only humans can make it TRANSCEND those boundaries through effort. The binding (bounded attachment) vs liberating (boundary-transcending universal love) split is directly SUPPORTED by the passage's own bounded-vs-transcendent contrast — lighter authored component than most entries.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.gha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.gha"
     },
     {
       "varna": "ha",
@@ -390,8 +396,8 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -414,7 +420,7 @@
       "flags": [
         "BACK_FIT"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ha"
     },
     {
       "varna": "ja",
@@ -428,8 +434,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -450,7 +456,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + ILLUSTRATION. ATTESTED: ja = ahaṃkāra vṛtti (ego), with the Aurangzeb illustration of the inflated 'I' — matching the BINDING pole. AUTHORED: the LIBERATING pole (agency without inflating the I) is lexicon-supplied; the passage illustrates only the inflated (binding) form.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ja"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ja"
     },
     {
       "varna": "jha",
@@ -464,11 +470,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "greed / avarice — hoarding accumulation without limit; the insatiable greedy fascination (nolā) that always wants more",
@@ -486,7 +492,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + ETYMOLOGY. ATTESTED: jha = lolupatā/lobha/lolatā vṛttis (greed/avarice), illustrated by nolā. AUTHORED: the binding/liberating split (limitless hoarding vs sufficiency-that-releases) is lexicon/framework-supplied; the passage names the vṛtti and its etymology but gives no pole contrast.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.jha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.jha"
     },
     {
       "varna": "ka",
@@ -500,8 +506,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -522,7 +528,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: ka = āśā vṛtti (hope that goads action) AND ka = Kārya Brahma (expressed universe) + sound/water/hair associations. AUTHORED: the binding/liberating SPLIT of hope (grasping vs non-attached) applies the general attachment principle — the source states āśā goads action but does not itself split it into poles.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ka"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ka"
     },
     {
       "varna": "kha",
@@ -536,11 +542,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
@@ -558,7 +564,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: kha = cintā vṛtti; the personal (train) vs impersonal (industry) modes; kha ≠ the sky's root (ha is), kha = crude heaven vs kṣa = transcendent heaven; ka + ha = kha. AUTHORED: labelling anxious/gripping rumination as binding and composed impersonal openness as liberating applies the framework's fixation-vs-detachment principle (consistent with the source lexicon); the passage describes both modes as cintā without itself labelling them binding/liberating.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.kha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.kha"
     },
     {
       "varna": "ksha",
@@ -572,8 +578,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
+      "native_parser_reachable": false,
+      "english_g2p_bridge_reachable": false,
       "active_status": "INACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "INACTIVE_NOT_USABLE",
@@ -594,7 +600,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED (primary text): kṣa = aparā-vidyā (mundane knowledge / material science); complement to ha (parā-vidyā); plus the kha-passage association (the transcendent sphere of heaven). Classical side liberating-oriented. AUTHORED: the binding/liberating split (knowledge owned as control/dogma vs instrumental knowledge released from possession) is lexicon-supplied but a standard aparā/parā-vidyā reading.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ksha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ksha"
     },
     {
       "varna": "la",
@@ -608,8 +614,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -630,7 +636,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED — both poles: kruratā (cruelty) as binding and compassion/karuṇā as the explicit counter-measure (liberating); plus the kṣititattva/earth + LAM bīja associations. Light authored component.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.la"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.la"
     },
     {
       "varna": "ma",
@@ -644,8 +650,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -666,7 +672,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME(s) + gloss. ATTESTED: ma = praṇāśa (annihilation) AND prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — the BINDING pole (indulgence-to-dissolution). AUTHORED: the LIBERATING pole (disciplined containment that holds form) is lexicon-supplied.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ma"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ma"
     },
     {
       "varna": "na",
@@ -680,8 +686,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -702,7 +708,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: na = moha vṛtti (blind attachment/infatuation), its four categories (desha/kāla/idea/ādhāra) richly illustrated — BINDING pole; and the LIBERATING DIRECTION (indifference + redirection to Parama Puruṣa) is the attested cure. AUTHORED: the exact liberated-mode wording ('de-fascination from false attraction') is lexicon-supplied but aligned.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.na"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.na"
     },
     {
       "varna": "nga",
@@ -716,8 +722,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -738,7 +744,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: nga (uṋa/ṅa) = dambha vṛtti (vanity); the phonetic history (Chinese-origin legend, Indo-Chinese usage) and the Tárā-cult context with the deities' SEPARATE roots aeṃ/krīṃ. AUTHORED: the binding/liberating split (displayed-for-others vs conduct-without-performance) applies the framework's display-vs-unselfconscious principle (consistent with the source lexicon); the passage states the vṛtti but does not itself split it into poles.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.nga"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.nga"
     },
     {
       "varna": "nna",
@@ -752,11 +758,11 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "envy — the sting at another's success; covetous resentment at another's good fortune",
@@ -774,7 +780,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: nna = īrṣā vṛtti (envy). AUTHORED (fully): BOTH poles are lexicon-supplied — the one-line passage gives no binding/liberating contrast.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.nna"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.nna"
     },
     {
       "varna": "nya",
@@ -788,11 +794,11 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
@@ -810,7 +816,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + FORMS. ATTESTED: nya = kapaṭatā vṛtti (hypocrisy), with three illustrated forms — all of the BINDING pole. AUTHORED: the LIBERATING pole (transparency, inner=outer) is lexicon-supplied; the passage illustrates only the hypocritical (binding) form.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.nya"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.nya"
     },
     {
       "varna": "pa",
@@ -824,8 +830,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -848,7 +854,7 @@
       "flags": [
         "META_STALE_PA"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.pa"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.pa"
     },
     {
       "varna": "pha",
@@ -862,11 +868,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "bhaya — fear: collapse or flight before danger; the shrinking, dread and panic under threat",
@@ -884,7 +890,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + ETIOLOGY. ATTESTED: pha = bhaya vṛtti (fear), born mainly of moha; and (from pa passage) bhaya is one of the eight pāshas. AUTHORED: both poles are lexicon-supplied (binding=collapse/flight matches the name; liberating=steadiness authored).",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.pha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.pha"
     },
     {
       "varna": "ra",
@@ -898,8 +904,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -920,7 +926,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED — both poles: sarvanāśa (defeatism) as binding and the vital/winning cure (prāṇaśakti / 'I am destined to win' / 'Parama Puruṣa is mine') as the liberating direction; plus the agni/prāṇaśakti/RAM/fire associations. Light authored component (the pole split is in the source; ra is classically DUAL).",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ra"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ra"
     },
     {
       "varna": "sa",
@@ -934,8 +940,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -956,7 +962,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED (primary text): sa = mokṣa (unqualified liberation) + sattvaguṇa (sentient principle); classical side liberating-oriented. AUTHORED: the binding pole (sattva clung to as purity/superiority — the golden chain) is lexicon-supplied but a standard reading of sattvic attachment; liberating = mokṣa / clarity-without-attachment.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.sa"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.sa"
     },
     {
       "varna": "sha",
@@ -970,8 +976,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -994,7 +1000,7 @@
       "flags": [
         "SIBILANT_SWAP"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.sha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.sha"
     },
     {
       "varna": "ssa",
@@ -1008,11 +1014,11 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
@@ -1032,7 +1038,7 @@
       "flags": [
         "SIBILANT_SWAP"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ssa"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ssa"
     },
     {
       "varna": "ta",
@@ -1046,8 +1052,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
@@ -1068,7 +1074,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED: ta = jāḍya/nidrā (staticity, long/deep sleep, intellectual dullness, spiritual inertness) — BINDING pole richly attested; and the LIBERATING DIRECTION (liberation from jāḍya via expansion) is attested through the Tantra etymology. AUTHORED: the specific liberated-mode wording ('alert wakefulness rising from torpor') is lexicon-supplied but well-aligned with the attested direction.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ta"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ta"
     },
     {
       "varna": "tha",
@@ -1082,11 +1088,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE_CONTRADICTS_TABLE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
@@ -1106,7 +1112,7 @@
       "flags": [
         "DOC_VS_CODE_TH"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.tha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.tha"
     },
     {
       "varna": "tta",
@@ -1120,9 +1126,9 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": true,
-      "active_status": "ACTIVE_CONTRADICTS_TABLE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": true,
       "usability_verdict": "USABLE_IN_PROSE_PACKETS",
       "poles": {
@@ -1144,7 +1150,7 @@
       "flags": [
         "REACHABILITY_CONTRADICTION"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.tta"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.tta"
     },
     {
       "varna": "ttha",
@@ -1158,11 +1164,11 @@
         "aspiration": "aspirated"
       },
       "bridge_reachable_table_field": false,
-      "practically_reachable_table_field": false,
-      "active_bridge_emits": false,
-      "active_status": "INACTIVE",
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": false,
+      "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
-      "usability_verdict": "INACTIVE_NOT_USABLE",
+      "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
       "poles": {
         "binding": {
           "text": "anutāpa as gripping remorse — the 'after-heat' that torments, replaying one's own past wrong without release",
@@ -1182,7 +1188,7 @@
       "flags": [
         "META_STALE_TTHA"
       ],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ttha"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ttha"
     },
     {
       "varna": "va",
@@ -1196,8 +1202,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -1218,7 +1224,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "ATTESTED (primary text): va = dharma = ENSCONCEMENT in one's original stance + 'that which sustains' + movement toward subtlety/Parama Puruṣa; plus the jalatattva/water + Varuṇa association; classical side liberating-oriented. The binding (rigid over-holding) is the distortion of ensconcement. Light authored component.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.va"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.va"
     },
     {
       "varna": "ya",
@@ -1232,8 +1238,8 @@
         "aspiration": "unaspirated"
       },
       "bridge_reachable_table_field": true,
-      "practically_reachable_table_field": true,
-      "active_bridge_emits": true,
+      "native_parser_reachable": true,
+      "english_g2p_bridge_reachable": true,
       "active_status": "ACTIVE",
       "rendered_in_facet_map": false,
       "usability_verdict": "ACTIVE_BUT_NOT_RENDERED",
@@ -1254,7 +1260,7 @@
       "classical_review_status": "PRIMARY_TEXT_PROVIDED_BY_OPERATOR",
       "attested_vs_authored_quote": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + movement association. ATTESTED: ya = aviśvāsa vṛtti (lack of confidence), illustrated; and the association with constant movement (air/vāyu). BINDING pole attested. AUTHORED: the LIBERATING pole (self-efficacy) is lexicon-supplied.",
       "flags": [],
-      "source_location": "frozen/varna_polarity_table_v3.json#varnas.ya"
+      "source_location": "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ya"
     }
   ],
   "missing_inventory": {
@@ -1308,20 +1314,20 @@
     {
       "rule_id": "consonant_clusters_presplit",
       "description": "G2P pre-splits clusters (tr→t+r, dr→d+r) before the bridge sees them.",
-      "provenance_status": "CONTRADICTORY",
-      "note": "The table caveat says clusters pre-split to DENTAL da/ta so retroflex ṭa/ḍa are 'never produced'; but the ACTIVE bridge's retroflex rule DOES emit ṭa/ḍa (true→ṭa, drum→ḍa). Code vs table conflict (D3)."
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "DEPRECATED ENGLISH-G2P BRIDGE property. D3 RESOLVED by the v3.1 metadata refreeze: reachability was scoped to the deprecated bridge; the native Stage-1 parser reaches ṭa/ḍa directly (native_parser_reachable=true)."
     },
     {
       "rule_id": "retroflex_before_r",
       "description": "d/t before r → retroflex ḍa/ṭa (bridge v2 retroflex rule).",
-      "provenance_status": "CONTRADICTORY",
-      "note": "Present and firing in varna_bridge_active, but the table declares it NOT retrofitted and marks ṭa/ḍa practically_reachable=False. Conflict (D3)."
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "DEPRECATED ENGLISH-G2P BRIDGE property. D3 RESOLVED: the native parser decomposes Devanāgarī ट/ड directly; the English-bridge retroflex-under-representation no longer describes the native input path."
     },
     {
       "rule_id": "th_to_ta",
       "description": "Merged English 'th' (/θ/ and /ð/) → ta (dental unaspirated stop).",
-      "provenance_status": "CONTRADICTORY",
-      "note": "The ACTIVE bridge (thfix) maps th→ta; the table's TH MIS-MAPPING caveat still says th→tha (viṣāda). Code vs meta-caveat conflict (D4). Also: /θ,ð/ are fricatives Sanskrit lacks — the target is a convention, not attested."
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "DEPRECATED ENGLISH-G2P BRIDGE property. D4 RESOLVED: under the native parser थ → tha (single aspirated dental stop) is correct and English 'th' never enters; the th→ta/th→tha bridge conflict is off the native path."
     },
     {
       "rule_id": "dh_inert",
@@ -1436,70 +1442,75 @@
       "id": "D1",
       "kind": "DOC_VS_DOC",
       "flag": "META_STALE_PA",
-      "conflict": "important_caveats says pa 'PARTIALLY INVERTS the source-attested pole'; the pa entry says v3 follows the attested assignment and 'no inversion flag remains'.",
+      "status": "RESOLVED_BY_METADATA_REFREEZE_v3_1",
+      "conflict": "(historical) important_caveats said pa 'PARTIALLY INVERTS the source-attested pole'; the pa entry says v3 follows the attested assignment and 'no inversion flag remains'.",
+      "resolution": "v3.1 important_caveats[1] updated to the resolved state; the pa entry was already authoritative.",
       "artifacts": [
-        "frozen/varna_polarity_table_v3.json#important_caveats",
-        "frozen/varna_polarity_table_v3.json#varnas.pa"
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.important_caveats",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.pa"
       ]
     },
     {
       "id": "D2",
       "kind": "DOC_VS_DOC",
       "flag": "META_STALE_TTHA",
-      "conflict": "important_caveats calls ṭha's night/moon vs 'Repentance' reading 'unresolved'; the ttha entry treats anutāpa as the vṛtti and night/moon as associations (resolved).",
+      "status": "RESOLVED_BY_METADATA_REFREEZE_v3_1",
+      "conflict": "(historical) important_caveats called ṭha's night/moon vs 'Repentance' reading 'unresolved'; the ttha entry treats anutāpa as the vṛtti and night/moon as associations (resolved).",
+      "resolution": "v3.1 important_caveats[3] updated; ttha.classical_discrepancy already = 'RESOLVED'.",
       "artifacts": [
-        "frozen/varna_polarity_table_v3.json#important_caveats",
-        "frozen/varna_polarity_table_v3.json#varnas.ttha"
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.important_caveats",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ttha"
       ]
     },
     {
       "id": "D3",
       "kind": "CODE_VS_TABLE",
       "flag": "REACHABILITY_CONTRADICTION",
-      "conflict": "Table sets tta/dda practically_reachable=False and the caveat says retroflex ṭa/ḍa are 'never produced'; the ACTIVE bridge emits them (true→ṭa; control→ṭa; drum→ḍa; dread→ḍa).",
+      "status": "RESOLVED_BY_METADATA_REFREEZE_v3_1",
+      "conflict": "(historical) table marked tta/dda practically_reachable=False while a decomposer emitted them.",
+      "resolution": "v3.1 scopes reachability into native_parser_reachable (true for tta/dda) vs english_g2p_bridge_reachable (historical). Native parser reaches them; contradiction dissolved.",
       "artifacts": [
-        "frozen/varna_polarity_table_v3.json#varnas.tta",
-        "frozen/varna_polarity_table_v3.json#varnas.dda",
-        "varna_bridge_active.word_to_varnas"
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.tta",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.dda",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.reachability_model"
       ]
     },
     {
       "id": "D4",
       "kind": "CODE_VS_DOC",
       "flag": "DOC_VS_CODE_TH",
-      "conflict": "important_caveats' TH MIS-MAPPING says 'th' → tha (viṣāda/melancholy); the ACTIVE bridge (thfix) maps merged 'th' (/θ,ð/) → ta (faith→ta).",
+      "status": "RESOLVED_BY_METADATA_REFREEZE_v3_1",
+      "conflict": "(historical) TH MIS-MAPPING caveat said 'th' → tha while the English thfix bridge mapped 'th' → ta.",
+      "resolution": "v3.1 scopes the th caveats to the deprecated English-G2P bridge; under the native parser थ → tha (single aspirated dental stop) is correct and English 'th' never enters.",
       "artifacts": [
-        "frozen/varna_polarity_table_v3.json#important_caveats",
-        "varna_bridge_active.word_to_varnas"
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.important_caveats",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.reachability_model"
       ]
     },
     {
       "id": "D5",
       "kind": "PROVENANCE_HAZARD",
       "flag": "SIBILANT_SWAP",
-      "conflict": "śa/ṣa are swapped in v2 AND the lexicon; v3 follows the primary text, but ssa's pole TEXTS are imported from the lexicon's mis-filed 'sha' entry (documented, resolved-in-v3 hazard, not an open conflict).",
+      "status": "OPEN_HAZARD",
+      "conflict": "śa/ṣa are swapped in v2 AND the lexicon; v3 follows the primary text, but ssa's pole TEXTS are imported from the lexicon's mis-filed 'sha' entry (documented hazard; out of D1–D4 scope).",
       "artifacts": [
-        "frozen/varna_polarity_table_v3.json#varnas.sha",
-        "frozen/varna_polarity_table_v3.json#varnas.ssa"
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.sha",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ssa"
       ]
     },
     {
       "id": "D6",
       "kind": "PROVENANCE_HAZARD",
       "flag": "BACK_FIT",
-      "conflict": "ha's binding/liberating split is 'researcher-imposed; motivated partly by making \"happy\" cohere' — an admitted back-fit (self-consistent across table + meta, but authored, not attested).",
+      "status": "OPEN_HAZARD",
+      "conflict": "ha's binding/liberating split is 'researcher-imposed; motivated partly by making \"happy\" cohere' — an admitted back-fit (authored, not attested; out of D1–D4 scope).",
       "artifacts": [
-        "frozen/varna_polarity_table_v3.json#varnas.ha",
-        "frozen/varna_polarity_table_v3.json#important_caveats"
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.ha",
+        "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas.important_caveats"
       ]
     }
   ],
-  "unresolved_contradiction_ids": [
-    "D1",
-    "D2",
-    "D3",
-    "D4"
-  ],
+  "unresolved_contradiction_ids": [],
   "validation": {
     "n_varnas_classified": 34,
     "all_34_accounted": true,
@@ -1511,17 +1522,15 @@
     },
     "n_poles_total": 68,
     "rule_provenance_counts": {
-      "OUT_OF_SCOPE": 7,
-      "CONTRADICTORY": 4,
+      "OUT_OF_SCOPE": 10,
       "INFERRED": 2,
       "MISSING": 2,
-      "AUTHORED_PROVISIONAL": 2
+      "AUTHORED_PROVISIONAL": 2,
+      "CONTRADICTORY": 1
     },
     "active_status_counts": {
-      "ACTIVE": 18,
-      "INACTIVE": 13,
-      "ACTIVE_CONTRADICTS_TABLE": 2,
-      "INACTIVE_CONTRADICTS_TABLE": 1
+      "ACTIVE": 33,
+      "INACTIVE": 1
     },
     "n_rendered_in_facet_map": 11,
     "missing_inventory_categories": [
@@ -1529,9 +1538,9 @@
       "anusvara",
       "visarga"
     ],
-    "n_unresolved_contradictions": 4
+    "n_unresolved_contradictions": 0
   },
-  "readiness_verdict": "BLOCKED_BY_SOURCE_CONTRADICTIONS",
-  "readiness_reason": "Four cross-artifact contradictions (D1 pa meta-stale, D2 ṭha meta-stale, D3 tta/dda code-vs-table reachability, D4 th code-vs-doc) must be resolved before any inventory decision. Secondary blocker: 27 authored-provisional poles and a wholly MISSING vowel inventory.",
+  "readiness_verdict": "BLOCKED_BY_PROVENANCE_GAPS",
+  "readiness_reason": "The four cross-artifact contradictions (D1–D4) are RESOLVED by the v3.1 metadata re-freeze (no pole content changed). The remaining blockers are provenance depth (27 authored-provisional poles; ha BACK_FIT; sha/ssa SIBILANT_SWAP) and — dominant — the wholly MISSING vowel / anusvāra / visarga / candrabindu inventory.",
   "guardrails": "Docs/data-only. No mapping/run01/Track G/frozen change. No ontology / semantic-truth / Sanskrit-privilege / generation-utility claim. Structure, not validated meaning."
 }

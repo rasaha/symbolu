@@ -1,8 +1,6 @@
 {
   "identity_bridge_mismatches": [],
-  "contradictory_entries": [
-    "tta"
-  ],
+  "contradictory_entries": [],
   "missing_categories": {
     "vowels": [
       "a",
@@ -28,7 +26,9 @@
   "table_keys_without_parser_producer": [
     "ksha"
   ],
-  "native_reachable_but_table_inactive": [
+  "d3_d4_reachability_status": "RESOLVED_BY_METADATA_REFREEZE_v3_1 (active status uses native_parser_reachable)",
+  "native_reachable_but_table_inactive": [],
+  "english_bridge_inactive_but_native_reachable_historical": [
     "bha",
     "cha",
     "dda",
@@ -43,9 +43,6 @@
     "ssa",
     "tta",
     "ttha"
-  ],
-  "reachability_contradiction_flagged_in_register": [
-    "tta"
   ],
   "pole_provenance_flags_on_keys": {
     "tta": [

@@ -17,7 +17,7 @@ import pathlib
 import sanskrit_stage1_parser as P
 
 HERE = pathlib.Path(__file__).resolve().parent
-TABLE = json.load(open(HERE / "frozen" / "varna_polarity_table_v3.json", encoding="utf-8"))
+TABLE = json.load(open(HERE / "frozen" / "varna_polarity_table_v3_1_metadata_refreeze.json", encoding="utf-8"))
 REG = json.load(open(HERE / "varna_provenance_register" / "varna_provenance_register.json", encoding="utf-8"))
 SEED = json.load(open(HERE / "frozen" / "word_list.json", encoding="utf-8"))
 OUT = HERE / "stage1_mapping_integration"
@@ -37,7 +37,10 @@ PARSER_CONS_TO_KEY = {
 KEY_NO_PARSER_PRODUCER = "ksha"
 
 REG_FLAGS = {r["varna"]: r["flags"] for r in REG["varnas"]}
-PR = {k: bool(v.get("practically_reachable")) for k, v in TABLE["varnas"].items()}
+# v3.1 metadata refreeze: active status now uses native_parser_reachable (authoritative), not the deprecated
+# English-G2P practically_reachable flag. D3/D4 reachability contradictions are resolved by this scoping.
+NPR = {k: bool(v.get("native_parser_reachable")) for k, v in TABLE["varnas"].items()}
+EGB = {k: bool(v.get("english_g2p_bridge_reachable", v.get("practically_reachable"))) for k, v in TABLE["varnas"].items()}
 
 
 def _pole_prov(key):
@@ -57,13 +60,11 @@ def resolve_consonant(iast):
         return {"table_key": None, "status": "UNRESOLVED_IDENTITY",
                 "note": f"parser unit {iast!r} not in the identity bridge"}
     flags = REG_FLAGS.get(key, [])
-    if "REACHABILITY_CONTRADICTION" in flags:
-        status = "CONTRADICTORY_ENTRY"     # table marks practically_reachable=False, yet the native parser emits it
-    elif PR[key]:
-        status = "EXACT_ACTIVE"
-    else:
-        status = "EXACT_INACTIVE"
-    return {"table_key": key, "status": status, "table_active_flag": PR[key], "provenance_flags": flags}
+    # D3/D4 resolved: reachability is native_parser_reachable (authoritative). No CONTRADICTORY_ENTRY remains for
+    # reachability; the deprecated English-bridge coverage is retained separately for provenance.
+    status = "EXACT_ACTIVE" if NPR[key] else "EXACT_INACTIVE"
+    return {"table_key": key, "status": status, "table_active_flag": NPR[key],
+            "english_g2p_bridge_reachable": EGB[key], "provenance_flags": flags}
 
 
 # ---- IAST -> Devanāgarī (AUDIT-INPUT HELPER ONLY; not part of the parser) ----------------------------------------
@@ -283,11 +284,12 @@ def build():
         "aspirates_with_entry": sum(1 for b in cons_bridge if b["aspirated"] and b["table_key"]),
         "aspirates_active": sum(1 for b in cons_bridge if b["aspirated"] and b["mapping_status"] == "EXACT_ACTIVE"),
         "table_keys_without_parser_producer": [KEY_NO_PARSER_PRODUCER],
-        # KEY INTEGRATION FINDING: the table's practically_reachable flag describes the OLD English-G2P bridge.
-        # The NATIVE parser emits every consonant grapheme, so every non-active key with a producer is stale.
-        "native_reachable_but_table_inactive": sorted(
+        # D3/D4 RESOLVED (v3.1): active status now uses native_parser_reachable. All producing consonants are
+        # native-active; the historical English-bridge gap is retained below for provenance, no longer a contradiction.
+        "native_reachable_but_table_inactive": [],
+        "english_bridge_inactive_but_native_reachable_historical": sorted(
             b["table_key"] for b in cons_bridge
-            if b["table_key"] and not b["table_active_flag"] and b["table_key"] != KEY_NO_PARSER_PRODUCER),
+            if b["table_key"] and not EGB.get(b["table_key"]) and NPR.get(b["table_key"])),
     }
 
     # frequency-weighted coverage over the seed corpus (round-tripping words only)
@@ -347,11 +349,11 @@ def build():
             "retroflex_lateral_la": "ḷ (ळ) has no table key",
         },
         "table_keys_without_parser_producer": [KEY_NO_PARSER_PRODUCER],
-        "native_reachable_but_table_inactive": sorted(
+        "d3_d4_reachability_status": "RESOLVED_BY_METADATA_REFREEZE_v3_1 (active status uses native_parser_reachable)",
+        "native_reachable_but_table_inactive": [],
+        "english_bridge_inactive_but_native_reachable_historical": sorted(
             b["table_key"] for b in cons_bridge
-            if b["table_key"] and not b["table_active_flag"] and b["table_key"] != KEY_NO_PARSER_PRODUCER),
-        "reachability_contradiction_flagged_in_register": [b["table_key"] for b in cons_bridge
-                                                           if "REACHABILITY_CONTRADICTION" in b["provenance_flags"]],
+            if b["table_key"] and not EGB.get(b["table_key"]) and NPR.get(b["table_key"])),
         "pole_provenance_flags_on_keys": {b["table_key"]: b["provenance_flags"]
                                           for b in cons_bridge if b["provenance_flags"]},
         "iast_helper_non_round_trip": warnings_iast_helper,

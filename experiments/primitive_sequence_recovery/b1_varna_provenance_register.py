@@ -38,9 +38,9 @@ import varna_bridge_active as AB
 import build_b1_10_control_ext as BUILD
 
 HERE = pathlib.Path(__file__).resolve().parent
-TABLE_PATH = HERE / "frozen" / "varna_polarity_table_v3.json"
+TABLE_PATH = HERE / "frozen" / "varna_polarity_table_v3_1_metadata_refreeze.json"  # v3.1: D1–D4 metadata refreeze (pole content == v3)
 OUT = HERE / "varna_provenance_register"
-SRC = "frozen/varna_polarity_table_v3.json#varnas"
+SRC = "frozen/varna_polarity_table_v3_1_metadata_refreeze.json#varnas"
 
 # ---- phonological grid (structure only; standard Sanskrit varṇa classification) ----------------
 # place ∈ velar/palatal/retroflex/dental/labial/glottal ; manner ∈ stop/nasal/semivowel/sibilant/aspirate
@@ -223,20 +223,16 @@ def varna_record(key):
     v = json.load(open(TABLE_PATH, encoding="utf-8"))["varnas"][key]
     place, manner, voicing, aspiration = PHON[key]
     b_status, l_status, flags, b_basis, l_basis = CLASSIFICATION[key]
-    table_reachable = bool(v.get("practically_reachable"))
-    code_reachable = _active_reachable(key)
+    # D3/D4 metadata refreeze: reachability is now split into explicit native vs deprecated-English-bridge scopes.
+    native_reachable = bool(v.get("native_parser_reachable"))
+    english_bridge_reachable = bool(v.get("english_g2p_bridge_reachable", v.get("practically_reachable")))
+    code_reachable = native_reachable                 # authoritative: the frozen native Stage-1 parser
+    table_reachable = english_bridge_reachable         # historical English-G2P coverage (deprecated for native use)
     rendered = (key, "binding") in BUILD.VARNA_PLAIN
-    # active status, with the code-vs-table reachability conflicts surfaced (not silently reconciled)
-    if code_reachable and not table_reachable:
-        active_status = "ACTIVE_CONTRADICTS_TABLE"    # code emits it; table says practically_reachable=False (D3: tta/dda)
-    elif code_reachable:
-        active_status = "ACTIVE"
-    elif table_reachable:
-        active_status = "INACTIVE_CONTRADICTS_TABLE"  # table says reachable; active bridge never emits it (D4: tha, th->ta)
-    else:
-        active_status = "INACTIVE"
-    usability = ("USABLE_IN_PROSE_PACKETS" if (rendered and code_reachable)
-                 else "ACTIVE_BUT_NOT_RENDERED" if code_reachable
+    # active status now reflects the NATIVE parser; the old code-vs-table contradiction (D3/D4) is resolved by scoping.
+    active_status = "ACTIVE" if native_reachable else "INACTIVE"
+    usability = ("USABLE_IN_PROSE_PACKETS" if (rendered and native_reachable)
+                 else "ACTIVE_BUT_NOT_RENDERED" if native_reachable
                  else "INACTIVE_NOT_USABLE")
     return {
         "varna": key,
@@ -245,8 +241,8 @@ def varna_record(key):
         "sanskrit_label": v.get("sanskrit_label"),
         "phonology": {"place": place, "manner": manner, "voicing": voicing, "aspiration": aspiration},
         "bridge_reachable_table_field": bool(v.get("bridge_reachable")),
-        "practically_reachable_table_field": table_reachable,
-        "active_bridge_emits": code_reachable,
+        "native_parser_reachable": native_reachable,
+        "english_g2p_bridge_reachable": english_bridge_reachable,
         "active_status": active_status,
         "rendered_in_facet_map": rendered,
         "usability_verdict": usability,
@@ -273,17 +269,17 @@ RULES = [
      "OUT_OF_SCOPE",
      "The table's ASPIRATION COLLAPSE caveat: aspirated word-initial stops classically differ; the bridge collapses them."),
     ("consonant_clusters_presplit", "G2P pre-splits clusters (tr→t+r, dr→d+r) before the bridge sees them.",
-     "CONTRADICTORY",
-     "The table caveat says clusters pre-split to DENTAL da/ta so retroflex ṭa/ḍa are 'never produced'; but the "
-     "ACTIVE bridge's retroflex rule DOES emit ṭa/ḍa (true→ṭa, drum→ḍa). Code vs table conflict (D3)."),
+     "OUT_OF_SCOPE",
+     "DEPRECATED ENGLISH-G2P BRIDGE property. D3 RESOLVED by the v3.1 metadata refreeze: reachability was scoped to "
+     "the deprecated bridge; the native Stage-1 parser reaches ṭa/ḍa directly (native_parser_reachable=true)."),
     ("retroflex_before_r", "d/t before r → retroflex ḍa/ṭa (bridge v2 retroflex rule).",
-     "CONTRADICTORY",
-     "Present and firing in varna_bridge_active, but the table declares it NOT retrofitted and marks ṭa/ḍa "
-     "practically_reachable=False. Conflict (D3)."),
+     "OUT_OF_SCOPE",
+     "DEPRECATED ENGLISH-G2P BRIDGE property. D3 RESOLVED: the native parser decomposes Devanāgarī ट/ड directly; "
+     "the English-bridge retroflex-under-representation no longer describes the native input path."),
     ("th_to_ta", "Merged English 'th' (/θ/ and /ð/) → ta (dental unaspirated stop).",
-     "CONTRADICTORY",
-     "The ACTIVE bridge (thfix) maps th→ta; the table's TH MIS-MAPPING caveat still says th→tha (viṣāda). "
-     "Code vs meta-caveat conflict (D4). Also: /θ,ð/ are fricatives Sanskrit lacks — the target is a convention, not attested."),
+     "OUT_OF_SCOPE",
+     "DEPRECATED ENGLISH-G2P BRIDGE property. D4 RESOLVED: under the native parser थ → tha (single aspirated dental "
+     "stop) is correct and English 'th' never enters; the th→ta/th→tha bridge conflict is off the native path."),
     ("dh_inert", "'dh'→da is pre-wired but inert (the G2P never emits dh).",
      "INFERRED", "Structural placeholder; no input path activates it."),
     ("anusvara_ignored", "Anusvāra (ṃ) is not produced.", "MISSING", "No emission path; no pole."),
@@ -373,41 +369,52 @@ def build():
     for rec in varnas:
         active_counts[rec["active_status"]] = active_counts.get(rec["active_status"], 0) + 1
 
+    # D1–D4 RESOLVED by the metadata-only re-freeze (reconciliation 26d680c9 → v3.1); see
+    # B1_VARNA_TABLE_D1_D4_RECONCILIATION.md. Recorded historically with resolution status; no pole content changed.
+    RESOLVED = "RESOLVED_BY_METADATA_REFREEZE_v3_1"
     contradictions = [
-        {"id": "D1", "kind": "DOC_VS_DOC", "flag": "META_STALE_PA",
-         "conflict": "important_caveats says pa 'PARTIALLY INVERTS the source-attested pole'; the pa entry says "
-                     "v3 follows the attested assignment and 'no inversion flag remains'.",
-         "artifacts": ["frozen/varna_polarity_table_v3.json#important_caveats", f"{SRC}.pa"]},
-        {"id": "D2", "kind": "DOC_VS_DOC", "flag": "META_STALE_TTHA",
-         "conflict": "important_caveats calls ṭha's night/moon vs 'Repentance' reading 'unresolved'; the ttha entry "
-                     "treats anutāpa as the vṛtti and night/moon as associations (resolved).",
-         "artifacts": ["frozen/varna_polarity_table_v3.json#important_caveats", f"{SRC}.ttha"]},
-        {"id": "D3", "kind": "CODE_VS_TABLE", "flag": "REACHABILITY_CONTRADICTION",
-         "conflict": "Table sets tta/dda practically_reachable=False and the caveat says retroflex ṭa/ḍa are 'never "
-                     "produced'; the ACTIVE bridge emits them (true→ṭa; control→ṭa; drum→ḍa; dread→ḍa).",
-         "artifacts": [f"{SRC}.tta", f"{SRC}.dda", "varna_bridge_active.word_to_varnas"]},
-        {"id": "D4", "kind": "CODE_VS_DOC", "flag": "DOC_VS_CODE_TH",
-         "conflict": "important_caveats' TH MIS-MAPPING says 'th' → tha (viṣāda/melancholy); the ACTIVE bridge (thfix) "
-                     "maps merged 'th' (/θ,ð/) → ta (faith→ta).",
-         "artifacts": ["frozen/varna_polarity_table_v3.json#important_caveats", "varna_bridge_active.word_to_varnas"]},
-        {"id": "D5", "kind": "PROVENANCE_HAZARD", "flag": "SIBILANT_SWAP",
+        {"id": "D1", "kind": "DOC_VS_DOC", "flag": "META_STALE_PA", "status": RESOLVED,
+         "conflict": "(historical) important_caveats said pa 'PARTIALLY INVERTS the source-attested pole'; the pa entry "
+                     "says v3 follows the attested assignment and 'no inversion flag remains'.",
+         "resolution": "v3.1 important_caveats[1] updated to the resolved state; the pa entry was already authoritative.",
+         "artifacts": [f"{SRC}.important_caveats", f"{SRC}.pa"]},
+        {"id": "D2", "kind": "DOC_VS_DOC", "flag": "META_STALE_TTHA", "status": RESOLVED,
+         "conflict": "(historical) important_caveats called ṭha's night/moon vs 'Repentance' reading 'unresolved'; the "
+                     "ttha entry treats anutāpa as the vṛtti and night/moon as associations (resolved).",
+         "resolution": "v3.1 important_caveats[3] updated; ttha.classical_discrepancy already = 'RESOLVED'.",
+         "artifacts": [f"{SRC}.important_caveats", f"{SRC}.ttha"]},
+        {"id": "D3", "kind": "CODE_VS_TABLE", "flag": "REACHABILITY_CONTRADICTION", "status": RESOLVED,
+         "conflict": "(historical) table marked tta/dda practically_reachable=False while a decomposer emitted them.",
+         "resolution": "v3.1 scopes reachability into native_parser_reachable (true for tta/dda) vs "
+                       "english_g2p_bridge_reachable (historical). Native parser reaches them; contradiction dissolved.",
+         "artifacts": [f"{SRC}.tta", f"{SRC}.dda", f"{SRC}.reachability_model"]},
+        {"id": "D4", "kind": "CODE_VS_DOC", "flag": "DOC_VS_CODE_TH", "status": RESOLVED,
+         "conflict": "(historical) TH MIS-MAPPING caveat said 'th' → tha while the English thfix bridge mapped 'th' → ta.",
+         "resolution": "v3.1 scopes the th caveats to the deprecated English-G2P bridge; under the native parser "
+                       "थ → tha (single aspirated dental stop) is correct and English 'th' never enters.",
+         "artifacts": [f"{SRC}.important_caveats", f"{SRC}.reachability_model"]},
+        {"id": "D5", "kind": "PROVENANCE_HAZARD", "flag": "SIBILANT_SWAP", "status": "OPEN_HAZARD",
          "conflict": "śa/ṣa are swapped in v2 AND the lexicon; v3 follows the primary text, but ssa's pole TEXTS are "
-                     "imported from the lexicon's mis-filed 'sha' entry (documented, resolved-in-v3 hazard, not an open conflict).",
+                     "imported from the lexicon's mis-filed 'sha' entry (documented hazard; out of D1–D4 scope).",
          "artifacts": [f"{SRC}.sha", f"{SRC}.ssa"]},
-        {"id": "D6", "kind": "PROVENANCE_HAZARD", "flag": "BACK_FIT",
+        {"id": "D6", "kind": "PROVENANCE_HAZARD", "flag": "BACK_FIT", "status": "OPEN_HAZARD",
          "conflict": "ha's binding/liberating split is 'researcher-imposed; motivated partly by making \"happy\" cohere' "
-                     "— an admitted back-fit (self-consistent across table + meta, but authored, not attested).",
-         "artifacts": [f"{SRC}.ha", "frozen/varna_polarity_table_v3.json#important_caveats"]},
+                     "— an admitted back-fit (authored, not attested; out of D1–D4 scope).",
+         "artifacts": [f"{SRC}.ha", f"{SRC}.important_caveats"]},
     ]
-    unresolved_contradictions = [c for c in contradictions if c["kind"].endswith(("VS_DOC", "VS_TABLE")) or c["kind"] == "CODE_VS_DOC"]
+    unresolved_contradictions = [c for c in contradictions
+                                 if c["kind"] in ("DOC_VS_DOC", "CODE_VS_TABLE", "CODE_VS_DOC")
+                                 and c.get("status") != RESOLVED]
 
     missing_categories = list(MISSING_INVENTORY.keys())
 
-    readiness = "BLOCKED_BY_SOURCE_CONTRADICTIONS"
+    # D1–D4 resolved; the dominant remaining blocker is provenance depth + the wholly MISSING vowel/marker inventory.
+    readiness = "BLOCKED_BY_PROVENANCE_GAPS"
     readiness_reason = (
-        "Four cross-artifact contradictions (D1 pa meta-stale, D2 ṭha meta-stale, D3 tta/dda code-vs-table "
-        "reachability, D4 th code-vs-doc) must be resolved before any inventory decision. Secondary blocker: "
-        f"{pole_counts.get('AUTHORED_PROVISIONAL', 0)} authored-provisional poles and a wholly MISSING vowel inventory."
+        "The four cross-artifact contradictions (D1–D4) are RESOLVED by the v3.1 metadata re-freeze (no pole content "
+        f"changed). The remaining blockers are provenance depth ({pole_counts.get('AUTHORED_PROVISIONAL', 0)} "
+        "authored-provisional poles; ha BACK_FIT; sha/ssa SIBILANT_SWAP) and — dominant — the wholly MISSING vowel / "
+        "anusvāra / visarga / candrabindu inventory."
     )
 
     validation = {
@@ -428,9 +435,12 @@ def build():
         "scope": "Part E Step 1 — provenance of the CURRENT active varṇa mechanism (docs/data-only).",
         "sources_read": {
             "table": SRC,
-            "active_bridge": "varna_bridge_active.word_to_varnas (bridge_v2_plus_theta_eth_ta)",
-            "facet_map": "build_b1_10_control_ext.VARNA_PLAIN (11 varṇas)",
+            "reachability_authority": "varnas.<key>.native_parser_reachable (v3.1 metadata refreeze)",
+            "deprecated_english_bridge": "varna_bridge_active.word_to_varnas (historical; not the native input path)",
+            "facet_map": "build_b1_10_control_ext.VARNA_PLAIN (11 varṇas; deprecated English-prose packet layer)",
         },
+        "d1_d4_refreeze": {"applied_via": "varna_polarity_table_v3_1_metadata_refreeze.json",
+                           "reconciliation_commit": "26d680c9", "pole_content_changed": False},
         "status_definitions": {
             "PRIMARY_ATTESTED": "stated by the operator-supplied primary classical text",
             "SECONDARY_ATTESTED": "vṛtti NAME attested; pole reading is the lexicon's, not a primary-text pole contrast",
