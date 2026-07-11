@@ -9,9 +9,12 @@ assigns **no** binding/liberating meaning, chooses **no** polarity, aggregates *
 Sanskrit-privilege / generation-utility claim. B1.4b′ remains `NULL_RETURN_BOTTOM`; Track B blocked; run01, Track G,
 and all frozen mappings unchanged.
 
-> **Implementation status:** implemented in `sanskrit_stage1_parser.py`, tested by
-> `test_sanskrit_stage1_parser.py` (golden + rule-level + invariant + semantic-firewall), with byte-for-byte golden
-> fixtures under `stage1_golden/`. All eight §4 fixtures pass byte-for-byte. See §10.
+> **Implementation status:** implemented in `sanskrit_stage1_parser.py`; tested by
+> `test_sanskrit_stage1_parser.py` (golden + rule-level + invariant + firewall) and
+> `test_sanskrit_stage1_parser_corrective.py` (post-audit adversarial + invariants), with byte-for-byte golden
+> fixtures under `stage1_golden/`. All eight §4 fixtures pass byte-for-byte. **Schema v1.1** (post hostile-audit):
+> atomic units carry `is_initial`/`is_final` and the record carries `schema_version`. See §10 and the authoritative
+> corrections in **§11**.
 
 ---
 
@@ -321,3 +324,57 @@ specified engineering defaults and do **not** block implementation.
 **Single recommended next action:** implement the parser to this spec **plus a test suite that pins the eight §4
 fixtures byte-for-byte** — as Stage-1 input infrastructure only — before, and separately from, any vowel-pole
 authoring or composition-rule pre-registration.
+
+---
+
+## 11. Audit corrections (schema v1.1, authoritative)
+
+A hostile implementation audit (`VERIFIED_WITH_CORRECTABLE_FINDINGS`) produced the following mandated corrections.
+These are normative and supersede any earlier under-specification.
+
+**11.1 ZWJ / ZWNJ join-control policy.** U+200D (ZWJ) and U+200C (ZWNJ) are orthographic **join controls**, not
+phonological varṇas. In the context `consonant + virāma + {join-control}* + consonant` the parser treats them as
+transparent: it continues the virāma-linked conjunct chain, emits **no** atomic unit for the control, inserts **no**
+inherent अ before the linked consonant, preserves constituent order, keeps the control in the original and
+normalized source and akṣara span/codepoints, and records a `join_control_in_conjunct` warning. Consequently
+`क्ष`, `क्‍ष` (ZWJ) and `क्‌ष` (ZWNJ) all yield atomic `[k, ṣ, a]`; their orthographic metadata (akṣara substring)
+remains distinguishable. A join control **outside** a valid virāma-linked context is retained in source, warned
+(`join_control_out_of_context`), and never emitted as a varṇa nor allowed to alter phonological structure.
+**Invariant:** no join control ever appears in the atomic-varṇa sequence.
+
+**11.2 Singleton boundary semantics.** Every atomic unit carries authoritative booleans **`is_initial`** and
+**`is_final`** in addition to the scalar `position`. `position` = `onset` at index 0, `final` at the last index
+when length > 1, else `medial`. For a **singleton** sequence both booleans are `true` (and `position` is `onset`).
+The booleans are authoritative for boundary roles; the scalar is retained for readability/back-compat.
+
+**11.3 Unsupported nukta-bearing bases.** A nukta-bearing (non-classical) base is **not** a recognized Sanskrit
+consonant. The parser emits a single `unsupported` unit (`origin = unresolved_nukta_base`), preserves the full
+orthographic unit (base + nukta + any dependent vowel sign) in its `devanagari`, records the dependent sign as
+warning metadata (`dependent_vowel_metadata`), warns `non_classical_nukta` (`no_canonical_atomic_consonant_identity`,
+`inherent_a_suppressed = true`), invents **no** consonant identity, and emits **no** inherent अ. Inside a conjunct
+it does not license an inherent vowel on prior members.
+
+**11.4 Malformed virāma + independent vowel.** A sequence such as `क्आ` (virāma with no consonantal continuation,
+followed by an independent vowel) preserves deterministic structure but raises an explicit
+`virama_before_independent_vowel` warning. No morphological or spelling repair is attempted.
+
+**11.5 Single-token whitespace contract.** The public parser is a **single surface-word** parser, not a tokenizer.
+Whitespace is never emitted as a varṇa. Leading/trailing whitespace → `leading_trailing_whitespace`; internal
+whitespace → `multiple_tokens_or_whitespace`; ZWSP (U+200B) → `zero_width_space_retained`; empty input →
+`empty_input`. The parser does **not** silently split and parse multiple words.
+
+**11.6 Losslessness / provenance invariants (now tested).** (1) concatenating akṣara source substrings reconstructs
+the NFC input exactly; (2) every normalized code point is covered by an akṣara span (with warning where non-varṇa);
+(3) ZWJ/ZWNJ remain reconstructable from the orthographic layer; (4) no join control in the atomic sequence; (5)
+every atomic unit maps to a valid source akṣara; (6) akṣara slices are ordered, non-overlapping, complete; (7)
+deterministic serialization; (8) NFC idempotent; (9) NFC- and NFD-form inputs yield an identical **canonical
+structural projection** (`canonical_structure()` — record minus `word_devanagari` and `normalization`), while the
+original-input echo and `normalization.changed` faithfully reflect each input. (NFD and NFC serialized records are
+**not** asserted byte-identical, because the record retains the original input and a `normalization.changed` field.)
+
+**11.7 Explicitly documented non-goals** (no semantic behavior implemented): legacy malformed `अा` is **not**
+auto-corrected to `आ` (flagged as orphan, retained); `ॐ` stays outside the classical atomic-varṇa inventory unless
+separately specified; pluta and full Vedic prosody remain future extensions; ZWSP outside specified contexts is
+retained and warned; sandhi reversal remains prohibited; multiword tokenization is outside parser scope.
+
+**Post-correction verdict:** `PARSER_CORRECTED_AND_READY_FOR_REFREEZE_AUDIT`.

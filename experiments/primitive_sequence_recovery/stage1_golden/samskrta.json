@@ -75,6 +75,8 @@
       "inherent_inserted": false,
       "orthographic_source": "base_letter",
       "position": "onset",
+      "is_initial": true,
+      "is_final": false,
       "source_akshara_index": 0
     },
     {
@@ -88,6 +90,8 @@
       "inherent_inserted": true,
       "orthographic_source": "inherent",
       "position": "medial",
+      "is_initial": false,
+      "is_final": false,
       "source_akshara_index": 0
     },
     {
@@ -101,6 +105,8 @@
       "inherent_inserted": false,
       "orthographic_source": "combining_mark",
       "position": "medial",
+      "is_initial": false,
+      "is_final": false,
       "source_akshara_index": 0
     },
     {
@@ -114,6 +120,8 @@
       "inherent_inserted": false,
       "orthographic_source": "conjunct_constituent",
       "position": "medial",
+      "is_initial": false,
+      "is_final": false,
       "source_akshara_index": 1
     },
     {
@@ -127,6 +135,8 @@
       "inherent_inserted": false,
       "orthographic_source": "base_letter",
       "position": "medial",
+      "is_initial": false,
+      "is_final": false,
       "source_akshara_index": 1
     },
     {
@@ -140,6 +150,8 @@
       "inherent_inserted": false,
       "orthographic_source": "dependent_vowel_sign",
       "position": "medial",
+      "is_initial": false,
+      "is_final": false,
       "source_akshara_index": 1
     },
     {
@@ -153,6 +165,8 @@
       "inherent_inserted": false,
       "orthographic_source": "base_letter",
       "position": "medial",
+      "is_initial": false,
+      "is_final": false,
       "source_akshara_index": 2
     },
     {
@@ -166,6 +180,8 @@
       "inherent_inserted": true,
       "orthographic_source": "inherent",
       "position": "final",
+      "is_initial": false,
+      "is_final": true,
       "source_akshara_index": 2
     }
   ],
@@ -191,5 +207,6 @@
     "resolved_pronunciation_candidate": null
   },
   "warnings": [],
-  "parser_spec_version": "PARSER_SPEC_v1"
+  "parser_spec_version": "PARSER_SPEC_v1",
+  "schema_version": "1.1"
 }
