@@ -1,0 +1,41 @@
+{
+  "task": "closed six-way forced-choice word identification (blind)",
+  "literal_prompt_template": "You will be shown a short description followed by six candidate meanings labelled W1 to W6. Exactly one candidate is the intended meaning of the description.\n\nDESCRIPTION:\n{description_block}\n\nCANDIDATES:\n{candidates_block}\n\nChoose the single candidate label that best matches the description. Respond with ONLY a JSON object of the exact form {\"choice\": \"W3\"} using one of W1, W2, W3, W4, W5, W6. Do not explain, do not add any other text, and do not show any reasoning.",
+  "description_block_render": {
+    "semantic_arms_T_X_S_R_G": "each packet feature rendered as two lines: 'toward: <binding_paraphrase>' and 'away: <liberating_paraphrase>', features in packet order, blank line between features",
+    "feature_only_arm_F": "single line 'structure only: <n_features> feature(s), length band <short|medium>' and no descriptive content"
+  },
+  "candidates_block_render": "six lines, each 'W<i>: <english_gloss>', in the frozen per-presentation candidate order",
+  "response_schema": {
+    "type": "object",
+    "required": [
+      "choice"
+    ],
+    "properties": {
+      "choice": {
+        "enum": [
+          "W1",
+          "W2",
+          "W3",
+          "W4",
+          "W5",
+          "W6"
+        ]
+      }
+    },
+    "additionalProperties": false
+  },
+  "explanation_or_chain_of_thought": "PROHIBITED — any text other than the JSON object makes the response invalid",
+  "invalid_output_handling": "if the response does not parse to exactly one of W1..W6 (extra text, multiple choices, malformed JSON), it is INVALID; retry once with the identical prompt; if still invalid, record status=invalid and score as incorrect (never resample toward a valid answer, never hand-repair)",
+  "retry_policy": "at most ONE retry per presentation, only on invalid-format or transient API/timeout error; temperature stays 0 on retry; no prompt changes",
+  "timeout_policy": "60 seconds per call; on timeout, one retry; if it times out again, status=missing",
+  "duplicate_response_policy": "a response naming more than one label is INVALID (handled as above)",
+  "missing_response_policy": "status=missing is scored as incorrect for accuracy; the missing/invalid rate is reported per arm and per evaluator and must be < 5% or the run is re-examined before interpretation",
+  "repetitions_per_base_trial": 6,
+  "repetitions_use_candidate_order_rotations": true,
+  "repetition_note": "the 6 repetitions ARE the 6 frozen candidate-order rotations (position counterbalancing); at temperature 0 no additional same-prompt resampling is performed",
+  "model_family_policy": "at least 3 blind LLM evaluators from >=3 distinct model families, each family DISJOINT from the model family used for isolated paraphrase authoring; evaluators are blind to arm identity, the mapping, the repository, and which packet is 'true'",
+  "temperature": 0,
+  "deterministic_settings": "temperature 0; top_p 1; fixed decoding seed where the provider supports it; identical prompt template and option rendering for every presentation",
+  "scoring_rule": "per presentation, correct iff choice == frozen correct_label; per-arm accuracy = mean correctness over all presentations of that arm (all rotations, all evaluators); chance = 1/6; PRIMARY CONTRAST Δ = Acc(T) − max(Acc(X), Acc(R), Acc(G), Acc(F)); success requires Δ ≥ 0.15 and its BCa 95% CI lower bound > 0 (paired cluster bootstrap over words), unchanged from the preregistration"
+}
