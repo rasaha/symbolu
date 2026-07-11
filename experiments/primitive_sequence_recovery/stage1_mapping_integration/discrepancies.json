@@ -1,0 +1,74 @@
+{
+  "identity_bridge_mismatches": [],
+  "contradictory_entries": [
+    "tta"
+  ],
+  "missing_categories": {
+    "vowels": [
+      "a",
+      "ā",
+      "i",
+      "ī",
+      "u",
+      "ū",
+      "ṛ",
+      "ṝ",
+      "l̥",
+      "l̥̄",
+      "e",
+      "ai",
+      "o",
+      "au"
+    ],
+    "anusvara": true,
+    "visarga": true,
+    "candrabindu": true,
+    "retroflex_lateral_la": "ḷ (ळ) has no table key"
+  },
+  "table_keys_without_parser_producer": [
+    "ksha"
+  ],
+  "native_reachable_but_table_inactive": [
+    "bha",
+    "cha",
+    "dda",
+    "ddha",
+    "dha",
+    "gha",
+    "jha",
+    "kha",
+    "nna",
+    "nya",
+    "pha",
+    "ssa",
+    "tta",
+    "ttha"
+  ],
+  "reachability_contradiction_flagged_in_register": [
+    "tta"
+  ],
+  "pole_provenance_flags_on_keys": {
+    "tta": [
+      "REACHABILITY_CONTRADICTION"
+    ],
+    "ttha": [
+      "META_STALE_TTHA"
+    ],
+    "tha": [
+      "DOC_VS_CODE_TH"
+    ],
+    "pa": [
+      "META_STALE_PA"
+    ],
+    "sha": [
+      "SIBILANT_SWAP"
+    ],
+    "ssa": [
+      "SIBILANT_SWAP"
+    ],
+    "ha": [
+      "BACK_FIT"
+    ]
+  },
+  "iast_helper_non_round_trip": []
+}
