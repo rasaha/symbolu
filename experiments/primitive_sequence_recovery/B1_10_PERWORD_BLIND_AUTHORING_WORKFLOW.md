@@ -225,6 +225,39 @@ python3 b1_10_perword_author_run.py \
     --words  doubt --start-rung 1
 ```
 
+**One rung per process (disk/VRAM-safe — required on a single 80 GB A100).** A single A100 cannot hold
+two large models at once (14B ≈ 28 GB + 32B ≈ 65 GB in fp16 exceed 80 GB VRAM, and both caches exceed the
+pod disk quota). So do **not** let one process climb rungs; run **one rung per fresh process** with
+`--start-rung r --max-rung r`, freeing the model cache between rungs. `--max-rung` caps the highest rung an
+invocation attempts (inclusive). A word that exhausts its capped budget on surface failure gets
+`status: RUNG_EXHAUSTED_ESCALATE_NEXT_PROCESS` and the exact next-process command in its provenance `note`.
+This is disk/VRAM management only — the escalation **trigger** is unchanged (packet-blind surface failure
+only), and a fresh process per rung is if anything *stronger* on isolation.
+
+```bash
+export HF_HOME=/workspace/hf_cache HF_HUB_DISABLE_XET=1
+
+# Phase A — rung 0 (Qwen2.5-14B) for all six words, no 32B download:
+python3 b1_10_perword_author_run.py --packet B1_10_OFFICIAL_CONTEXT_AUTHOR_PACKET.md \
+    --out /workspace/b1_10_author_v3_perword --start-rung 0 --max-rung 0
+
+# free the 14B weights (keeps the output dir; only clears the model cache):
+rm -rf "$HF_HOME"/*
+
+# Phase B — rung 1 (Qwen2.5-32B), ONLY the words that exhausted rung 0 (fresh process):
+python3 b1_10_perword_author_run.py --packet B1_10_OFFICIAL_CONTEXT_AUTHOR_PACKET.md \
+    --out /workspace/b1_10_author_v3_perword --words <exhausted...> --start-rung 1 --max-rung 1
+
+# Phase C — any word still exhausted -> rung 2 human handoff record:
+python3 b1_10_perword_author_run.py --packet B1_10_OFFICIAL_CONTEXT_AUTHOR_PACKET.md \
+    --out /workspace/b1_10_author_v3_perword --words <still-exhausted...> --start-rung 2 --max-rung 2
+```
+
+Each phase writes a rung-scoped `provenance_<word>.rung<start>_to_<cap>.json` alongside the canonical
+`provenance_<word>.json`, so an earlier phase's record is never lost on disk when a later phase re-runs a
+word at the next rung. Words already `ACCEPTED` at a lower rung are simply omitted from `--words` in later
+phases (accept-first-pass: never re-run an accepted word).
+
 **Human-author handoff (rung 2).** When both model rungs are exhausted the runner emits
 `provenance_<word>.json` with `status: ESCALATE_TO_HUMAN`. Procedure:
 

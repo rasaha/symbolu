@@ -139,13 +139,38 @@ def utc_now():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_rung=0):
-    """Author one word-pair, climbing the escalation ladder until a surface pass or human handoff.
+def free_model(model):
+    """Release a loaded model's VRAM before loading the next rung (defensive; a single
+    80 GB A100 cannot hold two large models at once). No-op if torch is unavailable."""
+    try:
+        del model
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+
+def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_rung=0, max_rung=None):
+    """Author one word-pair, climbing the escalation ladder until a surface pass or budget end.
 
     Returns (accepted_pair_dict_or_None, provenance_record). Accept-first-pass: the FIRST
     surface-passing generation is returned; no further attempts are made and no passing
     versions are compared.
+
+    `max_rung` caps the highest ladder rung this INVOCATION will attempt (inclusive; default =
+    last rung). Running one rung per process (`--start-rung r --max-rung r`) keeps only one
+    model on disk/VRAM at a time and makes each rung a genuinely fresh, packet-only process.
+    If the capped budget is exhausted without a pass AND a higher rung exists, the record's
+    status is `RUNG_EXHAUSTED_ESCALATE_NEXT_PROCESS` (surface failure only) — the operator then
+    runs the next rung in a fresh process. The escalation TRIGGER is unchanged: packet-blind
+    surface-validation failure only.
     """
+    last_idx = len(ESCALATION_LADDER) - 1
+    cap = last_idx if max_rung is None else min(max_rung, last_idx)
+
     directive = per_word_directive(word, index_1based)
     delivered_prompt = packet_text + directive
     delivered_sha = hashlib.sha256(delivered_prompt.encode("utf-8")).hexdigest()
@@ -154,7 +179,7 @@ def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_
     attempts_log = []
     tok = model = loaded_id = None
 
-    for rung_spec in ESCALATION_LADDER[start_rung:]:
+    for rung_spec in ESCALATION_LADDER[start_rung:cap + 1]:
         rung, model_id = rung_spec["rung"], rung_spec["model_id"]
 
         if model_id == "PACKET_NAIVE_HUMAN":
@@ -177,6 +202,9 @@ def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_
             return None, record
 
         if loaded_id != model_id:
+            if model is not None:
+                free_model(model)
+                model = None
             tok, model = load_model(model_id, rung_spec["revision"])
             loaded_id = model_id
 
@@ -240,13 +268,25 @@ def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_
                 (attempt_dir / "ACCEPTED.txt").write_text(raw, encoding="utf-8")
                 return raw, provenance
 
-    # every model rung exhausted -> escalate to human (unreachable here because the human rung
-    # is inside the ladder loop, but kept defensively)
+    if model is not None:
+        free_model(model)
+
+    # This invocation's capped rung budget was exhausted with no surface pass. If a higher rung
+    # exists beyond the cap, the operator escalates by running the NEXT rung in a fresh process
+    # (one model per process — disk/VRAM safe). The escalation trigger is surface failure only.
+    next_rung = cap + 1
+    next_model = ESCALATION_LADDER[next_rung]["model_id"] if next_rung <= last_idx else None
     return None, {
-        "artifact": "b1_10_perword_author_run", "word": word, "status": "ESCALATE_TO_HUMAN",
+        "artifact": "b1_10_perword_author_run", "word": word, "word_index_1based": index_1based,
+        "status": "RUNG_EXHAUSTED_ESCALATE_NEXT_PROCESS",
+        "exhausted_up_to_rung": cap, "next_rung": next_rung if next_model else None,
+        "next_rung_model": next_model,
         "reason_for_escalation": "SURFACE_VALIDATION_FAILURE_ONLY", "attempts": attempts_log,
         "master_packet_sha256": packet_sha, "delivered_prompt_sha256": delivered_sha,
-        "timestamp_utc": utc_now(),
+        "per_word_directive": directive, "timestamp_utc": utc_now(),
+        "note": ("Run the next rung in a FRESH process to keep one model on disk/VRAM at a time: "
+                 f"`--words {word} --start-rung {next_rung} --max-rung {next_rung}`" if next_model
+                 else "No higher rung; capped at the human rung — see ESCALATE_TO_HUMAN handling."),
     }
 
 
@@ -276,6 +316,9 @@ def main():
     ap.add_argument("--words", nargs="*", default=OFFICIAL_WORDS,
                     help="subset of words to author (default: all six, packet order)")
     ap.add_argument("--start-rung", type=int, default=0, help="ladder rung to start from (0=14B,1=32B,2=human)")
+    ap.add_argument("--max-rung", type=int, default=None,
+                    help="highest rung this INVOCATION attempts, inclusive (default: last). "
+                         "Use `--start-rung r --max-rung r` to run ONE rung per process (disk/VRAM safe).")
     a = ap.parse_args()
 
     out = pathlib.Path(a.out)
@@ -292,8 +335,14 @@ def main():
 
     for word in a.words:
         idx = OFFICIAL_WORDS.index(word) + 1
-        raw, prov = author_one_word(word, idx, packet_text, packet_sha, out, start_rung=a.start_rung)
-        (out / f"provenance_{word}.json").write_text(json.dumps(prov, ensure_ascii=False, indent=2))
+        raw, prov = author_one_word(word, idx, packet_text, packet_sha, out,
+                                    start_rung=a.start_rung, max_rung=a.max_rung)
+        prov_json = json.dumps(prov, ensure_ascii=False, indent=2)
+        (out / f"provenance_{word}.json").write_text(prov_json)
+        # rung-scoped copy so a phased (one-rung-per-process) run never overwrites an earlier
+        # phase's record on disk (canonical provenance_<word>.json still holds the latest)
+        cap = (len(ESCALATION_LADDER) - 1) if a.max_rung is None else a.max_rung
+        (out / f"provenance_{word}.rung{a.start_rung}_to_{cap}.json").write_text(prov_json)
         all_provenance.append(prov)
         if prov["status"] == "ACCEPTED":
             accepted_blocks.append(extract_pair_block(raw, word))
