@@ -1,0 +1,18 @@
+{
+  "blocked_shortcuts": {
+    "direct_orthographic_matching": "no Devanāgarī shown to evaluator",
+    "direct_iast_consonant_matching": "no IAST / consonant symbol shown; candidates are English glosses only",
+    "packet_length_identification": "sets are length-non-identifying (each length shared by >=2 words)",
+    "unique_word_length_identification": "same as above",
+    "rare_consonant_singleton_lookup": "sets have no rare-only unique feature; and consonant symbols are hidden",
+    "valence_only_matching": "dual-pole render shows BOTH poles per feature; G/R controls carry matched valence; primary contrast nets valence out",
+    "dictionary_gloss_sentiment_matching": "candidate glosses are neutral dictionary definitions; F/G controls estimate sentiment shortcut",
+    "sanskrit_vritti_name_reverse_map": "evaluator-facing render is ENGLISH-ONLY (Sanskrit vṛtti proper-names stripped/paraphrased)",
+    "evaluator_knowledge_of_set_construction": "evaluators blind to set-construction, arm identity, mapping keys, repository"
+  },
+  "set_A_disjoint_note": "Set A packets are fully disjoint consonants, but consonant identity is NEVER shown; the English-only vṛtti render + English-gloss candidates prevent inferring identity from visible names",
+  "residual_vectors_to_resolve_at_authoring": [
+    "author the fixed English-only paraphrase table (blind) and hash-pin it",
+    "verify no paraphrase row accidentally names its word's referent or a near-synonym of the gloss"
+  ]
+}

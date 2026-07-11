@@ -1,0 +1,14 @@
+{
+  "primary_endpoint": "six-way forced-choice accuracy by arm (chance = 1/6 ≈ 0.1667)",
+  "primary_contrast": "Delta = Accuracy(T) - max(Accuracy(X), Accuracy(R), Accuracy(G), Accuracy(F))",
+  "primary_statistic": "paired CLUSTER bootstrap over WORDS (resample words with replacement, 10000 resamples), BCa 95% CI on Delta",
+  "per_arm_ci": "exact binomial (Clopper-Pearson) 95% CI on each arm's accuracy",
+  "confirmatory_test": "permutation test over packet↔word assignment (>=10000 permutations) → p-value for Delta",
+  "secondary_model": "mixed-effects logistic (correct ~ arm + (1|word) + (1|evaluator_family)) IF sample size supports; else omitted",
+  "minimum_effect_margin": {
+    "delta_point": ">= 0.15",
+    "delta_ci_lower": "> 0"
+  },
+  "multiplicity": "secondary endpoints labelled exploratory or Holm-corrected; primary is the single Delta",
+  "no_rescue": "no selecting best evaluator/set/polarity/metric post hoc; primary is fixed"
+}

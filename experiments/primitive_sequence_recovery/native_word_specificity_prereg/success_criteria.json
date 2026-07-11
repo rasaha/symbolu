@@ -1,0 +1,11 @@
+{
+  "conjunctive_all_required": [
+    "Set A true accuracy above chance (binomial CI lower > 1/6)",
+    "Set A true accuracy above ALL controls (Delta point >= 0.15 and CI lower > 0)",
+    "Set B true accuracy above chance",
+    "Set B true accuracy above all controls, or at minimum above the strongest random/mismatch control (CI lower > 0)",
+    "effect direction consistent across >=3 evaluator families",
+    "same-valence-subset discrimination above chance",
+    "no evidence that phoneme rarity or length explains performance (F and length-matched controls ~ chance)"
+  ]
+}
