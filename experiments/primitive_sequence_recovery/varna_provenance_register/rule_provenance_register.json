@@ -1,0 +1,113 @@
+{
+  "rules": [
+    {
+      "rule_id": "vowels_dropped",
+      "description": "Vowels are dropped entirely; only consonant varṇas are emitted.",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "Consonant-only by construction (varna_bridge_active). Deliberate mechanism scope, but it means every vowel-borne distinction is discarded — an assumption, not an attested rule."
+    },
+    {
+      "rule_id": "aspiration_excluded",
+      "description": "Aspiration is ignored across the stop series (/tʰ/ top and /t/ stop both → ta).",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "The table's ASPIRATION COLLAPSE caveat: aspirated word-initial stops classically differ; the bridge collapses them."
+    },
+    {
+      "rule_id": "consonant_clusters_presplit",
+      "description": "G2P pre-splits clusters (tr→t+r, dr→d+r) before the bridge sees them.",
+      "provenance_status": "CONTRADICTORY",
+      "note": "The table caveat says clusters pre-split to DENTAL da/ta so retroflex ṭa/ḍa are 'never produced'; but the ACTIVE bridge's retroflex rule DOES emit ṭa/ḍa (true→ṭa, drum→ḍa). Code vs table conflict (D3)."
+    },
+    {
+      "rule_id": "retroflex_before_r",
+      "description": "d/t before r → retroflex ḍa/ṭa (bridge v2 retroflex rule).",
+      "provenance_status": "CONTRADICTORY",
+      "note": "Present and firing in varna_bridge_active, but the table declares it NOT retrofitted and marks ṭa/ḍa practically_reachable=False. Conflict (D3)."
+    },
+    {
+      "rule_id": "th_to_ta",
+      "description": "Merged English 'th' (/θ/ and /ð/) → ta (dental unaspirated stop).",
+      "provenance_status": "CONTRADICTORY",
+      "note": "The ACTIVE bridge (thfix) maps th→ta; the table's TH MIS-MAPPING caveat still says th→tha (viṣāda). Code vs meta-caveat conflict (D4). Also: /θ,ð/ are fricatives Sanskrit lacks — the target is a convention, not attested."
+    },
+    {
+      "rule_id": "dh_inert",
+      "description": "'dh'→da is pre-wired but inert (the G2P never emits dh).",
+      "provenance_status": "INFERRED",
+      "note": "Structural placeholder; no input path activates it."
+    },
+    {
+      "rule_id": "anusvara_ignored",
+      "description": "Anusvāra (ṃ) is not produced.",
+      "provenance_status": "MISSING",
+      "note": "No emission path; no pole."
+    },
+    {
+      "rule_id": "visarga_ignored",
+      "description": "Visarga (ḥ) is not produced.",
+      "provenance_status": "MISSING",
+      "note": "No emission path; no pole."
+    },
+    {
+      "rule_id": "sandhi_none",
+      "description": "No sandhi (junction) transformation is applied across word-internal boundaries.",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "Sanskrit phonology's core combinatorics are absent; words are treated as flat phoneme strings."
+    },
+    {
+      "rule_id": "gemination_collapsed",
+      "description": "Gemination / doubled consonants are not distinguished.",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "No length distinction survives to a varṇa."
+    },
+    {
+      "rule_id": "order_discarded",
+      "description": "Word rule is an UNORDERED, DEDUPED bag/set of varṇas (facet union).",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "The code (build_b1_10_control_ext) unions facets over a deduped set; sequence, position, and multiplicity are all discarded. This is the composition assumption the hypothesis most depends on and is NOT attested."
+    },
+    {
+      "rule_id": "multiplicity_discarded",
+      "description": "Repeated varṇas count once (dedup).",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "A varṇa appearing twice contributes the same as once; no intensity/weighting."
+    },
+    {
+      "rule_id": "position_discarded",
+      "description": "Initial/medial/final position carries no weight.",
+      "provenance_status": "OUT_OF_SCOPE",
+      "note": "Classical readings often privilege the initial varṇa; the mechanism does not."
+    },
+    {
+      "rule_id": "polarity_selection",
+      "description": "Each cell selects one pole (binding OR liberating) per varṇa for the packet.",
+      "provenance_status": "AUTHORED_PROVISIONAL",
+      "note": "The binding/liberating split itself is authored for most varṇas (see per-pole register); pole selection inherits that provenance."
+    },
+    {
+      "rule_id": "facet_union",
+      "description": "Packet meaning = union of the per-varṇa facet renderings (VARNA_PLAIN).",
+      "provenance_status": "AUTHORED_PROVISIONAL",
+      "note": "Facet render map covers ONLY 11 varṇas (ba da ga ka la ma na pa ra ta tta); all other varṇas have no render → any word using them yields an invalid packet (see Gate G0)."
+    },
+    {
+      "rule_id": "transliteration_normalization",
+      "description": "Fixed grapheme→varṇa transliteration keys (ba, tta, …).",
+      "provenance_status": "INFERRED",
+      "note": "Structural convention; internally consistent, not a meaning claim."
+    },
+    {
+      "rule_id": "orthography_over_phonology",
+      "description": "Decomposition is driven by English SPELLING via the G2P, not by pronunciation.",
+      "provenance_status": "CONTRADICTORY",
+      "note": "The stated intent (Sanskrit-first / pronunciation-based) conflicts with the actual spelling-driven pipeline (e.g. faith→ta via 'th', doubt→da+ba+ta). Intent vs implementation conflict."
+    }
+  ],
+  "counts": {
+    "OUT_OF_SCOPE": 7,
+    "CONTRADICTORY": 4,
+    "INFERRED": 2,
+    "MISSING": 2,
+    "AUTHORED_PROVISIONAL": 2
+  }
+}

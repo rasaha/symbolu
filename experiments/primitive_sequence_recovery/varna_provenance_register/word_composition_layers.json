@@ -1,0 +1,35 @@
+{
+  "layer_1_code_actually_does": {
+    "source": "varna_bridge_active.word_to_varnas + build_b1_10_control_ext (VARNA_PLAIN, packet build)",
+    "operations": [
+      "English spelling → G2P phonemes (grapheme-driven).",
+      "Phonemes → consonant varṇas only; vowels dropped; aspiration excluded.",
+      "Retroflex rule (d/t before r → ḍa/ṭa); merged 'th' → ta.",
+      "Collapse to an UNORDERED, DEDUPED set of varṇas.",
+      "Render each varṇa's selected pole via VARNA_PLAIN (11 varṇas only); UNION the facets."
+    ],
+    "discards": [
+      "vowels",
+      "order",
+      "position",
+      "multiplicity",
+      "aspiration",
+      "sandhi",
+      "gemination"
+    ],
+    "provenance_status": "OUT_OF_SCOPE",
+    "note": "This is what the mechanism computes. It is a structural procedure, not a validated-meaning claim."
+  },
+  "layer_2_docs_claim": {
+    "source": "frozen/varna_polarity_table_v3.json meta + B1 docs",
+    "claim": "A word's resonance is the composition of its constituent varṇa poles; the table supplies the poles.",
+    "provenance_status": "AUTHORED_PROVISIONAL",
+    "note": "The docs describe a per-varṇa pole table; they do NOT establish that an unordered facet-union over a spelling-derived consonant set recovers word meaning. Silent gaps vs Layer 1 are recorded, not reconciled."
+  },
+  "layer_3_hypothesis_requires": {
+    "source": "Symbol-U hypothesis (varṇas carry meaning)",
+    "requirement": "For the mechanism to test the hypothesis, the composition must be (a) pronunciation-based, (b) faithful to attested per-varṇa meaning, and (c) sensitive to order/position/multiplicity to the extent classical readings are.",
+    "provenance_status": "UNRESOLVED",
+    "note": "The hypothesis's requirements are NOT met by Layer 1 (spelling-driven, unordered, deduped, consonant-only, 28/34 liberating poles authored). Gap is stated, not closed."
+  }
+}
