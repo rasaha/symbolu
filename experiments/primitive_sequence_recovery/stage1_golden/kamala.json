@@ -1,0 +1,162 @@
+{
+  "word_devanagari": "कमल",
+  "normalized_devanagari": "कमल",
+  "transliteration_iast": "kamala",
+  "normalization": {
+    "form": "NFC",
+    "changed": false,
+    "notes": []
+  },
+  "aksharas": [
+    {
+      "index": 0,
+      "devanagari": "क",
+      "translit": "ka",
+      "codepoints": [
+        "U+0915"
+      ],
+      "source_span": [
+        0,
+        1
+      ],
+      "atomic_varna_indices": [
+        0,
+        1
+      ]
+    },
+    {
+      "index": 1,
+      "devanagari": "म",
+      "translit": "ma",
+      "codepoints": [
+        "U+092E"
+      ],
+      "source_span": [
+        1,
+        2
+      ],
+      "atomic_varna_indices": [
+        2,
+        3
+      ]
+    },
+    {
+      "index": 2,
+      "devanagari": "ल",
+      "translit": "la",
+      "codepoints": [
+        "U+0932"
+      ],
+      "source_span": [
+        2,
+        3
+      ],
+      "atomic_varna_indices": [
+        4,
+        5
+      ]
+    }
+  ],
+  "atomic_varnas": [
+    {
+      "index": 0,
+      "unit": "k",
+      "devanagari": "क",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "onset",
+      "source_akshara_index": 0
+    },
+    {
+      "index": 1,
+      "unit": "a",
+      "devanagari": "",
+      "type": "vowel",
+      "origin": "inherent_a",
+      "aspirated": null,
+      "vowel_length": "short",
+      "inherent_inserted": true,
+      "orthographic_source": "inherent",
+      "position": "medial",
+      "source_akshara_index": 0
+    },
+    {
+      "index": 2,
+      "unit": "m",
+      "devanagari": "म",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "medial",
+      "source_akshara_index": 1
+    },
+    {
+      "index": 3,
+      "unit": "a",
+      "devanagari": "",
+      "type": "vowel",
+      "origin": "inherent_a",
+      "aspirated": null,
+      "vowel_length": "short",
+      "inherent_inserted": true,
+      "orthographic_source": "inherent",
+      "position": "medial",
+      "source_akshara_index": 1
+    },
+    {
+      "index": 4,
+      "unit": "l",
+      "devanagari": "ल",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "medial",
+      "source_akshara_index": 2
+    },
+    {
+      "index": 5,
+      "unit": "a",
+      "devanagari": "",
+      "type": "vowel",
+      "origin": "inherent_a",
+      "aspirated": null,
+      "vowel_length": "short",
+      "inherent_inserted": true,
+      "orthographic_source": "inherent",
+      "position": "final",
+      "source_akshara_index": 2
+    }
+  ],
+  "inherent_vowel_insertions": {
+    "count": 3,
+    "atomic_indices": [
+      1,
+      3,
+      5
+    ]
+  },
+  "multiplicity": {
+    "varna_counts": {
+      "k": 1,
+      "a": 3,
+      "m": 1,
+      "l": 1
+    },
+    "geminations": []
+  },
+  "derived_noncanonical": {
+    "resolved_pronunciation_candidate": null
+  },
+  "warnings": [],
+  "parser_spec_version": "PARSER_SPEC_v1"
+}

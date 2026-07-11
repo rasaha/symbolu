@@ -9,6 +9,10 @@ assigns **no** binding/liberating meaning, chooses **no** polarity, aggregates *
 Sanskrit-privilege / generation-utility claim. B1.4b′ remains `NULL_RETURN_BOTTOM`; Track B blocked; run01, Track G,
 and all frozen mappings unchanged.
 
+> **Implementation status:** implemented in `sanskrit_stage1_parser.py`, tested by
+> `test_sanskrit_stage1_parser.py` (golden + rule-level + invariant + semantic-firewall), with byte-for-byte golden
+> fixtures under `stage1_golden/`. All eight §4 fixtures pass byte-for-byte. See §10.
+
 ---
 
 ## 0. Source framing (what the source does and does not mandate)
