@@ -1,0 +1,46 @@
+```
+pride
+A: Mark felt a surge of pride as he saw his name at the top of the class list, knowing it would impress his parents.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Sarah felt a quiet pride in her ability to solve complex problems on her own, without needing external validation.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+freedom
+A: John felt a rush of freedom when he finally quit his job, hoping to start his own business and outshine his peers.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Lisa savored her freedom to explore her creative passions without worrying about societal expectations or judgments.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+patience
+A: The teacher's patience was tested as she dealt with the same disruptive behavior from the same student for the third time.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Emily practiced patience as she waited for her plants to grow, trusting the process without needing immediate results.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+courage
+A: Alex mustered the courage to ask his crush out, fearing rejection but hoping for a positive response.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Jamie faced her fears head-on, drawing inner strength from her own resolve rather than external validation.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+control
+A: Michael tightened his grip on the steering wheel, feeling a need to control the situation as the car slid on the icy road.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Rachel allowed herself to flow with the current of events, trusting her inner compass to guide her actions.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+doubt
+A: Tom's confidence in his project wavered as his boss's skepticism began to affect his self-belief.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Maria felt a calm acceptance of doubt as she embarked on a new journey, trusting her path would unfold naturally.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
+
+```
+
+```
+
+author_identity:      Qwen, fresh isolated model session — model id Qwen + note "clean session"
+date_utc:             2023-10-06T15:30:00Z
+prompt_hash:          [SHA256 hash of the exact text of the packet]
+context_hash:         [SHA256 hash of the final 12-sentence block]
+blindness_attestation: I certify I had not seen any of the materials listed in Section 7 before or during this task, and I did not consult any outside material while writing.

@@ -1,0 +1,22 @@
+{
+  "artifact": "b1_10_nonclaude_author_run",
+  "model_id": "Qwen/Qwen2.5-14B-Instruct",
+  "revision_requested": "main",
+  "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
+  "generation_settings": {
+    "backend": "transformers",
+    "dtype": "float16",
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "top_k": 0,
+    "repetition_penalty": 1.0,
+    "do_sample": true,
+    "seed": 20260714,
+    "max_new_tokens": 900,
+    "runs": 1
+  },
+  "author_prompt_sha256": "7e07e16bb160481c647b5f6e11ff166f63f2fa42e442ba16bfa6fcffe9c30628",
+  "raw_output_sha256": "aad818d85c72ed40f89047f4439d40ede743151398d1f812d73b9d87e2be17be",
+  "timestamp_utc": "2026-07-11T07:21:24.322655+00:00",
+  "blindness_attestation": "Structural blindness: this fresh isolated process received ONLY the author packet (sha256 7e07e16bb160481c647b5f6e11ff166f63f2fa42e442ba16bfa6fcffe9c30628); no Claude context set, frozen contexts, packets, varna mappings, audits, results, prior generations, or prior failures were provided as input."
+}

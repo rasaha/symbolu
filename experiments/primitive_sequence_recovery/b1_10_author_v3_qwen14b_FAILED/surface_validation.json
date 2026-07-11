@@ -1,0 +1,10 @@
+{
+  "surface_pass": false,
+  "issues": [
+    "[A:Mark felt a surge of pride as he saw h...] wordcount 24 out of 12-22",
+    "[A:Michael tightened his grip on the stee...] wordcount 23 out of 12-22",
+    "[courage/B] target word appears 0 times (need exactly 1)",
+    "[control/B] target word appears 0 times (need exactly 1)",
+    "[doubt/A] target word appears 0 times (need exactly 1)"
+  ]
+}
