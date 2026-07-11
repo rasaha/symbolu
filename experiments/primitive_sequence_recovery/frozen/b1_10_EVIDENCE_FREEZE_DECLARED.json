@@ -1,0 +1,29 @@
+{
+  "artifact": "b1_10_pole_context_EVIDENCE_FREEZE_DECLARED",
+  "evidence_freeze_declared": true,
+  "mode": "b1_10_pole_context_microtest",
+  "representation_version": "B1.10_pole_context",
+  "mapping_era": "fidelity_bundle_v1",
+  "table": "v3",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "aspiration_applied": false,
+  "declared_by": "rakeshmohan888@gmail.com (operator)",
+  "declared_at_utc": "2026-07-10T00:00:00Z",
+  "attestation": "B1.10 pole-context micro-test; no-generation packet rating; 3 words x 2 contexts x 2 packets; source-condition fit only; no dictionary-fit, no synonyms/opposites; no semantic-truth claim; no GENUTILITY terminal label; B1.4b′ remains NULL_RETURN_BOTTOM.",
+  "prereg_sha256": "077cc124f5a705797b6a1d795a466a91e9d73014542820b0ec7e4bf62329eff0",
+  "items_sha256": "9d70bb863f49ba06b84dd2eb5463b04d95755fe0b7b371c1d2ebcd3b1832b3bd",
+  "v3_table_sha256": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3",
+  "bridge_manifest_sha256": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102",
+  "decomposer_sha256": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd",
+  "freeze_decision": {
+    "happy": "approved",
+    "peace": "approved",
+    "love": "included as a PRE-FLAGGED SOFT item",
+    "love_ambiguity_warning": "Binding-pole facet [la] = kruratā (cruelty) is a COARSE fit for jealous/possessive love — the source-condition is possessive control, not literal cruelty; the clinging [va] facet is expected to carry most of the binding signal. Only 2 facets, so the one weak facet weighs more. Watch love's binding-direction margin specifically. This warning is pre-registered (approval table 3632c92) and MUST remain in the frozen notes and the final report; a weak love margin is an expected soft spot, not a post-hoc excuse.",
+    "excluded_words": ["longing (asymmetric discriminating power)", "devotion (too many off-axis facets)"]
+  },
+  "interpretation_constraints": "No result label is emitted by the run. A positive context_pole_margin would show only source-condition / resonance legibility to judges — NOT ontology, semantic truth, Sanskrit privilege, generation utility, or word-specific varṇa mapping (the packet is a bag of constituent-varṇa readings; the test cannot attribute signal to any single varṇa). A null means the pole-context distinction is not legible to judges under this rating design. Whatever the outcome: B1.4b′ remains NULL_RETURN_BOTTOM; original B1.4b remains blocked; Track B remains blocked. Structure, not validated meaning.",
+  "run_status": "NO real judge run has occurred. This declaration authorizes a gated real run ONLY after explicit operator approval; the runner still additionally requires a real judge backend supplied programmatically.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "track_b_status": "BLOCKED"
+}

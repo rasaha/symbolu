@@ -1,0 +1,28 @@
+{
+  "artifact": "b1_6_phoneme_to_varna_bridge_v2_manifest",
+  "status": "APPROVED_IMPLEMENTED_NOT_YET_APPLIED",
+  "supersedes_when_applied": "b1_6_phoneme_to_varna_bridge_manifest.json (v1)",
+  "implemented_by": "varna_bridge_v2.py",
+  "summary": "v1 mapping + Phase-1 retroflex-cluster context rule: English /t/,/d/ before /r/ -> retroflex ṭa(tta)/ḍa(dda); the /r/ still emits 'ra' (Route B, r-survives). Everything else identical to v1.",
+  "context_rules": [
+    {"when": "phoneme 't' immediately followed by 'r'", "map": "tta (ṭa) + ra", "example": "train -> ta,ra,na (v1) => tta,ra,na (v2)"},
+    {"when": "phoneme 'd' immediately followed by 'r'", "map": "dda (ḍa) + ra", "example": "drum -> da,ra,ma (v1) => dda,ra,ma (v2)"}
+  ],
+  "scope": "Phase 1 only (dr, tr). NOT included: nr/shr/ny (weak or non-retroflex triggers), post-r retroflexion (accent-dependent), and the retroflex ASPIRATES ṭha/ḍha (no English trigger). So v2 recovers 2 of the 5 practically-unreachable retroflex/palatal targets (tta, dda); nna/nya/ssa/dha stay unreachable.",
+  "route_and_fork": "Route B (context-aware bridge; G2P untouched) + r-SURVIVES, per the approved scoping proposal (G2P_RETROFLEX_CLUSTER_RULE_PROPOSAL.md).",
+  "impact_on_frozen_items": "Among frozen experiment sets, ONLY 'dread' changes (da,ra,da -> dda,ra,da) — 1/24 pole-DiD, 1/12 B1.9 targets. Pervasive in general English (tr/dr very common).",
+  "not_applied_to": [
+    "frozen/b1_6_phoneme_to_varna_bridge_manifest.json (v1 UNCHANGED)",
+    "frozen/b1_9_targets.json / b1_9_pole_did_items.json (UNCHANGED)",
+    "any experiment builder or freeze declaration (UNCHANGED)"
+  ],
+  "to_go_live_checklist": [
+    "1. Operator sign-off to APPLY.",
+    "2. Re-derive affected varṇa sequences (only 'dread' among frozen items; plus any new words).",
+    "3. Re-freeze the evidence declarations that hash the decomposer/bridge (pole-DiD, pole-sanity, B1.8/B1.9).",
+    "4. Fresh prereg; freeze BEFORE authoring/re-running any test (anti-circularity)."
+  ],
+  "resonance_framing": "Phonetic-fidelity / resonance refinement only. It changes WHICH resonance a tr/dr word receives; it does not validate meaning. No GENUTILITY_*, no ONTOLOGICAL_SIGNAL.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "motto": "Structure, not validated meaning."
+}

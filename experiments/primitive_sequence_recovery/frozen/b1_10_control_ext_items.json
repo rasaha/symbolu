@@ -1,0 +1,767 @@
+{
+  "artifact_type": "b1_10_control_ext_items",
+  "extension_of": "B1.10_pole_context",
+  "mapping_era": "fidelity_bundle_v1",
+  "table": "v3",
+  "bridge": "bridge_v2_plus_theta_eth_ta",
+  "aspiration_applied": false,
+  "status": "FROZEN_CONTROL_EXT_MOCK_ONLY",
+  "representation_version": "B1.10_control_ext",
+  "words_included": [
+    "pride",
+    "freedom",
+    "patience",
+    "courage",
+    "control",
+    "doubt"
+  ],
+  "tiers": {
+    "1_valence": "generic hedonic tone only",
+    "2_source_condition": "generic other-conditioned vs self-grounded (word/varṇa-agnostic)",
+    "3_specific": "word's v3 binding/liberating facets paraphrased to plain English (hidden provenance)"
+  },
+  "judge_question": "How well does this description describe the inner experiential weather or source-condition underlying this word in this context?",
+  "rating_scale": {
+    "min": 0,
+    "max": 6,
+    "meaning": "0 = not at all, 6 = extremely well"
+  },
+  "tier1_fixed": {
+    "negative_pool": [
+      "a heavy aching mood that quietly weighs the whole body down",
+      "a raw unpleasant feeling that sits sourly deep inside the chest",
+      "a dull grey flatness that drains the colour out of everything",
+      "a sharp uncomfortable soreness that keeps prickling away under the skin",
+      "a bleak sinking tone that darkens whatever it happens to touch"
+    ],
+    "positive_pool": [
+      "a light glad mood that gently lifts the whole body up",
+      "a warm pleasant feeling that spreads slowly deep inside the chest",
+      "a bright clear tone that adds fresh colour back to everything",
+      "a soft agreeable smoothness that feels easy and quietly rather nice",
+      "a fresh cheerful lift that brightens whatever it happens to touch"
+    ]
+  },
+  "tier2_fixed": {
+    "other_conditioned_pool": [
+      "a contingent mood that depends on how other people respond",
+      "a needy restlessness that wants an outside result to feel whole",
+      "a comparing tension that keeps sizing itself up against others",
+      "a clutching unease that grips what it holds and dreads loss",
+      "a propped-up confidence that leans on approval from other people"
+    ],
+    "self_grounded_pool": [
+      "a self-resting calm that stays steady without needing anyone else",
+      "a full contentment that needs no outside result to feel whole",
+      "an unmeasuring ease that never sizes itself up against others",
+      "a light-handed openness that holds things loosely and lets go",
+      "a self-standing steadiness that needs no approval from anyone else"
+    ]
+  },
+  "jaccard_cap": 0.2,
+  "packet_invariance_note": "Packets are context-invariant; only the context changes which pole should fit. All three tiers are plain-English, register/length-matched.",
+  "source_hashes": {
+    "varna_polarity_table_v3.json": "d3ff8efd0775b78c92b66bf11cd5eec75aaf4354015551be1c22d6ba8494d0b3",
+    "varna_polarity_bridge_v3.json": "f5b1a82ebf1539eea6e5fe61e3e1b8ef492612e629a38e1cabf23e3bb2fce102",
+    "stage_a_prime_coverage.py": "217c9ec98fc876bc585bba006741886b202f192f3c6009f05ff833f5b7a9e2cd"
+  },
+  "interpretation_note": "No result label emitted. increment_over_valence and increment_over_source_condition are the primary comparisons; a positive result would show source-condition / resonance legibility to judges ONLY — not ontology, semantic truth, Sanskrit privilege, generation utility, or word-specific varṇa mapping.",
+  "b1_4b_prime_status": "NULL_RETURN_BOTTOM",
+  "track_b_status": "BLOCKED",
+  "n_words": 6,
+  "words": [
+    {
+      "word": "pride",
+      "varna_sequence": [
+        "pa",
+        "ra",
+        "da"
+      ],
+      "facet_count": 3,
+      "contexts": {
+        "binding": "His pride fed on looking down at those beneath him, and curdled to contempt when outshone.",
+        "liberating": "Her pride was a quiet self-respect that needed no one's inferiority to stand."
+      },
+      "expected_pole": {
+        "binding": "binding",
+        "liberating": "liberating"
+      },
+      "packets": {
+        "valence": {
+          "binding": [
+            {
+              "text": "a heavy aching mood that quietly weighs the whole body down"
+            },
+            {
+              "text": "a raw unpleasant feeling that sits sourly deep inside the chest"
+            },
+            {
+              "text": "a dull grey flatness that drains the colour out of everything"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a light glad mood that gently lifts the whole body up"
+            },
+            {
+              "text": "a warm pleasant feeling that spreads slowly deep inside the chest"
+            },
+            {
+              "text": "a bright clear tone that adds fresh colour back to everything"
+            }
+          ]
+        },
+        "source_condition": {
+          "binding": [
+            {
+              "text": "a contingent mood that depends on how other people respond"
+            },
+            {
+              "text": "a needy restlessness that wants an outside result to feel whole"
+            },
+            {
+              "text": "a comparing tension that keeps sizing itself up against others"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a self-resting calm that stays steady without needing anyone else"
+            },
+            {
+              "text": "a full contentment that needs no outside result to feel whole"
+            },
+            {
+              "text": "an unmeasuring ease that never sizes itself up against others"
+            }
+          ]
+        },
+        "specific": {
+          "binding": [
+            {
+              "text": "a contemptuous feeling that looks down on others and recoils",
+              "provenance_varna": "pa",
+              "provenance_v3_facet": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+            },
+            {
+              "text": "a collapsing sense that everything is lost and completely undone",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+            },
+            {
+              "text": "a prickly reactivity that takes offence and snaps back at people",
+              "provenance_varna": "da",
+              "provenance_v3_facet": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a warm goodwill that turns upward and wishes others well",
+              "provenance_varna": "pa",
+              "provenance_v3_facet": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+            },
+            {
+              "text": "a strong steady energy that moves forward with a sure resolve",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+            },
+            {
+              "text": "an even unbothered steadiness that does not flare up under provocation",
+              "provenance_varna": "da",
+              "provenance_v3_facet": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+            }
+          ]
+        }
+      },
+      "tier2_tier3_content_jaccard": 0.0299
+    },
+    {
+      "word": "freedom",
+      "varna_sequence": [
+        "ra",
+        "da",
+        "ma"
+      ],
+      "facet_count": 3,
+      "contexts": {
+        "binding": "His freedom was license: he indulged every impulse until nothing held together.",
+        "liberating": "Her freedom was inner and self-possessed, needing no escape and breaking nothing."
+      },
+      "expected_pole": {
+        "binding": "binding",
+        "liberating": "liberating"
+      },
+      "packets": {
+        "valence": {
+          "binding": [
+            {
+              "text": "a heavy aching mood that quietly weighs the whole body down"
+            },
+            {
+              "text": "a raw unpleasant feeling that sits sourly deep inside the chest"
+            },
+            {
+              "text": "a dull grey flatness that drains the colour out of everything"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a light glad mood that gently lifts the whole body up"
+            },
+            {
+              "text": "a warm pleasant feeling that spreads slowly deep inside the chest"
+            },
+            {
+              "text": "a bright clear tone that adds fresh colour back to everything"
+            }
+          ]
+        },
+        "source_condition": {
+          "binding": [
+            {
+              "text": "a contingent mood that depends on how other people respond"
+            },
+            {
+              "text": "a needy restlessness that wants an outside result to feel whole"
+            },
+            {
+              "text": "a comparing tension that keeps sizing itself up against others"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a self-resting calm that stays steady without needing anyone else"
+            },
+            {
+              "text": "a full contentment that needs no outside result to feel whole"
+            },
+            {
+              "text": "an unmeasuring ease that never sizes itself up against others"
+            }
+          ]
+        },
+        "specific": {
+          "binding": [
+            {
+              "text": "a collapsing sense that everything is lost and completely undone",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+            },
+            {
+              "text": "a prickly reactivity that takes offence and snaps back at people",
+              "provenance_varna": "da",
+              "provenance_v3_facet": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+            },
+            {
+              "text": "a loose over-indulgence that spills outward until things fall apart",
+              "provenance_varna": "ma",
+              "provenance_v3_facet": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a strong steady energy that moves forward with a sure resolve",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+            },
+            {
+              "text": "an even unbothered steadiness that does not flare up under provocation",
+              "provenance_varna": "da",
+              "provenance_v3_facet": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+            },
+            {
+              "text": "a disciplined restraint that holds its shape and does not spill over",
+              "provenance_varna": "ma",
+              "provenance_v3_facet": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+            }
+          ]
+        }
+      },
+      "tier2_tier3_content_jaccard": 0.0286
+    },
+    {
+      "word": "patience",
+      "varna_sequence": [
+        "pa",
+        "ta",
+        "na",
+        "ka"
+      ],
+      "facet_count": 4,
+      "contexts": {
+        "binding": "His patience was grudging, a resentful waiting that seethed under a still surface.",
+        "liberating": "Her patience was alert and willing, resting easily in the pace of things."
+      },
+      "expected_pole": {
+        "binding": "binding",
+        "liberating": "liberating"
+      },
+      "packets": {
+        "valence": {
+          "binding": [
+            {
+              "text": "a heavy aching mood that quietly weighs the whole body down"
+            },
+            {
+              "text": "a raw unpleasant feeling that sits sourly deep inside the chest"
+            },
+            {
+              "text": "a dull grey flatness that drains the colour out of everything"
+            },
+            {
+              "text": "a sharp uncomfortable soreness that keeps prickling away under the skin"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a light glad mood that gently lifts the whole body up"
+            },
+            {
+              "text": "a warm pleasant feeling that spreads slowly deep inside the chest"
+            },
+            {
+              "text": "a bright clear tone that adds fresh colour back to everything"
+            },
+            {
+              "text": "a soft agreeable smoothness that feels easy and quietly rather nice"
+            }
+          ]
+        },
+        "source_condition": {
+          "binding": [
+            {
+              "text": "a contingent mood that depends on how other people respond"
+            },
+            {
+              "text": "a needy restlessness that wants an outside result to feel whole"
+            },
+            {
+              "text": "a comparing tension that keeps sizing itself up against others"
+            },
+            {
+              "text": "a clutching unease that grips what it holds and dreads loss"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a self-resting calm that stays steady without needing anyone else"
+            },
+            {
+              "text": "a full contentment that needs no outside result to feel whole"
+            },
+            {
+              "text": "an unmeasuring ease that never sizes itself up against others"
+            },
+            {
+              "text": "a light-handed openness that holds things loosely and lets go"
+            }
+          ]
+        },
+        "specific": {
+          "binding": [
+            {
+              "text": "a contemptuous feeling that looks down on others and recoils",
+              "provenance_varna": "pa",
+              "provenance_v3_facet": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)"
+            },
+            {
+              "text": "a dull sluggish heaviness that slowly sinks toward a sleepy torpor",
+              "provenance_varna": "ta",
+              "provenance_v3_facet": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+            },
+            {
+              "text": "a blind fixation that clings to one thing and loses reason",
+              "provenance_varna": "na",
+              "provenance_v3_facet": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+            },
+            {
+              "text": "a grasping hope that clutches hard at a wanted result",
+              "provenance_varna": "ka",
+              "provenance_v3_facet": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a warm goodwill that turns upward and wishes others well",
+              "provenance_varna": "pa",
+              "provenance_v3_facet": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)"
+            },
+            {
+              "text": "an alert wakefulness that rises out of dullness into clear attention",
+              "provenance_varna": "ta",
+              "provenance_v3_facet": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+            },
+            {
+              "text": "a clear detachment that loosens fixation and frees the mind again",
+              "provenance_varna": "na",
+              "provenance_v3_facet": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+            },
+            {
+              "text": "an open hopefulness that acts without clutching at the result",
+              "provenance_varna": "ka",
+              "provenance_v3_facet": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+            }
+          ]
+        }
+      },
+      "tier2_tier3_content_jaccard": 0.0227
+    },
+    {
+      "word": "courage",
+      "varna_sequence": [
+        "ka",
+        "ra",
+        "ga"
+      ],
+      "facet_count": 3,
+      "contexts": {
+        "binding": "His courage was bravado to be seen, driven by dread of looking weak before others.",
+        "liberating": "Her courage rose quietly from within, acting rightly whether or not anyone watched."
+      },
+      "expected_pole": {
+        "binding": "binding",
+        "liberating": "liberating"
+      },
+      "packets": {
+        "valence": {
+          "binding": [
+            {
+              "text": "a heavy aching mood that quietly weighs the whole body down"
+            },
+            {
+              "text": "a raw unpleasant feeling that sits sourly deep inside the chest"
+            },
+            {
+              "text": "a dull grey flatness that drains the colour out of everything"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a light glad mood that gently lifts the whole body up"
+            },
+            {
+              "text": "a warm pleasant feeling that spreads slowly deep inside the chest"
+            },
+            {
+              "text": "a bright clear tone that adds fresh colour back to everything"
+            }
+          ]
+        },
+        "source_condition": {
+          "binding": [
+            {
+              "text": "a contingent mood that depends on how other people respond"
+            },
+            {
+              "text": "a needy restlessness that wants an outside result to feel whole"
+            },
+            {
+              "text": "a comparing tension that keeps sizing itself up against others"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a self-resting calm that stays steady without needing anyone else"
+            },
+            {
+              "text": "a full contentment that needs no outside result to feel whole"
+            },
+            {
+              "text": "an unmeasuring ease that never sizes itself up against others"
+            }
+          ]
+        },
+        "specific": {
+          "binding": [
+            {
+              "text": "a grasping hope that clutches hard at a wanted result",
+              "provenance_varna": "ka",
+              "provenance_v3_facet": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+            },
+            {
+              "text": "a collapsing sense that everything is lost and completely undone",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+            },
+            {
+              "text": "a restless striving that drives on and cannot ever stop",
+              "provenance_varna": "ga",
+              "provenance_v3_facet": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "an open hopefulness that acts without clutching at the result",
+              "provenance_varna": "ka",
+              "provenance_v3_facet": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+            },
+            {
+              "text": "a strong steady energy that moves forward with a sure resolve",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+            },
+            {
+              "text": "a purposeful effort that works hard then rests in poise",
+              "provenance_varna": "ga",
+              "provenance_v3_facet": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+            }
+          ]
+        }
+      },
+      "tier2_tier3_content_jaccard": 0.0308
+    },
+    {
+      "word": "control",
+      "varna_sequence": [
+        "ka",
+        "na",
+        "tta",
+        "ra",
+        "la"
+      ],
+      "facet_count": 5,
+      "contexts": {
+        "binding": "His control gripped every detail of her life, tightening whenever she slipped his hold.",
+        "liberating": "Her control was calm self-mastery: she governed her reactions and let others be free."
+      },
+      "expected_pole": {
+        "binding": "binding",
+        "liberating": "liberating"
+      },
+      "packets": {
+        "valence": {
+          "binding": [
+            {
+              "text": "a heavy aching mood that quietly weighs the whole body down"
+            },
+            {
+              "text": "a raw unpleasant feeling that sits sourly deep inside the chest"
+            },
+            {
+              "text": "a dull grey flatness that drains the colour out of everything"
+            },
+            {
+              "text": "a sharp uncomfortable soreness that keeps prickling away under the skin"
+            },
+            {
+              "text": "a bleak sinking tone that darkens whatever it happens to touch"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a light glad mood that gently lifts the whole body up"
+            },
+            {
+              "text": "a warm pleasant feeling that spreads slowly deep inside the chest"
+            },
+            {
+              "text": "a bright clear tone that adds fresh colour back to everything"
+            },
+            {
+              "text": "a soft agreeable smoothness that feels easy and quietly rather nice"
+            },
+            {
+              "text": "a fresh cheerful lift that brightens whatever it happens to touch"
+            }
+          ]
+        },
+        "source_condition": {
+          "binding": [
+            {
+              "text": "a contingent mood that depends on how other people respond"
+            },
+            {
+              "text": "a needy restlessness that wants an outside result to feel whole"
+            },
+            {
+              "text": "a comparing tension that keeps sizing itself up against others"
+            },
+            {
+              "text": "a clutching unease that grips what it holds and dreads loss"
+            },
+            {
+              "text": "a propped-up confidence that leans on approval from other people"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a self-resting calm that stays steady without needing anyone else"
+            },
+            {
+              "text": "a full contentment that needs no outside result to feel whole"
+            },
+            {
+              "text": "an unmeasuring ease that never sizes itself up against others"
+            },
+            {
+              "text": "a light-handed openness that holds things loosely and lets go"
+            },
+            {
+              "text": "a self-standing steadiness that needs no approval from anyone else"
+            }
+          ]
+        },
+        "specific": {
+          "binding": [
+            {
+              "text": "a grasping hope that clutches hard at a wanted result",
+              "provenance_varna": "ka",
+              "provenance_v3_facet": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire"
+            },
+            {
+              "text": "a blind fixation that clings to one thing and loses reason",
+              "provenance_varna": "na",
+              "provenance_v3_facet": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+            },
+            {
+              "text": "a bad-tempered over-talking that argues on far past the point",
+              "provenance_varna": "tta",
+              "provenance_v3_facet": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)"
+            },
+            {
+              "text": "a collapsing sense that everything is lost and completely undone",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+            },
+            {
+              "text": "a cruel harshness that would harm the weak without care",
+              "provenance_varna": "la",
+              "provenance_v3_facet": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "an open hopefulness that acts without clutching at the result",
+              "provenance_varna": "ka",
+              "provenance_v3_facet": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+            },
+            {
+              "text": "a clear detachment that loosens fixation and frees the mind again",
+              "provenance_varna": "na",
+              "provenance_v3_facet": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+            },
+            {
+              "text": "a measured to-the-point way of saying just what helps",
+              "provenance_varna": "tta",
+              "provenance_v3_facet": "pramita vāk — balanced, measured speech using only relevant words; saying just what is warranted (the helpful, to-the-point reply)"
+            },
+            {
+              "text": "a strong steady energy that moves forward with a sure resolve",
+              "provenance_varna": "ra",
+              "provenance_v3_facet": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+            },
+            {
+              "text": "a protective kindness that shields the weak and eases their pain",
+              "provenance_varna": "la",
+              "provenance_v3_facet": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+            }
+          ]
+        }
+      },
+      "tier2_tier3_content_jaccard": 0.037
+    },
+    {
+      "word": "doubt",
+      "varna_sequence": [
+        "da",
+        "ba",
+        "ta"
+      ],
+      "facet_count": 3,
+      "contexts": {
+        "binding": "His doubt corroded everything, dismissing worth and sinking him into dull paralysis.",
+        "liberating": "Her doubt was honest inquiry that weighed things fairly and woke her mind up."
+      },
+      "expected_pole": {
+        "binding": "binding",
+        "liberating": "liberating"
+      },
+      "packets": {
+        "valence": {
+          "binding": [
+            {
+              "text": "a heavy aching mood that quietly weighs the whole body down"
+            },
+            {
+              "text": "a raw unpleasant feeling that sits sourly deep inside the chest"
+            },
+            {
+              "text": "a dull grey flatness that drains the colour out of everything"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a light glad mood that gently lifts the whole body up"
+            },
+            {
+              "text": "a warm pleasant feeling that spreads slowly deep inside the chest"
+            },
+            {
+              "text": "a bright clear tone that adds fresh colour back to everything"
+            }
+          ]
+        },
+        "source_condition": {
+          "binding": [
+            {
+              "text": "a contingent mood that depends on how other people respond"
+            },
+            {
+              "text": "a needy restlessness that wants an outside result to feel whole"
+            },
+            {
+              "text": "a comparing tension that keeps sizing itself up against others"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "a self-resting calm that stays steady without needing anyone else"
+            },
+            {
+              "text": "a full contentment that needs no outside result to feel whole"
+            },
+            {
+              "text": "an unmeasuring ease that never sizes itself up against others"
+            }
+          ]
+        },
+        "specific": {
+          "binding": [
+            {
+              "text": "a prickly reactivity that takes offence and snaps back at people",
+              "provenance_varna": "da",
+              "provenance_v3_facet": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+            },
+            {
+              "text": "a careless disregard that overlooks what actually has real worth",
+              "provenance_varna": "ba",
+              "provenance_v3_facet": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended"
+            },
+            {
+              "text": "a dull sluggish heaviness that slowly sinks toward a sleepy torpor",
+              "provenance_varna": "ta",
+              "provenance_v3_facet": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+            }
+          ],
+          "liberating": [
+            {
+              "text": "an even unbothered steadiness that does not flare up under provocation",
+              "provenance_varna": "da",
+              "provenance_v3_facet": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+            },
+            {
+              "text": "an attentive regard that notices and honours what has worth",
+              "provenance_varna": "ba",
+              "provenance_v3_facet": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+            },
+            {
+              "text": "an alert wakefulness that rises out of dullness into clear attention",
+              "provenance_varna": "ta",
+              "provenance_v3_facet": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+            }
+          ]
+        }
+      },
+      "tier2_tier3_content_jaccard": 0.0141
+    }
+  ]
+}
