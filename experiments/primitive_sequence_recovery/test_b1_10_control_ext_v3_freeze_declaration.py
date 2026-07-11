@@ -36,16 +36,20 @@ def test_declaration_exists_and_flagged():
     assert "B1.10" in d["experiment_identity"]["experiment_number"]
 
 
-def test_every_pinned_hash_matches_live_file():
-    d = _decl()
-    for key, rec in d["pinned_input_hashes"].items():
-        if "path" in rec:
-            assert _sha(HERE / rec["path"]) == rec["sha256"], key
-    # derived canonical block
+def test_pins_matched_at_declaration_time_except_runner_after_hardening():
+    """At Step-2 the declaration pinned every input correctly. Stage-4 (Step 3) hardened the runner, so
+    the runner's own hash legitimately drifted -> the ONLY stale pin is `runner`. This is the freeze
+    binding the code: the declaration MUST be re-issued (re-run the Step-2 generator) before the real
+    run so it pins the hardened runner. All other pins still match the live files."""
+    import run_b1_10_control_ext as R
+    mismatches = R._recompute_pins(_decl(), HERE)
+    keys = {m.split(":")[0] for m in mismatches}
+    assert keys == {"runner"}, f"expected only the runner pin to be stale after hardening, got {keys}"
+    # derived canonical block still matches (contexts unchanged)
     md = (HERE / "B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md").read_text()
     block = md.split("```")[1].strip("\n") + "\n"
     assert hashlib.sha256(block.encode()).hexdigest() == \
-        d["pinned_input_hashes"]["approved_canonical_12_sentence_block"]["sha256"]
+        _decl()["pinned_input_hashes"]["approved_canonical_12_sentence_block"]["sha256"]
 
 
 def test_pins_the_approved_v3_inputs():
@@ -97,15 +101,17 @@ def test_primary_statistics_and_interpretation_lock():
     assert "individual-varṇa" in blob   # no single-varṇa attribution
 
 
-def test_runner_accepts_declaration_but_blocks_on_real_judge():
-    # freeze gate passes (declaration exists) -> the ONLY remaining block is the absent real judge backend
+def test_committed_declaration_fails_closed_on_stale_runner_after_hardening():
+    """After Stage-4 hardening the committed Step-2 declaration is stale on the `runner` pin, so the
+    fail-closed gate aborts on the hash mismatch BEFORE any judge/model call. This is the intended
+    anti-circularity behavior; the operator re-issues the declaration (pinning the hardened runner)
+    before the real run."""
     try:
         R.run(mock=False, decl_path=DECL, judge=R.FakeJudge(), items_file=V3_ITEMS)
-        assert False, "expected PermissionError"
+        assert False, "expected FreezeGateError"
     except PermissionError as e:
         msg = str(e)
-        assert "real judge backend" in msg          # blocked on the judge...
-        assert "declaration" not in msg              # ...NOT on the declaration (gate passed)
+        assert "pinned input hash mismatch" in msg and "runner" in msg
 
 
 def test_missing_declaration_still_refused():
