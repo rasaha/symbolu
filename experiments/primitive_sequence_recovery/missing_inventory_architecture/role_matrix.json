@@ -1,0 +1,594 @@
+{
+  "artifact_type": "missing_inventory_role_matrix",
+  "contains_semantic_glosses": false,
+  "candidate_role_vocabulary": [
+    "SEMANTIC_PRIMITIVE",
+    "POLARITY_BEARING_PRIMITIVE",
+    "TRANSITION_OPERATOR",
+    "MODIFIER",
+    "CARRIER_OR_SUPPORT",
+    "COMPOSITION_BOUNDARY_OPERATOR",
+    "PHONOLOGICAL_MARKER_ONLY",
+    "CONTEXTUAL_REALIZATION_OPERATOR",
+    "UNRESOLVED_ROLE",
+    "OUT_OF_SCOPE"
+  ],
+  "provenance_classes": [
+    "PRIMARY_ATTESTED",
+    "SECONDARY_ATTESTED",
+    "INFERRED",
+    "AUTHORED_PROVISIONAL",
+    "CONTRADICTORY",
+    "MISSING",
+    "OUT_OF_SCOPE",
+    "UNRESOLVED"
+  ],
+  "units": [
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "अ",
+      "canonical_unit": "a",
+      "length": "short",
+      "vowel_subtype": "simple",
+      "unresolved_questions": [
+        "the privative/inherent 'a' is the highest-frequency unit and the S4 negation carrier — does it hold a distinct role from other vowels?"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "आ",
+      "canonical_unit": "ā",
+      "length": "long",
+      "vowel_subtype": "simple",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "इ",
+      "canonical_unit": "i",
+      "length": "short",
+      "vowel_subtype": "simple",
+      "unresolved_questions": [
+        "individual differentiation vs shared category role is unsourced"
+      ],
+      "individual_differentiation_evidence": "none sourced"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ई",
+      "canonical_unit": "ī",
+      "length": "long",
+      "vowel_subtype": "simple",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "उ",
+      "canonical_unit": "u",
+      "length": "short",
+      "vowel_subtype": "simple",
+      "unresolved_questions": [
+        "individual differentiation vs shared category role is unsourced"
+      ],
+      "individual_differentiation_evidence": "none sourced"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ऊ",
+      "canonical_unit": "ū",
+      "length": "long",
+      "vowel_subtype": "simple",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ऋ",
+      "canonical_unit": "ṛ",
+      "length": "short",
+      "vowel_subtype": "vocalic_sonorant",
+      "unresolved_questions": [
+        "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+      ],
+      "individual_differentiation_evidence": "none sourced"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ॠ",
+      "canonical_unit": "ṝ",
+      "length": "long",
+      "vowel_subtype": "vocalic_sonorant",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)",
+        "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ऌ",
+      "canonical_unit": "l̥",
+      "length": "short",
+      "vowel_subtype": "vocalic_sonorant",
+      "unresolved_questions": [
+        "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+      ],
+      "individual_differentiation_evidence": "none sourced"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ॡ",
+      "canonical_unit": "l̥̄",
+      "length": "long",
+      "vowel_subtype": "vocalic_sonorant",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)",
+        "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ए",
+      "canonical_unit": "e",
+      "length": "long",
+      "vowel_subtype": "diphthongal",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ऐ",
+      "canonical_unit": "ai",
+      "length": "long",
+      "vowel_subtype": "diphthongal",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "ओ",
+      "canonical_unit": "o",
+      "length": "long",
+      "vowel_subtype": "diphthongal",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "category": "vowel",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "POLARITY_BEARING_PRIMITIVE",
+        "SEMANTIC_PRIMITIVE",
+        "TRANSITION_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "MODIFIER",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": "UNRESOLVED",
+      "modifies_next": false,
+      "composition_effect": "LOAD_BEARING_STRUCTURAL (S4: privative-a and length flip meaning); mechanism UNRESOLVED",
+      "independent_dependent_same_identity": true,
+      "required_evidence_before_activation": "PRIMARY/SECONDARY-attested Sarkar acoustic root per vowel; and a sourced determination of whether the root is polar (pole) or an operator/transition role",
+      "devanagari": "औ",
+      "canonical_unit": "au",
+      "length": "long",
+      "vowel_subtype": "diphthongal",
+      "unresolved_questions": [
+        "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+      ],
+      "individual_differentiation_evidence": "S4 (privative a; length) — structural only, per-unit poles UNSOURCED"
+    },
+    {
+      "devanagari": "ं",
+      "canonical_unit": "ṃ",
+      "category": "anusvara",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "PHONOLOGICAL_MARKER_ONLY",
+        "MODIFIER",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "POLARITY_BEARING_PRIMITIVE",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "MODIFIER",
+      "secondary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": true,
+      "modifies_next": false,
+      "composition_effect": "nasalization of the syllable; canonical ṃ kept DISTINCT from any homorganic-nasal resolution",
+      "required_evidence_before_activation": "sourced answer to S6 ('does anusvāra carry a nasal root?'); until then canonical marker only",
+      "unresolved_questions": [
+        "nasalization modifier vs root-bearing primitive (S1 vs S6)",
+        "must the canonical ṃ ever be replaced by a homorganic nasal for composition? (kept separate for now)"
+      ]
+    },
+    {
+      "devanagari": "ः",
+      "canonical_unit": "ḥ",
+      "category": "visarga",
+      "stage1_scope": "IN_SCOPE_STRUCTURAL",
+      "candidate_roles": [
+        "MODIFIER",
+        "COMPOSITION_BOUNDARY_OPERATOR",
+        "CONTEXTUAL_REALIZATION_OPERATOR",
+        "POLARITY_BEARING_PRIMITIVE",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "MODIFIER",
+      "secondary_candidate": "COMPOSITION_BOUNDARY_OPERATOR",
+      "role_provenance": "UNRESOLVED",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED",
+      "modifies_previous": true,
+      "modifies_next": false,
+      "composition_effect": "release/exhalation and frequent word/pada boundary; MUST NOT be collapsed into h",
+      "required_evidence_before_activation": "sourced acoustic root (S1 aḥ) or an explicit modifier/boundary decision",
+      "unresolved_questions": [
+        "release modifier vs boundary operator vs root-bearing primitive",
+        "distinct from h — do not merge"
+      ]
+    },
+    {
+      "devanagari": "ँ",
+      "canonical_unit": "m̐",
+      "category": "candrabindu",
+      "stage1_scope": "OUT_OF_SCOPE_CLASSICAL_CORE",
+      "candidate_roles": [
+        "PHONOLOGICAL_MARKER_ONLY",
+        "MODIFIER",
+        "OUT_OF_SCOPE",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "PHONOLOGICAL_MARKER_ONLY",
+      "primary_candidate": "PHONOLOGICAL_MARKER_ONLY",
+      "secondary_candidate": "OUT_OF_SCOPE",
+      "role_provenance": "MISSING",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "NO",
+      "modifies_previous": true,
+      "modifies_next": false,
+      "composition_effect": "vowel nasalization (metadata); kept DISTINCT from anusvāra; largely Vedic/vernacular",
+      "required_evidence_before_activation": "first a scope justification that classical Sanskrit uses it as a varṇa; no source currently assigns it a root",
+      "unresolved_questions": [
+        "is candrabindu in classical-core scope at all? (no source claim found)"
+      ]
+    },
+    {
+      "devanagari": "ळ",
+      "canonical_unit": "ḷ",
+      "category": "retroflex_lateral",
+      "stage1_scope": "OUT_OF_SCOPE_EXTENDED_VEDIC",
+      "candidate_roles": [
+        "OUT_OF_SCOPE",
+        "SEMANTIC_PRIMITIVE",
+        "UNRESOLVED_ROLE"
+      ],
+      "recommended_role": "OUT_OF_SCOPE",
+      "primary_candidate": "OUT_OF_SCOPE",
+      "secondary_candidate": "UNRESOLVED_ROLE",
+      "role_provenance": "OUT_OF_SCOPE",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "NO",
+      "modifies_previous": false,
+      "modifies_next": false,
+      "composition_effect": "consonantal; the parser emits it but the table has no key — extended Vedic/regional, not classical core",
+      "required_evidence_before_activation": "a scope justification to admit an extended Vedic inventory; do NOT create a table mapping without that justification",
+      "unresolved_questions": [
+        "retain in an extended Vedic inventory or exclude from Stage 1 entirely?"
+      ]
+    }
+  ],
+  "category_level_roles": {
+    "vowels": {
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "POLARITY_BEARING_PRIMITIVE",
+      "secondary_candidate": "CONTEXTUAL_REALIZATION_OPERATOR",
+      "independent_semantic_entry_allowed": false,
+      "polarity_allowed": "UNRESOLVED"
+    },
+    "anusvara": {
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "MODIFIER",
+      "polarity_allowed": "UNRESOLVED"
+    },
+    "visarga": {
+      "recommended_role": "UNRESOLVED_ROLE",
+      "primary_candidate": "MODIFIER",
+      "polarity_allowed": "UNRESOLVED"
+    },
+    "candrabindu": {
+      "recommended_role": "PHONOLOGICAL_MARKER_ONLY",
+      "polarity_allowed": "NO"
+    },
+    "retroflex_lateral_la": {
+      "recommended_role": "OUT_OF_SCOPE",
+      "polarity_allowed": "NO"
+    }
+  }
+}

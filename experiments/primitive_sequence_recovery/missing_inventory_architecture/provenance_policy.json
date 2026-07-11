@@ -1,0 +1,24 @@
+{
+  "confirmatory_mechanism_admits": [
+    "PRIMARY_ATTESTED",
+    "SECONDARY_ATTESTED"
+  ],
+  "requires_separate_stated_derivation": [
+    "INFERRED"
+  ],
+  "development_only_never_confirmatory": [
+    "AUTHORED_PROVISIONAL"
+  ],
+  "must_not_be_silently_ignored": [
+    "MISSING"
+  ],
+  "absence_may_be_an_explicit_decision": true,
+  "authored_provisional_permitted_in_confirmatory_stage1": false,
+  "evidence_required_before": {
+    "independent_semantic_gloss": "PRIMARY_ATTESTED or SECONDARY_ATTESTED source root for the specific unit",
+    "polar_pole": "sourced evidence that the unit's root is POLAR (not merely that a root exists) — S1 does not establish this",
+    "transition_role": "a sourced or separately-derived (INFERRED, labelled) compositional rule",
+    "modifier_role": "sourced phonological role (e.g. anusvāra nasalization) — structural, still no meaning",
+    "context_dependent_realization_rule": "a deterministic, pre-registered rule kept distinct from canonical output"
+  }
+}
