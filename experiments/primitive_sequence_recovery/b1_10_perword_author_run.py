@@ -153,7 +153,8 @@ def free_model(model):
         pass
 
 
-def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_rung=0, max_rung=None):
+def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_rung=0, max_rung=None,
+                    seed_offset=0):
     """Author one word-pair, climbing the escalation ladder until a surface pass or budget end.
 
     Returns (accepted_pair_dict_or_None, provenance_record). Accept-first-pass: the FIRST
@@ -174,7 +175,11 @@ def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_
     directive = per_word_directive(word, index_1based)
     delivered_prompt = packet_text + directive
     delivered_sha = hashlib.sha256(delivered_prompt.encode("utf-8")).hexdigest()
-    base_seed = BASE_SEEDS[word]
+    # seed_offset shifts the pre-declared base seed. Default 0 (unchanged). Used ONLY for an
+    # audit-driven re-authoring: generation is seed-deterministic, so a packet-aware-audit
+    # REJECT_ITEM needs a genuinely fresh blind draw (a different seed) — the escalation ladder
+    # only handles surface failures. The offset must be pre-declared (see the audit report).
+    base_seed = BASE_SEEDS[word] + seed_offset
 
     attempts_log = []
     tok = model = loaded_id = None
@@ -253,6 +258,7 @@ def author_one_word(word, index_1based, packet_text, packet_sha, out_dir, start_
                     "master_packet_sha256": packet_sha,
                     "delivered_prompt_sha256": delivered_sha,
                     "per_word_directive": directive,
+                    "seed_offset": seed_offset,
                     "attempts": attempts_log,
                     "reason_for_escalation": "SURFACE_VALIDATION_FAILURE_ONLY",
                     "retry_budget_role": ("operational safeguard only — NOT experimental, evidentiary, "
@@ -319,6 +325,10 @@ def main():
     ap.add_argument("--max-rung", type=int, default=None,
                     help="highest rung this INVOCATION attempts, inclusive (default: last). "
                          "Use `--start-rung r --max-rung r` to run ONE rung per process (disk/VRAM safe).")
+    ap.add_argument("--seed-offset", type=int, default=0,
+                    help="shift the pre-declared base seed by this amount (default 0). Use ONLY for an "
+                         "audit-driven re-authoring of a REJECT_ITEM word, to force a fresh blind draw; "
+                         "the offset must be pre-declared in the audit report.")
     a = ap.parse_args()
 
     out = pathlib.Path(a.out)
@@ -336,7 +346,7 @@ def main():
     for word in a.words:
         idx = OFFICIAL_WORDS.index(word) + 1
         raw, prov = author_one_word(word, idx, packet_text, packet_sha, out,
-                                    start_rung=a.start_rung, max_rung=a.max_rung)
+                                    start_rung=a.start_rung, max_rung=a.max_rung, seed_offset=a.seed_offset)
         prov_json = json.dumps(prov, ensure_ascii=False, indent=2)
         (out / f"provenance_{word}.json").write_text(prov_json)
         # rung-scoped copy so a phased (one-rung-per-process) run never overwrites an earlier

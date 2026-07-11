@@ -1,0 +1,79 @@
+{
+  "artifact": "b1_10_packet_aware_echo_audit",
+  "method": "frozen pre-reg §3 (lowercase/strip-punct/stopword/drop-target/Porter Jaccard)",
+  "stemmer": "nltk.PorterStemmer",
+  "jaccard_cap": 0.2,
+  "convergence_flag_threshold": 0.5,
+  "v3_block_source": "B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md (canonical block a0abccb8...)",
+  "results": {
+    "pride": {
+      "tier3_echo_jaccard": 0.0,
+      "tier3_echo_shared_stems": [],
+      "echo_within_cap": true,
+      "convergence_jaccard": {
+        "excluded_dev": 0.0625,
+        "excluded_claude_v2": 0.0588
+      },
+      "convergence_max": 0.0625,
+      "convergence_flag_gt_0_50": false
+    },
+    "freedom": {
+      "tier3_echo_jaccard": 0.0,
+      "tier3_echo_shared_stems": [],
+      "echo_within_cap": true,
+      "convergence_jaccard": {
+        "excluded_dev": 0.0,
+        "excluded_claude_v2": 0.0625
+      },
+      "convergence_max": 0.0625,
+      "convergence_flag_gt_0_50": false
+    },
+    "patience": {
+      "tier3_echo_jaccard": 0.0,
+      "tier3_echo_shared_stems": [],
+      "echo_within_cap": true,
+      "convergence_jaccard": {
+        "excluded_dev": 0.0385,
+        "excluded_claude_v2": 0.0303
+      },
+      "convergence_max": 0.0385,
+      "convergence_flag_gt_0_50": false
+    },
+    "courage": {
+      "tier3_echo_jaccard": 0.0,
+      "tier3_echo_shared_stems": [],
+      "echo_within_cap": true,
+      "convergence_jaccard": {
+        "excluded_dev": 0.0323,
+        "excluded_claude_v2": 0.0303
+      },
+      "convergence_max": 0.0323,
+      "convergence_flag_gt_0_50": false
+    },
+    "control": {
+      "tier3_echo_jaccard": 0.0,
+      "tier3_echo_shared_stems": [],
+      "echo_within_cap": true,
+      "convergence_jaccard": {
+        "excluded_dev": 0.0606,
+        "excluded_claude_v2": 0.0
+      },
+      "convergence_max": 0.0606,
+      "convergence_flag_gt_0_50": false
+    },
+    "doubt": {
+      "tier3_echo_jaccard": 0.0,
+      "tier3_echo_shared_stems": [],
+      "echo_within_cap": true,
+      "convergence_jaccard": {
+        "excluded_dev": 0.0,
+        "excluded_claude_v2": 0.0
+      },
+      "convergence_max": 0.0,
+      "convergence_flag_gt_0_50": false
+    }
+  },
+  "all_within_cap": true,
+  "any_convergence_flag": false,
+  "guardrails": "no GENUTILITY_*; no ONTOLOGICAL_SIGNAL; B1.4b' NULL_RETURN_BOTTOM; structure, not validated meaning"
+}
