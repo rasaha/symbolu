@@ -65,8 +65,10 @@ Re-issue `B1_10_OFFICIAL_CONTEXT_AUTHOR_PACKET.md`, **unchanged**, to a **non-Cl
   judge panel (Llama / Gemma) — e.g. a Mistral or Qwen session.
 
 Require the provenance block to name a non-Claude author and to carry the blindness attestation. When that set
-returns: freeze it **before** any packet comparison, then run naturalness → quality → packet-comparison → echo
-audit; reject-and-regenerate (never edit) any echoing item.
+returns (per `B1_10_WORKFLOW_PROTOCOL_UPDATE.md`, authoritative): record it as a Git-tracked development context
+file (**no** per-version freeze), then run the packet-aware audit **directly on it** — naturalness → quality →
+context-independence/echo → Tier-1/Tier-2 fairness; reject-and-regenerate (never edit) any failing word-pair via a
+fresh blind author. A single final evidence freeze is created only at the end, after the real judge run + statistics.
 
 ## 6. Status
 

@@ -1,7 +1,10 @@
 # B1.10 — Non-Claude Context-Author Handoff (docs-only)
 
-Records the final post-freeze audit outcome for the Claude-authored v2 context set, and specifies the exact
-operational handoff to run the frozen author packet through a genuinely packet-naive, **non-Claude** author.
+> **WORKFLOW UPDATE (authoritative):** context files are Git-tracked **development artifacts**, not individually
+> evidence-frozen. §6–§7 below use the single-final-evidence-freeze model — see `B1_10_WORKFLOW_PROTOCOL_UPDATE.md`.
+
+Records the final audit outcome for the Claude-authored v2 context set, and specifies the exact
+operational handoff to run the author packet through a genuinely packet-naive, **non-Claude** author.
 Docs-only: no contexts generated here, no frozen items/packets/contexts/runners/evidence-freeze/results changed, no
 new experiment number, everything stays under B1.10. Resonance / phonetic-fidelity refinement only — **no
 `GENUTILITY_*`, no `ONTOLOGICAL_SIGNAL`, no semantic-truth / ontology / Sanskrit-privilege claim.** B1.4b′ remains
@@ -168,23 +171,26 @@ The runner checks **only** the surface rules from the author packet; it makes **
 
 If surface validation **fails**, do not patch — re-run with a fresh packet-naive author (or the alternative model).
 
-## 6. Freeze BEFORE any packet-aware audit
+## 6. Record the accepted set as a development artifact (no per-version freeze)
+
+> **Updated per `B1_10_WORKFLOW_PROTOCOL_UPDATE.md` (authoritative).** Context files are Git-tracked development
+> artifacts, **not** individually evidence-frozen. Do **not** create a per-version evidence freeze here.
 
 Only after surface validation passes:
 1. Extract the 12 accepted sentences + the author's self-check fields + the provenance block into a **new,
-   separately-labelled** artifact — **`B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md`** (v3 = non-Claude), with a byte-identical
-   **`..._v3_QWEN_FROZEN.md`** copy. (`v2` = the excluded Claude set stays untouched; all prior B1.10 artifacts
-   preserved.)
-2. Record and publish the frozen v3 sha256 **before** the packets are ever placed beside it.
-3. **Do not compare against any packet before this freeze.** The freeze-before-comparison ordering is what
-   guarantees no packet knowledge can retroactively shape the contexts.
+   separately-labelled** development context file — **`B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md`** (v3 = non-Claude).
+   (`v2` = the excluded Claude set stays untouched; all prior B1.10 artifacts preserved.)
+2. Commit it through normal Git history and record its sha256 in the provenance.
+3. The blindness guarantee comes from the author having written **blind** to the packets (§2–§5) — not from freezing
+   the file before the audit. No packet content was available to the author, so no packet knowledge could shape it.
 
-## 7. After freeze (separate step — not part of this handoff)
+## 7. After acceptance (separate step — not part of this handoff)
 
-Bring the frozen v3 set here, then re-run the packet-aware audit (context-independence → Tier-3 echo → Tier-1/Tier-2
-fairness → word-level decisions). **Do not run judges.** Only after the v3 set passes the packet-aware audit does a
-v3 control-extension build + a new evidence-freeze declaration become appropriate — each a later, separately gated
-step.
+Bring the v3 development file here, then run the packet-aware audit **directly on it** (context-independence →
+Tier-3 echo → Tier-1/Tier-2 fairness → word-level decisions). If a word fails, regenerate **only that word-pair**
+via a fresh packet-naive author, update the file, and re-run the audit until all pass. **Do not run judges** during
+this handoff. A single final evidence freeze is created only after all items pass, the judges complete the real run,
+and statistics are computed (workflow update §4).
 
 ## 8. Guardrails
 Docs-only. No contexts generated in this Claude session. No new experiment number. Everything under B1.10. All prior

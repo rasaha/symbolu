@@ -1,7 +1,12 @@
 # B1.10 — Independent Context-Generation Protocol (docs-only)
 
+> **WORKFLOW UPDATE (authoritative):** context files are now Git-tracked **development artifacts**, not individually
+> evidence-frozen. §6–§8 below have been updated to the single-final-evidence-freeze model — see
+> `B1_10_WORKFLOW_PROTOCOL_UPDATE.md`. Where this doc says "freeze-ready," read "ready for use in the one final
+> evidence package."
+
 **Purpose:** provide a protocol by which an **independent, packet-naive author** (a human, or a fresh LLM session
-with no exposure to this work) generates the **official, freeze-ready** context sentences for the six B1.10
+with no exposure to this work) generates the **official** context sentences for the six B1.10
 control-extension words (pride, freedom, patience, courage, control, doubt), so that the contexts cannot mirror the
 Tier-3 packets (the context→specific-facet **echo confound**).
 
@@ -98,41 +103,48 @@ Discard and **regenerate** (never edit in place) if any of:
 
 Regeneration is a **fresh sentence** from the same prompt — never a patch of the rejected one.
 
-## 6. Freeze procedure (BEFORE any packet comparison)
+## 6. Development-artifact model (no per-version freeze)
 
-Freeze happens **before** anyone (author or reviewer) has compared the sentences to the Tier-3 packets:
+> **Updated per `B1_10_WORKFLOW_PROTOCOL_UPDATE.md` (authoritative).** Context files are development artifacts:
+> Git-tracked but **not** individually evidence-frozen. There is **no** requirement to freeze an accepted context
+> set before the packet-aware audit. A single evidence freeze is created only at the very end (§ workflow update §4).
+
 1. Collect the 12 accepted sentences + the author's per-sentence self-check table.
-2. Record provenance (§9): author identity, date, prompt hash, context hash, acceptance checklist.
-3. Write the sentences into a **new, separately-labeled** items file (e.g. `b1_10_control_ext_items_v2.json`) —
-   the current `b1_10_control_ext_items.json` and all other B1.10 artifacts remain **byte-unchanged**.
-4. Compute and record the sha256 of the frozen contexts.
-5. Only after this freeze is the packet content allowed to be placed alongside the contexts.
+2. Record provenance (§9): author identity, date, prompt hash, context hash, acceptance checklist, blindness
+   attestation.
+3. Write the sentences into a **new, separately-labeled** development context file (ordinary Git file); the current
+   `b1_10_control_ext_items.json` and all other B1.10 artifacts remain **byte-unchanged**.
+4. Commit it through normal Git history. No per-version evidence-freeze artifact is created.
 
-The ordering is the whole point: contexts are committed **blind**, so no packet knowledge can retroactively shape
-them.
+The blindness ordering is still enforced at authoring time: the author writes **blind** to the packets (§1), so no
+packet knowledge shapes the sentences — that guarantee comes from the author's blindness, not from freezing the
+file before the audit.
 
-## 7. Independent review procedure (ONLY after freeze)
+## 7. Packet-aware audit procedure (on the Git-tracked development file)
 
-In this order, never earlier:
+Run directly on the current development context file (no prior freeze required), in this order:
 1. **Naturalness review** — a reviewer (may be non-blind) confirms each sentence reads as natural English.
 2. **Sentence-quality review** — confirms 12–22 words, single condition, no transition, no caricature, expected
    class matches an independent reader's reading.
-3. **Packet comparison** — only now are the Tier-3 packets brought alongside the frozen contexts.
-4. **Echo audit** — measure context↔specific-facet overlap (lexical Jaccard + human check for near-paraphrase),
-   per word, against a pre-registered cap.
+3. **Context-independence + Tier-3 echo** — bring the Tier-3 packets alongside the development file; measure
+   context↔specific-facet overlap (lexical Jaccard + human check for near-paraphrase) per word, against a
+   pre-registered cap; assess convergence with prior context sets.
+4. **Tier-1/Tier-2 fairness** — confirm the controls remain credible competitors.
 
-Steps 1–2 gate on the frozen text; steps 3–4 may reject items but may **not** edit them.
+The audit may **reject** items but may **never edit** them (see §8).
 
-## 8. If an echo is discovered
+## 8. If a word fails (echo, unfairness, or independence)
 
 Do **NOT** edit the offending sentence (editing after seeing the packet is exactly the tailoring this protocol
 prevents). Instead:
-1. **Reject** the item (that word's context for that pole),
-2. **Regenerate** it with **another independent, packet-naive author** (fresh session/person), given only §2/§3,
-3. **Repeat the freeze** (§6) for the regenerated item before any new comparison,
-4. Re-run the echo audit (§7.4). Repeat until the item passes blind.
+1. **Reject** that word-pair,
+2. **Regenerate only that word-pair** with a **fresh packet-naive author** (fresh session/person), given only §2/§3,
+3. **Update the development file** (ordinary Git commit) with the regenerated sentences,
+4. **Re-run the packet-aware audit** (§7). Repeat until **all** items pass.
 
 An item that cannot pass blind after repeated independent regeneration is **dropped from the study**, not rescued.
+Only after all items pass, the set is approved, the official judges complete the real run, and statistics are
+computed is a **single** final evidence package created (workflow update §4).
 
 ## 9. Provenance (record for each generation round)
 
