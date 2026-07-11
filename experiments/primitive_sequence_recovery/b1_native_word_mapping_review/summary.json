@@ -1,0 +1,15 @@
+{
+  "artifact_type": "native_word_mapping_review",
+  "grade": "DEVELOPMENT_ONLY (authored vowels; NOT confirmatory; NOT semantically validated)",
+  "merged_lexicon": "frozen/varna_native_stage1_merged_v1.json",
+  "n_words": 153,
+  "n_round_tripped": 153,
+  "word_status_counts": {
+    "FULLY_RESOLVED_DEVELOPMENT_GRADE": 143,
+    "CONTAINS_MISSING_UNIT": 10
+  },
+  "mean_structural_coverage": 0.986,
+  "mean_confirmatory_eligible_coverage": 0.54,
+  "words_with_missing_unit": 10,
+  "note": "structural coverage includes authored-provisional vowels; it is NOT a semantic-validation claim."
+}
