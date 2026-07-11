@@ -1,0 +1,842 @@
+{
+  "ambition|boredom": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.322247,
+    "shared_varna_count": 2,
+    "unique_varna_count": 4
+  },
+  "ambition|calm": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.180689,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "ambition|contentment": {
+    "combined_overlap_score": 0.6,
+    "facet_jaccard": 0.6,
+    "lexical_jaccard_mean": 0.631222,
+    "shared_varna_count": 3,
+    "unique_varna_count": 2
+  },
+  "ambition|control": {
+    "combined_overlap_score": 0.125,
+    "facet_jaccard": 0.125,
+    "lexical_jaccard_mean": 0.125874,
+    "shared_varna_count": 1,
+    "unique_varna_count": 7
+  },
+  "ambition|courage": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "ambition|doubt": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.411538,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "ambition|faith": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.285714,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "ambition|fear": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "ambition|freedom": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.173319,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "ambition|gratitude": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.162029,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "ambition|greed": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "ambition|grief": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "ambition|patience": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.346154,
+    "shared_varna_count": 2,
+    "unique_varna_count": 4
+  },
+  "ambition|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "ambition|pride": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "boredom|calm": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.181021,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "boredom|contentment": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.150896,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "boredom|control": {
+    "combined_overlap_score": 0.125,
+    "facet_jaccard": 0.125,
+    "lexical_jaccard_mean": 0.138369,
+    "shared_varna_count": 1,
+    "unique_varna_count": 7
+  },
+  "boredom|courage": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.182984,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "boredom|doubt": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.364286,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "boredom|faith": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "boredom|fear": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.270202,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "boredom|freedom": {
+    "combined_overlap_score": 0.75,
+    "facet_jaccard": 0.75,
+    "lexical_jaccard_mean": 0.775253,
+    "shared_varna_count": 3,
+    "unique_varna_count": 1
+  },
+  "boredom|gratitude": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.335007,
+    "shared_varna_count": 2,
+    "unique_varna_count": 4
+  },
+  "boredom|greed": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.411255,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "boredom|grief": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.215909,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "boredom|patience": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 8
+  },
+  "boredom|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "boredom|pride": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.410022,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "calm|contentment": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.397306,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "calm|control": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.306502,
+    "shared_varna_count": 2,
+    "unique_varna_count": 4
+  },
+  "calm|courage": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.182981,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "calm|doubt": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "calm|faith": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "calm|fear": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "calm|freedom": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.214286,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "calm|gratitude": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "calm|greed": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "calm|grief": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "calm|patience": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.152477,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "calm|peace": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.233696,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "calm|pride": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "contentment|control": {
+    "combined_overlap_score": 0.285714,
+    "facet_jaccard": 0.285714,
+    "lexical_jaccard_mean": 0.27146,
+    "shared_varna_count": 2,
+    "unique_varna_count": 5
+  },
+  "contentment|courage": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.148529,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "contentment|doubt": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.194335,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "contentment|faith": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.285714,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "contentment|fear": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "contentment|freedom": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.173319,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "contentment|gratitude": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.162029,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "contentment|greed": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "contentment|grief": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "contentment|patience": {
+    "combined_overlap_score": 0.6,
+    "facet_jaccard": 0.6,
+    "lexical_jaccard_mean": 0.588745,
+    "shared_varna_count": 3,
+    "unique_varna_count": 2
+  },
+  "contentment|peace": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.180195,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "contentment|pride": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "control|courage": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.338095,
+    "shared_varna_count": 2,
+    "unique_varna_count": 4
+  },
+  "control|doubt": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.011364,
+    "shared_varna_count": 0,
+    "unique_varna_count": 8
+  },
+  "control|faith": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.014706,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "control|fear": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.22069,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "control|freedom": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.15641,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "control|gratitude": {
+    "combined_overlap_score": 0.125,
+    "facet_jaccard": 0.125,
+    "lexical_jaccard_mean": 0.147712,
+    "shared_varna_count": 1,
+    "unique_varna_count": 7
+  },
+  "control|greed": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.157267,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "control|grief": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.183333,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "control|patience": {
+    "combined_overlap_score": 0.285714,
+    "facet_jaccard": 0.285714,
+    "lexical_jaccard_mean": 0.273681,
+    "shared_varna_count": 2,
+    "unique_varna_count": 5
+  },
+  "control|peace": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.155159,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "control|pride": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.156794,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "courage|doubt": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "courage|faith": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "courage|fear": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.361111,
+    "shared_varna_count": 1,
+    "unique_varna_count": 2
+  },
+  "courage|freedom": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.215909,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "courage|gratitude": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.405956,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "courage|greed": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.522609,
+    "shared_varna_count": 2,
+    "unique_varna_count": 2
+  },
+  "courage|grief": {
+    "combined_overlap_score": 0.666667,
+    "facet_jaccard": 0.666667,
+    "lexical_jaccard_mean": 0.694444,
+    "shared_varna_count": 2,
+    "unique_varna_count": 1
+  },
+  "courage|patience": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.150526,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "courage|peace": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.230435,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "courage|pride": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.216667,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "doubt|faith": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.377976,
+    "shared_varna_count": 1,
+    "unique_varna_count": 2
+  },
+  "doubt|fear": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "doubt|freedom": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.189286,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "doubt|gratitude": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.416928,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "doubt|greed": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.192268,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "doubt|grief": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "doubt|patience": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.196172,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "doubt|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "doubt|pride": {
+    "combined_overlap_score": 0.2,
+    "facet_jaccard": 0.2,
+    "lexical_jaccard_mean": 0.192708,
+    "shared_varna_count": 1,
+    "unique_varna_count": 4
+  },
+  "faith|fear": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 2
+  },
+  "faith|freedom": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "faith|gratitude": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.273148,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "faith|greed": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "faith|grief": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 3
+  },
+  "faith|patience": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.290435,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "faith|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 3
+  },
+  "faith|pride": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "fear|freedom": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.348739,
+    "shared_varna_count": 1,
+    "unique_varna_count": 2
+  },
+  "fear|gratitude": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.256944,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "fear|greed": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.352339,
+    "shared_varna_count": 1,
+    "unique_varna_count": 2
+  },
+  "fear|grief": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.519231,
+    "shared_varna_count": 1,
+    "unique_varna_count": 1
+  },
+  "fear|patience": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "fear|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 3
+  },
+  "fear|pride": {
+    "combined_overlap_score": 0.333333,
+    "facet_jaccard": 0.333333,
+    "lexical_jaccard_mean": 0.350877,
+    "shared_varna_count": 1,
+    "unique_varna_count": 2
+  },
+  "freedom|gratitude": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.392611,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "freedom|greed": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.50161,
+    "shared_varna_count": 2,
+    "unique_varna_count": 2
+  },
+  "freedom|grief": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.263285,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "freedom|patience": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "freedom|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "freedom|pride": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.5,
+    "shared_varna_count": 2,
+    "unique_varna_count": 2
+  },
+  "gratitude|greed": {
+    "combined_overlap_score": 0.75,
+    "facet_jaccard": 0.75,
+    "lexical_jaccard_mean": 0.726852,
+    "shared_varna_count": 3,
+    "unique_varna_count": 1
+  },
+  "gratitude|grief": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.493056,
+    "shared_varna_count": 2,
+    "unique_varna_count": 2
+  },
+  "gratitude|patience": {
+    "combined_overlap_score": 0.142857,
+    "facet_jaccard": 0.142857,
+    "lexical_jaccard_mean": 0.16408,
+    "shared_varna_count": 1,
+    "unique_varna_count": 6
+  },
+  "gratitude|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "gratitude|pride": {
+    "combined_overlap_score": 0.4,
+    "facet_jaccard": 0.4,
+    "lexical_jaccard_mean": 0.396673,
+    "shared_varna_count": 2,
+    "unique_varna_count": 3
+  },
+  "greed|grief": {
+    "combined_overlap_score": 0.666667,
+    "facet_jaccard": 0.666667,
+    "lexical_jaccard_mean": 0.676901,
+    "shared_varna_count": 2,
+    "unique_varna_count": 1
+  },
+  "greed|patience": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 7
+  },
+  "greed|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 5
+  },
+  "greed|pride": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.510833,
+    "shared_varna_count": 2,
+    "unique_varna_count": 2
+  },
+  "grief|patience": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 6
+  },
+  "grief|peace": {
+    "combined_overlap_score": 0.0,
+    "facet_jaccard": 0.0,
+    "lexical_jaccard_mean": 0.0,
+    "shared_varna_count": 0,
+    "unique_varna_count": 4
+  },
+  "grief|pride": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.265,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  },
+  "patience|peace": {
+    "combined_overlap_score": 0.5,
+    "facet_jaccard": 0.5,
+    "lexical_jaccard_mean": 0.48087,
+    "shared_varna_count": 2,
+    "unique_varna_count": 2
+  },
+  "patience|pride": {
+    "combined_overlap_score": 0.166667,
+    "facet_jaccard": 0.166667,
+    "lexical_jaccard_mean": 0.165789,
+    "shared_varna_count": 1,
+    "unique_varna_count": 5
+  },
+  "peace|pride": {
+    "combined_overlap_score": 0.25,
+    "facet_jaccard": 0.25,
+    "lexical_jaccard_mean": 0.25,
+    "shared_varna_count": 1,
+    "unique_varna_count": 3
+  }
+}

@@ -1,0 +1,784 @@
+{
+  "ambition": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 258,
+        "n_facets": 4,
+        "n_words": 42
+      },
+      "liberating": {
+        "n_chars": 263,
+        "n_facets": 4,
+        "n_words": 44
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ma",
+      "ba",
+      "ta",
+      "na"
+    ],
+    "word": "ambition"
+  },
+  "anger": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [
+      "nga"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "nga",
+      "ra"
+    ],
+    "word": "anger"
+  },
+  "attachment": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [
+      "ca"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ta",
+      "ca",
+      "ma",
+      "na"
+    ],
+    "word": "attachment"
+  },
+  "aversion": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [
+      "va",
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "va",
+      "ra",
+      "sa",
+      "na"
+    ],
+    "word": "aversion"
+  },
+  "boredom": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 262,
+        "n_facets": 4,
+        "n_words": 41
+      },
+      "liberating": {
+        "n_chars": 261,
+        "n_facets": 4,
+        "n_words": 44
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ba",
+      "ra",
+      "da",
+      "ma"
+    ],
+    "word": "boredom"
+  },
+  "calm": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 177,
+        "n_facets": 3,
+        "n_words": 30
+      },
+      "liberating": {
+        "n_chars": 195,
+        "n_facets": 3,
+        "n_words": 33
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ka",
+      "la",
+      "ma"
+    ],
+    "word": "calm"
+  },
+  "clarity": {
+    "facet_count": 5,
+    "leakage": false,
+    "missing_varnas": [
+      "ya"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ka",
+      "la",
+      "ra",
+      "ta",
+      "ya"
+    ],
+    "word": "clarity"
+  },
+  "compassion": {
+    "facet_count": 5,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ka",
+      "ma",
+      "pa",
+      "sa",
+      "na"
+    ],
+    "word": "compassion"
+  },
+  "confusion": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ka",
+      "na",
+      "sa"
+    ],
+    "word": "confusion"
+  },
+  "contentment": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 247,
+        "n_facets": 4,
+        "n_words": 42
+      },
+      "liberating": {
+        "n_chars": 265,
+        "n_facets": 4,
+        "n_words": 44
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ka",
+      "na",
+      "ta",
+      "ma"
+    ],
+    "word": "contentment"
+  },
+  "control": {
+    "facet_count": 5,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 295,
+        "n_facets": 5,
+        "n_words": 51
+      },
+      "liberating": {
+        "n_chars": 308,
+        "n_facets": 5,
+        "n_words": 52
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ka",
+      "na",
+      "tta",
+      "ra",
+      "la"
+    ],
+    "word": "control"
+  },
+  "courage": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 174,
+        "n_facets": 3,
+        "n_words": 30
+      },
+      "liberating": {
+        "n_chars": 179,
+        "n_facets": 3,
+        "n_words": 31
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ka",
+      "ra",
+      "ga"
+    ],
+    "word": "courage"
+  },
+  "craving": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [
+      "va",
+      "nga"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ka",
+      "ra",
+      "va",
+      "nga"
+    ],
+    "word": "craving"
+  },
+  "desire": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "da",
+      "sa",
+      "ra"
+    ],
+    "word": "desire"
+  },
+  "detachment": {
+    "facet_count": 5,
+    "leakage": false,
+    "missing_varnas": [
+      "ca"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "da",
+      "ta",
+      "ca",
+      "ma",
+      "na"
+    ],
+    "word": "detachment"
+  },
+  "discipline": {
+    "facet_count": 6,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "da",
+      "sa",
+      "ka",
+      "pa",
+      "la",
+      "na"
+    ],
+    "word": "discipline"
+  },
+  "doubt": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 196,
+        "n_facets": 3,
+        "n_words": 32
+      },
+      "liberating": {
+        "n_chars": 199,
+        "n_facets": 3,
+        "n_words": 32
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "da",
+      "ba",
+      "ta"
+    ],
+    "word": "doubt"
+  },
+  "envy": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [
+      "va",
+      "ya"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "na",
+      "va",
+      "ya"
+    ],
+    "word": "envy"
+  },
+  "equanimity": {
+    "facet_count": 6,
+    "leakage": false,
+    "missing_varnas": [
+      "va",
+      "ya"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ka",
+      "va",
+      "na",
+      "ma",
+      "ta",
+      "ya"
+    ],
+    "word": "equanimity"
+  },
+  "faith": {
+    "facet_count": 1,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 66,
+        "n_facets": 1,
+        "n_words": 11
+      },
+      "liberating": {
+        "n_chars": 68,
+        "n_facets": 1,
+        "n_words": 11
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ta"
+    ],
+    "word": "faith"
+  },
+  "fear": {
+    "facet_count": 1,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 64,
+        "n_facets": 1,
+        "n_words": 10
+      },
+      "liberating": {
+        "n_chars": 61,
+        "n_facets": 1,
+        "n_words": 11
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ra"
+    ],
+    "word": "fear"
+  },
+  "focus": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ka",
+      "sa"
+    ],
+    "word": "focus"
+  },
+  "freedom": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 197,
+        "n_facets": 3,
+        "n_words": 31
+      },
+      "liberating": {
+        "n_chars": 201,
+        "n_facets": 3,
+        "n_words": 34
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ra",
+      "da",
+      "ma"
+    ],
+    "word": "freedom"
+  },
+  "gratitude": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 252,
+        "n_facets": 4,
+        "n_words": 42
+      },
+      "liberating": {
+        "n_chars": 257,
+        "n_facets": 4,
+        "n_words": 43
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ga",
+      "ra",
+      "ta",
+      "da"
+    ],
+    "word": "gratitude"
+  },
+  "greed": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 185,
+        "n_facets": 3,
+        "n_words": 31
+      },
+      "liberating": {
+        "n_chars": 188,
+        "n_facets": 3,
+        "n_words": 32
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ga",
+      "ra",
+      "da"
+    ],
+    "word": "greed"
+  },
+  "grief": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 120,
+        "n_facets": 2,
+        "n_words": 20
+      },
+      "liberating": {
+        "n_chars": 117,
+        "n_facets": 2,
+        "n_words": 21
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "ga",
+      "ra"
+    ],
+    "word": "grief"
+  },
+  "hope": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [
+      "ha"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ha",
+      "pa"
+    ],
+    "word": "hope"
+  },
+  "humility": {
+    "facet_count": 5,
+    "leakage": false,
+    "missing_varnas": [
+      "ha",
+      "ya"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ha",
+      "ma",
+      "la",
+      "ta",
+      "ya"
+    ],
+    "word": "humility"
+  },
+  "joy": {
+    "facet_count": 1,
+    "leakage": false,
+    "missing_varnas": [
+      "ja"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ja"
+    ],
+    "word": "joy"
+  },
+  "love": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [
+      "va"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "la",
+      "va"
+    ],
+    "word": "love"
+  },
+  "patience": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 240,
+        "n_facets": 4,
+        "n_words": 42
+      },
+      "liberating": {
+        "n_chars": 253,
+        "n_facets": 4,
+        "n_words": 42
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "pa",
+      "ta",
+      "na",
+      "ka"
+    ],
+    "word": "patience"
+  },
+  "peace": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 114,
+        "n_facets": 2,
+        "n_words": 20
+      },
+      "liberating": {
+        "n_chars": 118,
+        "n_facets": 2,
+        "n_words": 20
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "pa",
+      "ka"
+    ],
+    "word": "peace"
+  },
+  "pride": {
+    "facet_count": 3,
+    "leakage": false,
+    "missing_varnas": [],
+    "packet_lengths": {
+      "binding": {
+        "n_chars": 190,
+        "n_facets": 3,
+        "n_words": 31
+      },
+      "liberating": {
+        "n_chars": 189,
+        "n_facets": 3,
+        "n_words": 32
+      }
+    },
+    "valid_both_poles": true,
+    "varna_sequence": [
+      "pa",
+      "ra",
+      "da"
+    ],
+    "word": "pride"
+  },
+  "restlessness": {
+    "facet_count": 5,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "ra",
+      "sa",
+      "ta",
+      "la",
+      "na"
+    ],
+    "word": "restlessness"
+  },
+  "shame": {
+    "facet_count": 2,
+    "leakage": false,
+    "missing_varnas": [
+      "sha"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "sha",
+      "ma"
+    ],
+    "word": "shame"
+  },
+  "trust": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [
+      "sa"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "tta",
+      "ra",
+      "sa",
+      "ta"
+    ],
+    "word": "trust"
+  },
+  "wonder": {
+    "facet_count": 4,
+    "leakage": false,
+    "missing_varnas": [
+      "va"
+    ],
+    "packet_lengths": {
+      "binding": null,
+      "liberating": null
+    },
+    "valid_both_poles": false,
+    "varna_sequence": [
+      "va",
+      "na",
+      "da",
+      "ra"
+    ],
+    "word": "wonder"
+  }
+}
