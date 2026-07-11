@@ -1,0 +1,141 @@
+{
+  "artifact": "b1_10_g0_word_set_audit",
+  "invalid_candidates": {
+    "anger": [
+      "nga"
+    ],
+    "attachment": [
+      "ca"
+    ],
+    "aversion": [
+      "va",
+      "sa"
+    ],
+    "clarity": [
+      "ya"
+    ],
+    "compassion": [
+      "sa"
+    ],
+    "confusion": [
+      "sa"
+    ],
+    "craving": [
+      "va",
+      "nga"
+    ],
+    "desire": [
+      "sa"
+    ],
+    "detachment": [
+      "ca"
+    ],
+    "discipline": [
+      "sa"
+    ],
+    "envy": [
+      "va",
+      "ya"
+    ],
+    "equanimity": [
+      "va",
+      "ya"
+    ],
+    "focus": [
+      "sa"
+    ],
+    "hope": [
+      "ha"
+    ],
+    "humility": [
+      "ha",
+      "ya"
+    ],
+    "joy": [
+      "ja"
+    ],
+    "love": [
+      "va"
+    ],
+    "restlessness": [
+      "sa"
+    ],
+    "shame": [
+      "sha"
+    ],
+    "trust": [
+      "sa"
+    ],
+    "wonder": [
+      "va"
+    ]
+  },
+  "leakage_excluded": [],
+  "n_candidates": 37,
+  "n_eligible_subsets": 0,
+  "n_size_k_subsets_examined": 8008,
+  "n_valid_candidates": 16,
+  "old_six_for_context_only": {
+    "eligible": false,
+    "max_facet_jaccard": 0.5,
+    "mean_facet_jaccard": 0.180317,
+    "mean_lexical_jaccard": 0.184227,
+    "n_words_with_ge2_unique": 1,
+    "unique_facet_counts": {
+      "control": 2,
+      "courage": 1,
+      "doubt": 1,
+      "freedom": 1,
+      "patience": 0,
+      "pride": 0
+    },
+    "words": [
+      "control",
+      "courage",
+      "doubt",
+      "freedom",
+      "patience",
+      "pride"
+    ]
+  },
+  "prereg": "B1_10_WORD_SPECIFICITY_PREREG.md Rev 3 (commit 658a6475)",
+  "rule": {
+    "k": 6,
+    "max_facet_jaccard_cap": 0.34,
+    "mean_facet_jaccard_cap": 0.2,
+    "min_unique_facet_per_word": 1,
+    "target_unique_facet": 2,
+    "tie_break": [
+      "min max_facet_jaccard",
+      "min mean_facet_jaccard",
+      "min mean_lexical_jaccard",
+      "alphabetical"
+    ]
+  },
+  "selected_metrics": null,
+  "selected_word_set": null,
+  "semantic_correctness_inspected": false,
+  "semantic_similarity_status": "PENDING_SUPPLEMENTARY — not in the frozen selection/tie-break rule; no embedding model/revision is pinned; not required for selection, so not computed here (no network/model call).",
+  "status": "G0_NOT_TESTABLE_WITH_CURRENT_PROSE_PACKETS",
+  "trace": [
+    "8008 size-6 subsets of 16 valid words; 0 satisfy caps (max facet-Jaccard ≤ 0.34, mean ≤ 0.2) + per-word ≥1 unique facet. No relaxation permitted."
+  ],
+  "valid_candidates": [
+    "ambition",
+    "boredom",
+    "calm",
+    "contentment",
+    "control",
+    "courage",
+    "doubt",
+    "faith",
+    "fear",
+    "freedom",
+    "gratitude",
+    "greed",
+    "grief",
+    "patience",
+    "peace",
+    "pride"
+  ]
+}

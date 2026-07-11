@@ -1,0 +1,2964 @@
+{
+  "diffs": [
+    {
+      "word_id": "w000",
+      "iast": "kāla",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ka",
+        "la"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "la"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ā",
+        "l",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w001",
+      "iast": "lobha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "la",
+        "bha"
+      ],
+      "new_consonant_keys": [
+        "la",
+        "bha"
+      ],
+      "new_full_atomic": [
+        "l",
+        "o",
+        "bh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w002",
+      "iast": "moha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ha"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ha"
+      ],
+      "new_full_atomic": [
+        "m",
+        "o",
+        "h",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w003",
+      "iast": "kāma",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ka",
+        "ma"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ma"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ā",
+        "m",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w004",
+      "iast": "krodha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ka",
+        "ra",
+        "dha"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ra",
+        "dha"
+      ],
+      "new_full_atomic": [
+        "k",
+        "r",
+        "o",
+        "dh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w005",
+      "iast": "bhaya",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "bha",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "bha",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "bh",
+        "a",
+        "y",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w006",
+      "iast": "prema",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "ra",
+        "ma"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "ra",
+        "ma"
+      ],
+      "new_full_atomic": [
+        "p",
+        "r",
+        "e",
+        "m",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w007",
+      "iast": "jala",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ja",
+        "la"
+      ],
+      "new_consonant_keys": [
+        "ja",
+        "la"
+      ],
+      "new_full_atomic": [
+        "j",
+        "a",
+        "l",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w008",
+      "iast": "agni",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ga",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "ga",
+        "na"
+      ],
+      "new_full_atomic": [
+        "a",
+        "g",
+        "n",
+        "i"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w009",
+      "iast": "vāyu",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "v",
+        "ā",
+        "y",
+        "u"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w010",
+      "iast": "manas",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "na",
+        "sa"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "na",
+        "sa"
+      ],
+      "new_full_atomic": [
+        "m",
+        "a",
+        "n",
+        "a",
+        "s"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w011",
+      "iast": "deha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "da",
+        "ha"
+      ],
+      "new_consonant_keys": [
+        "da",
+        "ha"
+      ],
+      "new_full_atomic": [
+        "d",
+        "e",
+        "h",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w012",
+      "iast": "jīva",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ja",
+        "va"
+      ],
+      "new_consonant_keys": [
+        "ja",
+        "va"
+      ],
+      "new_full_atomic": [
+        "j",
+        "ī",
+        "v",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w013",
+      "iast": "mṛtyu",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ta",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ṛ",
+        "t",
+        "y",
+        "u"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w014",
+      "iast": "satya",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ta",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ta",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "s",
+        "a",
+        "t",
+        "y",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w015",
+      "iast": "dharma",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "dha",
+        "ra",
+        "ma"
+      ],
+      "new_consonant_keys": [
+        "dha",
+        "ra",
+        "ma"
+      ],
+      "new_full_atomic": [
+        "dh",
+        "a",
+        "r",
+        "m",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w016",
+      "iast": "karma",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ka",
+        "ra",
+        "ma"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ra",
+        "ma"
+      ],
+      "new_full_atomic": [
+        "k",
+        "a",
+        "r",
+        "m",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w017",
+      "iast": "māyā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ā",
+        "y",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w018",
+      "iast": "śānti",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sha",
+        "na",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "sha",
+        "na",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "ś",
+        "ā",
+        "n",
+        "t",
+        "i"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w019",
+      "iast": "ānanda",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "na",
+        "da"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "na",
+        "da"
+      ],
+      "new_full_atomic": [
+        "ā",
+        "n",
+        "a",
+        "n",
+        "d",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w020",
+      "iast": "duḥkha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "da",
+        "kha"
+      ],
+      "new_consonant_keys": [
+        "da",
+        "kha"
+      ],
+      "new_full_atomic": [
+        "d",
+        "u",
+        "ḥ",
+        "kh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 1,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "OLD_OMITTED_ANUSVARA_OR_VISARGA"
+      ]
+    },
+    {
+      "word_id": "w021",
+      "iast": "sukha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "kha"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "kha"
+      ],
+      "new_full_atomic": [
+        "s",
+        "u",
+        "kh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w022",
+      "iast": "jñāna",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ja",
+        "nya",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "ja",
+        "nya",
+        "na"
+      ],
+      "new_full_atomic": [
+        "j",
+        "ñ",
+        "ā",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w023",
+      "iast": "bhakti",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "bha",
+        "ka",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "bha",
+        "ka",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "bh",
+        "a",
+        "k",
+        "t",
+        "i"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w024",
+      "iast": "yoga",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ya",
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "ya",
+        "ga"
+      ],
+      "new_full_atomic": [
+        "y",
+        "o",
+        "g",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w025",
+      "iast": "guru",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ga",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ga",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "g",
+        "u",
+        "r",
+        "u"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w026",
+      "iast": "rāja",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "ja"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "ja"
+      ],
+      "new_full_atomic": [
+        "r",
+        "ā",
+        "j",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w027",
+      "iast": "deva",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "da",
+        "va"
+      ],
+      "new_consonant_keys": [
+        "da",
+        "va"
+      ],
+      "new_full_atomic": [
+        "d",
+        "e",
+        "v",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w028",
+      "iast": "asura",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "a",
+        "s",
+        "u",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w029",
+      "iast": "nara",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "n",
+        "a",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w030",
+      "iast": "nārī",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "n",
+        "ā",
+        "r",
+        "ī"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w031",
+      "iast": "putra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "p",
+        "u",
+        "t",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w032",
+      "iast": "mātā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ā",
+        "t",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w033",
+      "iast": "pitā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "p",
+        "i",
+        "t",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w034",
+      "iast": "gṛha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ga",
+        "ha"
+      ],
+      "new_consonant_keys": [
+        "ga",
+        "ha"
+      ],
+      "new_full_atomic": [
+        "g",
+        "ṛ",
+        "h",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w035",
+      "iast": "vana",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "na"
+      ],
+      "new_full_atomic": [
+        "v",
+        "a",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w036",
+      "iast": "parvata",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "ra",
+        "va",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "ra",
+        "va",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "p",
+        "a",
+        "r",
+        "v",
+        "a",
+        "t",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w037",
+      "iast": "nadī",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "da"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "da"
+      ],
+      "new_full_atomic": [
+        "n",
+        "a",
+        "d",
+        "ī"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w038",
+      "iast": "sūrya",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ra",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ra",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "s",
+        "ū",
+        "r",
+        "y",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w039",
+      "iast": "candra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ca",
+        "na",
+        "da",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ca",
+        "na",
+        "da",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "c",
+        "a",
+        "n",
+        "d",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w040",
+      "iast": "tārā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "t",
+        "ā",
+        "r",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w041",
+      "iast": "puṣpa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "ssa",
+        "pa"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "ssa",
+        "pa"
+      ],
+      "new_full_atomic": [
+        "p",
+        "u",
+        "ṣ",
+        "p",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w042",
+      "iast": "vṛkṣa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "ksha"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "ka",
+        "ssa"
+      ],
+      "new_full_atomic": [
+        "v",
+        "ṛ",
+        "k",
+        "ṣ",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": false,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "CONSONANT_SEQUENCE_DIFFERS"
+      ]
+    },
+    {
+      "word_id": "w043",
+      "iast": "phala",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pha",
+        "la"
+      ],
+      "new_consonant_keys": [
+        "pha",
+        "la"
+      ],
+      "new_full_atomic": [
+        "ph",
+        "a",
+        "l",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w044",
+      "iast": "anna",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "na"
+      ],
+      "new_full_atomic": [
+        "a",
+        "n",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w045",
+      "iast": "kṣudhā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ksha",
+        "dha"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ssa",
+        "dha"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ṣ",
+        "u",
+        "dh",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": false,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "CONSONANT_SEQUENCE_DIFFERS"
+      ]
+    },
+    {
+      "word_id": "w046",
+      "iast": "nidrā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "da",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "da",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "n",
+        "i",
+        "d",
+        "r",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w047",
+      "iast": "svapna",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "va",
+        "pa",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "va",
+        "pa",
+        "na"
+      ],
+      "new_full_atomic": [
+        "s",
+        "v",
+        "a",
+        "p",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w048",
+      "iast": "netra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "n",
+        "e",
+        "t",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w049",
+      "iast": "hasta",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ha",
+        "sa",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "ha",
+        "sa",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "h",
+        "a",
+        "s",
+        "t",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w050",
+      "iast": "pāda",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "da"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "da"
+      ],
+      "new_full_atomic": [
+        "p",
+        "ā",
+        "d",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w051",
+      "iast": "mukha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "kha"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "kha"
+      ],
+      "new_full_atomic": [
+        "m",
+        "u",
+        "kh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w052",
+      "iast": "hṛdaya",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ha",
+        "da",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "ha",
+        "da",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "h",
+        "ṛ",
+        "d",
+        "a",
+        "y",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w053",
+      "iast": "rakta",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "ka",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "ka",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "r",
+        "a",
+        "k",
+        "t",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w054",
+      "iast": "rūpa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "pa"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "pa"
+      ],
+      "new_full_atomic": [
+        "r",
+        "ū",
+        "p",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w055",
+      "iast": "rasa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "sa"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "sa"
+      ],
+      "new_full_atomic": [
+        "r",
+        "a",
+        "s",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w056",
+      "iast": "bala",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ba",
+        "la"
+      ],
+      "new_consonant_keys": [
+        "ba",
+        "la"
+      ],
+      "new_full_atomic": [
+        "b",
+        "a",
+        "l",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w057",
+      "iast": "vidyā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "da",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "da",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "v",
+        "i",
+        "d",
+        "y",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w058",
+      "iast": "avidyā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "da",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "da",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "a",
+        "v",
+        "i",
+        "d",
+        "y",
+        "ā"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w059",
+      "iast": "śatru",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sha",
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "sha",
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "ś",
+        "a",
+        "t",
+        "r",
+        "u"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w060",
+      "iast": "mitra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "m",
+        "i",
+        "t",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w061",
+      "iast": "loka",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "la",
+        "ka"
+      ],
+      "new_consonant_keys": [
+        "la",
+        "ka"
+      ],
+      "new_full_atomic": [
+        "l",
+        "o",
+        "k",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w062",
+      "iast": "svarga",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "va",
+        "ra",
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "va",
+        "ra",
+        "ga"
+      ],
+      "new_full_atomic": [
+        "s",
+        "v",
+        "a",
+        "r",
+        "g",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w063",
+      "iast": "naraka",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "ra",
+        "ka"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "ra",
+        "ka"
+      ],
+      "new_full_atomic": [
+        "n",
+        "a",
+        "r",
+        "a",
+        "k",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w064",
+      "iast": "pāpa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "pa"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "pa"
+      ],
+      "new_full_atomic": [
+        "p",
+        "ā",
+        "p",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w065",
+      "iast": "puṇya",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "pa",
+        "nna",
+        "ya"
+      ],
+      "new_consonant_keys": [
+        "pa",
+        "nna",
+        "ya"
+      ],
+      "new_full_atomic": [
+        "p",
+        "u",
+        "ṇ",
+        "y",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w066",
+      "iast": "dāna",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "da",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "da",
+        "na"
+      ],
+      "new_full_atomic": [
+        "d",
+        "ā",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w067",
+      "iast": "himsā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ha",
+        "ma",
+        "sa"
+      ],
+      "new_consonant_keys": [
+        "ha",
+        "ma",
+        "sa"
+      ],
+      "new_full_atomic": [
+        "h",
+        "i",
+        "m",
+        "s",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w068",
+      "iast": "ahimsā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ha",
+        "ma",
+        "sa"
+      ],
+      "new_consonant_keys": [
+        "ha",
+        "ma",
+        "sa"
+      ],
+      "new_full_atomic": [
+        "a",
+        "h",
+        "i",
+        "m",
+        "s",
+        "ā"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w069",
+      "iast": "kṣamā",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ksha",
+        "ma"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ssa",
+        "ma"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ṣ",
+        "a",
+        "m",
+        "ā"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": false,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "CONSONANT_SEQUENCE_DIFFERS"
+      ]
+    },
+    {
+      "word_id": "w070",
+      "iast": "māna",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "na"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ā",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w071",
+      "iast": "śakti",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sha",
+        "ka",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "sha",
+        "ka",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "ś",
+        "a",
+        "k",
+        "t",
+        "i"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w072",
+      "iast": "vīra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "v",
+        "ī",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w073",
+      "iast": "aśva",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sha",
+        "va"
+      ],
+      "new_consonant_keys": [
+        "sha",
+        "va"
+      ],
+      "new_full_atomic": [
+        "a",
+        "ś",
+        "v",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w074",
+      "iast": "gaja",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ga",
+        "ja"
+      ],
+      "new_consonant_keys": [
+        "ga",
+        "ja"
+      ],
+      "new_full_atomic": [
+        "g",
+        "a",
+        "j",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w075",
+      "iast": "siṃha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ha"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ha"
+      ],
+      "new_full_atomic": [
+        "s",
+        "i",
+        "ṃ",
+        "h",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 1,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "OLD_OMITTED_ANUSVARA_OR_VISARGA"
+      ]
+    },
+    {
+      "word_id": "w076",
+      "iast": "sarpa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ra",
+        "pa"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ra",
+        "pa"
+      ],
+      "new_full_atomic": [
+        "s",
+        "a",
+        "r",
+        "p",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w077",
+      "iast": "khaga",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "kha",
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "kha",
+        "ga"
+      ],
+      "new_full_atomic": [
+        "kh",
+        "a",
+        "g",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w078",
+      "iast": "mṛga",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ga"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ṛ",
+        "g",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w079",
+      "iast": "go",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "ga"
+      ],
+      "new_full_atomic": [
+        "g",
+        "o"
+      ],
+      "n_vowels_recovered": 1,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w080",
+      "iast": "megha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "gha"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "gha"
+      ],
+      "new_full_atomic": [
+        "m",
+        "e",
+        "gh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w081",
+      "iast": "vidyut",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "da",
+        "ya",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "da",
+        "ya",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "v",
+        "i",
+        "d",
+        "y",
+        "u",
+        "t"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w082",
+      "iast": "samudra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ma",
+        "da",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ma",
+        "da",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "s",
+        "a",
+        "m",
+        "u",
+        "d",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w083",
+      "iast": "dvīpa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "da",
+        "va",
+        "pa"
+      ],
+      "new_consonant_keys": [
+        "da",
+        "va",
+        "pa"
+      ],
+      "new_full_atomic": [
+        "d",
+        "v",
+        "ī",
+        "p",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w084",
+      "iast": "ratna",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "ta",
+        "na"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "ta",
+        "na"
+      ],
+      "new_full_atomic": [
+        "r",
+        "a",
+        "t",
+        "n",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w085",
+      "iast": "suvarṇa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "va",
+        "ra",
+        "nna"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "va",
+        "ra",
+        "nna"
+      ],
+      "new_full_atomic": [
+        "s",
+        "u",
+        "v",
+        "a",
+        "r",
+        "ṇ",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w086",
+      "iast": "rajata",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "ja",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "ja",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "r",
+        "a",
+        "j",
+        "a",
+        "t",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w087",
+      "iast": "kāṣṭha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ka",
+        "ssa",
+        "ttha"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ssa",
+        "ttha"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ā",
+        "ṣ",
+        "ṭh",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w088",
+      "iast": "tṛṇa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ta",
+        "nna"
+      ],
+      "new_consonant_keys": [
+        "ta",
+        "nna"
+      ],
+      "new_full_atomic": [
+        "t",
+        "ṛ",
+        "ṇ",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w089",
+      "iast": "mūla",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "la"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "la"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ū",
+        "l",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w090",
+      "iast": "bīja",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ba",
+        "ja"
+      ],
+      "new_consonant_keys": [
+        "ba",
+        "ja"
+      ],
+      "new_full_atomic": [
+        "b",
+        "ī",
+        "j",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w091",
+      "iast": "kṣetra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ksha",
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ssa",
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ṣ",
+        "e",
+        "t",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": false,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "CONSONANT_SEQUENCE_DIFFERS"
+      ]
+    },
+    {
+      "word_id": "w092",
+      "iast": "grāma",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ga",
+        "ra",
+        "ma"
+      ],
+      "new_consonant_keys": [
+        "ga",
+        "ra",
+        "ma"
+      ],
+      "new_full_atomic": [
+        "g",
+        "r",
+        "ā",
+        "m",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w093",
+      "iast": "nagara",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "na",
+        "ga",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "na",
+        "ga",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "n",
+        "a",
+        "g",
+        "a",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w094",
+      "iast": "mārga",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "ra",
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "ra",
+        "ga"
+      ],
+      "new_full_atomic": [
+        "m",
+        "ā",
+        "r",
+        "g",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w095",
+      "iast": "dvāra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "da",
+        "va",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "da",
+        "va",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "d",
+        "v",
+        "ā",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w096",
+      "iast": "setu",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sa",
+        "ta"
+      ],
+      "new_consonant_keys": [
+        "sa",
+        "ta"
+      ],
+      "new_full_atomic": [
+        "s",
+        "e",
+        "t",
+        "u"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w097",
+      "iast": "cakra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ca",
+        "ka",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ca",
+        "ka",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "c",
+        "a",
+        "k",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w098",
+      "iast": "dhanus",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "dha",
+        "na",
+        "sa"
+      ],
+      "new_consonant_keys": [
+        "dha",
+        "na",
+        "sa"
+      ],
+      "new_full_atomic": [
+        "dh",
+        "a",
+        "n",
+        "u",
+        "s"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w099",
+      "iast": "śara",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "sha",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "sha",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "ś",
+        "a",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w100",
+      "iast": "khaḍga",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "kha",
+        "dda",
+        "ga"
+      ],
+      "new_consonant_keys": [
+        "kha",
+        "dda",
+        "ga"
+      ],
+      "new_full_atomic": [
+        "kh",
+        "a",
+        "ḍ",
+        "g",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w101",
+      "iast": "ratha",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ra",
+        "tha"
+      ],
+      "new_consonant_keys": [
+        "ra",
+        "tha"
+      ],
+      "new_full_atomic": [
+        "r",
+        "a",
+        "th",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w102",
+      "iast": "vastra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "va",
+        "sa",
+        "ta",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "va",
+        "sa",
+        "ta",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "v",
+        "a",
+        "s",
+        "t",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w103",
+      "iast": "kṣīra",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ksha",
+        "ra"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ssa",
+        "ra"
+      ],
+      "new_full_atomic": [
+        "k",
+        "ṣ",
+        "ī",
+        "r",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": false,
+      "flags": [
+        "OLD_DROPPED_VOWELS",
+        "CONSONANT_SEQUENCE_DIFFERS"
+      ]
+    },
+    {
+      "word_id": "w104",
+      "iast": "madhu",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ma",
+        "dha"
+      ],
+      "new_consonant_keys": [
+        "ma",
+        "dha"
+      ],
+      "new_full_atomic": [
+        "m",
+        "a",
+        "dh",
+        "u"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w105",
+      "iast": "taila",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ta",
+        "la"
+      ],
+      "new_consonant_keys": [
+        "ta",
+        "la"
+      ],
+      "new_full_atomic": [
+        "t",
+        "ai",
+        "l",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w106",
+      "iast": "lavaṇa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "la",
+        "va",
+        "nna"
+      ],
+      "new_consonant_keys": [
+        "la",
+        "va",
+        "nna"
+      ],
+      "new_full_atomic": [
+        "l",
+        "a",
+        "v",
+        "a",
+        "ṇ",
+        "a"
+      ],
+      "n_vowels_recovered": 3,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w107",
+      "iast": "yajña",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ya",
+        "ja",
+        "nya"
+      ],
+      "new_consonant_keys": [
+        "ya",
+        "ja",
+        "nya"
+      ],
+      "new_full_atomic": [
+        "y",
+        "a",
+        "j",
+        "ñ",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w108",
+      "iast": "tapas",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ta",
+        "pa",
+        "sa"
+      ],
+      "new_consonant_keys": [
+        "ta",
+        "pa",
+        "sa"
+      ],
+      "new_full_atomic": [
+        "t",
+        "a",
+        "p",
+        "a",
+        "s"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    },
+    {
+      "word_id": "w109",
+      "iast": "karṇa",
+      "round_trip_ok": true,
+      "old_consonant_only": [
+        "ka",
+        "ra",
+        "nna"
+      ],
+      "new_consonant_keys": [
+        "ka",
+        "ra",
+        "nna"
+      ],
+      "new_full_atomic": [
+        "k",
+        "a",
+        "r",
+        "ṇ",
+        "a"
+      ],
+      "n_vowels_recovered": 2,
+      "n_marks_recovered": 0,
+      "consonants_match": true,
+      "flags": [
+        "OLD_DROPPED_VOWELS"
+      ]
+    }
+  ]
+}

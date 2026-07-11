@@ -1,0 +1,5 @@
+doubt
+A: Sarah felt a surge of doubt when she compared her progress to her colleagues', wondering if she was good enough.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Tom maintained a calm inner resolve, allowing his doubt to fade as he trusted in his own journey.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural

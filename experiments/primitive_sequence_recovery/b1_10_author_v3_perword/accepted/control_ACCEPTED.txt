@@ -1,0 +1,5 @@
+control
+A: She maintained a tight grip on the reins, her success hinging on her ability to control the spirited horse.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: He let go of the steering wheel, trusting the car's autonomous system to control the vehicle smoothly.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural

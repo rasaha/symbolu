@@ -1,0 +1,774 @@
+{
+  "words": [
+    {
+      "iast": "kāla",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "lobha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "moha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "kāma",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "krodha",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "bhaya",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "prema",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "jala",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "agni",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vāyu",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "manas",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "deha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "jīva",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mṛtyu",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": false,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "satya",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "dharma",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "karma",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "māyā",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "śānti",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "ānanda",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "duḥkha",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "sukha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "jñāna",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "bhakti",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "yoga",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "guru",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "rāja",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "deva",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "asura",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "nara",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "nārī",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "putra",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mātā",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "pitā",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "gṛha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": false,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vana",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "parvata",
+      "round_trip_ok": true,
+      "n_units": 7,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "nadī",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "sūrya",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "candra",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "tārā",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "puṣpa",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vṛkṣa",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": false,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "phala",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "anna",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "kṣudhā",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "nidrā",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "svapna",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "netra",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "hasta",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "pāda",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mukha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "hṛdaya",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": false,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "rakta",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "rūpa",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "rasa",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "bala",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vidyā",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "avidyā",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "śatru",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mitra",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "loka",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "svarga",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "naraka",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "pāpa",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "puṇya",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "dāna",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "himsā",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "ahimsā",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "kṣamā",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "māna",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "śakti",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vīra",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "aśva",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "gaja",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "siṃha",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "sarpa",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "khaga",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mṛga",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": false,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "go",
+      "round_trip_ok": true,
+      "n_units": 2,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "megha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vidyut",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "samudra",
+      "round_trip_ok": true,
+      "n_units": 7,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "dvīpa",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "ratna",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "suvarṇa",
+      "round_trip_ok": true,
+      "n_units": 7,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "rajata",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "kāṣṭha",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "tṛṇa",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": false,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mūla",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "bīja",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "kṣetra",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "grāma",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "nagara",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "mārga",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "dvāra",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "setu",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "cakra",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "dhanus",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "śara",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "khaḍga",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "ratha",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "vastra",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "kṣīra",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "madhu",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "taila",
+      "round_trip_ok": true,
+      "n_units": 4,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "lavaṇa",
+      "round_trip_ok": true,
+      "n_units": 6,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "yajña",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "tapas",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    },
+    {
+      "iast": "karṇa",
+      "round_trip_ok": true,
+      "n_units": 5,
+      "structurally_fully_mappable": true,
+      "confirmatory_fully_mappable": false
+    }
+  ]
+}

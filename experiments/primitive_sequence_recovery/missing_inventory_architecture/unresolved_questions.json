@@ -1,0 +1,119 @@
+{
+  "unresolved": [
+    {
+      "unit": "a",
+      "category": "vowel",
+      "question": "the privative/inherent 'a' is the highest-frequency unit and the S4 negation carrier — does it hold a distinct role from other vowels?"
+    },
+    {
+      "unit": "ā",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "i",
+      "category": "vowel",
+      "question": "individual differentiation vs shared category role is unsourced"
+    },
+    {
+      "unit": "ī",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "u",
+      "category": "vowel",
+      "question": "individual differentiation vs shared category role is unsourced"
+    },
+    {
+      "unit": "ū",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "ṛ",
+      "category": "vowel",
+      "question": "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+    },
+    {
+      "unit": "ṝ",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "ṝ",
+      "category": "vowel",
+      "question": "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+    },
+    {
+      "unit": "l̥",
+      "category": "vowel",
+      "question": "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+    },
+    {
+      "unit": "l̥̄",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "l̥̄",
+      "category": "vowel",
+      "question": "does vocalic ṛ/ḷ behave as an ordinary vowel or need separate (syllabic-sonorant) treatment?"
+    },
+    {
+      "unit": "e",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "ai",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "o",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "au",
+      "category": "vowel",
+      "question": "does length change ROLE or only magnitude? (S4 shows length is contrastive: nara↔nārī)"
+    },
+    {
+      "unit": "ṃ",
+      "category": "anusvara",
+      "question": "nasalization modifier vs root-bearing primitive (S1 vs S6)"
+    },
+    {
+      "unit": "ṃ",
+      "category": "anusvara",
+      "question": "must the canonical ṃ ever be replaced by a homorganic nasal for composition? (kept separate for now)"
+    },
+    {
+      "unit": "ḥ",
+      "category": "visarga",
+      "question": "release modifier vs boundary operator vs root-bearing primitive"
+    },
+    {
+      "unit": "ḥ",
+      "category": "visarga",
+      "question": "distinct from h — do not merge"
+    },
+    {
+      "unit": "m̐",
+      "category": "candrabindu",
+      "question": "is candrabindu in classical-core scope at all? (no source claim found)"
+    },
+    {
+      "unit": "ḷ",
+      "category": "retroflex_lateral",
+      "question": "retain in an extended Vedic inventory or exclude from Stage 1 entirely?"
+    },
+    {
+      "unit": "*vowels*",
+      "category": "vowel",
+      "question": "Are the Sarkar vowel acoustic roots POLAR (poles) or non-polar operator/transition roles? (S1 asserts roots exist but not that they are polar.)"
+    }
+  ]
+}

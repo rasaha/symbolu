@@ -1,0 +1,147 @@
+{
+  "word_devanagari": "क्षमा",
+  "normalized_devanagari": "क्षमा",
+  "transliteration_iast": "kṣamā",
+  "normalization": {
+    "form": "NFC",
+    "changed": false,
+    "notes": []
+  },
+  "aksharas": [
+    {
+      "index": 0,
+      "devanagari": "क्ष",
+      "translit": "kṣa",
+      "codepoints": [
+        "U+0915",
+        "U+094D",
+        "U+0937"
+      ],
+      "source_span": [
+        0,
+        3
+      ],
+      "atomic_varna_indices": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "index": 1,
+      "devanagari": "मा",
+      "translit": "mā",
+      "codepoints": [
+        "U+092E",
+        "U+093E"
+      ],
+      "source_span": [
+        3,
+        5
+      ],
+      "atomic_varna_indices": [
+        3,
+        4
+      ]
+    }
+  ],
+  "atomic_varnas": [
+    {
+      "index": 0,
+      "unit": "k",
+      "devanagari": "क",
+      "type": "consonant",
+      "origin": "virama_terminated",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "conjunct_constituent",
+      "position": "onset",
+      "is_initial": true,
+      "is_final": false,
+      "source_akshara_index": 0
+    },
+    {
+      "index": 1,
+      "unit": "ṣ",
+      "devanagari": "ष",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "medial",
+      "is_initial": false,
+      "is_final": false,
+      "source_akshara_index": 0
+    },
+    {
+      "index": 2,
+      "unit": "a",
+      "devanagari": "",
+      "type": "vowel",
+      "origin": "inherent_a",
+      "aspirated": null,
+      "vowel_length": "short",
+      "inherent_inserted": true,
+      "orthographic_source": "inherent",
+      "position": "medial",
+      "is_initial": false,
+      "is_final": false,
+      "source_akshara_index": 0
+    },
+    {
+      "index": 3,
+      "unit": "m",
+      "devanagari": "म",
+      "type": "consonant",
+      "origin": "consonant",
+      "aspirated": false,
+      "vowel_length": null,
+      "inherent_inserted": false,
+      "orthographic_source": "base_letter",
+      "position": "medial",
+      "is_initial": false,
+      "is_final": false,
+      "source_akshara_index": 1
+    },
+    {
+      "index": 4,
+      "unit": "ā",
+      "devanagari": "ा",
+      "type": "vowel",
+      "origin": "dependent_vowel_sign",
+      "aspirated": null,
+      "vowel_length": "long",
+      "inherent_inserted": false,
+      "orthographic_source": "dependent_vowel_sign",
+      "position": "final",
+      "is_initial": false,
+      "is_final": true,
+      "source_akshara_index": 1
+    }
+  ],
+  "inherent_vowel_insertions": {
+    "count": 1,
+    "atomic_indices": [
+      2
+    ]
+  },
+  "multiplicity": {
+    "varna_counts": {
+      "k": 1,
+      "ṣ": 1,
+      "a": 1,
+      "m": 1,
+      "ā": 1
+    },
+    "geminations": []
+  },
+  "derived_noncanonical": {
+    "resolved_pronunciation_candidate": null
+  },
+  "warnings": [],
+  "parser_spec_version": "PARSER_SPEC_v1",
+  "schema_version": "1.1"
+}

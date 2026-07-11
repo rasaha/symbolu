@@ -97,8 +97,13 @@ At context-generation time, record (per the generation protocol §9):
 
 - Docs-only freeze of the judge configuration + independence rules. **No** frozen items, packets, contexts,
   runners, evidence-freeze declarations, results, or experiment numbers changed. The official run is **not**
-  performed here; a B1.10 control-ext evidence-freeze declaration (naming this panel) is still required before any
-  real judging, and the official contexts must first be blindly authored (§5–§6).
+  performed here; the official contexts must first be blindly authored (§5) and pass the packet-aware audit.
+- **Evidence-freeze model (per `B1_10_WORKFLOW_PROTOCOL_UPDATE.md`, authoritative):** context files are Git-tracked
+  development artifacts, not individually frozen. A **single** evidence-freeze declaration naming this panel is
+  created **once**, for the final approved inputs, immediately before the real judge run (still required by the
+  runner — anti-circularity, pinning the approved context file + packets + panel + prompts + seeds); it, together
+  with the raw outputs, parsed scores, statistics, per-artifact hashes, and final report, forms the single immutable
+  evidence package. No per-context-version freeze is created.
 
 ## 9. Guardrails
 Resonance / phonetic-fidelity refinement only. No `GENUTILITY_*`; no `ONTOLOGICAL_SIGNAL`; no semantic-truth /

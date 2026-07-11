@@ -1,0 +1,78 @@
+{
+  "artifact_type": "varna_table_contradiction_resolution",
+  "scope": "Docs/data-only adjudication of the four unresolved cross-artifact contradictions (D1-D4) found by the provenance register. Resolves each on the table's OWN evidence. Does NOT mutate the frozen table; application is a separate, explicitly-approved re-freeze.",
+  "frozen_table": "frozen/varna_polarity_table_v3.json",
+  "frozen_table_status_at_audit": "ACTIVE_APPLIED",
+  "applied_to_frozen_table": false,
+  "changes_any_pole_content": false,
+  "guardrails": "No pole meaning changed, no opposite authored, no polarity selected. Only stale METADATA (caveats, bridge-scoped reachability) is adjudicated. Structure, not validated meaning.",
+  "resolutions": [
+    {
+      "id": "D1",
+      "kind": "DOC_VS_DOC",
+      "one_line": "important_caveats[1] says pa 'PARTIALLY INVERTS' the attested pole; the pa entry says v3 resolved it and 'no inversion flag remains'.",
+      "conflicting_artifacts": {
+        "stale": "important_caveats[1]: \"pa's operator reading PARTIALLY INVERTS the source-attested pole (ghṛṇā = the binding fetter). Recorded.\"",
+        "authoritative": "varnas.pa.attested_vs_authored: \"v3 OPTION B: pa = ghṛṇā (hatred) = BINDING ... v3 follows the attested assignment ... SUPERSEDES the earlier option-A inversion ... no inversion flag remains.\""
+      },
+      "adjudication": "The per-varṇa entry is authoritative and newer: it explicitly SUPERSEDES the inversion and aligns pa with every other ripu/pāsha (hatred = binding). The caveat describes a superseded (option-A) state.",
+      "root_cause": "doc_staleness",
+      "resolution_type": "UPDATE_STALE_CAVEAT",
+      "exact_change_spec": "Replace important_caveats[1] with a resolved-state note, e.g.: 'pa (ghṛṇā = hatred) is BINDING per the attested pāsha reading; v3 option B superseded the earlier option-A inversion. Resolved.' No pole text changes.",
+      "changes_pole_content": false,
+      "status": "RESOLVED_ON_EVIDENCE"
+    },
+    {
+      "id": "D2",
+      "kind": "DOC_VS_DOC",
+      "one_line": "important_caveats[3] calls ṭha's night/moon-vs-'Repentance' reading 'unresolved'; the ttha entry marks it RESOLVED.",
+      "conflicting_artifacts": {
+        "stale": "important_caveats[3]: \"ṭha (ttha) classical night/moon reading vs lexicon 'Repentance' is unresolved — see classical_discrepancy.\"",
+        "authoritative": "varnas.ttha.classical_discrepancy: \"RESOLVED (see ledger): ... Night/moon are ṭha's ASSOCIATIONS; anutāpa is its pole axis — associations vs pole, not a contradiction.\""
+      },
+      "adjudication": "The entry's own classical_discrepancy field states RESOLVED and gives the resolution (associations vs pole axis). The caveat's 'unresolved' pointer is stale and now self-contradicts the field it points to.",
+      "root_cause": "doc_staleness",
+      "resolution_type": "UPDATE_STALE_CAVEAT",
+      "exact_change_spec": "Replace important_caveats[3] with: 'ṭha (ttha) = anutāpa (repentance) is the pole axis; night/moon/bhúvarloka are associations (ha's cosmological opposite), not a competing pole. Resolved — see varnas.ttha.classical_discrepancy.' No pole text changes.",
+      "changes_pole_content": false,
+      "status": "RESOLVED_ON_EVIDENCE"
+    },
+    {
+      "id": "D3",
+      "kind": "CODE_VS_TABLE",
+      "one_line": "practically_reachable=False for tta/dda + caveats[5,6] ('retroflex never produced') contradict the fact that the native Stage-1 parser emits ṭa/ḍa from ट/ड.",
+      "conflicting_artifacts": {
+        "english_bridge_scoped": "important_caveats[5]: '... fed only by phonemes the English G2P never emits ... PRACTICALLY UNREACHABLE. Real English coverage is ~19 of 34.' important_caveats[6]: 'the G2P PRE-SPLITS the cluster ... the retroflex ḍa/ṭa are never produced ... a G2P change, not retrofitted here.'",
+        "native_parser_fact": "sanskrit_stage1_parser emits ṭ (ट) and ḍ (ड) directly (e.g. koṭi -> ...ṭ..., see stage1_mapping_integration/word_resolution.json)."
+      },
+      "adjudication": "No genuine conflict once scope is made explicit: practically_reachable and caveats[4-6] describe the DEPRECATED English-G2P bridge, not the frozen native Stage-1 parser. Under the native parser every consonant grapheme is reachable. The contradiction is a scope-labelling defect, not a pole/identity error.",
+      "root_cause": "english_bridge_artifact",
+      "resolution_type": "RESCOPE_METADATA_TO_DEPRECATED_BRIDGE",
+      "exact_change_spec": "Rename practically_reachable -> english_bridge_reachable (value unchanged) and add native_parser_reachable=true for all 34 consonants; re-scope caveats[4,5,6] with the prefix 'DEPRECATED ENGLISH-G2P BRIDGE ONLY:'. Record that native-parser reachability supersedes the English-bridge flag as the input authority. No pole text changes.",
+      "changes_pole_content": false,
+      "status": "RESOLVED_ON_EVIDENCE_DISSOLVES_UNDER_NATIVE_PARSER"
+    },
+    {
+      "id": "D4",
+      "kind": "CODE_VS_DOC",
+      "one_line": "important_caveats[7] ('th' -> tha) vs the deprecated active thfix bridge ('th' -> ta); under the native parser थ -> tha is correct and English 'th' never enters.",
+      "conflicting_artifacts": {
+        "english_bridge_scoped": "important_caveats[7]: 'the English \"th\" grapheme is the dental FRICATIVES /θ/,/ð/ ... the bridge maps \"th\" -> tha ... injects a spurious melancholy varṇa. ... This is a MIS-mapping.'",
+        "native_parser_fact": "varnas.tha.attested_vs_authored operator note: 'थ = aspirated dental stop, NOT the English /θ/,/ð/ fricatives.' The native parser maps थ -> tha correctly and never consumes an English 'th'."
+      },
+      "adjudication": "The mis-mapping caveat describes the DEPRECATED English bridge (and its later thfix th->ta remap). Under the frozen native Stage-1 parser the input is Devanāgarī; थ -> tha is the correct, non-spurious mapping. The conflict dissolves once the caveat is scoped to the deprecated bridge.",
+      "root_cause": "english_bridge_artifact",
+      "resolution_type": "RESCOPE_METADATA_TO_DEPRECATED_BRIDGE",
+      "exact_change_spec": "Re-scope caveats[7,8] with the prefix 'DEPRECATED ENGLISH-G2P BRIDGE ONLY:' and add a note: 'Under the native Stage-1 parser (frozen a1988394), थ -> tha is correct; English th-routing (th->tha, later thfix th->ta) is not part of the native input path.' No pole text changes.",
+      "changes_pole_content": false,
+      "status": "RESOLVED_ON_EVIDENCE_DISSOLVES_UNDER_NATIVE_PARSER"
+    }
+  ],
+  "summary": {
+    "D1_D2": "Pure doc-vs-doc staleness; the newer per-varṇa entries already adjudicate (pa SUPERSEDES; ttha RESOLVED). Fix = update two stale caveats. No pole content touched.",
+    "D3_D4": "Artifacts of the deprecated English-G2P bridge; they dissolve once the reachability field and caveats[4-8] are scoped to that bridge and native-parser reachability is recorded as the input authority. No pole content touched.",
+    "net_effect_on_meanings": "NONE. No pole, polarity, or meaning is changed by any resolution.",
+    "unresolved_after_this": "The provenance register's SECONDARY blockers remain and are OUT OF SCOPE here: 21/34 liberating poles AUTHORED_PROVISIONAL, ha BACK_FIT, sha/ssa SIBILANT_SWAP provenance hazards, and the entirely MISSING vowel/anusvāra/visarga/candrabindu inventory."
+  },
+  "application_note": "This record RESOLVES D1-D4 on the evidence but is NOT applied to the frozen table. Applying the exact_change_spec items is a separate, explicitly-approved re-freeze step (edit frozen/varna_polarity_table_v3.json metadata only, re-run wired tests, re-issue the provenance register). Until then the frozen table is unchanged."
+}

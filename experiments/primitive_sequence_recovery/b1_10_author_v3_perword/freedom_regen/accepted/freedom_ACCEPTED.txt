@@ -1,0 +1,5 @@
+freedom
+A: Sarah felt a surge of freedom when she finally quit her job, knowing her colleagues would envy her decision.
+   intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
+B: Walking alone in the forest, Mark found true freedom in the quiet of his own thoughts, unburdened by expectations.
+   intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
