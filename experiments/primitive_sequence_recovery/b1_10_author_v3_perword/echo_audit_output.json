@@ -23,9 +23,9 @@
       "echo_within_cap": true,
       "convergence_jaccard": {
         "excluded_dev": 0.0,
-        "excluded_claude_v2": 0.0625
+        "excluded_claude_v2": 0.0938
       },
-      "convergence_max": 0.0625,
+      "convergence_max": 0.0938,
       "convergence_flag_gt_0_50": false
     },
     "patience": {

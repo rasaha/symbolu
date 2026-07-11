@@ -108,7 +108,27 @@ passes surface validation, **re-run this audit on freedom only**; if it PASSes, 
 No judges, no evidence-freeze declaration, no items rebuild, no new experiment number were produced by this
 audit.
 
-## 6. Guardrails
+## 6. Stage-3b addendum — freedom re-audit (after fresh blind re-authoring)
+
+`freedom` was re-authored blind per §5: a single fresh per-word run on Qwen2.5-14B (rev `cf98f3b3…`) with the
+pre-declared fresh seed **20260821** (`--seed-offset 100`), accept-first-pass. The re-drawn pair (on-box
+`raw_output_sha256` `02eec5e5…`, hash-verified) is a genuinely different draw from the rejected pair
+(`18a9c8e9…`, seed 20260721), and is **not** an edit of it.
+
+- A: "Sarah felt a surge of freedom when she finally quit her job, knowing her colleagues would envy her decision." — the freedom is now explicitly contingent on **other people's reactions** ("her colleagues would envy her decision") = comparison/approval. **Condition A: FIT** (the earlier "despite"/autonomy mixing is gone).
+- B: "Walking alone in the forest, Mark found true freedom in the quiet of his own thoughts, unburdened by expectations." — inward, self-possessed, non-comparison. **Condition B: FIT.**
+- Independent surface re-validation: exit 0 / `surface_pass: true` / `issues: []`.
+- Tier-3 echo Jaccard: **0.0000** (CLEAN, within cap). Convergence max 0.0938 (vs Claude-v2), no flag.
+- naturalness natural · condition-fit FIT · echo CLEAN · fairness FAIR → **freedom PASS**
+
+**Updated whole-set decision:** PASS **6**, REJECT_ITEM 0, DROP 0 → **the six-word set is APPROVED for
+judge-run preparation.** The approved canonical block is `e0a1477e…` (`B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md`);
+it supersedes the pre-audit block `a0abccb8…`. The rejected freedom pair is retained as evidence
+(`b1_10_author_v3_perword/accepted/freedom_ACCEPTED.txt`, superseded); the approved freedom pair is in
+`b1_10_author_v3_perword/freedom_regen/`. Still produced here: **no** judges, **no** evidence-freeze
+declaration, **no** items rebuild, **no** new experiment number.
+
+## 7. Guardrails
 Resonance / phonetic-fidelity refinement only. No `GENUTILITY_*`; no `ONTOLOGICAL_SIGNAL`; no semantic-truth /
 ontology / Sanskrit-privilege claim. **B1.4b′ remains `NULL_RETURN_BOTTOM`. Original B1.4b blocked. Track B
 blocked. Structure, not validated meaning.**

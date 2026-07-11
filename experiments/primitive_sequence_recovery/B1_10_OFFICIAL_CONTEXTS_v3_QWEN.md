@@ -1,12 +1,14 @@
-# B1.10 — Official Contexts v3 (non-Claude blind author: Qwen) — PENDING PACKET-AWARE AUDIT
+# B1.10 — Official Contexts v3 (non-Claude blind author: Qwen) — PACKET-AWARE AUDIT APPROVED
 
-**Classification: `NONCLAUDE_BLIND_AUTHORED_v3_PENDING_PACKET_AWARE_AUDIT`.** These twelve sentences were
-authored by a **packet-naive, non-Claude** author (Qwen2.5-14B/32B) via the per-word blind-authoring
-workflow (`B1_10_PERWORD_BLIND_AUTHORING_WORKFLOW.md`, commit `0785b1ec` + `--max-rung` fix `1b47c8f6`).
-They have passed **surface validation only**. They are **NOT yet approved** as official experimental
-stimuli — the packet-aware audit (context-independence → Tier-3 echo → Tier-1/Tier-2 fairness → per-word
-decisions) has **not** been run and is the deliberate next step. No judges have been run; no evidence-freeze
-declaration has been created; the experiment number is unchanged (B1.10).
+**Classification: `NONCLAUDE_BLIND_AUTHORED_v3_AUDIT_APPROVED`.** These twelve sentences were authored by a
+**packet-naive, non-Claude** author (Qwen2.5-14B/32B) via the per-word blind-authoring workflow
+(`B1_10_PERWORD_BLIND_AUTHORING_WORKFLOW.md`, commit `0785b1ec` + `--max-rung` fix `1b47c8f6`). They passed
+**surface validation** and the **packet-aware audit** (`B1_10_PACKET_AWARE_AUDIT_REPORT.md`): all six words
+PASS (naturalness, condition-fit, Tier-3 echo ≤ cap, Tier-1/Tier-2 fairness). **`freedom` was REJECTED in the
+first audit pass on condition-fit** (the "despite" clause mixed the pole) and **re-authored blind** at a fresh
+pre-declared seed (20260821, `--seed-offset 100`); the re-drawn pair PASSes. The set is **APPROVED for
+judge-run preparation.** No judges have been run; no evidence-freeze declaration has been created; no items
+rebuild has been done; the experiment number is unchanged (B1.10).
 
 Guardrails: resonance / phonetic-fidelity refinement only. **No `GENUTILITY_*`; no `ONTOLOGICAL_SIGNAL`; no
 semantic-truth / ontology / Sanskrit-privilege claim.** B1.4b′ remains `NULL_RETURN_BOTTOM`; original B1.4b
@@ -26,7 +28,7 @@ master packet + a per-word output-scope directive.
 | word | accepted rung / model | resolved revision | attempt / seed | accepted raw_output_sha256 | failed attempts |
 |---|---|---|---|---|---|
 | pride | 0 / Qwen2.5-14B-Instruct | `cf98f3b3…` | 0 / 20260720 | `286f91d7…` | 0 |
-| freedom | 0 / Qwen2.5-14B-Instruct | `cf98f3b3…` | 0 / 20260721 | `18a9c8e9…` | 0 |
+| freedom | 0 / Qwen2.5-14B-Instruct | `cf98f3b3…` | 0 / **20260821** (re-auth) | `02eec5e5…` | 0 (orig `18a9c8e9…` audit-REJECTED, superseded) |
 | patience | 1 / Qwen2.5-32B-Instruct | `5ede1c97…` | 2 / 20260724 | `fa8366ea…` | 8 (6× rung0, 2× rung1) |
 | courage | 0 / Qwen2.5-14B-Instruct | `cf98f3b3…` | 5 / 20260728 | `84cc9277…` | 5 (rung0) |
 | control | 0 / Qwen2.5-14B-Instruct | `cf98f3b3…` | 0 / 20260724 | `3ba3f3df…` | 0 |
@@ -44,7 +46,8 @@ authoritative provenance hash; the transcriptions are substantively faithful but
 
 ## 2. The twelve sentences (canonical block)
 
-Combined-block sha256 (over the exact text between the fences): `a0abccb89091578cc6ee81b22143bd2bcd82ee9eb8624ba6855224825a418bfc`
+Combined-block sha256 (over the exact text between the fences): `e0a1477ebaaf41df95b489b7547a895369f115d5231c424fc8598d4f598c3046`
+(supersedes the pre-audit block `a0abccb8…`, which contained the audit-rejected freedom pair.)
 
 ```
 pride
@@ -54,9 +57,9 @@ B: Mark felt a quiet pride in his ability to solve complex problems without need
    intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
 
 freedom
-A: She felt a surge of freedom when she finally quit her job and started her own business, despite the uncertainty.
+A: Sarah felt a surge of freedom when she finally quit her job, knowing her colleagues would envy her decision.
    intended class: A | confidence: high | mixed-condition detected: no | naturalness: natural
-B: He found true freedom in his daily walks through the park, enjoying the quiet solitude and natural beauty.
+B: Walking alone in the forest, Mark found true freedom in the quiet of his own thoughts, unburdened by expectations.
    intended class: B | confidence: high | mixed-condition detected: no | naturalness: natural
 
 patience
@@ -91,14 +94,15 @@ Each pair independently re-validated with the frozen validator
 `surface_pass: true`, `issues: []`. Rules unchanged (count / 12–22 words / target-word-exactly-once /
 forbidden labels / self-check fields / mixed≠yes / naturalness≠forced).
 
-## 4. Status / next step (NOT done here)
+## 4. Status / next step
 
-The **packet-aware audit** is the next step and has not been run. Do not run judges, do not create an
-evidence-freeze declaration, and do not treat these as approved stimuli until the audit passes. If a word
-fails the audit, regenerate **only that word-pair** via a fresh per-word blind job (never a packet-aware
-edit) and re-audit. Items a reviewer should scrutinize are listed neutrally in
-`b1_10_author_v3_perword/CAPTURE_NOTE.md` (§ audit-watch) — that list is *not* an audit finding, only a
-pointer for the deferred review.
+The **packet-aware audit is complete and PASSED** for all six words
+(`B1_10_PACKET_AWARE_AUDIT_REPORT.md`; freedom re-audit in that report's Stage-3b addendum). The set is
+**APPROVED for judge-run preparation.** Remaining, in order (none done here): (1) rebuild
+`frozen/b1_10_control_ext_items.json` with these approved v3 contexts (`build_b1_10_control_ext.py`);
+(2) create the **single** evidence-freeze declaration pinning the approved inputs; (3) run the real
+**Llama/Gemma** judge panel (Stage 4) on the pod; (4) statistics; (5) the single final evidence package.
+**Do not run judges** until (1)–(2) are done and approved.
 
 ## 5. Guardrails
 Resonance / phonetic-fidelity refinement only. No `GENUTILITY_*`; no `ONTOLOGICAL_SIGNAL`; no semantic-truth

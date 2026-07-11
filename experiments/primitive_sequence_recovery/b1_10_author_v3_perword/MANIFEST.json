@@ -1,6 +1,6 @@
 {
   "artifact": "b1_10_official_contexts_v3_qwen_MANIFEST",
-  "classification": "NONCLAUDE_BLIND_AUTHORED_v3_PENDING_PACKET_AWARE_AUDIT",
+  "classification": "NONCLAUDE_BLIND_AUTHORED_v3_AUDIT_APPROVED",
   "experiment": "B1.10 (unchanged; no new experiment number)",
   "workflow_commit": "0785b1ec (per-word workflow) + 1b47c8f6 (--max-rung one-rung-per-process)",
   "master_packet_sha256": "7e07e16bb160481c647b5f6e11ff166f63f2fa42e442ba16bfa6fcffe9c30628",
@@ -22,8 +22,8 @@
   "reason_for_escalation": "SURFACE_VALIDATION_FAILURE_ONLY",
   "retry_budget_role": "operational safeguard only — NOT experimental, evidentiary, hypothesis-testing, or judging",
   "official_context_file": "../B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md",
-  "official_context_file_sha256": "4e75d98ad5cbacca4e42ecc003154016a9bdf8c1f6d6994d31a32abffa27c78c",
-  "combined_context_block_sha256": "a0abccb89091578cc6ee81b22143bd2bcd82ee9eb8624ba6855224825a418bfc",
+  "official_context_file_sha256": "ea25d27eef9d99138ed3ea3cc289783441cb6e327577694822e92fc51116a103",
+  "combined_context_block_sha256": "e0a1477ebaaf41df95b489b7547a895369f115d5231c424fc8598d4f598c3046",
   "n_ab_sentences": 12,
   "independent_surface_revalidation": {
     "all_pass": true,
@@ -72,7 +72,8 @@
       "failed_attempts": [],
       "first_passing_pair": true,
       "edited_or_patched": false,
-      "mixed_A_B_across_attempts": false
+      "mixed_A_B_across_attempts": false,
+      "audit_status": "PASS"
     },
     {
       "word": "freedom",
@@ -81,16 +82,24 @@
       "accepted_model_id": "Qwen/Qwen2.5-14B-Instruct",
       "revision_resolved": "cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8",
       "accepted_attempt_index": 0,
-      "accepted_seed": 20260721,
-      "accepted_raw_output_sha256_authoritative": "18a9c8e9837d02896eaf04d28b6bdc8a971f7b0ae9d20dc47fbfe2954b360377",
+      "accepted_seed": 20260821,
+      "accepted_raw_output_sha256_authoritative": "02eec5e5f519cea426ab240553670138707ced73f6f731cc4104399e06911860",
       "delivered_prompt_sha256": "1f1a63873494c52d4549120c97ae9600cebcda5bab3833ae65894271df9444f3",
-      "committed_accepted_transcription_file": "accepted/freedom_ACCEPTED.txt",
-      "committed_accepted_transcription_sha256": "4b8b5f8b3e75a7998335b3ebe619fb1c328a98ccc336cd14f62563af926c781c",
+      "committed_accepted_transcription_file": "freedom_regen/accepted/freedom_ACCEPTED.txt",
+      "committed_accepted_transcription_sha256": "753d490b0e8821577b078721a6babceb7b25f00db027d517c173315fe6272f1e",
       "n_failed_attempts": 0,
       "failed_attempts": [],
       "first_passing_pair": true,
       "edited_or_patched": false,
-      "mixed_A_B_across_attempts": false
+      "mixed_A_B_across_attempts": false,
+      "audit_status": "PASS (re-authored; original 18a9c8e9... audit-REJECTED on condition-fit, superseded)",
+      "seed_offset": 100,
+      "superseded_original": {
+        "raw_output_sha256_authoritative": "18a9c8e9837d02896eaf04d28b6bdc8a971f7b0ae9d20dc47fbfe2954b360377",
+        "seed": 20260721,
+        "status": "AUDIT_REJECTED_condition_fit",
+        "evidence_file": "accepted/freedom_ACCEPTED.txt (retained, superseded)"
+      }
     },
     {
       "word": "patience",
@@ -165,7 +174,8 @@
       ],
       "first_passing_pair": true,
       "edited_or_patched": false,
-      "mixed_A_B_across_attempts": false
+      "mixed_A_B_across_attempts": false,
+      "audit_status": "PASS"
     },
     {
       "word": "courage",
@@ -219,7 +229,8 @@
       ],
       "first_passing_pair": true,
       "edited_or_patched": false,
-      "mixed_A_B_across_attempts": false
+      "mixed_A_B_across_attempts": false,
+      "audit_status": "PASS"
     },
     {
       "word": "control",
@@ -237,7 +248,8 @@
       "failed_attempts": [],
       "first_passing_pair": true,
       "edited_or_patched": false,
-      "mixed_A_B_across_attempts": false
+      "mixed_A_B_across_attempts": false,
+      "audit_status": "PASS"
     },
     {
       "word": "doubt",
@@ -263,7 +275,8 @@
       ],
       "first_passing_pair": true,
       "edited_or_patched": false,
-      "mixed_A_B_across_attempts": false
+      "mixed_A_B_across_attempts": false,
+      "audit_status": "PASS"
     }
   ],
   "confirmations": {
@@ -273,11 +286,20 @@
     "all_failed_attempts_and_hashes_recorded": true,
     "escalation_only_on_surface_failure": true,
     "packet_unchanged_hash_asserted": true,
-    "packet_aware_audit_run": false,
+    "packet_aware_audit_run": true,
     "judges_run": false,
     "evidence_freeze_declaration_created": false,
-    "new_experiment_number_created": false
+    "new_experiment_number_created": false,
+    "packet_aware_audit_passed_all_six": true
   },
   "byte_fidelity_caveat": "Box could not git push. Accepted sentence blocks and accepted/*.txt are terminal-paste transcriptions. Authoritative artifacts are the on-box files hashing to accepted_raw_output_sha256_authoritative; each pasted ACCEPTED.txt sha256sum matched its provenance hash on the box. Full FAILED raw outputs remain on-box (hashes recorded here); they can be added byte-exact if the box can push.",
-  "guardrails": "Resonance / phonetic-fidelity refinement only. No GENUTILITY_*; no ONTOLOGICAL_SIGNAL; no semantic-truth / ontology / Sanskrit-privilege claim. B1.4b' NULL_RETURN_BOTTOM; original B1.4b blocked; Track B blocked; structure, not validated meaning."
+  "guardrails": "Resonance / phonetic-fidelity refinement only. No GENUTILITY_*; no ONTOLOGICAL_SIGNAL; no semantic-truth / ontology / Sanskrit-privilege claim. B1.4b' NULL_RETURN_BOTTOM; original B1.4b blocked; Track B blocked; structure, not validated meaning.",
+  "packet_aware_audit": {
+    "report": "../B1_10_PACKET_AWARE_AUDIT_REPORT.md",
+    "prereg_commit": "9510c054",
+    "result": "PASS 6 / REJECT_ITEM 0 / DROP 0 -> SET APPROVED",
+    "echo_all_within_cap_0.20": true,
+    "freedom_re_authored": true
+  },
+  "combined_context_block_sha256_pre_audit_superseded": "a0abccb89091578cc6ee81b22143bd2bcd82ee9eb8624ba6855224825a418bfc"
 }
