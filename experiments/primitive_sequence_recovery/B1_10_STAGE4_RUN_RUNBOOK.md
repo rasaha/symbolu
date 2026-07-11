@@ -9,46 +9,33 @@ claim. B1.4b′ remains `NULL_RETURN_BOTTOM`. Structure, not validated meaning.
 
 ---
 
-## Step 0 (REQUIRED) — re-issue the evidence-freeze declaration on the final code
+## The authorized declaration (hardened)
 
-Stage-4 step 3 **hardened the runner**, so the committed Step-2 declaration
-(`frozen/b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED.json`, sha `9b1d4d63…`) is now **stale on its `runner`
-pin** — the gate will (correctly) fail-closed on it. That committed file stays as the Step-2 record. Before the
-real run, **re-issue** the declaration so it pins the hardened runner, on the exact commit you will execute:
+Use **only** the hardened re-issued declaration, which pins the hardened runner:
+
+- **`frozen/b1_10_control_ext_v3_HARDENED_EVIDENCE_FREEZE_DECLARED.json`**
+- expected SHA256: **`e71889d44e90a86e11fb5fbe3a1db3d49b03db630aaba35d8a00233f596e0181`**
+
+The Step-2 declaration (`b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED.json`, sha `9b1d4d63…`) is the
+historical record and is **stale on its `runner` pin** after hardening — the gate fail-closes on it. Do **not**
+use it, and do **not** edit it.
+
+## Step 0 — check out the pinned commit and verify the runner matches
 
 ```bash
 cd /workspace/symbolu/experiments/primitive_sequence_recovery
 git fetch origin claude/symbolu-adversarial-eval-zevb4h && git checkout claude/symbolu-adversarial-eval-zevb4h && git pull
-
-python3 - <<'PY'
-import json, hashlib, pathlib, datetime
-import run_b1_10_control_ext as R
-HERE=R.HERE
-d=json.loads((R.FROZEN/"b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED.json").read_text())
-# recompute every pinned hash against the live (hardened) files
-for k,rec in d["pinned_input_hashes"].items():
-    if "path" in rec: rec["sha256"]=hashlib.sha256((HERE/rec["path"]).read_bytes()).hexdigest()
-md=(HERE/"B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md").read_text(); block=md.split("```")[1].strip("\n")+"\n"
-d["pinned_input_hashes"]["approved_canonical_12_sentence_block"]["sha256"]=hashlib.sha256(block.encode()).hexdigest()
-d["provenance"]["declared_at_utc"]=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
-d["provenance"]["reissue_note"]="Re-issued on the hardened runner commit before the real run (Step 0)."
-out=R.FROZEN/"b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED_REISSUED.json"
-out.write_text(json.dumps(d,ensure_ascii=False,indent=2))
-print("REISSUED_DECL", out)
-print("REISSUED_SHA", hashlib.sha256(out.read_bytes()).hexdigest())
-PY
+# the hardened declaration pins this exact runner; if you later change the runner, re-issue the declaration.
 ```
 
-Record `REISSUED_SHA`; pass it as `--expect-decl-sha` everywhere below. (Do **not** edit the Step-2 file.)
-
-## Step 1 — preflight (no judges, no model): inputs consistent with the declaration
+## Step 1 — preflight (no judges, no model): inputs consistent with the hardened declaration
 
 ```bash
 python3 run_b1_10_control_ext.py preflight \
-    --decl frozen/b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED_REISSUED.json \
+    --decl frozen/b1_10_control_ext_v3_HARDENED_EVIDENCE_FREEZE_DECLARED.json \
     --items frozen/b1_10_control_ext_items_v3_qwen.json \
     --seed 20260712 \
-    --expect-decl-sha <REISSUED_SHA>
+    --expect-decl-sha e71889d44e90a86e11fb5fbe3a1db3d49b03db630aaba35d8a00233f596e0181
 # expect: {"preflight":"PASS", ..., "n_cells":72, "expected_total_ratings":216}
 ```
 
@@ -101,8 +88,9 @@ print("RUN_OK", man["run_id"], "ratings", man["n_ratings_collected"], "revs", ma
 ```bash
 export HF_HOME=/workspace/hf_cache HF_HUB_DISABLE_XET=1
 python3 run_b1_10_v3_judges.py \
-    --decl frozen/b1_10_control_ext_v3_EVIDENCE_FREEZE_DECLARED_REISSUED.json \
-    --seed 20260712 --run-id run01 --expect-decl-sha <REISSUED_SHA>
+    --decl frozen/b1_10_control_ext_v3_HARDENED_EVIDENCE_FREEZE_DECLARED.json \
+    --seed 20260712 --run-id run01 \
+    --expect-decl-sha e71889d44e90a86e11fb5fbe3a1db3d49b03db630aaba35d8a00233f596e0181
 # writes runs/b1_10_control_ext_v3_run_run01/{<judge>/{E01.raw.txt..,parsed_ratings.json,per_judge_manifest.json},
 #         run_manifest.json, aggregation_inputs.json}
 ```
