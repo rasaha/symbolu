@@ -84,8 +84,8 @@ def _sha_file(p: pathlib.Path) -> str:
     return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
 
 
-def load_items() -> Dict:
-    return json.loads(ITEMS_FILE.read_text())
+def load_items(items_file: pathlib.Path = ITEMS_FILE) -> Dict:
+    return json.loads(pathlib.Path(items_file).read_text())
 
 
 # ------------------------------------------------------------------ 72 cells
@@ -159,14 +159,15 @@ class FakeJudge:
 
 # ------------------------------------------------------------------ freeze gate (real runs only; no decl exists yet)
 def run(mock: bool = True, judge=None, decl_path: Optional[pathlib.Path] = None, seed: int = DEFAULT_SEED,
-        out_dir: Optional[pathlib.Path] = None, write: bool = False) -> Dict:
+        out_dir: Optional[pathlib.Path] = None, write: bool = False,
+        items_file: pathlib.Path = ITEMS_FILE) -> Dict:
     if not mock:
         if decl_path is None or not pathlib.Path(decl_path).exists():
             raise PermissionError("real run requires a B1.10 control-ext evidence-freeze declaration (none exists yet)")
         if judge is None or getattr(judge, "is_real", False) is not True:
             raise PermissionError("real run requires a real judge backend (none supplied)")
     judge = judge or FakeJudge()
-    items = load_items()
+    items = load_items(items_file)
     cells = build_cells(items, seed=seed)
     _ = [make_judge_visible(c) for c in cells]        # asserts blinding on all 72
 
@@ -189,7 +190,7 @@ def run(mock: bool = True, judge=None, decl_path: Optional[pathlib.Path] = None,
         "representation_version": REPRESENTATION, "seed": seed,
         "judge_backend": getattr(judge, "backend", "custom"), "judge_is_real": bool(getattr(judge, "is_real", False)),
         "n_cells": len(cells), "n_rated": len(ratings), "n_failures": len(failures), "failures": failures,
-        "input_hashes": {"items": _sha_file(ITEMS_FILE), "v3_table": _sha_file(V3_TABLE_FILE),
+        "input_hashes": {"items": _sha_file(items_file), "v3_table": _sha_file(V3_TABLE_FILE),
                          "bridge_manifest": _sha_file(BRIDGE_MANIFEST_FILE), "decomposer": _sha_file(DECOMPOSER_FILE)},
         "b1_4b_prime_status": B1_4B_PRIME_STATUS, "track_b_status": "BLOCKED",
         "no_verdict_note": "Descriptive statistics only; no accept/reject or positive/null verdict label emitted.",
@@ -311,15 +312,20 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     dp = sub.add_parser("dry-check")
     dp.add_argument("--seed", type=int, default=DEFAULT_SEED); dp.add_argument("--out")
+    dp.add_argument("--items", default=None, help="items file to dry-check (default: original excluded-context file)")
     rp = sub.add_parser("run")
     rp.add_argument("--decl", required=True); rp.add_argument("--seed", type=int, default=DEFAULT_SEED)
     rp.add_argument("--out", required=True)
+    rp.add_argument("--items", default=None, help="approved items file for the real run")
     args = ap.parse_args(argv)
     if args.cmd == "dry-check":
-        part = run(mock=True, seed=args.seed, out_dir=pathlib.Path(args.out) if args.out else None, write=bool(args.out))
+        items_file = pathlib.Path(args.items) if args.items else ITEMS_FILE
+        part = run(mock=True, seed=args.seed, out_dir=pathlib.Path(args.out) if args.out else None,
+                   write=bool(args.out), items_file=items_file)
         agg = aggregate(part["ratings"])
-        diag = tier_identifiability(load_items())
+        diag = tier_identifiability(load_items(items_file))
         print(json.dumps({"mode": part["mode"], "n_cells": part["n_cells"], "n_rated": part["n_rated"],
+                          "items_file": items_file.name,
                           "judge_is_real": part["judge_is_real"], "status": agg["status"],
                           "aggregate": agg["aggregate"], "tier_style_loo_accuracy": diag["style_only_loo_accuracy"],
                           "chance": diag["chance"],

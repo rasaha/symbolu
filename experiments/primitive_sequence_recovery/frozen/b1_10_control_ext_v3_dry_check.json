@@ -1,0 +1,39 @@
+{
+  "artifact": "b1_10_control_ext_v3_qwen_REBUILD_VERIFICATION",
+  "note": "Mock/dry-check verification of the approved-v3 items rebuild. NO judges, NO real model, NO freeze, NO statistics from real ratings.",
+  "approved_context_file": "B1_10_OFFICIAL_CONTEXTS_v3_QWEN.md",
+  "approved_context_file_sha256": "ea25d27eef9d99138ed3ea3cc289783441cb6e327577694822e92fc51116a103",
+  "approved_context_block_sha256": "e0a1477ebaaf41df95b489b7547a895369f115d5231c424fc8598d4f598c3046",
+  "v3_items_file": "frozen/b1_10_control_ext_items_v3_qwen.json",
+  "v3_items_sha256": "885fc2f95627b0d35612ef5acdfedde2e5f068b8fac577a373b05f2f4ec04f3a",
+  "original_excluded_items_sha256_UNCHANGED": "df76b7feb1aa8534f5bd62c57b429478f8ea523911ad0bd6bb38f556f2a00ba9",
+  "cell_verification": {
+    "n_cells": 72,
+    "unique_combos": 72,
+    "exactly_72": true,
+    "ids_contiguous": true,
+    "design": "6 words x 2 contexts x 3 tiers x 2 poles"
+  },
+  "dry_check": {
+    "mode": "MOCK",
+    "judge_is_real": false,
+    "n_rated": 72,
+    "status": "complete",
+    "note": "FakeJudge scores meaningless; no verdict"
+  },
+  "tier_identifiability_style_loo_accuracy": 0.333,
+  "tier_identifiability_chance": 0.333,
+  "tier2_tier3_content_jaccard": {
+    "pride": 0.0299,
+    "freedom": 0.0286,
+    "patience": 0.0227,
+    "courage": 0.0308,
+    "control": 0.037,
+    "doubt": 0.0141
+  },
+  "jaccard_cap": 0.2,
+  "register_parity_ok": true,
+  "leakage_packet_leaks": 0,
+  "no_real_judge_called": true,
+  "guardrails": "no GENUTILITY_*; no ONTOLOGICAL_SIGNAL; B1.4b' NULL_RETURN_BOTTOM; Track B blocked; structure, not validated meaning"
+}

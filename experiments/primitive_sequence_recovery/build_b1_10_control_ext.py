@@ -141,7 +141,13 @@ def _jaccard(a: set, b: set) -> float:
     return (len(a & b) / len(a | b)) if (a | b) else 0.0
 
 
-def build() -> Dict:
+def build(contexts: Dict = CONTEXTS, items_out: pathlib.Path = ITEMS_OUT,
+          provenance: Dict = None) -> Dict:
+    """Build the control-ext items. Defaults reproduce the original (excluded dev-context) file
+    byte-for-byte. Pass `contexts` + `items_out` (+ optional `provenance` merged into the doc) to
+    build a separately-labeled variant (e.g. the approved v3 Qwen contexts) WITHOUT touching the
+    original. Packets (all three tiers), poles, words, cell design, and overlap/style rules are
+    unchanged — only which context sentence sits at each (word, pole) changes."""
     table = json.loads(V3_TABLE.read_text())["varnas"]
     words = []
     for w in WORDS:
@@ -169,7 +175,7 @@ def build() -> Dict:
         assert jac <= JACCARD_CAP, f"{w}: Tier2/Tier3 content Jaccard {jac} > {JACCARD_CAP}"
         words.append({
             "word": w, "varna_sequence": seq, "facet_count": n,
-            "contexts": CONTEXTS[w], "expected_pole": EXPECTED_POLE,
+            "contexts": contexts[w], "expected_pole": EXPECTED_POLE,
             "packets": {"valence": val, "source_condition": sc, "specific": spec},
             "tier2_tier3_content_jaccard": jac,
         })
@@ -202,7 +208,9 @@ def build() -> Dict:
         "b1_4b_prime_status": "NULL_RETURN_BOTTOM", "track_b_status": "BLOCKED",
         "n_words": len(words), "words": words,
     }
-    ITEMS_OUT.write_text(json.dumps(doc, ensure_ascii=False, indent=2))
+    if provenance:
+        doc.update(provenance)
+    pathlib.Path(items_out).write_text(json.dumps(doc, ensure_ascii=False, indent=2))
     return doc
 
 
