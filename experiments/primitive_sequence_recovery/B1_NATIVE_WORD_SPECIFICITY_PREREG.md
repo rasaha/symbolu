@@ -14,6 +14,12 @@ hashes: `native_word_specificity_prereg/freeze_index.json`. **Structure, not val
 A **word-identity discrimination** test. **Not** a test of: valence, pole legibility, metaphysical truth, Sanskrit
 privilege, ontology, individual-varṇa causality, or full-word semantic reconstruction.
 
+## Canonical hidden input & candidate-gloss policy (binding clarifications)
+
+> Devanāgarī remains the canonical hidden input used to construct packets. English glosses are displayed only as semantically readable candidate labels and are never parsed or decomposed.
+
+> Every candidate label must use a short, neutral, independently sourced dictionary gloss. No poetic, interpretive, etymological, or mechanism-specific translation is permitted.
+
 ## Frozen inputs (packets: confirmatory backbone only)
 
 Frozen Stage-1 parser (schema 1.1); `frozen/varna_native_stage1_merged_v1.json`; v3.1 consonant source; native
@@ -35,8 +41,8 @@ consonant-only packet (its vocalic ṛ never enters). **A positive result may no
 ## Task design — closed six-way forced choice
 
 Each trial: present **one rendered packet** → present the **six candidates** as **anonymized IDs (W1–W6, order
-randomized per trial from a frozen seed) + independently-sourced ENGLISH dictionary glosses only** (e.g. "a horse",
-"strength / power", "fear", "suffering / pain", "an elephant", "a cloud") → require exactly **one** choice. **No
+randomized per trial from a frozen seed) + independently-sourced ENGLISH dictionary glosses only** (e.g. "horse",
+"strength", "fear", "pain", "elephant", "cloud" — one neutral independently-sourced dictionary sense each) → require exactly **one** choice. **No
 open-ended plausibility prose as the endpoint.** No Devanāgarī / IAST / spelling is ever shown, so the task **cannot
 be solved by matching visible phonemes**.
 
