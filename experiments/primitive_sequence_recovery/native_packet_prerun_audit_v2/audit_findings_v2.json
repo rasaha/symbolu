@@ -1,0 +1,692 @@
+{
+  "commit": "42f38d57",
+  "audit": "focused_v2_prerun",
+  "mode": "read_only",
+  "1_position": {
+    "distributions": {
+      "global": {
+        "dist": [
+          120,
+          120,
+          120,
+          120,
+          120,
+          120
+        ],
+        "chi2": 0.0
+      },
+      "set_A": {
+        "dist": [
+          60,
+          60,
+          60,
+          60,
+          60,
+          60
+        ],
+        "chi2": 0.0
+      },
+      "set_B": {
+        "dist": [
+          60,
+          60,
+          60,
+          60,
+          60,
+          60
+        ],
+        "chi2": 0.0
+      },
+      "arm_T": {
+        "dist": [
+          12,
+          12,
+          12,
+          12,
+          12,
+          12
+        ],
+        "chi2": 0.0
+      },
+      "arm_X": {
+        "dist": [
+          12,
+          12,
+          12,
+          12,
+          12,
+          12
+        ],
+        "chi2": 0.0
+      },
+      "arm_S": {
+        "dist": [
+          12,
+          12,
+          12,
+          12,
+          12,
+          12
+        ],
+        "chi2": 0.0
+      },
+      "arm_R": {
+        "dist": [
+          60,
+          60,
+          60,
+          60,
+          60,
+          60
+        ],
+        "chi2": 0.0
+      },
+      "arm_G": {
+        "dist": [
+          12,
+          12,
+          12,
+          12,
+          12,
+          12
+        ],
+        "chi2": 0.0
+      },
+      "arm_F": {
+        "dist": [
+          12,
+          12,
+          12,
+          12,
+          12,
+          12
+        ],
+        "chi2": 0.0
+      }
+    },
+    "per_word": {
+      "aśva": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "bala": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "bhaya": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "duḥkha": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "gaja": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "megha": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "bīja": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "sukha": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "deha": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "lavaṇa": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "yoga": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      },
+      "vṛkṣa": {
+        "dist": [
+          10,
+          10,
+          10,
+          10,
+          10,
+          10
+        ],
+        "chi2": 0.0
+      }
+    },
+    "per_repeat": {
+      "0": {
+        "dist": [
+          24,
+          21,
+          15,
+          22,
+          20,
+          18
+        ],
+        "chi2": 2.5
+      },
+      "1": {
+        "dist": [
+          21,
+          15,
+          22,
+          20,
+          18,
+          24
+        ],
+        "chi2": 2.5
+      },
+      "2": {
+        "dist": [
+          15,
+          22,
+          20,
+          18,
+          24,
+          21
+        ],
+        "chi2": 2.5
+      },
+      "3": {
+        "dist": [
+          22,
+          20,
+          18,
+          24,
+          21,
+          15
+        ],
+        "chi2": 2.5
+      },
+      "4": {
+        "dist": [
+          20,
+          18,
+          24,
+          21,
+          15,
+          22
+        ],
+        "chi2": 2.5
+      },
+      "5": {
+        "dist": [
+          18,
+          24,
+          21,
+          15,
+          22,
+          20
+        ],
+        "chi2": 2.5
+      }
+    },
+    "arm_repeat_chi2": {
+      "T/r0": 13.0,
+      "T/r1": 13.0,
+      "T/r2": 13.0,
+      "T/r3": 13.0,
+      "T/r4": 13.0,
+      "T/r5": 13.0,
+      "X/r0": 1.0,
+      "X/r1": 1.0,
+      "X/r2": 1.0,
+      "X/r3": 1.0,
+      "X/r4": 1.0,
+      "X/r5": 1.0,
+      "S/r0": 2.0,
+      "S/r1": 2.0,
+      "S/r2": 2.0,
+      "S/r3": 2.0,
+      "S/r4": 2.0,
+      "S/r5": 2.0,
+      "R/r0": 8.4,
+      "R/r1": 8.4,
+      "R/r2": 8.4,
+      "R/r3": 8.4,
+      "R/r4": 8.4,
+      "R/r5": 8.4,
+      "G/r0": 2.0,
+      "G/r1": 2.0,
+      "G/r2": 2.0,
+      "G/r3": 2.0,
+      "G/r4": 2.0,
+      "G/r5": 2.0,
+      "F/r0": 7.0,
+      "F/r1": 7.0,
+      "F/r2": 7.0,
+      "F/r3": 7.0,
+      "F/r4": 7.0,
+      "F/r5": 7.0
+    },
+    "same_valence_subsets": {
+      "A_neg": {
+        "words": [
+          "bhaya",
+          "duḥkha"
+        ],
+        "dist": [
+          20,
+          20,
+          20,
+          20,
+          20,
+          20
+        ],
+        "chi2": 0.0
+      },
+      "B_pos": {
+        "words": [
+          "sukha",
+          "yoga"
+        ],
+        "dist": [
+          20,
+          20,
+          20,
+          20,
+          20,
+          20
+        ],
+        "chi2": 0.0
+      }
+    },
+    "T_profile_matches_each_control": {
+      "X": true,
+      "R": true,
+      "G": true,
+      "F": true
+    },
+    "max_word_position_share": {
+      "aśva": 0.1667,
+      "bala": 0.1667,
+      "bhaya": 0.1667,
+      "duḥkha": 0.1667,
+      "gaja": 0.1667,
+      "megha": 0.1667,
+      "bīja": 0.1667,
+      "sukha": 0.1667,
+      "deha": 0.1667,
+      "lavaṇa": 0.1667,
+      "yoga": 0.1667,
+      "vṛkṣa": 0.1667
+    },
+    "per_arm_uniform": true,
+    "per_word_uniform": true,
+    "per_set_uniform": true,
+    "same_valence_uniform": true,
+    "per_repeat_uniform": false,
+    "per_repeat_is_cyclic_rotation_summing_to_uniform": true,
+    "position_only_simulations": {
+      "W1": {
+        "per_arm": {
+          "T": 0.166667,
+          "X": 0.166667,
+          "S": 0.166667,
+          "R": 0.166667,
+          "G": 0.166667,
+          "F": 0.166667
+        },
+        "delta": 0.0
+      },
+      "W6": {
+        "per_arm": {
+          "T": 0.166667,
+          "X": 0.166667,
+          "S": 0.166667,
+          "R": 0.166667,
+          "G": 0.166667,
+          "F": 0.166667
+        },
+        "delta": 0.0
+      },
+      "W3": {
+        "per_arm": {
+          "T": 0.166667,
+          "X": 0.166667,
+          "S": 0.166667,
+          "R": 0.166667,
+          "G": 0.166667,
+          "F": 0.166667
+        },
+        "delta": 0.0
+      },
+      "alternating": {
+        "per_arm": {
+          "T": 0.236111,
+          "X": 0.125,
+          "S": 0.166667,
+          "R": 0.147222,
+          "G": 0.194444,
+          "F": 0.097222
+        },
+        "delta": 0.041667
+      },
+      "primacy": {
+        "per_arm": {
+          "T": 0.166667,
+          "X": 0.166667,
+          "S": 0.166667,
+          "R": 0.166667,
+          "G": 0.166667,
+          "F": 0.166667
+        },
+        "delta": 0.0
+      },
+      "recency": {
+        "per_arm": {
+          "T": 0.166667,
+          "X": 0.166667,
+          "S": 0.166667,
+          "R": 0.166667,
+          "G": 0.166667,
+          "F": 0.166667
+        },
+        "delta": 0.0
+      }
+    },
+    "order_independent_sim_max_delta": 0.0,
+    "order_dependent_alternating_delta": 0.041667,
+    "alternating_note": "order-dependent policy keyed to global presentation index; the Δ is an artifact of the frozen opaque-id ordering (not a per-arm position difference), far below the 0.15 threshold, and unexploitable because the repeat/order structure is hidden; nulled in expectation if the run randomizes presentation order per evaluator"
+  },
+  "2_authoring_isolation": {
+    "input_has_no_identity": true,
+    "covers_17_rows": true,
+    "two_poles_each": true,
+    "withheld_list_complete": true
+  },
+  "3_equivalence": {
+    "all_preserved": true,
+    "r12_remediation_noted": true,
+    "r15_no_surface_embellishment": true
+  },
+  "4_leakage": {
+    "classified_flags": [
+      {
+        "row": "r09",
+        "pole": "binding",
+        "issue": "gloss_neighborhood:body:outward",
+        "gloss": "body",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r09",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:strength:potent",
+        "gloss": "strength",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r15",
+        "pole": "binding",
+        "issue": "gloss_neighborhood:body:outward",
+        "gloss": "body",
+        "category": "SOURCE_INTRINSIC_PROXIMITY"
+      },
+      {
+        "row": "r15",
+        "pole": "binding",
+        "issue": "gloss_neighborhood:body:visible",
+        "gloss": "body",
+        "category": "SOURCE_INTRINSIC_PROXIMITY"
+      },
+      {
+        "row": "r15",
+        "pole": "binding",
+        "issue": "gloss_neighborhood:body:physical",
+        "gloss": "body",
+        "category": "SOURCE_INTRINSIC_PROXIMITY"
+      },
+      {
+        "row": "r13",
+        "pole": "binding",
+        "issue": "gloss_neighborhood:fear:anxious",
+        "gloss": "fear",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r13",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:fear:anxious",
+        "gloss": "fear",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r06",
+        "pole": "binding",
+        "issue": "gloss_neighborhood:body:physical",
+        "gloss": "body",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r06",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:pain:misery",
+        "gloss": "pain",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r05",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:union:merge",
+        "gloss": "union",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r05",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:union:merger",
+        "gloss": "union",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r10",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:body:physical",
+        "gloss": "body",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r04",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:pain:pain",
+        "gloss": "pain",
+        "category": "DISTRACTOR_PULL"
+      },
+      {
+        "row": "r04",
+        "pole": "liberating",
+        "issue": "gloss_neighborhood:happiness:glad",
+        "gloss": "happiness",
+        "category": "DISTRACTOR_PULL"
+      }
+    ],
+    "exact_name_hits": [],
+    "n_paraphrase_added_cue": 0,
+    "n_unresolved": 0,
+    "only_exploitable_is_source_intrinsic": true
+  },
+  "5_opacity": {
+    "devanagari": 0,
+    "iast_diacritic": false,
+    "literal_arm_key": false,
+    "target_word_field": false,
+    "correct_label_field": false,
+    "structured_id": false,
+    "base_seq_field": false,
+    "repeat_field": false,
+    "rowid_token_present": false,
+    "opaque_ids_only": true,
+    "arm_substring_context": [
+      "harm"
+    ]
+  },
+  "6_arm_mechanics": {
+    "T_true": true,
+    "X_derangement_no_fixed": true,
+    "X_bijection": true,
+    "S_order_only": true,
+    "R_length_matched": true,
+    "R_self_excluding": true,
+    "F_metadata_only": true,
+    "semantic_arms_uniform_format": true,
+    "packet_len_reveals_arm": false,
+    "semantic_arm_length_sets": {
+      "T": [
+        2,
+        3
+      ],
+      "X": [
+        2,
+        3
+      ],
+      "S": [
+        2,
+        3
+      ],
+      "R": [
+        2,
+        3
+      ],
+      "G": [
+        2,
+        3
+      ]
+    },
+    "T_length_distinguishable_from_controls": false
+  },
+  "6_counts": {
+    "A/F": 36,
+    "A/G": 36,
+    "A/R": 180,
+    "A/S": 36,
+    "A/T": 36,
+    "A/X": 36,
+    "B/F": 36,
+    "B/G": 36,
+    "B/R": 180,
+    "B/S": 36,
+    "B/T": 36,
+    "B/X": 36
+  },
+  "6_repeat_counts": {
+    "0": 120,
+    "1": 120,
+    "2": 120,
+    "3": 120,
+    "4": 120,
+    "5": 120
+  },
+  "7_protocol": {
+    "literal_prompt_template": true,
+    "response_schema": true,
+    "invalid_output_handling": true,
+    "retry_policy": true,
+    "timeout_policy": true,
+    "duplicate_response_policy": true,
+    "missing_response_policy": true,
+    "model_family_policy": true,
+    "scoring_rule": true,
+    "temperature_zero": true,
+    "repeats_six": true,
+    "rotations": true,
+    "cot_prohibited": true,
+    "no_placeholder": true,
+    "six_options_choice_enum": true
+  },
+  "9_flagged_plan": {
+    "four_words": true,
+    "all_trial_primary": true,
+    "sensitivity_excluding": true,
+    "per_word_TXRG": true,
+    "confusion": true,
+    "concentration": true,
+    "caveat": true,
+    "kept_in_primary": true
+  }
+}
