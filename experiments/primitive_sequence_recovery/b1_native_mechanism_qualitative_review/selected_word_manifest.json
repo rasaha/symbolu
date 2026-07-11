@@ -1,0 +1,174 @@
+{
+  "selection_rule": "Fixed before inspecting fit: the 10 required known examples + fillers chosen to cover a phonological×semantic category matrix (abstract/concrete/mental/action × positive/negative/neutral × short/long/diphthong vowels × aspiration/conjunct/anusvāra/visarga/missing-ṛ). Fillers chosen by category need, NOT by apparent fit.",
+  "selected": {
+    "śānti": [
+      "mental/abstract",
+      "positive",
+      "peace",
+      "long ā, conjunct, sibilant"
+    ],
+    "sukha": [
+      "mental",
+      "positive",
+      "happiness/ease",
+      "short u, aspirate kh"
+    ],
+    "bala": [
+      "abstract",
+      "positive",
+      "strength",
+      "short a (repeated inherent)"
+    ],
+    "jñāna": [
+      "abstract",
+      "positive",
+      "knowledge",
+      "jña conjunct, long ā"
+    ],
+    "kṣamā": [
+      "abstract",
+      "positive",
+      "patience/forbearance",
+      "kṣa conjunct, long ā"
+    ],
+    "sattva": [
+      "abstract",
+      "positive",
+      "goodness/being (guṇa)",
+      "gemination t+t"
+    ],
+    "mokṣa": [
+      "abstract",
+      "positive",
+      "liberation",
+      "vowel o, kṣa conjunct"
+    ],
+    "ahiṃsā": [
+      "abstract",
+      "positive",
+      "nonviolence",
+      "anusvāra + long ā"
+    ],
+    "satya": [
+      "abstract",
+      "positive",
+      "truth",
+      "conjunct ty"
+    ],
+    "dharma": [
+      "abstract",
+      "positive",
+      "righteousness/sustaining",
+      "aspirate dh, repha"
+    ],
+    "yoga": [
+      "process/abstract",
+      "positive",
+      "union/discipline",
+      "vowel o"
+    ],
+    "ānanda": [
+      "emotional",
+      "positive",
+      "bliss",
+      "long ā onset, nd"
+    ],
+    "deva": [
+      "concrete/abstract",
+      "positive",
+      "deity",
+      "diphthong e"
+    ],
+    "duḥkha": [
+      "mental",
+      "negative",
+      "suffering",
+      "visarga + aspirate"
+    ],
+    "bhaya": [
+      "emotional",
+      "negative",
+      "fear",
+      "aspirate bh"
+    ],
+    "krodha": [
+      "emotional",
+      "negative",
+      "anger",
+      "aspirate dh, vowel o"
+    ],
+    "moha": [
+      "mental",
+      "negative",
+      "delusion",
+      "vowel o"
+    ],
+    "kāma": [
+      "mental",
+      "negative",
+      "desire",
+      "long ā"
+    ],
+    "māyā": [
+      "abstract",
+      "negative",
+      "illusion",
+      "long ā×2"
+    ],
+    "agni": [
+      "concrete",
+      "neutral",
+      "fire",
+      "independent-vowel onset"
+    ],
+    "jala": [
+      "concrete",
+      "neutral",
+      "water",
+      "short a (repeated)"
+    ],
+    "nara": [
+      "concrete",
+      "neutral",
+      "man/person",
+      "short a (repeated)"
+    ],
+    "namaḥ": [
+      "action",
+      "neutral",
+      "salutation",
+      "final visarga"
+    ],
+    "saṃskāra": [
+      "process",
+      "neutral",
+      "impression/refinement",
+      "anusvāra"
+    ],
+    "hṛdaya": [
+      "concrete/abstract",
+      "positive",
+      "heart",
+      "MISSING vocalic ṛ"
+    ],
+    "saṃskṛta": [
+      "abstract",
+      "neutral",
+      "refined/Sanskrit",
+      "anusvāra + MISSING ṛ"
+    ],
+    "mṛtyu": [
+      "abstract",
+      "negative",
+      "death",
+      "MISSING ṛ + conjunct"
+    ],
+    "kṛṣṇa": [
+      "concrete",
+      "neutral",
+      "dark / a name",
+      "MISSING ṛ + conjuncts"
+    ]
+  },
+  "manifest_hash": "ecead77c73a0d8db0bbe7087d22b3a1965a9b7ade2d4aa6217581d846ce95be8"
+}

@@ -1,0 +1,81 @@
+{
+  "candidates": [
+    {
+      "id": "ORDERED_FACET_SEQUENCE",
+      "consistency": "low (long generic lists)",
+      "parameter_count": "low",
+      "post_hoc_flexibility": "high (both poles available)",
+      "preserves_order": "records but does not use order",
+      "vowel_treatment": "includes generic 'a' padding",
+      "falsifiability": "low",
+      "failure_modes": "Barnum; valence via polarity only",
+      "supported_or_invented": "the current default; not source-grounded"
+    },
+    {
+      "id": "ONSET_SEED_PLUS_TRANSFORMERS",
+      "consistency": "low",
+      "parameter_count": "medium",
+      "post_hoc_flexibility": "high",
+      "preserves_order": "partial (privileges position 0)",
+      "vowel_treatment": "unclear",
+      "falsifiability": "medium",
+      "failure_modes": "onset consonant rarely seeds the word's meaning (ś≠peace)",
+      "supported_or_invented": "invented (mirrors the English apparatus)"
+    },
+    {
+      "id": "CONSONANT_BACKBONE_WITH_VOWEL_MODULATION",
+      "consistency": "medium",
+      "parameter_count": "medium",
+      "post_hoc_flexibility": "medium",
+      "preserves_order": "yes",
+      "vowel_treatment": "vowels modulate, drop generic 'a' padding (cleanest)",
+      "falsifiability": "medium",
+      "failure_modes": "consonant themes still broad; polarity still ambiguous",
+      "supported_or_invented": "partially source-aligned (v3.1 backbone)"
+    },
+    {
+      "id": "AKSHARA_LOCAL_COMPOSITION",
+      "consistency": "unknown",
+      "parameter_count": "high",
+      "post_hoc_flexibility": "high",
+      "preserves_order": "yes (within/between akṣara)",
+      "vowel_treatment": "vowel bound to its akṣara consonant",
+      "falsifiability": "low (large space)",
+      "failure_modes": "no source rule for akṣara-level meaning",
+      "supported_or_invented": "invented"
+    },
+    {
+      "id": "DOMINANT_OR_DIAGNOSTIC_VARNA",
+      "consistency": "low",
+      "parameter_count": "low-medium",
+      "post_hoc_flexibility": "very high",
+      "preserves_order": "discards most units",
+      "vowel_treatment": "usually drops vowels",
+      "falsifiability": "low",
+      "failure_modes": "maximal cherry-pick; which varṇa 'dominates' is post-hoc",
+      "supported_or_invented": "invented"
+    },
+    {
+      "id": "BIDIRECTIONAL_POLARITY_PATH",
+      "consistency": "medium (valence-coupled)",
+      "parameter_count": "low",
+      "post_hoc_flexibility": "LOW (poles fixed per whole-word trajectory, not mixed per unit)",
+      "preserves_order": "yes",
+      "vowel_treatment": "included in both trajectories",
+      "falsifiability": "HIGH",
+      "failure_modes": "our data: the valence-matched trajectory reads coherently, the mismatched one contradicts — so it only predicts VALENCE (1 bit), not word identity",
+      "supported_or_invented": "testable; the only non-cherry-pick option"
+    },
+    {
+      "id": "NULL_OR_NO_COMPOSITION",
+      "consistency": "n/a",
+      "parameter_count": "zero",
+      "post_hoc_flexibility": "none",
+      "preserves_order": "n/a",
+      "vowel_treatment": "n/a",
+      "falsifiability": "n/a",
+      "failure_modes": "consistent with the prior NO_SIGNAL and the generic finding here",
+      "supported_or_invented": "the honest null the evidence currently favours"
+    }
+  ]
+}

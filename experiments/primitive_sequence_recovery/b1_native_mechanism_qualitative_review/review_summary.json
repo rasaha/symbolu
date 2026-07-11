@@ -1,0 +1,105 @@
+{
+  "artifact_type": "native_mechanism_qualitative_review",
+  "grade": "DEVELOPMENT_ONLY",
+  "source_word_mappings": "b1_native_word_mapping_review/word_mappings.json (commit 2fbdecc3)",
+  "selection_rule": "Fixed before inspecting fit: the 10 required known examples + fillers chosen to cover a phonological×semantic category matrix (abstract/concrete/mental/action × positive/negative/neutral × short/long/diphthong vowels × aspiration/conjunct/anusvāra/visarga/missing-ṛ). Fillers chosen by category need, NOT by apparent fit.",
+  "selected_words": [
+    "śānti",
+    "sukha",
+    "bala",
+    "jñāna",
+    "kṣamā",
+    "sattva",
+    "mokṣa",
+    "ahiṃsā",
+    "satya",
+    "dharma",
+    "yoga",
+    "ānanda",
+    "deva",
+    "duḥkha",
+    "bhaya",
+    "krodha",
+    "moha",
+    "kāma",
+    "māyā",
+    "agni",
+    "jala",
+    "nara",
+    "namaḥ",
+    "saṃskāra",
+    "hṛdaya",
+    "saṃskṛta",
+    "mṛtyu",
+    "kṛṣṇa"
+  ],
+  "views": [
+    "A_full_binding",
+    "B_full_liberating",
+    "C_consonant_binding",
+    "D_consonant_liberating",
+    "E_typed_mixed"
+  ],
+  "fit_taxonomy": {
+    "DIRECTLY_SPECIFIC": "the sequence names something distinctive to THIS word, not shared by many words",
+    "PLAUSIBLY_RELATED": "valence/theme-consistent with the word, but broad (shared across its valence class) — NOT word-specific",
+    "GENERIC_OR_BARNUM": "facets are broad human themes that fit many unrelated words",
+    "PARTIALLY_CONTRADICTORY": "the fixed-polarity reading opposes the word's conventional valence/meaning in part",
+    "STRONGLY_CONTRADICTORY": "the reading is the strict opposite of the word's meaning unit-by-unit",
+    "UNINTERPRETABLE_DUE_TO_MISSING_UNIT": "a unit (vocalic ṛ) has no mapping, leaving a hole in the sequence"
+  },
+  "view_fit_distribution": {
+    "A_full_binding": {
+      "PARTIALLY_CONTRADICTORY": 13,
+      "PLAUSIBLY_RELATED": 6,
+      "GENERIC_OR_BARNUM": 5,
+      "UNINTERPRETABLE_DUE_TO_MISSING_UNIT": 4
+    },
+    "B_full_liberating": {
+      "PLAUSIBLY_RELATED": 13,
+      "PARTIALLY_CONTRADICTORY": 6,
+      "GENERIC_OR_BARNUM": 5,
+      "UNINTERPRETABLE_DUE_TO_MISSING_UNIT": 4
+    },
+    "C_consonant_binding": {
+      "PARTIALLY_CONTRADICTORY": 13,
+      "PLAUSIBLY_RELATED": 6,
+      "GENERIC_OR_BARNUM": 5,
+      "UNINTERPRETABLE_DUE_TO_MISSING_UNIT": 4
+    },
+    "D_consonant_liberating": {
+      "PLAUSIBLY_RELATED": 13,
+      "PARTIALLY_CONTRADICTORY": 6,
+      "GENERIC_OR_BARNUM": 5,
+      "UNINTERPRETABLE_DUE_TO_MISSING_UNIT": 4
+    },
+    "E_typed_mixed": {
+      "GENERIC_OR_BARNUM": 24,
+      "UNINTERPRETABLE_DUE_TO_MISSING_UNIT": 4
+    }
+  },
+  "adversarial_control": {
+    "claim": "PLAUSIBLY_RELATED is a valence-class property, NOT word-specific discrimination.",
+    "demonstration": "Positive-abstract words (śānti, sattva, bala, satya) all receive the SAME PLAUSIBLY_RELATED class under View D — their liberating consonant backbones are interchangeable broad themes ('sublimation', 'de-fascination', 'cessation of dullness', 'raw potential'); swapping the gloss label does not change which reading 'fits'. Same-length negative words flip only which polarity reads coherently (1 bit), not the content."
+  },
+  "conclusions": {
+    "most_specific_words": "NONE reach DIRECTLY_SPECIFIC. The least-generic are positive-abstract words under the consonant liberating view (śānti, mokṣa, kṣamā) — but only PLAUSIBLY_RELATED (valence-level).",
+    "most_generic_words": [
+      "bala",
+      "jala",
+      "nara",
+      "kāma",
+      "agni"
+    ],
+    "contradicting_words": "valence-mismatched fixed polarity: sukha/śānti/… under binding; duḥkha/mṛtyu under liberating.",
+    "vowels_improve_or_worsen_specificity": "WORSEN — the ubiquitous 'a' pads every word with a generic positive theme and injects contradictions into negative words.",
+    "order_appears_important": false,
+    "one_polarity_consistently_better": false,
+    "consonant_only_vs_full_typed_differ_materially": true,
+    "any_candidate_ready_for_preregistration": false,
+    "mappings_too_flexible_for_fair_rule": true
+  },
+  "prior_no_signal_preserved": "varna_lens/RESULTS_ACOUSTIC_SIGNAL.md + …_CORRECTED_LEXICON.md (NO_SIGNAL ×2); not overturned.",
+  "development_verdict": "MAPPINGS_TOO_GENERIC_FOR_COMPOSITION_PREREGISTRATION",
+  "verdict_reason": "Under one uniform rule across all 28 words, 'fit' reduces to a single bit — whether the fixed polarity matches the word's valence. No view yields DIRECTLY_SPECIFIC for any word; valence-matched views are PLAUSIBLY_RELATED but interchangeable across a valence class (adversarial control), valence-mismatched fixed polarity is PARTIALLY_CONTRADICTORY, neutral/concrete referents and all typed-mixed readings are GENERIC_OR_BARNUM, and four vocalic-ṛ words are UNINTERPRETABLE. The mappings encode valence-via-polarity, not word identity — too generic/flexible for a fair composition pre-registration. Consistent with the prior NO_SIGNAL."
+}
