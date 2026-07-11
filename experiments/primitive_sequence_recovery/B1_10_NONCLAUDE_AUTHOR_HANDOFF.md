@@ -1,5 +1,12 @@
 # B1.10 — Non-Claude Context-Author Handoff (docs-only)
 
+> **AUTHORING MECHANICS SUPERSEDED (authoritative):** the single-shot six-word authoring in §3–§5 is
+> **superseded** by the per-word decomposition + escalation ladder in
+> `B1_10_PERWORD_BLIND_AUTHORING_WORKFLOW.md` (both prior single-shot Qwen attempts failed the surface
+> validator on instruction-following, not content). The blinding, scope, and independence requirements
+> here (§1, §2, §5) still hold and are carried into the per-word workflow unchanged. The master packet
+> (`7e07e16b…`), surface rules, judges, statistics, and experiment number are unchanged.
+>
 > **WORKFLOW UPDATE (authoritative):** context files are Git-tracked **development artifacts**, not individually
 > evidence-frozen. §6–§7 below use the single-final-evidence-freeze model — see `B1_10_WORKFLOW_PROTOCOL_UPDATE.md`.
 
