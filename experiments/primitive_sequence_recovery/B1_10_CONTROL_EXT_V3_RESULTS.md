@@ -145,6 +145,59 @@ files hashing to the values above.
   external immutable storage), not by quietly bypassing `.gitignore`.
 - **Final evidence packaging is a distinct next decision** and is not performed here.
 
+## Appendix A — Audit / limitations (docs-only; no statistic changed, no re-run)
+
+This appendix records a methodological audit of the §5 result. **It changes no reported statistic and softens
+no conclusion**; it bounds *how* the decisive negative should be read.
+
+### A.1 Tier-2 coupling caveat
+
+The official contexts were authored **from** the generic Condition A/B definitions ("A: depends on comparison,
+approval, possession, control, fear of loss, rivalry, outside results, or other people's reactions"; "B:
+inward steadiness, non-comparison, autonomy, non-grasping, clarity, self-possession"). **Tier-2 restates those
+same definitions closely** — e.g. Tier-2 binding = *"a contingent mood that depends on how other people
+respond,"* *"a comparing tension that keeps sizing itself up against others"*; Tier-2 self = *"a self-resting
+calm that stays steady without needing anyone else,"* *"needs no outside result to feel whole."* Tier-2 is
+therefore, in effect, the **operationalized context-authoring rubric**. This gives Tier-2 a
+**stimulus-construction alignment advantage**: rating Tier-2 against these contexts is close to matching text
+to the specification the text was written from. **This likely inflates the magnitude of
+`increment_over_source_condition = −2.78`** (a less-coupled generic control would show a smaller gap).
+
+### A.2 On-axis fit table (correct packet on correct context; mean over 6 words, 0–6)
+
+| tier | binding-context fit Pb\|Cb | liberating-context fit Pl\|Cl |
+|---|---:|---:|
+| Tier-2 generic source-condition | 3.17 | 4.72 |
+| Tier-3 word-specific | 1.22 | 3.00 |
+| Tier-1 valence | 1.06 | 1.44 |
+
+### A.3 Why the coupling caveat does NOT reverse the result
+
+- **Tier-3 binding fit is independently weak** (1.22/6) — regardless of any control, the varṇa binding facets
+  do not describe the other-conditioned contexts well.
+- **pride (0.67), freedom (0.00), and doubt (0.67)** are especially poor on the binding side (Pb\|Cb): the
+  varṇa-derived affects (e.g. doubt → reactivity / careless-disregard / torpor) are simply not what the word's
+  other-conditioned meaning is about.
+- **Tier-3's positive signal comes mostly from generic liberating/steadiness language** (its liberating-pole
+  half is positive; its binding-pole half is ~0 or negative) — i.e. it rides the same broad "inner-steadiness"
+  cue Tier-2 already captures, not any word-specific content.
+- The **least-coupled comparison, `increment_over_valence` (valence is not the authoring axis), is only
+  weakly positive (+0.89)** — so even the fairer contrast does not indicate strong incremental packet value.
+- Therefore the current run **still does not support incremental packet value over generic source-condition
+  framing**; the coupling caveat bounds the *magnitude*, not the *sign*.
+
+### A.4 Measurement distinction (what run01 did and did not test)
+
+- **B1.10 run01 tested pole / source-condition discrimination** — can a packet tell a binding (other-
+  conditioned) context from a liberating (self-grounded) context? On that question the generic axis wins and
+  the varṇa packet does not add value.
+- **It did NOT directly test word-specificity** — whether a given word's Tier-3 packet fits *that word*
+  better than a *different* word's packet. Tier-2 is word-identical and the contexts are generic-pole, so the
+  design contains no cross-word cells.
+- **Pole legibility and word-specificity are separate hypotheses.** A clean word-specificity test is
+  pre-registered separately (see `B1_10_WORD_SPECIFICITY_PREREG.md`). Nothing in this appendix weakens the
+  §5–§8 conclusion for the hypothesis run01 actually tested.
+
 ## 11. Guardrails
 Docs-only results record. No re-run; no frozen input, declaration, panel, context, packet, control, runner, or
 statistic changed. Resonance / phonetic-fidelity refinement only. No `GENUTILITY_*`; no `ONTOLOGICAL_SIGNAL`;
