@@ -1,0 +1,104 @@
+{
+  "selected_words": [
+    "aśva",
+    "bala",
+    "bhaya",
+    "duḥkha",
+    "gaja",
+    "megha"
+  ],
+  "packets": {
+    "aśva": [
+      "v",
+      "ś"
+    ],
+    "bala": [
+      "b",
+      "l"
+    ],
+    "bhaya": [
+      "bh",
+      "y"
+    ],
+    "duḥkha": [
+      "d",
+      "kh"
+    ],
+    "gaja": [
+      "g",
+      "j"
+    ],
+    "megha": [
+      "gh",
+      "m"
+    ]
+  },
+  "cons_sequences": {
+    "aśva": [
+      "ś",
+      "v"
+    ],
+    "bala": [
+      "b",
+      "l"
+    ],
+    "bhaya": [
+      "bh",
+      "y"
+    ],
+    "duḥkha": [
+      "d",
+      "kh"
+    ],
+    "gaja": [
+      "g",
+      "j"
+    ],
+    "megha": [
+      "m",
+      "gh"
+    ]
+  },
+  "valence_balance": {
+    "aśva": "neut",
+    "bala": "pos",
+    "bhaya": "neg",
+    "duḥkha": "neg",
+    "gaja": "unknown",
+    "megha": "unknown"
+  },
+  "distinctiveness": {
+    "max_jaccard": 0.0,
+    "mean_jaccard": 0.0,
+    "unique_features": {
+      "aśva": [
+        "v",
+        "ś"
+      ],
+      "bala": [
+        "b",
+        "l"
+      ],
+      "bhaya": [
+        "bh",
+        "y"
+      ],
+      "duḥkha": [
+        "d",
+        "kh"
+      ],
+      "gaja": [
+        "g",
+        "j"
+      ],
+      "megha": [
+        "gh",
+        "m"
+      ]
+    },
+    "c56_length_not_identifying": true,
+    "c8_same_valence_pair": true,
+    "rare_only_unique_words": []
+  },
+  "verdict": "NATIVE_GATE_G0_PASS"
+}

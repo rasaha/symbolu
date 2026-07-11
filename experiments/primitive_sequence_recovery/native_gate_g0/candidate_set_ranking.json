@@ -1,0 +1,1159 @@
+{
+  "ranked_sets": [
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "gaja",
+        "megha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "gaja": [
+          "g",
+          "j"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "gaja",
+        "puṣpa"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "gaja": [
+          "g",
+          "j"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "gṛha",
+        "megha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "gṛha",
+        "puṣpa"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "jñāna",
+        "kāṣṭha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kāṣṭha": [
+          "k",
+          "ṣ",
+          "ṭh"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "jñāna",
+        "kṣudhā"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kṣudhā": [
+          "dh",
+          "k",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "duḥkha",
+        "megha",
+        "puṣpa"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "duḥkha": [
+          "d",
+          "kh"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gaja",
+        "megha",
+        "puṣpa"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gaja": [
+          "g",
+          "j"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gaja",
+        "megha",
+        "sukha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gaja": [
+          "g",
+          "j"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ],
+        "sukha": [
+          "kh",
+          "s"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gaja",
+        "puṣpa",
+        "sukha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gaja": [
+          "g",
+          "j"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ],
+        "sukha": [
+          "kh",
+          "s"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gṛha",
+        "jñāna",
+        "kāṣṭha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kāṣṭha": [
+          "k",
+          "ṣ",
+          "ṭh"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gṛha",
+        "jñāna",
+        "kṣudhā"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kṣudhā": [
+          "dh",
+          "k",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gṛha",
+        "megha",
+        "puṣpa"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gṛha",
+        "megha",
+        "sukha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ],
+        "sukha": [
+          "kh",
+          "s"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "gṛha",
+        "puṣpa",
+        "sukha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "gṛha": [
+          "g",
+          "h"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ],
+        "sukha": [
+          "kh",
+          "s"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "khaga",
+        "kāṣṭha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "khaga": [
+          "g",
+          "kh"
+        ],
+        "kāṣṭha": [
+          "k",
+          "ṣ",
+          "ṭh"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "khaga",
+        "kṣudhā"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "khaga": [
+          "g",
+          "kh"
+        ],
+        "kṣudhā": [
+          "dh",
+          "k",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "khaḍga",
+        "kāṣṭha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "khaḍga": [
+          "g",
+          "kh",
+          "ḍ"
+        ],
+        "kāṣṭha": [
+          "k",
+          "ṣ",
+          "ṭh"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "khaḍga",
+        "kṣudhā"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "khaḍga": [
+          "g",
+          "kh",
+          "ḍ"
+        ],
+        "kṣudhā": [
+          "dh",
+          "k",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "khaḍga",
+        "megha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "khaḍga": [
+          "g",
+          "kh",
+          "ḍ"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "khaḍga",
+        "puṣpa"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "khaḍga": [
+          "g",
+          "kh",
+          "ḍ"
+        ],
+        "puṣpa": [
+          "p",
+          "ṣ"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "kāṣṭha",
+        "megha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kāṣṭha": [
+          "k",
+          "ṣ",
+          "ṭh"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "kāṣṭha",
+        "sukha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kāṣṭha": [
+          "k",
+          "ṣ",
+          "ṭh"
+        ],
+        "sukha": [
+          "kh",
+          "s"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "kṣudhā",
+        "megha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kṣudhā": [
+          "dh",
+          "k",
+          "ṣ"
+        ],
+        "megha": [
+          "gh",
+          "m"
+        ]
+      }
+    },
+    {
+      "words": [
+        "aśva",
+        "bala",
+        "bhaya",
+        "jñāna",
+        "kṣudhā",
+        "sukha"
+      ],
+      "eligible": true,
+      "c1_per_word_unique": true,
+      "c23_no_identical": true,
+      "c4_jaccard_caps": true,
+      "c56_length_not_identifying": true,
+      "c8_same_valence_pair": true,
+      "max_jaccard": 0.0,
+      "mean_jaccard": 0.0,
+      "rare_only_unique_words": [],
+      "unique_features": {
+        "aśva": [
+          "v",
+          "ś"
+        ],
+        "bala": [
+          "b",
+          "l"
+        ],
+        "bhaya": [
+          "bh",
+          "y"
+        ],
+        "jñāna": [
+          "j",
+          "n",
+          "ñ"
+        ],
+        "kṣudhā": [
+          "dh",
+          "k",
+          "ṣ"
+        ],
+        "sukha": [
+          "kh",
+          "s"
+        ]
+      }
+    }
+  ]
+}
