@@ -1,0 +1,71 @@
+# Native Sanskrit word-specificity — evaluator model manifest TEMPLATE.
+#
+# REQUIRED before the official run (operator decision — no model is chosen silently):
+#   * confirm each model_id is the model you intend to run;
+#   * pin `revision` to an exact commit SHA for reproducibility (null = "latest", discouraged);
+#   * confirm each `family` is DISJOINT from the paraphrase-authoring family (Anthropic / Claude) and that the
+#     three families are mutually distinct (the protocol requires >=3 distinct, disjoint families);
+#   * set `backend` to `transformers` (self-contained HF load) or `vllm_openai` (talk to a LOCAL vLLM server you
+#     launched with your chosen dtype / tensor-parallel / max-model-len / trust-remote-code);
+#   * for `vllm_openai`, set `base_url` to your LOCAL server (e.g. http://127.0.0.1:8000).
+#
+# The recommended defaults below are open-weight families already used elsewhere in this repo (Llama / Gemma /
+# Qwen), none of which is the authoring family. They are a STARTING POINT you must confirm, not an automatic choice.
+
+evaluators:
+  - evaluator_id: eval_1
+    model_id: meta-llama/Llama-3.1-8B-Instruct   # CONFIRM
+    family: llama
+    revision: null                               # PIN an exact commit SHA before the official run
+    backend: transformers                        # transformers | vllm_openai
+    dtype: bfloat16                              # bfloat16 | float16
+    tensor_parallel_size: 1
+    max_model_len: 4096
+    trust_remote_code: false
+    base_url: null                               # required only for backend: vllm_openai
+    max_new_tokens: 24
+    seed: 0
+    timeout_s: 60
+
+  - evaluator_id: eval_2
+    model_id: google/gemma-2-9b-it               # CONFIRM
+    family: gemma
+    revision: null
+    backend: transformers
+    dtype: bfloat16
+    tensor_parallel_size: 1
+    max_model_len: 4096
+    trust_remote_code: false
+    base_url: null
+    max_new_tokens: 24
+    seed: 0
+    timeout_s: 60
+
+  - evaluator_id: eval_3
+    model_id: Qwen/Qwen2.5-14B-Instruct          # CONFIRM
+    family: qwen
+    revision: null
+    backend: transformers
+    dtype: bfloat16
+    tensor_parallel_size: 1
+    max_model_len: 4096
+    trust_remote_code: false
+    base_url: null
+    max_new_tokens: 24
+    seed: 0
+    timeout_s: 60
+
+  # Optional 4th family for a stronger family-diversity check (uncomment + confirm):
+  # - evaluator_id: eval_4
+  #   model_id: mistralai/Mistral-7B-Instruct-v0.3
+  #   family: mistral
+  #   revision: null
+  #   backend: transformers
+  #   dtype: bfloat16
+  #   tensor_parallel_size: 1
+  #   max_model_len: 4096
+  #   trust_remote_code: false
+  #   base_url: null
+  #   max_new_tokens: 24
+  #   seed: 0
+  #   timeout_s: 60
