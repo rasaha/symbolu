@@ -123,9 +123,38 @@ def validate_word_pair(raw_text: str, word: str) -> dict:
     return {"surface_pass": not issues, "issues": issues, "word": word, "n_sentences": len(sents)}
 
 
-# ------------------------------------------------------------------ self-test (mock only)
+def _cli_validate(raw_path, word):
+    """Validate one raw per-word output file for a target word.
+
+    Prints the validation JSON to stdout and exits 0 on surface_pass, 1 on failure — so the
+    per-word workflow can gate on the exit code. Rules are unchanged (no relaxation); this is
+    only a standalone entry point around validate_word_pair for operational reproducibility.
+    """
+    import json
+    import pathlib
+    import sys
+
+    raw = pathlib.Path(raw_path).read_text(encoding="utf-8")
+    result = validate_word_pair(raw, word)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    sys.exit(0 if result["surface_pass"] else 1)
+
+
+# ------------------------------------------------------------------ CLI / self-test
 if __name__ == "__main__":
     import json
+    import sys
+
+    # `--raw <file> --word <word>` validates one per-word output (exit 0 pass / 1 fail).
+    # With no args, runs the built-in self-tests (mock only).
+    if "--raw" in sys.argv or "--word" in sys.argv:
+        import argparse
+
+        ap = argparse.ArgumentParser(description="B1.10 per-word-pair surface validator (rules unchanged).")
+        ap.add_argument("--raw", required=True, help="path to one word-pair raw output file")
+        ap.add_argument("--word", required=True, help="target word (one of the six official words)")
+        a = ap.parse_args()
+        _cli_validate(a.raw, a.word)
 
     good = (
         "pride\n"
