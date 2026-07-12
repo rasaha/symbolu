@@ -225,6 +225,82 @@ in the evidence table on Page 4.
 
 ## Page 3 — Competitive Landscape
 
+### The category: an AI Action Authorization platform, not another IAM
+
+ActionGate is best described as *a new cybersecurity platform focused on AI
+agent authorization and action governance* — an **enterprise AI Action
+Authorization Platform that secures autonomous agents before they perform
+real-world actions.** It is deliberately **not** positioned as "the next
+Microsoft Entra ID." Entra, Okta, and the IAM incumbents are identity
+platforms — directory services, SSO, MFA, conditional access, federation,
+lifecycle, PIM, thousands of SaaS integrations, a decade and thousands of
+engineers. Inviting that comparison would set expectations around identity
+and directory services that are outside ActionGate's scope. It is also not
+"just a tool" (a JWT library, an OPA engine, an admission webhook, an MCP
+middleware) — those are *components*. ActionGate aims to be the **control
+plane in front of every consequential AI action**, which is a platform.
+
+The distinction is a matter of which question is being answered. Entra
+answers *"who are you?"*. ActionGate answers *"should this exact
+AI-generated action execute, right now?"* — a different problem, one layer
+down the stack.
+
+### Where ActionGate sits in the enterprise stack
+
+```
+  Identity           ──►  Microsoft Entra / Okta        (who may authenticate)
+       │
+  Authentication
+       │
+  Authorization
+       │
+  Secrets            ──►  CyberArk / HashiCorp Vault     (who receives credentials)
+       │
+  Infra Policy       ──►  OPA / Gatekeeper / Kyverno     (is this config allowed)
+       │
+  Cloud Permissions  ──►  AWS IAM / Azure RBAC           (what a role may do)
+       │
+  ═══════════════════════════════════════════════════════════════════════
+       an AI agent decides to perform a specific action
+  ═══════════════════════════════════════════════════════════════════════
+       │
+       ▼
+  ██  ActionGate  ██   ← decides admissibility of THIS action, then
+       │                 mints a single-use credential to execute it
+       ▼
+  Runtime execution  ──►  Kubernetes · GitHub · Terraform · Databases ·
+                          Email · Payments · Cloud APIs
+```
+
+ActionGate operates **after identity is established but before an action
+executes**. That placement is deliberate: it avoids competing head-on with
+identity vendors, and instead sits at the seam the whole stack above leaves
+open once an autonomous agent — not a human at a console — is the thing
+choosing the next action.
+
+### Four adjacent categories, not one competitor
+
+ActionGate does not have a single incumbent competitor; today its
+capabilities are spread across four adjacent categories, and it sits between
+all four rather than replacing any one of them.
+
+| Category | Examples | What they protect |
+|---|---|---|
+| **Identity** | Microsoft Entra, Okta | Who may authenticate |
+| **Privileged access** | CyberArk, BeyondTrust | Who receives privileged credentials |
+| **Policy engines** | OPA, Gatekeeper, Kyverno, HashiCorp Sentinel | Whether an infrastructure configuration is allowed |
+| **AI agent frameworks** | LangGraph, CrewAI, OpenAI Agents | How agents execute tools |
+
+ActionGate combines pieces of these — policy evaluation, credential
+brokering, an execution boundary — into one runtime focused specifically on
+AI-generated actions. That makes it materially larger than a developer
+library, and materially more specialized than an identity platform. As an
+*illustrative* (not precise) sense of relative breadth: an OPA-class engine
+is roughly 8–10× a single library, a privileged-access module perhaps ~20×,
+ActionGate at full planned scope perhaps 30–80×, and Entra ID 500–1000×. The
+point of the scale is only this — ActionGate is a focused platform with room
+to grow, not an identity suite and not a component.
+
 "Agent security" is a noisy space, but most of the crowd is solving a
 different problem than ActionGate. Most tools **observe** agent behavior or
 **grant standing access**; ActionGate **decides admissibility before commit
@@ -253,7 +329,82 @@ it differs and why that difference matters to a security buyer.
 | Transport-neutral (MCP / HTTP / gRPC) | **Yes** | Varies | Varies | Varies |
 | Ecosystem breadth / maturity | Early, focused | **Broad** | **Broad** | **Mature** |
 
+### How the authorization primitive differs
+
+The clearest way to see why ActionGate is a new category rather than a
+variant of an existing one is the unit of authorization itself.
+
+1. **The decision object is an action, not a principal.** Traditional policy
+   asks *"can Alice delete Pods?"* and RBAC answers yes/no for the role.
+   ActionGate asks *"can Alice's agent delete **this exact** Pod, with this
+   justification, this state hash, this approval, right now?"* — the
+   authorization unit is one individual action, not a user or role. This is
+   the biggest conceptual difference. **(MEASURED — the 24-field envelope +
+   action hash.)**
+2. **Just-Enough Authorization, not Just-In-Time.** Privileged-access tools
+   grant a credential good for 15–60 minutes. ActionGate mints a capability
+   for one approved action, executes exactly once, then destroys it — not
+   "just-in-time" but "just-enough." **(MEASURED — single-use scoped broker.)**
+3. **Canonical action identity as the security primitive.** Competitors
+   authorize *principal → role → permission*. ActionGate authorizes
+   *canonical action envelope → action hash → approval → execution token →
+   one execution.* **(MEASURED.)**
+4. **Approval bound to one immutable action.** A traditional approval reads
+   "approve Terraform, production." An ActionGate approval binds to *delete
+   deployment · namespace=payments · resource=X · state-hash=ABC ·
+   rollback=XYZ · policy-version=1.3* — it cannot be replayed against a
+   different action. **(MEASURED — exact-action approval binding.)**
+5. **One abstraction across heterogeneous actions (breadth is roadmap).**
+   Policy engines each understand one domain (Kyverno: Kubernetes; Sentinel:
+   Terraform). ActionGate's envelope is designed so *delete Pod / delete IAM
+   role / delete S3 bucket / delete repo / delete database* share one
+   authorization model. **Today only the Kubernetes reference is validated;
+   the transport-neutral core makes the abstraction real, but AWS, GitHub,
+   Terraform, and database connectors are roadmap, not shipped.**
+6. **AI-first by construction.** Existing products assume *human → requests
+   action.* ActionGate assumes *AI agent → generates action → needs
+   authorization.* That assumption changes the architecture (deterministic
+   identity, non-compensatory gates, agent holds no durable credential).
+   **(MEASURED.)**
+7. **A runtime lifecycle, not a policy verdict.** OPA returns *policy →
+   allow → done.* ActionGate runs *policy → approval → capability →
+   execution → verification → audit → destroy capability* as one bound
+   lifecycle. **(MEASURED.)**
+8. **Behavioral intelligence — future, not a current claim.** If the
+   optional behavioral/identity/confidence work succeeds, authorization could
+   eventually fuse *identity + behavior + confidence + policy + exact action.*
+   This is a **roadmap item on a separate research track, not a present
+   differentiator**, and can only ever *raise* scrutiny.
+
+### Competitive positioning matrix
+
+| Product | Identity | Policy | Action hash | Single-use capability | AI-native | Cross-platform |
+|---|---|---|---|---|---|---|
+| **Microsoft Entra** | ✓ | Partial | ✗ | ✗ | ✗ | ✓ |
+| **CyberArk** | ✓ | Partial | ✗ | Partial | ✗ | ✓ |
+| **OPA** | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ |
+| **Kyverno** | ✗ | ✓ | ✗ | ✗ | ✗ | Kubernetes |
+| **HashiCorp Sentinel** | ✗ | ✓ | ✗ | ✗ | ✗ | Terraform |
+| **AI agent frameworks** | ✗ | Minimal | ✗ | ✗ | ✓ | Varies |
+| **ActionGate** | Uses existing identity | ✓ | ✓ | ✓ | ✓ | ✓ * |
+
+\* *Cross-platform is the design intent of the transport-neutral core and the
+domain-agnostic envelope. Today it is **reference-validated on Kubernetes**;
+additional connectors (AWS IAM, Terraform, GitHub, databases) are on the
+roadmap, not yet shipped. The ✓ marks architectural fit, not present breadth.*
+
 ### Where the moat is — and is not
+
+**The moat is the runtime, not any single feature.** We are deliberately
+careful *not* to claim the moat is "action hashing" or "credential brokering"
+on their own — both have related precedents. The stronger, more honest
+framing is architectural: **ActionGate is a deterministic authorization
+runtime for AI-generated actions, in which an immutable action description,
+policy evaluation, human approval (when required), short-lived capability
+issuance, execution verification, and audit are all bound into a single
+execution lifecycle.** That end-to-end binding — not any one primitive — is
+what positions ActionGate as an authorization runtime designed for autonomous
+AI systems rather than another policy engine.
 
 **Primary — what the product rests on (all MEASURED in the repository):**
 - **Deterministic exact-action admissibility, credential-enforced.** The
