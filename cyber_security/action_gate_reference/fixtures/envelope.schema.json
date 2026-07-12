@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symbolu/actiongate/envelope.schema.json",
+  "title": "Agent Action Envelope",
+  "description": "Machine-readable mirror of the 24 frozen envelope fields (ACTION_GATE_SPECIFICATION.md §2). NON-NORMATIVE: the enforced validator is action_gate_ref/schema.py, which additionally rejects duplicate keys, bare JSON numbers, NaN/Infinity, and non-NFC strings — constraints JSON Schema cannot express. All numeric quantities are typed strings by the Action Profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action_id", "timestamp", "agent_identity", "runtime", "model_provider",
+    "delegator", "delegation_chain", "objective", "tool", "operation",
+    "target_resource", "arguments", "credential_scope", "current_state_hash",
+    "state_freshness", "policy_version", "reversibility", "correlation_id",
+    "sequence_id"
+  ],
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Per-attempt UUIDv4. Excluded from action_hash."
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}Z$",
+      "description": "RFC-3339 UTC, millisecond precision, trailing Z. Excluded from action_hash."
+    },
+    "agent_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key_id", "sig"],
+      "properties": {
+        "id": {"type": "string"},
+        "key_id": {"type": "string"},
+        "sig": {"type": "string", "description": "Signature over the payload; excluded from action_hash."}
+      }
+    },
+    "runtime": {"type": "string"},
+    "model_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "provider"],
+      "properties": {"model": {"type": "string"}, "provider": {"type": "string"}}
+    },
+    "delegator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": {"type": "string"},
+        "type": {"type": "string", "enum": ["HUMAN", "SERVICE"]}
+      }
+    },
+    "delegation_chain": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "grant", "exp"],
+        "properties": {
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "grant": {"type": "string"},
+          "exp": {"type": "string"}
+        }
+      }
+    },
+    "objective": {"type": "string"},
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["server_id", "tool_name"],
+      "properties": {"server_id": {"type": "string"}, "tool_name": {"type": "string"}}
+    },
+    "operation": {
+      "type": "string",
+      "enum": ["IAM_GRANT_ADMIN", "DEPLOY", "DB_DELETE", "NET_EXPOSE", "SECRET_READ",
+               "MONITORING_DISABLE", "DB_MUTATION", "KEY_ROTATE", "CLOUD_SPEND_INCREASE",
+               "EXTERNAL_COMMS"]
+    },
+    "target_resource": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"},
+      "description": "Ordered array of resource identifiers."
+    },
+    "arguments": {
+      "type": "object",
+      "description": "Operation-specific structured arguments. No bare JSON numbers (typed strings only)."
+    },
+    "credential_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["principal", "permissions", "ttl"],
+      "properties": {
+        "principal": {"type": "string"},
+        "permissions": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "SET-LIKE path credential_scope.permissions: order-independent, duplicates rejected."
+        },
+        "ttl": {"type": "string", "description": "ISO-8601 duration (e.g. PT10M)."}
+      }
+    },
+    "current_state_hash": {"type": "string", "pattern": "^(?:sha-?256:)?[0-9a-f]{64}$"},
+    "state_freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as_of", "source"],
+      "properties": {
+        "as_of": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}Z$"},
+        "source": {"type": "string"}
+      }
+    },
+    "policy_version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+\\+.+$"},
+    "reversibility": {"type": "string", "enum": ["REVERSIBLE", "REVERSIBLE_WITH_COST", "IRREVERSIBLE"]},
+    "correlation_id": {"type": "string"},
+    "sequence_id": {"type": "string"},
+
+    "linked_ticket": {"type": ["string", "null"], "description": "Optional. Present-vs-absent is hash-significant; null != absent."},
+    "approvals": {"type": "array", "description": "Optional. Bind TO action_hash; excluded from action_hash."},
+    "attestation": {
+      "type": "object",
+      "description": "Optional. Independently bound; excluded from action_hash.",
+      "additionalProperties": false,
+      "required": ["type", "evidence", "exp"],
+      "properties": {
+        "type": {"type": "string"},
+        "evidence": {"type": "string"},
+        "exp": {"type": "string"}
+      }
+    },
+    "rollback_plan": {"type": "object", "description": "Optional. Included in action_hash when present."},
+    "expected_effects": {"type": "object", "description": "Optional. Included by digest (SIMULATION domain), not raw."}
+  }
+}
