@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from cyber_security.behavioral_biometrics.version import (
+    DATA_ORIGINS,
     REAL_MARKER,
     SCHEMA_VERSION,
     SYNTHETIC_MARKER,
@@ -69,6 +70,7 @@ class SessionMeta:
     role: str = "verification"        # enrollment | verification
     condition: str = "unspecified"    # genuine | live_impostor | unspecified
     data_provenance: str = REAL_MARKER
+    data_origin: Optional[str] = None  # REAL_PARTICIPANT | SYNTHETIC_TEST_ONLY | DEMO_ONLY
     consent: Dict[str, Any] = field(default_factory=dict)
     notes: str = ""
 
@@ -141,6 +143,9 @@ def validate_meta(meta: Dict[str, Any]) -> List[Dict[str, str]]:
         _v(v, "meta_device_class", str(meta.get("device_class")))
     if meta.get("data_provenance") not in DATA_PROVENANCE:
         _v(v, "meta_data_provenance", str(meta.get("data_provenance")))
+    origin = meta.get("data_origin")
+    if origin is not None and origin not in DATA_ORIGINS:
+        _v(v, "meta_data_origin", str(origin))
     return v
 
 

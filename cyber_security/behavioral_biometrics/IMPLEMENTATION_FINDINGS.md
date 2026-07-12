@@ -63,11 +63,40 @@ inspection, but **not an audited AEAD**. Documented in `PRIVACY_AND_ETHICS.md`; 
 with full-disk encryption for real use. File deletion is best-effort overwrite (no
 guarantee on wear-leveled/CoW media).
 
-## F9 — no OS input-hook adapter (out of scope)
-The collector is transport-agnostic (`ingest`), exercised here by the task runner and
-synthetic driver. A real OS/browser input hook (keylogger-class code) is intentionally
-not implemented in this phase; the binding point and privacy contract are documented in
-`DATA_COLLECTION_PROTOCOL.md`.
+## F9 — real browser collector added (`collector_app/`)
+The transport-agnostic collector is now bound to a real, local, cloud-free **browser**
+application (`collector_app/`): a stdlib `http.server` (127.0.0.1 only) serves a
+single-page app that captures in-page keyboard/pointer/context events (page-scoped
+listeners — **no global keylogger**) and POSTs them at completion. A browser→schema
+adapter (`adapter.py`) maps events into the FROZEN schema (no second format), validates
+each, and **quarantines** malformed ones. The raw character (`event.key`) is used in
+the browser only to derive the privacy-safe key class/id and is never stored or sent;
+the adapter additionally quarantines any event that carries a raw-content field.
+
+## F9a — real browser E2E via raw CDP (no playwright)
+Python `playwright` is not installed, but Node 22 (with a global `WebSocket`) and a
+Chromium binary are present. Rather than skip browser testing, `tests/browser_e2e.js`
+drives headless Chromium over the Chrome DevTools Protocol directly, dispatching REAL
+keyboard and pointer events into the actual page and asserting privacy-safe capture
+(no raw content) plus local storage. `test_browser_e2e.py` runs it and SKIPS cleanly if
+node/Chromium are absent, in which case the adapter/server layers plus the manual
+`ACCEPTANCE_CHECKLIST.md` provide coverage.
+
+## F9b — data_origin lock (REAL_PARTICIPANT / SYNTHETIC_TEST_ONLY / DEMO_ONLY)
+A stricter `data_origin` field was added to the schema (alongside `data_provenance`).
+`verdicts.session_is_real` treats only `REAL_PARTICIPANT` as real; SYNTHETIC and DEMO
+are both non-real and can never yield a positive identity/coupling verdict. Ambiguity
+resolved: `features.extract` now carries `data_origin` into the feature record so the
+lock survives feature extraction (a DEMO record was briefly misclassified as
+real-but-insufficient before this fix). The collector-app readiness verdict
+(`REAL_COLLECTOR_READY_FOR_PILOT` / `_DEGRADED` / `_NOT_READY`) concerns only the
+collection application, not biometric validity.
+
+## F9c — key-class parity across two runtimes
+The key→class mapping necessarily exists twice (Python `privacy.key_to_class` for the
+adapter/analysis, `static/keyclass.js` for the browser). `test_keyclass_parity.py`
+executes the JS in node over a shared key set and asserts byte-for-byte parity, so the
+two implementations cannot silently diverge.
 
 ## F10 — BCVF / USE / SCC / phase are not privileged
 Coupling features are ordinary candidates, not a favored mechanism. Phase-based

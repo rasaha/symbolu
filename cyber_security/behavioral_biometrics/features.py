@@ -278,6 +278,7 @@ def extract(session: Dict[str, Any], cfg: Optional[FeatureConfig] = None,
             "role": meta.get("role", ""),
             "condition": meta.get("condition", "unspecified"),
             "data_provenance": meta.get("data_provenance", "REAL"),
+            "data_origin": meta.get("data_origin"),
             "extractor_version": EXTRACTOR_VERSION,
         },
     }

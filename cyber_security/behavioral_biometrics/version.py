@@ -15,3 +15,12 @@ ANALYSIS_VERSION = "bbio-analysis/1.0.0"
 # Sentinel that MUST accompany any data produced by the synthetic generators.
 SYNTHETIC_MARKER = "SYNTHETIC_TEST_ONLY"
 REAL_MARKER = "REAL"
+
+# data_origin — a stricter provenance label used by the real collector app. Only
+# REAL_PARTICIPANT data can ever produce a positive identity/coupling verdict.
+ORIGIN_REAL = "REAL_PARTICIPANT"
+ORIGIN_SYNTHETIC = "SYNTHETIC_TEST_ONLY"
+ORIGIN_DEMO = "DEMO_ONLY"
+DATA_ORIGINS = (ORIGIN_REAL, ORIGIN_SYNTHETIC, ORIGIN_DEMO)
+
+COLLECTOR_APP_VERSION = "bbio-collector-app/1.0.0"

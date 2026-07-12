@@ -22,7 +22,11 @@ from typing import Any, Dict, List, Optional
 
 from cyber_security.behavioral_biometrics import quality
 from cyber_security.behavioral_biometrics.config import DEFAULT, BiometricConfig
-from cyber_security.behavioral_biometrics.version import REAL_MARKER, SYNTHETIC_MARKER
+from cyber_security.behavioral_biometrics.version import (
+    ORIGIN_REAL,
+    REAL_MARKER,
+    SYNTHETIC_MARKER,
+)
 
 # Instrumentation cohort verdict thresholds (frozen).
 _READY_FRACTION_READY = 0.70
@@ -50,13 +54,24 @@ COUPLING_INSUFFICIENT = "COUPLING_INSUFFICIENT_DATA"
 # provenance + minimums
 # ---------------------------------------------------------------------------
 
+def session_is_real(meta: Dict[str, Any]) -> bool:
+    """A session counts as real only if its data_origin is REAL_PARTICIPANT (when
+    present) AND its data_provenance is REAL. SYNTHETIC_TEST_ONLY and DEMO_ONLY are
+    both non-real and can never produce a positive identity/coupling verdict."""
+    origin = meta.get("data_origin")
+    if origin is not None:
+        return origin == ORIGIN_REAL and meta.get("data_provenance") == REAL_MARKER
+    return meta.get("data_provenance") == REAL_MARKER
+
+
 def data_is_synthetic(records: List[Dict[str, Any]]) -> bool:
-    return any(r.get("meta", {}).get("data_provenance") == SYNTHETIC_MARKER for r in records)
+    """True if ANY record is non-real (synthetic OR demo OR unset-real). Name kept for
+    compatibility; semantics are 'any non-real origin blocks a verdict'."""
+    return any(not session_is_real(r.get("meta", {})) for r in records)
 
 
 def all_real(records: List[Dict[str, Any]]) -> bool:
-    return bool(records) and all(
-        r.get("meta", {}).get("data_provenance") == REAL_MARKER for r in records)
+    return bool(records) and all(session_is_real(r.get("meta", {})) for r in records)
 
 
 def minimums_report(records: List[Dict[str, Any]], quality_summaries: List[Dict[str, Any]],

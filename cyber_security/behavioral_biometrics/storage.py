@@ -129,6 +129,22 @@ class SessionStore:
         _write(d / "quality.json", _json(quality), self.passphrase)
         return d / "quality.json"
 
+    def load_quality(self, participant: str, session_id: str) -> Dict[str, Any]:
+        d = self._dir(participant, session_id)
+        return json.loads(_read(d / "quality.json", self.passphrase))
+
+    def save_manifest(self, participant: str, session_id: str, manifest: Dict[str, Any]) -> Path:
+        d = self._dir(participant, session_id)
+        _write(d / "manifest.json", _json(manifest), self.passphrase)
+        return d / "manifest.json"
+
+    def load_manifest(self, participant: str, session_id: str) -> Dict[str, Any]:
+        d = self._dir(participant, session_id)
+        return json.loads(_read(d / "manifest.json", self.passphrase))
+
+    def has_manifest(self, participant: str, session_id: str) -> bool:
+        return (self._dir(participant, session_id) / "manifest.json").exists()
+
     # ---- enumeration / retention / deletion ----
 
     def list_sessions(self) -> List[Dict[str, str]]:
