@@ -12,6 +12,15 @@ orchestration with full reasoning kept offline; kept mission→intent→goal mod
 backstopped; noted the differentiation ceiling depends on the AI semantic layer, not on any
 evidence source.
 
+**Rev. 3:** integrated **Critical Transition Governance / OSGE** (`CRITICAL_TRANSITION_GOVERNANCE.md`)
+as a governance decision-mode inside L3 and the North-Star Phase 5 — reframing from
+*authenticating identities* to *authorizing consequential organizational state transitions*
+(the justification handshake; catches insider/privileged-misuse/mistakes/policy-violations/
+agent-errors). MVP now seeds a minimal deterministic handshake (Phase 2); full AI-reasoned,
+systems-of-record governance is the end-state (Phase 5), with AI kept advisory + escalate-only +
+human-approval. Positioning note: this raises the differentiation ceiling but into GRC /
+policy-as-code / PAM territory, and it is a heavier build (end-state, not beachhead).
+
 ---
 
 ## 0. How the thesis evolved
@@ -44,6 +53,15 @@ merely Layer-1 evidence producers.
 Key property: **no single L1 evidence producer is indispensable.** If an experiment shows a
 producer (BCVF same-latent, USE coupling, a 2nd-order feature) adds no incremental value, it is
 removed and the rest of the architecture is unchanged. That modularity is a sign of health.
+
+**A governance decision-mode sits inside L3 (see `CRITICAL_TRANSITION_GOVERNANCE.md`).** For
+**critical state transitions** (exactly the critical actions enumerated in Phase −1), the
+decision is not a risk score but a **justification handshake**: *even if the user is legitimate,
+should this organizational state change happen?* This asks a question orthogonal to identity and
+catches insider misuse, compromised-privileged users, mistakes, policy violations, and AI-agent
+errors — the class the evidence stack cannot. Ordinary actions take the risk-based flow (§2);
+critical transitions take the governance flow. This is the North-Star end-state, layered on the
+consequence-gating MVP — not a replacement for it.
 
 ---
 
@@ -98,6 +116,16 @@ Reframed ambition: not "a better detector" but "an **AI-native adaptive security
 whose differentiation is semantic consequence reasoning, sitting above deterministic real-time
 enforcement." One-line: *innovate on how evidence is used, not on squeezing 2% from a biometric.*
 
+**The governance reframe (North Star) pushes this further** — from *authenticating identities* to
+*authorizing consequential organizational state transitions* (`CRITICAL_TRANSITION_GOVERNANCE.md`).
+That is the clearest expression of the AI-semantic wedge, applied to the highest-value question,
+and it plausibly raises the differentiation ceiling above 7/10 — but it moves the competitive
+frame into **GRC / policy-as-code / PAM / change-governance** (OPA, ServiceNow, CyberArk,
+zero-trust PDP), all incumbent-held. The wedge there is semantic organizational-consistency
+reasoning the rule engines lack — executed with the advisory + escalate-only + human-approval
+safety boundary. It is a bigger, heavier build (systems-of-record integration), so it is the
+end-state, not the beachhead.
+
 ---
 
 ## 4. Phased, gated plan
@@ -136,6 +164,7 @@ assets → threats → attacker objectives → attack paths → critical actions
 
 ### Phase 2 — MVP integration + operational evaluation
 - Wire L2·L3·L4 + attestation/MFA hard gates, with `P` from a **deliberately mediocre** detector (proving weak-detector-is-OK).
+- Include a **minimal governance handshake** on the top few critical transitions: deterministic policy checks (linked approval / owner / window) + **human approval** — *no* AI reasoning, *no* systems-of-record integration yet. This is the MVP seed of OSGE.
 - Evaluate against the operational kill criterion vs flat-policy and detector-only baselines.
 - **Gate G2 (the product gate):** *at a fixed fraud-prevention target, does consequence-aware step-up reduce irreversible damage without unacceptable friction on legitimate critical actions?* **Yes →** a shippable damage-preventing product that does not depend on biometrics or on novel liveness.
 
@@ -160,9 +189,21 @@ to today's hypotheses.
 - Governance: value/cost-model drift + attacker-manipulation resistance; privacy/telemetry.
 - Tier-C research (unknown-goal, joint-generative, full-compromise) tracked, never gating.
 
+### Phase 5 — Critical Transition Governance / OSGE (North-Star; after MVP traction)
+Generalize the Phase-2 minimal handshake into full **Critical Transition Governance**
+(`CRITICAL_TRANSITION_GOVERNANCE.md`): systems-of-record integration (ITSM / IAM / CI-CD /
+ticketing), the full multi-condition justification handshake, and **AI semantic
+organizational-consistency reasoning** as **advisory + escalate-only** input to a deterministic,
+auditable policy + human approval. Renewed role for the evidence layer: flag **fabricated /
+anomalous justification**. Enforce real segregation-of-duties for collusion resistance.
+- **Gate G5 (governance kill criterion):** at a fixed rate of allowing legitimate critical
+  transitions, does the handshake reduce **unjustified** transitions (insider misuse, mistakes,
+  policy violations, agent errors) vs identity/risk-gating alone, at acceptable latency/approver
+  burden? Heavy integration → the end-state, **not** the beachhead.
+
 ```
 CRITICAL:  Phase −1 (threat model) ─► Phase 0 (DESIGN) ─┐
-           Phase 1A commodity trust  ─────────────────── ┼─► Phase 2 MVP ──[G2]──► ship ──► Phase 4
+           Phase 1A commodity trust  ─────────────────── ┼─► Phase 2 MVP (+minimal handshake) ─[G2]─► ship ─► Phase 4 ─► Phase 5 OSGE [G5]
 PARALLEL:  Phase 1B novel liveness (enhancement, G1b) ───┘   (moat vs relay/generation if it passes)
 PARALLEL:  Phase 3 Evidence Innovation Lane (drop-or-keep) ──┘ layer in if it helps
 ```
