@@ -385,26 +385,66 @@ some demonstrations requiring infrastructure not present in CI;
 - **Auditable agent operations** — a tamper-evident, replayable record of
   every admissibility decision for compliance reconstruction.
 
-### 12-month roadmap
+### Roadmap — a maturity timeline, not a coding schedule
 
-**Quarter 1 — External proof**
-- Commission a third-party external red-team against the enforcement theses.
-- First external design-partner integration behind the MCP adapter.
-- Publish the conformance-vector suite so integrators can self-verify.
+A candid note on timelines. AI compressed the *prototype-construction* phase
+dramatically: the reference model, real enforcement paths, tests, mock
+integrations, and a Kubernetes reference environment already exist. It did
+**not** compress the work that turns a prototype into a deployable security
+platform — hardening, integration, operational reliability, independent
+assurance, and customer acceptance. Those are mostly *boundary* work
+(key custody, workload identity, credential rotation/revocation, multi-host
+replay protection, HA, durable audit, egress control, incident response,
+external penetration testing) and *calendar* work (a customer's architecture,
+threat-model, penetration, legal, and privacy reviews plus a controlled
+rollout) — neither of which is eliminated by generating more application
+code. The stages below are therefore stated as maturity milestones with
+realistic durations for a focused team, not as quarters of coding.
 
-**Quarter 2 — Concurrency and robustness**
-- Extend measured race coverage beyond the update path to all decision verbs.
-- Broker hardening: rotation, revocation, and stricter scope-widening rejection.
+| Maturity target | Realistic duration (focused 3–5 person team) | What it means |
+|---|---|---|
+| **Demo / research prototype** | **Already achieved** | Real enforcement paths, 274 tests, mock integrations, Kubernetes reference environment, isolated red-team, independent validation at `SUPPORTED_WITH_LIMITATIONS`. |
+| **Design-partner pilot** | ~1 month (4–8 weeks) | One environment, one cluster, one MCP client, a small policy set, one hardened broker, KMS-backed signing, persistent audit/replay storage, supervised single workflow. |
+| **Internal production beta** | 2–3 months | Multi-host deployment, HA, failure recovery, monitoring, key management, incident handling; runs continuously without per-action engineering supervision. |
+| **Enterprise production v1** | 4–6 months | Customer identity integration, SIEM/OpenTelemetry export, durable audit retention, upgrade/rollback, a second connector, external security remediation, first reference customer. |
+| **Regulated-enterprise platform** | 9–15 months | Multiple connectors, distributed enforcement, policy administration, compliance evidence, tenant isolation, scale, customer security reviews. |
 
-**Quarter 3 — Distribution**
-- Cross-host durable store / distributed transaction so enforcement is not
-  single-host-bound.
-- Additional control-plane references beyond Kubernetes (cloud IAM/STS-backed).
+**Stage 1 — Pilot-ready vertical (~month 1).** Deliberately narrow scope to a
+single, supervised, credible pilot — *not* a broadly deployable platform:
+production-infrastructure agent actions on Kubernetes/MCP, one hardened
+broker, KMS-backed asymmetric signing, persistent PostgreSQL (or equivalent)
+replay/audit storage, basic metrics and incident logging, a small
+administrative approval surface, and deployment automation. **Goal:** one
+design partner can safely run one supervised workflow. Honest label:
+*pilot-ready, single-workflow, supervised reference deployment* — not yet a
+production security platform.
 
-**Quarter 4 — Productionization and assurance**
-- Audited key custody (HSM / audited AEAD) replacing file-permission custody.
-- Verified build-time supply chain (signed, reproducible provenance).
-- Begin the compliance/audit-persistence work regulated buyers require.
+**Stage 2 — Internal beta (months 2–3).** Multi-host deployment, high
+availability, failure recovery, operational dashboards, policy-backend
+integration, an **external penetration test**, latency and false-escalation
+measurement, and stronger Kubernetes policy coverage. Also: extend measured
+race coverage beyond the update path to all decision verbs, and broker
+rotation/revocation. **Goal:** operate continuously without engineering
+supervision of every action.
+
+**Stage 3 — Enterprise v1 (months 4–6).** Hardened deployment packaging,
+customer identity integration, SIEM/OpenTelemetry export, production audit
+retention, upgrade/rollback procedures, a second connector driven by customer
+demand, external-security remediation, audited key custody (HSM / audited
+AEAD) replacing file-permission custody, and support runbooks. **Goal:** first
+production reference customer.
+
+**Stage 4 — Platformization (months 6–15).** Multiple cloud/tool connectors
+(each with its own action mapping, credential scoping, simulation/preview,
+state hashing, conditional-commit and rollback semantics — Kubernetes is only
+one), distributed enforcement across hosts, policy administration, a
+compliance program, tenant isolation, scale, verified build-time supply chain,
+and broader deployments. **Goal:** a repeatable enterprise product rather than
+a bespoke pilot.
+
+*A solo-founder path would run roughly 12–24 months to the same milestones,
+because engineering, security, operations, integration, documentation, sales,
+and compliance would compete for one person's time.*
 
 **Parallel research track (separate from the product roadmap)**
 - Evaluate optional evidence inputs — behavioral, semantic, attestation, and
@@ -416,21 +456,34 @@ some demonstrations requiring infrastructure not present in CI;
 ### The ask
 
 We are raising to take ActionGate from a tested reference implementation and
-runnable enforcement gateway to an externally-validated, production-hardened
-enforcement layer. The mechanism is implemented and measured today —
-274 tests across a stdlib reference core, a credential-brokering gateway, an
-MCP adapter, a real Kubernetes control-plane reference, and a fully-executed
-compromised-agent experiment — and an independent architectural validation
-places it at `SUPPORTED_WITH_LIMITATIONS` after N1–N11 remediation. Capital is
-earmarked for external red-teaming, cross-host distribution, audited key
-custody and supply-chain provenance, and the compliance work required for
-regulated deployment.
+runnable enforcement gateway through the maturity stages above to an
+externally-validated, production-hardened enforcement layer. The mechanism is
+implemented and measured today — 274 tests across a stdlib reference core, a
+credential-brokering gateway, an MCP adapter, a real Kubernetes control-plane
+reference, and a fully-executed compromised-agent experiment — and an
+independent architectural validation places it at `SUPPORTED_WITH_LIMITATIONS`
+after N1–N11 remediation. Capital is earmarked for a supervised design-partner
+pilot, then the hardening, integration, external red-teaming, distribution,
+audited key custody, and compliance work that turn a validated prototype into
+a deployable product.
+
+We are deliberate about what each timeframe buys. **One month** is realistic
+for a narrow, supervised, single-workflow design-partner pilot — a legitimate
+product pilot, not merely a demo, but not yet a broadly deployable platform.
+**Three to six months**, with a focused 3–5 person team, is realistic for the
+first serious production deployment. **Nine to fifteen months** is realistic
+for a repeatable enterprise-grade product with multiple integrations and
+security/compliance evidence. The fast prototype compressed the *construction*
+phase; the remaining time is mostly hardening, integration, external
+validation, operationalization, and customer deployment — calendar work that
+generating more code does not remove.
 
 Enforcement — not monitoring — is becoming a precondition for putting
 autonomous agents in front of money, infrastructure, and customers. ActionGate
 is building the deterministic, credential-enforced, exact-action boundary that
 gap requires, and is honest about what is proved, what is reference-validated,
-and what remains to be productionized.
+and what realistically remains — in engineering *and* in calendar time —
+before it is a production security platform.
 
 ---
 
