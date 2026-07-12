@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# local session stores / reports produced by the CLI (never commit collected data)
+/tmp/bbio*/
+*.sqlite
+report.json
