@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Behavioral Instrumentation Pilot — Local Collector</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <span class="brand">Behavioral Instrumentation Pilot</span>
+    <span id="rec-indicator" class="rec hidden">● RECORDING</span>
+    <span id="origin-badge" class="badge">origin: —</span>
+  </header>
+
+  <main id="app">
+    <!-- 1. Consent -->
+    <section id="screen-consent" class="screen">
+      <h1>Consent</h1>
+      <div id="consent-summary" class="card"></div>
+      <label class="consent-check">
+        <input type="checkbox" id="consent-checkbox" />
+        I have read the summary and I consent to this recording for this research pilot.
+      </label>
+      <div class="row">
+        <button id="btn-consent" disabled>Confirm consent</button>
+        <button id="btn-decline" class="secondary">Decline / exit</button>
+      </div>
+      <p class="fineprint">No recording occurs until you confirm consent. Only in-app
+        keyboard timing (key <em>category</em>, never the characters), pointer motion,
+        and task context are captured. Nothing outside this page is monitored.</p>
+    </section>
+
+    <!-- 2/4. Setup -->
+    <section id="screen-setup" class="screen hidden">
+      <h1>Session setup</h1>
+      <div class="card">
+        <label>Participant pseudonym
+          <input id="participant" type="text" placeholder="e.g. p_017" autocomplete="off" />
+        </label>
+        <label>Session role
+          <select id="role"><option value="enrollment">enrollment</option>
+            <option value="verification" selected>verification</option></select>
+        </label>
+        <label>Task
+          <select id="task"></select>
+        </label>
+        <div id="device-meta" class="muted"></div>
+      </div>
+      <div class="row">
+        <button id="btn-calibrate">Run calibration check</button>
+      </div>
+      <div id="calibration-result" class="muted"></div>
+    </section>
+
+    <!-- 6. Calibration overlay reused inside setup -->
+
+    <!-- 7. Task -->
+    <section id="screen-task" class="screen hidden">
+      <h1 id="task-title"></h1>
+      <div id="stage-label" class="stage"></div>
+      <div id="task-area" class="task-area" tabindex="0"></div>
+      <div class="row"><button id="btn-finish" class="secondary">Finish task</button></div>
+    </section>
+
+    <!-- 9. Completion (neutral) -->
+    <section id="screen-done" class="screen hidden">
+      <h1>Session complete</h1>
+      <div id="done-message" class="card"></div>
+      <div id="quality-summary" class="card mono"></div>
+      <div class="row">
+        <button id="btn-delete" class="danger">Delete this session's data</button>
+        <button id="btn-again" class="secondary">Start another session</button>
+      </div>
+      <p class="fineprint">This screen shows only recording <em>quality</em>. No identity
+        or biometric result is computed or shown during this instrumentation pilot.</p>
+    </section>
+  </main>
+
+  <footer>
+    <span id="status" class="muted"></span>
+  </footer>
+
+  <script src="/static/keyclass.js"></script>
+  <script src="/static/tasks.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
