@@ -16,11 +16,16 @@
 
 ## Page 1 — The Problem
 
-### Autonomous agents can now act. Nothing decides — deterministically — whether a specific action is allowed to commit.
+### Autonomous-agent stacks lack a unified way to bind policy, approval, state, credential, and execution to one exact action.
 
 The last eighteen months made it easy to give an LLM tools: MCP servers,
 function-calling APIs, and agent frameworks all wire a model to a
-tool-calling loop. What is still missing is the layer between *"the model
+tool-calling loop. Deterministic pre-commit checks already exist in
+pieces — admission controllers, transaction-authorization systems, policy
+engines, and domain-specific controls each decide something before an
+action lands. What is missing is a **unified, vendor-neutral way to bind
+policy, human approval, current state, credential issuance, and execution
+to one exact agent-generated action** — the layer between *"the model
 emitted a tool call"* and *"that exact call committed against a production
 system."* That seam is where consequential harm happens — a wrong
 database written, a payment released, a resource deleted, a credential
@@ -83,17 +88,17 @@ evidence, state, approval, and consequence requirements are satisfied.*
 ### ActionGate — enforcement at the pre-commit boundary, not monitoring around it
 
 ActionGate places a deterministic decision-and-enforcement layer between
-an autonomous agent and the systems it acts on. Every consequential action
-is reduced to a **canonical action envelope**, canonicalized to a stable
-identity, evaluated by a frozen decision state machine, and — if allowed —
-executed *only* through a single-use, narrowly scoped credential the agent
-never holds. The agent proposes; ActionGate disposes; the credential broker
-makes the disposition real.
+an autonomous agent and the systems it acts on. Every action entering an
+ActionGate-supported adapter is reduced to a **canonical action envelope**,
+canonicalized to a stable identity, evaluated by a frozen decision state
+machine, and — if allowed — executed *only* through a single-use, narrowly
+scoped credential the agent never holds. The agent proposes; ActionGate
+disposes; the credential broker makes the disposition real.
 
 ### The implemented pre-commit flow
 
 ```
-  agent tool call  (MCP / HTTP / gRPC adapter — transport-neutral)
+  agent tool call  (MCP adapter today; transport-neutral core, HTTP/gRPC planned)
         │
         ▼
   Canonical Action Envelope  ──►  24-field structured action
@@ -133,8 +138,8 @@ replayed or widened for another.
 
 ### The nine technical properties enforcement rests on
 
-1. **Canonical action envelope (24 fields).** Every consequential action is
-   expressed in one structured envelope — actor, action type, target,
+1. **Canonical action envelope (24 fields).** Every action ActionGate
+   authorizes is expressed in one structured envelope — actor, action type, target,
    parameters, scope, consequence class, evidence, approval, and more — so
    that authorization operates on a single, comparable representation.
 2. **Deterministic action identity.** JCS plus an Action-Profile
@@ -164,11 +169,15 @@ replayed or widened for another.
    state is re-read and applied under optimistic-concurrency / compare-and-set,
    closing the gap between the moment of check and the moment of action.
 8. **Independent broker recomputation.** The broker recomputes the action
-   hash independently rather than trusting the gateway's assertion, so a
-   single compromised component cannot mint authority for a different action.
-9. **Transport neutrality with a real control-plane reference.** MCP is one
-   adapter, not an architectural dependency; the same core runs under HTTP
-   and gRPC. A real Kubernetes reference implementation exercises the pattern
+   identity independently rather than trusting the gateway's assertion,
+   preventing a compromised or defective gateway from substituting another
+   action — **assuming the broker itself remains trusted** (a compromised
+   broker is a trusted-boundary failure, outside this threat model).
+9. **Transport-neutral core with a real control-plane reference.** The core
+   is a deterministic in-process runtime; MCP is the currently implemented
+   protocol integration, not an architectural dependency, and the core is
+   designed for additional adapters such as HTTP or gRPC (planned, not yet
+   built). A real Kubernetes reference implementation exercises the pattern
    against a live control plane (etcd + kube-apiserver, server-side dry-run,
    scoped TokenRequest/RBAC, PodSecurity admission).
 
@@ -185,34 +194,47 @@ signal — those are a separate research track, not a dependency.
 
 ### Developer surface — one boundary, deterministic decisions
 
-```python
-from action_gate_ref import ActionGate, ActionEnvelope
+At the protocol level the boundary is a single pre-commit lifecycle:
 
-gate = ActionGate(policy=policy, broker=credential_broker)
-
-decision = gate.decide(ActionEnvelope(
-    actor="agent://refund-worker",
-    action_type="payment.refund",
-    target="orders/8842",
-    parameters={"amount": 40.00, "currency": "USD"},
-    consequence_class="IRREVERSIBLE_FINANCIAL",
-    evidence=collected_evidence,      # optional; can only raise scrutiny
-    approval=human_approval,          # bound to this action's hash
-))
-# decision.outcome ∈ {ALLOW, ALLOW_WITH_CONSTRAINTS, SIMULATE_AND_RETRY,
-#                      REQUEST_MORE_EVIDENCE, ESCALATE_TO_HUMAN, DENY}
-
-if decision.outcome is Outcome.ALLOW:
-    token = gate.broker.mint(decision)   # single-use, scoped, time-limited
-    execute(action, token)               # agent never held a durable credential
+```
+prepare canonical action envelope
+    → evaluate against signed policy (+ optional evidence / approval)
+    → receive one of six deterministic outcomes
+    → attach required simulation or human approval (if demanded)
+    → obtain a single-use execution authorization
+    → execute exactly once through the broker (agent holds no durable credential)
+    → verify state at commit + append a tamper-evident audit record
 ```
 
-The reference core is Python 3.11+ standard-library only and ships with
-conformance vectors, a frozen envelope schema, and frozen transition
-tables, so an integrator can verify byte-for-byte that their implementation
-matches the specified decision behavior. The runnable enforcement gateway,
-the MCP protocol adapter, and the Kubernetes reference build on that same
-core without changing the decision contract.
+The reference core exposes this as a small, functional Python surface
+(`action_gate_ref`) — envelopes are plain JSON/dict objects validated
+against a frozen schema, and the decision is a pure function of the envelope,
+the signed policy, and the current time:
+
+```python
+from action_gate_ref import gate, schema
+
+schema.validate_envelope(envelope)                 # frozen envelope schema
+decision = gate.evaluate(
+    envelope, signed_policy,
+    evidence=evidence,      # optional; can only raise scrutiny
+    approvals=approvals,    # each bound to this action's hash
+    now="2026-07-12T00:00:00Z",
+)
+# decision["outcome"] ∈ {ALLOW, ALLOW_WITH_CONSTRAINTS, SIMULATE_AND_RETRY,
+#                        REQUEST_MORE_EVIDENCE, ESCALATE_TO_HUMAN, DENY}
+```
+
+The same operations are exercised from a real CLI (`action_gate_ref`:
+`validate-envelope`, `canonicalize`, `hash-action`, `verify-approval`,
+`verify-token`, `verify-audit-chain`). Credential brokering and single-use
+execution live in the separately-tested gateway package, not in the
+reference core. The reference core is Python 3.11+ standard-library only and
+ships with conformance vectors, a frozen envelope schema, and frozen
+transition tables, so an integrator can verify byte-for-byte that their
+implementation matches the specified decision behavior. The runnable
+enforcement gateway, the MCP protocol adapter, and the Kubernetes reference
+build on that same core without changing the decision contract.
 
 **Honest surface note.** The reference core is deliberately scoped: no
 network, no MCP, no credential custody, no AI/biometric evidence — it
@@ -318,6 +340,11 @@ it differs and why that difference matters to a security buyer.
 
 ### Feature-level differentiation
 
+In the table below, "No" means *not the product family's native abstraction*
+— not a claim that it is impossible to approximate through custom
+configuration or integration. The point is where each capability sits at the
+center of the product versus at its periphery.
+
 | Capability | ActionGate | Guardrails / moderation | Observability | IAM / secrets brokers |
 |---|---|---|---|---|
 | Deterministic pre-commit **admissibility decision** | **Yes** — six frozen outcomes | No (text-level) | No (post-hoc) | No (grants access, not per-action admissibility) |
@@ -326,13 +353,16 @@ it differs and why that difference matters to a security buyer.
 | **Human approval bound to the action hash** | **Yes** | No | No | No |
 | **Commit-time state verification** (TOCTOU) | **Yes** — CAS re-read | No | No | No |
 | Optional evidence can only **raise** scrutiny | **Yes** — non-compensatory | N/A | N/A | N/A |
-| Transport-neutral (MCP / HTTP / gRPC) | **Yes** | Varies | Varies | Varies |
+| Transport-neutral core | **MCP implemented; HTTP/gRPC planned** | Varies | Varies | Varies |
 | Ecosystem breadth / maturity | Early, focused | **Broad** | **Broad** | **Mature** |
 
 ### How the authorization primitive differs
 
-The clearest way to see why ActionGate is a new category rather than a
-variant of an existing one is the unit of authorization itself.
+ActionGate defines a focused product category around AI action
+authorization by integrating known policy, capability, approval, and audit
+primitives at the agent-action boundary. It does not claim a new
+computer-science primitive — the differentiation is the *unit of
+authorization* and the *lifecycle they are bound into*, illustrated below.
 
 1. **The decision object is an action, not a principal.** Traditional policy
    asks *"can Alice delete Pods?"* and RBAC answers yes/no for the role.
@@ -378,20 +408,36 @@ variant of an existing one is the unit of authorization itself.
 
 ### Competitive positioning matrix
 
-| Product | Identity | Policy | Action hash | Single-use capability | AI-native | Cross-platform |
-|---|---|---|---|---|---|---|
-| **Microsoft Entra** | ✓ | Partial | ✗ | ✗ | ✗ | ✓ |
-| **CyberArk** | ✓ | Partial | ✗ | Partial | ✗ | ✓ |
-| **OPA** | ✗ | ✓ | ✗ | ✗ | ✗ | ✓ |
-| **Kyverno** | ✗ | ✓ | ✗ | ✗ | ✗ | Kubernetes |
-| **HashiCorp Sentinel** | ✗ | ✓ | ✗ | ✗ | ✗ | Terraform |
-| **AI agent frameworks** | ✗ | Minimal | ✗ | ✗ | ✓ | Varies |
-| **ActionGate** | Uses existing identity | ✓ | ✓ | ✓ | ✓ | ✓ * |
+This matrix describes each product's **primary/native abstraction**, not the
+limits of what it could be configured to do. Enterprise platforms may
+approximate several of these capabilities through custom policy, workflow,
+conditional access, or integration; the cells below mark where a capability
+is *central* to the product versus adjacent to it. Labels: **Native**
+(central capability) · **Config/integration** (achievable but not the native
+abstraction) · **Ref-impl** (implemented in ActionGate's reference) ·
+**Planned** · **Not established in this review**.
 
-\* *Cross-platform is the design intent of the transport-neutral core and the
-domain-agnostic envelope. Today it is **reference-validated on Kubernetes**;
-additional connectors (AWS IAM, Terraform, GitHub, databases) are on the
-roadmap, not yet shipped. The ✓ marks architectural fit, not present breadth.*
+| Product | Identity | Policy | Action-bound identity | Single-use capability | AI-native | Cross-domain |
+|---|---|---|---|---|---|---|
+| **Microsoft Entra** | Native | Config/integration | Not central | Config/integration | Not central | Native |
+| **CyberArk** | Native | Config/integration | Not central | Partial (short-lived) | Not central | Native |
+| **OPA** | — | Native | Not central | — | Not central | Native |
+| **Kyverno** | — | Native | Not central | — | Not central | Kubernetes |
+| **HashiCorp Sentinel** | — | Native | Not central | — | Not central | Terraform |
+| **AI agent frameworks** | — | Minimal | Not central | — | Native | Varies |
+| **ActionGate** | Uses existing identity | Native | **Ref-impl** | **Ref-impl** | Native | **Planned** * |
+
+\* *Cross-domain breadth is the design intent of the transport-neutral core
+and the domain-agnostic envelope. Today it is **reference-validated on
+Kubernetes**; additional connectors (AWS IAM, Terraform, GitHub, databases)
+are planned, not yet shipped. The label marks architectural fit, not present
+breadth.*
+
+**The safest competitive statement.** We do not claim these products *cannot*
+do the above. Their **primary abstraction is identity, entitlement, policy,
+or admission**; ActionGate's **primary abstraction is a canonical, one-use
+autonomous-agent action lifecycle.** That difference in what sits at the
+center of the product — not a checkbox a competitor lacks — is the positioning.
 
 ### Where the moat is — and is not
 
@@ -447,9 +493,9 @@ and holds the credential that makes the decision real.
 | **Reference conformance core** | 123 tests passing — canonical envelope, JCS + Action-Profile canonicalization, domain-separated hashing, six-outcome state machine, hard-invariant operators, conformance vectors (Python 3.11+ stdlib only). |
 | **Runnable enforcement gateway** | 39 tests passing — single-use execution token + scoped broker-minted credential; nine end-to-end enforcement demonstrations; transport-agnostic core. |
 | **MCP protocol adapter** | 43 tests passing — tool-invocation interception → canonical envelope → gateway → execution only via valid token + single-use broker capability; fifteen end-to-end scenarios. |
-| **Kubernetes control-plane reference** | 30 tests (14 passing, 16 real-cluster demonstrations skip cleanly without a cluster) — server-side dry-run, scoped TokenRequest/RBAC, PodSecurity admission, commit-time state verification; eighteen real-cluster demonstrations when a cluster is present. |
-| **Isolated compromised-agent experiment** | 39 tests (37 passing, 2 skip without root/cluster) — four protection domains, netns/user/process separation, Ed25519 public-key-only verification, mTLS SAN identity, durable SQLite replay store, independent broker recomputation, tamper-evident audit checkpoints; parser-differential canonicalization tests. |
-| **Total** | **274 tests** across the ActionGate stack, passing where the environment allows; cluster demonstrations and root-required isolation tests skip cleanly without that infrastructure. |
+| **Kubernetes control-plane reference** | 30 tests total: 14 environment-independent tests (passing) and 16 real-cluster tests that skip when the control plane is unavailable. *Separately*, 18 real-cluster demonstration scenarios (server-side dry-run, scoped TokenRequest/RBAC, PodSecurity admission, commit-time state verification) execute in the reference cluster environment — these are demonstrations, not counted in the 30 tests. |
+| **Isolated compromised-agent experiment** | 39 tests total: 37 environment-independent tests (unit 14 + remediation 11 + parser-differential 12, all passing) and 2 end-to-end isolation tests that skip without root / netns privileges. Covers four protection domains, netns/user/process separation, Ed25519 public-key-only verification, mTLS SAN identity, durable SQLite replay store, independent broker recomputation, tamper-evident audit checkpoints. *Separately*, the compromised-agent red-team run executes 27 attacks (see verdict row) — a demonstration, not part of the 39 tests. |
+| **Total** | **274 tests** across the five packages (123 + 39 + 43 + 30 + 39), each auditable per the rows above; where a row lists demonstrations, they are stated separately and are **not** folded into the 274. Cluster demonstrations and root-required tests skip cleanly without that infrastructure. |
 | **Mechanical red-team verdict (isolated)** | `ISOLATED_GATE_THESIS_SUPPORTED` — 27/27 attacks blocked, all **executed** (no asserted/hard-coded passes). On the decisive-attack baseline, the exact-action gateway + isolated broker design blocks attacks that static RBAC (blocks 1), admission-only (blocks 1), and time-window-JIT (blocks 1) do not. |
 | **Independent architectural validation** | **`SUPPORTED_WITH_LIMITATIONS`** — see below. |
 
@@ -517,24 +563,38 @@ some demonstrations requiring infrastructure not present in CI;
 
 | Limitation | Why it exists | Status |
 |---|---|---|
-| Single-host durable store | No cross-host distributed transaction implemented | By scope; roadmap Q3 |
-| Trusted broker / signing-root / cluster | Trust anchored in the broker and its roots | By scope; hardening on roadmap |
-| File-permission key custody, pure-Python crypto | No HSM/audited-AEAD dependency in the environment | By scope; productionization item |
-| Unverified build-time supply chain | Trust roots pinned (N8) but build provenance unverified | Roadmap Q4 |
-| Race coverage on the update path only | Concurrency measured for `update`, not all verbs | By scope; roadmap Q2 |
-| No third-party external red-team | Only internal, fully-executed experiments so far | Roadmap Q1 |
+| Single-host durable store | No cross-host distributed transaction implemented | By scope; Stage 4 |
+| Trusted broker / signing-root / cluster | Trust anchored in the broker and its roots | By scope; hardening across stages |
+| File-permission key custody, pure-Python crypto | No HSM/audited-AEAD dependency in the environment | By scope; Stage 3 productionization |
+| Unverified build-time supply chain | Trust roots pinned (N8) but build provenance unverified | Stage 4 |
+| Race coverage on the update path only | Concurrency measured for `update`, not all verbs | By scope; Stage 2 |
+| No third-party external red-team | Only internal, fully-executed experiments so far | Stage 1–2 |
 | Optional evidence unvalidated | Interface exists; value not yet demonstrated | Research track |
 
-### Representative use cases (buildable on today's mechanism)
+### Representative use cases (by connector-availability status)
 
-- **Consequential financial/infra actions** — refunds, payouts, resource
-  deletion, config changes: exact-action approval binding + scoped credential.
-- **Human-in-the-loop for irreversible actions** — ESCALATE_TO_HUMAN with an
-  approval bound to the exact action hash, so it cannot be replayed.
-- **Compromised-agent containment** — an agent that holds no durable
-  credential cannot act even if its process is hijacked.
-- **Auditable agent operations** — a tamper-evident, replayable record of
-  every admissibility decision for compliance reconstruction.
+The enforcement *mechanism* is domain-agnostic, but each use case also
+requires a connector. We distinguish mechanism portability from connector
+availability:
+
+- **Reference-validated (Kubernetes / infrastructure actions).** Resource
+  creation/deletion and config changes against a real control plane, with
+  server-side dry-run and commit-time state verification — the strongest
+  validated surface today.
+- **Implemented through generic / mock adapters.** Filesystem, HTTP-tool,
+  and Terraform-style pathways exist as mock adapters (no real egress),
+  exercising the enforcement lifecycle without a production backend.
+- **Target use case / roadmap (not yet a connector).** Payments, email,
+  databases, IAM, and broader cloud actions — e.g. a refund gated by
+  exact-action approval + single-use credential. These illustrate the
+  *mechanism*; the connectors are on the roadmap, not shipped.
+
+Two capabilities are mechanism-level and available today regardless of
+connector: **human-in-the-loop for irreversible actions** (ESCALATE_TO_HUMAN
+with an approval bound to the exact action hash, non-replayable) and
+**compromised-agent containment** (an agent holding no durable credential
+cannot act even if its process is hijacked), plus a tamper-evident,
+replayable audit record of every admissibility decision.
 
 ### Roadmap — a maturity timeline, not a coding schedule
 
