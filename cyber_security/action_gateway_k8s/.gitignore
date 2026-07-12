@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.action_gateway_k8s_session.json
+# local cluster runtime artefacts (binaries, certs, etcd data, kubeconfig)
+/tmp/k8sref/
+*.kubeconfig

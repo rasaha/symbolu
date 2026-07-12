@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# runtime domain state: keys, certs, sockets, sqlite stores, kubeconfig copies
+/tmp/agw-iso/
+*.sqlite
+*.sqlite-*
+*.pem
+*.sk
+*.key

@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.action_gateway_session.json

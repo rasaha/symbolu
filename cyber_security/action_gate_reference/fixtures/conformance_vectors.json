@@ -1,0 +1,260 @@
+{
+  "conformance": {
+    "all_pass": true,
+    "count": 24,
+    "passed": 24,
+    "results": [
+      {
+        "detail": "key-order independent",
+        "expectation": "same",
+        "passed": true,
+        "vector": "V1_key_order"
+      },
+      {
+        "detail": "whitespace independent",
+        "expectation": "same",
+        "passed": true,
+        "vector": "V2_whitespace"
+      },
+      {
+        "detail": "omit != null",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V3_omit_vs_null"
+      },
+      {
+        "detail": "got E_BARE_NUMBER, wanted E_BARE_NUMBER",
+        "expectation": "reject:E_BARE_NUMBER",
+        "passed": true,
+        "vector": "V4_number_rejected"
+      },
+      {
+        "detail": "ms-UTC accepted; offset rejected",
+        "expectation": "mixed",
+        "passed": true,
+        "vector": "V5_timestamp_norm"
+      },
+      {
+        "detail": "argument change -> different action_hash",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V6_arg_change"
+      },
+      {
+        "detail": "target change -> different",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V7_target_change"
+      },
+      {
+        "detail": "credential expansion -> different",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V8_scope_expand"
+      },
+      {
+        "detail": "policy_version change -> different action_hash",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V9_policy_change"
+      },
+      {
+        "detail": "expiry change -> different approval_hash",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V10_approval_expiry"
+      },
+      {
+        "detail": "rollback change -> different",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V11_rollback_change"
+      },
+      {
+        "detail": "set reorder -> same",
+        "expectation": "same",
+        "passed": true,
+        "vector": "V12_set_reorder_same"
+      },
+      {
+        "detail": "ordered list reorder -> different",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V13_list_reorder_diff"
+      },
+      {
+        "detail": "got E_DUP_KEY, wanted E_DUP_KEY",
+        "expectation": "reject:E_DUP_KEY",
+        "passed": true,
+        "vector": "V14_dup_key"
+      },
+      {
+        "detail": "got E_NAN_INF, wanted E_NAN_INF",
+        "expectation": "reject:E_NAN_INF",
+        "passed": true,
+        "vector": "V15_nan_inf"
+      },
+      {
+        "detail": "NFC-required rejects NFD; raw NFC != NFD",
+        "expectation": "reject:E_NON_NFC",
+        "passed": true,
+        "vector": "V16_non_nfc"
+      },
+      {
+        "detail": "secret versions differ",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V17_secret_ref"
+      },
+      {
+        "detail": "chain verifies; tamper localized to record 1",
+        "expectation": "verify+tamper",
+        "passed": true,
+        "vector": "V18_audit_chain"
+      },
+      {
+        "detail": "got E_NONCE_REPLAY, wanted E_NONCE_REPLAY",
+        "expectation": "reject:E_NONCE_REPLAY",
+        "passed": true,
+        "vector": "V19_token_replay"
+      },
+      {
+        "detail": "got E_STALE_STATE, wanted E_STALE_STATE",
+        "expectation": "reject:E_STALE_STATE",
+        "passed": true,
+        "vector": "V20_toctou"
+      },
+      {
+        "detail": "action_id/timestamp excluded -> same action_hash",
+        "expectation": "same",
+        "passed": true,
+        "vector": "V21_id_ts_excluded"
+      },
+      {
+        "detail": "same bytes, different domain -> different digest",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V22_domain_separation"
+      },
+      {
+        "detail": "runtime/model included -> different",
+        "expectation": "different",
+        "passed": true,
+        "vector": "V23_runtime_model_included"
+      },
+      {
+        "detail": "no bare-hash-of-secret API exists (HMAC commitment required, \u00a78)",
+        "expectation": "policy",
+        "passed": true,
+        "vector": "V24_low_entropy_secret"
+      }
+    ]
+  },
+  "pinned": {
+    "action_hash_sha256": "40af208b568da0a8a52356231b17eccca317f1c129cc3d4054b14e3fdbe3697f",
+    "action_hash_sha512_256": "9bb7639d34d5882acd218890d0b7108da6759963ca10843424fb96fd3851fba2",
+    "reference_action_byte_len": 965,
+    "reference_action_canonical_bytes": "{\"agent_identity\":{\"id\":\"agent://sre/1\",\"key_id\":\"k7\"},\"arguments\":{\"grantee\":\"arn:aws:iam::acct:role/other\"},\"correlation_id\":\"sess-77c1\",\"credential_scope\":{\"permissions\":[\"iam:AttachRolePolicy\"],\"principal\":\"agent://sre/1\",\"ttl\":\"PT10M\"},\"current_state_hash\":\"sha256:3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f\",\"delegation_chain\":[{\"exp\":\"2026-07-12T18:00:00.000Z\",\"from\":\"user://alice\",\"grant\":\"iam:*\",\"to\":\"agent://sre/1\"}],\"delegator\":{\"id\":\"user://alice\",\"type\":\"HUMAN\"},\"model_provider\":{\"model\":\"claude-opus-4-8\",\"provider\":\"anthropic\"},\"objective\":\"onboard service account\",\"operation\":\"IAM_GRANT_ADMIN\",\"policy_version\":\"1.4.0+sha256:aa11\",\"reversibility\":\"REVERSIBLE_WITH_COST\",\"runtime\":\"mcp-host/1.2\",\"sequence_id\":\"sess-77c1:0007\",\"state_freshness\":{\"as_of\":\"2026-07-12T14:03:05.000Z\",\"source\":\"iam-live\"},\"target_resource\":[\"arn:aws:iam::acct:role/billing-sa\"],\"tool\":{\"server_id\":\"cloud-iam\",\"tool_name\":\"attach_role_policy\"}}",
+    "sample_canonical_bytes": "{\"a\":\"2\",\"b\":\"1\"}",
+    "sample_digest_ACTION_sha256": "5d4439343a125d09ca5ebb09bf3346cf3e4f3a486f975477a79e72d63aa8d5d2",
+    "sample_digest_ACTION_sha512_256": "9377a9760675d286487160c46f62287925681099c814b82d82b7d911647f9cf8"
+  },
+  "vectors": [
+    {
+      "expectation": "same",
+      "vector": "V1_key_order"
+    },
+    {
+      "expectation": "same",
+      "vector": "V2_whitespace"
+    },
+    {
+      "expectation": "different",
+      "vector": "V3_omit_vs_null"
+    },
+    {
+      "expectation": "reject:E_BARE_NUMBER",
+      "vector": "V4_number_rejected"
+    },
+    {
+      "expectation": "mixed",
+      "vector": "V5_timestamp_norm"
+    },
+    {
+      "expectation": "different",
+      "vector": "V6_arg_change"
+    },
+    {
+      "expectation": "different",
+      "vector": "V7_target_change"
+    },
+    {
+      "expectation": "different",
+      "vector": "V8_scope_expand"
+    },
+    {
+      "expectation": "different",
+      "vector": "V9_policy_change"
+    },
+    {
+      "expectation": "different",
+      "vector": "V10_approval_expiry"
+    },
+    {
+      "expectation": "different",
+      "vector": "V11_rollback_change"
+    },
+    {
+      "expectation": "same",
+      "vector": "V12_set_reorder_same"
+    },
+    {
+      "expectation": "different",
+      "vector": "V13_list_reorder_diff"
+    },
+    {
+      "expectation": "reject:E_DUP_KEY",
+      "vector": "V14_dup_key"
+    },
+    {
+      "expectation": "reject:E_NAN_INF",
+      "vector": "V15_nan_inf"
+    },
+    {
+      "expectation": "reject:E_NON_NFC",
+      "vector": "V16_non_nfc"
+    },
+    {
+      "expectation": "different",
+      "vector": "V17_secret_ref"
+    },
+    {
+      "expectation": "verify+tamper",
+      "vector": "V18_audit_chain"
+    },
+    {
+      "expectation": "reject:E_NONCE_REPLAY",
+      "vector": "V19_token_replay"
+    },
+    {
+      "expectation": "reject:E_STALE_STATE",
+      "vector": "V20_toctou"
+    },
+    {
+      "expectation": "same",
+      "vector": "V21_id_ts_excluded"
+    },
+    {
+      "expectation": "different",
+      "vector": "V22_domain_separation"
+    },
+    {
+      "expectation": "different",
+      "vector": "V23_runtime_model_included"
+    },
+    {
+      "expectation": "policy",
+      "vector": "V24_low_entropy_secret"
+    }
+  ]
+}
