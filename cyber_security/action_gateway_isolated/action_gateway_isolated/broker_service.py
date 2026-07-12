@@ -14,6 +14,9 @@ import sys
 from . import bootstrap, layout, rpc
 from .broker_core import BrokerError
 
+# N10: the broker authenticates the gateway by its certificate SAN, never the CN.
+_GATEWAY_SAN = (f"DNS:gateway", f"URI:{layout.GATEWAY_SPIFFE}")
+
 
 def _admin_client():
     from action_gateway_k8s.cluster import AdminKubeClient
@@ -32,9 +35,9 @@ def build_core():
 
 def make_handler(core):
     def handler(req):
-        # transport identity: only the gateway certificate may drive the broker
-        if req.get("_peer_cn") != "gateway":
-            return {"error": "E_TLS_IDENTITY", "peer": req.get("_peer_cn")}
+        # transport identity: only a cert carrying the gateway SAN may drive the broker
+        if not rpc.peer_has_identity(req.get("_peer_san"), *_GATEWAY_SAN):
+            return {"error": "E_TLS_IDENTITY", "peer": req.get("_peer_san")}
         method = req.get("method")
         a = req.get("args", {})
         try:
@@ -49,6 +52,10 @@ def make_handler(core):
                 return {"ok": True, "result": core.execute(a["authz"])}
             if method == "verify_audit":
                 return {"ok": True, "result": core.verify_audit()}
+            if method == "reconcile":
+                return {"ok": True, "result": core.reconcile()}
+            if method == "detect_divergence":
+                return {"ok": True, "result": core.detect_divergence()}
             return {"error": "E_UNKNOWN_METHOD"}
         except BrokerError as e:
             return {"error": e.code, "message": str(e)}

@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 from pathlib import Path
 
 from . import crypto
@@ -32,11 +33,13 @@ class AuditLedger:
     def __init__(self, db_path: str):
         self.path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()  # serialize appends within this process
         self._init()
 
     def _conn(self):
         c = sqlite3.connect(self.path, timeout=30, isolation_level=None)
         c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA busy_timeout=30000")
         return c
 
     def _init(self):
@@ -53,13 +56,49 @@ class AuditLedger:
                 BEGIN SELECT RAISE(ABORT,'append-only'); END""")
 
     def append(self, payload: dict) -> str:
+        return self.append_record(payload)[1]
+
+    def append_record(self, payload: dict):
+        """Append and return (seq, record_hash) so a commit can link its audit (N3).
+
+        The read-prev + insert is done under BEGIN IMMEDIATE (a SQLite write lock) plus
+        an in-process lock, so concurrent appends from multiple threads/instances/
+        processes serialize and cannot fork the hash chain — required now that the
+        transport is multi-threaded (N4)."""
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute("SELECT record_hash FROM records ORDER BY seq DESC LIMIT 1").fetchone()
+                prev = row[0] if row else "genesis"
+                rh = _h(prev, payload)
+                cur = c.execute("INSERT INTO records(prev_hash, payload, record_hash) VALUES(?,?,?)",
+                                (prev, json.dumps(payload, sort_keys=True), rh))
+                seq = cur.lastrowid
+                c.execute("COMMIT")
+            finally:
+                c.close()
+        return seq, rh
+
+    def events_by(self, event: str, action_hash: str):
+        """Return the seqs of ledger records with a given event + action_hash."""
+        seqs = []
         with self._conn() as c:
-            row = c.execute("SELECT record_hash FROM records ORDER BY seq DESC LIMIT 1").fetchone()
-            prev = row[0] if row else "genesis"
-            rh = _h(prev, payload)
-            c.execute("INSERT INTO records(prev_hash, payload, record_hash) VALUES(?,?,?)",
-                      (prev, json.dumps(payload, sort_keys=True), rh))
-        return rh
+            for (seq, payload) in c.execute("SELECT seq, payload FROM records ORDER BY seq"):
+                p = json.loads(payload)
+                if p.get("event") == event and p.get("action_hash") == action_hash:
+                    seqs.append(seq)
+        return seqs
+
+    def event_action_hashes(self, event: str):
+        """Return {action_hash: [seq,...]} for every record of ``event``."""
+        out = {}
+        with self._conn() as c:
+            for (seq, payload) in c.execute("SELECT seq, payload FROM records ORDER BY seq"):
+                p = json.loads(payload)
+                if p.get("event") == event:
+                    out.setdefault(p.get("action_hash", ""), []).append(seq)
+        return out
 
     def head(self):
         with self._conn() as c:

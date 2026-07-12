@@ -20,7 +20,7 @@ setpriv --reuid=gwu --regid=gwu --init-groups \
   python3 -m action_gateway_isolated.gateway_service >> "$RUN/gateway.log" 2>&1 &
 
 for i in $(seq 1 30); do
-  [ -S "$RUN/gateway.sock" ] && python3 -c "import socket;socket.create_connection(('127.0.0.1',8443),2)" 2>/dev/null && break
+  [ -S "$RUN/sock/gateway.sock" ] && python3 -c "import socket;socket.create_connection(('127.0.0.1',8443),2)" 2>/dev/null && break
   sleep 1
 done
 echo "[restart] services restarted" >&2

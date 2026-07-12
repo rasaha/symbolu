@@ -7,6 +7,13 @@ runtime behavior. Where implementation contradicts documentation, implementation
 wins. No code was written or changed for this study; all findings are grounded in
 source inspection with file:line citations.*
 
+> **Post-remediation re-validation (appended).** Phases 1–9 below are the **original,
+> pre-remediation** falsification record and are left **unaltered**. After the N1–N11
+> findings were remediated, the falsification was re-run against the changed system;
+> the measured re-validation and the **updated verdict** are in **Phase 10**, which
+> supersedes the Phase 9 verdict. The Phase 10 verdict change is justified **only** by
+> re-executed, measured evidence.
+
 ---
 
 ## Methodology
@@ -329,7 +336,7 @@ but not on this artifact's security claims as stated.
 
 ---
 
-## Phase 9 — Independent verdict
+## Phase 9 — Independent verdict *(superseded by Phase 10 after remediation)*
 
 # PARTIALLY_SUPPORTED
 
@@ -365,3 +372,98 @@ Kyverno/OPA (N1); make finalize/teardown ordering fail-safe and never release a
 claim after a successful write (N2); add server-side read timeouts + a threaded/
 bounded transport (N4); recompute `action_hash` in the broker (N5); replace the 9
 asserted attack outcomes with executed ones (N6).
+
+---
+
+## Phase 10 — Re-validation after remediation (measured)
+
+The N1–N11 fixes were applied and the falsification re-run against the changed code,
+tests, and runtime. This phase records **only measured / re-executed** outcomes; no
+finding text above was edited. Re-validation environment: same local etcd +
+kube-apiserver control plane, same netns/user/mTLS isolation, `ecdsa 0.19.2`.
+
+**Reference run (deterministic across repeated runs):**
+`ISOLATED_GATE_THESIS_SUPPORTED` — **27/27 attacks blocked, all executed** (0 asserted).
+Regression: reference 123 / gateway 39 / mcp 43 / k8s 30 / isolated 39 tests pass.
+Post-run broker state: `detect_divergence() == []`, `open_orphans() == []`,
+`verify_audit().intact == True`.
+
+### Per-finding re-validation
+
+| # | Original status | Re-validation (measured) | Now |
+|---|---|---|---|
+| **N1** policy completeness | Falsified (initContainer/envFrom admitted) | `policy_semantic` validates all three container lists + `envFrom`/volumes/SA/securityContext against an allow-list, **fails closed** on unknown fields; init-container image + ephemeral privileged + envFrom-secret now flagged (`test_remediation.py`, `A20/A21`) | **Closed** |
+| **N2** teardown double-commit | Falsified (release after write) | commit finalized+audited before teardown, claim never released post-write, durable orphan ledger + `reconcile()`; `A19` induces a teardown failure → mutation stays committed, residual recorded, then actually deleted, `divergence=[]` | **Closed** |
+| **N3** audit atomicity | Falsified (dual-write gap) | commit↔audit linked by `seq`; `detect_divergence()` deterministic; appends serialized under `BEGIN IMMEDIATE` (a fork bug the multi-threaded transport exposed was found+fixed) | **Closed** |
+| **N4** gateway DoS | Falsified (single-thread, no bounds) | bounded frame/timeout/concurrency + `E_OVERLOADED` back-pressure; oversized/truncated/malformed rejected; `A24` 40-way flood answers deterministically, no hang, no mutation | **Closed** |
+| **N5** broker recomputes hash | Overstated (gateway-asserted) | broker recomputes action-hash/manifest-digest/target/GVR/policy from its own trusted inputs; `A9→E_AUTHZ_BAD_GATEWAY_SIGNATURE`, `A14/A15→E_MANIFEST_DIGEST_MISMATCH` | **Closed** |
+| **N6** asserted verdict | Overstated (17 measured + 9 asserted) | all 9 previously-asserted attacks now executed with real codes; **0** hard-coded passes remain | **Closed** |
+| **N7** distributed replay | Single-host only | `A31`: a 2nd broker on the **same** durable store rejects a committed action's replay (`E_NONCE_REPLAY`) | **Closed for the shared-store case; cross-host limitation retained** |
+| **N8** trust base | Unpinned | trust-manifest fingerprint pinning (fail closed) + `ecdsa` min-version pin (`test_remediation.py`) | **Closed for the deployed trust base; build-time fetch integrity retained** |
+| **N9** ad-hoc hashing | Unframed concat | single `canon` module (framed JCS + length-prefix) used by both gateway and broker; `bc.canon is gc.canon` asserted | **Closed** |
+| **N10** transport identity | CN string match, hostname off | SAN-based auth + `check_hostname=True`; CA-signed **wrong-SAN** cert → `E_TLS_IDENTITY` (`A7`) | **Closed** |
+| **N11** parser differential | Argued only | 12 parser-differential/transport tests (ordering, duplicate keys, unicode, escaping, malformed/truncated/oversized) | **Closed** |
+
+### Theses re-assessed against the measured re-run
+
+- **"No unauthorized protected-state mutation"** — the N1 falsification (initContainer/
+  `envFrom`/SA smuggling) no longer reproduces; those manifests are now denied, and the
+  policy fails closed on any unmodeled field. Holds for the modeled Kubernetes kinds.
+- **"Exact-action binding"** — now **broker-verified** (N5), not gateway-asserted; a
+  tampered signed intent is rejected by independent recomputation.
+- **"Single-use / no replay"** — holds on teardown failure (N2) and across a second
+  broker on the shared store (N7); the durable single-use store is the enforcer.
+- **"Complete tamper-evident audit"** — commit/audit divergence is now deterministically
+  detectable and the chain no longer forks under concurrency (N3).
+- **"26/26 blocked"** — replaced by **27/27 executed**; the headline is now empirical.
+
+### Limitations that remain (honest; NOT claimed fixed)
+
+These are genuine residual boundaries, retained from Phases 3/5–8 — the remediation
+was scoped to N1–N11 and did **not** attempt them:
+
+1. **Cross-host distributed atomicity.** The durable store is still one SQLite file.
+   The shared-store two-broker case is measured (N7), but a true network partition /
+   multi-host / NFS deployment lacks a distributed transaction. *Off-host double-commit
+   remains possible.*
+2. **Trusted broker / signing-root / cluster / colluding approvers** (Phase 3 #1,2,9,12)
+   — unchanged. A compromised broker still holds admin creds.
+3. **Key custody = file permissions, not HSM; `ecdsa` is pure-Python** (non-constant-time,
+   unaudited). Pinning fixes *which* key is trusted, not *where* it lives.
+4. **Build-time supply chain.** The download of cluster binaries and the `ecdsa` wheel is
+   still unverified (the deeper half of N8); pinning covers the deployed trust base only.
+5. **TOCTOU coverage.** Only the `update` CAS path has a dedicated adversarial race
+   measurement; `create` (fail-if-present) and `delete` (preconditions) use the same
+   mechanism but are not independently race-tested.
+6. **Novelty (Phases 5–8) is unchanged** — the contribution is still an *integration*
+   of ocap + attestation-gated admission + JIT approval + tamper-evident audit +
+   SPIFFE. Fixing the engineering defects does not create a new abstraction or proof;
+   the "Reject as a research paper / would-not-fund on novelty alone" analyses stand.
+
+## Phase 10 — Updated verdict
+
+# SUPPORTED_WITH_LIMITATIONS
+
+**Justification (re-executed / measured evidence only).** Every in-scope defect that
+*falsified* a security thesis in the original study — policy incompleteness (N1),
+double-commit + residual RBAC + audit gap on teardown failure (N2), and the
+agent-triggerable gateway DoS (N4) — no longer reproduces; each now has an executed,
+measured block, and the two latent bugs the new executable tests surfaced (manifest
+aliasing, audit-chain fork under concurrency) were found and fixed. The overstated
+claims were corrected at the mechanism level, not in prose: exact-action binding is
+broker-verified (N5), the verdict is 27/27 **executed** rather than partly asserted
+(N6), audit divergence is deterministically detectable (N3), duplicate execution is
+rejected across a second broker on the shared store (N7), transport identity is
+SAN-based (N10), trust roots are pinned (N8), and one framed canonicalizer serves
+both sides (N9), exercised by parser-differential tests (N11).
+
+This lifts the honest standing from `PARTIALLY_SUPPORTED` to
+**`SUPPORTED_WITH_LIMITATIONS`**: the falsifications are closed and the theses now
+survive re-execution — but it stops short of `STRONGLY_SUPPORTED` because real
+architectural limitations remain **by scope, not oversight**: single-host durable
+store (no cross-host distributed transaction), a trusted broker/signing-root/cluster,
+file-permission key custody with pure-Python crypto, an unverified build-time supply
+chain, and race coverage measured only for the `update` path. The isolation and
+asymmetric-authorization theses (already strong) are now joined by a
+policy-complete, broker-verified, transactionally-audited, bounded, fully-measured
+enforcement path — within the stated single-host, trusted-broker threat model.

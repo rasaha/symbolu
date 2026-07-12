@@ -2,12 +2,18 @@
 
 Determines **mechanically** whether the Action Gateway architecture survives a
 fully compromised agent, by building four **enforced** protection domains and
-running a 30-attack red-team from inside a genuinely isolated agent.
+running a fully-executed compromised-agent red-team from inside a genuinely isolated
+agent.
 
-**Result of the reference run:** `ISOLATED_GATE_THESIS_SUPPORTED` — 26/26 attacks
-blocked with all seven prerequisites enforced (see `RED_TEAM_RESULTS.md`). This is
-a *reference* result on a local control plane; the boundaries beyond a compromised
-broker / signing root / cluster / colluding approvers remain out of scope.
+**Result of the reference run:** `ISOLATED_GATE_THESIS_SUPPORTED` — **27/27 attacks
+blocked, all executed and measured (no asserted passes)**, with all seven
+prerequisites enforced (see `RED_TEAM_RESULTS.md`). This is a *reference* result on a
+local control plane; the boundaries beyond a compromised broker / signing root /
+cluster / colluding approvers remain out of scope.
+
+The enforcement path was hardened against the independent architectural validation
+(`../INDEPENDENT_ARCHITECTURAL_VALIDATION.md`, findings N1–N11); see
+`IMPLEMENTATION_FINDINGS.md`.
 
 ## What the adversarial review demanded, and what this builds
 
@@ -36,7 +42,7 @@ Protected Kubernetes API  (real etcd + kube-apiserver; RBAC + PodSecurity)
 | Agent → network | Linux **network namespace** (`unshare --net`) | apiserver:6443 and broker:8443 are *Network unreachable* |
 | Agent → files/keys | Separate **Unix users** + 0400 ownership | every private key / kubeconfig / DB read = `PermissionError` |
 | Agent → gateway | **Unix domain socket**, group `agwsock`, 0660 | the only reachable channel |
-| Gateway → broker | **mTLS** (broker requires CN=gateway client cert) | agent has no cert and no route |
+| Gateway → broker | **mTLS**, broker requires the gateway **SAN** (`DNS:gateway` / `URI:spiffe://…/gateway`), not the CN | a CA-signed wrong-SAN cert → `E_TLS_IDENTITY`; agent has no cert and no route |
 | Broker → K8s | mTLS admin cert (broker-only copy) | agent/gateway cannot read it |
 
 Container tooling is unavailable in this environment, so isolation uses Linux
@@ -59,22 +65,80 @@ The gateway cannot forge approvals or policy; the broker holds no signing key (i
 only verifies); the agent holds nothing. The frozen HMAC scheme stays *inside* the
 gateway domain and is never trusted across a boundary (see IMPLEMENTATION_FINDINGS).
 
+### Trust roots are pinned (establishment · rotation · failure)
+
+- **Establishment.** At key genesis the offline root writes `pub/trust_manifest.json`
+  — the SHA-256 fingerprint of every purpose's public key. `deploy.sh` sets it
+  root-owned + read-only (`0444`) so the pins cannot be rewritten by the gateway,
+  broker, or agent.
+- **Enforcement.** `crypto.PublicKeyring` refuses to trust any public key that is not
+  in the manifest or whose fingerprint does not match — **fail closed**. Verification
+  of an unpinned/mismatched key simply returns False.
+- **Rotation.** Regenerate the affected keypair under offline-root custody and
+  rewrite the manifest (`crypto.write_trust_manifest`); distribute the new public key.
+  Until the manifest is updated, the new key is untrusted (fail closed), so rotation
+  is atomic from the verifier's point of view.
+- **Crypto pin.** `ecdsa` is pinned to a known-good minimum version; below it,
+  `ASYMMETRIC_AVAILABLE` is False and the verdict is forced to `ISOLATION_NOT_PROVEN`
+  (never a silent downgrade).
+- *Out of scope:* the integrity of the **download** of the cluster binaries and the
+  `ecdsa` wheel is a build-time supply-chain concern (documented limitation); the
+  pinning above anchors the **deployed** trust base.
+
 ## Broker, replay, TOCTOU, audit
 
+- **Independent recomputation.** Before acting, the broker recomputes the action
+  hash, manifest digest, target identity, namespace, GVR, and policy binding from its
+  **own** trusted inputs (via the shared `canon` module) and rejects any mismatch
+  (`E_ACTION_HASH_MISMATCH` / `E_MANIFEST_DIGEST_MISMATCH` / …). Exact-action binding
+  is enforced by the component that mints credentials, not asserted by the gateway.
 - **Broker** mints a per-action ServiceAccount + `resourceNames`/verb-scoped Role +
-  short-lived TokenRequest token, performs the write, and **verifies teardown**
-  (a failure raises `E_TEARDOWN`, never swallowed). No bearer credential ever
+  short-lived TokenRequest token and performs the write. No bearer credential ever
   leaves the broker.
+- **Transactional teardown.** After a durable mutation, the commit is **finalized and
+  audited before teardown**, and its claim is never released. If teardown does not
+  confirm, the residual credential is written to a durable **orphan ledger** and
+  audited, then drained by `broker.reconcile()` (delete + re-verify + divergence
+  check). No successful execution loses its commit or audit; reconciliation is
+  idempotent.
 - **Durable replay** (`SQLite`): execution-token / approval nonces and the
-  single-commit claim survive process restart and are shared across instances; a
-  fresh correlation id cannot reset a global watermark.
+  single-commit claim survive process restart and are shared across instances (a
+  second broker on the same store rejects a replay with `E_NONCE_REPLAY`); a fresh
+  correlation id cannot reset a global watermark.
 - **TOCTOU**: writes are optimistic-concurrency (`resourceVersion` CAS on update,
   preconditions on delete, create-fails-if-present); a stale state assumption at
   commit yields `E_STALE_STATE`.
 - **Audit** is an append-only, hash-chained SQLite ledger (WORM triggers) whose
-  head is signed by a **separate** offline checkpoint key — so a compromised agent
-  or gateway can neither rewrite records (no file access) nor re-sign checkpoints
-  (no key).
+  head is signed by a **separate** offline checkpoint key. Appends are serialized
+  (`BEGIN IMMEDIATE` + in-process lock) so the multi-threaded broker cannot fork the
+  chain. A commit and its audit record are linked by `seq`, and `detect_divergence()`
+  deterministically flags a commit without audit (or vice-versa).
+
+## Semantic policy — validated workload surface (fail closed)
+
+`policy_semantic.check` validates the **complete** pod workload surface against an
+explicit allow-list; any field it does not model produces an `unrecognized_*`
+violation (**fail closed**). Enforced fields (`policy_semantic.SUPPORTED_FIELDS`):
+
+| group | fields (dangerous values flagged) |
+|---|---|
+| pod spec | `containers`, `initContainers`, `ephemeralContainers`, `volumes`, `serviceAccountName`/`serviceAccount`, `automountServiceAccountToken`, `hostNetwork`/`hostPID`/`hostIPC`, `shareProcessNamespace`, `hostUsers`, `securityContext`, `imagePullSecrets` (+ modeled scheduling/lifecycle fields) |
+| container (all three lists) | `image` (pinned-digest required), `env` (secretKeyRef → `secret_env`), `envFrom` (secretRef → `secret_envfrom`), `securityContext`, … |
+| volume | `hostPath` → `host_path`, `secret`/projected-secret → `secret_mount`, `csi` → `csi_volume`, remote block sources → `remote_volume`; benign `emptyDir`/`configMap`/`downwardAPI`/`pvc`/`ephemeral` pass |
+| securityContext (pod + container) | `privileged`, `capabilities.add`, `allowPrivilegeEscalation`, `runAsNonRoot=false`/`runAsUser=0`, `procMount` |
+
+Both the gateway (to gate the decision) and the broker (defence in depth) run this
+same check. `SUPPORTED_FIELDS` is asserted by the unit tests, so the documented
+surface cannot silently drift from the enforced one.
+
+## Bounded transport (deterministic under overload)
+
+The agent↔gateway and gateway↔broker RPC is bounded on every axis (`rpc.py`):
+`MAX_FRAME_BYTES` (oversized frames rejected before allocation), `READ_TIMEOUT`
+(idle/slow-loris), a fixed worker pool + `BoundedSemaphore` that immediately replies
+`E_OVERLOADED` when at capacity (back-pressure — no unbounded queue), and a bounded
+accept backlog. Overload fails deterministically (shed or connection reset), never a
+hang; malformed/truncated frames raise deterministically.
 
 ## Run it
 
@@ -95,6 +159,8 @@ sudo bash scripts/teardown.sh
 
 ```bash
 python3 -m pytest tests/test_unit.py -q          # crypto/replay/authz/policy/audit (no cluster)
+python3 -m pytest tests/test_remediation.py -q   # N1 fail-closed, N2 orphans, N3 divergence, N8 pinning
+python3 -m pytest tests/test_parser_diff.py -q   # N9/N11 canonicalization + N4 bounded transport
 python3 -m pytest tests/test_isolation_e2e.py -q # SKIPs unless the stack is deployed (=> NOT_PROVEN)
 ```
 A skipped isolation test is **not** a pass — it maps to `ISOLATION_NOT_PROVEN`.

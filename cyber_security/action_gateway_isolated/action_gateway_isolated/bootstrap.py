@@ -40,6 +40,8 @@ def generate_keys(force=False):
         sk, vk = crypto.generate_keypair()
         priv.write_bytes(sk.to_pem(format="pkcs8"))  # Ed25519 requires PKCS#8
         pub.write_bytes(vk.to_pem())
+    # pin every public key so the verifier keyrings are trust-anchored (N8)
+    crypto.write_trust_manifest(str(layout.PUB_DIR), crypto.PURPOSES)
     return list(crypto.PURPOSES)
 
 

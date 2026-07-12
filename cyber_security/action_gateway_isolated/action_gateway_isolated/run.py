@@ -80,7 +80,10 @@ def main():
     #    deterministic conditional-write test; shares the same durable stores)
     from action_gateway_k8s import cluster
     bc = bootstrap.make_broker_core(admin, clock, server=cluster.SERVER, ca_cert=str(cluster.CA_CERT))
-    orch = redteam.orchestrated_attacks(sock, admin, clock, restart_services, broker_core=bc)
+    # a SECOND broker instance on the SAME durable stores (N7 two-gateway replay)
+    bc2 = bootstrap.make_broker_core(admin, clock, server=cluster.SERVER, ca_cert=str(cluster.CA_CERT))
+    orch = redteam.orchestrated_attacks(sock, admin, clock, restart_services, broker_core=bc,
+                                        second_broker_core=bc2)
 
     # conditional-write proof: the TOCTOU attack must have been blocked by a CAS conflict
     env["conditional_write"] = any(a["id"] == "A18_A28_toctou" and a["blocked"] for a in orch)

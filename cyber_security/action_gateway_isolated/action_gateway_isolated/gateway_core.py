@@ -1,34 +1,28 @@
 """Gateway decision core (no privileged K8s authority, no approver/policy keys).
 
-Reuses the frozen canonicalization + action-hash semantics (via the Kubernetes
-mapping) unchanged. Runs the deterministic policy checks, requests state + a real
-server-side dry-run from the broker, and — on ALLOW — builds an Ed25519 execution
-authorization it signs with the GATEWAY key only, then hands it to the broker. The
-agent never sees or forwards the authorization; decision and execution are one
-gateway-side transaction, so a compromised agent cannot interpose a modified
-action, target, or scope after approval.
+Computes the action identity through the single shared ``canon`` module (N9) — the
+exact same function the broker calls to recompute it (N5) — so there is one framed
+hashing implementation, not an ad-hoc string concatenation. Runs the deterministic
+policy checks, requests state + a real server-side dry-run from the broker, and —
+on ALLOW — builds an Ed25519 execution authorization it signs with the GATEWAY key
+only, then hands it to the broker. The agent never sees or forwards the
+authorization; decision and execution are one gateway-side transaction, so a
+compromised agent cannot interpose a modified action, target, or scope after
+approval.
 """
 
 from __future__ import annotations
 
-from . import authz, policy_semantic
-from ._core import ref_hashing
+from . import authz, canon, policy_semantic
+from ._core import GVR, ref_hashing
+from . import layout
 from action_gateway_k8s import mapping
-from action_gateway.clock import FixedClock
-from action_gateway.mapping import build_envelope
-from action_gateway._ref import projection
-
-# Deterministic clock for HASH-relevant envelope fields (delegation exp,
-# state_freshness.as_of, timestamp). Real time is used only for authz expiry/nonce,
-# which are NOT part of the action hash. This keeps an action's identity stable
-# across submissions (so an approval bound to it re-applies) while the real
-# current-state hash still tracks live cluster state.
-_HASH_CLOCK = FixedClock("2026-01-01T00:00:00.000Z")
 
 
 class GatewayCore:
     def __init__(self, *, gateway_sk, keyring, broker, clock, policy_hash, policy_version,
-                 gateway_identity, allowed_namespaces=("protected",), token_ttl=300):
+                 gateway_identity, allowed_namespaces=("protected",), token_ttl=300,
+                 cluster_id=layout.CLUSTER_ID):
         self.sk = gateway_sk
         self.keyring = keyring
         self.broker = broker
@@ -38,6 +32,7 @@ class GatewayCore:
         self.identity = gateway_identity
         self.allowed = set(allowed_namespaces)
         self.token_ttl = token_ttl
+        self.cluster_id = cluster_id
         self._seq = 0
 
     def handle(self, request: dict) -> dict:
@@ -65,16 +60,16 @@ class GatewayCore:
                               [v["check"] for v in violations])
 
         state = self.broker.state(ns, kind, name)
-        # build canonical envelope + action hash (frozen semantics, unchanged)
-        state_hash = "sha256:" + ref_hashing.domain_digest(
-            "ACTION", f"{ns}/{kind}/{name}@{state['resource_version'] or 'absent'}".encode())
-        req = mapping.to_tool_request(spec, args, _Ctx(self.identity), current_state_hash=state_hash)
-        env = build_envelope(req, clock=_HASH_CLOCK, policy_version=self.policy_version,
-                             current_state_hash=state_hash)
-        action_hash = projection.action_hash(env)
+        gvr = GVR[kind]
+        verb = "delete" if spec.verb == "delete" else ("create" if not state["present"] else "update")
+        # single shared framed hashing (N9); the broker recomputes these identically (N5)
+        state_hash = canon.state_hash(ns, kind, name, state["present"], state["resource_version"])
+        action_hash = canon.action_hash(
+            cluster=self.cluster_id, namespace=ns, api_group=gvr.group, api_version=gvr.version,
+            kind=kind, name=name, verb=verb, manifest=manifest, policy_hash=self.policy_hash,
+            state_present=state["present"], state_rv=state["resource_version"])
 
         # real server-side dry-run via the broker (admin identity, non-mutating)
-        verb = "delete" if spec.verb == "delete" else ("create" if not state["present"] else "update")
         dr = self.broker.dry_run(ns, kind, name, manifest, verb)
         if not dr.get("ok"):
             return self._deny("E_DRY_RUN_REJECTED", dr)
@@ -91,15 +86,17 @@ class GatewayCore:
                         "executable": False}
             approvals = valid
 
-        # build Ed25519 execution authorization and execute (one transaction)
+        # build Ed25519 execution authorization and execute (one transaction).
+        # The intent carries EVERY input to canon.action_hash so the broker can
+        # recompute the identity independently (N5) rather than trusting the field.
         self._seq += 1
         intent = {
             "action_hash": action_hash, "policy_hash": self.policy_hash,
             "decision_record_hash": ref_hashing.domain_digest("AUDIT_RECORD", action_hash.encode()),
-            "operation": spec.operation, "namespace": ns, "kind": kind, "name": name,
-            "verb": verb, "manifest": manifest,
-            "manifest_digest": ref_hashing.domain_digest(
-                "SIMULATION", (req.args.get("manifest_json") or "").encode()),
+            "operation": spec.operation, "cluster": self.cluster_id,
+            "namespace": ns, "api_group": gvr.group, "api_version": gvr.version,
+            "kind": kind, "name": name, "verb": verb, "manifest": manifest,
+            "manifest_digest": canon.manifest_digest(manifest),
             "state_hash": state_hash, "state_rv": state["resource_version"],
             "state_present": state["present"], "rollback_plan": args.get("rollback_plan"),
             "gateway_identity": self.identity, "expiry": self.clock.plus(self.token_ttl),
@@ -126,18 +123,3 @@ class GatewayCore:
 
     def _deny(self, code, detail=None):
         return {"outcome": "DENY", "reason_codes": [code], "detail": detail, "executable": False}
-
-
-class _Ctx:
-    """Minimal context adapter for the k8s mapping (identity + defaults)."""
-
-    def __init__(self, identity):
-        self.effective_agent_id = lambda: identity
-        self.agent_key_id = "k-gw"
-        self.delegator = "user://operator"
-        self.delegator_type = "HUMAN"
-        self.agent_runtime = "isolated/1.0"
-        self.model = None
-        self.provider = None
-        self.correlation_id = "iso"
-        self.sequence_id = "iso:0001"

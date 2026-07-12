@@ -34,6 +34,8 @@ for k in policy_root "approver__security-lead" "approver__sre-lead" checkpoint; 
   chown root:root "$RUN/keys/$k.sk"; chmod 0400 "$RUN/keys/$k.sk"
 done
 chmod 0644 "$RUN"/pub/*.pub; chmod 0755 "$RUN/pub"
+# trust manifest: root-owned + read-only so pinned fingerprints cannot be rewritten (N8)
+chown root:root "$RUN/pub/trust_manifest.json"; chmod 0444 "$RUN/pub/trust_manifest.json"
 
 # --- mTLS PKI (CA, broker server cert, gateway client cert) ---
 cd "$RUN/tls"
@@ -57,10 +59,24 @@ CNF
   openssl genrsa -out broker.key 2048 2>/dev/null
   openssl req -new -key broker.key -subj "/CN=broker" -config broker.cnf -out broker.csr 2>/dev/null
   openssl x509 -req -in broker.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out broker.crt -days 2 -extensions v3 -extfile broker.cnf 2>/dev/null
-  # gateway client cert (CN=gateway)
+  # gateway client cert (CN=gateway, SAN = DNS:gateway + URI:spiffe://agw.local/gateway).
+  # The broker authenticates the gateway by this SAN, NOT the CN (N10).
+  cat > gateway.cnf <<'CNF'
+[req]
+distinguished_name=dn
+req_extensions=v3
+prompt=no
+[dn]
+CN=gateway
+[v3]
+subjectAltName=@a
+[a]
+DNS.1=gateway
+URI.1=spiffe://agw.local/gateway
+CNF
   openssl genrsa -out gateway.key 2048 2>/dev/null
-  openssl req -new -key gateway.key -subj "/CN=gateway" -out gateway.csr 2>/dev/null
-  openssl x509 -req -in gateway.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out gateway.crt -days 2 2>/dev/null
+  openssl req -new -key gateway.key -subj "/CN=gateway" -config gateway.cnf -out gateway.csr 2>/dev/null
+  openssl x509 -req -in gateway.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out gateway.crt -days 2 -extensions v3 -extfile gateway.cnf 2>/dev/null
 fi
 chown brokeru:brokeru broker.key; chmod 0400 broker.key
 chown gwu:gwu gateway.key; chmod 0400 gateway.key
@@ -102,7 +118,7 @@ log "gateway pid $!"
 # --- wait for readiness ---
 ready=0
 for i in $(seq 1 30); do
-  if [ -S "$RUN/gateway.sock" ] && python3 -c "import socket;socket.create_connection(('127.0.0.1',8443),2)" 2>/dev/null; then
+  if [ -S "$RUN/sock/gateway.sock" ] && python3 -c "import socket;socket.create_connection(('127.0.0.1',8443),2)" 2>/dev/null; then
     ready=1; break
   fi
   sleep 1

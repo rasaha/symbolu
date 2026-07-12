@@ -1,15 +1,21 @@
 """Credential broker / execution service — the ONLY holder of privileged K8s authority.
 
-Verifies asymmetric authorization independently, claims durable single-use nonces,
-mints a per-action resource/verb-scoped short-lived credential, performs a
-CONDITIONAL (optimistic-concurrency) write that closes the commit-time TOCTOU race,
-tears the credential down and VERIFIES the teardown (never swallowed), and appends
-a hash-chained audit record. It exposes no bearer credential to the gateway/agent.
+Verifies asymmetric authorization independently, INDEPENDENTLY RECOMPUTES the
+action identity (N5) instead of trusting the gateway's asserted hash, claims
+durable single-use nonces, mints a per-action resource/verb-scoped short-lived
+credential, performs a CONDITIONAL (optimistic-concurrency) write that closes the
+commit-time TOCTOU race, then — as a SEPARATE, TRANSACTIONAL step — atomically
+finalizes the commit and appends its audit record before verifying teardown. A
+teardown that does not confirm is recorded in a durable orphan ledger and
+reconciled later (N2); it never releases the commit or loses the audit (N3). It
+exposes no bearer credential to the gateway/agent.
 """
 
 from __future__ import annotations
 
-from . import authz, policy_semantic
+import copy
+
+from . import authz, canon, layout, policy_semantic
 from ._core import GVR, K8sApiError, KubeClient, ref_hashing
 from .audit_ledger import AuditLedger
 from .replaystore import ReplayStore
@@ -27,7 +33,7 @@ class BrokerError(Exception):
 class BrokerCore:
     def __init__(self, *, admin_client, keyring, active_policy_hash, replay_db, audit_db,
                  server, ca_cert, clock, allowed_namespaces=("protected",),
-                 gateway_identity):
+                 gateway_identity, cluster_id=layout.CLUSTER_ID):
         self.admin = admin_client
         self.keyring = keyring
         self.active_policy_hash = active_policy_hash
@@ -38,6 +44,11 @@ class BrokerCore:
         self.clock = clock
         self.allowed = set(allowed_namespaces)
         self.gateway_identity = gateway_identity
+        self.cluster_id = cluster_id
+        # test-only fault injection: force the single-use teardown to fail so the
+        # durable orphan ledger + reconciler (N2) can be exercised end to end.
+        self._teardown_fault = False
+        self._last_scope = None  # the most recently minted RBAC scope (A16 inspection)
 
     # ---- read helpers the gateway calls (no mutation authority) ----
 
@@ -90,7 +101,18 @@ class BrokerCore:
         verb = intent["verb"]
         if ns not in self.allowed:
             raise self._reject(intent, "E_NAMESPACE")
+        if kind not in GVR:
+            raise self._reject(intent, "E_UNKNOWN_KIND")
+        if verb not in _VERBS:
+            raise self._reject(intent, "E_UNKNOWN_VERB")
         manifest = intent.get("manifest")
+
+        # N5: INDEPENDENT RECOMPUTATION. Trust nothing the gateway asserted about the
+        # action's identity. Recompute the manifest digest and the action hash from
+        # first principles using the broker's OWN trusted cluster id, GVR table, and
+        # active policy hash. A mismatch means the signed intent's identity does not
+        # match its contents (target, manifest, namespace, or policy) -> fatal.
+        self._verify_action_identity(intent, ns, kind, name, verb, manifest)
 
         # defence in depth: re-run semantic checks before any privileged action
         violations = policy_semantic.check({"namespace": ns, "kind": kind, "name": name},
@@ -119,18 +141,61 @@ class BrokerCore:
         if not self.replay.claim_commit(ah, at=now):
             raise self._reject(intent, "E_DUPLICATE_COMMIT")
 
+        # privileged write. A BrokerError here is raised BEFORE any mutation (the
+        # write itself is the last thing that can fail), so the commit claim is safe
+        # to release; the minted RBAC is torn down inside _mint_and_write on failure.
         try:
-            result = self._mint_scope_and_write(intent, ns, kind, name, verb, manifest)
+            result, sa = self._mint_and_write(intent, ns, kind, name, verb, manifest)
         except BrokerError:
             self.replay.release_commit(ah)
             raise
-        rh = ref_hashing.domain_digest("EXECUTION_RESULT",
-                                       str(sorted(result.items())).encode())
-        self.replay.finalize_commit(ah, rh)
-        self._audit("COMMIT", intent, "OK", extra={"result_rv": result.get("resource_version")})
-        return {"outcome": "COMMITTED", **result}
 
-    def _mint_scope_and_write(self, intent, ns, kind, name, verb, manifest) -> dict:
+        # The mutation is now DURABLE. Finalize the commit and append its audit
+        # record atomically (N3) BEFORE teardown, so a successful execution can never
+        # silently lose its commit record or its audit trail. release_commit can no
+        # longer touch this action (result_hash is set).
+        rh = ref_hashing.domain_digest("EXECUTION_RESULT", str(sorted(result.items())).encode())
+        self._finalize_and_audit(ah, rh, intent, result)
+
+        # Teardown of the single-use credential is a SEPARATE durable step. If it does
+        # not confirm, the residual RBAC is recorded in the durable orphan ledger and
+        # audited for the reconciler (N2) — never swallowed, never lost.
+        ok_td, detail = self._teardown(sa, ns)
+        if not ok_td:
+            self.replay.record_orphan(sa, ns, at=now, action_hash=ah, detail=detail)
+            self._audit("TEARDOWN_FAILURE", intent, detail, extra={"orphan_sa": sa})
+        return {"outcome": "COMMITTED", "teardown": "confirmed" if ok_td else "orphaned", **result}
+
+    def _verify_action_identity(self, intent, ns, kind, name, verb, manifest) -> None:
+        """N5: recompute the identity independently; any mismatch is fatal."""
+        gvr = GVR[kind]
+        if canon.manifest_digest(manifest) != intent.get("manifest_digest"):
+            raise self._reject(intent, "E_MANIFEST_DIGEST_MISMATCH")
+        recomputed = canon.action_hash(
+            cluster=self.cluster_id, namespace=ns, api_group=gvr.group, api_version=gvr.version,
+            kind=kind, name=name, verb=verb, manifest=manifest,
+            policy_hash=self.active_policy_hash,
+            state_present=intent.get("state_present"), state_rv=intent.get("state_rv"))
+        if recomputed != intent.get("action_hash"):
+            raise self._reject(intent, "E_ACTION_HASH_MISMATCH")
+        # the gateway must not have asserted a different cluster/group/version either
+        if intent.get("cluster") not in (None, self.cluster_id):
+            raise self._reject(intent, "E_CLUSTER_MISMATCH")
+        if intent.get("api_group") not in (None, gvr.group) or \
+           intent.get("api_version") not in (None, gvr.version):
+            raise self._reject(intent, "E_GVR_MISMATCH")
+
+    def _finalize_and_audit(self, ah, rh, intent, result) -> None:
+        """Append the COMMIT audit record, then link it to the finalized commit so
+        commit/audit divergence is deterministically detectable (N3)."""
+        seq, _ = self.audit.append_record(
+            {"event": "COMMIT", "action_hash": ah, "operation": intent.get("operation", ""),
+             "verb": intent.get("verb", ""), "namespace": intent.get("namespace", ""),
+             "name": intent.get("name", ""), "detail": "OK",
+             "result_rv": result.get("resource_version"), "at": self.clock.now()})
+        self.replay.finalize_commit(ah, rh, audit_seq=seq)
+
+    def _mint_and_write(self, intent, ns, kind, name, verb, manifest):
         gvr = GVR[kind]
         short = ref_hashing.domain_digest("EXECUTION_TOKEN", intent["nonce"].encode())[:12]
         sa = f"cap-{short}"
@@ -145,6 +210,8 @@ class BrokerCore:
                           "resourceNames": [name], "verbs": named})
         if "create" in verbs:
             rules.append({"apiGroups": [gvr.group], "resources": [gvr.resource], "verbs": ["create"]})
+        self._last_scope = {"namespace": ns, "resource": gvr.resource, "name": name,
+                            "verbs": verbs, "rules": rules}  # inspectable minted scope (A16)
         self.admin.create(GVR["Role"], ns, {"apiVersion": "rbac.authorization.k8s.io/v1",
                           "kind": "Role", "metadata": {"name": sa, "namespace": ns}, "rules": rules})
         self.admin.create(GVR["RoleBinding"], ns, {"apiVersion": "rbac.authorization.k8s.io/v1",
@@ -158,9 +225,16 @@ class BrokerCore:
 
         try:
             result = self._conditional_write(scoped, gvr, ns, name, verb, manifest, intent)
-        finally:
-            self._teardown_verified(sa, ns)  # single-use; failure reported, not swallowed
-        return result
+        except BrokerError:
+            # nothing was mutated; tear the just-minted RBAC down. If teardown itself
+            # fails, record the orphan durably so the reconciler cleans it (N2).
+            ok_td, detail = self._teardown(sa, ns)
+            if not ok_td:
+                self.replay.record_orphan(sa, ns, at=self.clock.now(),
+                                          action_hash=intent.get("action_hash", ""), detail=detail)
+                self._audit("TEARDOWN_FAILURE", intent, detail, extra={"orphan_sa": sa})
+            raise
+        return result, sa
 
     def _conditional_write(self, client, gvr, ns, name, verb, manifest, intent) -> dict:
         """Optimistic-concurrency write: rejects if live state moved since approval."""
@@ -172,7 +246,7 @@ class BrokerCore:
                     raise BrokerError("E_STALE_STATE", "resource appeared after approval")
                 obj = client.create(gvr, ns, manifest)
             elif verb == "update":
-                m = dict(manifest)
+                m = copy.deepcopy(manifest)  # never mutate the signed intent's manifest
                 m.setdefault("metadata", {})["resourceVersion"] = approved_rv  # CAS
                 obj = client.replace(gvr, ns, name, m)
             else:  # delete
@@ -187,9 +261,18 @@ class BrokerCore:
         return {"verb": verb, "kind": gvr.resource, "name": name, "namespace": ns,
                 "resource_version": obj.get("metadata", {}).get("resourceVersion", "")}
 
-    def _teardown_verified(self, sa, ns):
+    def _teardown(self, sa, ns):
+        """Delete the minted RBAC and VERIFY the ServiceAccount is gone.
+
+        Returns ``(ok, detail)`` and NEVER raises or swallows — the caller decides
+        whether a non-confirmation becomes a durable orphan. ``_teardown_fault`` is a
+        test-only switch that skips the deletes so a genuine residual is produced.
+        """
         errors = []
         for kind in ("RoleBinding", "Role", "ServiceAccount"):
+            if self._teardown_fault:
+                errors.append(f"{kind}:fault-injected-skip")
+                continue
             try:
                 self.admin.delete(GVR[kind], ns, sa)
             except K8sApiError as e:
@@ -203,8 +286,45 @@ class BrokerCore:
             if e.status != 404:
                 errors.append(f"verify:{e.status}")
         if errors:
-            self._audit("TEARDOWN_FAILURE", {"sa": sa, "namespace": ns}, ",".join(errors))
-            raise BrokerError("E_TEARDOWN", f"credential revocation not confirmed: {errors}")
+            return False, ",".join(errors)
+        return True, "confirmed"
+
+    # ---- reconciliation: durable orphan drain + commit/audit divergence (N2/N3) ----
+
+    def reconcile(self) -> dict:
+        """Idempotent recovery: drain the orphan ledger (delete + verify each residual
+        credential) and detect any commit/audit divergence. Safe to run repeatedly."""
+        now = self.clock.now()
+        reconciled, still_open = [], []
+        for o in self.replay.open_orphans():
+            ok, detail = self._teardown(o["sa"], o["namespace"])
+            if ok:
+                self.replay.resolve_orphan(o["sa"], o["namespace"], at=now)
+                self._audit("ORPHAN_RECONCILED", {"namespace": o["namespace"],
+                            "name": o["sa"], "action_hash": o.get("action_hash", "")}, "resolved")
+                reconciled.append(o["sa"])
+            else:
+                still_open.append({"sa": o["sa"], "namespace": o["namespace"], "detail": detail})
+        return {"reconciled": reconciled, "still_open": still_open,
+                "divergence": self.detect_divergence()}
+
+    def detect_divergence(self) -> list:
+        """Deterministically detect commit<->audit divergence (N3):
+          * a finalized commit whose linked COMMIT audit record is missing;
+          * a COMMIT audit record with no finalized commit.
+        An intact system returns []."""
+        problems = []
+        audit_commits = self.audit.event_action_hashes("COMMIT")
+        for fc in self.replay.finalized_commits():
+            seqs = audit_commits.get(fc["action_hash"], [])
+            if not seqs or fc["audit_seq"] not in seqs:
+                problems.append({"type": "commit_without_audit",
+                                 "action_hash": fc["action_hash"]})
+        for ah in audit_commits:
+            rec = self.replay.commit_record(ah)
+            if rec is None or rec["result_hash"] is None:
+                problems.append({"type": "audit_without_commit", "action_hash": ah})
+        return problems
 
     def _reject(self, intent, code) -> BrokerError:
         self._audit("REJECT", intent, code)

@@ -56,6 +56,9 @@ GATEWAY_SPIFFE = "spiffe://agw.local/gateway"
 BROKER_SPIFFE = "spiffe://agw.local/broker"
 AGENT_SPIFFE = "spiffe://agw.local/agent"
 
+# cluster identity bound into every action hash (gateway + broker agree on this)
+CLUSTER_ID = "ref://127.0.0.1:6443"
+
 PROTECTED_NS = "protected"
 
 
