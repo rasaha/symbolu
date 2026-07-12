@@ -1,0 +1,179 @@
+{
+  "study": "bcvf_bio_adversarial_synthetic_kill_study",
+  "scope": "synthetic_falsification_only",
+  "config": {
+    "guard": {
+      "anchor_radius": 2.0,
+      "gate_threshold": 0.9,
+      "cumulative_disp_limit": 6.0,
+      "deadband_k": 2.0,
+      "ema_center_alpha": 0.05,
+      "hyst_on": 3.0,
+      "hyst_off": 1.5,
+      "persistence_k": 5,
+      "persistence_m": 3
+    },
+    "observer": {
+      "alpha_fast": 0.3,
+      "alpha_slow": 0.02
+    },
+    "detector": {
+      "cusum_kappa": 0.25,
+      "w_identity": 1.0,
+      "w_disagree": 1.0,
+      "w_accel": 1.0,
+      "bcvf_gate_threshold": 0.3,
+      "bcvf_gate_beta": 40.0,
+      "huber_delta": 0.5,
+      "llt_q_level": 0.0001,
+      "llt_q_slope": 1e-05,
+      "llt_r_obs": 0.09
+    },
+    "damage": {
+      "horizon": 40,
+      "peak": 1.0,
+      "floor": 0.1
+    },
+    "embed_dim": 2,
+    "horizon": 200,
+    "onset": 80,
+    "dt": 1.0,
+    "dev_seeds_per_cell": 8,
+    "eval_seeds_per_cell": 16,
+    "dev_grid": {
+      "sigma": [
+        0.25,
+        0.35
+      ],
+      "separation": [
+        3.0,
+        4.0
+      ],
+      "ramp_duration": [
+        90.0
+      ],
+      "missing_rate": [
+        0.0
+      ]
+    },
+    "eval_grid": {
+      "sigma": [
+        0.3,
+        0.45
+      ],
+      "separation": [
+        3.5,
+        5.0
+      ],
+      "ramp_duration": [
+        70.0,
+        110.0
+      ],
+      "missing_rate": [
+        0.0,
+        0.3
+      ]
+    },
+    "far_budget": 0.05,
+    "det_fixed_far": 0.05,
+    "threshold_sweep": [
+      0.0,
+      0.5,
+      1.0,
+      1.5,
+      2.0,
+      2.5,
+      3.0,
+      3.5,
+      4.0,
+      4.5,
+      5.0,
+      5.5,
+      6.0,
+      6.5,
+      7.0,
+      7.5,
+      8.0,
+      8.5,
+      9.0,
+      9.5,
+      10.0,
+      10.5,
+      11.0,
+      11.5,
+      12.0
+    ],
+    "n_boot": 2000,
+    "boot_seed": 20260712
+  },
+  "arms": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I"
+  ],
+  "families": [
+    "F01_stable",
+    "F02_constant_offset",
+    "F03_linear_drift",
+    "F04_smooth_nonlinear_drift",
+    "F05_abrupt_device_switch",
+    "F06_abrupt_takeover",
+    "F07_slow_linear_takeover",
+    "F08_smooth_low_curvature_takeover",
+    "F09_gate_aware_poisoning",
+    "F10_detector_aware_optimized",
+    "F11_replay_low_noise",
+    "F12_sparse_missing_evidence"
+  ],
+  "event_counts": {
+    "dev": 384,
+    "eval": 3072
+  },
+  "eval_events_per_family": {
+    "F01_stable": 256,
+    "F02_constant_offset": 256,
+    "F03_linear_drift": 256,
+    "F04_smooth_nonlinear_drift": 256,
+    "F05_abrupt_device_switch": 256,
+    "F06_abrupt_takeover": 256,
+    "F07_slow_linear_takeover": 256,
+    "F08_smooth_low_curvature_takeover": 256,
+    "F09_gate_aware_poisoning": 256,
+    "F10_detector_aware_optimized": 256,
+    "F11_replay_low_noise": 256,
+    "F12_sparse_missing_evidence": 256
+  },
+  "records_written": 31104,
+  "events_file": "events.jsonl",
+  "calibration": {
+    "mean": {
+      "A": 0.7304585533486427,
+      "B": 0.28125280762484883,
+      "C": 7.001386417437097,
+      "D": 37.11458993190073,
+      "E": 98.99803001226753,
+      "F": 0.007503911129249879,
+      "G": -0.3118257054814186,
+      "H": -1.1368683772161603e-16,
+      "I": -1.1368683772161603e-16
+    },
+    "std": {
+      "A": 0.5193743069921084,
+      "B": 0.19928134753199475,
+      "C": 10.492324614119918,
+      "D": 48.872832089489854,
+      "E": 63.06280607892432,
+      "F": 0.014421371945342312,
+      "G": 1.8081852870447772,
+      "H": 2.3066886415030705,
+      "I": 2.3684390648560254
+    }
+  },
+  "deterministic": true
+}
