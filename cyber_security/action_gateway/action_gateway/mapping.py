@@ -24,6 +24,8 @@ TOOL_PERMS = {
     "http": {"request": "http:request"},
     "terraform": {"apply": "tf:apply", "plan": "tf:plan"},
     "kubernetes": {"delete": "k8s:delete", "apply": "k8s:apply"},
+    "iam": {"grant": "iam:grant"},
+    "monitoring": {"disable": "monitoring:disable"},
 }
 
 # (tool, verb) -> frozen gate operation
@@ -37,6 +39,8 @@ TOOL_OPERATION = {
     ("terraform", "plan"): "DEPLOY",
     ("kubernetes", "delete"): "DB_DELETE",
     ("kubernetes", "apply"): "DEPLOY",
+    ("iam", "grant"): "IAM_GRANT_ADMIN",
+    ("monitoring", "disable"): "MONITORING_DISABLE",
 }
 
 DEFAULT_REVERSIBILITY = {
@@ -45,6 +49,8 @@ DEFAULT_REVERSIBILITY = {
     "DEPLOY": "REVERSIBLE",
     "NET_EXPOSE": "REVERSIBLE",
     "SECRET_READ": "IRREVERSIBLE",
+    "IAM_GRANT_ADMIN": "REVERSIBLE_WITH_COST",
+    "MONITORING_DISABLE": "REVERSIBLE",
 }
 
 

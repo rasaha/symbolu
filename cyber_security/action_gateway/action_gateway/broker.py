@@ -63,6 +63,7 @@ class MockCredentialBroker(CredentialBroker):
     def __init__(self):
         self._issued: dict[str, ScopedCredential] = {}
         self._revoked: set[str] = set()
+        self._used: set[str] = set()
         self._counter = itertools.count(1)
 
     def issue(self, *, token: dict, requested_permissions, principal: str,
@@ -88,18 +89,23 @@ class MockCredentialBroker(CredentialBroker):
         return cred
 
     def validate(self, credential: ScopedCredential, *, needed_permission: str,
-                 now: str) -> bool:
+                 now: str, consume: bool = True) -> bool:
         # identity check: reject any capability this broker did not mint (forgery).
         known = self._issued.get(credential.credential_id)
         if known is None or known != credential:
             raise CredentialError("unknown or forged credential")
         if credential.credential_id in self._revoked:
             raise CredentialError("credential revoked")
+        # single-use: a capability that has already been consumed cannot be replayed.
+        if credential.credential_id in self._used:
+            raise CredentialError("credential already used (single-use capability)")
         if parse_ts(now) >= parse_ts(credential.expires_at):
             raise CredentialError("credential expired")
         if not _covers(credential.permissions, needed_permission):
             raise CredentialError(
                 f"credential lacks permission {needed_permission!r}")
+        if consume:
+            self._used.add(credential.credential_id)
         return True
 
     def revoke(self, credential: ScopedCredential) -> None:

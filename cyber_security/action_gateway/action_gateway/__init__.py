@@ -14,8 +14,8 @@ __version__ = "0.1.0-gw"
 
 from ._ref import REF_VERSION  # noqa: F401
 from .adapters import (  # noqa: F401
-    FilesystemTool, HTTPTool, KubernetesTool, ShellCommandTool, TerraformTool,
-    ToolAdapter, default_adapters,
+    FilesystemTool, HTTPTool, IamTool, KubernetesTool, MonitoringTool,
+    ShellCommandTool, TerraformTool, ToolAdapter, default_adapters,
 )
 from .broker import CredentialBroker, MockCredentialBroker, ScopedCredential  # noqa: F401
 from .clock import FixedClock, RealClock  # noqa: F401

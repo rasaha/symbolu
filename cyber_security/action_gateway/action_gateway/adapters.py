@@ -124,6 +124,24 @@ class KubernetesTool(ToolAdapter):
                 "namespace": req.args.get("namespace", "default")}
 
 
+class IamTool(ToolAdapter):
+    name = "iam"
+
+    def _perform(self, req: "ToolRequest") -> dict:
+        # MOCK: no real IAM control-plane calls.
+        return {"status": "ok", "verb": req.verb, "mocked": "true",
+                "target": req.target, "grantee": req.args.get("grantee", "")}
+
+
+class MonitoringTool(ToolAdapter):
+    name = "monitoring"
+
+    def _perform(self, req: "ToolRequest") -> dict:
+        # MOCK: no real monitoring/alerting mutation.
+        return {"status": "ok", "verb": req.verb, "mocked": "true",
+                "target": req.args.get("target", req.target[0] if req.target else "")}
+
+
 def default_adapters(sandbox_root: str) -> dict:
     return {
         "filesystem": FilesystemTool(sandbox_root),
@@ -131,4 +149,6 @@ def default_adapters(sandbox_root: str) -> dict:
         "http": HTTPTool(),
         "terraform": TerraformTool(),
         "kubernetes": KubernetesTool(),
+        "iam": IamTool(),
+        "monitoring": MonitoringTool(),
     }

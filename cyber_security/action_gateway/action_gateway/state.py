@@ -19,18 +19,20 @@ ESCALATED = "ESCALATED"
 EXPIRED = "EXPIRED"
 
 ALL = (PENDING, APPROVED, EXECUTING, COMPLETED, FAILED, DENIED, ESCALATED, EXPIRED)
-TERMINAL = frozenset({COMPLETED, FAILED, DENIED, ESCALATED, EXPIRED})
+# ESCALATED is NOT terminal: a human approval can re-admit the request to
+# evaluation (escalate -> approve -> execute). DENY is terminal.
+TERMINAL = frozenset({COMPLETED, FAILED, DENIED, EXPIRED})
 
 # Legal runtime transitions. Re-evaluation may keep a request PENDING (awaiting
 # evidence/simulation) or move it forward/backward among non-terminal verdicts.
 _LEGAL = {
     PENDING: {PENDING, APPROVED, DENIED, ESCALATED, EXPIRED},
-    APPROVED: {EXECUTING, EXPIRED, DENIED, PENDING},  # re-eval can revoke approval
+    APPROVED: {EXECUTING, EXPIRED, DENIED, PENDING, ESCALATED},  # re-eval can revoke approval
     EXECUTING: {COMPLETED, FAILED},
+    ESCALATED: {ESCALATED, APPROVED, DENIED, PENDING, EXPIRED},  # human input re-admits
     COMPLETED: set(),
     FAILED: set(),
     DENIED: set(),
-    ESCALATED: set(),
     EXPIRED: set(),
 }
 

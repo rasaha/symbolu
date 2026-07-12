@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import threading
 from dataclasses import dataclass, field
 
 from . import state as S
@@ -95,6 +96,9 @@ class Gateway:
         self._spent_nonces: set[str] = set()
         self._id_n = 0
         self._nonce_n = 0
+        # serializes evaluate/execute so a token nonce can be reserved atomically;
+        # guarantees at most one commit under parallel duplicate execution.
+        self._lock = threading.RLock()
 
     # ---------------------------------------------------------------- helpers
 
@@ -151,6 +155,10 @@ class Gateway:
     # ---------------------------------------------------------------- API: evaluate
 
     def evaluate_action(self, request_id: str, *, evidence=None, approvals=None) -> dict:
+        with self._lock:
+            return self._evaluate_locked(request_id, evidence=evidence, approvals=approvals)
+
+    def _evaluate_locked(self, request_id: str, *, evidence=None, approvals=None) -> dict:
         """Invoke the frozen gate; record + enforce its decision. Mints a token on ALLOW."""
         rec = self._get(request_id)
         if S.is_terminal(rec.state):
@@ -207,6 +215,16 @@ class Gateway:
     def execute_action(self, request_id: str, *, call_envelope=None,
                        observed_state_hash=None, requested_permissions=None,
                        active_policy_hash=None, require_reeval: bool = True) -> dict:
+        with self._lock:  # atomic verify+reserve+commit -> at most one commit
+            return self._execute_locked(
+                request_id, call_envelope=call_envelope,
+                observed_state_hash=observed_state_hash,
+                requested_permissions=requested_permissions,
+                active_policy_hash=active_policy_hash, require_reeval=require_reeval)
+
+    def _execute_locked(self, request_id: str, *, call_envelope=None,
+                        observed_state_hash=None, requested_permissions=None,
+                        active_policy_hash=None, require_reeval: bool = True) -> dict:
         """Verify the execution token, issue a scoped credential, invoke the adapter.
 
         No token -> no execution. The token is verified against the *actual* call
