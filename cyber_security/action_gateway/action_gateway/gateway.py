@@ -81,12 +81,14 @@ class Record:
 
 class Gateway:
     def __init__(self, *, sandbox_root: str, clock=None, broker=None,
-                 adapters=None, token_ttl_seconds: int = 300):
+                 adapters=None, token_ttl_seconds: int = 300, policy_bundle=None):
         self.clock = clock or RealClock()
         self.broker = broker or MockCredentialBroker()
         self.adapters = adapters or default_adapters(sandbox_root)
         self.token_ttl = token_ttl_seconds
-        self._bundle = policy.build_bundle()
+        # a caller may supply a custom signed-policy bundle (e.g. a Kubernetes
+        # rule set); defaults to the frozen reference ruleset.
+        self._bundle = policy_bundle or policy.build_bundle()
         self.signed_policy = policy.sign_policy(self._bundle)
         self.policy_version = policy.policy_version(self._bundle)
         self.sandbox_root = sandbox_root
@@ -357,9 +359,11 @@ class Gateway:
         }
 
     @classmethod
-    def restore(cls, snap: dict, *, clock=None, broker=None) -> "Gateway":
+    def restore(cls, snap: dict, *, clock=None, broker=None, adapters=None,
+                policy_bundle=None) -> "Gateway":
         gw = cls(sandbox_root=snap["sandbox_root"], clock=clock, broker=broker,
-                 token_ttl_seconds=snap.get("token_ttl_seconds", 300))
+                 adapters=adapters, token_ttl_seconds=snap.get("token_ttl_seconds", 300),
+                 policy_bundle=policy_bundle)
         gw._id_n = snap["id_n"]
         gw._nonce_n = snap["nonce_n"]
         gw._spent_nonces = set(snap["spent_nonces"])
