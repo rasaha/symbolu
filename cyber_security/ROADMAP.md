@@ -1,268 +1,189 @@
-# Roadmap — Adaptive Security Orchestration (consequence-first)
+# Roadmap — Agent Action Admissibility Gate (beachhead of record)
 
-**Status:** the forward plan after the full BCVF → USE → SCC → consequence-gating analysis.
-Capstone to `GAP_REGISTER.md`, `COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md`,
-`BCVF_CONCEPT_DIRECTION.md`, `USE_CONTRIBUTION_MAP.md`, and `kill_study/`.
+**Status:** the forward plan. The **concrete product of record is
+`AGENT_ACTION_ADMISSIBILITY_MVP.md`.** Context and prior analysis:
+`GAP_REGISTER.md`, `COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md`, `BCVF_CONCEPT_DIRECTION.md`,
+`USE_CONTRIBUTION_MAP.md`, `CRITICAL_TRANSITION_GOVERNANCE.md`, `kill_study/`.
 
-**Rev. 2:** added Phase −1 threat modeling (so `V` is derived, not invented); split liveness into
-commodity attestation (G1a, low-risk floor) vs novel context-bound liveness (G1b, parallel
-research enhancement — not a ship blocker); renamed Phase 3 to the pluggable "Evidence
-Innovation Lane"; added the safety-monotone (escalate-only) constraint on real-time agentic
-orchestration with full reasoning kept offline; kept mission→intent→goal modeling secondary and
-backstopped; noted the differentiation ceiling depends on the AI semantic layer, not on any
-evidence source.
-
-**Rev. 3:** integrated **Critical Transition Governance / OSGE** (`CRITICAL_TRANSITION_GOVERNANCE.md`)
-as a governance decision-mode inside L3 and the North-Star Phase 5 — reframing from
-*authenticating identities* to *authorizing consequential organizational state transitions*
-(the justification handshake; catches insider/privileged-misuse/mistakes/policy-violations/
-agent-errors). MVP now seeds a minimal deterministic handshake (Phase 2); full AI-reasoned,
-systems-of-record governance is the end-state (Phase 5), with AI kept advisory + escalate-only +
-human-approval. Positioning note: this raises the differentiation ceiling but into GRC /
-policy-as-code / PAM territory, and it is a heavier build (end-state, not beachhead).
+**Rev. 4 (reconciliation with the MVP spec).** Established the **agent-action admissibility
+gate** as the beachhead of record; restated the near-term product precisely (§0); repositioned
+Organizational State Governance / Critical Transition Governance as a *possible later
+generalization*, not the immediate product (§6); replaced the critical-path dependency graph
+with the agent-gate build order (§3); reclassified prior work (§5). The earlier human-fraud /
+attestation / OSGE phasing from Rev. 2–3 is **retained only as later-generalization context**,
+not as the critical path. Revs 2–3 are preserved as history at the bottom.
 
 ---
 
-## 0. How the thesis evolved
+## 0. Product of record (near-term)
 
+> **A vendor-neutral pre-commit admissibility gate at the autonomous-agent tool-invocation
+> boundary, initially governing production-infrastructure actions.**
+
+Full specification: `AGENT_ACTION_ADMISSIBILITY_MVP.md`. The gate permits a consequential action
+only when the proposed transition leaves the system inside a **conservatively enforceable
+approximation of the safe viability kernel**. It **wins by safely allowing more legitimate
+autonomy** than static permissions or approve-everything workflows — not merely by blocking more.
+
+**Architectural sequence:**
 ```
-BCVF (original)   :  can a new detector beat classical detectors?          → refuted (kill study)
-middle phase      :  can many detectors beat one detector?                 → no incremental value shown
-current thesis    :  minimize expected business damage, regardless of      → the right objective
-                     detector quality
-```
-
-The center of gravity moved from "build a better behavioral detector" to "use evidence well."
-The security outcome now depends far more on **how evidence is used** than on any single
-evidence source's performance.
-
----
-
-## 1. The four-layer architecture
-
-BCVF / USE / SCC are **not** the architecture. The architecture is four layers; those three are
-merely Layer-1 evidence producers.
-
-| Layer | Role | Produces / decides | Contents |
-|---|---|---|---|
-| **L1 Trust Evidence** | produce evidence only, no decisions | calibrated signals + quality | behavioral identity, device identity, **hardware attestation**, **context-bound liveness**, USE coupling, BCVF consistency, network trust, reputation, geolocation |
-| **L2 Consequence Model** | how much damage if this action succeeds? | `V_t = f(impact, irreversibility, privilege, recoverability)` | application-specific action/resource map |
-| **L3 Decision Engine** | choose the lowest-cost *safe* action | an optimization (below) | expected-loss + friction + op-cost tradeoff under hard constraints |
-| **L4 Action Orchestrator** | enact the decision | one of a graded action set | continue / monitor / passive challenge / attestation / behavioral challenge / MFA / supervisor approval / freeze / terminate |
-
-Key property: **no single L1 evidence producer is indispensable.** If an experiment shows a
-producer (BCVF same-latent, USE coupling, a 2nd-order feature) adds no incremental value, it is
-removed and the rest of the architecture is unchanged. That modularity is a sign of health.
-
-**A governance decision-mode sits inside L3 (see `CRITICAL_TRANSITION_GOVERNANCE.md`).** For
-**critical state transitions** (exactly the critical actions enumerated in Phase −1), the
-decision is not a risk score but a **justification handshake**: *even if the user is legitimate,
-should this organizational state change happen?* This asks a question orthogonal to identity and
-catches insider misuse, compromised-privileged users, mistakes, policy violations, and AI-agent
-errors — the class the evidence stack cannot. Ordinary actions take the risk-based flow (§2);
-critical transitions take the governance flow. This is the North-Star end-state, layered on the
-consequence-gating MVP — not a replacement for it.
-
----
-
-## 2. The Decision Engine is the differentiator — as a constrained optimization
-
-Not `Risk = P × Impact` (a score), but **action selection**:
-
-```
-choose  a_t = argmin_a  [ ExpectedLoss(a | E_{1:t})  +  λ₁·UserFriction(a)  +  λ₂·OperationalCost(a) ]
-        subject to  { security policy, compliance, business rules, latency, UX }   ← HARD constraints
-where   ExpectedLoss(a) = P(attack | E_{1:t}) · V_t · ρ_t   (V multi-dim; ρ = recovery-hardness)
-```
-
-Why this is right and rich:
-- It **unifies enforcement and evidence-gathering**: a cheap attestation/liveness probe is just
-  another action `a`, so the evidence-scheduler falls out of the same optimization.
-- It chooses the **lowest-cost safe action**, not merely a risk band — trading expected loss
-  against friction and operational cost.
-
-Two guardrails (carried from the prior analysis):
-- **Hard constraints stay hard.** Compliance, irreversibility, and explicit attestation/liveness
-  FAIL are *constraints*, not soft penalties — non-compensatory. No amount of low friction-cost
-  buys back a failed hard gate.
-- **The new hard problem is cost-model calibration** — putting friction-cost and loss-cost in
-  comparable units. More tractable and more within our control than the biometric SNR problem,
-  but real; it must be governed and validated, not hand-set.
-
----
-
-## 3. Strategic positioning (honest)
-
-The pivot to adaptive orchestration is correct about **where value is** — and must be clear-eyed
-about **where it competes**:
-
-- **You are no longer competing with BioCatch** (behavioral biometrics, a niche). You are
-  entering **adaptive access / policy orchestration** — the most contested space in security:
-  Microsoft Conditional Access, Okta Adaptive MFA, CrowdStrike, Zscaler, Palo Alto. They own
-  distribution, integrations, and enterprise trust. This is a **red ocean of incumbents**, not
-  greenfield. The pivot only works with a *specific wedge*.
-- **The wedge:** AI/agent-reasoned **consequence modeling over business and transaction
-  *semantics*** — reasoning about intent, workflow meaning, privilege context — which the
-  incumbents' rule/score engines do poorly. This fits the broader agentic work directly.
-- **The hard boundary on AI (non-negotiable):** an LLM/agent must **not** sit in the real-time
-  allow/block path — too slow (sub-second decisions), injectable (the attacker's actions *are*
-  the model's input), and unauditable (regulators require deterministic, explainable decisions).
-  AI belongs in **consequence modeling, offline policy synthesis, novel-workflow reasoning, and
-  analyst augmentation**; the real-time decision is a fast, deterministic, auditable optimization
-  over precomputed values. This boundary separates a defensible AI-security product from a
-  liability.
-
-Reframed ambition: not "a better detector" but "an **AI-native adaptive security decision layer**
-whose differentiation is semantic consequence reasoning, sitting above deterministic real-time
-enforcement." One-line: *innovate on how evidence is used, not on squeezing 2% from a biometric.*
-
-**The governance reframe (North Star) pushes this further** — from *authenticating identities* to
-*authorizing consequential organizational state transitions* (`CRITICAL_TRANSITION_GOVERNANCE.md`).
-That is the clearest expression of the AI-semantic wedge, applied to the highest-value question,
-and it plausibly raises the differentiation ceiling above 7/10 — but it moves the competitive
-frame into **GRC / policy-as-code / PAM / change-governance** (OPA, ServiceNow, CyberArk,
-zero-trust PDP), all incumbent-held. The wedge there is semantic organizational-consistency
-reasoning the rule engines lack — executed with the advisory + escalate-only + human-approval
-safety boundary. It is a bigger, heavier build (systems-of-record integration), so it is the
-end-state, not the beachhead.
-
----
-
-## 4. Phased, gated plan
-
-Critical path = threat modeling → DESIGN (consequence + decision) + commodity trust. The novel
-liveness research and the biometric lane run **parallel and non-blocking**.
-
-### Phase −1 — Threat modeling (DESIGN; must precede consequence modeling)
-Without the attack graph, the value model `V` is arbitrary. Derive it, don't invent it:
-```
-assets → threats → attacker objectives → attack paths → critical actions → consequence model
-```
-- **Deliverable:** for one vertical, the asset/threat/objective map and the concrete attack
-  paths (e.g. `reset MFA → change email → add beneficiary → transfer`).
-- **Dual use:** the attack **paths** become both the source of "which actions are critical" (→ L2)
-  and the kill-chains for goal-progress monitoring (→ the secondary `γ` term).
-- **Gate G−1:** is there an enumerated attack graph with named critical actions? (Prereq for G0.)
-
-### Phase 0 — Consequence + Decision foundations (DESIGN; unblocked by data) — start now
-- L2 value model `V_t = f(impact, irreversibility, privilege, recoverability)` **derived from the
-  Phase −1 attack graph** for one vertical.
-- L3 decision engine as the constrained optimization (§2); cost model `λ₁, λ₂`; hard-constraint set.
-- L4 action set + no-trust-inheritance (recompute risk at sensitive actions) + auditability/override.
-- **Deliverable:** decision-engine spec + populated value model + cost model for one workflow.
-- **Gate G0:** can you enumerate critical actions, assign 4-D consequence, and express the action-selection optimization for one real workflow?
-
-### Phase 1A — Commodity trust (RSYS; low research risk) — parallel with Phase 0
-- Integrate off-the-shelf attestation: Play Integrity / App Attest / Windows TPM / secure enclave / device binding; three-state handling (PASS/FAIL/UNAVAILABLE).
-- **Deliverable:** working attestation gate + explicit MFA step-up as the liveness *floor*.
-- **Gate G1a (engineering, not research):** is attestation deployable on the target endpoints, and what is the real-world UNAVAILABLE rate? This de-risks most of the externally-grounded-trust thesis immediately — it already exists commercially.
-
-### Phase 1B — Novel context-bound liveness (RSYS **research**; the actual gamble) — parallel
-- Prototype **one** novel mechanism: unpredictable UI perturbation / dynamic interaction proof / human-response timing / hardware timing fingerprint.
-- **Deliverable:** measured replay-vs-live separation at real friction, vs the MFA floor.
-- **Gate G1b (highest research risk — but an enhancement over a commodity floor):** does context-binding separate replay at *lower friction than explicit MFA*? **No →** ship on the commodity floor (attestation + MFA); novel liveness is deferred, **not** blocking. **Yes →** load-bearing specifically against the **relay / real-time-MITM / coherent-generation** threat that static MFA cannot resist (an unpredictable proof is hard to relay live). This is where the moat, if any, actually is.
-
-### Phase 2 — MVP integration + operational evaluation
-- Wire L2·L3·L4 + attestation/MFA hard gates, with `P` from a **deliberately mediocre** detector (proving weak-detector-is-OK).
-- Include a **minimal governance handshake** on the top few critical transitions: deterministic policy checks (linked approval / owner / window) + **human approval** — *no* AI reasoning, *no* systems-of-record integration yet. This is the MVP seed of OSGE.
-- Evaluate against the operational kill criterion vs flat-policy and detector-only baselines.
-- **Gate G2 (the product gate):** *at a fixed fraud-prevention target, does consequence-aware step-up reduce irreversible damage without unacceptable friction on legitimate critical actions?* **Yes →** a shippable damage-preventing product that does not depend on biometrics or on novel liveness.
-
-### Phase 3 — Evidence Innovation Lane (RDATA + cheap SYN) — parallel, non-blocking
-A **pluggable lane** where *any* evidence source competes on the same incremental-value test —
-BCVF, USE, graph embeddings, foundation-model reasoning, new sensors, future models. Not tied
-to today's hypotheses.
-- Instrumentation pilot (10–15 users): timestamp-sync + coupling-stability *feasibility*.
-- USE Phase 1 signal-existence (frozen prereg); base behavioral EER; E2 second-order kill.
-- **Gate G3 (drop-or-keep, uniform per candidate):** does the source reduce friction / add coverage at equal security, ≥ Δ_min? **No → drop, don't relabel.** **Yes →** layer in.
-
-### Phase 4 — Enhancements + hardening (after G2)
-- **Agentic orchestration (safety-monotone):** an agent in the **real-time** path may only
-  *escalate* (add scrutiny, require stronger proof) — **never relax/allow**. Full reasoning
-  (allow decisions, novel-workflow analysis, policy synthesis) runs **offline / analyst-facing**,
-  not in the sub-second decision. Connects L4 to the existing Agentic Framework (governance,
-  budget allocation, safety orchestration).
-- **Mission→intent→goal→action modeling** as an *enrichment* of L2/L3 and analyst explanation —
-  kept **secondary and backstopped** (intent inference is attacker-manipulable and blind to
-  novel paths; it never load-bears the real-time block decision).
-- Dependence-aware fusion (E5) once real component outputs exist.
-- Governance: value/cost-model drift + attacker-manipulation resistance; privacy/telemetry.
-- Tier-C research (unknown-goal, joint-generative, full-compromise) tracked, never gating.
-
-### Phase 5 — Critical Transition Governance / OSGE (North-Star; after MVP traction)
-Generalize the Phase-2 minimal handshake into full **Critical Transition Governance**
-(`CRITICAL_TRANSITION_GOVERNANCE.md`): systems-of-record integration (ITSM / IAM / CI-CD /
-ticketing), the full multi-condition justification handshake, and **AI semantic
-organizational-consistency reasoning** as **advisory + escalate-only** input to a deterministic,
-auditable policy + human approval. Renewed role for the evidence layer: flag **fabricated /
-anomalous justification**. Enforce real segregation-of-duties for collusion resistance.
-- **Gate G5 (governance kill criterion):** at a fixed rate of allowing legitimate critical
-  transitions, does the handshake reduce **unjustified** transitions (insider misuse, mistakes,
-  policy violations, agent errors) vs identity/risk-gating alone, at acceptable latency/approver
-  burden? Heavy integration → the end-state, **not** the beachhead.
-
-```
-CRITICAL:  Phase −1 (threat model) ─► Phase 0 (DESIGN) ─┐
-           Phase 1A commodity trust  ─────────────────── ┼─► Phase 2 MVP (+minimal handshake) ─[G2]─► ship ─► Phase 4 ─► Phase 5 OSGE [G5]
-PARALLEL:  Phase 1B novel liveness (enhancement, G1b) ───┘   (moat vs relay/generation if it passes)
-PARALLEL:  Phase 3 Evidence Innovation Lane (drop-or-keep) ──┘ layer in if it helps
+agent proposes action
+  → canonical action envelope
+  → deterministic invariant checks            (hard, non-compensatory)
+  → conservative viability approximation       (Viab̂(A) — under-approximation, not exact)
+  → simulation / blast-radius evidence         (evidence, with fidelity classes)
+  → allow / constrain / escalate / deny
+  → audited commit
 ```
 
 ---
 
-## 5. Effort allocation — and why risk ≠ effort
+## 1. Supersession & continuity
 
-Rough 6–12 month allocation (aligned with the four-layer emphasis):
+- The MVP **narrows, it does not contradict**, the earlier architecture. The four-layer analysis
+  (evidence → consequence → decision → orchestration) still holds; the gate is that architecture
+  **instantiated for one concrete transition class.**
+- **Production-infrastructure agent actions are the first concrete transition class** — the
+  enumerated critical transitions of the prior threat-model step, made specific and buildable.
+- **OSGE / Critical Transition Governance remains a *potential* end-state**, pursued **only after
+  the beachhead is validated** (§6).
+- **The gate must prove value independently of BCVF, USE, and SCC.** They are optional evidence
+  modules, off the critical path (§5). The core viability gate must remain useful with all of
+  them removed.
 
-| % | Area | Layer |
-|---|---|---|
-| 40 | Decision engine + consequence modeling | L2 + L3 |
-| 25 | Attestation, liveness, trustworthy evidence | L1 (grounded) |
-| 20 | Orchestration + adaptive policy optimization | L4 (+ L3) |
-| 10 | USE evaluation (does user-specific coupling exist?) | L1 (behavioral) |
-| 5  | BCVF evaluation (does same-latent consistency add value?) | L1 (behavioral) |
+## 2. How we got here (condensed continuity)
 
-**Effort ≠ risk-priority, and the risk is now split.** Attestation (**G1a**) is commodity
-engineering — do it early to establish the trust *floor*; it de-risks most of the
-externally-grounded-trust thesis because it already exists commercially. **Novel liveness
-(G1b)** is the highest *research* risk — but it is an **enhancement over that floor**, not a
-product blocker (the MVP can ship on attestation + MFA). So it runs in parallel and does not
-gate the ship. Decision/consequence/orchestration (60% combined) is the highest *leverage*.
-**Fund by leverage (L2/L3/L4), sequence commodity trust early, treat novel liveness as a
-parallel research bet whose payoff is the relay/generation-resistant moat.** The real
-make-or-break for the product is **G2**, not liveness.
-
-**Differentiation ceiling (the 7/10 reality).** Most components — RBA, attestation,
-orchestration, step-up — are established; inventing them is not a moat. The one lever that
-raises differentiation above table-stakes is executing the **AI-reasoned semantic
-consequence/intent layer** well *and safely* (offline reasoning + escalate-only real-time).
-Differentiation ≈ the quality of that layer, not the novelty of any evidence source.
+```
+BCVF (detector)         → refuted as a primary detector (kill_study)
+USE / SCC (evidence)    → optional evidence modules, unproven / commodity
+consequence-gating      → the right OBJECTIVE: act on expected loss, not anomaly
+critical-transition gov → authorize consequential TRANSITIONS, not just users
+agent-action gate       → the one buildable, vendor-neutral, chokepoint-defensible NARROWING
+```
+Detail lives in the referenced documents; this roadmap now leads with the narrowing.
 
 ---
 
-## 6. Where BCVF and USE finally sit
+## 3. Critical-path dependency graph
 
-- **BCVF:** one Layer-1 evidence producer, ~5% of the system. Not the architecture, product, moat,
-  or detector. Keep if same-latent consistency beats a fair joint model (E1); remove otherwise.
-- **USE:** a Layer-1 evidence producer, ~5–10%. Humanness (anti-automation) is the reliable job;
-  identity is the Phase-1 gate. Keep the identity lane only if the residual exists.
-- **SCC:** absorbed into L3/L4 as fusion + non-compensatory policy logic; no independent security
-  claim.
+The critical path is the agent-gate build order (mapping to `AGENT_ACTION_ADMISSIBILITY_MVP.md`
+§12 Stages 0–6). It does **not** include broad OSGE / systems-of-record integration.
 
-The product's security does not wait on any of them.
+```
+[C1] canonical action-envelope schema                                  (MVP §2; Stage 0)
+      → [C2] hard-invariant policy language + root of trust            (MVP §4; Stage 1)
+          → [C3] deterministic gateway on ONE prod-infra tool surface  (MVP §5,§9; Stage 1)
+              → [C4] credential brokering + bypass resistance          (MVP §9; Stage 1)
+                     └─ enforcement, NOT monitoring, requires C4
+                  → [C5] simulator / blast-radius integration          (MVP §5,§6; Stage 2)
+                      → [C6] human approval + signed audit             (MVP §7,§8; Stage 3)
+                          → [C7] OPERATIONAL EVALUATION vs policy-as-code
+                                 & approve-everything baselines         (MVP §11; Stage 6)  ← thesis gate
+      (parallel, optional) [O1] advisory semantic reasoning, escalate-only (MVP §5 Tier 3; Stage 4)
+      (after single-surface proof) [E1] runtime-neutral MCP + non-MCP expansion (MVP §9; Stage 5)
+```
+
+**Thesis gate = C7 (the operational kill criterion, MVP §11):** the MVP is *not supported*
+unless it prevents materially more unsafe *composite* actions than conventional policy-as-code
+**and** auto-admits materially more legitimate actions than approve-everything — both by a
+preregistered practical margin `Δ_min`, within preregistered delay / human-review / bypass
+bounds. `O1` and `E1` are off the critical path and each must earn its place on the same test.
+
+---
+
+## 4. Explicit constraints (preserved, non-negotiable)
+
+- **AI is advisory and safety-monotone**: it may only *escalate* assurance.
+- **AI cannot override a hard invariant or approve a critical action**, and cannot lower required
+  assurance or modify policy.
+- **MCP is one integration opportunity, not an architectural dependency**; the policy and action
+  model stay runtime-neutral (MCP + non-MCP).
+- **Enforcement without credential control and egress restriction is monitoring, not
+  enforcement** — envelope interception alone must be labeled as such.
+- **Exact viability is not claimed.** The implementation uses a **conservative
+  under-approximation** `Viab̂(A)`; the gap to true viability is the escalation region. **No claim
+  of formal verification over the open world, and no novel mathematics** (viability /
+  invariant-preservation + reachability + constraint logic applied to the agent action boundary).
+- **BCVF, USE, SCC, and behavioral biometrics are optional evidence modules and are NOT on the
+  MVP critical path.**
+
+---
+
+## 5. Reclassification of prior work
+
+| Prior workstream | New status |
+|---|---|
+| Consequence-aware orchestration (expected-loss, `V·ρ`) | **Retained inside the gate's assurance policy** (escalation by reversibility / blast-radius / freshness; MVP §7) |
+| Critical-transition governance / OSGE | **Retained as a later platform expansion** (§6), after beachhead validation |
+| Liveness / attestation | **Retained as evidence and hard-gate inputs where applicable** (envelope `attestation_evidence`; freshness invariants; MVP §2,§4) |
+| BCVF / USE / SCC | **Optional incremental experiments only** — off the critical path; each must pass the same `Δ_min` test or be dropped |
+| Broad horizontal enterprise integration (systems-of-record) | **Deferred** — not part of the MVP; end-state only |
+
+The product's security **does not wait on** BCVF, USE, SCC, biometrics, or novel liveness.
+
+Effort concentrates on the C1→C7 critical path (envelope, hard invariants + root of trust,
+enforcement chokepoint with credential brokering, simulation/blast-radius, human approval +
+audit, operational evaluation). Optional intelligence (`O1`) and multi-runtime expansion (`E1`)
+are funded only after the single-surface deterministic gate proves out.
+
+---
+
+## 6. Later generalization (not the immediate product)
+
+Once the agent-action beachhead is validated at C7, the same admissibility abstraction can
+generalize toward **Critical Transition Governance / OSGE** (`CRITICAL_TRANSITION_GOVERNANCE.md`):
+broader transition classes, human-initiated critical transitions, systems-of-record integration
+(ITSM / IAM / CI-CD / ticketing), and richer advisory semantic reasoning — all under the same
+advisory + escalate-only + deterministic-policy + human-approval constraints (§4).
+
+This is a **possible end-state, explicitly gated on beachhead success.** Broad horizontal
+enterprise governance moves the competitive frame into GRC / policy-as-code / PAM / change-
+governance (incumbent-held) and requires heavy integration; it is **not** the near-term product
+and must not precede the MVP.
+
+**Positioning of the near-term product (honest):** the defensible position is the **vendor-neutral
+pre-commit chokepoint** governing agents on any model/runtime (the "neutral layer in a
+multi-vendor world" pattern). Value lives in **enforcement + policy authority + cross-runtime
+neutrality + calibrated consequence analysis**, not in any protocol adapter. Two first-class
+risks (MVP §12): **protocol/runtime absorption** (admissibility becoming native to MCP/runtimes —
+stay runtime-neutral, win on enforcement and neutrality) and **adoption timing** (demand is
+incident-/compliance-driven; early buyers are risk-averse verticals).
 
 ---
 
 ## 7. Immediate next actions
 
-1. **Threat-model one vertical (Phase −1)** — asset/threat/objective map + concrete attack paths + named critical actions. *Prerequisite that makes `V` non-arbitrary.*
-2. **Draft the L2 consequence/value-model schema + L3 optimization spec** derived from that attack graph (DESIGN) — highest leverage, no data needed. *The single most important next build.*
-3. **Integrate commodity attestation (G1a)** (RSYS) — establishes the trust floor early; low research risk.
-4. **Stand up the novel-liveness spike (G1b)** (RSYS, research) — parallel, non-blocking; the potential relay/generation-resistant moat.
-5. **E2 second-order kill** on the existing harness (SYN) — cheap loop-closure; enters the Evidence Innovation Lane.
-6. **Scope the behavioral data pilot** (RDATA) — parallel, non-blocking, Evidence Innovation Lane only.
+1. **C1 — Canonical action-envelope schema** (`AGENT_ACTION_ADMISSIBILITY_MVP.md` §2) plus the
+   ten concrete transitions (§10). *Largely specified; formalize as the machine schema.*
+2. **C2 — Hard-invariant policy language + out-of-band root of trust** (§4).
+3. **C3 — Deterministic gateway on ONE production-infrastructure tool surface** (Tier-1 checks +
+   hard invariants; §5, §9) — real enforcement, no AI, no simulation.
+4. **C4 — Credential brokering + egress control** so the gate is enforcement, not monitoring (§9).
+5. Then **C5 (simulation/blast-radius) → C6 (human approval + signed audit) → C7 (operational
+   evaluation vs policy-as-code and approve-everything).**
 
-Central message: **threat-model first, then build the consequence-gating + commodity-attestation
-MVP with an AI-reasoned (offline) consequence/intent layer and a deterministic, escalate-only
-real-time decision engine. Treat behavioral biometrics — and even novel liveness — as
-droppable/parallel enhancements. Innovate on how evidence is used, not on the detector.**
+Off the critical path, funded only after C3–C4 prove out: `O1` advisory semantic reasoning
+(escalate-only), `E1` MCP + non-MCP expansion, and any BCVF/USE/SCC evidence experiment (each on
+the `Δ_min` drop-or-keep test).
+
+Central message: **build the deterministic single-surface admissibility gate first (C1–C4),
+prove it enforces (credential control) and that it beats policy-as-code on safety while beating
+approve-everything on autonomy (C7). Everything else — semantic reasoning, multi-runtime, OSGE
+generalization, and every behavioral evidence module — is optional and gated on that result.**
+
+---
+
+## Appendix — history (Rev. 2–3, superseded framing)
+
+Retained for continuity; **not** the current critical path.
+
+- **Rev. 2** (adaptive security orchestration): four-layer model (evidence → consequence →
+  decision → orchestration); threat-modeling-first; commodity attestation vs novel liveness split;
+  "Evidence Innovation Lane"; safety-monotone real-time agentic orchestration. These concepts
+  survive **inside** the gate's assurance policy and constraints (§4, §5).
+- **Rev. 3** (Critical Transition Governance / OSGE): reframe from authenticating identities to
+  authorizing consequential organizational state transitions. **Repositioned** as the later
+  generalization (§6), explicitly gated on the agent-action beachhead.
+- The human-authentication / fraud-prevention phasing and the `G−1…G5` gates from those revs
+  described a *different* (human-session) beachhead and are **not** part of the agent-action
+  critical path. Where their ideas survive, they are reclassified in §5.

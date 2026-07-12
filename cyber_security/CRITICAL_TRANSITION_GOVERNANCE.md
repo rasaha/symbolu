@@ -1,9 +1,13 @@
 # Critical Transition Governance (OSGE) — governing state changes, not users
 
-**Status:** the North-Star end-state for the security line. Reframes the problem from
-*authenticating identities* to *authorizing consequential organizational state transitions*.
-Layers on top of the consequence-gating MVP; it does **not** replace the near-term MVP.
-Companion to `ROADMAP.md`, `GAP_REGISTER.md`, `COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md`.
+**Status:** a **possible later generalization / North-Star**, explicitly gated on validating the
+beachhead. The **beachhead of record is `AGENT_ACTION_ADMISSIBILITY_MVP.md`** (a vendor-neutral
+pre-commit admissibility gate at the autonomous-agent tool-invocation boundary, production-
+infrastructure actions). This document reframes the problem from *authenticating identities* to
+*authorizing consequential organizational state transitions*; it is pursued **only after** the
+agent-action beachhead proves out, and it does **not** precede or replace it.
+Companion to `ROADMAP.md` (§6), `AGENT_ACTION_ADMISSIBILITY_MVP.md`, `GAP_REGISTER.md`,
+`COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md`.
 
 ---
 

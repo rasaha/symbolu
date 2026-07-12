@@ -5,6 +5,13 @@ damage-preventing product. Supersedes the implicit "detector-first" ordering. Co
 `COMBINED_ARCHITECTURE_BCVF2_USE_SCC.md`, `BCVF_CONCEPT_DIRECTION.md`, and
 `USE_CONTRIBUTION_MAP.md`.
 
+> **Repositioned (see `ROADMAP.md` Rev. 4):** the **beachhead of record is now
+> `AGENT_ACTION_ADMISSIBILITY_MVP.md`** — a vendor-neutral pre-commit admissibility gate at the
+> autonomous-agent tool-invocation boundary (production-infrastructure actions). The
+> consequence-gating / human-fraud framing in this register is retained as **context and later
+> generalization**, not the immediate product. BCVF/USE/SCC and behavioral biometrics remain
+> off the critical path.
+
 ---
 
 ## 0. Strategic conclusion (explicit, up front)
