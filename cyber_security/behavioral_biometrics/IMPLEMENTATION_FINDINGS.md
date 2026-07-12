@@ -121,6 +121,54 @@ parameter are fit on the split's enroll (train) records only, then applied to te
 `test_splits.py` asserts the fitted mean equals the train mean. Identifiers never enter
 the vectorized feature space (`test_features.py`, `test_adversarial_fixtures.py`).
 
+## F14 — study machinery (`study/`) added; every scientific claim origin-locked
+The full evaluation pipeline (identity runner, USE, BCVF, fusion, confidence, temporal,
+end-to-end runner, evidence export, preregistration) lives under `study/`. It runs on
+`MOCK_TEST_ONLY` fixtures and emits only `*_PATH_VERIFIED` / `*_NO_SCIENTIFIC_VERDICT`.
+`data_origin` was extended with `MOCK_TEST_ONLY`; `origin.guarded` wraps every
+scientific classifier so non-real data can never emit a positive verdict, and
+`origin.assert_not_positive_on_nonreal` is a defensive tripwire (tested).
+
+## F14a — pure classifiers vs guarded verdicts
+Each machinery has a PURE classifier (`classify_use/bcvf/fusion/confidence`) over
+measured numbers and a GUARDED wrapper that applies the origin lock. Branches that a
+well-behaved model does not cleanly produce from a stub (`BCVF_REGRESSES`,
+`DEVICE_BOUND_COUPLING_ONLY`, some `*_SMALL_EFFECT`) are exercised by unit tests over
+FABRICATED numbers — testing the decision function, not manufacturing a data verdict.
+
+## F14b — capacity-matched BCVF contrast
+The BCVF fair contrast is capacity-matched: the no-disagreement arm gets a matched
+random noise feature so both arms have equal parameter count and the ONLY difference is
+the explicit normalized disagreement `q`. This prevents crediting BCVF for extra
+capacity. Eligibility requires two structurally-distinct estimators each showing
+held-out signal; a fast/slow same-stream pair is refused.
+
+## F14c — coupling never credited for extra modalities
+The `MM_SHUFFLED` arm carries the same coupling slots with decorrelated values, so any
+gain from extra feature slots alone appears equally in the shuffled control and is not
+credited. USE is supported only when context-conditioned coupling beats BOTH the fair
+marginal baseline and the shuffled control.
+
+## F14d — confidence needs held-out evaluation; calibration split isolation
+Calibration is fit on a chronological calibration split and evaluated on an untouched
+test split. The verdict uses the best ACHIEVABLE held-out ECE (min of raw vs calibrated)
+so an already-calibrated model is not penalized by a distorting calibrator, while
+genuine held-out miscalibration (drift) is still caught. Isotonic uses a clean
+block-based pool-adjacent-violators (an earlier naive PAV overflowed — fixed).
+
+## F14e — estimator-uncertainty proxy in the end-to-end runner
+When deriving BCVF/fusion estimators from the identity arms in `runner.py`, per-estimate
+σ is a documented proxy (constant) and z-scores are standardized descriptively. This is
+adequate for path verification; the dedicated BCVF fixtures carry explicit σ for the
+real-contrast tests. Recorded as an ambiguity for the real-data phase.
+
+## F14f — temporal machinery is diagnostic-only
+The takeover/temporal runner reuses the frozen LLT-Kalman+CUSUM observer and emits only
+diagnostics (TTD, false-challenges/hour, change-point timing) with no security claim.
+Composite arms (quality-aware multimodal, fusion+USE, fusion+BCVF, confidence-gated) are
+wired as later-ready arms that currently reduce to the single-stream detector on a
+single mock stream, clearly flagged `later_ready_stub`.
+
 ## F13 — what remains untested
 Whether **stable, user-specific behavioral signals exist** is untested — that is the
 purpose of a *later* real-data run through this harness. No real participant data has
