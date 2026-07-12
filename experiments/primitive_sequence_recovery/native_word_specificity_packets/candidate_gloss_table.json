@@ -1,0 +1,62 @@
+{
+  "aśva": {
+    "gloss": "horse",
+    "source": "Monier-Williams (1899) s.v. aśva",
+    "sense": "primary nominal sense (the animal)"
+  },
+  "bala": {
+    "gloss": "strength",
+    "source": "Monier-Williams (1899) s.v. bala",
+    "sense": "primary sense 'power, strength'"
+  },
+  "bhaya": {
+    "gloss": "fear",
+    "source": "Monier-Williams (1899) s.v. bhaya",
+    "sense": "primary sense 'fear, alarm'"
+  },
+  "duḥkha": {
+    "gloss": "pain",
+    "source": "Monier-Williams (1899) s.v. duḥkha",
+    "sense": "primary sense 'pain, sorrow'"
+  },
+  "gaja": {
+    "gloss": "elephant",
+    "source": "Monier-Williams (1899) s.v. gaja",
+    "sense": "primary nominal sense"
+  },
+  "megha": {
+    "gloss": "cloud",
+    "source": "Monier-Williams (1899) s.v. megha",
+    "sense": "primary nominal sense"
+  },
+  "bīja": {
+    "gloss": "seed",
+    "source": "Monier-Williams (1899) s.v. bīja",
+    "sense": "primary sense 'seed, germ'"
+  },
+  "sukha": {
+    "gloss": "happiness",
+    "source": "Monier-Williams (1899) s.v. sukha",
+    "sense": "primary nominal sense 'ease, happiness'"
+  },
+  "deha": {
+    "gloss": "body",
+    "source": "Monier-Williams (1899) s.v. deha",
+    "sense": "primary sense 'the body'"
+  },
+  "lavaṇa": {
+    "gloss": "salt",
+    "source": "Monier-Williams (1899) s.v. lavaṇa",
+    "sense": "primary sense 'salt'"
+  },
+  "yoga": {
+    "gloss": "union",
+    "source": "Monier-Williams (1899) s.v. yoga",
+    "sense": "frozen sense-selection rule: first nominal sense 'yoking / union' (not the darśana / discipline senses)"
+  },
+  "vṛkṣa": {
+    "gloss": "tree",
+    "source": "Monier-Williams (1899) s.v. vṛkṣa",
+    "sense": "primary nominal sense"
+  }
+}

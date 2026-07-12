@@ -1,0 +1,18 @@
+{
+  "controlling_gate": "native Gate-G0 PASS (commit 794ecaa4)",
+  "packet_source": "confirmatory consonant backbone only (source consonant_v3_1, scope CONFIRMATORY_BACKBONE)",
+  "readiness_verdict": "READY_FOR_PACKET_AUTHORING_AND_FREEZE",
+  "frozen_artifact_hashes": {
+    "set_A_manifest.json": "084963874d71f0801c6384334a3cf69ff6bd96b3f267f2e611e56b66afa7cc9a",
+    "set_B_manifest.json": "117ddbc450bf9b46854b3716f257d3cc6d9e29698e41b54e859737859e51caaa",
+    "packet_rendering_spec.json": "05ddfc5e1ee4d217664cdcceadc5a305d8e19c591887bacf3d04cfdb2a9385ec",
+    "leakage_controls.json": "bf0ab92e3c4e8bda0283e1786ed72ad39528a8bb700bd0a734e2d334ea783444",
+    "arm_control_spec.json": "14431393248862478d50db9599fad909be770c3f99446297d5accecbba8b9a93",
+    "evaluator_prompt_spec.json": "89b3bc4acddd1421e106315d01ba98242149604455db91bb54a2dca412b93a4a",
+    "randomization_manifest_schema.json": "82526f5c7747aae028966eeaa42ffd11a75373bec83ba7e33f0fdee9f248b38c",
+    "analysis_plan.json": "93f9cb77b1acf16d802bcbec84b9935597e9df722573ef746554092bf29907dc",
+    "outcome_taxonomy.json": "1211fa5e753ef9c34b8e55f3e4eeafc5e60d0bf3090530fa84843186176ef9df",
+    "success_criteria.json": "1cf0f24862f9ef6c281d14aaddb095078d7b3544c52c49fc0cdaddc6e2e66a0e"
+  },
+  "guardrails": "no experiment run; no judge; no result; no mapping/parser/vowel change; no per-word polarity; no raw consonant-name leakage; B1.10 negative preserved; feasibility-only prior"
+}

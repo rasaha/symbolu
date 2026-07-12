@@ -1,0 +1,27 @@
+{
+  "renderer_id": "confirmatory_dual_pole_v1",
+  "rules": [
+    "one fixed renderer for all words and arms",
+    "per consonant, in SOURCE order, emit BOTH binding and liberating rows (fixed dual-pole schema)",
+    "NEVER choose polarity per word; NEVER paraphrase rows per word (identical paraphrase table across words); NO bespoke prose synthesis",
+    "preserve packet length (feature count == consonant count)",
+    "NO consonant symbol, NO Devanāgarī, NO IAST in the rendered packet (leakage block)",
+    "EVALUATOR-FACING render is ENGLISH-ONLY: strip/paraphrase every Sanskrit vṛtti proper-name (e.g. 'avajñā', 'kruratā', 'karuṇā') so no source-language term that could be reverse-mapped to a consonant appears; authored blind at the packet-authoring-and-freeze step and hash-pinned",
+    "identical formatting across words and arms",
+    "row order fixed to source order; order tested only via the secondary S / O arms"
+  ],
+  "raw_mapped_rows_note": "the SET manifests freeze the RAW mapped rows (provenance). The evaluator-facing English-only render is a fixed, blind, table-driven paraphrase of those rows, authored + frozen at the next step (that is why readiness is PACKET_AUTHORING_AND_FREEZE).",
+  "example_raw_packet_bala": [
+    {
+      "feature_index": 0,
+      "binding": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+      "liberating": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+    },
+    {
+      "feature_index": 1,
+      "binding": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+      "liberating": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+    }
+  ],
+  "leakage_guarantee": "evaluator sees English-only descriptive vṛtti content; NO consonant symbol, NO Sanskrit vṛtti proper-name, NO spelling — identity is never directly shown"
+}

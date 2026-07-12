@@ -1,0 +1,23 @@
+{
+  "purpose": "precommitted SECONDARY (sensitivity) analysis for the four source-intrinsic semantic-adjacency cases; these trials are NOT removed from the primary endpoint",
+  "flagged_words": {
+    "bhaya": "fear",
+    "duḥkha": "pain",
+    "sukha": "happiness",
+    "deha": "body"
+  },
+  "why_flagged": "a blind rater with no varṇa theory could pick the true gloss for these four from ordinary English semantics; the adjacency traces to the FROZEN SOURCE vṛtti (e.g. the row in deha's packet whose source reads 'physically-seen, outward-facing world'), faithfully paraphrased, not injected at packet authoring",
+  "required_reports": [
+    "primary results computed over ALL trials (flagged words included)",
+    "sensitivity results recomputed with the four flagged words EXCLUDED from both sets",
+    "per-word confusion matrices (which gloss each word's packets are chosen as)",
+    "for each flagged word: true (T) accuracy vs its X / R / G accuracy",
+    "explicit statement of whether the overall primary effect is driven ONLY by these four words (e.g. does Δ CI-lower remain > 0 after their exclusion?)"
+  ],
+  "mandatory_interpretation_statement": "Source-intrinsic semantic proximity is part of the mapping under test, but because the upstream lexicon may have been authored with semantic awareness, concentration of the effect in these words limits causal interpretation.",
+  "prohibitions": [
+    "do not relabel source-faithful proximity as packet leakage",
+    "do not drop the flagged words from the primary endpoint",
+    "do not weaken the success thresholds"
+  ]
+}

@@ -1,0 +1,19 @@
+# Dependencies for the native Sanskrit word-specificity evaluator run (RunPod).
+#
+# GPU stack: reuse the repo's pinned CUDA 12.1 wheels (do NOT `pip install -U torch` — it grabs a cu130 build
+# that needs a newer driver and a mismatched torchvision). Mirrors requirements-gpu.txt.
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.4.1
+torchvision==0.19.1
+transformers>=4.40,<4.46
+accelerate
+sentencepiece
+protobuf
+
+# harness (manifest parsing + offline scoring statistics)
+pyyaml            # only needed to read a .yaml manifest; the .json manifest template needs no extra dep
+numpy
+scipy
+
+# OPTIONAL, only if you choose backend: vllm_openai (launch a local vLLM OpenAI server yourself)
+# vllm>=0.5,<0.7

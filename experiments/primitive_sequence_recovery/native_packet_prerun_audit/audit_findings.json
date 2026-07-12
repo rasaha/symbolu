@@ -1,0 +1,361 @@
+{
+  "commit": "aadf7345",
+  "audit_type": "pre_run_integrity_and_leakage",
+  "mode": "read_only",
+  "A_hash_verification": {
+    "all_frozen_hashes_match": true,
+    "hashes": {
+      "paraphrase_table.json": {
+        "frozen": "99d4e6d054dfa0fb1a04e25de4a9630748f6a416efe8be71023a3b03eaf76687",
+        "recomputed": "99d4e6d054dfa0fb1a04e25de4a9630748f6a416efe8be71023a3b03eaf76687"
+      },
+      "candidate_gloss_table.json": {
+        "frozen": "0568f0b7494e9adfc4ade254d13a43a9df99e2893ffb36cf3308fa623781d211",
+        "recomputed": "0568f0b7494e9adfc4ade254d13a43a9df99e2893ffb36cf3308fa623781d211"
+      },
+      "leakage_audit.json": {
+        "frozen": "5b22891f7fabce828fd5ee0f0766713b0cf7021e73f8aaa92f0740736e7d3f2d",
+        "recomputed": "5b22891f7fabce828fd5ee0f0766713b0cf7021e73f8aaa92f0740736e7d3f2d"
+      },
+      "equivalence_audit.json": {
+        "frozen": "cd33e16ec61d51f4407d34ac564d005c31ef1be992888c6839ac5a3b8376d13d",
+        "recomputed": "cd33e16ec61d51f4407d34ac564d005c31ef1be992888c6839ac5a3b8376d13d"
+      },
+      "evaluator_facing/trials.json": {
+        "frozen": "35e90057840f2bf38ef4ed08d5ff75c351019656de93c493e056bfd520f619ad",
+        "recomputed": "35e90057840f2bf38ef4ed08d5ff75c351019656de93c493e056bfd520f619ad"
+      },
+      "internal/answer_key.json": {
+        "frozen": "12c38ffe9bbf8554cdb3c52a14f999ef36cdd9585ea8f53b71e3d0f066e7b85e",
+        "recomputed": "12c38ffe9bbf8554cdb3c52a14f999ef36cdd9585ea8f53b71e3d0f066e7b85e"
+      },
+      "internal/blind_authoring_input.json": {
+        "frozen": "5dc75fdd1c95b360ece67f79b72272792d3951066573630cb734afd09ffa1f15",
+        "recomputed": "5dc75fdd1c95b360ece67f79b72272792d3951066573630cb734afd09ffa1f15"
+      },
+      "internal/rowid_to_consonant_map.json": {
+        "frozen": "1c53c3db8cc0eeb3be0e1b3c62df23fa37851faa4b2302cfac3e04f8fdad7609",
+        "recomputed": "1c53c3db8cc0eeb3be0e1b3c62df23fa37851faa4b2302cfac3e04f8fdad7609"
+      }
+    }
+  },
+  "A_authoring_isolation": {
+    "classification": "IDENTITY_HIDDEN_BUT_CONTEXT_NOT_ISOLATED",
+    "basis": "paraphrases were authored in the same session/context that had already seen the consonant identities, Set A, Set B, and the candidate glosses; opaque row IDs made the blindness procedural, not genuine context isolation.",
+    "bounded_by": "inspection shows paraphrases track the frozen source vṛtti (equivalence PRESERVED); residual embellishment example: r15/h 'physically-seen, outward-facing' -> 'visible surface'."
+  },
+  "B_semantic_leakage": {
+    "exact_name_leak": false,
+    "broad_neighborhood_hits": [
+      {
+        "rowid": "r09",
+        "consonant": "g",
+        "pole": "binding",
+        "gloss_neighborhood": "body",
+        "term": "outward",
+        "lands_on_true_word": false
+      },
+      {
+        "rowid": "r15",
+        "consonant": "h",
+        "pole": "binding",
+        "gloss_neighborhood": "body",
+        "term": "surface",
+        "lands_on_true_word": true
+      },
+      {
+        "rowid": "r15",
+        "consonant": "h",
+        "pole": "binding",
+        "gloss_neighborhood": "body",
+        "term": "outward",
+        "lands_on_true_word": true
+      },
+      {
+        "rowid": "r15",
+        "consonant": "h",
+        "pole": "binding",
+        "gloss_neighborhood": "body",
+        "term": "visible",
+        "lands_on_true_word": true
+      },
+      {
+        "rowid": "r15",
+        "consonant": "h",
+        "pole": "liberating",
+        "gloss_neighborhood": "body",
+        "term": "surface",
+        "lands_on_true_word": true
+      },
+      {
+        "rowid": "r10",
+        "consonant": "ś",
+        "pole": "binding",
+        "gloss_neighborhood": "body",
+        "term": "physical",
+        "lands_on_true_word": false
+      },
+      {
+        "rowid": "r10",
+        "consonant": "ś",
+        "pole": "liberating",
+        "gloss_neighborhood": "body",
+        "term": "physical",
+        "lands_on_true_word": false
+      }
+    ],
+    "blind_solvability": {
+      "trials_rated_blind": [
+        {
+          "trial": "A_T021",
+          "blind_lean_gloss": "fear",
+          "true_gloss": "fear",
+          "matched_true": true
+        },
+        {
+          "trial": "A_T031",
+          "blind_lean_gloss": "pain",
+          "true_gloss": "pain",
+          "matched_true": true
+        },
+        {
+          "trial": "B_T011",
+          "blind_lean_gloss": "happiness",
+          "true_gloss": "happiness",
+          "matched_true": true
+        },
+        {
+          "trial": "B_T021",
+          "blind_lean_gloss": "body",
+          "true_gloss": "body",
+          "matched_true": true
+        }
+      ],
+      "blind_correct_out_of_12": 4,
+      "note": "a blind rater with no varṇa theory picked the true gloss in 4/12 true packets; all four trace to the frozen source vṛtti, not to injected wording."
+    },
+    "channels": [
+      "affect/valence flavor (fear/pain/happiness)",
+      "definitional association (deha/body via 'outward visible surface')",
+      "abstract-vs-concrete (packets are all abstract psychological states; abstract valenced glosses are more packet-like than concrete nouns)"
+    ],
+    "interpretation": "these are SUBSTRATE-faithful, not packet-injected; they constrain interpretation of a positive result (cannot distinguish varṇa meaning from upstream lexicon back-fitting) but are not by themselves a packet-authoring leakage defect."
+  },
+  "C_fingerprints": {
+    "per_set": {
+      "A": {
+        "per_word": [
+          {
+            "word": "aśva",
+            "rows": 2,
+            "chars": 332
+          },
+          {
+            "word": "bala",
+            "rows": 2,
+            "chars": 299
+          },
+          {
+            "word": "bhaya",
+            "rows": 2,
+            "chars": 284
+          },
+          {
+            "word": "duḥkha",
+            "rows": 2,
+            "chars": 282
+          },
+          {
+            "word": "gaja",
+            "rows": 2,
+            "chars": 256
+          },
+          {
+            "word": "megha",
+            "rows": 2,
+            "chars": 309
+          }
+        ],
+        "row_count_uniquely_identifies_any_word": false
+      },
+      "B": {
+        "per_word": [
+          {
+            "word": "bīja",
+            "rows": 2,
+            "chars": 276
+          },
+          {
+            "word": "deha",
+            "rows": 2,
+            "chars": 235
+          },
+          {
+            "word": "lavaṇa",
+            "rows": 3,
+            "chars": 434
+          },
+          {
+            "word": "sukha",
+            "rows": 2,
+            "chars": 300
+          },
+          {
+            "word": "vṛkṣa",
+            "rows": 3,
+            "chars": 471
+          },
+          {
+            "word": "yoga",
+            "rows": 2,
+            "chars": 265
+          }
+        ],
+        "row_count_uniquely_identifies_any_word": false
+      }
+    },
+    "row_count_or_length_maps_to_gloss": false,
+    "note": "spelling hidden -> row-count/length cannot be mapped to an English gloss; the F arm empirically measures this ceiling by design."
+  },
+  "D_control_integrity": {
+    "T_equals_true_rows": true,
+    "X_strict_derangement": true,
+    "X_bijection": true,
+    "S_order_only": true,
+    "R_length_matched": true,
+    "R_excludes_self_rows": true,
+    "F_metadata_only": true,
+    "no_arm_word_key_leak_in_evaluator_facing": true
+  },
+  "D_position_shortcut_BLOCKER": {
+    "per_arm_correct_label_position_W1toW6": {
+      "T": [
+        0,
+        0,
+        2,
+        2,
+        2,
+        6
+      ],
+      "X": [
+        2,
+        0,
+        8,
+        2,
+        0,
+        0
+      ],
+      "S": [
+        2,
+        0,
+        0,
+        4,
+        0,
+        6
+      ],
+      "R": [
+        10,
+        6,
+        10,
+        10,
+        12,
+        12
+      ],
+      "G": [
+        0,
+        0,
+        2,
+        2,
+        4,
+        4
+      ],
+      "F": [
+        0,
+        2,
+        4,
+        2,
+        2,
+        2
+      ]
+    },
+    "overall_distribution": {
+      "W1": 14,
+      "W2": 8,
+      "W3": 26,
+      "W4": 22,
+      "W5": 20,
+      "W6": 30
+    },
+    "overall_chi2_df5": 16.0,
+    "T_max_position_share": 0.5,
+    "R_max_position_share": 0.2,
+    "arm_confounded": true,
+    "verdict": "BLOCKER: correct-label position is arm-confounded (T concentrates at W6=50% vs R uniform), so an evaluator with any last-/first-option bias inflates T over controls independent of packet content; the frozen permutation/bootstrap plan cannot correct a position-bias shortcut."
+  },
+  "F_gloss_integrity": {
+    "valence": {
+      "negative": [
+        "fear",
+        "pain"
+      ],
+      "positive": [
+        "strength",
+        "happiness"
+      ],
+      "neutral": [
+        "horse",
+        "elephant",
+        "cloud",
+        "seed",
+        "body",
+        "salt",
+        "union",
+        "tree"
+      ]
+    },
+    "same_valence_pairs": {
+      "A": "fear/pain",
+      "B": "happiness is the lone positively-valenced gloss"
+    },
+    "concreteness_split": {
+      "abstract": [
+        "strength",
+        "fear",
+        "pain",
+        "happiness",
+        "union"
+      ],
+      "concrete": [
+        "horse",
+        "elephant",
+        "cloud",
+        "seed",
+        "body",
+        "salt",
+        "tree"
+      ]
+    },
+    "unequal_specificity_flag": "abstract valenced glosses are semantically closer to the abstract packets than concrete nouns are — a secondary matching channel (overlaps §B)."
+  },
+  "G_prompt": {
+    "forced_single_choice": true,
+    "open_ended_plausibility_endpoint": false,
+    "chain_of_thought_uncontrolled": false,
+    "overt_theory_leak": false,
+    "gaps": [
+      "literal prompt template not frozen at packet level (specified in prereg only)",
+      "repeat count unspecified ('N>=?')"
+    ]
+  },
+  "H_reproducibility_separation": {
+    "evaluator_facing_excludes_answer_key": true,
+    "answer_key_isolated_in_internal_dir": true,
+    "model_family_pinning_policy_present": true,
+    "gaps": [
+      "retry/error rules undefined",
+      "per-(packet,arm) repeat count undefined"
+    ]
+  },
+  "GATE_VERDICT": "PRE_RUN_BLOCKED_BY_STRUCTURAL_SHORTCUT",
+  "READINESS_VERDICT": "REFREEZE_REQUIRED_BEFORE_RUN"
+}

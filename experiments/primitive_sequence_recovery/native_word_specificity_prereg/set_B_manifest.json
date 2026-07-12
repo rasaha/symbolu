@@ -1,0 +1,154 @@
+{
+  "set": "B_harder_replication",
+  "selection_rule": "from eligible words NOT in Set A, the deterministic (overlap-then-alphabetical) six-word set with 0 < max_jaccard <= 0.34, length-non-identifying, >=1 same-valence pair, no rare-only unique feature; fixed BEFORE any evaluator sees packets; not selected by fit.",
+  "words": [
+    "bīja",
+    "sukha",
+    "deha",
+    "lavaṇa",
+    "yoga",
+    "vṛkṣa"
+  ],
+  "packets": {
+    "bīja": {
+      "iast": "bīja",
+      "gloss": "a seed",
+      "n_features": 2,
+      "packet_features": [
+        {
+          "feature_index": 0,
+          "binding": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+          "liberating": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)"
+        },
+        {
+          "feature_index": 1,
+          "binding": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+          "liberating": "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership"
+        }
+      ],
+      "consonant_count": 2,
+      "missing_r_consonant_only": false,
+      "valence_balance": "unknown"
+    },
+    "sukha": {
+      "iast": "sukha",
+      "gloss": "happiness / ease",
+      "n_features": 2,
+      "packet_features": [
+        {
+          "feature_index": 0,
+          "binding": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+          "liberating": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+        },
+        {
+          "feature_index": 1,
+          "binding": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+          "liberating": "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip"
+        }
+      ],
+      "consonant_count": 2,
+      "missing_r_consonant_only": false,
+      "valence_balance": "pos"
+    },
+    "deha": {
+      "iast": "deha",
+      "gloss": "the body",
+      "n_features": 2,
+      "packet_features": [
+        {
+          "feature_index": 0,
+          "binding": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "liberating": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+        },
+        {
+          "feature_index": 1,
+          "binding": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+          "liberating": "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing"
+        }
+      ],
+      "consonant_count": 2,
+      "missing_r_consonant_only": false,
+      "valence_balance": "unknown"
+    },
+    "lavaṇa": {
+      "iast": "lavaṇa",
+      "gloss": "salt",
+      "n_features": 3,
+      "packet_features": [
+        {
+          "feature_index": 0,
+          "binding": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "liberating": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+        },
+        {
+          "feature_index": 1,
+          "binding": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+          "liberating": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+        },
+        {
+          "feature_index": 2,
+          "binding": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "liberating": "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it"
+        }
+      ],
+      "consonant_count": 3,
+      "missing_r_consonant_only": false,
+      "valence_balance": "unknown"
+    },
+    "yoga": {
+      "iast": "yoga",
+      "gloss": "union / disciplined practice",
+      "n_features": 2,
+      "packet_features": [
+        {
+          "feature_index": 0,
+          "binding": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "liberating": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+        },
+        {
+          "feature_index": 1,
+          "binding": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+          "liberating": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+        }
+      ],
+      "consonant_count": 2,
+      "missing_r_consonant_only": false,
+      "valence_balance": "pos"
+    },
+    "vṛkṣa": {
+      "iast": "vṛkṣa",
+      "gloss": "a tree",
+      "n_features": 3,
+      "packet_features": [
+        {
+          "feature_index": 0,
+          "binding": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+          "liberating": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+        },
+        {
+          "feature_index": 1,
+          "binding": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "liberating": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)"
+        },
+        {
+          "feature_index": 2,
+          "binding": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+          "liberating": "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)"
+        }
+      ],
+      "consonant_count": 3,
+      "missing_r_consonant_only": true,
+      "valence_balance": "unknown"
+    }
+  },
+  "properties": {
+    "max_jaccard": 0.2,
+    "mean_jaccard": 0.013,
+    "length_non_identifying": true,
+    "same_valence_pair": [
+      "sukha",
+      "yoga"
+    ],
+    "bounded_nonzero_overlap": true
+  }
+}

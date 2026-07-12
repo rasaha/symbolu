@@ -1,0 +1,2060 @@
+{
+  "candidates": [
+    {
+      "iast": "agni",
+      "devanagari": "अग्नि",
+      "cons_seq": [
+        "g",
+        "n"
+      ],
+      "cons_set": [
+        "g",
+        "n"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.0788
+    },
+    {
+      "iast": "ahimsā",
+      "devanagari": "अहिम्सा",
+      "cons_seq": [
+        "h",
+        "m",
+        "s"
+      ],
+      "cons_set": [
+        "h",
+        "m",
+        "s"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1033
+    },
+    {
+      "iast": "asura",
+      "devanagari": "असुर",
+      "cons_seq": [
+        "s",
+        "r"
+      ],
+      "cons_set": [
+        "r",
+        "s"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.1498
+    },
+    {
+      "iast": "avidyā",
+      "devanagari": "अविद्या",
+      "cons_seq": [
+        "v",
+        "d",
+        "y"
+      ],
+      "cons_set": [
+        "d",
+        "v",
+        "y"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.1
+    },
+    {
+      "iast": "aśva",
+      "devanagari": "अश्व",
+      "cons_seq": [
+        "ś",
+        "v"
+      ],
+      "cons_set": [
+        "v",
+        "ś"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.0514
+    },
+    {
+      "iast": "bala",
+      "devanagari": "बल",
+      "cons_seq": [
+        "b",
+        "l"
+      ],
+      "cons_set": [
+        "b",
+        "l"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0275
+    },
+    {
+      "iast": "bhakti",
+      "devanagari": "भक्ति",
+      "cons_seq": [
+        "bh",
+        "k",
+        "t"
+      ],
+      "cons_set": [
+        "bh",
+        "k",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0835
+    },
+    {
+      "iast": "bhaya",
+      "devanagari": "भय",
+      "cons_seq": [
+        "bh",
+        "y"
+      ],
+      "cons_set": [
+        "bh",
+        "y"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.0357
+    },
+    {
+      "iast": "bīja",
+      "devanagari": "बीज",
+      "cons_seq": [
+        "b",
+        "j"
+      ],
+      "cons_set": [
+        "b",
+        "j"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0228
+    },
+    {
+      "iast": "cakra",
+      "devanagari": "चक्र",
+      "cons_seq": [
+        "c",
+        "k",
+        "r"
+      ],
+      "cons_set": [
+        "c",
+        "k",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1164
+    },
+    {
+      "iast": "candra",
+      "devanagari": "चन्द्र",
+      "cons_seq": [
+        "c",
+        "n",
+        "d",
+        "r"
+      ],
+      "cons_set": [
+        "c",
+        "d",
+        "n",
+        "r"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.1322
+    },
+    {
+      "iast": "deha",
+      "devanagari": "देह",
+      "cons_seq": [
+        "d",
+        "h"
+      ],
+      "cons_set": [
+        "d",
+        "h"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0591
+    },
+    {
+      "iast": "deva",
+      "devanagari": "देव",
+      "cons_seq": [
+        "d",
+        "v"
+      ],
+      "cons_set": [
+        "d",
+        "v"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0871
+    },
+    {
+      "iast": "dhanus",
+      "devanagari": "धनुस्",
+      "cons_seq": [
+        "dh",
+        "n",
+        "s"
+      ],
+      "cons_set": [
+        "dh",
+        "n",
+        "s"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0814
+    },
+    {
+      "iast": "dharma",
+      "devanagari": "धर्म",
+      "cons_seq": [
+        "dh",
+        "r",
+        "m"
+      ],
+      "cons_set": [
+        "dh",
+        "m",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.1365
+    },
+    {
+      "iast": "duḥkha",
+      "devanagari": "दुःख",
+      "cons_seq": [
+        "d",
+        "kh"
+      ],
+      "cons_set": [
+        "d",
+        "kh"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.0505
+    },
+    {
+      "iast": "dvāra",
+      "devanagari": "द्वार",
+      "cons_seq": [
+        "d",
+        "v",
+        "r"
+      ],
+      "cons_set": [
+        "d",
+        "r",
+        "v"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1516
+    },
+    {
+      "iast": "dvīpa",
+      "devanagari": "द्वीप",
+      "cons_seq": [
+        "d",
+        "v",
+        "p"
+      ],
+      "cons_set": [
+        "d",
+        "p",
+        "v"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0936
+    },
+    {
+      "iast": "dāna",
+      "devanagari": "दान",
+      "cons_seq": [
+        "d",
+        "n"
+      ],
+      "cons_set": [
+        "d",
+        "n"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0945
+    },
+    {
+      "iast": "gaja",
+      "devanagari": "गज",
+      "cons_seq": [
+        "g",
+        "j"
+      ],
+      "cons_set": [
+        "g",
+        "j"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0498
+    },
+    {
+      "iast": "grāma",
+      "devanagari": "ग्राम",
+      "cons_seq": [
+        "g",
+        "r",
+        "m"
+      ],
+      "cons_set": [
+        "g",
+        "m",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1572
+    },
+    {
+      "iast": "guru",
+      "devanagari": "गुरु",
+      "cons_seq": [
+        "g",
+        "r"
+      ],
+      "cons_set": [
+        "g",
+        "r"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.1324
+    },
+    {
+      "iast": "gṛha",
+      "devanagari": "गृह",
+      "cons_seq": [
+        "g",
+        "h"
+      ],
+      "cons_set": [
+        "g",
+        "h"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": true,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.0491
+    },
+    {
+      "iast": "hasta",
+      "devanagari": "हस्त",
+      "cons_seq": [
+        "h",
+        "s",
+        "t"
+      ],
+      "cons_set": [
+        "h",
+        "s",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1024
+    },
+    {
+      "iast": "himsā",
+      "devanagari": "हिम्सा",
+      "cons_seq": [
+        "h",
+        "m",
+        "s"
+      ],
+      "cons_set": [
+        "h",
+        "m",
+        "s"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1033
+    },
+    {
+      "iast": "hṛdaya",
+      "devanagari": "हृदय",
+      "cons_seq": [
+        "h",
+        "d",
+        "y"
+      ],
+      "cons_set": [
+        "d",
+        "h",
+        "y"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": true,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0741
+    },
+    {
+      "iast": "jala",
+      "devanagari": "जल",
+      "cons_seq": [
+        "j",
+        "l"
+      ],
+      "cons_set": [
+        "j",
+        "l"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.044
+    },
+    {
+      "iast": "jñāna",
+      "devanagari": "ज्ञान",
+      "cons_seq": [
+        "j",
+        "ñ",
+        "n"
+      ],
+      "cons_set": [
+        "j",
+        "n",
+        "ñ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0555
+    },
+    {
+      "iast": "jīva",
+      "devanagari": "जीव",
+      "cons_seq": [
+        "j",
+        "v"
+      ],
+      "cons_set": [
+        "j",
+        "v"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0608
+    },
+    {
+      "iast": "karma",
+      "devanagari": "कर्म",
+      "cons_seq": [
+        "k",
+        "r",
+        "m"
+      ],
+      "cons_set": [
+        "k",
+        "m",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.166
+    },
+    {
+      "iast": "karṇa",
+      "devanagari": "कर्ण",
+      "cons_seq": [
+        "k",
+        "r",
+        "ṇ"
+      ],
+      "cons_set": [
+        "k",
+        "r",
+        "ṇ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1225
+    },
+    {
+      "iast": "khaga",
+      "devanagari": "खग",
+      "cons_seq": [
+        "kh",
+        "g"
+      ],
+      "cons_set": [
+        "g",
+        "kh"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0436
+    },
+    {
+      "iast": "khaḍga",
+      "devanagari": "खड्ग",
+      "cons_seq": [
+        "kh",
+        "ḍ",
+        "g"
+      ],
+      "cons_set": [
+        "g",
+        "kh",
+        "ḍ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0347
+    },
+    {
+      "iast": "krodha",
+      "devanagari": "क्रोध",
+      "cons_seq": [
+        "k",
+        "r",
+        "dh"
+      ],
+      "cons_set": [
+        "dh",
+        "k",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.1241
+    },
+    {
+      "iast": "kāla",
+      "devanagari": "काल",
+      "cons_seq": [
+        "k",
+        "l"
+      ],
+      "cons_set": [
+        "k",
+        "l"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0664
+    },
+    {
+      "iast": "kāma",
+      "devanagari": "काम",
+      "cons_seq": [
+        "k",
+        "m"
+      ],
+      "cons_set": [
+        "k",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.0981
+    },
+    {
+      "iast": "kāṣṭha",
+      "devanagari": "काष्ठ",
+      "cons_seq": [
+        "k",
+        "ṣ",
+        "ṭh"
+      ],
+      "cons_set": [
+        "k",
+        "ṣ",
+        "ṭh"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0472
+    },
+    {
+      "iast": "kṣamā",
+      "devanagari": "क्षमा",
+      "cons_seq": [
+        "k",
+        "ṣ",
+        "m"
+      ],
+      "cons_set": [
+        "k",
+        "m",
+        "ṣ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0937
+    },
+    {
+      "iast": "kṣetra",
+      "devanagari": "क्षेत्र",
+      "cons_seq": [
+        "k",
+        "ṣ",
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "k",
+        "r",
+        "t",
+        "ṣ"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1539
+    },
+    {
+      "iast": "kṣudhā",
+      "devanagari": "क्षुधा",
+      "cons_seq": [
+        "k",
+        "ṣ",
+        "dh"
+      ],
+      "cons_set": [
+        "dh",
+        "k",
+        "ṣ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0561
+    },
+    {
+      "iast": "kṣīra",
+      "devanagari": "क्षीर",
+      "cons_seq": [
+        "k",
+        "ṣ",
+        "r"
+      ],
+      "cons_set": [
+        "k",
+        "r",
+        "ṣ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1311
+    },
+    {
+      "iast": "lavaṇa",
+      "devanagari": "लवण",
+      "cons_seq": [
+        "l",
+        "v",
+        "ṇ"
+      ],
+      "cons_set": [
+        "l",
+        "v",
+        "ṇ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0602
+    },
+    {
+      "iast": "lobha",
+      "devanagari": "लोभ",
+      "cons_seq": [
+        "l",
+        "bh"
+      ],
+      "cons_set": [
+        "bh",
+        "l"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.0299
+    },
+    {
+      "iast": "loka",
+      "devanagari": "लोक",
+      "cons_seq": [
+        "l",
+        "k"
+      ],
+      "cons_set": [
+        "k",
+        "l"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0664
+    },
+    {
+      "iast": "madhu",
+      "devanagari": "मधु",
+      "cons_seq": [
+        "m",
+        "dh"
+      ],
+      "cons_set": [
+        "dh",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0671
+    },
+    {
+      "iast": "manas",
+      "devanagari": "मनस्",
+      "cons_seq": [
+        "m",
+        "n",
+        "s"
+      ],
+      "cons_set": [
+        "m",
+        "n",
+        "s"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1215
+    },
+    {
+      "iast": "megha",
+      "devanagari": "मेघ",
+      "cons_seq": [
+        "m",
+        "gh"
+      ],
+      "cons_set": [
+        "gh",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0561
+    },
+    {
+      "iast": "mitra",
+      "devanagari": "मित्र",
+      "cons_seq": [
+        "m",
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "m",
+        "r",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1825
+    },
+    {
+      "iast": "moha",
+      "devanagari": "मोह",
+      "cons_seq": [
+        "m",
+        "h"
+      ],
+      "cons_set": [
+        "h",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.0781
+    },
+    {
+      "iast": "mukha",
+      "devanagari": "मुख",
+      "cons_seq": [
+        "m",
+        "kh"
+      ],
+      "cons_set": [
+        "kh",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0679
+    },
+    {
+      "iast": "māna",
+      "devanagari": "मान",
+      "cons_seq": [
+        "m",
+        "n"
+      ],
+      "cons_set": [
+        "m",
+        "n"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1047
+    },
+    {
+      "iast": "mārga",
+      "devanagari": "मार्ग",
+      "cons_seq": [
+        "m",
+        "r",
+        "g"
+      ],
+      "cons_set": [
+        "g",
+        "m",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1572
+    },
+    {
+      "iast": "mātā",
+      "devanagari": "माता",
+      "cons_seq": [
+        "m",
+        "t"
+      ],
+      "cons_set": [
+        "m",
+        "t"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1156
+    },
+    {
+      "iast": "māyā",
+      "devanagari": "माया",
+      "cons_seq": [
+        "m",
+        "y"
+      ],
+      "cons_set": [
+        "m",
+        "y"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neg",
+      "mean_overlap_vs_all": 0.0879
+    },
+    {
+      "iast": "mūla",
+      "devanagari": "मूल",
+      "cons_seq": [
+        "m",
+        "l"
+      ],
+      "cons_set": [
+        "l",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0805
+    },
+    {
+      "iast": "mṛga",
+      "devanagari": "मृग",
+      "cons_seq": [
+        "m",
+        "g"
+      ],
+      "cons_set": [
+        "g",
+        "m"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": true,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0895
+    },
+    {
+      "iast": "mṛtyu",
+      "devanagari": "मृत्यु",
+      "cons_seq": [
+        "m",
+        "t",
+        "y"
+      ],
+      "cons_set": [
+        "m",
+        "t",
+        "y"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": true,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1189
+    },
+    {
+      "iast": "nadī",
+      "devanagari": "नदी",
+      "cons_seq": [
+        "n",
+        "d"
+      ],
+      "cons_set": [
+        "d",
+        "n"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.0945
+    },
+    {
+      "iast": "nagara",
+      "devanagari": "नगर",
+      "cons_seq": [
+        "n",
+        "g",
+        "r"
+      ],
+      "cons_set": [
+        "g",
+        "n",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1506
+    },
+    {
+      "iast": "nara",
+      "devanagari": "नर",
+      "cons_seq": [
+        "n",
+        "r"
+      ],
+      "cons_set": [
+        "n",
+        "r"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.1555
+    },
+    {
+      "iast": "naraka",
+      "devanagari": "नरक",
+      "cons_seq": [
+        "n",
+        "r",
+        "k"
+      ],
+      "cons_set": [
+        "k",
+        "n",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1588
+    },
+    {
+      "iast": "netra",
+      "devanagari": "नेत्र",
+      "cons_seq": [
+        "n",
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "n",
+        "r",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1781
+    },
+    {
+      "iast": "nidrā",
+      "devanagari": "निद्रा",
+      "cons_seq": [
+        "n",
+        "d",
+        "r"
+      ],
+      "cons_set": [
+        "d",
+        "n",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1599
+    },
+    {
+      "iast": "nārī",
+      "devanagari": "नारी",
+      "cons_seq": [
+        "n",
+        "r"
+      ],
+      "cons_set": [
+        "n",
+        "r"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1555
+    },
+    {
+      "iast": "parvata",
+      "devanagari": "पर्वत",
+      "cons_seq": [
+        "p",
+        "r",
+        "v",
+        "t"
+      ],
+      "cons_set": [
+        "p",
+        "r",
+        "t",
+        "v"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.1635
+    },
+    {
+      "iast": "phala",
+      "devanagari": "फल",
+      "cons_seq": [
+        "ph",
+        "l"
+      ],
+      "cons_set": [
+        "l",
+        "ph"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0244
+    },
+    {
+      "iast": "pitā",
+      "devanagari": "पिता",
+      "cons_seq": [
+        "p",
+        "t"
+      ],
+      "cons_set": [
+        "p",
+        "t"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0877
+    },
+    {
+      "iast": "prema",
+      "devanagari": "प्रेम",
+      "cons_seq": [
+        "p",
+        "r",
+        "m"
+      ],
+      "cons_set": [
+        "m",
+        "p",
+        "r"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.152
+    },
+    {
+      "iast": "putra",
+      "devanagari": "पुत्र",
+      "cons_seq": [
+        "p",
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "p",
+        "r",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1604
+    },
+    {
+      "iast": "puṇya",
+      "devanagari": "पुण्य",
+      "cons_seq": [
+        "p",
+        "ṇ",
+        "y"
+      ],
+      "cons_set": [
+        "p",
+        "y",
+        "ṇ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0539
+    },
+    {
+      "iast": "puṣpa",
+      "devanagari": "पुष्प",
+      "cons_seq": [
+        "p",
+        "ṣ",
+        "p"
+      ],
+      "cons_set": [
+        "p",
+        "ṣ"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 3,
+      "repeated": true,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.041
+    },
+    {
+      "iast": "pāda",
+      "devanagari": "पाद",
+      "cons_seq": [
+        "p",
+        "d"
+      ],
+      "cons_set": [
+        "d",
+        "p"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0676
+    },
+    {
+      "iast": "rajata",
+      "devanagari": "रजत",
+      "cons_seq": [
+        "r",
+        "j",
+        "t"
+      ],
+      "cons_set": [
+        "j",
+        "r",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1478
+    },
+    {
+      "iast": "rakta",
+      "devanagari": "रक्त",
+      "cons_seq": [
+        "r",
+        "k",
+        "t"
+      ],
+      "cons_set": [
+        "k",
+        "r",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1712
+    },
+    {
+      "iast": "rasa",
+      "devanagari": "रस",
+      "cons_seq": [
+        "r",
+        "s"
+      ],
+      "cons_set": [
+        "r",
+        "s"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1498
+    },
+    {
+      "iast": "ratha",
+      "devanagari": "रथ",
+      "cons_seq": [
+        "r",
+        "th"
+      ],
+      "cons_set": [
+        "r",
+        "th"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0965
+    },
+    {
+      "iast": "ratna",
+      "devanagari": "रत्न",
+      "cons_seq": [
+        "r",
+        "t",
+        "n"
+      ],
+      "cons_set": [
+        "n",
+        "r",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1781
+    },
+    {
+      "iast": "rāja",
+      "devanagari": "राज",
+      "cons_seq": [
+        "r",
+        "j"
+      ],
+      "cons_set": [
+        "j",
+        "r"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1178
+    },
+    {
+      "iast": "rūpa",
+      "devanagari": "रूप",
+      "cons_seq": [
+        "r",
+        "p"
+      ],
+      "cons_set": [
+        "p",
+        "r"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1296
+    },
+    {
+      "iast": "samudra",
+      "devanagari": "समुद्र",
+      "cons_seq": [
+        "s",
+        "m",
+        "d",
+        "r"
+      ],
+      "cons_set": [
+        "d",
+        "m",
+        "r",
+        "s"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1658
+    },
+    {
+      "iast": "sarpa",
+      "devanagari": "सर्प",
+      "cons_seq": [
+        "s",
+        "r",
+        "p"
+      ],
+      "cons_set": [
+        "p",
+        "r",
+        "s"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1456
+    },
+    {
+      "iast": "satya",
+      "devanagari": "सत्य",
+      "cons_seq": [
+        "s",
+        "t",
+        "y"
+      ],
+      "cons_set": [
+        "s",
+        "t",
+        "y"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.1105
+    },
+    {
+      "iast": "setu",
+      "devanagari": "सेतु",
+      "cons_seq": [
+        "s",
+        "t"
+      ],
+      "cons_set": [
+        "s",
+        "t"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1052
+    },
+    {
+      "iast": "siṃha",
+      "devanagari": "सिंह",
+      "cons_seq": [
+        "s",
+        "h"
+      ],
+      "cons_set": [
+        "h",
+        "s"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0668
+    },
+    {
+      "iast": "sukha",
+      "devanagari": "सुख",
+      "cons_seq": [
+        "s",
+        "kh"
+      ],
+      "cons_set": [
+        "kh",
+        "s"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.055
+    },
+    {
+      "iast": "suvarṇa",
+      "devanagari": "सुवर्ण",
+      "cons_seq": [
+        "s",
+        "v",
+        "r",
+        "ṇ"
+      ],
+      "cons_set": [
+        "r",
+        "s",
+        "v",
+        "ṇ"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1371
+    },
+    {
+      "iast": "svapna",
+      "devanagari": "स्वप्न",
+      "cons_seq": [
+        "s",
+        "v",
+        "p",
+        "n"
+      ],
+      "cons_set": [
+        "n",
+        "p",
+        "s",
+        "v"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1113
+    },
+    {
+      "iast": "svarga",
+      "devanagari": "स्वर्ग",
+      "cons_seq": [
+        "s",
+        "v",
+        "r",
+        "g"
+      ],
+      "cons_set": [
+        "g",
+        "r",
+        "s",
+        "v"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1515
+    },
+    {
+      "iast": "sūrya",
+      "devanagari": "सूर्य",
+      "cons_seq": [
+        "s",
+        "r",
+        "y"
+      ],
+      "cons_set": [
+        "r",
+        "s",
+        "y"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.1431
+    },
+    {
+      "iast": "taila",
+      "devanagari": "तैल",
+      "cons_seq": [
+        "t",
+        "l"
+      ],
+      "cons_set": [
+        "l",
+        "t"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0807
+    },
+    {
+      "iast": "tapas",
+      "devanagari": "तपस्",
+      "cons_seq": [
+        "t",
+        "p",
+        "s"
+      ],
+      "cons_set": [
+        "p",
+        "s",
+        "t"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1105
+    },
+    {
+      "iast": "tārā",
+      "devanagari": "तारा",
+      "cons_seq": [
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "r",
+        "t"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1667
+    },
+    {
+      "iast": "tṛṇa",
+      "devanagari": "तृण",
+      "cons_seq": [
+        "t",
+        "ṇ"
+      ],
+      "cons_set": [
+        "t",
+        "ṇ"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": true,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0653
+    },
+    {
+      "iast": "vana",
+      "devanagari": "वन",
+      "cons_seq": [
+        "v",
+        "n"
+      ],
+      "cons_set": [
+        "n",
+        "v"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.0892
+    },
+    {
+      "iast": "vastra",
+      "devanagari": "वस्त्र",
+      "cons_seq": [
+        "v",
+        "s",
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "r",
+        "s",
+        "t",
+        "v"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1768
+    },
+    {
+      "iast": "vidyut",
+      "devanagari": "विद्युत्",
+      "cons_seq": [
+        "v",
+        "d",
+        "y",
+        "t"
+      ],
+      "cons_set": [
+        "d",
+        "t",
+        "v",
+        "y"
+      ],
+      "n_distinct": 4,
+      "n_tokens": 4,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.121
+    },
+    {
+      "iast": "vidyā",
+      "devanagari": "विद्या",
+      "cons_seq": [
+        "v",
+        "d",
+        "y"
+      ],
+      "cons_set": [
+        "d",
+        "v",
+        "y"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.1
+    },
+    {
+      "iast": "vāyu",
+      "devanagari": "वायु",
+      "cons_seq": [
+        "v",
+        "y"
+      ],
+      "cons_set": [
+        "v",
+        "y"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "neut",
+      "mean_overlap_vs_all": 0.0755
+    },
+    {
+      "iast": "vīra",
+      "devanagari": "वीर",
+      "cons_seq": [
+        "v",
+        "r"
+      ],
+      "cons_set": [
+        "r",
+        "v"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1431
+    },
+    {
+      "iast": "vṛkṣa",
+      "devanagari": "वृक्ष",
+      "cons_seq": [
+        "v",
+        "k",
+        "ṣ"
+      ],
+      "cons_set": [
+        "k",
+        "v",
+        "ṣ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": true,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0802
+    },
+    {
+      "iast": "yajña",
+      "devanagari": "यज्ञ",
+      "cons_seq": [
+        "y",
+        "j",
+        "ñ"
+      ],
+      "cons_set": [
+        "j",
+        "y",
+        "ñ"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0426
+    },
+    {
+      "iast": "yoga",
+      "devanagari": "योग",
+      "cons_seq": [
+        "y",
+        "g"
+      ],
+      "cons_set": [
+        "g",
+        "y"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0604
+    },
+    {
+      "iast": "ānanda",
+      "devanagari": "आनन्द",
+      "cons_seq": [
+        "n",
+        "n",
+        "d"
+      ],
+      "cons_set": [
+        "d",
+        "n"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 3,
+      "repeated": true,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0945
+    },
+    {
+      "iast": "śakti",
+      "devanagari": "शक्ति",
+      "cons_seq": [
+        "ś",
+        "k",
+        "t"
+      ],
+      "cons_set": [
+        "k",
+        "t",
+        "ś"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.0892
+    },
+    {
+      "iast": "śara",
+      "devanagari": "शर",
+      "cons_seq": [
+        "ś",
+        "r"
+      ],
+      "cons_set": [
+        "r",
+        "ś"
+      ],
+      "n_distinct": 2,
+      "n_tokens": 2,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1083
+    },
+    {
+      "iast": "śatru",
+      "devanagari": "शत्रु",
+      "cons_seq": [
+        "ś",
+        "t",
+        "r"
+      ],
+      "cons_set": [
+        "r",
+        "t",
+        "ś"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "unknown",
+      "mean_overlap_vs_all": 0.1426
+    },
+    {
+      "iast": "śānti",
+      "devanagari": "शान्ति",
+      "cons_seq": [
+        "ś",
+        "n",
+        "t"
+      ],
+      "cons_set": [
+        "n",
+        "t",
+        "ś"
+      ],
+      "n_distinct": 3,
+      "n_tokens": 3,
+      "repeated": false,
+      "missing_r_but_consonant_only": false,
+      "valence": "pos",
+      "mean_overlap_vs_all": 0.0943
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "NO_WORD_SPECIFIC_SIGNAL": "Set A Delta CI lower bound <= 0 (T not above strongest control)",
+  "IDEAL_SET_ONLY_NOT_REPLICATED": "Set A passes all criteria but Set B Delta CI lower bound <= 0",
+  "STRUCTURAL_SHORTCUT_EXPLAINS": "F (feature-only) accuracy ~ T accuracy (length/frequency explains it)",
+  "RANDOM_ASSIGNMENT_EXPLAINS": "R accuracy ~ T accuracy (the specific assignment adds nothing)",
+  "VALENCE_EXPLAINS": "same-valence-subset accuracy ~ chance while cross-valence drives any effect",
+  "ORDER_NOT_INFORMATIVE": "S/O ablation shows no ordered-vs-bag difference",
+  "WORD_SPECIFIC_SIGNAL_REPLICATES": "all conjunctive success criteria met in BOTH sets across families"
+}

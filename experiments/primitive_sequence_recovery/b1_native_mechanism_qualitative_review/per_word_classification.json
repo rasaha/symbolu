@@ -1,0 +1,2054 @@
+{
+  "words": [
+    {
+      "word_devanagari": "शान्ति",
+      "iast": "śānti",
+      "conventional_meaning": "peace",
+      "semantic_category": "mental/abstract",
+      "valence": "positive",
+      "exercises": "long ā, conjunct, sibilant",
+      "aksharas": [
+        "शा",
+        "न्ति"
+      ],
+      "atomic_varnas": [
+        "ś",
+        "ā",
+        "n",
+        "t",
+        "i"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+        "overextension, inflation",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "self-absorption, ego-centric doing"
+      ],
+      "liberating_sequence": [
+        "physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released",
+        "Ongoing thought / expansion",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "I-ness, doing self"
+      ],
+      "consonant_only_binding": [
+        "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+      ],
+      "consonant_only_liberating": [
+        "physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+      ],
+      "vowel_marker_binding": [
+        "overextension, inflation",
+        "self-absorption, ego-centric doing"
+      ],
+      "vowel_marker_liberating": [
+        "Ongoing thought / expansion",
+        "I-ness, doing self"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "सुख",
+      "iast": "sukha",
+      "conventional_meaning": "happiness/ease",
+      "semantic_category": "mental",
+      "valence": "positive",
+      "exercises": "short u, aspirate kh",
+      "aksharas": [
+        "सु",
+        "ख"
+      ],
+      "atomic_varnas": [
+        "s",
+        "u",
+        "kh",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "tunnel vision, missing the whole picture",
+        "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "Zoom, contraction",
+        "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs"
+      ],
+      "consonant_only_liberating": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip"
+      ],
+      "vowel_marker_binding": [
+        "tunnel vision, missing the whole picture",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Zoom, contraction",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "बल",
+      "iast": "bala",
+      "conventional_meaning": "strength",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "short a (repeated inherent)",
+      "aksharas": [
+        "ब",
+        "ल"
+      ],
+      "atomic_varnas": [
+        "b",
+        "a",
+        "l",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+        "restless starting without sustaining",
+        "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)",
+        "Birth of cognition / raw potential",
+        "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+        "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+      ],
+      "consonant_only_liberating": [
+        "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)",
+        "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "ज्ञान",
+      "iast": "jñāna",
+      "conventional_meaning": "knowledge",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "jña conjunct, long ā",
+      "aksharas": [
+        "ज्ञा",
+        "न"
+      ],
+      "atomic_varnas": [
+        "j",
+        "ñ",
+        "ā",
+        "n",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+        "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+        "overextension, inflation",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+        "transparency — inner intent and outer act coincide; no pretense, being what one appears",
+        "Ongoing thought / expansion",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+        "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+      ],
+      "consonant_only_liberating": [
+        "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+        "transparency — inner intent and outer act coincide; no pretense, being what one appears",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+      ],
+      "vowel_marker_binding": [
+        "overextension, inflation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Ongoing thought / expansion",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "क्षमा",
+      "iast": "kṣamā",
+      "conventional_meaning": "patience/forbearance",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "kṣa conjunct, long ā",
+      "aksharas": [
+        "क्ष",
+        "मा"
+      ],
+      "atomic_varnas": [
+        "k",
+        "ṣ",
+        "a",
+        "m",
+        "ā"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "restless starting without sustaining",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "overextension, inflation"
+      ],
+      "liberating_sequence": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+        "Birth of cognition / raw potential",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Ongoing thought / expansion"
+      ],
+      "consonant_only_binding": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+      ],
+      "consonant_only_liberating": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "overextension, inflation"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Ongoing thought / expansion"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "सत्त्व",
+      "iast": "sattva",
+      "conventional_meaning": "goodness/being (guṇa)",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "gemination t+t",
+      "aksharas": [
+        "स",
+        "त्त्व"
+      ],
+      "atomic_varnas": [
+        "s",
+        "a",
+        "t",
+        "t",
+        "v",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "restless starting without sustaining",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "Birth of cognition / raw potential",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+      ],
+      "consonant_only_liberating": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "मोक्ष",
+      "iast": "mokṣa",
+      "conventional_meaning": "liberation",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "vowel o, kṣa conjunct",
+      "aksharas": [
+        "मो",
+        "क्ष"
+      ],
+      "atomic_varnas": [
+        "m",
+        "o",
+        "k",
+        "ṣ",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "premature closure, stagnation",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Completion, closure",
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)"
+      ],
+      "consonant_only_liberating": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)"
+      ],
+      "vowel_marker_binding": [
+        "premature closure, stagnation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Completion, closure",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "अहिंसा",
+      "iast": "ahiṃsā",
+      "conventional_meaning": "nonviolence",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "anusvāra + long ā",
+      "aksharas": [
+        "अ",
+        "हिं",
+        "सा"
+      ],
+      "atomic_varnas": [
+        "a",
+        "h",
+        "i",
+        "ṃ",
+        "s",
+        "ā"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "restless starting without sustaining",
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "self-absorption, ego-centric doing",
+        "purging without integration, loss of vital essence",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "overextension, inflation"
+      ],
+      "liberating_sequence": [
+        "Birth of cognition / raw potential",
+        "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+        "I-ness, doing self",
+        "Repulsion, Detox",
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "Ongoing thought / expansion"
+      ],
+      "consonant_only_binding": [
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)"
+      ],
+      "consonant_only_liberating": [
+        "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "self-absorption, ego-centric doing",
+        "purging without integration, loss of vital essence",
+        "overextension, inflation"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "I-ness, doing self",
+        "Repulsion, Detox",
+        "Ongoing thought / expansion"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "सत्य",
+      "iast": "satya",
+      "conventional_meaning": "truth",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "conjunct ty",
+      "aksharas": [
+        "स",
+        "त्य"
+      ],
+      "atomic_varnas": [
+        "s",
+        "a",
+        "t",
+        "y",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "restless starting without sustaining",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "Birth of cognition / raw potential",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+      ],
+      "consonant_only_liberating": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "धर्म",
+      "iast": "dharma",
+      "conventional_meaning": "righteousness/sustaining",
+      "semantic_category": "abstract",
+      "valence": "positive",
+      "exercises": "aspirate dh, repha",
+      "aksharas": [
+        "ध",
+        "र्म"
+      ],
+      "atomic_varnas": [
+        "dh",
+        "a",
+        "r",
+        "m",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL",
+        "PRIMARY_ATTESTED",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+        "restless starting without sustaining",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "the acquisitive thirst quenched at its root — all thoughts (pure and impure) redirected wholly toward the Supreme (Parama Puruṣa), the attested cure",
+        "Birth of cognition / raw potential",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+      ],
+      "consonant_only_liberating": [
+        "the acquisitive thirst quenched at its root — all thoughts (pure and impure) redirected wholly toward the Supreme (Parama Puruṣa), the attested cure",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "योग",
+      "iast": "yoga",
+      "conventional_meaning": "union/discipline",
+      "semantic_category": "process/abstract",
+      "valence": "positive",
+      "exercises": "vowel o",
+      "aksharas": [
+        "यो",
+        "ग"
+      ],
+      "atomic_varnas": [
+        "y",
+        "o",
+        "g",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "premature closure, stagnation",
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "Completion, closure",
+        "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)"
+      ],
+      "consonant_only_liberating": [
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation"
+      ],
+      "vowel_marker_binding": [
+        "premature closure, stagnation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Completion, closure",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "आनन्द",
+      "iast": "ānanda",
+      "conventional_meaning": "bliss",
+      "semantic_category": "emotional",
+      "valence": "positive",
+      "exercises": "long ā onset, nd",
+      "aksharas": [
+        "आ",
+        "न",
+        "न्द"
+      ],
+      "atomic_varnas": [
+        "ā",
+        "n",
+        "a",
+        "n",
+        "d",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "overextension, inflation",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "Ongoing thought / expansion",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "Birth of cognition / raw potential",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)"
+      ],
+      "consonant_only_liberating": [
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation"
+      ],
+      "vowel_marker_binding": [
+        "overextension, inflation",
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Ongoing thought / expansion",
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "देव",
+      "iast": "deva",
+      "conventional_meaning": "deity",
+      "semantic_category": "concrete/abstract",
+      "valence": "positive",
+      "exercises": "diphthong e",
+      "aksharas": [
+        "दे",
+        "व"
+      ],
+      "atomic_varnas": [
+        "d",
+        "e",
+        "v",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "overthinking, nitpicking",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "Practical thought, benefit",
+        "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety"
+      ],
+      "consonant_only_liberating": [
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)"
+      ],
+      "vowel_marker_binding": [
+        "overthinking, nitpicking",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Practical thought, benefit",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PARTIALLY_CONTRADICTORY",
+        "B_full_liberating": "PLAUSIBLY_RELATED",
+        "C_consonant_binding": "PARTIALLY_CONTRADICTORY",
+        "D_consonant_liberating": "PLAUSIBLY_RELATED",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "दुःख",
+      "iast": "duḥkha",
+      "conventional_meaning": "suffering",
+      "semantic_category": "mental",
+      "valence": "negative",
+      "exercises": "visarga + aspirate",
+      "aksharas": [
+        "दुः",
+        "ख"
+      ],
+      "atomic_varnas": [
+        "d",
+        "u",
+        "ḥ",
+        "kh",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "tunnel vision, missing the whole picture",
+        "compulsion, clinging pull",
+        "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "Zoom, contraction",
+        "Attraction, Nectar-pull",
+        "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs"
+      ],
+      "consonant_only_liberating": [
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip"
+      ],
+      "vowel_marker_binding": [
+        "tunnel vision, missing the whole picture",
+        "compulsion, clinging pull",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Zoom, contraction",
+        "Attraction, Nectar-pull",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PLAUSIBLY_RELATED",
+        "B_full_liberating": "PARTIALLY_CONTRADICTORY",
+        "C_consonant_binding": "PLAUSIBLY_RELATED",
+        "D_consonant_liberating": "PARTIALLY_CONTRADICTORY",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "भय",
+      "iast": "bhaya",
+      "conventional_meaning": "fear",
+      "semantic_category": "emotional",
+      "valence": "negative",
+      "exercises": "aspirate bh",
+      "aksharas": [
+        "भ",
+        "य"
+      ],
+      "atomic_varnas": [
+        "bh",
+        "a",
+        "y",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+        "restless starting without sustaining",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "breaking the entrancing spell into clear sense — withdrawing the mind (pratyāhāra) along the path of righteousness, no longer spellbound (aided by kīrtana / devotional song)",
+        "Birth of cognition / raw potential",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+      ],
+      "consonant_only_liberating": [
+        "breaking the entrancing spell into clear sense — withdrawing the mind (pratyāhāra) along the path of righteousness, no longer spellbound (aided by kīrtana / devotional song)",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PLAUSIBLY_RELATED",
+        "B_full_liberating": "PARTIALLY_CONTRADICTORY",
+        "C_consonant_binding": "PLAUSIBLY_RELATED",
+        "D_consonant_liberating": "PARTIALLY_CONTRADICTORY",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "क्रोध",
+      "iast": "krodha",
+      "conventional_meaning": "anger",
+      "semantic_category": "emotional",
+      "valence": "negative",
+      "exercises": "aspirate dh, vowel o",
+      "aksharas": [
+        "क्रो",
+        "ध"
+      ],
+      "atomic_varnas": [
+        "k",
+        "r",
+        "o",
+        "dh",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "premature closure, stagnation",
+        "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+        "Completion, closure",
+        "the acquisitive thirst quenched at its root — all thoughts (pure and impure) redirected wholly toward the Supreme (Parama Puruṣa), the attested cure",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)"
+      ],
+      "consonant_only_liberating": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+        "the acquisitive thirst quenched at its root — all thoughts (pure and impure) redirected wholly toward the Supreme (Parama Puruṣa), the attested cure"
+      ],
+      "vowel_marker_binding": [
+        "premature closure, stagnation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Completion, closure",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PLAUSIBLY_RELATED",
+        "B_full_liberating": "PARTIALLY_CONTRADICTORY",
+        "C_consonant_binding": "PLAUSIBLY_RELATED",
+        "D_consonant_liberating": "PARTIALLY_CONTRADICTORY",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "मोह",
+      "iast": "moha",
+      "conventional_meaning": "delusion",
+      "semantic_category": "mental",
+      "valence": "negative",
+      "exercises": "vowel o",
+      "aksharas": [
+        "मो",
+        "ह"
+      ],
+      "atomic_varnas": [
+        "m",
+        "o",
+        "h",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "premature closure, stagnation",
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Completion, closure",
+        "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world"
+      ],
+      "consonant_only_liberating": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing"
+      ],
+      "vowel_marker_binding": [
+        "premature closure, stagnation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Completion, closure",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PLAUSIBLY_RELATED",
+        "B_full_liberating": "PARTIALLY_CONTRADICTORY",
+        "C_consonant_binding": "PLAUSIBLY_RELATED",
+        "D_consonant_liberating": "PARTIALLY_CONTRADICTORY",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "काम",
+      "iast": "kāma",
+      "conventional_meaning": "desire",
+      "semantic_category": "mental",
+      "valence": "negative",
+      "exercises": "long ā",
+      "aksharas": [
+        "का",
+        "म"
+      ],
+      "atomic_varnas": [
+        "k",
+        "ā",
+        "m",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "overextension, inflation",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "Ongoing thought / expansion",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+      ],
+      "consonant_only_liberating": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+      ],
+      "vowel_marker_binding": [
+        "overextension, inflation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Ongoing thought / expansion",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "PLAUSIBLY_RELATED",
+        "B_full_liberating": "PARTIALLY_CONTRADICTORY",
+        "C_consonant_binding": "PLAUSIBLY_RELATED",
+        "D_consonant_liberating": "PARTIALLY_CONTRADICTORY",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "माया",
+      "iast": "māyā",
+      "conventional_meaning": "illusion",
+      "semantic_category": "abstract",
+      "valence": "negative",
+      "exercises": "long ā×2",
+      "aksharas": [
+        "मा",
+        "या"
+      ],
+      "atomic_varnas": [
+        "m",
+        "ā",
+        "y",
+        "ā"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "overextension, inflation",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "overextension, inflation"
+      ],
+      "liberating_sequence": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Ongoing thought / expansion",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "Ongoing thought / expansion"
+      ],
+      "consonant_only_binding": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+      ],
+      "consonant_only_liberating": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+      ],
+      "vowel_marker_binding": [
+        "overextension, inflation",
+        "overextension, inflation"
+      ],
+      "vowel_marker_liberating": [
+        "Ongoing thought / expansion",
+        "Ongoing thought / expansion"
+      ],
+      "view_fit": {
+        "A_full_binding": "PLAUSIBLY_RELATED",
+        "B_full_liberating": "PARTIALLY_CONTRADICTORY",
+        "C_consonant_binding": "PLAUSIBLY_RELATED",
+        "D_consonant_liberating": "PARTIALLY_CONTRADICTORY",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "अग्नि",
+      "iast": "agni",
+      "conventional_meaning": "fire",
+      "semantic_category": "concrete",
+      "valence": "neutral",
+      "exercises": "independent-vowel onset",
+      "aksharas": [
+        "अ",
+        "ग्नि"
+      ],
+      "atomic_varnas": [
+        "a",
+        "g",
+        "n",
+        "i"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "restless starting without sustaining",
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "self-absorption, ego-centric doing"
+      ],
+      "liberating_sequence": [
+        "Birth of cognition / raw potential",
+        "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "I-ness, doing self"
+      ],
+      "consonant_only_binding": [
+        "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)"
+      ],
+      "consonant_only_liberating": [
+        "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation",
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "self-absorption, ego-centric doing"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "I-ness, doing self"
+      ],
+      "view_fit": {
+        "A_full_binding": "GENERIC_OR_BARNUM",
+        "B_full_liberating": "GENERIC_OR_BARNUM",
+        "C_consonant_binding": "GENERIC_OR_BARNUM",
+        "D_consonant_liberating": "GENERIC_OR_BARNUM",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "जल",
+      "iast": "jala",
+      "conventional_meaning": "water",
+      "semantic_category": "concrete",
+      "valence": "neutral",
+      "exercises": "short a (repeated)",
+      "aksharas": [
+        "ज",
+        "ल"
+      ],
+      "atomic_varnas": [
+        "j",
+        "a",
+        "l",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+        "restless starting without sustaining",
+        "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+        "Birth of cognition / raw potential",
+        "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+        "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour"
+      ],
+      "consonant_only_liberating": [
+        "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+        "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "GENERIC_OR_BARNUM",
+        "B_full_liberating": "GENERIC_OR_BARNUM",
+        "C_consonant_binding": "GENERIC_OR_BARNUM",
+        "D_consonant_liberating": "GENERIC_OR_BARNUM",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "नर",
+      "iast": "nara",
+      "conventional_meaning": "man/person",
+      "semantic_category": "concrete",
+      "valence": "neutral",
+      "exercises": "short a (repeated)",
+      "aksharas": [
+        "न",
+        "र"
+      ],
+      "atomic_varnas": [
+        "n",
+        "a",
+        "r",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL",
+        "PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "Birth of cognition / raw potential",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+      ],
+      "consonant_only_liberating": [
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "GENERIC_OR_BARNUM",
+        "B_full_liberating": "GENERIC_OR_BARNUM",
+        "C_consonant_binding": "GENERIC_OR_BARNUM",
+        "D_consonant_liberating": "GENERIC_OR_BARNUM",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "नमः",
+      "iast": "namaḥ",
+      "conventional_meaning": "salutation",
+      "semantic_category": "action",
+      "valence": "neutral",
+      "exercises": "final visarga",
+      "aksharas": [
+        "न",
+        "मः"
+      ],
+      "atomic_varnas": [
+        "n",
+        "a",
+        "m",
+        "a",
+        "ḥ"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "restless starting without sustaining",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "restless starting without sustaining",
+        "compulsion, clinging pull"
+      ],
+      "liberating_sequence": [
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "Birth of cognition / raw potential",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "Birth of cognition / raw potential",
+        "Attraction, Nectar-pull"
+      ],
+      "consonant_only_binding": [
+        "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse"
+      ],
+      "consonant_only_liberating": [
+        "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "restless starting without sustaining",
+        "compulsion, clinging pull"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential",
+        "Attraction, Nectar-pull"
+      ],
+      "view_fit": {
+        "A_full_binding": "GENERIC_OR_BARNUM",
+        "B_full_liberating": "GENERIC_OR_BARNUM",
+        "C_consonant_binding": "GENERIC_OR_BARNUM",
+        "D_consonant_liberating": "GENERIC_OR_BARNUM",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "संस्कार",
+      "iast": "saṃskāra",
+      "conventional_meaning": "impression/refinement",
+      "semantic_category": "process",
+      "valence": "neutral",
+      "exercises": "anusvāra",
+      "aksharas": [
+        "सं",
+        "स्का",
+        "र"
+      ],
+      "atomic_varnas": [
+        "s",
+        "a",
+        "ṃ",
+        "s",
+        "k",
+        "ā",
+        "r",
+        "a"
+      ],
+      "missing_units": [],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "restless starting without sustaining",
+        "purging without integration, loss of vital essence",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "overextension, inflation",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "Birth of cognition / raw potential",
+        "Repulsion, Detox",
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "Ongoing thought / expansion",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat"
+      ],
+      "consonant_only_liberating": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "purging without integration, loss of vital essence",
+        "overextension, inflation",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Repulsion, Detox",
+        "Ongoing thought / expansion",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "GENERIC_OR_BARNUM",
+        "B_full_liberating": "GENERIC_OR_BARNUM",
+        "C_consonant_binding": "GENERIC_OR_BARNUM",
+        "D_consonant_liberating": "GENERIC_OR_BARNUM",
+        "E_typed_mixed": "GENERIC_OR_BARNUM"
+      }
+    },
+    {
+      "word_devanagari": "हृदय",
+      "iast": "hṛdaya",
+      "conventional_meaning": "heart",
+      "semantic_category": "concrete/abstract",
+      "valence": "positive",
+      "exercises": "MISSING vocalic ṛ",
+      "aksharas": [
+        "हृ",
+        "द",
+        "य"
+      ],
+      "atomic_varnas": [
+        "h",
+        "ṛ",
+        "d",
+        "a",
+        "y",
+        "a"
+      ],
+      "missing_units": [
+        "ṛ"
+      ],
+      "provenance_sequence": [
+        "AUTHORED_PROVISIONAL",
+        "MISSING_TABLE_ENTRY",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "MISSING",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        null,
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "restless starting without sustaining",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+        null,
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "Birth of cognition / raw potential",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+        "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+      ],
+      "consonant_only_liberating": [
+        "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+        "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+      ],
+      "vowel_marker_binding": [
+        null,
+        "restless starting without sustaining",
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        null,
+        "Birth of cognition / raw potential",
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "B_full_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "C_consonant_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "D_consonant_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "E_typed_mixed": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT"
+      }
+    },
+    {
+      "word_devanagari": "संस्कृत",
+      "iast": "saṃskṛta",
+      "conventional_meaning": "refined/Sanskrit",
+      "semantic_category": "abstract",
+      "valence": "neutral",
+      "exercises": "anusvāra + MISSING ṛ",
+      "aksharas": [
+        "सं",
+        "स्कृ",
+        "त"
+      ],
+      "atomic_varnas": [
+        "s",
+        "a",
+        "ṃ",
+        "s",
+        "k",
+        "ṛ",
+        "t",
+        "a"
+      ],
+      "missing_units": [
+        "ṛ"
+      ],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "binding=INFERRED;liberating=PRIMARY_ATTESTED",
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "MISSING_TABLE_ENTRY",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY",
+        "DEVELOPMENT_ONLY",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "MISSING",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "restless starting without sustaining",
+        "purging without integration, loss of vital essence",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        null,
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "Birth of cognition / raw potential",
+        "Repulsion, Detox",
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        null,
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness"
+      ],
+      "consonant_only_liberating": [
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)"
+      ],
+      "vowel_marker_binding": [
+        "restless starting without sustaining",
+        "purging without integration, loss of vital essence",
+        null,
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        "Birth of cognition / raw potential",
+        "Repulsion, Detox",
+        null,
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "B_full_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "C_consonant_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "D_consonant_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "E_typed_mixed": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT"
+      }
+    },
+    {
+      "word_devanagari": "मृत्यु",
+      "iast": "mṛtyu",
+      "conventional_meaning": "death",
+      "semantic_category": "abstract",
+      "valence": "negative",
+      "exercises": "MISSING ṛ + conjunct",
+      "aksharas": [
+        "मृ",
+        "त्यु"
+      ],
+      "atomic_varnas": [
+        "m",
+        "ṛ",
+        "t",
+        "y",
+        "u"
+      ],
+      "missing_units": [
+        "ṛ"
+      ],
+      "provenance_sequence": [
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "MISSING_TABLE_ENTRY",
+        "binding=PRIMARY_ATTESTED;liberating=INFERRED",
+        "binding=PRIMARY_ATTESTED;liberating=AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "MISSING",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        null,
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+        "tunnel vision, missing the whole picture"
+      ],
+      "liberating_sequence": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        null,
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+        "Zoom, contraction"
+      ],
+      "consonant_only_binding": [
+        "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+        "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+        "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others"
+      ],
+      "consonant_only_liberating": [
+        "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+        "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+        "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path"
+      ],
+      "vowel_marker_binding": [
+        null,
+        "tunnel vision, missing the whole picture"
+      ],
+      "vowel_marker_liberating": [
+        null,
+        "Zoom, contraction"
+      ],
+      "view_fit": {
+        "A_full_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "B_full_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "C_consonant_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "D_consonant_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "E_typed_mixed": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT"
+      }
+    },
+    {
+      "word_devanagari": "कृष्ण",
+      "iast": "kṛṣṇa",
+      "conventional_meaning": "dark / a name",
+      "semantic_category": "concrete",
+      "valence": "neutral",
+      "exercises": "MISSING ṛ + conjuncts",
+      "aksharas": [
+        "कृ",
+        "ष्ण"
+      ],
+      "atomic_varnas": [
+        "k",
+        "ṛ",
+        "ṣ",
+        "ṇ",
+        "a"
+      ],
+      "missing_units": [
+        "ṛ"
+      ],
+      "provenance_sequence": [
+        "binding=INFERRED;liberating=AUTHORED_PROVISIONAL",
+        "MISSING_TABLE_ENTRY",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL",
+        "AUTHORED_PROVISIONAL"
+      ],
+      "activation_scope_sequence": [
+        "CONFIRMATORY_BACKBONE",
+        "MISSING",
+        "CONFIRMATORY_BACKBONE",
+        "CONFIRMATORY_BACKBONE",
+        "DEVELOPMENT_ONLY"
+      ],
+      "binding_sequence": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        null,
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "envy — the sting at another's success; covetous resentment at another's good fortune",
+        "restless starting without sustaining"
+      ],
+      "liberating_sequence": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        null,
+        "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+        "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+        "Birth of cognition / raw potential"
+      ],
+      "consonant_only_binding": [
+        "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+        "envy — the sting at another's success; covetous resentment at another's good fortune"
+      ],
+      "consonant_only_liberating": [
+        "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+        "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+        "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it"
+      ],
+      "vowel_marker_binding": [
+        null,
+        "restless starting without sustaining"
+      ],
+      "vowel_marker_liberating": [
+        null,
+        "Birth of cognition / raw potential"
+      ],
+      "view_fit": {
+        "A_full_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "B_full_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "C_consonant_binding": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "D_consonant_liberating": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT",
+        "E_typed_mixed": "UNINTERPRETABLE_DUE_TO_MISSING_UNIT"
+      }
+    }
+  ]
+}

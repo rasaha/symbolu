@@ -1,0 +1,20 @@
+{
+  "fields": [
+    "derangement_seed",
+    "random_assignment_seed",
+    "n_random_assignments",
+    "generic_seed",
+    "candidate_order_seed",
+    "repeat_seed",
+    "per_trial_candidate_order",
+    "per_arm_packet_map"
+  ],
+  "pinned_seeds": {
+    "derangement": 20260901,
+    "random_varna_assignment": 20260902,
+    "generic": 20260903,
+    "candidate_order": 20260904,
+    "repeats": 20260905
+  },
+  "note": "seeds + methods are pinned here; the actual randomized packets are generated at the separate packet-authoring-and-freeze step and hash-pinned then."
+}
