@@ -29,35 +29,77 @@ class LLMResponse:
     completion_tokens: int
     latency_ms: float
     is_real: bool          # False for the deterministic reader
+    peak_mem_mb: float = 0.0
+    throughput_tps: float = 0.0
 
 
 class TransformersLLMClient:
-    """Local open-weight model via HuggingFace transformers. Lazy — importing/loading
-    only happens on construction, so the harness has no hard dependency."""
+    """Local open-weight model via HuggingFace transformers (Qwen/Llama/Gemma/Mistral).
+
+    Deployment-correct: applies the tokenizer chat template with add_generation_prompt,
+    selects BF16 where supported else FP16 on CUDA, refuses a silent CPU fallback when
+    CUDA is requested, runs under inference_mode with greedy decoding (temperature 0),
+    decodes only the generated tokens, and reports prompt/generated token counts,
+    latency, peak CUDA memory, and throughput. It does not change the logical prompt
+    content (system + question) or any scoring."""
 
     is_real = True
 
-    def __init__(self, model_name: str, max_new_tokens: int = 64):
+    def __init__(self, model_name: str, max_new_tokens: int = 64, *, dtype: str = "auto",
+                 device: str = "cuda", seed: int = 0):
         import torch  # noqa: F401  (raises clearly if absent)
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        self.name = f"hf:{model_name}"
+        self.torch = torch
+        torch.manual_seed(seed)
+        self.device = device
+        if device == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError("CUDA requested but unavailable; refusing silent CPU fallback. "
+                               "Set DEVICE=cpu explicitly only for non-benchmark debugging.")
+        if dtype == "auto":
+            if device == "cuda":
+                dt = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            else:
+                dt = torch.float32
+        else:
+            dt = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[dtype]
+        self.dtype = dt
         self.max_new_tokens = max_new_tokens
         self.tok = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=dt,
+                                                          device_map=None)
+        if device == "cuda":
+            self.model.to("cuda")               # explicit; no accelerate CPU offload
         self.model.eval()
+        self.name = f"hf:{model_name}:{str(dt).split('.')[-1]}:{device}"
+
+    def _render(self, system: str, prompt: str) -> str:
+        messages = ([{"role": "system", "content": system}] if system else [])
+        messages.append({"role": "user", "content": prompt})
+        if getattr(self.tok, "chat_template", None):
+            return self.tok.apply_chat_template(messages, tokenize=False,
+                                                add_generation_prompt=True)
+        return (system + "\n\n" + prompt) if system else prompt
 
     def generate(self, system: str, prompt: str, *, task=None, max_tokens: int = 64) -> LLMResponse:
-        import torch
-        text = (system + "\n\n" + prompt) if system else prompt
-        ids = self.tok(text, return_tensors="pt")
+        torch = self.torch
+        text = self._render(system, prompt)
+        ids = self.tok(text, return_tensors="pt").to(self.model.device)
+        in_len = int(ids["input_ids"].shape[1])
+        if self.device == "cuda":
+            torch.cuda.reset_peak_memory_stats()
         t0 = time.perf_counter()
-        with torch.no_grad():
+        with torch.inference_mode():
             out = self.model.generate(**ids, max_new_tokens=min(max_tokens, self.max_new_tokens),
-                                      do_sample=False)
+                                      do_sample=False, num_beams=1,
+                                      pad_token_id=(self.tok.pad_token_id or self.tok.eos_token_id))
         dt = (time.perf_counter() - t0) * 1000.0
-        gen = self.tok.decode(out[0][ids["input_ids"].shape[1]:], skip_special_tokens=True)
-        return LLMResponse(gen.strip(), int(ids["input_ids"].shape[1]),
-                           int(out.shape[1] - ids["input_ids"].shape[1]), dt, True)
+        gen_ids = out[0][in_len:]
+        n_gen = int(gen_ids.shape[0])
+        gen = self.tok.decode(gen_ids, skip_special_tokens=True)
+        peak = (torch.cuda.max_memory_allocated() / 1e6) if self.device == "cuda" else 0.0
+        tps = (n_gen / (dt / 1000.0)) if dt > 0 else 0.0
+        return LLMResponse(gen.strip(), in_len, n_gen, dt, True,
+                           peak_mem_mb=peak, throughput_tps=tps)
 
 
 class AgenticAPIClient:
