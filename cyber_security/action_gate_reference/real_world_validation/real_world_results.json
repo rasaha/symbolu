@@ -1,0 +1,201 @@
+{
+  "summary": {
+    "n_workflows": 5,
+    "n_records": 17,
+    "n_happy_paths_ok": 5,
+    "n_happy_paths": 5,
+    "n_attacks": 12,
+    "n_attacks_detected": 12,
+    "all_attacks_detected": true,
+    "all_happy_paths_ok": true
+  },
+  "records": [
+    {
+      "workflow": "github_coding_agent",
+      "operation": "DEPLOY",
+      "scenario": "happy_path",
+      "kind": "happy",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "ALLOW -> COMPLETED",
+      "security_property": "authorized commit executed once",
+      "detected": true
+    },
+    {
+      "workflow": "github_coding_agent",
+      "operation": "DEPLOY",
+      "scenario": "replay_duplicate_execution",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_NONCE_REPLAY",
+      "security_property": "single-use nonce -> exactly-once",
+      "detected": true
+    },
+    {
+      "workflow": "github_coding_agent",
+      "operation": "DEPLOY",
+      "scenario": "target_substitution",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_ACTION_HASH_MISMATCH",
+      "security_property": "action_hash rebind rejects retargeting",
+      "detected": true
+    },
+    {
+      "workflow": "kubernetes_deployment",
+      "operation": "DB_DELETE",
+      "scenario": "happy_path",
+      "kind": "happy",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "ALLOW -> COMPLETED",
+      "security_property": "destructive delete: backup + dual approval required",
+      "detected": true
+    },
+    {
+      "workflow": "kubernetes_deployment",
+      "operation": "DB_DELETE",
+      "scenario": "approval_reuse_cross_action",
+      "kind": "attack",
+      "phase": "DECISION",
+      "detection_point": "DECISION",
+      "observed": "DENY",
+      "security_property": "approval binds one action_hash only",
+      "detected": true
+    },
+    {
+      "workflow": "kubernetes_deployment",
+      "operation": "DB_DELETE",
+      "scenario": "stale_state_at_decision",
+      "kind": "attack",
+      "phase": "DECISION",
+      "detection_point": "DECISION",
+      "observed": "REQUEST_MORE_EVIDENCE",
+      "security_property": "stale state -> refuse (REQUEST_MORE_EVIDENCE)",
+      "detected": true
+    },
+    {
+      "workflow": "kubernetes_deployment",
+      "operation": "DB_DELETE",
+      "scenario": "toctou_state_drift",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_STALE_STATE",
+      "security_property": "commit-time state binding rejects drift",
+      "detected": true
+    },
+    {
+      "workflow": "erp_purchase_approval",
+      "operation": "CLOUD_SPEND_INCREASE",
+      "scenario": "happy_path",
+      "kind": "happy",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "ALLOW -> token_verified=True",
+      "security_property": "over-threshold spend: budget-owner approval",
+      "detected": true
+    },
+    {
+      "workflow": "erp_purchase_approval",
+      "operation": "CLOUD_SPEND_INCREASE",
+      "scenario": "policy_update_after_approval",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_POLICY_MISMATCH",
+      "security_property": "token bound to policy_hash; stale-policy commit rejected",
+      "detected": true
+    },
+    {
+      "workflow": "erp_purchase_approval",
+      "operation": "CLOUD_SPEND_INCREASE",
+      "scenario": "privilege_tamper_at_commit",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_ACTION_HASH_MISMATCH",
+      "security_property": "credential_scope in action_hash; tamper rejected",
+      "detected": true
+    },
+    {
+      "workflow": "erp_purchase_approval",
+      "operation": "CLOUD_SPEND_INCREASE",
+      "scenario": "approval_nonce_replay",
+      "kind": "attack",
+      "phase": "DECISION",
+      "detection_point": "DECISION",
+      "observed": "DENY",
+      "security_property": "approval nonce single-use",
+      "detected": true
+    },
+    {
+      "workflow": "database_schema_migration",
+      "operation": "DB_MUTATION",
+      "scenario": "happy_path",
+      "kind": "happy",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "ALLOW_WITH_CONSTRAINTS -> COMPLETED",
+      "security_property": "bounded migration: simulation required",
+      "detected": true
+    },
+    {
+      "workflow": "database_schema_migration",
+      "operation": "DB_MUTATION",
+      "scenario": "over_scope_blast_radius",
+      "kind": "attack",
+      "phase": "DECISION",
+      "detection_point": "DECISION",
+      "observed": "ESCALATE_TO_HUMAN",
+      "security_property": "MAX_SCOPE blast-radius guard escalates",
+      "detected": true
+    },
+    {
+      "workflow": "database_schema_migration",
+      "operation": "DB_MUTATION",
+      "scenario": "argument_expansion_at_commit",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_ACTION_HASH_MISMATCH",
+      "security_property": "arguments in action_hash; expansion rejected",
+      "detected": true
+    },
+    {
+      "workflow": "multi_agent_pipeline",
+      "operation": "DEPLOY+DB_MUTATION",
+      "scenario": "happy_pipeline",
+      "kind": "happy",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "A=COMPLETED B=COMPLETED (corr=pipe-42)",
+      "security_property": "each step independently authorized + audited under one correlation_id",
+      "detected": true
+    },
+    {
+      "workflow": "multi_agent_pipeline",
+      "operation": "DEPLOY",
+      "scenario": "cross_step_replay",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_NONCE_REPLAY",
+      "security_property": "agent A's action commits exactly once",
+      "detected": true
+    },
+    {
+      "workflow": "multi_agent_pipeline",
+      "operation": "DB_MUTATION",
+      "scenario": "cross_agent_action_confusion",
+      "kind": "attack",
+      "phase": "COMMIT",
+      "detection_point": "COMMIT",
+      "observed": "E_ACTION_HASH_MISMATCH",
+      "security_property": "B's token binds B's action only (no cross-agent action swap)",
+      "detected": true
+    }
+  ]
+}
