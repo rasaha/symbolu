@@ -1,0 +1,37 @@
+{
+  "constraint_independent_counts": {
+    "bigram": 1582240,
+    "edit_floor": 1423200,
+    "endpoint": 186718,
+    "length_span": 1582240,
+    "selforder": 1623160,
+    "trigram": 1582240
+  },
+  "n_eligible_candidates": 35,
+  "n_satisfying_all": 178234,
+  "order_specific_diagnostic": {
+    "d_ord_given_inv_all_pool": {
+      "max": 0.75,
+      "mean": 0.0686,
+      "min": 0.0,
+      "n_positive": 151,
+      "n_zero": 444
+    },
+    "d_ord_given_inv_eligible": {
+      "max": 0.75,
+      "mean": 0.0686,
+      "min": 0.0,
+      "n_positive": 151,
+      "n_zero": 444
+    },
+    "n_pairs_all": 595
+  },
+  "principal_eliminating_constraint_counts": {
+    "edit_floor": 199960,
+    "endpoint": 1243569,
+    "length_span": 1397
+  },
+  "schema": "b1_12_subset_search_summary_v1",
+  "status": "G0_PASS",
+  "total_size6_subsets": 1623160
+}

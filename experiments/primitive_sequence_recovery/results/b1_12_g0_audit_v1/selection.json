@@ -1,0 +1,58 @@
+{
+  "schema": "b1_12_selection_v1",
+  "selected_subset": [
+    "W03",
+    "W15",
+    "W20",
+    "W23",
+    "W30",
+    "W35"
+  ],
+  "selection": {
+    "objective_min_pairwise_d_edit": 0.8,
+    "selected_subset": [
+      "W03",
+      "W15",
+      "W20",
+      "W23",
+      "W30",
+      "W35"
+    ],
+    "selected_words": [
+      {
+        "iast": "asthi",
+        "id": "W03",
+        "length": 4
+      },
+      {
+        "iast": "grīvā",
+        "id": "W15",
+        "length": 5
+      },
+      {
+        "iast": "jñāna",
+        "id": "W20",
+        "length": 5
+      },
+      {
+        "iast": "keśa",
+        "id": "W23",
+        "length": 4
+      },
+      {
+        "iast": "nadī",
+        "id": "W30",
+        "length": 4
+      },
+      {
+        "iast": "sūrya",
+        "id": "W35",
+        "length": 5
+      }
+    ],
+    "tie_break_mean_multiset_jaccard": 0.130555,
+    "tie_break_mean_pairwise_d_edit": 0.96,
+    "tie_break_mean_unique_trigram_count": 2.5
+  },
+  "status": "G0_PASS"
+}
