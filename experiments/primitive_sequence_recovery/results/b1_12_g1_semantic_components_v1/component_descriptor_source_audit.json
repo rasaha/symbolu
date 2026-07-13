@@ -1,0 +1,11 @@
+{
+  "all_source_backed_verbatim_preserved": true,
+  "lexicon_sha256": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+  "n_entries": 18,
+  "n_tier_A_source_backed": 18,
+  "n_tier_B_developmental": 0,
+  "n_unmapped": 0,
+  "note": "every source-backed entry preserves the exact frozen binding-pole gloss verbatim.",
+  "polarity_consistent_no_switching": true,
+  "schema": "b1_12_component_descriptor_source_audit_v1"
+}
