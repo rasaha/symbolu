@@ -13,6 +13,8 @@ python3 -m pip install "torch==${TORCH_VERSION}" --index-url "${CUDA_INDEX}"
 echo "[setup] installing pinned inference deps"
 python3 -m pip install -r requirements-runpod.txt
 
-echo "[setup] probing environment (GPU required; model not required yet)"
-PROBE_REQUIRE_GPU=1 PROBE_REQUIRE_MODEL=0 python3 probe_environment.py
+echo "[setup] probing environment (informational; the run scripts enforce the gates)"
+# Do not abort setup on a dirty tree / missing model — those are RUN-time gates.
+PROBE_REQUIRE_GPU=1 PROBE_REQUIRE_MODEL=0 python3 probe_environment.py \
+  || echo "[setup] probe flagged issues above (e.g. dirty tree) — resolve or set ALLOW_DIRTY=1 before a scientific run"
 echo "[setup] done"

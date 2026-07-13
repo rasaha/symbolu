@@ -14,7 +14,21 @@ import runpod_common as RC
 from probe_environment import model_complete
 
 
+def _ensure_hf_transfer_ok():
+    """Some RunPod images set HF_HUB_ENABLE_HF_TRANSFER=1 without installing the
+    'hf_transfer' package, which makes every download fail. If the accelerator is
+    enabled but not importable, disable it so downloads still work (a bit slower)."""
+    if os.environ.get("HF_HUB_ENABLE_HF_TRANSFER") == "1":
+        try:
+            import hf_transfer  # noqa: F401
+        except Exception:
+            os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+            print("[download] hf_transfer not installed; disabling fast-transfer "
+                  "(pip install hf_transfer to re-enable)")
+
+
 def download(model_id: str, model_dir: str, *, force: bool = False) -> dict:
+    _ensure_hf_transfer_ok()
     d = pathlib.Path(model_dir)
     complete, msg = model_complete(model_dir)
     if complete and not force:
