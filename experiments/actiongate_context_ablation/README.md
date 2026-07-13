@@ -39,7 +39,22 @@ It does **not** build a compressor. It answers one question:
 | `EXTRACTOR_V2_RESULTS.md` / `results/extractor_v2_results.json` | Before/after for the two bottlenecks + recommendation. |
 | `actiongate_context_ablation/{structured,semantic,validator}_extractor.py`, `extractor_v2.py`, `protected_detector.py`, `milestone_bench.py` | Multi-stage extractor + trainable protected-span detector + benchmark harness. |
 
-### Compressor prototype milestone (latest)
+### Real-LLM validation milestone (latest)
+
+Model-agnostic harness (`real_llm_bench.py`, `llm_client.py`, `llm_tasks.py`,
+`real_llm_plots.py`) that drives the FROZEN compressor through real downstream tasks
+(instruction following, QA, reasoning, summarization, extraction, tool selection,
+tool-arg generation, envelope extraction) across 5 methods × 6 budgets.
+**No runnable open-weight LLM exists in this environment** (no transformers/torch,
+HuggingFace policy-blocked, no API keys), so per the milestone rule the harness is
+built and the dependency documented — **no results fabricated**. Recommendation:
+**`BLOCKED_NO_MODEL`** (GO/LIMITED_GO/STOP cannot be honestly emitted without real-LLM
+evidence). A deterministic reader validates plumbing (labelled non-scientific) and
+already shows the protected method holding 100% decision/envelope preservation while
+the protection-unaware control degrades at high compression. Ready to run:
+`R.run(TransformersLLMClient('Qwen/Qwen2.5-0.5B-Instruct'))`. See `REAL_LLM_RESULTS.md`.
+
+### Compressor prototype milestone
 
 First extractive ActionGate Context Minimization compressor (`compressor.py`,
 `compressor_bench.py`, `task_benchmark.py`, `plots.py`). Reuses the frozen detector +
