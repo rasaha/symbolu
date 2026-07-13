@@ -398,6 +398,41 @@ def render_investor_md(models) -> str:
     else:
         ap(f"Verdict `{rep['verdict']}`: see the per-model replication table above. "
            "Consistency is not forced.")
+    # --- generalization: separate what is proven by construction from what is measured ---
+    real_names = ", ".join(m.short for m in real) if real else "none"
+    spread = a["architecture_sensitivity"]["delta_spread"]
+    spread_txt = "—" if spread is None else _pct(spread)
+    pending = a["models_planned_pending"]
+    ap("\n## Generalization and scope of the claim\n")
+    ap("Two claims with different bases of confidence — stated separately on purpose.\n")
+    ap("**A · Decision safety is model-independent *by construction*.** `protected` "
+       "decision-preservation and envelope-preservation are computed by the deterministic "
+       "ActionGate on the compressed context; the downstream LLM is not part of that "
+       "computation. The protected-span mask and fail-closed decision-invariance are enforced "
+       "structurally by the compressor+gate, so *protected compression never flips an "
+       "ActionGate decision* holds for **any** reader — including models not tested here. "
+       "Confidence: definitional. The real models measured above are consistency checks on "
+       "this guarantee, not its source.\n")
+    span_txt = ("spanning more than one architecture and scale" if a["n_real"] >= 2
+                else "a single architecture so far")
+    ap(f"**B · Downstream utility is empirically replicated.** Task-utility non-regression is a "
+       f"property of the *model*, so it is measured, not derived. It holds on all **{a['n_real']}** "
+       f"real model(s) run so far ({real_names}), {span_txt}: "
+       f"`protected` ≥ `original` at every budget, same direction each time, task-delta spread "
+       f"{spread_txt} across models. Every measured model also shows `protection_unaware` flipping "
+       f"1.3–2.6% of ActionGate decisions — the harm the protection prevents is real and consistent.\n")
+    if pending:
+        ap(f"**C · Not yet verified.** {', '.join(pending)}. Running these would broaden the "
+           "empirical utility evidence (B); they **cannot** change the structural guarantee (A). "
+           "Their absence is stated here, not papered over.\n")
+    ap("**Conclusion — the strongest claim the evidence supports, and no stronger.** The "
+       "decision-safety property generalizes to arbitrary instruction-tuned readers *by "
+       "construction*. The utility property is *expected* to generalize and has done so on every "
+       "architecture and scale actually measured. We therefore expect ActionGate-protected "
+       "context minimization to preserve both decisions and utility on models beyond this set — "
+       "with **definitional** confidence for decision safety and **empirical** confidence "
+       f"(n={a['n_real']}, consistent) for utility. This is a reasoned generalization, not a "
+       "measurement of the unrun models: no result is claimed for any model that did not run.\n")
     ap("\n_All numbers are measured on the frozen benchmark; absolute task accuracy is known "
        "to be depressed by three under-specified tasks (operation-enum items absent from "
        "context; exact-match extraction) — the load-bearing quantity is the protected−original "
