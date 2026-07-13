@@ -16,6 +16,11 @@ evidence.py, approval.py, audit.py, errors.py, schema.py). Nothing here is imple
 | `ACTIONGATE_COMPATIBILITY_REVIEW.md` | SDK/CLI/MCP/schema/conformance/versioning (Q8); additive-MINOR recommendation |
 | `ACTIONGATE_REMEDIATION_ROADMAP.md` | phased, invariant-gated rollout + the five conclusion answers |
 
+## Implementation
+- `r1/` — **R1 (implemented):** additive remediation projection (opt-in, default OFF).
+  Code: `../action_gate_ref/remediation.py`, CLI `decide --remediation-mode`, tests
+  `../tests/test_remediation.py`. See `r1/R1_IMPLEMENTATION_README.md`.
+
 ## Headline recommendations
 1. `required_changes[]` — **implement** (deterministic, audit-neutral, additive).
 2. `all_unmet_conditions[]` — **expose, disclosure-gated to FULL**; keep `dispositive_rules` as the single audit anchor.
