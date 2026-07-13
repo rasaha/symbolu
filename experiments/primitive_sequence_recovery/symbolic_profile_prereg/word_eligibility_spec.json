@@ -1,0 +1,40 @@
+{
+  "auditability": "every inclusion/exclusion records word, decision, rule id, and the two sources consulted",
+  "decision_tree": [
+    "1. Parse round-trips under the frozen parser? no -> EXCLUDE(parse).",
+    "2. Backbone uses only confirmatory consonants, no contradiction? no -> EXCLUDE(mapping).",
+    "3. Morphological status by >=2 sources: simplex/rūḍha vs derived/yaugika. derived -> EXCLUDE(derived).",
+    "4. Etymological transparency: is a synchronic root+affix analysis available and profile-predictive? yes -> EXCLUDE(transparent).",
+    "5. Conventionalized vs synchronically compositional: compositional -> EXCLUDE(compositional).",
+    "6. Independent profile measurable (>=2 lexicographic sources + ratable)? no -> EXCLUDE(unmeasurable).",
+    "7. Uncertain on (3)-(5) after two sources -> EXCLUDE(uncertain) (conservative; never weaken to grow N)."
+  ],
+  "exclusions": [
+    "transparent compounds",
+    "obvious root+affix (yaugika) derivations whose profile is predictable from morphology",
+    "words chosen because their packet looks convincing",
+    "words whose profile cannot be independently measured",
+    "unresolved textual identity"
+  ],
+  "min_sample": {
+    "balance": "across semantic + grammatical categories; variation in length, consonant count, vowel pattern, attribute profile",
+    "confirmatory_preferred": "60-100",
+    "development": 40,
+    "on_shortfall": "PREREG_BLOCKED_BY_INSUFFICIENT_OPAQUE_LEXEMES; never weaken eligibility"
+  },
+  "primary_word_requirements": [
+    "native Sanskrit form with canonical Devanāgarī",
+    "deterministically parsed by the frozen Stage-1 parser (round-trip)",
+    "monomorphemic / simplex under the predeclared criterion below",
+    "etymologically opaque or conventionalized (rūḍha), NOT transparently compositional",
+    "supported by >=2 independent lexicographic sources",
+    "consonant backbone uses ONLY confirmatory mappings; no contradictory mapping",
+    "selected WITHOUT inspecting any packet-to-profile fit"
+  ],
+  "required_sources_examples": [
+    "Mayrhofer EWA (etymology)",
+    "Monier-Williams (senses/derivation)",
+    "Amarakośa / nighaṇṭu (attestation)",
+    "Whitney roots (derivation)"
+  ]
+}

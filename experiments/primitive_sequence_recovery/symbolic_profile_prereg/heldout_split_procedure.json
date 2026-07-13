@@ -1,0 +1,9 @@
+{
+  "procedure": [
+    "split eligible words into development + untouched confirmatory BEFORE any scoring",
+    "freeze attribute inventory + packet-projection using ONLY permissible sources + dev set",
+    "no tuning on confirmatory profiles",
+    "capacity well below memorizing word-profile pairs",
+    "lookup tables and word-specific exceptions forbidden"
+  ]
+}

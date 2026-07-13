@@ -1,0 +1,28 @@
+{
+  "does_not_modify": [
+    "parser",
+    "varṇa mappings",
+    "merged lexicon",
+    "prior packets",
+    "prior results"
+  ],
+  "frozen_hashes": {
+    "and_composition_spec.json": "1455fe3545a368b2f57c78c1ebd2c05150cb61e4abd4fa2de671ce75be62901d",
+    "blind_profile_collection_protocol.json": "32fb1628e290c516ce15230f562b1b067c4c9d11d631bccd297f65d26c531f96",
+    "candidate_word_inventory.json": "431239f8c9a33f4ff077d1eff36ed7f689591c10f9037ec96a885f3b7fb83a34",
+    "closed_attribute_inventory.json": "930a622064035d4c20e20b91def7209b42f71502a78e54096ffe49ae31a2ffcb",
+    "control_spec.json": "7d7100a18037eeac3957e7ca7be2241932fc6756c3190ac8981d2342eeb3f7d7",
+    "feasibility_report.json": "e3fcb041f7e6f41c659cb26f282d8b3f905bfa57ef98ae689e02ec4857d1a0a7",
+    "heldout_split_procedure.json": "0524ef381847c1c0c4a54bfc4985807ea3a505c155edd632c16b121773172458",
+    "morphology_baseline_spec.json": "2d4cfa86583ba904143f81a19272fef3a17e3c2c5bf40879ee92719eb2c23a68",
+    "outcome_taxonomy.json": "f4f938f6396638dd4c84476658ccbc043fee0ddab59eab45b0e3b2c131c1ae09",
+    "packet_projection_spec.json": "e2b641dce65c382cad5d9765c3544cd51ab74053bc68f36f78011ca3125e9ebc",
+    "scoring_analysis_plan.json": "b6319d126ed6446052130db2b15dd2e44607e6b69aeb30eda60065e764dae530",
+    "success_kill_criteria.json": "72c072f5a029fa2c800e2d8f82ca9bcf8f8d3210dea5c4e9c5536386ba19d96c",
+    "word_eligibility_spec.json": "2037e1bbf45997b10f3c6b86444a67a176dd19f6b63653e646e39a990dbda075"
+  },
+  "prereg": "B1_SYMBOLIC_PROFILE",
+  "readiness_verdict": "PREREG_BLOCKED_BY_UNDEFINED_PACKET_PROJECTION",
+  "stage": "F_feasibility",
+  "study_outcome_if_run_now": "STUDY_BLOCKED_BY_UNDEFINED_PROJECTION"
+}

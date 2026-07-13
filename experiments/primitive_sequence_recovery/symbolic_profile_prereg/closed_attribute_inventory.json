@@ -1,0 +1,105 @@
+{
+  "dimensions": [
+    {
+      "anchors": "animate ⟷ inanimate",
+      "name": "animacy",
+      "source": "Binder et al. 2016 (Social/Human); classic animacy norms",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "living ⟷ non-living",
+      "name": "living",
+      "source": "semantic feature norms (McRae et al. 2005)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "concrete ⟷ abstract",
+      "name": "concreteness",
+      "source": "Brysbaert et al. 2014 concreteness norms",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "large ⟷ small",
+      "name": "size",
+      "source": "Binder et al. 2016 (Vision/Size)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "heavy ⟷ light",
+      "name": "weight",
+      "source": "Binder et al. 2016 (Somatic/Weight)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "mobile ⟷ stationary",
+      "name": "mobility",
+      "source": "Binder et al. 2016 (Motion)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "agentive ⟷ non-agentive",
+      "name": "agency",
+      "source": "Binder et al. 2016 (Cognition/Social)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "bounded ⟷ diffuse",
+      "name": "boundedness",
+      "source": "qualia/ontology (Pustejovsky); count/mass",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "natural ⟷ constructed",
+      "name": "naturalness",
+      "source": "artifact vs natural-kind ontology",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "terrestrial ⟷ aquatic ⟷ aerial",
+      "name": "domain",
+      "source": "ecological domain (categorical)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "object ⟷ process ⟷ quality ⟷ relation",
+      "name": "ontological_type",
+      "source": "lexical ontology (categorical)",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "positive ⟷ negative",
+      "name": "valence",
+      "source": "Osgood Evaluation; Warriner et al. 2013",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "forceful ⟷ gentle",
+      "name": "potency",
+      "source": "Osgood Potency",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "active ⟷ passive",
+      "name": "activity",
+      "source": "Osgood Activity",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    },
+    {
+      "anchors": "beneficial ⟷ harmful",
+      "name": "harm",
+      "source": "affective/functional norm",
+      "why_included": "general cross-lexical property, not tailored to any packet"
+    }
+  ],
+  "external_basis": [
+    "Osgood, Suci & Tannenbaum 1957 (Evaluation/Potency/Activity)",
+    "Binder et al. 2016 experiential attribute norms",
+    "Brysbaert et al. 2014 concreteness",
+    "McRae et al. 2005 feature norms",
+    "Warriner et al. 2013 valence"
+  ],
+  "frozen": true,
+  "n_dimensions": 15,
+  "policy": "FIXED, externally-defined, closed inventory; NO free-text profile writing; NO packet-specific attributes; NO target-word names; NO open 'other' field; clear bipolar/categorical anchors.",
+  "rating_scale": "7-point bipolar for bipolar dims; single-select for categorical dims; 'cannot determine' allowed"
+}
