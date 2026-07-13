@@ -84,7 +84,12 @@ def load_model_result(result_dir) -> ModelResult | None:
         return None
     res = json.loads(rj.read_text())
     man = json.loads(mj.read_text()) if mj.exists() else {}
-    model_id = man.get("model_id") or res.get("model_id", d.name)
+    # run_config.model_id is authoritative (what the run committed to). The top-level
+    # manifest model_id can be mislabeled if collect ran without MODEL_ID exported, which
+    # would otherwise collapse/mis-name distinct architectures in the report.
+    model_id = (man.get("run_config", {}).get("model_id")
+                or man.get("model_id")
+                or res.get("model_id", d.name))
     rp = d / "records.jsonl"
     return ModelResult(
         model_id=model_id,

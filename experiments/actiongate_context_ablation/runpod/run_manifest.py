@@ -43,7 +43,10 @@ def build_manifest(config=None) -> dict:
     return {
         "run_id": config["run_id"],
         "run_kind": config["run_kind"],
-        "model_id": config["model_id"],
+        # Authoritative model identity is what the RUN committed to (run_config), not the
+        # ambient MODEL_ID env at manifest time — collect_results.sh may run without it set,
+        # which would otherwise default to PRIMARY_MODEL and mislabel a non-7B run.
+        "model_id": run_cfg.get("model_id", config["model_id"]),
         "model_revision": run_cfg.get("model_revision", "unknown"),
         "git": RC.git_state(),
         "frozen_fingerprint": RC.frozen_fingerprint()["fingerprint"],

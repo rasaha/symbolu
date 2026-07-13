@@ -1,16 +1,32 @@
 {
-  "n_models": 1,
-  "n_real": 1,
+  "n_models": 3,
+  "n_real": 3,
   "models_present": [
-    "Qwen/Qwen2.5-7B-Instruct"
-  ],
-  "models_planned_pending": [
     "Qwen/Qwen2.5-14B-Instruct",
-    "meta-llama/Llama-3.1-8B-Instruct",
-    "google/gemma-2-9b-it",
+    "Qwen/Qwen2.5-7B-Instruct",
     "mistralai/Mistral-7B-Instruct-v0.3"
   ],
+  "models_planned_pending": [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "google/gemma-2-9b-it"
+  ],
   "forest": [
+    {
+      "model": "Mistral-7B-Instruct-v0.3",
+      "is_real": true,
+      "delta_mean": 0.04398921184635476,
+      "ci_low": null,
+      "ci_high": null,
+      "n_contexts": null
+    },
+    {
+      "model": "Qwen2.5-14B-Instruct",
+      "is_real": true,
+      "delta_mean": 0.02084965299251022,
+      "ci_low": null,
+      "ci_high": null,
+      "n_contexts": null
+    },
     {
       "model": "Qwen2.5-7B-Instruct",
       "is_real": true,
@@ -21,6 +37,42 @@
     }
   ],
   "decision_comparison": [
+    {
+      "model": "Mistral-7B-Instruct-v0.3",
+      "is_real": true,
+      "budgets": {
+        "0.2": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.3": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.4": {
+          "protected": 1.0,
+          "protection_unaware": 0.974025974025974
+        }
+      }
+    },
+    {
+      "model": "Qwen2.5-14B-Instruct",
+      "is_real": true,
+      "budgets": {
+        "0.2": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.3": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.4": {
+          "protected": 1.0,
+          "protection_unaware": 0.974025974025974
+        }
+      }
+    },
     {
       "model": "Qwen2.5-7B-Instruct",
       "is_real": true,
@@ -41,6 +93,58 @@
     }
   ],
   "cost_accuracy": [
+    {
+      "model": "Mistral-7B-Instruct-v0.3",
+      "is_real": true,
+      "original_cost": 0.06519249999999999,
+      "original_accuracy": 0.4386054421768707,
+      "protected": [
+        {
+          "budget": 0.2,
+          "token_reduction": 0.3190791248577014,
+          "cost": 0.05632849999999996,
+          "task_accuracy": 0.4832972582972583
+        },
+        {
+          "budget": 0.3,
+          "token_reduction": 0.45620897542739647,
+          "cost": 0.053250499999999985,
+          "task_accuracy": 0.48311688311688317
+        },
+        {
+          "budget": 0.4,
+          "token_reduction": 0.5038029346208911,
+          "cost": 0.052246500000000015,
+          "task_accuracy": 0.4813698206555349
+        }
+      ]
+    },
+    {
+      "model": "Qwen2.5-14B-Instruct",
+      "is_real": true,
+      "original_cost": 0.05581449999999998,
+      "original_accuracy": 0.5643733250876107,
+      "protected": [
+        {
+          "budget": 0.2,
+          "token_reduction": 0.3190791248577014,
+          "cost": 0.04921950000000001,
+          "task_accuracy": 0.5877808699237271
+        },
+        {
+          "budget": 0.3,
+          "token_reduction": 0.45620897542739647,
+          "cost": 0.046630499999999984,
+          "task_accuracy": 0.5805658627087199
+        },
+        {
+          "budget": 0.4,
+          "token_reduction": 0.5038029346208911,
+          "cost": 0.0457655,
+          "task_accuracy": 0.5873222016079158
+        }
+      ]
+    },
     {
       "model": "Qwen2.5-7B-Instruct",
       "is_real": true,
@@ -75,12 +179,50 @@
         "delta_mean": 0.01629904487047344,
         "ci_low": null,
         "ci_high": null
+      },
+      {
+        "model": "Qwen2.5-14B-Instruct",
+        "delta_mean": 0.02084965299251022,
+        "ci_low": null,
+        "ci_high": null
+      },
+      {
+        "model": "Mistral-7B-Instruct-v0.3",
+        "delta_mean": 0.04398921184635476,
+        "ci_low": null,
+        "ci_high": null
       }
     ],
-    "delta_spread": null,
+    "delta_spread": 0.02769016697588132,
     "note": "delta_spread is the range of protected-vs-original task deltas across real models; small spread => architecture-insensitive."
   },
   "failure_taxonomy": {
+    "Mistral-7B-Instruct-v0.3": {
+      "counts": {
+        "hallucination": 0,
+        "extraction_miss": 0,
+        "summarization_loss": 0,
+        "reasoning_degradation": 0,
+        "policy_misunderstanding": 0,
+        "tool_argument_error": 0,
+        "tool_selection_error": 0,
+        "decision_flip": 4
+      },
+      "records_available": false
+    },
+    "Qwen2.5-14B-Instruct": {
+      "counts": {
+        "hallucination": 0,
+        "extraction_miss": 0,
+        "summarization_loss": 0,
+        "reasoning_degradation": 0,
+        "policy_misunderstanding": 0,
+        "tool_argument_error": 0,
+        "tool_selection_error": 0,
+        "decision_flip": 4
+      },
+      "records_available": false
+    },
     "Qwen2.5-7B-Instruct": {
       "counts": {
         "hallucination": 0,
@@ -96,10 +238,26 @@
     }
   },
   "replication": {
-    "verdict": "INSUFFICIENT_MODELS",
-    "n_real_models": 1,
-    "n_replicating": 1,
+    "verdict": "CONSISTENT_REPLICATION",
+    "n_real_models": 3,
+    "n_replicating": 3,
     "per_model": [
+      {
+        "model": "Mistral-7B-Instruct-v0.3",
+        "protected_decisions_100": true,
+        "utility_preserved": true,
+        "protection_beats_unaware": true,
+        "replicates": true,
+        "task_delta_mean": 0.04398921184635476
+      },
+      {
+        "model": "Qwen2.5-14B-Instruct",
+        "protected_decisions_100": true,
+        "utility_preserved": true,
+        "protection_beats_unaware": true,
+        "replicates": true,
+        "task_delta_mean": 0.02084965299251022
+      },
       {
         "model": "Qwen2.5-7B-Instruct",
         "protected_decisions_100": true,

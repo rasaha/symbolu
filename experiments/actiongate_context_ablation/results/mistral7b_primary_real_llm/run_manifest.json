@@ -1,0 +1,56 @@
+{
+  "actiongate_policy": "0.1.0-ref:b93b95d182bf796c",
+  "checksums": {
+    "REAL_LLM_RESULTS.md": "sha256:743f92783daf18ecc8d83cc92697ee4a8c98f1f06c4deb0a95d3e23848abbc17",
+    "environment_probe.json": "sha256:6cf89b0066e1ac0f728aef28abf6600ca793e8b4c3e00ca710f69222c0f25775",
+    "records.jsonl": "sha256:65633a54cfb0fc58a00c7f264a7141152a933f785ff5d3ca9bcd53f3ef4aa5f4",
+    "results.csv": "sha256:7f19636b965b8c9f65a1ea7bd0e788c112956a6c0ee932b910023762e9b050ac",
+    "results.json": "sha256:2fa0228888e099a894572ef46661eed453ad61a19422c2d9a24cce4569761b0a",
+    "run_config.json": "sha256:00fd0bc88f6e141a70f23b1033e98e0064891790607d50b0cd440e249ea9a8e9",
+    "verify_report.json": "sha256:32b553762b04a96c266b8aef2e0ab9ac5fb09cc1c46cb01ef15e704c9fc6102d"
+  },
+  "frozen_fingerprint": "sha256:ac4e069262ec663de0983c5461c64ad57bb8d62db326e6a6f1701f0628381eac",
+  "git": {
+    "branch": "claude/token-compression-enterprise-0koy0r",
+    "commit": "995dd3720744dbe70867510d789ef6e052ec640a",
+    "dirty": true
+  },
+  "is_real": true,
+  "model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "model_revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+  "n_records": 3808,
+  "note": "",
+  "records_per_cell": {
+    "original@0.0": 476,
+    "protected@0.2": 476,
+    "protected@0.3": 476,
+    "protected@0.4": 476,
+    "protection_unaware@0.2": 476,
+    "protection_unaware@0.3": 476,
+    "protection_unaware@0.4": 476,
+    "structural_only@0.0": 476
+  },
+  "run_config": {
+    "budgets": [
+      0.2,
+      0.3,
+      0.4
+    ],
+    "dtype": "auto",
+    "frozen_fingerprint": "sha256:ac4e069262ec663de0983c5461c64ad57bb8d62db326e6a6f1701f0628381eac",
+    "max_new_tokens": 64,
+    "methods": [
+      "original",
+      "structural_only",
+      "protected",
+      "protection_unaware"
+    ],
+    "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+    "model_revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+    "run_id": "xmodel_Mistral-7B-Instruct-v0.3",
+    "run_kind": "PRIMARY",
+    "system_hash": "sha256:0131598f9a531c02e142a8cc2ad178a82f5c0472963059d2a18fa9f72499a564"
+  },
+  "run_id": "xmodel_Mistral-7B-Instruct-v0.3",
+  "run_kind": "PRIMARY"
+}
