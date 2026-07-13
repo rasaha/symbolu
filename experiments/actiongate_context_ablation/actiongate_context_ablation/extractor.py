@@ -40,10 +40,13 @@ def _merge(base: dict, fragments: list) -> adapter.RequestSpec:
     state_hash = base.get("state_hash", adapter.DEFAULT_STATE_HASH)
     evidence: list = list(base.get("evidence", []))
     approvals: list = list(base.get("approvals", []))
+    attestation = base.get("attestation")
 
     for frag in fragments:
         if not frag:
             continue
+        if "attestation" in frag:
+            attestation = frag["attestation"]
         if "args" in frag:
             args.update(frag["args"])
         if "target_add" in frag:
@@ -66,7 +69,8 @@ def _merge(base: dict, fragments: list) -> adapter.RequestSpec:
         reversibility=reversibility,
         permissions=tuple(permissions) if permissions else None,
         state_as_of=state_as_of, state_hash=state_hash,
-        evidence=tuple(evidence), approvals=tuple(approvals))
+        evidence=tuple(evidence), approvals=tuple(approvals),
+        attestation=attestation)
 
 
 def oracle_spec(ctx: Context, surviving_ids) -> adapter.RequestSpec:
@@ -101,6 +105,11 @@ def reference_fragment(text: str) -> dict:
         frag.setdefault("evidence", []).append({"kind": "simulation", "fidelity": fidelity, "producer": "planner"})
     if "verified backup" in t or "restorable backup" in t or "backup verified" in t:
         frag.setdefault("evidence", []).append({"kind": "verified_restorable_backup", "producer": "restore-checker"})
+
+    # attestation phrases
+    if "workload identity" in t or "workload-identity" in t or "attestation" in t:
+        frag["attestation"] = {"type": "workload-identity", "evidence": "deadbeef",
+                               "exp": "2026-07-12T15:00:00.000Z"}
 
     # approval phrases
     if "dual control" in t or "two approvers" in t or "dual-control" in t:

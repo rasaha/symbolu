@@ -31,6 +31,16 @@ SINGLE_ABLATION_INADEQUATE = "SINGLE_ABLATION_INADEQUATE"
 ECONOMICS_NOT_SUPPORTED = "ECONOMICS_NOT_SUPPORTED"
 NOT_ELIGIBLE = "NOT_ELIGIBLE"
 
+# ---- naturalistic-corpus verdicts (distinct from synthetic lock) ----
+PUBLIC_CORPUS_OPPORTUNITY_SUPPORTED = "PUBLIC_CORPUS_OPPORTUNITY_SUPPORTED"
+AUTHORED_CORPUS_OPPORTUNITY_SUPPORTED = "AUTHORED_CORPUS_OPPORTUNITY_SUPPORTED"
+MIXED_BY_DOMAIN = "MIXED_BY_DOMAIN"
+# NOTE: REAL_CUSTOMER_VALIDATED is intentionally NOT defined and must never be emitted.
+_SUPPORTED_BY_PARTITION = {
+    origin.PUBLIC_NATURALISTIC: PUBLIC_CORPUS_OPPORTUNITY_SUPPORTED,
+    origin.AUTHORED_REALISTIC: AUTHORED_CORPUS_OPPORTUNITY_SUPPORTED,
+}
+
 
 @dataclass
 class Verdict:
@@ -79,3 +89,48 @@ def decide(agg, econ, origins) -> Verdict:
         indicative_scientific_verdict=indicative,
         rationale=("synthetic/mock corpus: scientific verdict locked. "
                    f"Indicative-only (NON-AUTHORITATIVE): {indicative} — {rationale}"))
+
+
+# never-emit guard: no code path may produce this label
+REAL_CUSTOMER_VALIDATED_FORBIDDEN = "REAL_CUSTOMER_VALIDATED"
+
+
+def _domain_supported(per_domain, econ) -> dict:
+    """Per-domain base verdict (supported vs a specific failure)."""
+    out = {}
+    for dom, dagg in per_domain.items():
+        v, _ = _scientific_verdict(dagg, econ)
+        out[dom] = v
+    return out
+
+
+def decide_naturalistic(agg, econ, per_domain, partition_label) -> Verdict:
+    """Corpus-level verdict for a naturalistic partition.
+
+    Emits PUBLIC_/AUTHORED_CORPUS_OPPORTUNITY_SUPPORTED when the corpus clears all
+    gates, a specific failure label when it doesn't, or MIXED_BY_DOMAIN when domains
+    disagree (some supportable, some dense/bottlenecked). NEVER emits
+    REAL_CUSTOMER_VALIDATED — naturalistic data is not customer operational data.
+    """
+    base, rationale = _scientific_verdict(agg, econ)
+    dom_v = _domain_supported(per_domain, econ)
+    supportable = {d for d, v in dom_v.items() if v == ABLATION_OPPORTUNITY_SUPPORTED}
+    failing = {d for d, v in dom_v.items() if v != ABLATION_OPPORTUNITY_SUPPORTED}
+
+    # Domain heterogeneity is reported, not averaged away: if some domains are
+    # supportable while others are not, that IS the finding — even when the
+    # aggregate happens to pass or fail a single gate.
+    if supportable and failing:
+        verdict = MIXED_BY_DOMAIN
+        rationale = (f"domains supportable: {sorted(supportable)}; "
+                     f"not supportable: {sorted(failing)}. Aggregate: {base} — {rationale}")
+    elif base == ABLATION_OPPORTUNITY_SUPPORTED:
+        verdict = _SUPPORTED_BY_PARTITION.get(partition_label, base)
+    else:
+        verdict = base   # a specific corpus-wide failure label
+
+    return Verdict(
+        verdict=verdict, scientific=False, pipeline_path_verified=True,
+        indicative_scientific_verdict=base,
+        rationale=(f"[{partition_label}] naturalistic (NOT customer data; cannot emit "
+                   f"REAL_CUSTOMER_VALIDATED). {rationale}"))

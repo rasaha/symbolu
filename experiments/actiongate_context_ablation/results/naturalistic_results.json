@@ -1,0 +1,599 @@
+{
+  "annotation": {
+    "agreement_rate": 0.9596541786743515,
+    "n_annotated": 347,
+    "n_disagree": 14,
+    "n_uncertain": 0
+  },
+  "by_action_type": {
+    "branch_protection": {
+      "deployable_ceiling": 0.2660098522167488,
+      "f_critical_union": 0.24630541871921183,
+      "oracle_ceiling": 0.7536945812807881
+    },
+    "cloud_storage_delete": {
+      "deployable_ceiling": 0.32666666666666666,
+      "f_critical_union": 0.31,
+      "oracle_ceiling": 0.69
+    },
+    "credential_scope_change": {
+      "deployable_ceiling": 0.44981412639405205,
+      "f_critical_union": 0.241635687732342,
+      "oracle_ceiling": 0.758364312267658
+    },
+    "customer_data_export": {
+      "deployable_ceiling": 0.31188118811881194,
+      "f_critical_union": 0.30198019801980197,
+      "oracle_ceiling": 0.698019801980198
+    },
+    "database_migration": {
+      "deployable_ceiling": 0.21739130434782605,
+      "f_critical_union": 0.33695652173913043,
+      "oracle_ceiling": 0.6630434782608696
+    },
+    "iam_grant": {
+      "deployable_ceiling": 0.3068493150684931,
+      "f_critical_union": 0.35342465753424657,
+      "oracle_ceiling": 0.6465753424657534
+    },
+    "incident_mitigation": {
+      "deployable_ceiling": 0.15909090909090906,
+      "f_critical_union": 0.25,
+      "oracle_ceiling": 0.75
+    },
+    "kubernetes_delete": {
+      "deployable_ceiling": 0.3340857787810384,
+      "f_critical_union": 0.49887133182844245,
+      "oracle_ceiling": 0.5011286681715575
+    },
+    "kubernetes_deploy": {
+      "deployable_ceiling": 0.33668341708542715,
+      "f_critical_union": 0.32663316582914576,
+      "oracle_ceiling": 0.6733668341708543
+    },
+    "monitoring_disable": {
+      "deployable_ceiling": 0.3266932270916335,
+      "f_critical_union": 0.2350597609561753,
+      "oracle_ceiling": 0.7649402390438247
+    },
+    "network_policy": {
+      "deployable_ceiling": 0.29220779220779225,
+      "f_critical_union": 0.23376623376623376,
+      "oracle_ceiling": 0.7662337662337663
+    },
+    "payment_refund": {
+      "deployable_ceiling": 0.3106796116504854,
+      "f_critical_union": 0.5388349514563107,
+      "oracle_ceiling": 0.46116504854368934
+    },
+    "release_promotion": {
+      "deployable_ceiling": 0.3846153846153846,
+      "f_critical_union": 0.3525641025641026,
+      "oracle_ceiling": 0.6474358974358974
+    },
+    "secret_export": {
+      "deployable_ceiling": 0.2842639593908629,
+      "f_critical_union": 0.4010152284263959,
+      "oracle_ceiling": 0.5989847715736041
+    },
+    "service_rollback": {
+      "deployable_ceiling": 0.24770642201834858,
+      "f_critical_union": 0.3211009174311927,
+      "oracle_ceiling": 0.6788990825688073
+    },
+    "terraform_apply": {
+      "deployable_ceiling": 0.3125,
+      "f_critical_union": 0.3385416666666667,
+      "oracle_ceiling": 0.6614583333333333
+    }
+  },
+  "combined": {
+    "deployable_ceiling": 0.30987961809879616,
+    "extractor_instability_rate": 0.14697406340057637,
+    "f_assurance": 0.09319219593192196,
+    "f_critical_union": 0.340390203403902,
+    "f_decision": 0.25985886259858865,
+    "f_envelope": 0.05209630552096305,
+    "f_protected": 0.6901203819012038,
+    "interaction_miss_rate": 0.09402241594022416,
+    "n_contexts": 77,
+    "oracle_ceiling": 0.659609796596098,
+    "precision_p0": 0.3136842105263158,
+    "recall_p0": 0.6359756097560976,
+    "total_ablations": 551,
+    "total_tokens": 4818,
+    "total_units": 347
+  },
+  "combined_ci": {
+    "deployable_ceiling": [
+      0.2720462481233305,
+      0.34938138378910166
+    ],
+    "f_critical_union": [
+      0.31482794815724424,
+      0.36792566676494937
+    ],
+    "oracle_ceiling": [
+      0.6320743332350506,
+      0.6851720518427559
+    ],
+    "precision_p0": [
+      0.27472265999196566,
+      0.35376088816760104
+    ],
+    "recall_p0": [
+      0.5211637550375641,
+      0.7362069261100633
+    ]
+  },
+  "coverage": {
+    "by_action_type": {
+      "branch_protection": 3,
+      "cloud_storage_delete": 5,
+      "credential_scope_change": 5,
+      "customer_data_export": 3,
+      "database_migration": 6,
+      "iam_grant": 6,
+      "incident_mitigation": 2,
+      "kubernetes_delete": 5,
+      "kubernetes_deploy": 6,
+      "monitoring_disable": 5,
+      "network_policy": 6,
+      "payment_refund": 3,
+      "release_promotion": 5,
+      "secret_export": 6,
+      "service_rollback": 5,
+      "terraform_apply": 6
+    },
+    "by_domain": {
+      "cicd": 10,
+      "database": 6,
+      "iam": 11,
+      "kubernetes": 11,
+      "monitoring": 7,
+      "network": 6,
+      "payments": 3,
+      "repo": 3,
+      "secrets": 9,
+      "storage": 5,
+      "terraform": 6
+    },
+    "by_partition": {
+      "AUTHORED_REALISTIC_CORPUS": 35,
+      "PUBLIC_NATURALISTIC_CORPUS": 42
+    },
+    "by_split": {
+      "DEV": 28,
+      "HELDOUT_TEST": 26,
+      "VALIDATION": 23
+    },
+    "by_structure_family": {
+      "prose": 54,
+      "prose_tables": 10,
+      "structured": 13
+    },
+    "n_action_types": 16,
+    "n_domains": 11,
+    "n_items": 77,
+    "total_tokens": 4818,
+    "total_units": 347
+  },
+  "disclaimer": "This study uses public and authored naturalistic data, NOT confidential customer operational data.",
+  "economics_combined": {
+    "cache_adjusted": 0.2189705271897053,
+    "clears": true,
+    "naive": 0.30987961809879616
+  },
+  "length_distribution": {
+    "max": 100,
+    "mean": 62.57142857142857,
+    "median": 66,
+    "min": 25,
+    "n": 77,
+    "p25": 54.0,
+    "p75": 69.0
+  },
+  "manifest_hash": "sha256:d0cde387dc40a6b8a56d9c1afae2de729e513c5af785dc8c0d3b19141a448b4b",
+  "partitions": {
+    "AUTHORED_REALISTIC_CORPUS": {
+      "aggregate": {
+        "deployable_ceiling": 0.30360824742268044,
+        "extractor_instability_rate": 0.1510791366906475,
+        "f_assurance": 0.09536082474226804,
+        "f_critical_union": 0.3938144329896907,
+        "f_decision": 0.27783505154639176,
+        "f_envelope": 0.07422680412371134,
+        "f_protected": 0.6963917525773196,
+        "interaction_miss_rate": 0.12628865979381443,
+        "n_contexts": 35,
+        "oracle_ceiling": 0.6061855670103093,
+        "precision_p0": 0.35751295336787564,
+        "recall_p0": 0.6321989528795812,
+        "total_ablations": 221,
+        "total_tokens": 1940,
+        "total_units": 139
+      },
+      "by_domain": {
+        "cicd": {
+          "deployable_ceiling": 0.2951541850220264,
+          "extractor_instability_rate": 0.11764705882352941,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.3744493392070485,
+          "f_decision": 0.3744493392070485,
+          "f_envelope": 0.0,
+          "f_protected": 0.7048458149779736,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 4,
+          "oracle_ceiling": 0.6255506607929515,
+          "precision_p0": 0.375,
+          "recall_p0": 0.7058823529411765,
+          "total_ablations": 22,
+          "total_tokens": 227,
+          "total_units": 17
+        },
+        "database": {
+          "deployable_ceiling": 0.17449664429530198,
+          "extractor_instability_rate": 0.08333333333333333,
+          "f_assurance": 0.21476510067114093,
+          "f_critical_union": 0.33557046979865773,
+          "f_decision": 0.21476510067114093,
+          "f_envelope": 0.12080536912751678,
+          "f_protected": 0.825503355704698,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.6644295302013423,
+          "precision_p0": 0.3089430894308943,
+          "recall_p0": 0.76,
+          "total_ablations": 16,
+          "total_tokens": 149,
+          "total_units": 12
+        },
+        "iam": {
+          "deployable_ceiling": 0.3677685950413223,
+          "extractor_instability_rate": 0.2222222222222222,
+          "f_assurance": 0.10743801652892562,
+          "f_critical_union": 0.39669421487603307,
+          "f_decision": 0.2066115702479339,
+          "f_envelope": 0.128099173553719,
+          "f_protected": 0.6322314049586777,
+          "interaction_miss_rate": 0.16253443526170797,
+          "n_contexts": 5,
+          "oracle_ceiling": 0.6033057851239669,
+          "precision_p0": 0.3202614379084967,
+          "recall_p0": 0.5104166666666666,
+          "total_ablations": 29,
+          "total_tokens": 242,
+          "total_units": 18
+        },
+        "kubernetes": {
+          "deployable_ceiling": 0.3413978494623656,
+          "extractor_instability_rate": 0.23076923076923078,
+          "f_assurance": 0.08064516129032258,
+          "f_critical_union": 0.44086021505376344,
+          "f_decision": 0.3655913978494624,
+          "f_envelope": 0.0,
+          "f_protected": 0.6586021505376344,
+          "interaction_miss_rate": 0.13440860215053763,
+          "n_contexts": 5,
+          "oracle_ceiling": 0.5591397849462365,
+          "precision_p0": 0.3795918367346939,
+          "recall_p0": 0.5670731707317073,
+          "total_ablations": 45,
+          "total_tokens": 372,
+          "total_units": 26
+        },
+        "monitoring": {
+          "deployable_ceiling": 0.25153374233128833,
+          "extractor_instability_rate": 0.09090909090909091,
+          "f_assurance": 0.2822085889570552,
+          "f_critical_union": 0.2822085889570552,
+          "f_decision": 0.2822085889570552,
+          "f_envelope": 0.0,
+          "f_protected": 0.7484662576687117,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 4,
+          "oracle_ceiling": 0.7177914110429449,
+          "precision_p0": 0.27049180327868855,
+          "recall_p0": 0.717391304347826,
+          "total_ablations": 14,
+          "total_tokens": 163,
+          "total_units": 11
+        },
+        "network": {
+          "deployable_ceiling": 0.29007633587786263,
+          "extractor_instability_rate": 0.1111111111111111,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.2748091603053435,
+          "f_decision": 0.2748091603053435,
+          "f_envelope": 0.0,
+          "f_protected": 0.7099236641221374,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.7251908396946565,
+          "precision_p0": 0.27956989247311825,
+          "recall_p0": 0.7222222222222222,
+          "total_ablations": 13,
+          "total_tokens": 131,
+          "total_units": 9
+        },
+        "payments": {
+          "deployable_ceiling": 0.3106796116504854,
+          "extractor_instability_rate": 0.0,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.5388349514563107,
+          "f_decision": 0.0,
+          "f_envelope": 0.3640776699029126,
+          "f_protected": 0.6893203883495146,
+          "interaction_miss_rate": 0.5,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.46116504854368934,
+          "precision_p0": 0.528169014084507,
+          "recall_p0": 0.6756756756756757,
+          "total_ablations": 24,
+          "total_tokens": 206,
+          "total_units": 12
+        },
+        "secrets": {
+          "deployable_ceiling": 0.29166666666666663,
+          "extractor_instability_rate": 0.15384615384615385,
+          "f_assurance": 0.30357142857142855,
+          "f_critical_union": 0.43452380952380953,
+          "f_decision": 0.30357142857142855,
+          "f_envelope": 0.11904761904761904,
+          "f_protected": 0.7083333333333334,
+          "interaction_miss_rate": 0.3134920634920635,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.5654761904761905,
+          "precision_p0": 0.4369747899159664,
+          "recall_p0": 0.7123287671232876,
+          "total_ablations": 25,
+          "total_tokens": 168,
+          "total_units": 13
+        },
+        "storage": {
+          "deployable_ceiling": 0.33653846153846156,
+          "extractor_instability_rate": 0.25,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.36538461538461536,
+          "f_decision": 0.36538461538461536,
+          "f_envelope": 0.0,
+          "f_protected": 0.6634615384615384,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 2,
+          "oracle_ceiling": 0.6346153846153846,
+          "precision_p0": 0.2463768115942029,
+          "recall_p0": 0.4473684210526316,
+          "total_ablations": 13,
+          "total_tokens": 104,
+          "total_units": 8
+        },
+        "terraform": {
+          "deployable_ceiling": 0.297752808988764,
+          "extractor_instability_rate": 0.15384615384615385,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.3651685393258427,
+          "f_decision": 0.3651685393258427,
+          "f_envelope": 0.0,
+          "f_protected": 0.702247191011236,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.6348314606741573,
+          "precision_p0": 0.32,
+          "recall_p0": 0.6153846153846154,
+          "total_ablations": 20,
+          "total_tokens": 178,
+          "total_units": 13
+        }
+      },
+      "economics": {
+        "cache_adjusted": 0.21269915651358953,
+        "clears": true,
+        "naive": 0.3036082474226804
+      },
+      "heldout_instability": 0.5135135135135135,
+      "rationale": "[AUTHORED_REALISTIC_CORPUS] naturalistic (NOT customer data; cannot emit REAL_CUSTOMER_VALIDATED). extractor instability 0.15 > 0.1",
+      "redundancy_only_fraction": 0.03608247422680412,
+      "verdict": "EXTRACTOR_NOT_RELIABLE"
+    },
+    "PUBLIC_NATURALISTIC_CORPUS": {
+      "aggregate": {
+        "deployable_ceiling": 0.31410701876302993,
+        "extractor_instability_rate": 0.14423076923076922,
+        "f_assurance": 0.0917303683113273,
+        "f_critical_union": 0.30437804030576787,
+        "f_decision": 0.2477414871438499,
+        "f_envelope": 0.03717859624739402,
+        "f_protected": 0.6858929812369701,
+        "interaction_miss_rate": 0.07227241139680332,
+        "n_contexts": 42,
+        "oracle_ceiling": 0.6956219596942321,
+        "precision_p0": 0.28368794326241137,
+        "recall_p0": 0.639269406392694,
+        "total_ablations": 330,
+        "total_tokens": 2878,
+        "total_units": 208
+      },
+      "by_domain": {
+        "cicd": {
+          "deployable_ceiling": 0.3252427184466019,
+          "extractor_instability_rate": 0.13333333333333333,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.3155339805825243,
+          "f_decision": 0.3155339805825243,
+          "f_envelope": 0.0,
+          "f_protected": 0.6747572815533981,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 6,
+          "oracle_ceiling": 0.6844660194174756,
+          "precision_p0": 0.28776978417266186,
+          "recall_p0": 0.6153846153846154,
+          "total_ablations": 42,
+          "total_tokens": 412,
+          "total_units": 30
+        },
+        "database": {
+          "deployable_ceiling": 0.2465753424657534,
+          "extractor_instability_rate": 0.058823529411764705,
+          "f_assurance": 0.0547945205479452,
+          "f_critical_union": 0.3378995433789954,
+          "f_decision": 0.0547945205479452,
+          "f_envelope": 0.0821917808219178,
+          "f_protected": 0.7534246575342466,
+          "interaction_miss_rate": 0.4687975646879756,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.6621004566210046,
+          "precision_p0": 0.37575757575757573,
+          "recall_p0": 0.8378378378378378,
+          "total_ablations": 39,
+          "total_tokens": 219,
+          "total_units": 17
+        },
+        "iam": {
+          "deployable_ceiling": 0.36734693877551017,
+          "extractor_instability_rate": 0.18518518518518517,
+          "f_assurance": 0.09948979591836735,
+          "f_critical_union": 0.25,
+          "f_decision": 0.15051020408163265,
+          "f_envelope": 0.07908163265306123,
+          "f_protected": 0.6326530612244898,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 6,
+          "oracle_ceiling": 0.75,
+          "precision_p0": 0.1532258064516129,
+          "recall_p0": 0.3877551020408163,
+          "total_ablations": 39,
+          "total_tokens": 392,
+          "total_units": 27
+        },
+        "kubernetes": {
+          "deployable_ceiling": 0.3304904051172708,
+          "extractor_instability_rate": 0.2727272727272727,
+          "f_assurance": 0.09381663113006397,
+          "f_critical_union": 0.39872068230277186,
+          "f_decision": 0.39872068230277186,
+          "f_envelope": 0.0,
+          "f_protected": 0.6695095948827292,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 6,
+          "oracle_ceiling": 0.6012793176972282,
+          "precision_p0": 0.36942675159235666,
+          "recall_p0": 0.6203208556149733,
+          "total_ablations": 48,
+          "total_tokens": 469,
+          "total_units": 33
+        },
+        "monitoring": {
+          "deployable_ceiling": 0.3125,
+          "extractor_instability_rate": 0.08333333333333333,
+          "f_assurance": 0.19886363636363635,
+          "f_critical_union": 0.19886363636363635,
+          "f_decision": 0.19886363636363635,
+          "f_envelope": 0.0,
+          "f_protected": 0.6875,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.8011363636363636,
+          "precision_p0": 0.18181818181818182,
+          "recall_p0": 0.6285714285714286,
+          "total_ablations": 18,
+          "total_tokens": 176,
+          "total_units": 12
+        },
+        "network": {
+          "deployable_ceiling": 0.29378531073446323,
+          "extractor_instability_rate": 0.08333333333333333,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.2033898305084746,
+          "f_decision": 0.2033898305084746,
+          "f_envelope": 0.0,
+          "f_protected": 0.7062146892655368,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.7966101694915254,
+          "precision_p0": 0.208,
+          "recall_p0": 0.7222222222222222,
+          "total_ablations": 18,
+          "total_tokens": 177,
+          "total_units": 12
+        },
+        "repo": {
+          "deployable_ceiling": 0.2660098522167488,
+          "extractor_instability_rate": 0.06666666666666667,
+          "f_assurance": 0.15763546798029557,
+          "f_critical_union": 0.24630541871921183,
+          "f_decision": 0.15763546798029557,
+          "f_envelope": 0.08866995073891626,
+          "f_protected": 0.7339901477832512,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.7536945812807881,
+          "precision_p0": 0.2550335570469799,
+          "recall_p0": 0.76,
+          "total_ablations": 21,
+          "total_tokens": 203,
+          "total_units": 15
+        },
+        "secrets": {
+          "deployable_ceiling": 0.29439252336448596,
+          "extractor_instability_rate": 0.125,
+          "f_assurance": 0.2383177570093458,
+          "f_critical_union": 0.3411214953271028,
+          "f_decision": 0.2383177570093458,
+          "f_envelope": 0.09345794392523364,
+          "f_protected": 0.705607476635514,
+          "interaction_miss_rate": 0.24610591900311526,
+          "n_contexts": 6,
+          "oracle_ceiling": 0.6588785046728972,
+          "precision_p0": 0.3443708609271523,
+          "recall_p0": 0.7123287671232876,
+          "total_ablations": 60,
+          "total_tokens": 428,
+          "total_units": 32
+        },
+        "storage": {
+          "deployable_ceiling": 0.3214285714285714,
+          "extractor_instability_rate": 0.13333333333333333,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.28061224489795916,
+          "f_decision": 0.28061224489795916,
+          "f_envelope": 0.0,
+          "f_protected": 0.6785714285714286,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.7193877551020409,
+          "precision_p0": 0.2556390977443609,
+          "recall_p0": 0.6181818181818182,
+          "total_ablations": 24,
+          "total_tokens": 196,
+          "total_units": 15
+        },
+        "terraform": {
+          "deployable_ceiling": 0.3252427184466019,
+          "extractor_instability_rate": 0.13333333333333333,
+          "f_assurance": 0.0,
+          "f_critical_union": 0.3155339805825243,
+          "f_decision": 0.3155339805825243,
+          "f_envelope": 0.0,
+          "f_protected": 0.6747572815533981,
+          "interaction_miss_rate": 0.0,
+          "n_contexts": 3,
+          "oracle_ceiling": 0.6844660194174756,
+          "precision_p0": 0.28776978417266186,
+          "recall_p0": 0.6153846153846154,
+          "total_ablations": 21,
+          "total_tokens": 206,
+          "total_units": 15
+        }
+      },
+      "economics": {
+        "cache_adjusted": 0.223197927853939,
+        "clears": true,
+        "naive": 0.3141070187630299
+      },
+      "heldout_instability": 0.35294117647058826,
+      "rationale": "[PUBLIC_NATURALISTIC_CORPUS] naturalistic (NOT customer data; cannot emit REAL_CUSTOMER_VALIDATED). extractor instability 0.14 > 0.1",
+      "redundancy_only_fraction": 0.030576789437109102,
+      "verdict": "EXTRACTOR_NOT_RELIABLE"
+    }
+  }
+}

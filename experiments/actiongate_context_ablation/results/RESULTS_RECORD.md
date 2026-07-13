@@ -77,3 +77,17 @@
 | t3_network_change | 35 | 68.6% | 31.4% | 0.0% | 0.0% | 0.0% |
 
 _Origin lock: all corpora are authored SYNTHETIC, so the run cannot emit a scientific verdict. Fractions above are pipeline-verified and INDICATIVE only; they are not a product decision._
+
+---
+
+# NATURALISTIC-CORPUS SECTION
+
+> Public + authored naturalistic data, NOT customer operational data. The synthetic result above is preserved unchanged.
+
+- Corpus: 77 contexts, 347 units, 551 ablations, 4818 tokens.
+- PUBLIC verdict: **`EXTRACTOR_NOT_RELIABLE`** | AUTHORED verdict: **`EXTRACTOR_NOT_RELIABLE`**
+- Combined critical-union 34.0% (CI [31.5%, 36.8%]); deployable ceiling 31.0% (CI [27.2%, 34.9%]).
+- P0 recall/precision 63.6%/31.4%; extractor instability 14.7% (held-out 41.0%).
+- Cache-adjusted net savings 21.9%; annotation agreement 96.0%.
+- Full detail: `PUBLIC_CORPUS_RESULTS.md`, `results/naturalistic_results.json`, `corpus/manifest.json`.
+

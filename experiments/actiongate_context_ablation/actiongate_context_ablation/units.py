@@ -44,6 +44,7 @@ class SemanticUnit:
     references: tuple = ()                          # ids this unit points at
     dependency_links: tuple = ()                   # ids this unit needs to be meaningful
     redundancy_set: str | None = None              # shared id across duplicate facts
+    expected: str | None = None                    # pass-1 annotation label (annotation.py)
 
     def __post_init__(self):
         if self.source_type not in SOURCE_TYPES:

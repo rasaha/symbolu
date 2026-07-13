@@ -11,11 +11,25 @@ from __future__ import annotations
 
 # Origin tiers, most-synthetic first.
 MOCK = "MOCK_TEST_ONLY"
-SYNTHETIC = "SYNTHETIC_AUTHORED"          # authored fixtures (Tiers 1 & 3 here)
+SYNTHETIC = "SYNTHETIC_AUTHORED"          # authored fixtures (synthetic Tiers 1 & 3)
+# naturalistic partitions: realistic but NOT confidential customer data
+PUBLIC_NATURALISTIC = "PUBLIC_NATURALISTIC_CORPUS"     # repository-derived, provenance-documented
+AUTHORED_REALISTIC = "AUTHORED_REALISTIC_CORPUS"       # independently authored realistic
 NATURALISTIC_REPO = "NATURALISTIC_REPO"   # real repo artifacts w/ documented provenance
-FIELD_REAL = "FIELD_REAL"                 # real production context
+FIELD_REAL = "FIELD_REAL"                 # real production customer context
 
 _SYNTHETIC_ORIGINS = frozenset({MOCK, SYNTHETIC})
+_NATURALISTIC_ORIGINS = frozenset({PUBLIC_NATURALISTIC, AUTHORED_REALISTIC})
+
+
+def is_naturalistic(origin: str) -> bool:
+    return origin in _NATURALISTIC_ORIGINS
+
+
+def run_is_naturalistic(origins) -> bool:
+    """A naturalistic run may emit a corpus-level opportunity verdict (never customer)."""
+    origins = list(origins)
+    return bool(origins) and all(o in _NATURALISTIC_ORIGINS for o in origins)
 
 # Locked verdicts an all-synthetic / mock run may emit.
 PIPELINE_PATH_VERIFIED = "PIPELINE_PATH_VERIFIED"

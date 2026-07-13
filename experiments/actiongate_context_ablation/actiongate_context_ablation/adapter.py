@@ -80,6 +80,7 @@ class RequestSpec:
     state_hash: str = DEFAULT_STATE_HASH
     evidence: tuple = ()      # each item: dict of ref_evidence.build_evidence kwargs (minus bound_to/times)
     approvals: tuple = ()     # each item: dict describing an approval to mint
+    attestation: dict | None = None   # workload-identity attestation (for IAM_GRANT_ADMIN)
 
 
 def default_signed_policy() -> dict:
@@ -106,6 +107,7 @@ def build_env(spec: RequestSpec, signed_policy: dict) -> dict:
         permissions=list(spec.permissions) if spec.permissions else None,
         reversibility=spec.reversibility,
         state_as_of=spec.state_as_of,
+        attestation=spec.attestation,
         action_id="00000000-0000-4000-8000-000000000000",  # fixed valid UUIDv4
     )
     return build_envelope(req, clock=clock, policy_version=pv,
