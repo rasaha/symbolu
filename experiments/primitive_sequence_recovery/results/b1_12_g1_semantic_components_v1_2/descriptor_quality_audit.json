@@ -1,0 +1,80 @@
+{
+  "candidate_meaning_domain": "ordinary_concrete_referent",
+  "confirmatory_length_range": [
+    37,
+    121
+  ],
+  "consonant_length_range": [
+    37,
+    121
+  ],
+  "descriptor_domain": {
+    "consonant:d": "affliction_tendency",
+    "consonant:g": "affliction_tendency",
+    "consonant:j": "affliction_tendency",
+    "consonant:k": "affliction_tendency",
+    "consonant:n": "affliction_tendency",
+    "consonant:r": "affliction_tendency",
+    "consonant:s": "affliction_tendency",
+    "consonant:th": "affliction_tendency",
+    "consonant:v": "affliction_tendency",
+    "consonant:y": "affliction_tendency",
+    "consonant:ñ": "affliction_tendency",
+    "consonant:ś": "affliction_tendency",
+    "vowel:a": "other",
+    "vowel:e": "affliction_tendency",
+    "vowel:i": "affliction_tendency",
+    "vowel:ā": "affliction_tendency",
+    "vowel:ī": "affliction_tendency",
+    "vowel:ū": "affliction_tendency"
+  },
+  "development_length_range": [
+    24,
+    36
+  ],
+  "domain_match": false,
+  "embedded_em_dash_narrative": [
+    "consonant:d",
+    "consonant:g",
+    "consonant:j",
+    "consonant:k",
+    "consonant:n",
+    "consonant:r",
+    "consonant:s",
+    "consonant:th",
+    "consonant:v",
+    "consonant:y",
+    "consonant:ñ",
+    "consonant:ś"
+  ],
+  "exact_duplicates": 0,
+  "length_leakage_vowel_vs_consonant_disjoint": true,
+  "length_min_max_mean": [
+    24,
+    121,
+    59.5
+  ],
+  "n_affliction_tendency": 17,
+  "n_descriptors": 18,
+  "prohibited_progression_term_hits": {},
+  "quality_outcomes": [
+    "DESCRIPTOR_LENGTH_LEAKAGE",
+    "DESCRIPTOR_SOURCE_TIER_LEAKAGE",
+    "DESCRIPTOR_NEUTRALITY_FAILURE"
+  ],
+  "raw_sanskrit_term_descriptors": [
+    "consonant:k",
+    "consonant:n",
+    "consonant:r",
+    "consonant:s",
+    "consonant:th",
+    "consonant:y",
+    "consonant:ś"
+  ],
+  "schema": "b1_12_descriptor_quality_audit_v1_2",
+  "source_tier_leakage_disjoint": true,
+  "vowel_length_range": [
+    24,
+    36
+  ]
+}
