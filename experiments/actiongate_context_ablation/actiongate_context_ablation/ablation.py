@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from . import effects
+from . import extractor as _extractor
 from .extractor import ORACLE, REALISTIC, extract_and_eval
 from .units import Context
 
@@ -67,10 +68,23 @@ def _all_ids(ctx: Context) -> list:
     return [u.id for u in ctx.units]
 
 
-def run_ablations(ctx: Context, signed_policy, *, dev: bool = False) -> AblationRun:
+def run_ablations(ctx: Context, signed_policy, *, dev: bool = False,
+                  realistic_spec_fn=None) -> AblationRun:
+    """Ablate ``ctx`` against the real gate.
+
+    ``realistic_spec_fn`` (optional) swaps the realistic extractor used to compute
+    the extractor-sensitivity signal. Default None keeps the frozen v1 realistic
+    extractor, so existing behaviour is unchanged. The ORACLE path is never swapped.
+    """
     all_ids = _all_ids(ctx)
+
+    def _real(ids):
+        if realistic_spec_fn is None:
+            return extract_and_eval(ctx, ids, signed_policy, mode=REALISTIC)
+        return _extractor.eval_with(ctx, ids, signed_policy, realistic_spec_fn)
+
     base_oracle = extract_and_eval(ctx, all_ids, signed_policy, mode=ORACLE)
-    base_real = extract_and_eval(ctx, all_ids, signed_policy, mode=REALISTIC)
+    base_real = _real(all_ids)
     run = AblationRun(ctx=ctx, baseline_outcome=base_oracle["decision"]["outcome"])
     for u in ctx.units:
         run.unit_labels.setdefault(u.id, set())
@@ -81,7 +95,7 @@ def run_ablations(ctx: Context, signed_policy, *, dev: bool = False) -> Ablation
         surviving = [i for i in all_ids if i != u.id]
         after_o = extract_and_eval(ctx, surviving, signed_policy, mode=ORACLE)
         eff_o = effects.classify(base_oracle, after_o, ctx=ctx, removed_ids={u.id})
-        after_r = extract_and_eval(ctx, surviving, signed_policy, mode=REALISTIC)
+        after_r = _real(surviving)
         eff_r = effects.classify(base_real, after_r, ctx=ctx, removed_ids={u.id})
         ext_sensitive = eff_o.is_critical() != eff_r.is_critical()
         run.records.append(AblationRecord(

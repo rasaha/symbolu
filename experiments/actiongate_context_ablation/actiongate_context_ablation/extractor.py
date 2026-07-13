@@ -159,3 +159,13 @@ def realistic_spec(ctx: Context, surviving_ids) -> adapter.RequestSpec:
 def extract_and_eval(ctx: Context, surviving_ids, signed_policy, *, mode=ORACLE) -> dict:
     spec = oracle_spec(ctx, surviving_ids) if mode == ORACLE else realistic_spec(ctx, surviving_ids)
     return adapter.evaluate(spec, signed_policy)
+
+
+def eval_with(ctx: Context, surviving_ids, signed_policy, spec_fn) -> dict:
+    """Evaluate the real gate on a spec produced by an arbitrary extractor spec_fn.
+
+    ``spec_fn(ctx, surviving_ids) -> adapter.RequestSpec``. Used to benchmark
+    alternative realistic extractors (e.g. the v2 multi-stage extractor) without
+    touching the frozen oracle path.
+    """
+    return adapter.evaluate(spec_fn(ctx, surviving_ids), signed_policy)

@@ -35,6 +35,19 @@ It does **not** build a compressor. It answers one question:
 | `tests/` | 19 tests (gate path, effect detection, metrics, origin lock, determinism). |
 | `demos/run_demos.py` | The 10 required demonstrations. |
 | `results/RESULTS_RECORD.md` | Regenerable results table. |
+| `EXTRACTOR_V2_DESIGN.md` / `MILESTONE_PREREGISTRATION.md` | Extraction+detector milestone: design & frozen targets. |
+| `EXTRACTOR_V2_RESULTS.md` / `results/extractor_v2_results.json` | Before/after for the two bottlenecks + recommendation. |
+| `actiongate_context_ablation/{structured,semantic,validator}_extractor.py`, `extractor_v2.py`, `protected_detector.py`, `milestone_bench.py` | Multi-stage extractor + trainable protected-span detector + benchmark harness. |
+
+### Extraction-quality milestone (latest)
+
+Multi-stage extractor + trained protected-span detector, reusing the corpus and
+ActionGate-derived labels unchanged. Held-out extractor instability **41%→1.9%**
+(<10%, all domains); held-out protected-span detection **recall 7.5%→100%,
+precision 5.9%→100%** (fail-closed hybrid), deployable ceiling **51%→61%**
+(≈ oracle ceiling). Run: `python -c "from actiongate_context_ablation import
+milestone_bench as MB; print(MB.render_report_md(MB.run_bench()))"`. See
+`EXTRACTOR_V2_RESULTS.md` for the recommendation.
 
 ## Run
 

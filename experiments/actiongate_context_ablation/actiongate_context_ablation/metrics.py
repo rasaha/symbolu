@@ -51,7 +51,10 @@ def _safe_div(a: float, b: float) -> float:
     return (a / b) if b else 0.0
 
 
-def context_metrics(run: AblationRun) -> ContextMetrics:
+def context_metrics(run: AblationRun, protect_fn=None) -> ContextMetrics:
+    """``protect_fn(ctx) -> set[unit_id]`` selects the protected set. Default is the
+    conservative rule detector, so existing callers are unchanged; the milestone
+    harness passes the trained detector to measure its precision/ceiling."""
     ctx = run.ctx
     total = ctx.total_tokens
 
@@ -64,7 +67,7 @@ def context_metrics(run: AblationRun) -> ContextMetrics:
     single_critical = set(dec) | set(env) | set(asr) | set(st)
     interaction_only = (set(redundant) | set(interaction)) - single_critical
 
-    protected = detector.protect(ctx)
+    protected = (protect_fn or detector.protect)(ctx)
     prot_tok = _tok(ctx, protected)
     crit_tok = _tok(ctx, union)
     tp_tok = _tok(ctx, protected & union)
@@ -115,9 +118,9 @@ class AggregateMetrics:
     per_context: list = field(default_factory=list)
 
 
-def aggregate(runs) -> AggregateMetrics:
+def aggregate(runs, protect_fn=None) -> AggregateMetrics:
     runs = list(runs)
-    cms = [context_metrics(r) for r in runs]
+    cms = [context_metrics(r, protect_fn) for r in runs]
     tot_tokens = sum(c.total_tokens for c in cms) or 1
     tot_units = sum(len(r.ctx.units) for r in runs)
     tot_abl = sum(len(r.records) for r in runs)
