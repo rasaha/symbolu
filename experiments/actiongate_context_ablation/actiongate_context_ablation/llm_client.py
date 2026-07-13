@@ -70,6 +70,15 @@ class TransformersLLMClient:
         if device == "cuda":
             self.model.to("cuda")               # explicit; no accelerate CPU offload
         self.model.eval()
+        # Make greedy decoding unambiguous: clear the model's sampling defaults so
+        # do_sample=False is not shadowed by temperature/top_p/top_k from the shipped
+        # generation_config (silences the harmless warning; behaviour was already greedy).
+        gc = getattr(self.model, "generation_config", None)
+        if gc is not None:
+            gc.do_sample = False
+            for attr in ("temperature", "top_p", "top_k"):
+                if hasattr(gc, attr):
+                    setattr(gc, attr, None)
         self.name = f"hf:{model_name}:{str(dt).split('.')[-1]}:{device}"
 
     def _render(self, system: str, prompt: str) -> str:
