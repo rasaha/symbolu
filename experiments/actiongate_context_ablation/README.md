@@ -39,7 +39,23 @@ It does **not** build a compressor. It answers one question:
 | `EXTRACTOR_V2_RESULTS.md` / `results/extractor_v2_results.json` | Before/after for the two bottlenecks + recommendation. |
 | `actiongate_context_ablation/{structured,semantic,validator}_extractor.py`, `extractor_v2.py`, `protected_detector.py`, `milestone_bench.py` | Multi-stage extractor + trainable protected-span detector + benchmark harness. |
 
-### Extraction-quality milestone (latest)
+### Compressor prototype milestone (latest)
+
+First extractive ActionGate Context Minimization compressor (`compressor.py`,
+`compressor_bench.py`, `task_benchmark.py`, `plots.py`). Reuses the frozen detector +
+extractor + gate; corpus unchanged; extractive-only. Measured (naturalistic corpus,
+real gate): **100% decision invariance and 100% protected recall at every budget**,
+up to **~66% token reduction** (the non-protected fraction), fail-closed restores an
+adversarial detector miss, and a protection-*unaware* baseline corrupts decisions in
+up to ~51% of contexts where ours corrupts none. Downstream task metric is a
+deterministic information-preservation **proxy** (no runnable open-weights LLM present).
+**Recommendation: `LIMITED_GO`** — proceed to a real-LLM + real-customer-data
+validation; do not ship on these numbers. See `COMPRESSOR_RESULTS.md`,
+`results/compressor_results.json`, `results/plots/`.
+Run: `python -c "from actiongate_context_ablation import compressor_bench as CB;
+print(CB.render_report_md(CB.run_bench()))"`.
+
+### Extraction-quality milestone
 
 Multi-stage extractor + trained protected-span detector, reusing the corpus and
 ActionGate-derived labels unchanged. Held-out extractor instability **41%→1.9%**

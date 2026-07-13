@@ -1,0 +1,150 @@
+{
+  "adversarial": {
+    "fell_back": false,
+    "invariant_after_failclosed": true,
+    "trap_restored_or_fellback": true
+  },
+  "baselines": {
+    "generic_unaware_30": {
+      "decision_preservation": 0.987012987012987,
+      "reduction": 0.46077210460772106
+    },
+    "generic_unaware_50": {
+      "decision_preservation": 0.8831168831168831,
+      "reduction": 0.653590701535907
+    },
+    "generic_unaware_70": {
+      "decision_preservation": 0.4935064935064935,
+      "reduction": 0.7938978829389788
+    },
+    "no_compression": {
+      "decision_preservation": 1.0,
+      "reduction": 0.0,
+      "task_decision_acc": 1.0,
+      "task_incidental_acc": 1.0
+    },
+    "protected_only_max": {
+      "decision_preservation": 1.0,
+      "reduction": 0.6774595267745953,
+      "task_decision_acc": 1.0
+    },
+    "structural_only": {
+      "decision_preservation": 1.0,
+      "reduction": 0.0178497301784973
+    }
+  },
+  "budgets": [
+    {
+      "actual_reduction": 0.2980489829804898,
+      "cost_reduction_cache_adjusted": 0.1490244914902449,
+      "cost_reduction_naive": 0.2980489829804898,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 6.986076987009137,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.1,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.5573593073593073
+    },
+    {
+      "actual_reduction": 0.30780406807804067,
+      "cost_reduction_cache_adjusted": 0.15390203403902034,
+      "cost_reduction_naive": 0.30780406807804067,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 6.992335142848339,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.2,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.5443722943722944
+    },
+    {
+      "actual_reduction": 0.4559983395599834,
+      "cost_reduction_cache_adjusted": 0.2279991697799917,
+      "cost_reduction_naive": 0.4559983395599834,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 7.308092987016182,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.3,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.31601731601731586
+    },
+    {
+      "actual_reduction": 0.5058115400581153,
+      "cost_reduction_cache_adjusted": 0.2529057700290577,
+      "cost_reduction_naive": 0.5058115400581153,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 7.525360922077847,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.4,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.23917748917748924
+    },
+    {
+      "actual_reduction": 0.6282689912826899,
+      "cost_reduction_cache_adjusted": 0.31413449564134494,
+      "cost_reduction_naive": 0.6282689912826899,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 7.264912324671968,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.5,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.06385281385281384
+    },
+    {
+      "actual_reduction": 0.6774595267745953,
+      "cost_reduction_cache_adjusted": 0.33872976338729766,
+      "cost_reduction_naive": 0.6774595267745953,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 7.147397675320368,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.6,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.0
+    },
+    {
+      "actual_reduction": 0.6774595267745953,
+      "cost_reduction_cache_adjusted": 0.33872976338729766,
+      "cost_reduction_naive": 0.6774595267745953,
+      "decision_preservation": 1.0,
+      "fallback_rate": 0.0,
+      "mean_latency_ms": 7.31138077922028,
+      "protected_precision": 1.0,
+      "protected_recall": 1.0,
+      "restored_spans": 0,
+      "target": 0.7,
+      "task_decision_acc_proxy": 1.0,
+      "task_incidental_acc_proxy": 0.0
+    }
+  ],
+  "detector_precision": 1.0,
+  "max_removable_fraction": 0.659609796596098,
+  "n_contexts": 77,
+  "note": "Downstream-task accuracy is a deterministic information-preservation PROXY (no runnable open-weights LLM present); it upper-bounds real LLM accuracy. Latency is wall-clock and not part of any determinism check.",
+  "recommendation": "LIMITED_GO",
+  "recommendation_detail": {
+    "all_decision_invariant": true,
+    "all_protected_recall_100": true,
+    "cache_adjusted_savings_gt_5pct": true,
+    "generic_unaware_breaks_decisions": true,
+    "max_safe_reduction": 0.659609796596098,
+    "task_decision_preserved_PROXY": true,
+    "task_is_llm_proxy_not_real_llm": true
+  }
+}
