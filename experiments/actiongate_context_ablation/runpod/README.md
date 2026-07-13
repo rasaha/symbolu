@@ -47,6 +47,24 @@ bash run_qwen_primary.sh
 RUN_ID=primary_qwen7b bash collect_results.sh
 ```
 
+## Cross-model replication (changing MODEL_ID is the only requirement)
+The benchmark is model-agnostic — `run_qwen_matrix.sh` already takes `MODEL_ID`. To
+run the replication set and aggregate:
+```bash
+# runs Qwen2.5-14B, Llama-3.1-8B, Gemma-2-9B, Mistral-7B-v0.3 (skips any that can't run)
+bash run_cross_model.sh
+# or a subset / single model:
+MODELS="google/gemma-2-9b-it" bash run_cross_model.sh
+# aggregate whatever is present into CROSS_MODEL_RESULTS.md + plots + json:
+bash analyze_cross_model.sh
+```
+`cross_model.py` computes the forest deltas, protected-vs-unaware decision
+comparison, cost/accuracy, architecture sensitivity (bootstrap CIs from records),
+the failure taxonomy, and the replication verdict
+(`CONSISTENT_/PARTIAL_/MODEL_SPECIFIC/FAILED_REPLICATION`, or `INSUFFICIENT_MODELS`).
+Gated models (Llama/Gemma/Mistral) require accepting the license on HF and
+`HF_TOKEN`; unavailable models are skipped honestly with no fabricated result.
+
 ## Scientific status
 Until a real Qwen run completes, the recommendation stays **`BLOCKED_NO_MODEL`**.
 After a complete primary run, the FROZEN `real_llm_bench._success` emits one of

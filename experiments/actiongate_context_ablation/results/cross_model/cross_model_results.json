@@ -1,0 +1,113 @@
+{
+  "architecture_sensitivity": {
+    "delta_spread": null,
+    "note": "delta_spread is the range of protected-vs-original task deltas across real models; small spread => architecture-insensitive.",
+    "per_model": [
+      {
+        "ci_high": null,
+        "ci_low": null,
+        "delta_mean": 0.01629904487047344,
+        "model": "Qwen2.5-7B-Instruct"
+      }
+    ]
+  },
+  "cost_accuracy": [
+    {
+      "is_real": true,
+      "model": "Qwen2.5-7B-Instruct",
+      "original_accuracy": 0.5369202226345083,
+      "original_cost": 0.048762999999999966,
+      "protected": [
+        {
+          "budget": 0.2,
+          "cost": 0.041021999999999996,
+          "task_accuracy": 0.5499020820449392,
+          "token_reduction": 0.3190791248577014
+        },
+        {
+          "budget": 0.3,
+          "cost": 0.039278999999999974,
+          "task_accuracy": 0.5554937126365698,
+          "token_reduction": 0.45620897542739647
+        },
+        {
+          "budget": 0.4,
+          "cost": 0.03854300000000001,
+          "task_accuracy": 0.5542620078334364,
+          "token_reduction": 0.5038029346208911
+        }
+      ]
+    }
+  ],
+  "decision_comparison": [
+    {
+      "budgets": {
+        "0.2": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.3": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.4": {
+          "protected": 1.0,
+          "protection_unaware": 0.974025974025974
+        }
+      },
+      "is_real": true,
+      "model": "Qwen2.5-7B-Instruct"
+    }
+  ],
+  "failure_taxonomy": {
+    "Qwen2.5-7B-Instruct": {
+      "counts": {
+        "decision_flip": 4,
+        "extraction_miss": 0,
+        "hallucination": 0,
+        "policy_misunderstanding": 0,
+        "reasoning_degradation": 0,
+        "summarization_loss": 0,
+        "tool_argument_error": 0,
+        "tool_selection_error": 0
+      },
+      "records_available": false
+    }
+  },
+  "forest": [
+    {
+      "ci_high": null,
+      "ci_low": null,
+      "delta_mean": 0.01629904487047344,
+      "is_real": true,
+      "model": "Qwen2.5-7B-Instruct",
+      "n_contexts": null
+    }
+  ],
+  "models_planned_pending": [
+    "Qwen/Qwen2.5-14B-Instruct",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "google/gemma-2-9b-it",
+    "mistralai/Mistral-7B-Instruct-v0.3"
+  ],
+  "models_present": [
+    "Qwen/Qwen2.5-7B-Instruct"
+  ],
+  "n_models": 1,
+  "n_real": 1,
+  "replication": {
+    "n_real_models": 1,
+    "n_replicating": 1,
+    "per_model": [
+      {
+        "model": "Qwen2.5-7B-Instruct",
+        "protected_decisions_100": true,
+        "protection_beats_unaware": true,
+        "replicates": true,
+        "task_delta_mean": 0.01629904487047344,
+        "utility_preserved": true
+      }
+    ],
+    "verdict": "INSUFFICIENT_MODELS"
+  }
+}
