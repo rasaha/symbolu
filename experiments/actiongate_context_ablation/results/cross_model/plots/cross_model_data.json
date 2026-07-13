@@ -1,0 +1,113 @@
+{
+  "n_models": 1,
+  "n_real": 1,
+  "models_present": [
+    "Qwen/Qwen2.5-7B-Instruct"
+  ],
+  "models_planned_pending": [
+    "Qwen/Qwen2.5-14B-Instruct",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "google/gemma-2-9b-it",
+    "mistralai/Mistral-7B-Instruct-v0.3"
+  ],
+  "forest": [
+    {
+      "model": "Qwen2.5-7B-Instruct",
+      "is_real": true,
+      "delta_mean": 0.01629904487047344,
+      "ci_low": null,
+      "ci_high": null,
+      "n_contexts": null
+    }
+  ],
+  "decision_comparison": [
+    {
+      "model": "Qwen2.5-7B-Instruct",
+      "is_real": true,
+      "budgets": {
+        "0.2": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.3": {
+          "protected": 1.0,
+          "protection_unaware": 0.987012987012987
+        },
+        "0.4": {
+          "protected": 1.0,
+          "protection_unaware": 0.974025974025974
+        }
+      }
+    }
+  ],
+  "cost_accuracy": [
+    {
+      "model": "Qwen2.5-7B-Instruct",
+      "is_real": true,
+      "original_cost": 0.048762999999999966,
+      "original_accuracy": 0.5369202226345083,
+      "protected": [
+        {
+          "budget": 0.2,
+          "token_reduction": 0.3190791248577014,
+          "cost": 0.041021999999999996,
+          "task_accuracy": 0.5499020820449392
+        },
+        {
+          "budget": 0.3,
+          "token_reduction": 0.45620897542739647,
+          "cost": 0.039278999999999974,
+          "task_accuracy": 0.5554937126365698
+        },
+        {
+          "budget": 0.4,
+          "token_reduction": 0.5038029346208911,
+          "cost": 0.03854300000000001,
+          "task_accuracy": 0.5542620078334364
+        }
+      ]
+    }
+  ],
+  "architecture_sensitivity": {
+    "per_model": [
+      {
+        "model": "Qwen2.5-7B-Instruct",
+        "delta_mean": 0.01629904487047344,
+        "ci_low": null,
+        "ci_high": null
+      }
+    ],
+    "delta_spread": null,
+    "note": "delta_spread is the range of protected-vs-original task deltas across real models; small spread => architecture-insensitive."
+  },
+  "failure_taxonomy": {
+    "Qwen2.5-7B-Instruct": {
+      "counts": {
+        "hallucination": 0,
+        "extraction_miss": 0,
+        "summarization_loss": 0,
+        "reasoning_degradation": 0,
+        "policy_misunderstanding": 0,
+        "tool_argument_error": 0,
+        "tool_selection_error": 0,
+        "decision_flip": 4
+      },
+      "records_available": false
+    }
+  },
+  "replication": {
+    "verdict": "INSUFFICIENT_MODELS",
+    "n_real_models": 1,
+    "n_replicating": 1,
+    "per_model": [
+      {
+        "model": "Qwen2.5-7B-Instruct",
+        "protected_decisions_100": true,
+        "utility_preserved": true,
+        "protection_beats_unaware": true,
+        "replicates": true,
+        "task_delta_mean": 0.01629904487047344
+      }
+    ]
+  }
+}

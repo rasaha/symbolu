@@ -1,0 +1,295 @@
+{
+  "detector_by_domain": {
+    "cicd": {
+      "baseline": {
+        "deployable_ceiling": 0.3145539906103286,
+        "name": "baseline",
+        "oracle_ceiling": 0.6635367762128326,
+        "precision": 0.319634703196347,
+        "protected_fraction": 0.6854460093896714,
+        "recall": 0.6511627906976745
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.6635367762128326,
+        "name": "hybrid",
+        "oracle_ceiling": 0.6635367762128326,
+        "precision": 1.0,
+        "protected_fraction": 0.3364632237871675,
+        "recall": 1.0
+      }
+    },
+    "database": {
+      "baseline": {
+        "deployable_ceiling": 0.21739130434782605,
+        "name": "baseline",
+        "oracle_ceiling": 0.6630434782608696,
+        "precision": 0.3472222222222222,
+        "protected_fraction": 0.782608695652174,
+        "recall": 0.8064516129032258
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.6630434782608696,
+        "name": "hybrid",
+        "oracle_ceiling": 0.6630434782608696,
+        "precision": 1.0,
+        "protected_fraction": 0.33695652173913043,
+        "recall": 1.0
+      }
+    },
+    "iam": {
+      "baseline": {
+        "deployable_ceiling": 0.3675078864353313,
+        "name": "baseline",
+        "oracle_ceiling": 0.694006309148265,
+        "precision": 0.2169576059850374,
+        "protected_fraction": 0.6324921135646687,
+        "recall": 0.4484536082474227
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.694006309148265,
+        "name": "hybrid",
+        "oracle_ceiling": 0.694006309148265,
+        "precision": 1.0,
+        "protected_fraction": 0.305993690851735,
+        "recall": 1.0
+      }
+    },
+    "kubernetes": {
+      "baseline": {
+        "deployable_ceiling": 0.3353151010701546,
+        "name": "baseline",
+        "oracle_ceiling": 0.5826397146254458,
+        "precision": 0.3738819320214669,
+        "protected_fraction": 0.6646848989298454,
+        "recall": 0.5954415954415955
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.5826397146254458,
+        "name": "hybrid",
+        "oracle_ceiling": 0.5826397146254458,
+        "precision": 1.0,
+        "protected_fraction": 0.4173602853745541,
+        "recall": 1.0
+      }
+    },
+    "monitoring": {
+      "baseline": {
+        "deployable_ceiling": 0.2831858407079646,
+        "name": "baseline",
+        "oracle_ceiling": 0.7610619469026548,
+        "precision": 0.22633744855967078,
+        "protected_fraction": 0.7168141592920354,
+        "recall": 0.6790123456790124
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.7610619469026548,
+        "name": "hybrid",
+        "oracle_ceiling": 0.7610619469026548,
+        "precision": 1.0,
+        "protected_fraction": 0.23893805309734514,
+        "recall": 1.0
+      }
+    },
+    "network": {
+      "baseline": {
+        "deployable_ceiling": 0.29220779220779225,
+        "name": "baseline",
+        "oracle_ceiling": 0.7662337662337663,
+        "precision": 0.23853211009174313,
+        "protected_fraction": 0.7077922077922078,
+        "recall": 0.7222222222222222
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.7662337662337663,
+        "name": "hybrid",
+        "oracle_ceiling": 0.7662337662337663,
+        "precision": 1.0,
+        "protected_fraction": 0.23376623376623376,
+        "recall": 1.0
+      }
+    },
+    "payments": {
+      "baseline": {
+        "deployable_ceiling": 0.3106796116504854,
+        "name": "baseline",
+        "oracle_ceiling": 0.46116504854368934,
+        "precision": 0.528169014084507,
+        "protected_fraction": 0.6893203883495146,
+        "recall": 0.6756756756756757
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.46116504854368934,
+        "name": "hybrid",
+        "oracle_ceiling": 0.46116504854368934,
+        "precision": 1.0,
+        "protected_fraction": 0.5388349514563107,
+        "recall": 1.0
+      }
+    },
+    "repo": {
+      "baseline": {
+        "deployable_ceiling": 0.2660098522167488,
+        "name": "baseline",
+        "oracle_ceiling": 0.7536945812807881,
+        "precision": 0.2550335570469799,
+        "protected_fraction": 0.7339901477832512,
+        "recall": 0.76
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.7536945812807881,
+        "name": "hybrid",
+        "oracle_ceiling": 0.7536945812807881,
+        "precision": 1.0,
+        "protected_fraction": 0.24630541871921183,
+        "recall": 1.0
+      }
+    },
+    "secrets": {
+      "baseline": {
+        "deployable_ceiling": 0.2936241610738255,
+        "name": "baseline",
+        "oracle_ceiling": 0.6325503355704698,
+        "precision": 0.37054631828978624,
+        "protected_fraction": 0.7063758389261745,
+        "recall": 0.7123287671232876
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.6325503355704698,
+        "name": "hybrid",
+        "oracle_ceiling": 0.6325503355704698,
+        "precision": 1.0,
+        "protected_fraction": 0.3674496644295302,
+        "recall": 1.0
+      }
+    },
+    "storage": {
+      "baseline": {
+        "deployable_ceiling": 0.32666666666666666,
+        "name": "baseline",
+        "oracle_ceiling": 0.69,
+        "precision": 0.2524752475247525,
+        "protected_fraction": 0.6733333333333333,
+        "recall": 0.5483870967741935
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.69,
+        "name": "hybrid",
+        "oracle_ceiling": 0.69,
+        "precision": 1.0,
+        "protected_fraction": 0.31,
+        "recall": 1.0
+      }
+    },
+    "terraform": {
+      "baseline": {
+        "deployable_ceiling": 0.3125,
+        "name": "baseline",
+        "oracle_ceiling": 0.6614583333333333,
+        "precision": 0.30303030303030304,
+        "protected_fraction": 0.6875,
+        "recall": 0.6153846153846154
+      },
+      "hybrid": {
+        "deployable_ceiling": 0.6614583333333333,
+        "name": "hybrid",
+        "oracle_ceiling": 0.6614583333333333,
+        "precision": 1.0,
+        "protected_fraction": 0.3385416666666667,
+        "recall": 1.0
+      }
+    }
+  },
+  "detectors": {
+    "heldout": [
+      {
+        "deployable_ceiling": 0.5114709851551957,
+        "name": "baseline_keyword",
+        "oracle_ceiling": 0.6106612685560053,
+        "precision": 0.05939226519337017,
+        "protected_fraction": 0.4885290148448043,
+        "recall": 0.07452339688041594
+      },
+      {
+        "deployable_ceiling": 0.6187584345479082,
+        "name": "trained_classifier",
+        "oracle_ceiling": 0.6106612685560053,
+        "precision": 1.0,
+        "protected_fraction": 0.38124156545209176,
+        "recall": 0.9792027729636048
+      },
+      {
+        "deployable_ceiling": 0.6106612685560053,
+        "name": "fail_closed_hybrid",
+        "oracle_ceiling": 0.6106612685560053,
+        "precision": 1.0,
+        "protected_fraction": 0.3893387314439946,
+        "recall": 1.0
+      }
+    ],
+    "overall": [
+      {
+        "deployable_ceiling": 0.30987961809879616,
+        "name": "baseline_keyword",
+        "oracle_ceiling": 0.659609796596098,
+        "precision": 0.3136842105263158,
+        "protected_fraction": 0.6901203819012038,
+        "recall": 0.6359756097560976
+      },
+      {
+        "deployable_ceiling": 0.6670817766708177,
+        "name": "trained_classifier",
+        "oracle_ceiling": 0.659609796596098,
+        "precision": 1.0,
+        "protected_fraction": 0.33291822332918225,
+        "recall": 0.9780487804878049
+      },
+      {
+        "deployable_ceiling": 0.659609796596098,
+        "name": "fail_closed_hybrid",
+        "oracle_ceiling": 0.659609796596098,
+        "precision": 1.0,
+        "protected_fraction": 0.340390203403902,
+        "recall": 1.0
+      }
+    ]
+  },
+  "extractor_instability": {
+    "all": {
+      "v1": 0.14697406340057637,
+      "v2": 0.011527377521613832
+    },
+    "heldout": {
+      "v1": 0.4095238095238095,
+      "v2": 0.01904761904761905
+    },
+    "v2_by_domain": {
+      "cicd": 0.0,
+      "database": 0.0,
+      "iam": 0.0,
+      "kubernetes": 0.06779661016949153,
+      "monitoring": 0.0,
+      "network": 0.0,
+      "payments": 0.0,
+      "repo": 0.0,
+      "secrets": 0.0,
+      "storage": 0.0,
+      "terraform": 0.0
+    }
+  },
+  "heldout_per_class_recall": {
+    "ASSURANCE_CRITICAL": 1.0,
+    "DECISION_CRITICAL": 1.0,
+    "ENVELOPE_CRITICAL": 1.0,
+    "INTERACTION_ONLY": 1.0,
+    "NON_CRITICAL": 1.0,
+    "STRUCTURAL": 1.0
+  },
+  "heldout_residual_unprotected": [],
+  "n_contexts": 77,
+  "targets_met": {
+    "all_domains_instability_below_10pct": true,
+    "heldout_instability_below_10pct": true,
+    "heldout_precision_gain_substantial": true,
+    "heldout_recall_is_1": true
+  }
+}
