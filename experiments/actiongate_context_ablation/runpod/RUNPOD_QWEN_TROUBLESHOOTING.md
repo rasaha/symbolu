@@ -16,6 +16,7 @@
 | HF download 401/403 | gated repo / bad token | set `HF_TOKEN`; accept the model license on HuggingFace. |
 | `huggingface.co` unreachable | network policy blocks HF | use a pod/network with HF egress; the token is read only from `HF_TOKEN`. |
 | chat template warnings | tokenizer lacks a chat template | Qwen2.5-Instruct ships one; verify `MODEL_ID` is the *Instruct* variant. |
+| Gemma-2 run: **every record `status=ERROR`**, `is_real: false`, run skipped | Gemma-2 needs the *eager* attention impl (soft-capping + sliding window); the default SDPA/FlashAttention kernels raise on every generation | Handled automatically: `run_benchmark.build_client` injects `attn_implementation='eager'` for any `gemma-2` model. Ensure you're on the current runpod code (`git pull`). The `error` field on each record now carries the underlying message for diagnosis. The frozen client bytes and fingerprint are unchanged (fix lives in the non-frozen runner). |
 | plots missing | matplotlib not installed | `pip install matplotlib==3.9.2`; reports still generate without plots. |
 
 ## Verifying a run is scientific

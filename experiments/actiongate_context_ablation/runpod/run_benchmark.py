@@ -37,15 +37,45 @@ def _model_revision(config) -> str:
     return rf.read_text().strip() if rf.exists() else "local-unpinned"
 
 
+def _needs_eager_attention(model_id: str) -> bool:
+    """Gemma-2 uses logit soft-capping + sliding-window attention that the fused SDPA/
+    FlashAttention kernels silently break: HuggingFace explicitly requires the *eager*
+    attention implementation for Gemma-2, otherwise every generation raises. This is a
+    per-family model-loading requirement, NOT a change to prompts, tasks, or scoring."""
+    return "gemma-2" in (model_id or "").lower()
+
+
 def build_client(config):
     """Return a real client, or the mock ONLY if ALLOW_MOCK=1 (local tests). A primary
-    or smoke run must never silently use the mock reader."""
+    or smoke run must never silently use the mock reader.
+
+    Deployment-layer only: this file is NOT part of the frozen benchmark fingerprint, so
+    per-family loading requirements are handled here rather than in the frozen client.
+    For Gemma-2 we inject attn_implementation='eager' by wrapping from_pretrained; the
+    frozen TransformersLLMClient bytes are untouched and every other family loads exactly
+    as before, so the frozen fingerprint is identical for all models."""
     from actiongate_context_ablation import llm_client
     if config["allow_mock"]:
         return llm_client.MockReaderClient()
-    client = llm_client.TransformersLLMClient(
-        config["model_dir"], max_new_tokens=config["max_new_tokens"],
-        dtype=config["dtype"], device=config["device"])
+    if _needs_eager_attention(config["model_id"]):
+        import transformers
+        _orig = transformers.AutoModelForCausalLM.from_pretrained
+
+        def _eager_from_pretrained(*a, **k):
+            k.setdefault("attn_implementation", "eager")
+            return _orig(*a, **k)
+
+        transformers.AutoModelForCausalLM.from_pretrained = _eager_from_pretrained
+        try:
+            client = llm_client.TransformersLLMClient(
+                config["model_dir"], max_new_tokens=config["max_new_tokens"],
+                dtype=config["dtype"], device=config["device"])
+        finally:
+            transformers.AutoModelForCausalLM.from_pretrained = _orig
+    else:
+        client = llm_client.TransformersLLMClient(
+            config["model_dir"], max_new_tokens=config["max_new_tokens"],
+            dtype=config["dtype"], device=config["device"])
     if not getattr(client, "is_real", False):
         raise RuntimeError("primary/smoke run requires a real model; refusing mock backend")
     return client
@@ -130,6 +160,7 @@ def run(config=None):
                 raise RuntimeError(f"resume guard: prompt changed for existing key {key}")
             continue
         status = "OK"
+        err_msg = ""
         try:
             resp = client.generate(R._SYSTEM, full_prompt, task=task)
             score = task["scorer"](resp.text)
@@ -139,6 +170,9 @@ def run(config=None):
             score = 0.0
             halluc = False
             status = "ERROR:" + exc.__class__.__name__
+            # Keep the message (truncated) so a systemic failure (e.g. a family that
+            # needs a specific attention impl) is diagnosable instead of blind.
+            err_msg = str(exc)[:500]
         record = {
             "key": key, "run_id": config["run_id"], "run_kind": config["run_kind"],
             "example_id": item.item_id, "task": task["type"], "model_id": config["model_id"],
@@ -155,6 +189,7 @@ def run(config=None):
             "is_real": bool(resp.is_real) if resp else False,
             "token_reduction": tred, "decision_preservation": bool(invariant),
             "envelope_preservation": bool(env_ok), "status": status,
+            "error": err_msg,
         }
         RC.atomic_append_jsonl(rpath, record)
         done[key] = ph
