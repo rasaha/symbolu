@@ -18,7 +18,7 @@ from __future__ import annotations
 import threading
 
 from . import protocol, registry, simulation
-from ._core import Gateway, RealClock, ToolRequest, ref_errors
+from ._core import Gateway, RealClock, ToolRequest, ref_errors, ref_remediation
 from .audit import Metrics, ProtocolAudit
 from .context import RequestContext
 from .errors import (
@@ -29,6 +29,17 @@ from .escalation import EscalationQueue, build_approval
 
 DENY = protocol.DENY
 EXECUTABLE = protocol.EXECUTABLE
+
+# R1.5: the capability that, ON TOP OF an authenticated session, unlocks a privileged
+# remediation disclosure mode. A privileged mode is NEVER granted by request alone —
+# it requires (a) a transport-authenticated caller and (b) this capability.
+_REMEDIATION_CAP = {
+    ref_remediation.TRUSTED_PLANNER: "remediation:trusted_planner",
+    ref_remediation.HUMAN_ONLY: "remediation:human",
+    ref_remediation.FULL: "remediation:full",
+}
+_REMEDIATION_FIELDS = ("response_schema_version", "all_unmet_conditions", "required_changes",
+                       "retryability", "disclosure", "retry_budget")
 
 
 class McpGateway:
@@ -106,11 +117,31 @@ class McpGateway:
         return eid
 
     def _respond(self, dec, rid, spec, escalation_id=None):
+        # forward any advisory remediation fields the gateway attached (R1.5); none by default
+        rem = {k: dec[k] for k in _REMEDIATION_FIELDS if k in dec}
         return protocol.decision_response(
             outcome=dec["outcome"], request_id=rid, action_hash=dec["action_hash"],
             dispositive_rules=dec["dispositive_rules"],
             applied_constraints=dec["applied_constraints"], reason=dec["reason"],
-            required_evidence=spec.required_evidence, escalation_id=escalation_id)
+            required_evidence=spec.required_evidence, escalation_id=escalation_id,
+            remediation=rem or None)
+
+    def _resolve_remediation(self, ctx: RequestContext, requested):
+        """Runtime trust resolution. Returns (mode, trusted). OFF/MINIMAL/STANDARD need no
+        trust. A privileged mode requires an AUTHENTICATED caller (transport-established
+        identity, not the self-declared one) carrying the matching capability; otherwise the
+        gateway clamps it down to STANDARD. FULL is never granted by request alone."""
+        mode = (requested or "off").upper().replace("-", "_")
+        if mode not in ref_remediation.DISCLOSURE_MODES:
+            mode = ref_remediation.OFF
+        if mode not in _REMEDIATION_CAP:
+            return mode, False
+        authenticated = ctx.authenticated_agent_id is not None
+        caps = set(getattr(ctx, "client_capabilities", []) or [])
+        need = _REMEDIATION_CAP[mode]
+        trusted = authenticated and (need in caps
+                                     or _REMEDIATION_CAP[ref_remediation.FULL] in caps)
+        return mode, trusted
 
     # ------------------------------------------------------------- discovery
 
@@ -209,11 +240,15 @@ class McpGateway:
     # ------------------------------------------------------------- evaluation phase
 
     def evaluate(self, ctx: RequestContext, request_id: str, *,
-                 evidence=None, approvals=None) -> dict:
+                 evidence=None, approvals=None, remediation_mode="off") -> dict:
         """Evaluate a prepared request through the frozen gate. Never executes.
 
         Re-callable: supply more evidence/approvals to advance a PENDING request.
         Mints an execution token in the gateway only on ALLOW / ALLOW_WITH_CONSTRAINTS.
+
+        ``remediation_mode`` (R1.5, default ``"off"``) requests optional advisory remediation
+        metadata; privileged modes are gated by the authenticated caller context (see
+        ``_resolve_remediation``). Default OFF keeps the response byte-identical.
         """
         with self._lock:
             self.metrics.inc("requests_total")
@@ -238,7 +273,10 @@ class McpGateway:
                 meta["auto_applied"] = True
             self.audit.event("evaluation_requested", action_hash=ah,
                              detail={"request_id": request_id})
-            dec = self.gateway.evaluate_action(request_id, evidence=ev, approvals=approvals or [])
+            rmode, rtrusted = self._resolve_remediation(ctx, remediation_mode)
+            dec = self.gateway.evaluate_action(
+                request_id, evidence=ev, approvals=approvals or [],
+                remediation_mode=rmode, remediation_trusted=rtrusted)
             self.audit.event("decision", action_hash=ah,
                              detail={"outcome": dec["outcome"], "rules": dec["dispositive_rules"]})
             self.metrics.outcome(dec["outcome"])

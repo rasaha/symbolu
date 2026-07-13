@@ -25,7 +25,8 @@ import threading
 from dataclasses import dataclass, field
 
 from . import state as S
-from ._ref import audit, gate, hashing, jcs, policy, projection, schema, token
+from . import remediation_runtime as RR
+from ._ref import audit, gate, hashing, jcs, policy, projection, remediation, schema, token
 from ._ref import errors as ref_errors
 from .adapters import default_adapters
 from .broker import MockCredentialBroker
@@ -156,11 +157,18 @@ class Gateway:
 
     # ---------------------------------------------------------------- API: evaluate
 
-    def evaluate_action(self, request_id: str, *, evidence=None, approvals=None) -> dict:
+    def evaluate_action(self, request_id: str, *, evidence=None, approvals=None,
+                        remediation_mode="OFF", remediation_trusted=False,
+                        remediation_limits=None) -> dict:
         with self._lock:
-            return self._evaluate_locked(request_id, evidence=evidence, approvals=approvals)
+            return self._evaluate_locked(
+                request_id, evidence=evidence, approvals=approvals,
+                remediation_mode=remediation_mode, remediation_trusted=remediation_trusted,
+                remediation_limits=remediation_limits)
 
-    def _evaluate_locked(self, request_id: str, *, evidence=None, approvals=None) -> dict:
+    def _evaluate_locked(self, request_id: str, *, evidence=None, approvals=None,
+                         remediation_mode="OFF", remediation_trusted=False,
+                         remediation_limits=None) -> dict:
         """Invoke the frozen gate; record + enforce its decision. Mints a token on ALLOW."""
         rec = self._get(request_id)
         if S.is_terminal(rec.state):
@@ -205,12 +213,26 @@ class Gateway:
         else:
             rec.token, rec.token_nonce = None, None
 
-        return {"request_id": request_id, "outcome": decision["outcome"],
+        resp = {"request_id": request_id, "outcome": decision["outcome"],
                 "state": rec.state, "dispositive_rules": decision["dispositive_rules"],
                 "applied_constraints": decision.get("applied_constraints"),
                 "action_hash": rec.action_hash,
                 "token_hash": rec.token["token_hash"] if rec.token else None,
                 "reason": decision.get("reason", "")}
+
+        # --- R1.5: attach advisory remediation AFTER the decision is finalized + audited +
+        # any token minted. Default OFF -> byte-identical response. This never feeds back into
+        # the gate, mints no authority, and is excluded from every hash (audit already written).
+        mode = RR.clamp_mode(remediation_mode, remediation_trusted)
+        if mode != remediation.OFF:
+            rem = remediation.project_remediation(
+                decision, rec.envelope, self.signed_policy,
+                evidence=rec.evidence, approvals=rec.approvals, now=now,
+                disclosure_mode=mode, trusted_context=remediation_trusted,
+                used_nonces=self._spent_nonces)
+            rem = RR.apply_limits(rem, remediation_limits or RR.DEFAULT_LIMITS)
+            resp.update(rem)   # additive advisory fields; existing keys unchanged
+        return resp
 
     # ---------------------------------------------------------------- API: execute
 
