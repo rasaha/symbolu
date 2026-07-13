@@ -1,0 +1,35 @@
+{
+  "controls_matched": "A/B/D identical token multiset, length, template, and position tags; content-masked renders are byte-identical across arms",
+  "description": "position-tagged opaque ordered varṇa IDs, e.g. 'p1:U25 p2:U17 p3:U19 p4:U27'",
+  "encoding_id": "OPT_A_D_POSITIONAL_OPAQUE",
+  "evaluator_does_not_receive": [
+    "the Sanskrit word",
+    "IAST/Devanāgarī",
+    "any semantic gloss",
+    "the opaque-ID legend/meaning",
+    "cross-word candidate list"
+  ],
+  "evaluator_receives": [
+    "position-tagged opaque ID sequences for arms of a single hidden word",
+    "identical template/length across arms"
+  ],
+  "positive_result_does_NOT_support": [
+    "order carries semantic/word-specific meaning",
+    "varṇa mappings are true",
+    "Sanskrit words encode referents",
+    "H2 (semantic) is supported",
+    "B1.10 is rescued"
+  ],
+  "positive_result_supports": "that ordered opaque varṇa composition is a recoverable, distinguishable STRUCTURAL signal — order is preserved and usable, not collapsed",
+  "primary_contrast": "WITHIN-word A (true order) vs B (order-scramble); A vs D (unordered) secondary",
+  "rejected_alternatives": {
+    "cross_word_candidate_match (Model 2)": "leaks via unique first unit + distinct inventories -> tests inventory",
+    "learned_key (Model 1)": "needs a training phase not yet designed; deferred",
+    "semantic_glosses (Option C / Model 4)": "reintroduces B1.10 prose-packet confound; secondary only"
+  },
+  "schema": "b1_12_g1_proposed_primary_encoding_v1",
+  "target_answer": "a structural order judgment (e.g. which arm is the reference's true order / whether two renders share the same order) — NOT a word or meaning",
+  "task_model": "MODEL_3_SAME_WORD_ORDER_DISCRIMINATION",
+  "why_inventory_alone_insufficient": "within a trial all arms share the exact multiset and length, so inventory/length carry zero discriminative information",
+  "why_true_order_could_help": "A differs from B and D only in the ORDER of an identical multiset; any above-chance discrimination must use order, since inventory+length are held constant"
+}

@@ -1,0 +1,34 @@
+{
+  "all_leakage_checks_pass": true,
+  "checks": {
+    "content_masked_arm_unclassifiable": true,
+    "content_masked_word_ambiguous": true,
+    "masked_arms_identical_within_word": true,
+    "no_iast_or_devanagari_chars": true,
+    "no_word_transliteration_substring": true,
+    "within_word_length_constant": true
+  },
+  "control_leakage": false,
+  "cross_word_first_unit_unique": true,
+  "cross_word_last_unit_multiplicity": {
+    "U25": 3,
+    "U27": 1,
+    "U29": 1,
+    "U30": 1
+  },
+  "cross_word_leakage_note": "first opaque unit is UNIQUE per selected word -> a cross-word candidate task would leak the answer via the first unit; this is a further reason the primary task is WITHIN-word, where no cross-word choice is presented.",
+  "cross_word_length_groups": {
+    "4": [
+      "W03",
+      "W23",
+      "W30"
+    ],
+    "5": [
+      "W15",
+      "W20",
+      "W35"
+    ]
+  },
+  "encoding_audited": "position-tagged opaque IDs (primary)",
+  "schema": "b1_12_g1_leakage_audit_v1"
+}

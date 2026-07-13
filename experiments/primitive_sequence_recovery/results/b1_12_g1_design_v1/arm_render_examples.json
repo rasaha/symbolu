@@ -1,0 +1,215 @@
+{
+  "arms": {
+    "W03": {
+      "A_true_order": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U25 p2:U17 p3:U19 p4:U27",
+        "tokens": [
+          "U25",
+          "U17",
+          "U19",
+          "U27"
+        ]
+      },
+      "B_order_scramble": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U27 p2:U25 p3:U17 p4:U19",
+        "tokens": [
+          "U27",
+          "U25",
+          "U17",
+          "U19"
+        ]
+      },
+      "D_unordered_inventory": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U17 p2:U19 p3:U25 p4:U27",
+        "tokens": [
+          "U17",
+          "U19",
+          "U25",
+          "U27"
+        ]
+      },
+      "iast": "asthi"
+    },
+    "W15": {
+      "A_true_order": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U06 p2:U16 p3:U30 p4:U20 p5:U29",
+        "tokens": [
+          "U06",
+          "U16",
+          "U30",
+          "U20",
+          "U29"
+        ]
+      },
+      "B_order_scramble": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U16 p2:U06 p3:U30 p4:U29 p5:U20",
+        "tokens": [
+          "U16",
+          "U06",
+          "U30",
+          "U29",
+          "U20"
+        ]
+      },
+      "D_unordered_inventory": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U06 p2:U16 p3:U20 p4:U29 p5:U30",
+        "tokens": [
+          "U06",
+          "U16",
+          "U20",
+          "U29",
+          "U30"
+        ]
+      },
+      "iast": "grīvā"
+    },
+    "W20": {
+      "A_true_order": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U09 p2:U22 p3:U29 p4:U14 p5:U25",
+        "tokens": [
+          "U09",
+          "U22",
+          "U29",
+          "U14",
+          "U25"
+        ]
+      },
+      "B_order_scramble": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U29 p2:U14 p3:U09 p4:U25 p5:U22",
+        "tokens": [
+          "U29",
+          "U14",
+          "U09",
+          "U25",
+          "U22"
+        ]
+      },
+      "D_unordered_inventory": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U09 p2:U14 p3:U22 p4:U25 p5:U29",
+        "tokens": [
+          "U09",
+          "U14",
+          "U22",
+          "U25",
+          "U29"
+        ]
+      },
+      "iast": "jñāna"
+    },
+    "W23": {
+      "A_true_order": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U10 p2:U26 p3:U23 p4:U25",
+        "tokens": [
+          "U10",
+          "U26",
+          "U23",
+          "U25"
+        ]
+      },
+      "B_order_scramble": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U26 p2:U25 p3:U10 p4:U23",
+        "tokens": [
+          "U26",
+          "U25",
+          "U10",
+          "U23"
+        ]
+      },
+      "D_unordered_inventory": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U10 p2:U23 p3:U25 p4:U26",
+        "tokens": [
+          "U10",
+          "U23",
+          "U25",
+          "U26"
+        ]
+      },
+      "iast": "keśa"
+    },
+    "W30": {
+      "A_true_order": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U14 p2:U25 p3:U05 p4:U30",
+        "tokens": [
+          "U14",
+          "U25",
+          "U05",
+          "U30"
+        ]
+      },
+      "B_order_scramble": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U30 p2:U14 p3:U05 p4:U25",
+        "tokens": [
+          "U30",
+          "U14",
+          "U05",
+          "U25"
+        ]
+      },
+      "D_unordered_inventory": {
+        "masked": "p1:• p2:• p3:• p4:•",
+        "render": "p1:U05 p2:U14 p3:U25 p4:U30",
+        "tokens": [
+          "U05",
+          "U14",
+          "U25",
+          "U30"
+        ]
+      },
+      "iast": "nadī"
+    },
+    "W35": {
+      "A_true_order": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U17 p2:U31 p3:U16 p4:U21 p5:U25",
+        "tokens": [
+          "U17",
+          "U31",
+          "U16",
+          "U21",
+          "U25"
+        ]
+      },
+      "B_order_scramble": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U16 p2:U25 p3:U31 p4:U21 p5:U17",
+        "tokens": [
+          "U16",
+          "U25",
+          "U31",
+          "U21",
+          "U17"
+        ]
+      },
+      "D_unordered_inventory": {
+        "masked": "p1:• p2:• p3:• p4:• p5:•",
+        "render": "p1:U16 p2:U17 p3:U21 p4:U25 p5:U31",
+        "tokens": [
+          "U16",
+          "U17",
+          "U21",
+          "U25",
+          "U31"
+        ]
+      },
+      "iast": "sūrya"
+    }
+  },
+  "encoding": "position-tagged opaque IDs (Option A content + Option D formatting)",
+  "note": "confirmatory Arm-B seed is NOT frozen here; this seed is a feasibility instantiation",
+  "schema": "b1_12_g1_arm_renders_v1",
+  "scramble_seed_feasibility_only": 20260101
+}
