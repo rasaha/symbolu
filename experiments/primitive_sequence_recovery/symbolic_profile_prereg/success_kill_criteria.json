@@ -1,0 +1,17 @@
+{
+  "conjunctive_all_required": [
+    "T > X",
+    "T > R",
+    "T > profile-swap P",
+    "T > generic G",
+    "T > dictionary D",
+    "T > morphology M",
+    "primary Δ CI excludes zero",
+    "direction replicates on held-out words",
+    "not driven only by valence or one semantic class",
+    "survives exclusion of pre-flagged transparent words",
+    "profile-swap margin collapses as expected",
+    "inter-rater reliability passes frozen threshold"
+  ],
+  "no_absolute_fit": "success is NEVER declared from absolute fit alone"
+}

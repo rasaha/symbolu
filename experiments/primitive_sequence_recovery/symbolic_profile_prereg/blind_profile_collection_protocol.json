@@ -1,0 +1,25 @@
+{
+  "conflict_of_interest": "no author of mappings/packets/hypotheses may supply confirmatory profiles",
+  "on_low_reliability": "PROFILE_TARGET_NOT_RELIABLE",
+  "predefine": [
+    "min number of raters",
+    "qualification criteria",
+    "rating scale",
+    "missing/uncertain handling",
+    "inter-rater reliability threshold",
+    "aggregation rule"
+  ],
+  "raters_blind_to": [
+    "varṇa mappings",
+    "packets",
+    "study hypothesis",
+    "true/foil assignment",
+    "packet-derived predictions"
+  ],
+  "raters_receive": [
+    "Sanskrit word",
+    "controlled dictionary definition / profile source",
+    "fixed attribute questionnaire"
+  ],
+  "status": "PLAN ONLY; no rater is run in this preregistration; reliability is established at run time."
+}

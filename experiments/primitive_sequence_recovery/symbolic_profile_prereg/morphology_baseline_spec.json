@@ -1,0 +1,6 @@
+{
+  "feasibility_in_environment": "REQUIRES external etymological sources (Mayrhofer EWA, Whitney, Monier-Williams) not available here; cannot be constructed deterministically in-environment.",
+  "incremental_validity_rule": "the varṇa packet must beat dictionary-only, morphology/etymology, and generic semantic-class baselines. If morphology >= true packet -> MORPHOLOGY_EXPLAINS_PROFILE.",
+  "on_infeasible": "PREREG_BLOCKED_BY_MORPHOLOGY_BASELINE",
+  "requirement": "even for the opaque/simplex primary set, record for every word: any traditional/historical derivation; whether it predicts any closed attributes; confidence + source; a morphology profile in the SAME attribute space."
+}

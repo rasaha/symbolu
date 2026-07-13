@@ -1,0 +1,122 @@
+{
+  "all_gates_pass": false,
+  "domain_scan": {
+    "conclusion": "the frozen packet vocabulary is psychological-tendency content and carries essentially no referent-attribute content; there is no principled, non-narrative deterministic map from tendency-space into a referent-attribute inventory",
+    "n_confirmatory_glosses": 66,
+    "n_referent_attribute_terms": 7,
+    "n_tendency_terms": 40,
+    "referent_attribute_terms_found": [
+      "creature",
+      "fire",
+      "light",
+      "object",
+      "rain",
+      "root",
+      "water"
+    ],
+    "tendency_terms_found": [
+      "anger",
+      "anxious",
+      "attachment",
+      "clinging",
+      "compassion",
+      "confidence",
+      "craving",
+      "cruelty",
+      "desire",
+      "discernment",
+      "distrust",
+      "doership",
+      "doubt",
+      "effort",
+      "ego",
+      "entrancement",
+      "envy",
+      "fear",
+      "grasping",
+      "greed",
+      "harm",
+      "hope",
+      "indulgence",
+      "irritability",
+      "judgment",
+      "longing",
+      "mine",
+      "neglect",
+      "possessive",
+      "pride",
+      "regard",
+      "resentment",
+      "restless",
+      "restraint",
+      "rumination",
+      "self",
+      "steadiness",
+      "striving",
+      "vanity",
+      "worry"
+    ]
+  },
+  "gates": {
+    "and_operator_has_admissible_inputs": {
+      "detail": "operator is definable but inert without the (blocked) projection",
+      "pass": false
+    },
+    "attribute_inventory_finalized": {
+      "detail": "closed inventory grounded in external norms",
+      "pass": true
+    },
+    "candidate_words_sourced_and_min_sample": {
+      "detail": "requires external lexicographic/etymological sources (Mayrhofer EWA, Monier-Williams, Amarakośa) NOT available in this environment; eligibility must not be adjudicated from memory (unauditable + violates the auditability rule). Sufficiency of >=40 opaque lexemes cannot be established here.",
+      "pass": false,
+      "verdict_if_binding": "PREREG_BLOCKED_BY_INSUFFICIENT_OPAQUE_LEXEMES"
+    },
+    "deterministic_packet_projection_defined": {
+      "detail": "DOMAIN MISMATCH: packet is tendency-valued, inventory is referent-property valued; no principled non-narrative projection exists; frozen-embedder rescue is prohibited + leakage-driven.",
+      "pass": false,
+      "verdict_if_binding": "PREREG_BLOCKED_BY_UNDEFINED_PACKET_PROJECTION"
+    },
+    "eligibility_rule_defined": {
+      "detail": "decision tree specified",
+      "pass": true
+    },
+    "heldout_split_feasible": {
+      "detail": "procedure specified",
+      "pass": true
+    },
+    "matched_controls_feasible": {
+      "detail": "definable; depend on the blocked projection",
+      "pass": true
+    },
+    "mechanical_scoring_defined": {
+      "detail": "frozen Fit function + primary Δ specified",
+      "pass": true
+    },
+    "morphology_baseline_feasible": {
+      "detail": "requires external etymology sources unavailable here",
+      "pass": false,
+      "verdict_if_binding": "PREREG_BLOCKED_BY_MORPHOLOGY_BASELINE"
+    },
+    "profile_reliability_plan_defined": {
+      "detail": "plan only; reliability TBD at run",
+      "pass": true
+    }
+  },
+  "primary_blocker": "UNDEFINED_PACKET_PROJECTION (domain mismatch: tendency-space vs referent-attribute space) — not resolvable by sourcing more words",
+  "readiness_verdict": "PREREG_BLOCKED_BY_UNDEFINED_PACKET_PROJECTION",
+  "secondary_blockers": [
+    "candidate words not sourceable in-environment (INSUFFICIENT_OPAQUE_LEXEMES not establishable here)",
+    "morphology baseline needs external sources"
+  ],
+  "study_outcome_if_run_now": "STUDY_BLOCKED_BY_UNDEFINED_PROJECTION",
+  "unmet_gates": [
+    "candidate_words_sourced_and_min_sample",
+    "deterministic_packet_projection_defined",
+    "and_operator_has_admissible_inputs",
+    "morphology_baseline_feasible"
+  ],
+  "what_would_unblock": [
+    "redefine the prediction target so packet and profile share ONE domain (e.g. an experiential/tendency inventory the packet actually populates) — but then the 'referent profile' target dissolves and the hypothesis must be reformulated",
+    "OR supply a principled, non-narrative, capacity-limited tendency→referent-attribute map derived independently of the target words (none is known)"
+  ]
+}

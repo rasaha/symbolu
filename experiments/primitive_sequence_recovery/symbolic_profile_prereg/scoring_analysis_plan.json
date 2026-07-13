@@ -1,0 +1,13 @@
+{
+  "fit_components": [
+    "attribute precision",
+    "attribute recall/coverage",
+    "F-score",
+    "contradiction penalty",
+    "weighted profile similarity"
+  ],
+  "fit_definition": "Fit(prediction, profile) = a single frozen mechanical function applied IDENTICALLY to T,X,R,S,P,G,M,D. NO free-form 'joint coherence' unless reduced to an exact function.",
+  "order_effect": "Fit(T) − Fit(S)",
+  "primary_contrast": "Δ = Fit(T) − max(Fit(X), Fit(R), Fit(P), Fit(G), Fit(M), Fit(D))",
+  "statistics": "cluster bootstrap over WORDS, BCa 95% CI on Δ; permutation over packet↔profile pairing; held-out replication; capacity/MDL bound; lookup-table + word-specific-exception ban."
+}
