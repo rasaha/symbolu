@@ -1,0 +1,27 @@
+{
+  "arm_A_true_order": "components in exact frozen pronunciation-derived order; repetition preserved",
+  "arm_B_scramble": {
+    "fixed_seed": 20260101,
+    "must_differ_from_A": true,
+    "no_resample_after_output": true,
+    "same_count": true,
+    "same_multiset": true,
+    "same_template": true
+  },
+  "arm_D_unordered_inventory": {
+    "canonical_order": "by stable_component_id",
+    "no_pronunciation_order_semantics": true,
+    "same_footprint": true,
+    "same_multiset": true
+  },
+  "blocked_reason_if_any": null,
+  "optional_arm_E_bigram": "secondary only; ordered adjacent descriptor pairs",
+  "prohibited": [
+    "synthesized prose paragraphs",
+    "connectives between positions",
+    "progression/causal language",
+    "word-level packet prose"
+  ],
+  "schema": "b1_12_arm_render_spec_v1",
+  "template": "position i: <normalized_component_descriptor>   (one line per varṇa, no connectives)"
+}
