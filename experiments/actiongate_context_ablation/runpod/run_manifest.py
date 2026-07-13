@@ -48,8 +48,11 @@ def build_manifest(config=None) -> dict:
         # which would otherwise default to PRIMARY_MODEL and mislabel a non-7B run.
         "model_id": run_cfg.get("model_id", config["model_id"]),
         "model_revision": run_cfg.get("model_revision", "unknown"),
+        "benchmark_version": run_cfg.get("benchmark_version", "v1"),
         "git": RC.git_state(),
-        "frozen_fingerprint": RC.frozen_fingerprint()["fingerprint"],
+        # the fingerprint the run actually committed to (V1 or V2), not the ambient V1 one
+        "frozen_fingerprint": run_cfg.get("frozen_fingerprint",
+                                          RC.frozen_fingerprint()["fingerprint"]),
         "actiongate_policy": RC.frozen_fingerprint()["policy"],
         "run_config": run_cfg,
         "n_records": len(recs),

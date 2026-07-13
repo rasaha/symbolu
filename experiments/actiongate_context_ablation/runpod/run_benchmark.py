@@ -24,6 +24,35 @@ from actiongate_context_ablation.corpus import registry
 from actiongate_context_ablation import adapter, ablation, milestone_bench as MB, protected_detector as PD
 
 
+class _Bench:
+    """Version-selected benchmark surface. V1 uses the frozen llm_tasks/real_llm_bench;
+    V2 uses the separate absolute-utility modules. The compression arms (_surviving) and
+    prompt rendering (_prompt) are shared/frozen in both; only tasks, SYSTEM, task-types,
+    scoring, verdict, and the fingerprint differ."""
+
+    def __init__(self, version: str):
+        self.version = version
+        if version == "v2":
+            from actiongate_context_ablation import llm_tasks_v2 as TV2
+            from actiongate_context_ablation import real_llm_bench_v2 as RV2
+            from actiongate_context_ablation import benchmark_v2 as BV2
+            self.tasks = TV2
+            self.system = RV2.SYSTEM_V2
+            self.task_types = TV2.TASK_TYPES
+            self.fingerprint = BV2.fingerprint()["fingerprint"]
+        elif version == "v1":
+            self.tasks = llm_tasks
+            self.system = R._SYSTEM
+            self.task_types = llm_tasks.TASK_TYPES
+            self.fingerprint = RC.frozen_fingerprint()["fingerprint"]
+        else:
+            raise RuntimeError(f"unknown BENCHMARK_VERSION={version!r} (expected v1|v2)")
+
+
+def _bench(config) -> _Bench:
+    return _Bench(config.get("benchmark_version", "v1"))
+
+
 def _prompt_hash(full_prompt: str) -> str:
     return "sha256:" + hashlib.sha256(full_prompt.encode("utf-8")).hexdigest()
 
@@ -82,13 +111,15 @@ def build_client(config):
 
 
 def expected_config(config, revision) -> dict:
+    b = _bench(config)
     return {
         "run_id": config["run_id"], "run_kind": config["run_kind"],
+        "benchmark_version": b.version,
         "model_id": config["model_id"], "model_revision": revision,
         "budgets": config["budgets"], "methods": config["methods"],
         "max_new_tokens": config["max_new_tokens"], "dtype": config["dtype"],
-        "system_hash": _prompt_hash(R._SYSTEM),
-        "frozen_fingerprint": RC.frozen_fingerprint()["fingerprint"],
+        "system_hash": _prompt_hash(b.system),
+        "frozen_fingerprint": b.fingerprint,
     }
 
 
@@ -101,8 +132,8 @@ def check_resume_guard(config, revision):
         RC.write_json_atomic(cfg_path, want)
         return
     have = json.loads(cfg_path.read_text())
-    for key in ("run_kind", "model_id", "model_revision", "system_hash",
-                "frozen_fingerprint", "max_new_tokens"):
+    for key in ("run_kind", "benchmark_version", "model_id", "model_revision",
+                "system_hash", "frozen_fingerprint", "max_new_tokens"):
         if have.get(key) != want.get(key):
             raise RuntimeError(f"resume guard: '{key}' changed "
                                f"({have.get(key)!r} -> {want.get(key)!r}); refusing to mix runs")
@@ -110,7 +141,7 @@ def check_resume_guard(config, revision):
         pass  # budgets may be a superset on resume; new budgets simply add work
 
 
-def _iter_units(config, items, sp, protect):
+def _iter_units(config, items, sp, protect, bench):
     for method in config["methods"]:
         budgets = [0.0] if method in ("original", "structural_only") else config["budgets"]
         for b in budgets:
@@ -120,11 +151,11 @@ def _iter_units(config, items, sp, protect):
                 kept = sum(item.context.unit(i).token_count for i in surviving)
                 tred = (total - kept) / total if total else 0.0
                 prompt_ctx = R._prompt(item.context, surviving)
-                for task in llm_tasks.build_tasks(item, sp):
+                for task in bench.tasks.build_tasks(item, sp):
                     yield (method, b, item, task, surviving, invariant, env_ok, tred, prompt_ctx)
 
 
-def run(config=None):
+def run(config=None, client=None):
     config = config or RC.load_config()
     gs = RC.git_state()
     if gs["dirty"] and not config["allow_dirty"]:
@@ -137,13 +168,21 @@ def run(config=None):
     runs = [ablation.run_ablations(it.context, sp) for it in items]
     protect = MB.hybrid_protect_fn(PD.fit(items, runs))
 
-    client = build_client(config)
+    bench = _bench(config)
+    if client is None:
+        client = build_client(config)
     revision = _model_revision(config)
     check_resume_guard(config, revision)
 
     rpath = RC.records_path(config)
     done = {}
     for rec in RC.read_records(rpath):
+        # Never mix benchmark versions in one run dir: a V1 record in a V2 run (or vice
+        # versa) is a fatal integrity error, not a resumable state.
+        rv = rec.get("benchmark_version", "v1")
+        if rv != bench.version:
+            raise RuntimeError(f"resume guard: record benchmark_version {rv!r} != run "
+                               f"{bench.version!r}; refusing to mix V1/V2 records in {rpath}")
         k = rec["key"]
         if k in done and done[k] != rec.get("prompt_hash"):
             raise RuntimeError(f"duplicate result key with differing prompt: {k}")
@@ -151,7 +190,7 @@ def run(config=None):
 
     n_new = 0
     for (method, b, item, task, surviving, invariant, env_ok, tred, prompt_ctx) in \
-            _iter_units(config, items, sp, protect):
+            _iter_units(config, items, sp, protect, bench):
         key = RC.example_key(config["run_id"], revision, method, b, item.item_id, task["type"])
         full_prompt = f"CONTEXT:\n{prompt_ctx}\n\nQUESTION: {task['question']}"
         ph = _prompt_hash(full_prompt)
@@ -162,8 +201,8 @@ def run(config=None):
         status = "OK"
         err_msg = ""
         try:
-            resp = client.generate(R._SYSTEM, full_prompt, task=task)
-            score = task["scorer"](resp.text)
+            resp = client.generate(bench.system, full_prompt, task=task)
+            score = float(task["scorer"](resp.text))
             halluc = R._hallucinated(task["type"], resp.text, full_prompt)
         except Exception as exc:   # OOM / parse / runtime
             resp = None
@@ -175,6 +214,7 @@ def run(config=None):
             err_msg = str(exc)[:500]
         record = {
             "key": key, "run_id": config["run_id"], "run_kind": config["run_kind"],
+            "benchmark_version": bench.version,
             "example_id": item.item_id, "task": task["type"], "model_id": config["model_id"],
             "model_revision": revision, "method": method, "budget": b,
             "prompt_hash": ph,
@@ -252,6 +292,58 @@ def build_result(records) -> R.Result:
     return R.Result(is_real=is_real, client_name=("durable-run" if is_real else "mock"),
                     availability_reason="", cells=cells, success=detail,
                     recommendation=rec, note=note)
+
+
+# --- V2 aggregation (absolute-utility benchmark) -----------------------------
+def records_to_cells_v2(records) -> list:
+    """Aggregate V2 records into V2 cells (field-aware, with protected_recall)."""
+    from actiongate_context_ablation import real_llm_bench_v2 as R2
+    from actiongate_context_ablation import llm_tasks_v2 as T2
+    by_cell = {}
+    for r in records:
+        by_cell.setdefault((r["method"], float(r["budget"])), []).append(r)
+    cells = []
+    for (method, budget), recs in sorted(by_cell.items()):
+        by_ctx = {}
+        for r in recs:
+            by_ctx.setdefault(r["example_id"], []).append(r)
+        n = len(by_ctx)
+        tred = sum(next(iter(v))["token_reduction"] for v in by_ctx.values()) / n
+        decp = sum(1.0 for v in by_ctx.values() if next(iter(v))["decision_preservation"]) / n
+        envp = sum(1.0 for v in by_ctx.values() if next(iter(v))["envelope_preservation"]) / n
+        # protected_recall proxy: for protected/structural arms every retained context
+        # preserves the decision-critical envelope (env preservation == recall of protected
+        # spans). We report it explicitly so the safety criterion is auditable.
+        recall = envp
+        acc = sum(sum(x["score"] for x in v) / len(v) for v in by_ctx.values()) / n
+        per_type = {t: [0.0, 0] for t in T2.TASK_TYPES}
+        halluc = [0, 0]
+        lat = cost = 0.0
+        for r in recs:
+            if r["task"] in per_type:
+                per_type[r["task"]][0] += r["score"]
+                per_type[r["task"]][1] += 1
+            halluc[0] += 1 if r.get("hallucination") else 0
+            halluc[1] += 1
+            lat += r["latency_ms"]
+            cost += r["prompt_tokens"] / 1000 * R2.PRICE_IN + r["completion_tokens"] / 1000 * R2.PRICE_OUT
+        cells.append(R2.Cell(
+            method=method, budget=budget, token_reduction=tred,
+            decision_preservation=decp, envelope_preservation=envp, protected_recall=recall,
+            task_accuracy=acc,
+            per_task_accuracy={t: (v[0] / v[1] if v[1] else None) for t, v in per_type.items()},
+            hallucination_rate=(halluc[0] / halluc[1] if halluc[1] else 0.0),
+            mean_latency_ms=lat / n, cost_estimate_usd=cost, n_contexts=n))
+    return cells
+
+
+def build_result_v2(records) -> dict:
+    """Return the V2 result JSON (recommendation + criteria + cells) from records."""
+    from actiongate_context_ablation import real_llm_bench_v2 as R2
+    cells = records_to_cells_v2(records)
+    is_real = bool(records) and all(r.get("is_real") for r in records)
+    rec, detail = R2._success(cells, is_real)
+    return R2.to_json(rec, detail, cells, is_real)
 
 
 if __name__ == "__main__":   # pragma: no cover

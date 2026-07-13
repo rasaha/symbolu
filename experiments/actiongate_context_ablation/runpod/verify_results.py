@@ -19,17 +19,26 @@ from actiongate_context_ablation.corpus import registry
 from actiongate_context_ablation import adapter, ablation, milestone_bench as MB, protected_detector as PD
 
 
+def _tasks_module(config):
+    """Select the benchmark version's task builder (V1 frozen suite or V2 suite)."""
+    if config.get("benchmark_version", "v1") == "v2":
+        from actiongate_context_ablation import llm_tasks_v2
+        return llm_tasks_v2
+    return llm_tasks
+
+
 def _expected_keys(config, revision):
     items = registry.load_all()
     if config["contexts_limit"]:
         items = items[: config["contexts_limit"]]
     sp = adapter.default_signed_policy()
+    tasks_mod = _tasks_module(config)
     keys = set()
     for method in config["methods"]:
         budgets = [0.0] if method in ("original", "structural_only") else config["budgets"]
         for b in budgets:
             for it in items:
-                for task in llm_tasks.build_tasks(it, sp):
+                for task in tasks_mod.build_tasks(it, sp):
                     keys.add(RC.example_key(config["run_id"], revision, method, b,
                                             it.item_id, task["type"]))
     return keys
