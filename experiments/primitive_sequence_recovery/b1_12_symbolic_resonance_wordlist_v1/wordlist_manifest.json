@@ -1,0 +1,64 @@
+{
+  "schema": "b1_12_bsr_wordlist_manifest_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "controlling_preregistration": {
+    "path": "VARNA_SYMBOLIC_RESONANCE_PREREG_V1.md",
+    "sha256": "996baf8478e3684eddfadf462b6fb66ebf6b13bbf75c5d3479a1c65a32d6b9c3"
+  },
+  "scope_update_artifact": {
+    "path": "B1_12_SCOPE_UPDATE_AND_CONTROLLING_PREREG.md",
+    "sha256": "11ceb0549278798bdce734b5776ef516df9784283ef57128e73fd4f31c19985f"
+  },
+  "parser": {
+    "path": "sanskrit_stage1_parser.py",
+    "sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947"
+  },
+  "mapping_table": {
+    "path": "frozen/varna_native_stage1_merged_v3.json",
+    "sha256": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+    "note": "pinned by file hash; gloss text not inspected during selection"
+  },
+  "sample_size_N": 20,
+  "category_quotas": {
+    "afflictive": 4,
+    "virtue_calm": 4,
+    "concrete_object": 4,
+    "animal_body_living": 4,
+    "natural_action_abstract": 4
+  },
+  "deterministic_selection_rule": "1) attestation/lexical-sense eligibility; 2) contamination classification (prefer FRESH_UNINSPECTED); 3) parser+mapping-coverage eligibility (parses, >=1 mapped consonant, coverage==100% via unit-set membership); 4) category quotas (4 each); 5) deterministic IAST Unicode-codepoint ascending order within category; 6) take first eligible until quota & N met",
+  "final_wordlist_sha256": "9779384dcb82e0c6d86fa88ed1f000317ed387ea5f227cb32f96f38b95f8a6ba",
+  "exclusion_taxonomy": [
+    "OVER_CATEGORY_QUOTA",
+    "DEVELOPMENT_CONTAMINATED",
+    "parser_invalid",
+    "no_mapped_consonant",
+    "incomplete_coverage"
+  ],
+  "included_contamination_status": {
+    "bhūmi": "FRESH_UNINSPECTED",
+    "bāhu": "FRESH_UNINSPECTED",
+    "droha": "FRESH_UNINSPECTED",
+    "dīpa": "FRESH_UNINSPECTED",
+    "garva": "FRESH_UNINSPECTED",
+    "kapaṭa": "FRESH_UNINSPECTED",
+    "kleśa": "FRESH_UNINSPECTED",
+    "kāka": "FRESH_UNINSPECTED",
+    "mayūra": "FRESH_UNINSPECTED",
+    "naukā": "FRESH_UNINSPECTED",
+    "nāsā": "FRESH_UNINSPECTED",
+    "prema": "FRESH_UNINSPECTED",
+    "pāṭha": "FRESH_UNINSPECTED",
+    "rūpa": "FRESH_UNINSPECTED",
+    "santoṣa": "FRESH_UNINSPECTED",
+    "setu": "FRESH_UNINSPECTED",
+    "sneha": "FRESH_UNINSPECTED",
+    "snāna": "FRESH_UNINSPECTED",
+    "titikṣā": "FRESH_UNINSPECTED",
+    "vastra": "FRESH_UNINSPECTED"
+  },
+  "frozen_before_any_evaluator_run": true,
+  "no_scoring_performed": true,
+  "no_model_executed": true,
+  "old_60word_list_reused_as_primary": false
+}

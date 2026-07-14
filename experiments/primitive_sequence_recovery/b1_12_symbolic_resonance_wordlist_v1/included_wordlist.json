@@ -1,0 +1,129 @@
+{
+  "schema": "b1_12_bsr_included_wordlist_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "N": 20,
+  "attestation": "Monier-Williams primary; Apte secondary (ordinary dominant sense)",
+  "wordlist_sha256": "9779384dcb82e0c6d86fa88ed1f000317ed387ea5f227cb32f96f38b95f8a6ba",
+  "words": [
+    {
+      "iast": "bhūmi",
+      "dev": "भूमि",
+      "gloss": "earth",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "bāhu",
+      "dev": "बाहु",
+      "gloss": "arm",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "droha",
+      "dev": "द्रोह",
+      "gloss": "malice",
+      "category": "afflictive"
+    },
+    {
+      "iast": "dīpa",
+      "dev": "दीप",
+      "gloss": "lamp",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "garva",
+      "dev": "गर्व",
+      "gloss": "arrogance",
+      "category": "afflictive"
+    },
+    {
+      "iast": "kapaṭa",
+      "dev": "कपट",
+      "gloss": "deceit",
+      "category": "afflictive"
+    },
+    {
+      "iast": "kleśa",
+      "dev": "क्लेश",
+      "gloss": "distress",
+      "category": "afflictive"
+    },
+    {
+      "iast": "kāka",
+      "dev": "काक",
+      "gloss": "crow",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "mayūra",
+      "dev": "मयूर",
+      "gloss": "peacock",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "naukā",
+      "dev": "नौका",
+      "gloss": "boat",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "nāsā",
+      "dev": "नासा",
+      "gloss": "nose",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "prema",
+      "dev": "प्रेम",
+      "gloss": "love",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "pāṭha",
+      "dev": "पाठ",
+      "gloss": "recitation",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "rūpa",
+      "dev": "रूप",
+      "gloss": "form",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "santoṣa",
+      "dev": "सन्तोष",
+      "gloss": "contentment",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "setu",
+      "dev": "सेतु",
+      "gloss": "bridge",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "sneha",
+      "dev": "स्नेह",
+      "gloss": "affection",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "snāna",
+      "dev": "स्नान",
+      "gloss": "bathing",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "titikṣā",
+      "dev": "तितिक्षा",
+      "gloss": "forbearance",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "vastra",
+      "dev": "वस्त्र",
+      "gloss": "garment",
+      "category": "concrete_object"
+    }
+  ]
+}

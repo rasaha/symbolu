@@ -1,0 +1,605 @@
+{
+  "rows": [
+    {
+      "alt_glosses": [
+        "meal",
+        "eating"
+      ],
+      "ambiguity_reason": "food vs eating vs meal — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S009",
+      "category": "action",
+      "controlling_gloss": "food",
+      "devanagari": "भोजन",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√bhuj",
+      "iast": "bhojana",
+      "parser": {
+        "consonants": [
+          "bh",
+          "j",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√bhuj"
+    },
+    {
+      "alt_glosses": [
+        "deity"
+      ],
+      "ambiguity_reason": "religious technical term",
+      "ambiguity_status": "technical",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S014",
+      "category": "abstract",
+      "controlling_gloss": "god",
+      "devanagari": "देव",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "PROPER_NAME_OR_TECHNICAL_TERM",
+      "failure_stage": 1,
+      "group_id": "deva",
+      "iast": "deva",
+      "parser": {
+        "consonants": [
+          "d",
+          "v"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "deva"
+    },
+    {
+      "alt_glosses": [
+        "duty",
+        "law",
+        "religion"
+      ],
+      "ambiguity_reason": "virtue/duty/law/religion — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S016",
+      "category": "abstract",
+      "controlling_gloss": "virtue",
+      "devanagari": "धर्म",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√dhṛ",
+      "iast": "dharma",
+      "parser": {
+        "consonants": [
+          "dh",
+          "r",
+          "m"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√dhṛ"
+    },
+    {
+      "alt_glosses": [],
+      "ambiguity_reason": "",
+      "ambiguity_status": "clear",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S022",
+      "category": "action",
+      "controlling_gloss": "going",
+      "devanagari": "गमन",
+      "exact_norm_match": false,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "NO_EXACT_NORM_MATCH",
+      "failure_stage": 4,
+      "group_id": "√gam",
+      "iast": "gamana",
+      "parser": {
+        "consonants": [
+          "g",
+          "m",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√gam"
+    },
+    {
+      "alt_glosses": [
+        "ox",
+        "earth",
+        "ray"
+      ],
+      "ambiguity_reason": "cow/earth/ray/speech — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S027",
+      "category": "animal",
+      "controlling_gloss": "cow",
+      "devanagari": "गो",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "go",
+      "iast": "go",
+      "parser": {
+        "consonants": [
+          "g"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 2,
+        "n_consonants": 1,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "go"
+    },
+    {
+      "alt_glosses": [
+        "goose"
+      ],
+      "ambiguity_reason": "",
+      "ambiguity_status": "clear",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S032",
+      "category": "animal",
+      "controlling_gloss": "swan",
+      "devanagari": "हंस",
+      "exact_norm_match": false,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "NO_EXACT_NORM_MATCH",
+      "failure_stage": 4,
+      "group_id": "haṃsa",
+      "iast": "haṃsa",
+      "parser": {
+        "consonants": [
+          "h",
+          "s"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "haṃsa"
+    },
+    {
+      "alt_glosses": [
+        "ray",
+        "tax",
+        "doer"
+      ],
+      "ambiguity_reason": "hand/ray/tax — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S040",
+      "category": "body",
+      "controlling_gloss": "hand",
+      "devanagari": "कर",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√kṛ",
+      "iast": "kara",
+      "parser": {
+        "consonants": [
+          "k",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√kṛ"
+    },
+    {
+      "alt_glosses": [
+        "love",
+        "lust"
+      ],
+      "ambiguity_reason": "desire vs love vs lust — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S047",
+      "category": "emotion",
+      "controlling_gloss": "desire",
+      "devanagari": "काम",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√kam",
+      "iast": "kāma",
+      "parser": {
+        "consonants": [
+          "k",
+          "m"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√kam"
+    },
+    {
+      "alt_glosses": [
+        "body",
+        "land"
+      ],
+      "ambiguity_reason": "field/body/sacred-place — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S048",
+      "category": "object",
+      "controlling_gloss": "field",
+      "devanagari": "क्षेत्र",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "kṣetra",
+      "iast": "kṣetra",
+      "parser": {
+        "consonants": [
+          "k",
+          "ṣ",
+          "t",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "kṣetra"
+    },
+    {
+      "alt_glosses": [
+        "intoxication"
+      ],
+      "ambiguity_reason": "pride vs intoxication — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S053",
+      "category": "emotion",
+      "controlling_gloss": "pride",
+      "devanagari": "मद",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√mad",
+      "iast": "mada",
+      "parser": {
+        "consonants": [
+          "m",
+          "d"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√mad"
+    },
+    {
+      "alt_glosses": [
+        "mouth"
+      ],
+      "ambiguity_reason": "face vs mouth — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S059",
+      "category": "body",
+      "controlling_gloss": "face",
+      "devanagari": "मुख",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "mukha",
+      "iast": "mukha",
+      "parser": {
+        "consonants": [
+          "m",
+          "kh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "mukha"
+    },
+    {
+      "alt_glosses": [],
+      "ambiguity_reason": "",
+      "ambiguity_status": "clear",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S068",
+      "category": "nature",
+      "controlling_gloss": "mountain",
+      "devanagari": "पर्वत",
+      "duplicate_of": "S026",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "DUPLICATE_ENGLISH_GLOSS",
+      "failure_stage": 5,
+      "group_id": "parvata",
+      "iast": "parvata",
+      "parser": {
+        "consonants": [
+          "p",
+          "r",
+          "v",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 7,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "parvata",
+      "target": {
+        "arousal_A_mean_sum": 4.12,
+        "dominance_D_mean_sum": 6.18,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7947",
+        "valence_V_mean_sum": 6.65
+      }
+    },
+    {
+      "alt_glosses": [
+        "red"
+      ],
+      "ambiguity_reason": "blood (noun) vs red (adj) — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S074",
+      "category": "body",
+      "controlling_gloss": "blood",
+      "devanagari": "रक्त",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√rañj",
+      "iast": "rakta",
+      "parser": {
+        "consonants": [
+          "r",
+          "k",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√rañj"
+    },
+    {
+      "alt_glosses": [],
+      "ambiguity_reason": "",
+      "ambiguity_status": "clear",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S088",
+      "category": "nature",
+      "controlling_gloss": "fire",
+      "devanagari": "वह्नि",
+      "duplicate_of": "S001",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "DUPLICATE_ENGLISH_GLOSS",
+      "failure_stage": 5,
+      "group_id": "vahni",
+      "iast": "vahni",
+      "parser": {
+        "consonants": [
+          "v",
+          "h",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vahni",
+      "target": {
+        "arousal_A_mean_sum": 6.05,
+        "dominance_D_mean_sum": 4.57,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4644",
+        "valence_V_mean_sum": 4.32
+      }
+    },
+    {
+      "alt_glosses": [
+        "year"
+      ],
+      "ambiguity_reason": "rain vs year — materially different",
+      "ambiguity_status": "ambiguous",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S090",
+      "category": "nature",
+      "controlling_gloss": "rain",
+      "devanagari": "वर्ष",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "MATERIAL_GLOSS_VALENCE_CONFLICT",
+      "failure_stage": 1,
+      "group_id": "√vṛṣ",
+      "iast": "varṣa",
+      "parser": {
+        "consonants": [
+          "v",
+          "r",
+          "ṣ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√vṛṣ"
+    },
+    {
+      "alt_glosses": [
+        "ape"
+      ],
+      "ambiguity_reason": "",
+      "ambiguity_status": "clear",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S093",
+      "category": "animal",
+      "controlling_gloss": "monkey",
+      "devanagari": "वानर",
+      "duplicate_of": "S039",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "DUPLICATE_ENGLISH_GLOSS",
+      "failure_stage": 5,
+      "group_id": "vānara",
+      "iast": "vānara",
+      "parser": {
+        "consonants": [
+          "v",
+          "n",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vānara",
+      "target": {
+        "arousal_A_mean_sum": 5.15,
+        "dominance_D_mean_sum": 5.74,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7860",
+        "valence_V_mean_sum": 5.82
+      }
+    },
+    {
+      "alt_glosses": [
+        "worship"
+      ],
+      "ambiguity_reason": "ritual technical term",
+      "ambiguity_status": "technical",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S098",
+      "category": "abstract",
+      "controlling_gloss": "sacrifice",
+      "devanagari": "यज्ञ",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "PROPER_NAME_OR_TECHNICAL_TERM",
+      "failure_stage": 1,
+      "group_id": "√yaj",
+      "iast": "yajña",
+      "parser": {
+        "consonants": [
+          "y",
+          "j",
+          "ñ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√yaj"
+    },
+    {
+      "alt_glosses": [
+        "soul"
+      ],
+      "ambiguity_reason": "philosophical technical term",
+      "ambiguity_status": "technical",
+      "attestation": "Monier-Williams",
+      "candidate_id": "S101",
+      "category": "abstract",
+      "controlling_gloss": "self",
+      "devanagari": "आत्मन्",
+      "exact_norm_match": true,
+      "excluded": true,
+      "extra_failures": [],
+      "failure_reason": "PROPER_NAME_OR_TECHNICAL_TERM",
+      "failure_stage": 1,
+      "group_id": "ātman",
+      "iast": "ātman",
+      "parser": {
+        "consonants": [
+          "t",
+          "m",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "ātman"
+    }
+  ],
+  "schema": "varna_lift_excluded_v1"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "b1_12_bsr_wordlist_gate_v1",
+  "gate": "GATE_2_WORDLIST_PRECOMMITMENT",
+  "requirement": "a separately precommitted B1.12 Bare-Word Symbolic Resonance word list, frozen before scoring, attested Sanskrit, under VARNA_SYMBOLIC_RESONANCE_PREREG_V1.md, not the old 60-word calibration set",
+  "candidates_examined": [
+    {
+      "path": "varna_affliction_pilot_run_v1/wordlist_precommit.json",
+      "rejected_because": "belongs to the Resolution/PMM-PR-CR methodology (VARNA_AFFLICTION_RESOLUTION_TEST_PREREG_V1_1.md), NOT BSR; and it is the old 60-word calibration/developmental set"
+    },
+    {
+      "path": "b1_eval_wordlist.json",
+      "rejected_because": "H2 Track-B B1 English/McRae eval list (dev words + fixtures); not a Sanskrit BSR precommitment"
+    }
+  ],
+  "controlling_prereg_readiness": "READY_FOR_WORDLIST_PRECOMMITMENT (precommitment is the not-yet-done next gate)",
+  "words_selected_here": false,
+  "verdict": "BLOCKED_WORDLIST_NOT_PRECOMMITTED"
+}

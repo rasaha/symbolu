@@ -1,0 +1,50 @@
+{
+  "schema": "varna_vocalic_resonance_tags_v1",
+  "label": "RESONANCE_LAYER / DEVELOPMENT_ONLY — symbolic resonance, not the frozen affliction backbone, not exact science",
+  "scope": "the four vocalic r/l sounds the operator had not previously mapped: ṛ, ṝ, ḷ, ḹ",
+  "not_merged_into": "frozen/varna_native_stage1_merged_v1.json (untouched); these are a separate resonance layer",
+  "disambiguation_note": "The vowel ṛ (ऋ) is NOT the consonant Ra (र). Ra = annihilation (sarvanāśa — defeatist annihilation-thought). ṛ carries no such affliction; its resonance is freedom.",
+  "pole_convention": "core = the primary symbolic resonance word; binding = its shadow/distortion (derived, symbolic — not attested)",
+  "rows": [
+    {
+      "iast": "ṛ",
+      "devanagari": "ऋ",
+      "core_mapping": "freedom",
+      "binding_shadow": "rootlessness / escapism (flight that will not commit or take form)",
+      "pole": "liberating-side (freedom)",
+      "source": "symbolic/etymological resonance — ṛta (cosmic order/truth), ṛṣi (realized seer), ṛddhi (attainment); r-vocalic rises toward ṝ = oṃ",
+      "sarkar_acoustic_root": "niṣāda (7th musical note) — neutral; freedom is a resonance reading, not Sarkar's doctrine",
+      "note": "ṛ (ऋ) ≠ Ra (र). Ra = annihilation (sarvanāśa). Do not inherit Ra's affliction onto ṛ."
+    },
+    {
+      "iast": "ṝ",
+      "devanagari": "ॠ",
+      "core_mapping": "totality / oṃ",
+      "binding_shadow": "dissolution / self-loss (totality that engulfs the individual)",
+      "pole": "supreme / liberating",
+      "source": "Sarkar — ṝ = acoustic root of oṃ (praṇava): creation-preservation-destruction + transmutation; Saguṇa & Nirguṇa; the mahābīja of oṃkāra",
+      "sarkar_acoustic_root": "oṃ (oṋm)",
+      "note": "Sarkar-attested core; binding shadow is a derived symbolic reading."
+    },
+    {
+      "iast": "ḷ",
+      "devanagari": "ऌ",
+      "core_mapping": "arrangement / formation",
+      "binding_shadow": "rigid contrivance / over-fitting / forced ordering",
+      "pole": "neutral / constructive",
+      "source": "corpus-etymological — ḷ occurs only in √kḷp = 'to arrange, fit, form, be suitable' (kḷpta, kalpanā, vikalpa)",
+      "sarkar_acoustic_root": "hummm (struggle, sādhanā, kuṇḍalinī) — DIFFERS from the √kḷp reading; resonance layer uses the corpus meaning",
+      "note": "Only one root (√kḷp) carries ḷ; source-tension with Sarkar is disclosed."
+    },
+    {
+      "iast": "ḹ",
+      "devanagari": "ॡ",
+      "core_mapping": "explosion / breakthrough",
+      "binding_shadow": "destructive outburst / rash discharge / premature shattering",
+      "pole": "dynamic / liberating",
+      "source": "Sarkar — ḹ = acoustic root of phaṭ: sudden bursting into light, removal of lethargy, putting theory into practice",
+      "sarkar_acoustic_root": "phaṭ",
+      "note": "No attested Sanskrit word contains ḹ (phantom letter, alphabet-symmetry only); mapping is symbolic and practically inert on real input."
+    }
+  ]
+}

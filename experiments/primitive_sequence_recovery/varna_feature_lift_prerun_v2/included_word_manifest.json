@@ -1,0 +1,2772 @@
+{
+  "n": 88,
+  "rows": [
+    {
+      "alt_glosses": [],
+      "candidate_id": "S001",
+      "category": "nature",
+      "controlling_gloss": "fire",
+      "devanagari": "अग्नि",
+      "group_id": "agni",
+      "iast": "agni",
+      "parser": {
+        "consonants": [
+          "g",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "agni",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 6.05,
+        "dominance_D_mean_sum": 4.57,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4644",
+        "valence_V_mean_sum": 4.32
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S002",
+      "category": "animal",
+      "controlling_gloss": "goat",
+      "devanagari": "अज",
+      "group_id": "aja",
+      "iast": "aja",
+      "parser": {
+        "consonants": [
+          "j"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 3,
+        "n_consonants": 1,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "aja",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 2.94,
+        "dominance_D_mean_sum": 5.17,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5252",
+        "valence_V_mean_sum": 5.3
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S003",
+      "category": "body",
+      "controlling_gloss": "bone",
+      "devanagari": "अस्थि",
+      "group_id": "asthi",
+      "iast": "asthi",
+      "parser": {
+        "consonants": [
+          "s",
+          "th"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "asthi",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.75,
+        "dominance_D_mean_sum": 6.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "1328",
+        "valence_V_mean_sum": 5.24
+      }
+    },
+    {
+      "alt_glosses": [
+        "rock"
+      ],
+      "candidate_id": "S004",
+      "category": "nature",
+      "controlling_gloss": "stone",
+      "devanagari": "अश्म",
+      "group_id": "aśman",
+      "iast": "aśma",
+      "parser": {
+        "consonants": [
+          "ś",
+          "m"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "aśman",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 3.25,
+        "dominance_D_mean_sum": 7.26,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11863",
+        "valence_V_mean_sum": 4.81
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S005",
+      "category": "animal",
+      "controlling_gloss": "horse",
+      "devanagari": "अश्व",
+      "group_id": "aśva",
+      "iast": "aśva",
+      "parser": {
+        "consonants": [
+          "ś",
+          "v"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "aśva",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 4.16,
+        "dominance_D_mean_sum": 5.71,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5924",
+        "valence_V_mean_sum": 6.05
+      }
+    },
+    {
+      "alt_glosses": [
+        "power"
+      ],
+      "candidate_id": "S006",
+      "category": "abstract",
+      "controlling_gloss": "strength",
+      "devanagari": "बल",
+      "group_id": "bala",
+      "iast": "bala",
+      "parser": {
+        "consonants": [
+          "b",
+          "l"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "bala",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.3,
+        "dominance_D_mean_sum": 7.42,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11913",
+        "valence_V_mean_sum": 6.73
+      }
+    },
+    {
+      "alt_glosses": [
+        "worship"
+      ],
+      "candidate_id": "S007",
+      "category": "emotion",
+      "controlling_gloss": "devotion",
+      "devanagari": "भक्ति",
+      "group_id": "√bhaj",
+      "iast": "bhakti",
+      "parser": {
+        "consonants": [
+          "bh",
+          "k",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√bhaj",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.73,
+        "dominance_D_mean_sum": 6.3,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3407",
+        "valence_V_mean_sum": 6.0
+      }
+    },
+    {
+      "alt_glosses": [
+        "dread"
+      ],
+      "candidate_id": "S008",
+      "category": "emotion",
+      "controlling_gloss": "fear",
+      "devanagari": "भय",
+      "group_id": "√bhī",
+      "iast": "bhaya",
+      "parser": {
+        "consonants": [
+          "bh",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√bhī",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 6.14,
+        "dominance_D_mean_sum": 3.32,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4524",
+        "valence_V_mean_sum": 2.93
+      }
+    },
+    {
+      "alt_glosses": [
+        "intelligence"
+      ],
+      "candidate_id": "S010",
+      "category": "cognitive",
+      "controlling_gloss": "intellect",
+      "devanagari": "बुद्धि",
+      "group_id": "√budh",
+      "iast": "buddhi",
+      "parser": {
+        "consonants": [
+          "b",
+          "d",
+          "dh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√budh",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.41,
+        "dominance_D_mean_sum": 6.69,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "6490",
+        "valence_V_mean_sum": 6.62
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S011",
+      "category": "nature",
+      "controlling_gloss": "seed",
+      "devanagari": "बीज",
+      "group_id": "bīja",
+      "iast": "bīja",
+      "parser": {
+        "consonants": [
+          "b",
+          "j"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "bīja",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 3.68,
+        "dominance_D_mean_sum": 5.19,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "10872",
+        "valence_V_mean_sum": 6.38
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S012",
+      "category": "nature",
+      "controlling_gloss": "moon",
+      "devanagari": "चन्द्र",
+      "group_id": "candra",
+      "iast": "candra",
+      "parser": {
+        "consonants": [
+          "c",
+          "n",
+          "d",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "candra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.43,
+        "dominance_D_mean_sum": 6.11,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7884",
+        "valence_V_mean_sum": 7.0
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S013",
+      "category": "body",
+      "controlling_gloss": "tooth",
+      "devanagari": "दन्त",
+      "group_id": "danta",
+      "iast": "danta",
+      "parser": {
+        "consonants": [
+          "d",
+          "n",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "danta",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 3.52,
+        "dominance_D_mean_sum": 4.89,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12638",
+        "valence_V_mean_sum": 5.06
+      }
+    },
+    {
+      "alt_glosses": [
+        "money",
+        "riches"
+      ],
+      "candidate_id": "S015",
+      "category": "abstract",
+      "controlling_gloss": "wealth",
+      "devanagari": "धन",
+      "group_id": "dhana",
+      "iast": "dhana",
+      "parser": {
+        "consonants": [
+          "dh",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "dhana",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.24,
+        "dominance_D_mean_sum": 6.53,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "13607",
+        "valence_V_mean_sum": 7.33
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S017",
+      "category": "nature",
+      "controlling_gloss": "smoke",
+      "devanagari": "धूम",
+      "group_id": "dhūma",
+      "iast": "dhūma",
+      "parser": {
+        "consonants": [
+          "dh",
+          "m"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "dhūma",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 5.0,
+        "dominance_D_mean_sum": 4.17,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11362",
+        "valence_V_mean_sum": 3.44
+      }
+    },
+    {
+      "alt_glosses": [
+        "suffering",
+        "pain"
+      ],
+      "candidate_id": "S018",
+      "category": "emotion",
+      "controlling_gloss": "sorrow",
+      "devanagari": "दुःख",
+      "group_id": "duḥkha",
+      "iast": "duḥkha",
+      "parser": {
+        "consonants": [
+          "d",
+          "kh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "duḥkha",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.55,
+        "dominance_D_mean_sum": 3.8,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11496",
+        "valence_V_mean_sum": 2.95
+      }
+    },
+    {
+      "alt_glosses": [
+        "aversion"
+      ],
+      "candidate_id": "S019",
+      "category": "emotion",
+      "controlling_gloss": "hatred",
+      "devanagari": "द्वेष",
+      "group_id": "√dviṣ",
+      "iast": "dveṣa",
+      "parser": {
+        "consonants": [
+          "d",
+          "v",
+          "ṣ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√dviṣ",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 5.22,
+        "dominance_D_mean_sum": 4.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5638",
+        "valence_V_mean_sum": 2.38
+      }
+    },
+    {
+      "alt_glosses": [
+        "giving",
+        "donation"
+      ],
+      "candidate_id": "S020",
+      "category": "action",
+      "controlling_gloss": "gift",
+      "devanagari": "दान",
+      "group_id": "√dā",
+      "iast": "dāna",
+      "parser": {
+        "consonants": [
+          "d",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√dā",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 4.64,
+        "dominance_D_mean_sum": 6.32,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5179",
+        "valence_V_mean_sum": 7.27
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S021",
+      "category": "animal",
+      "controlling_gloss": "elephant",
+      "devanagari": "गज",
+      "group_id": "gaja",
+      "iast": "gaja",
+      "parser": {
+        "consonants": [
+          "g",
+          "j"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "gaja",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.23,
+        "dominance_D_mean_sum": 4.23,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4003",
+        "valence_V_mean_sum": 6.17
+      }
+    },
+    {
+      "alt_glosses": [
+        "ass"
+      ],
+      "candidate_id": "S023",
+      "category": "animal",
+      "controlling_gloss": "donkey",
+      "devanagari": "गर्दभ",
+      "group_id": "gardabha",
+      "iast": "gardabha",
+      "parser": {
+        "consonants": [
+          "g",
+          "r",
+          "d",
+          "bh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 7,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "gardabha",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 2.9,
+        "dominance_D_mean_sum": 5.12,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3722",
+        "valence_V_mean_sum": 6.29
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S024",
+      "category": "action",
+      "controlling_gloss": "motion",
+      "devanagari": "गति",
+      "group_id": "√gam",
+      "iast": "gati",
+      "parser": {
+        "consonants": [
+          "g",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√gam",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 4.71,
+        "dominance_D_mean_sum": 6.15,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7930",
+        "valence_V_mean_sum": 5.8
+      }
+    },
+    {
+      "alt_glosses": [
+        "jar"
+      ],
+      "candidate_id": "S025",
+      "category": "object",
+      "controlling_gloss": "pot",
+      "devanagari": "घट",
+      "group_id": "ghaṭa",
+      "iast": "ghaṭa",
+      "parser": {
+        "consonants": [
+          "gh",
+          "ṭ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "ghaṭa",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.0,
+        "dominance_D_mean_sum": 6.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "9299",
+        "valence_V_mean_sum": 5.81
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S026",
+      "category": "nature",
+      "controlling_gloss": "mountain",
+      "devanagari": "गिरि",
+      "group_id": "giri",
+      "iast": "giri",
+      "parser": {
+        "consonants": [
+          "g",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "giri",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.12,
+        "dominance_D_mean_sum": 6.18,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7947",
+        "valence_V_mean_sum": 6.65
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S028",
+      "category": "body",
+      "controlling_gloss": "neck",
+      "devanagari": "ग्रीवा",
+      "group_id": "grīvā",
+      "iast": "grīvā",
+      "parser": {
+        "consonants": [
+          "g",
+          "r",
+          "v"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "grīvā",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.65,
+        "dominance_D_mean_sum": 5.17,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "8107",
+        "valence_V_mean_sum": 5.44
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S029",
+      "category": "object",
+      "controlling_gloss": "house",
+      "devanagari": "गृह",
+      "group_id": "gṛha",
+      "iast": "gṛha",
+      "parser": {
+        "consonants": [
+          "g",
+          "h"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "gṛha",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.95,
+        "dominance_D_mean_sum": 6.41,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5954",
+        "valence_V_mean_sum": 7.19
+      }
+    },
+    {
+      "alt_glosses": [
+        "delight"
+      ],
+      "candidate_id": "S030",
+      "category": "emotion",
+      "controlling_gloss": "joy",
+      "devanagari": "हर्ष",
+      "group_id": "√hṛṣ",
+      "iast": "harṣa",
+      "parser": {
+        "consonants": [
+          "h",
+          "r",
+          "ṣ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√hṛṣ",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.55,
+        "dominance_D_mean_sum": 7.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "6722",
+        "valence_V_mean_sum": 8.21
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S031",
+      "category": "body",
+      "controlling_gloss": "hand",
+      "devanagari": "हस्त",
+      "group_id": "hasta",
+      "iast": "hasta",
+      "parser": {
+        "consonants": [
+          "h",
+          "s",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "hasta",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 3.98,
+        "dominance_D_mean_sum": 5.88,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5562",
+        "valence_V_mean_sum": 5.9
+      }
+    },
+    {
+      "alt_glosses": [
+        "frost"
+      ],
+      "candidate_id": "S033",
+      "category": "nature",
+      "controlling_gloss": "snow",
+      "devanagari": "हिम",
+      "group_id": "hima",
+      "iast": "hima",
+      "parser": {
+        "consonants": [
+          "h",
+          "m"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "hima",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.57,
+        "dominance_D_mean_sum": 5.62,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11411",
+        "valence_V_mean_sum": 6.78
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S034",
+      "category": "action",
+      "controlling_gloss": "laughter",
+      "devanagari": "हास",
+      "group_id": "√has",
+      "iast": "hāsa",
+      "parser": {
+        "consonants": [
+          "h",
+          "s"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√has",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.39,
+        "dominance_D_mean_sum": 7.02,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "6951",
+        "valence_V_mean_sum": 8.05
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S035",
+      "category": "body",
+      "controlling_gloss": "heart",
+      "devanagari": "हृदय",
+      "group_id": "hṛd",
+      "iast": "hṛdaya",
+      "parser": {
+        "consonants": [
+          "h",
+          "d",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "hṛd",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.07,
+        "dominance_D_mean_sum": 5.43,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5684",
+        "valence_V_mean_sum": 6.95
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S036",
+      "category": "nature",
+      "controlling_gloss": "water",
+      "devanagari": "जल",
+      "group_id": "jala",
+      "iast": "jala",
+      "parser": {
+        "consonants": [
+          "j",
+          "l"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "jala",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.71,
+        "dominance_D_mean_sum": 6.12,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "13585",
+        "valence_V_mean_sum": 7.0
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S037",
+      "category": "body",
+      "controlling_gloss": "tongue",
+      "devanagari": "जिह्वा",
+      "group_id": "jihvā",
+      "iast": "jihvā",
+      "parser": {
+        "consonants": [
+          "j",
+          "h",
+          "v"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "jihvā",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.25,
+        "dominance_D_mean_sum": 6.32,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12633",
+        "valence_V_mean_sum": 6.29
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S038",
+      "category": "cognitive",
+      "controlling_gloss": "knowledge",
+      "devanagari": "ज्ञान",
+      "group_id": "√jñā",
+      "iast": "jñāna",
+      "parser": {
+        "consonants": [
+          "j",
+          "ñ",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√jñā",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.86,
+        "dominance_D_mean_sum": 7.2,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "6861",
+        "valence_V_mean_sum": 7.28
+      }
+    },
+    {
+      "alt_glosses": [
+        "ape"
+      ],
+      "candidate_id": "S039",
+      "category": "animal",
+      "controlling_gloss": "monkey",
+      "devanagari": "कपि",
+      "group_id": "kapi",
+      "iast": "kapi",
+      "parser": {
+        "consonants": [
+          "k",
+          "p"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "kapi",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.15,
+        "dominance_D_mean_sum": 5.74,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7860",
+        "valence_V_mean_sum": 5.82
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S041",
+      "category": "body",
+      "controlling_gloss": "ear",
+      "devanagari": "कर्ण",
+      "group_id": "karṇa",
+      "iast": "karṇa",
+      "parser": {
+        "consonants": [
+          "k",
+          "r",
+          "ṇ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "karṇa",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.5,
+        "dominance_D_mean_sum": 6.74,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3901",
+        "valence_V_mean_sum": 5.86
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S042",
+      "category": "body",
+      "controlling_gloss": "hair",
+      "devanagari": "केश",
+      "group_id": "keśa",
+      "iast": "keśa",
+      "parser": {
+        "consonants": [
+          "k",
+          "ś"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "keśa",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.71,
+        "dominance_D_mean_sum": 6.69,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5530",
+        "valence_V_mean_sum": 6.18
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S043",
+      "category": "animal",
+      "controlling_gloss": "bird",
+      "devanagari": "खग",
+      "group_id": "kha+ga",
+      "iast": "khaga",
+      "parser": {
+        "consonants": [
+          "kh",
+          "g"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "kha+ga",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 3.83,
+        "dominance_D_mean_sum": 5.88,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "1150",
+        "valence_V_mean_sum": 6.75
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S044",
+      "category": "object",
+      "controlling_gloss": "sword",
+      "devanagari": "खड्ग",
+      "group_id": "khaḍga",
+      "iast": "khaḍga",
+      "parser": {
+        "consonants": [
+          "kh",
+          "ḍ",
+          "g"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "khaḍga",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.95,
+        "dominance_D_mean_sum": 6.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12210",
+        "valence_V_mean_sum": 5.27
+      }
+    },
+    {
+      "alt_glosses": [
+        "wrath",
+        "rage"
+      ],
+      "candidate_id": "S045",
+      "category": "emotion",
+      "controlling_gloss": "anger",
+      "devanagari": "क्रोध",
+      "group_id": "√krudh",
+      "iast": "krodha",
+      "parser": {
+        "consonants": [
+          "k",
+          "r",
+          "dh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√krudh",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 5.93,
+        "dominance_D_mean_sum": 5.14,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "418",
+        "valence_V_mean_sum": 2.5
+      }
+    },
+    {
+      "alt_glosses": [
+        "sport"
+      ],
+      "candidate_id": "S046",
+      "category": "action",
+      "controlling_gloss": "play",
+      "devanagari": "क्रीडा",
+      "group_id": "√krīḍ",
+      "iast": "krīḍā",
+      "parser": {
+        "consonants": [
+          "k",
+          "r",
+          "ḍ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√krīḍ",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 3.81,
+        "dominance_D_mean_sum": 6.29,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "9134",
+        "valence_V_mean_sum": 7.55
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S049",
+      "category": "state",
+      "controlling_gloss": "hunger",
+      "devanagari": "क्षुधा",
+      "group_id": "√kṣudh",
+      "iast": "kṣudhā",
+      "parser": {
+        "consonants": [
+          "k",
+          "ṣ",
+          "dh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√kṣudh",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.8,
+        "dominance_D_mean_sum": 3.18,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "6007",
+        "valence_V_mean_sum": 3.2
+      }
+    },
+    {
+      "alt_glosses": [
+        "modesty"
+      ],
+      "candidate_id": "S050",
+      "category": "emotion",
+      "controlling_gloss": "shame",
+      "devanagari": "लज्जा",
+      "group_id": "√lajj",
+      "iast": "lajjā",
+      "parser": {
+        "consonants": [
+          "l",
+          "j",
+          "j"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√lajj",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.4,
+        "dominance_D_mean_sum": 5.21,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11000",
+        "valence_V_mean_sum": 2.62
+      }
+    },
+    {
+      "alt_glosses": [
+        "vine"
+      ],
+      "candidate_id": "S051",
+      "category": "nature",
+      "controlling_gloss": "creeper",
+      "devanagari": "लता",
+      "group_id": "latā",
+      "iast": "latā",
+      "parser": {
+        "consonants": [
+          "l",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "latā",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.68,
+        "dominance_D_mean_sum": 3.86,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "2897",
+        "valence_V_mean_sum": 3.61
+      }
+    },
+    {
+      "alt_glosses": [
+        "avarice"
+      ],
+      "candidate_id": "S052",
+      "category": "emotion",
+      "controlling_gloss": "greed",
+      "devanagari": "लोभ",
+      "group_id": "√lubh",
+      "iast": "lobha",
+      "parser": {
+        "consonants": [
+          "l",
+          "bh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√lubh",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.45,
+        "dominance_D_mean_sum": 4.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5383",
+        "valence_V_mean_sum": 2.48
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S054",
+      "category": "cognitive",
+      "controlling_gloss": "mind",
+      "devanagari": "मनस्",
+      "group_id": "√man",
+      "iast": "manas",
+      "parser": {
+        "consonants": [
+          "m",
+          "n",
+          "s"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√man",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.05,
+        "dominance_D_mean_sum": 6.09,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7725",
+        "valence_V_mean_sum": 6.7
+      }
+    },
+    {
+      "alt_glosses": [
+        "gem"
+      ],
+      "candidate_id": "S055",
+      "category": "object",
+      "controlling_gloss": "jewel",
+      "devanagari": "मणि",
+      "group_id": "maṇi",
+      "iast": "maṇi",
+      "parser": {
+        "consonants": [
+          "m",
+          "ṇ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "maṇi",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.83,
+        "dominance_D_mean_sum": 5.1,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "6689",
+        "valence_V_mean_sum": 6.68
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S056",
+      "category": "nature",
+      "controlling_gloss": "cloud",
+      "devanagari": "मेघ",
+      "group_id": "megha",
+      "iast": "megha",
+      "parser": {
+        "consonants": [
+          "m",
+          "gh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "megha",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 2.81,
+        "dominance_D_mean_sum": 4.79,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "2236",
+        "valence_V_mean_sum": 6.2
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S057",
+      "category": "person",
+      "controlling_gloss": "friend",
+      "devanagari": "मित्र",
+      "group_id": "mitra",
+      "iast": "mitra",
+      "parser": {
+        "consonants": [
+          "m",
+          "t",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "mitra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.29,
+        "dominance_D_mean_sum": 6.31,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4958",
+        "valence_V_mean_sum": 6.79
+      }
+    },
+    {
+      "alt_glosses": [
+        "confusion",
+        "infatuation"
+      ],
+      "candidate_id": "S058",
+      "category": "emotion",
+      "controlling_gloss": "delusion",
+      "devanagari": "मोह",
+      "group_id": "√muh",
+      "iast": "moha",
+      "parser": {
+        "consonants": [
+          "m",
+          "h"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√muh",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.6,
+        "dominance_D_mean_sum": 3.91,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3253",
+        "valence_V_mean_sum": 3.3
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S060",
+      "category": "animal",
+      "controlling_gloss": "cat",
+      "devanagari": "मार्जार",
+      "group_id": "mārjāra",
+      "iast": "mārjāra",
+      "parser": {
+        "consonants": [
+          "m",
+          "r",
+          "j",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 7,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "mārjāra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.5,
+        "dominance_D_mean_sum": 5.48,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "1834",
+        "valence_V_mean_sum": 6.95
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S061",
+      "category": "animal",
+      "controlling_gloss": "fish",
+      "devanagari": "मीन",
+      "group_id": "mīna",
+      "iast": "mīna",
+      "parser": {
+        "consonants": [
+          "m",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "mīna",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.33,
+        "dominance_D_mean_sum": 6.08,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4665",
+        "valence_V_mean_sum": 6.42
+      }
+    },
+    {
+      "alt_glosses": [
+        "antelope"
+      ],
+      "candidate_id": "S062",
+      "category": "animal",
+      "controlling_gloss": "deer",
+      "devanagari": "मृग",
+      "group_id": "mṛga",
+      "iast": "mṛga",
+      "parser": {
+        "consonants": [
+          "m",
+          "g"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "mṛga",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.95,
+        "dominance_D_mean_sum": 4.89,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3189",
+        "valence_V_mean_sum": 6.89
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S063",
+      "category": "state",
+      "controlling_gloss": "death",
+      "devanagari": "मृत्यु",
+      "group_id": "√mṛ",
+      "iast": "mṛtyu",
+      "parser": {
+        "consonants": [
+          "m",
+          "t",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√mṛ",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 5.53,
+        "dominance_D_mean_sum": 3.42,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3120",
+        "valence_V_mean_sum": 1.89
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S064",
+      "category": "nature",
+      "controlling_gloss": "river",
+      "devanagari": "नदी",
+      "group_id": "nadī",
+      "iast": "nadī",
+      "parser": {
+        "consonants": [
+          "n",
+          "d"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "nadī",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.22,
+        "dominance_D_mean_sum": 4.89,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "10432",
+        "valence_V_mean_sum": 6.72
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S065",
+      "category": "body",
+      "controlling_gloss": "eye",
+      "devanagari": "नेत्र",
+      "group_id": "netra",
+      "iast": "netra",
+      "parser": {
+        "consonants": [
+          "n",
+          "t",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "netra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.95,
+        "dominance_D_mean_sum": 5.72,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4405",
+        "valence_V_mean_sum": 6.18
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S066",
+      "category": "state",
+      "controlling_gloss": "sleep",
+      "devanagari": "निद्रा",
+      "group_id": "√nid",
+      "iast": "nidrā",
+      "parser": {
+        "consonants": [
+          "n",
+          "d",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√nid",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.6,
+        "dominance_D_mean_sum": 5.3,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11291",
+        "valence_V_mean_sum": 7.22
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S067",
+      "category": "action",
+      "controlling_gloss": "dance",
+      "devanagari": "नृत्य",
+      "group_id": "√nṛt",
+      "iast": "nṛtya",
+      "parser": {
+        "consonants": [
+          "n",
+          "t",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√nṛt",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.48,
+        "dominance_D_mean_sum": 6.28,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3072",
+        "valence_V_mean_sum": 7.27
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S069",
+      "category": "nature",
+      "controlling_gloss": "fruit",
+      "devanagari": "फल",
+      "group_id": "phala",
+      "iast": "phala",
+      "parser": {
+        "consonants": [
+          "ph",
+          "l"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "phala",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.09,
+        "dominance_D_mean_sum": 6.12,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4984",
+        "valence_V_mean_sum": 7.0
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S070",
+      "category": "object",
+      "controlling_gloss": "book",
+      "devanagari": "पुस्तक",
+      "group_id": "pustaka",
+      "iast": "pustaka",
+      "parser": {
+        "consonants": [
+          "p",
+          "s",
+          "t",
+          "k"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 7,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "pustaka",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.13,
+        "dominance_D_mean_sum": 6.41,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "1344",
+        "valence_V_mean_sum": 7.05
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S071",
+      "category": "nature",
+      "controlling_gloss": "flower",
+      "devanagari": "पुष्प",
+      "group_id": "puṣpa",
+      "iast": "puṣpa",
+      "parser": {
+        "consonants": [
+          "p",
+          "ṣ",
+          "p"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "puṣpa",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.67,
+        "dominance_D_mean_sum": 6.43,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4769",
+        "valence_V_mean_sum": 7.3
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S072",
+      "category": "body",
+      "controlling_gloss": "foot",
+      "devanagari": "पाद",
+      "group_id": "pāda",
+      "iast": "pāda",
+      "parser": {
+        "consonants": [
+          "p",
+          "d"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "pāda",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 2.77,
+        "dominance_D_mean_sum": 5.97,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4815",
+        "valence_V_mean_sum": 4.68
+      }
+    },
+    {
+      "alt_glosses": [
+        "evil"
+      ],
+      "candidate_id": "S073",
+      "category": "abstract",
+      "controlling_gloss": "sin",
+      "devanagari": "पाप",
+      "group_id": "pāpa",
+      "iast": "pāpa",
+      "parser": {
+        "consonants": [
+          "p",
+          "p"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "pāpa",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.82,
+        "dominance_D_mean_sum": 5.74,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11196",
+        "valence_V_mean_sum": 3.08
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S075",
+      "category": "object",
+      "controlling_gloss": "chariot",
+      "devanagari": "रथ",
+      "group_id": "ratha",
+      "iast": "ratha",
+      "parser": {
+        "consonants": [
+          "r",
+          "th"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "ratha",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.11,
+        "dominance_D_mean_sum": 6.59,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "1960",
+        "valence_V_mean_sum": 6.11
+      }
+    },
+    {
+      "alt_glosses": [
+        "illness"
+      ],
+      "candidate_id": "S076",
+      "category": "state",
+      "controlling_gloss": "disease",
+      "devanagari": "रोग",
+      "group_id": "√ruj",
+      "iast": "roga",
+      "parser": {
+        "consonants": [
+          "r",
+          "g"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√ruj",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.5,
+        "dominance_D_mean_sum": 2.8,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3561",
+        "valence_V_mean_sum": 1.68
+      }
+    },
+    {
+      "alt_glosses": [
+        "ocean"
+      ],
+      "candidate_id": "S077",
+      "category": "nature",
+      "controlling_gloss": "sea",
+      "devanagari": "समुद्र",
+      "group_id": "samudra",
+      "iast": "samudra",
+      "parser": {
+        "consonants": [
+          "s",
+          "m",
+          "d",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 7,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "samudra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 2.8,
+        "dominance_D_mean_sum": 5.22,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "10821",
+        "valence_V_mean_sum": 6.56
+      }
+    },
+    {
+      "alt_glosses": [
+        "serpent"
+      ],
+      "candidate_id": "S078",
+      "category": "animal",
+      "controlling_gloss": "snake",
+      "devanagari": "सर्प",
+      "group_id": "√sṛp",
+      "iast": "sarpa",
+      "parser": {
+        "consonants": [
+          "s",
+          "r",
+          "p"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√sṛp",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 7.24,
+        "dominance_D_mean_sum": 3.65,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11378",
+        "valence_V_mean_sum": 4.03
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S079",
+      "category": "abstract",
+      "controlling_gloss": "truth",
+      "devanagari": "सत्य",
+      "group_id": "sat",
+      "iast": "satya",
+      "parser": {
+        "consonants": [
+          "s",
+          "t",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "sat",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 3.88,
+        "dominance_D_mean_sum": 6.95,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12866",
+        "valence_V_mean_sum": 7.19
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S080",
+      "category": "animal",
+      "controlling_gloss": "lion",
+      "devanagari": "सिंह",
+      "group_id": "siṃha",
+      "iast": "siṃha",
+      "parser": {
+        "consonants": [
+          "s",
+          "h"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "siṃha",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.29,
+        "dominance_D_mean_sum": 4.86,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7134",
+        "valence_V_mean_sum": 5.84
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S081",
+      "category": "cognitive",
+      "controlling_gloss": "memory",
+      "devanagari": "स्मृति",
+      "group_id": "√smṛ",
+      "iast": "smṛti",
+      "parser": {
+        "consonants": [
+          "s",
+          "m",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√smṛ",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.08,
+        "dominance_D_mean_sum": 5.75,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7613",
+        "valence_V_mean_sum": 6.58
+      }
+    },
+    {
+      "alt_glosses": [
+        "pleasure",
+        "ease"
+      ],
+      "candidate_id": "S082",
+      "category": "emotion",
+      "controlling_gloss": "happiness",
+      "devanagari": "सुख",
+      "group_id": "sukha",
+      "iast": "sukha",
+      "parser": {
+        "consonants": [
+          "s",
+          "kh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "sukha",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 6.5,
+        "dominance_D_mean_sum": 7.05,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5595",
+        "valence_V_mean_sum": 8.48
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S083",
+      "category": "object",
+      "controlling_gloss": "gold",
+      "devanagari": "सुवर्ण",
+      "group_id": "suvarṇa",
+      "iast": "suvarṇa",
+      "parser": {
+        "consonants": [
+          "s",
+          "v",
+          "r",
+          "ṇ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 7,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "suvarṇa",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 6.35,
+        "dominance_D_mean_sum": 5.8,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5269",
+        "valence_V_mean_sum": 7.28
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S084",
+      "category": "state",
+      "controlling_gloss": "dream",
+      "devanagari": "स्वप्न",
+      "group_id": "√svap",
+      "iast": "svapna",
+      "parser": {
+        "consonants": [
+          "s",
+          "v",
+          "p",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√svap",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 4.37,
+        "dominance_D_mean_sum": 5.4,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "3795",
+        "valence_V_mean_sum": 7.43
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S085",
+      "category": "nature",
+      "controlling_gloss": "sun",
+      "devanagari": "सूर्य",
+      "group_id": "sūrya",
+      "iast": "sūrya",
+      "parser": {
+        "consonants": [
+          "s",
+          "r",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "sūrya",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.64,
+        "dominance_D_mean_sum": 4.98,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12069",
+        "valence_V_mean_sum": 6.92
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S086",
+      "category": "nature",
+      "controlling_gloss": "star",
+      "devanagari": "तारा",
+      "group_id": "tārā",
+      "iast": "tārā",
+      "parser": {
+        "consonants": [
+          "t",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "tārā",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.5,
+        "dominance_D_mean_sum": 5.82,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "11742",
+        "valence_V_mean_sum": 7.47
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S087",
+      "category": "nature",
+      "controlling_gloss": "grass",
+      "devanagari": "तृण",
+      "group_id": "tṛṇa",
+      "iast": "tṛṇa",
+      "parser": {
+        "consonants": [
+          "t",
+          "ṇ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "tṛṇa",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 3.39,
+        "dominance_D_mean_sum": 5.67,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5355",
+        "valence_V_mean_sum": 6.47
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S089",
+      "category": "nature",
+      "controlling_gloss": "forest",
+      "devanagari": "वन",
+      "group_id": "vana",
+      "iast": "vana",
+      "parser": {
+        "consonants": [
+          "v",
+          "n"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vana",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.44,
+        "dominance_D_mean_sum": 5.71,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4853",
+        "valence_V_mean_sum": 6.68
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S091",
+      "category": "nature",
+      "controlling_gloss": "lightning",
+      "devanagari": "विद्युत्",
+      "group_id": "vi+√dyut",
+      "iast": "vidyut",
+      "parser": {
+        "consonants": [
+          "v",
+          "d",
+          "y",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vi+√dyut",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 6.75,
+        "dominance_D_mean_sum": 4.0,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "7096",
+        "valence_V_mean_sum": 5.34
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S092",
+      "category": "animal",
+      "controlling_gloss": "tiger",
+      "devanagari": "व्याघ्र",
+      "group_id": "vyāghra",
+      "iast": "vyāghra",
+      "parser": {
+        "consonants": [
+          "v",
+          "y",
+          "gh",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 6,
+        "n_consonants": 4,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vyāghra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.55,
+        "dominance_D_mean_sum": 4.4,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12562",
+        "valence_V_mean_sum": 6.0
+      }
+    },
+    {
+      "alt_glosses": [
+        "air"
+      ],
+      "candidate_id": "S094",
+      "category": "nature",
+      "controlling_gloss": "wind",
+      "devanagari": "वायु",
+      "group_id": "vāyu",
+      "iast": "vāyu",
+      "parser": {
+        "consonants": [
+          "v",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vāyu",
+      "split": "dev",
+      "target": {
+        "arousal_A_mean_sum": 3.7,
+        "dominance_D_mean_sum": 4.5,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "13735",
+        "valence_V_mean_sum": 5.67
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S095",
+      "category": "person",
+      "controlling_gloss": "hero",
+      "devanagari": "वीर",
+      "group_id": "vīra",
+      "iast": "vīra",
+      "parser": {
+        "consonants": [
+          "v",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vīra",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 6.35,
+        "dominance_D_mean_sum": 5.78,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5759",
+        "valence_V_mean_sum": 7.44
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S096",
+      "category": "animal",
+      "controlling_gloss": "wolf",
+      "devanagari": "वृक",
+      "group_id": "vṛka",
+      "iast": "vṛka",
+      "parser": {
+        "consonants": [
+          "v",
+          "k"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vṛka",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 5.25,
+        "dominance_D_mean_sum": 4.59,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "13786",
+        "valence_V_mean_sum": 6.26
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S097",
+      "category": "nature",
+      "controlling_gloss": "tree",
+      "devanagari": "वृक्ष",
+      "group_id": "vṛkṣa",
+      "iast": "vṛkṣa",
+      "parser": {
+        "consonants": [
+          "v",
+          "k",
+          "ṣ"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "vṛkṣa",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 2.67,
+        "dominance_D_mean_sum": 5.62,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "12790",
+        "valence_V_mean_sum": 7.59
+      }
+    },
+    {
+      "alt_glosses": [
+        "glory"
+      ],
+      "candidate_id": "S099",
+      "category": "abstract",
+      "controlling_gloss": "fame",
+      "devanagari": "यशस्",
+      "group_id": "yaśas",
+      "iast": "yaśas",
+      "parser": {
+        "consonants": [
+          "y",
+          "ś",
+          "s"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "yaśas",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 4.63,
+        "dominance_D_mean_sum": 6.27,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4457",
+        "valence_V_mean_sum": 5.45
+      }
+    },
+    {
+      "alt_glosses": [
+        "battle"
+      ],
+      "candidate_id": "S100",
+      "category": "action",
+      "controlling_gloss": "war",
+      "devanagari": "युद्ध",
+      "group_id": "√yudh",
+      "iast": "yuddha",
+      "parser": {
+        "consonants": [
+          "y",
+          "d",
+          "dh"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√yudh",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 6.27,
+        "dominance_D_mean_sum": 3.27,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "13548",
+        "valence_V_mean_sum": 2.23
+      }
+    },
+    {
+      "alt_glosses": [
+        "jealousy"
+      ],
+      "candidate_id": "S102",
+      "category": "emotion",
+      "controlling_gloss": "envy",
+      "devanagari": "ईर्ष्या",
+      "group_id": "√īrṣy",
+      "iast": "īrṣyā",
+      "parser": {
+        "consonants": [
+          "r",
+          "ṣ",
+          "y"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√īrṣy",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.35,
+        "dominance_D_mean_sum": 3.16,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4167",
+        "valence_V_mean_sum": 3.05
+      }
+    },
+    {
+      "alt_glosses": [
+        "foe"
+      ],
+      "candidate_id": "S103",
+      "category": "person",
+      "controlling_gloss": "enemy",
+      "devanagari": "शत्रु",
+      "group_id": "śatru",
+      "iast": "śatru",
+      "parser": {
+        "consonants": [
+          "ś",
+          "t",
+          "r"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "śatru",
+      "split": "test",
+      "target": {
+        "arousal_A_mean_sum": 5.3,
+        "dominance_D_mean_sum": 2.5,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "4103",
+        "valence_V_mean_sum": 2.22
+      }
+    },
+    {
+      "alt_glosses": [],
+      "candidate_id": "S104",
+      "category": "body",
+      "controlling_gloss": "head",
+      "devanagari": "शिरस्",
+      "group_id": "śiras",
+      "iast": "śiras",
+      "parser": {
+        "consonants": [
+          "ś",
+          "r",
+          "s"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "śiras",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.45,
+        "dominance_D_mean_sum": 5.56,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5656",
+        "valence_V_mean_sum": 5.86
+      }
+    },
+    {
+      "alt_glosses": [
+        "mourning"
+      ],
+      "candidate_id": "S105",
+      "category": "emotion",
+      "controlling_gloss": "grief",
+      "devanagari": "शोक",
+      "group_id": "√śuc",
+      "iast": "śoka",
+      "parser": {
+        "consonants": [
+          "ś",
+          "k"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 4,
+        "n_consonants": 2,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√śuc",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.95,
+        "dominance_D_mean_sum": 3.26,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "5395",
+        "valence_V_mean_sum": 2.33
+      }
+    },
+    {
+      "alt_glosses": [
+        "calm",
+        "tranquility"
+      ],
+      "candidate_id": "S106",
+      "category": "emotion",
+      "controlling_gloss": "peace",
+      "devanagari": "शान्ति",
+      "group_id": "√śam",
+      "iast": "śānti",
+      "parser": {
+        "consonants": [
+          "ś",
+          "n",
+          "t"
+        ],
+        "mapped_coverage": 1.0,
+        "n_atomic": 5,
+        "n_consonants": 3,
+        "unmapped_consonants": [],
+        "warnings": []
+      },
+      "root_family": "√śam",
+      "split": "train",
+      "target": {
+        "arousal_A_mean_sum": 4.65,
+        "dominance_D_mean_sum": 7.17,
+        "lookup": "lowercase exact",
+        "match": "exact_lemma",
+        "raw_entry_index": "8819",
+        "valence_V_mean_sum": 7.75
+      }
+    }
+  ],
+  "schema": "varna_lift_included_v1"
+}

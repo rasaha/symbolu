@@ -1,0 +1,7 @@
+{
+  "schema": "b1_12_bsr_input_hashes_v1",
+  "parser_sanskrit_stage1_parser.py": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+  "lexicon_frozen/varna_native_stage1_merged_v3.json": "65116f371aca9f24ba2cce080c458a7a878f9af4ae50562d3f518567e681d33f",
+  "controlling_prereg_VARNA_SYMBOLIC_RESONANCE_PREREG_V1.md": "996baf8478e3684eddfadf462b6fb66ebf6b13bbf75c5d3479a1c65a32d6b9c3",
+  "scope_B1_12_SCOPE_UPDATE_AND_CONTROLLING_PREREG.md": "11ceb0549278798bdce734b5776ef516df9784283ef57128e73fd4f31c19985f"
+}
