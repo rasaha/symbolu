@@ -17,11 +17,13 @@ import cross_model as CM
 
 def _discover_dirs():
     dirs = []
-    # committed Qwen-7B result (frozen evidence)
-    committed = RC.EXPERIMENT_DIR / "results" / "qwen7b_primary_real_llm"
-    if committed.exists():
-        dirs.append(str(committed))
-    # per-model runs under RESULTS_ROOT
+    # committed model results in the repo (each subdir of results/ with a results.json)
+    committed_root = RC.EXPERIMENT_DIR / "results"
+    if committed_root.exists():
+        for d in sorted(committed_root.iterdir()):
+            if d.is_dir() and (d / "results.json").exists():
+                dirs.append(str(d))
+    # per-model runs under RESULTS_ROOT (the live RunPod outputs)
     root = pathlib.Path(os.environ.get("RESULTS_ROOT", "/workspace/results/actiongate-context-qwen"))
     if root.exists():
         for d in sorted(root.iterdir()):

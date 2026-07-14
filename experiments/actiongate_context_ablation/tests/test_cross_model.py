@@ -91,6 +91,33 @@ def test_protection_must_beat_unaware_to_replicate():
     assert CM._model_replicates(m)["replicates"] is False
 
 
+# ---- model identity uses run_config (authoritative), not the mislabeled top-level ----
+def test_three_committed_models_load_with_correct_ids():
+    root = RC.EXPERIMENT_DIR / "results"
+    dirs = [str(root / n) for n in
+            ("qwen7b_primary_real_llm", "qwen14b_primary_real_llm", "mistral7b_primary_real_llm")]
+    models = CM.discover(dirs)
+    ids = sorted(m.model_id for m in models)
+    # even though the 14B/Mistral manifests carry a mislabeled top-level model_id
+    # ("Qwen/Qwen2.5-7B-Instruct"), the reader must recover the true id from run_config
+    assert ids == ["Qwen/Qwen2.5-14B-Instruct", "Qwen/Qwen2.5-7B-Instruct",
+                   "mistralai/Mistral-7B-Instruct-v0.3"]
+    assert all(m.is_real for m in models)
+    # three distinct real models -> a graded (non-INSUFFICIENT) verdict
+    assert CM.verdict(models)["n_real_models"] == 3
+
+
+def test_load_prefers_run_config_model_id(tmp_path):
+    d = tmp_path / "run"
+    d.mkdir()
+    (d / "results.json").write_text('{"is_real_llm": true, "cells": []}')
+    (d / "run_manifest.json").write_text(
+        '{"model_id": "org/WRONG", "model_revision": "r",'
+        ' "run_config": {"model_id": "org/RIGHT"}}')
+    m = CM.load_model_result(str(d))
+    assert m.model_id == "org/RIGHT"
+
+
 # ---- discovery honesty ----
 def test_discover_skips_missing_and_empty(tmp_path):
     (tmp_path / "empty").mkdir()

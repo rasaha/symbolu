@@ -1,0 +1,50 @@
+{
+  "benchmark_id": "ACTIONGATE_REAL_LLM_ABSOLUTE_UTILITY_V2",
+  "components": {
+    "actiongate_policy": "0.1.0-ref:b93b95d182bf796c",
+    "benchmark_id": "ACTIONGATE_REAL_LLM_ABSOLUTE_UTILITY_V2",
+    "budgets": [
+      0.2,
+      0.3,
+      0.4
+    ],
+    "compressor_hash": "sha256:d38ea25466d62fa1bb2439dee3cf38e5fbe1f1995dee267514a242c1c9336fbd",
+    "corpus_hash": "sha256:d0cde387dc40a6b8a56d9c1afae2de729e513c5af785dc8c0d3b19141a448b4b",
+    "methods": [
+      "original",
+      "structural_only",
+      "protected",
+      "protection_unaware"
+    ],
+    "normalization_hash": "sha256:004d87c2ea212a37790de0bdc5365f7b541fe40d4da577cf879c8ad2e6270f13",
+    "prompt_hash": "sha256:c40a4d7e7132bd65c42e9ed6022d4c9db7757dc5e1e0b8702e120f85cc8e39cc",
+    "scorer_hash": "sha256:d1f25044ddc240a20361ffdfbf11b0705d7b26e9520c4276bedff39691ca766e",
+    "task_suite_version": "v2.0.0",
+    "task_types": [
+      "tool_selection",
+      "tool_argument_generation",
+      "factual_qa",
+      "amount_extraction",
+      "approval_status",
+      "policy_condition",
+      "negation_exception",
+      "rollback_simulation",
+      "scope_target",
+      "reversibility",
+      "multi_hop_reasoning",
+      "envelope_field_extraction",
+      "instruction_following",
+      "summarization",
+      "operation_mapping"
+    ],
+    "v2_source_hashes": {
+      "benchmark_v2.py": "sha256:38bef1531d7915edd61a4971cfa2cedf0ee795570a7201bf12fe0682c778899f",
+      "llm_tasks_v2.py": "sha256:1c2ca01a50decef94b70c78b387957708f4320dfd30a7d7fb208ea998cab2c9e",
+      "normalize_v2.py": "sha256:c5dcaabd1b55d4d7c022e7f5750d8049b66fcbc589e4a4c19d7591e0d0ab2762",
+      "real_llm_bench_v2.py": "sha256:00a2d43f7e18da336e66f56c6aced7019ba3b5a5f0e40104cfaf8a63ed9f74d4",
+      "scoring_v2.py": "sha256:fd1ee6672c9299ef7c4446a32c84d470632e73d47cb1bcfc663a9e339930d84a"
+    }
+  },
+  "fingerprint": "sha256:4b9478483105dbadc741ae122b312db00a7b2db59fb496667a99981c84de54e5",
+  "policy": "0.1.0-ref:b93b95d182bf796c"
+}

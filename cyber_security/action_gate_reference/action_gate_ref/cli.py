@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from . import audit, gate, jcs, policy as policy_mod, projection, schema
+from . import audit, gate, jcs, policy as policy_mod, projection, remediation, schema
 from . import approval as approval_mod
 from . import token as token_mod
 from .errors import GateError
@@ -111,7 +111,17 @@ def cmd_decide(a):
         approvals = _load(a.approvals) if a.approvals else []
         signed = policy_mod.sign_policy(policy_mod.build_bundle())  # reference default policy
         decision = gate.evaluate(env, signed, evidence=evidence, approvals=approvals, now=a.now)
-        return _emit({"ok": True, **decision})
+        mode = (getattr(a, "remediation_mode", "off") or "off").upper().replace("-", "_")
+        if mode == remediation.OFF:
+            # remediation OFF -> byte-identical to the pre-remediation decision output
+            return _emit({"ok": True, **decision})
+        # FULL/HUMAN_ONLY/TRUSTED_PLANNER require an explicit, non-production admin flag —
+        # a caller-provided mode string alone must never unlock privileged disclosure.
+        trusted = bool(getattr(a, "trusted_admin", False))
+        rem = remediation.project_remediation(
+            decision, env, signed, evidence=evidence, approvals=approvals, now=a.now,
+            disclosure_mode=mode, trusted_context=trusted)
+        return _emit({"ok": True, **remediation.attach(decision, rem)})
     except Exception as exc:  # noqa: BLE001
         return _emit(_err(exc))
 
@@ -140,6 +150,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("decide")
     s.add_argument("envelope"); s.add_argument("--now", required=True)
     s.add_argument("--evidence", default=None); s.add_argument("--approvals", default=None)
+    s.add_argument("--remediation-mode", dest="remediation_mode", default="off",
+                   choices=["off", "minimal", "standard", "trusted-planner", "human-only", "full"],
+                   help="opt-in advisory remediation metadata (default: off = unchanged output)")
+    s.add_argument("--trusted-admin", dest="trusted_admin", action="store_true",
+                   help="NON-PRODUCTION: unlock privileged disclosure (trusted-planner/human-only/full)")
     s.set_defaults(fn=cmd_decide)
     s = sub.add_parser("run-conformance"); s.set_defaults(fn=cmd_run_conformance)
     return p

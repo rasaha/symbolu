@@ -59,8 +59,12 @@ def parse_request(payload: dict) -> dict:
 
 def decision_response(*, outcome, request_id, action_hash, dispositive_rules,
                       applied_constraints, reason, required_evidence=None,
-                      required_next=None, escalation_id=None) -> dict:
-    """Structured protocol response for any of the six outcomes. Never carries a token."""
+                      required_next=None, escalation_id=None, remediation=None) -> dict:
+    """Structured protocol response for any of the six outcomes. Never carries a token.
+
+    ``remediation`` (R1.5) is optional advisory metadata already projected by the gateway
+    from the FINALIZED decision. When absent (default), the response is byte-identical to the
+    pre-R1.5 shape. The remediation fields are additive and never execution authority."""
     executable, next_action = _NEXT[outcome]
     resp = {
         "outcome": outcome,
@@ -78,4 +82,6 @@ def decision_response(*, outcome, request_id, action_hash, dispositive_rules,
         resp["required_evidence"] = list(required_evidence)
     if escalation_id:
         resp["escalation_id"] = escalation_id
+    if remediation:
+        resp.update(remediation)   # additive advisory fields; no key collides with the above
     return resp

@@ -95,9 +95,11 @@ def load_config() -> dict:
     run_kind = _env("RUN_KIND", RUN_KIND_PRIMARY)
     model_id = _env("MODEL_ID", PRIMARY_MODEL)
     results_root = _env("RESULTS_ROOT", "/workspace/results/actiongate-context-qwen")
+    benchmark_version = _env("BENCHMARK_VERSION", "v1").lower()
     run_id = _env("RUN_ID", f"{run_kind.lower()}_{model_id.split('/')[-1]}")
     return {
         "model_id": model_id,
+        "benchmark_version": benchmark_version,
         "model_dir": _env("MODEL_DIR", f"/workspace/models/{model_id.split('/')[-1]}"),
         "budgets": budgets,
         "methods": methods,

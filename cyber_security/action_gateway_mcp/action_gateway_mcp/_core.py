@@ -27,6 +27,7 @@ from action_gateway._ref import evidence as ref_evidence  # noqa: E402,F401
 from action_gateway._ref import hashing as ref_hashing  # noqa: E402,F401
 from action_gateway._ref import jcs as ref_jcs  # noqa: E402,F401
 from action_gateway._ref import projection as ref_projection  # noqa: E402,F401
+from action_gateway._ref import remediation as ref_remediation  # noqa: E402,F401
 from action_gateway.broker import MockCredentialBroker, ScopedCredential  # noqa: E402,F401
 from action_gateway.clock import FixedClock, RealClock  # noqa: E402,F401
 

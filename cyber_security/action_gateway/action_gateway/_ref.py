@@ -30,6 +30,7 @@ from action_gate_ref import (  # noqa: E402,F401
     jcs,
     policy,
     projection,
+    remediation,
     schema,
     signing,
     token,
@@ -39,6 +40,6 @@ REF_VERSION = action_gate_ref.__version__
 
 __all__ = [
     "approval", "audit", "canon_profile", "errors", "evidence", "gate",
-    "hashing", "jcs", "policy", "projection", "schema", "signing", "token",
-    "REF_VERSION",
+    "hashing", "jcs", "policy", "projection", "remediation", "schema", "signing",
+    "token", "REF_VERSION",
 ]

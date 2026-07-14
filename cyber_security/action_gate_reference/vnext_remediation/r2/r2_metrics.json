@@ -1,0 +1,81 @@
+{
+  "action_modification": {
+    "autonomous_success": 14,
+    "autonomous_success_rate": 0.6087,
+    "capability_stall_or_conflict": 5,
+    "count": 23,
+    "share_of_all": 0.1503,
+    "share_of_remediable": 0.377,
+    "terminal_by_unbinding": 4
+  },
+  "average_retries": 0.549,
+  "average_retries_on_success": 1.667,
+  "capability_stall_rate": 0.0654,
+  "decision_stability_rate": 1.0,
+  "expected_class_distribution": {
+    "ACTION_MODIFICATION_REMEDIABLE": 23,
+    "EVIDENCE_REMEDIABLE": 24,
+    "HUMAN_ONLY": 48,
+    "SIMULATION_REMEDIABLE": 14,
+    "TERMINAL": 44
+  },
+  "human_escalation_rate": 0.3137,
+  "maximum_retries": 3,
+  "observed_class_distribution": {
+    "ACTION_MODIFICATION_REMEDIABLE": 23,
+    "EVIDENCE_REMEDIABLE": 24,
+    "HUMAN_ONLY": 48,
+    "SIMULATION_REMEDIABLE": 14,
+    "TERMINAL": 44
+  },
+  "oscillation_rate": 0.0327,
+  "per_class_simulator_outcomes": {
+    "ACTION_MODIFICATION_REMEDIABLE": {
+      "ALLOW_SUCCESS": 14,
+      "STUCK": 5,
+      "TERMINAL": 4
+    },
+    "EVIDENCE_REMEDIABLE": {
+      "ALLOW_SUCCESS": 14,
+      "OSCILLATION": 5,
+      "STUCK": 5
+    },
+    "HUMAN_ONLY": {
+      "ESCALATED_HUMAN": 48
+    },
+    "SIMULATION_REMEDIABLE": {
+      "ALLOW_SUCCESS": 14
+    },
+    "TERMINAL": {
+      "TERMINAL": 44
+    }
+  },
+  "policy_leakage_count": 0,
+  "policy_leakage_rate": 0.0,
+  "retry_budget_exhaustion_rate": 0.0,
+  "security": {
+    "fresh_hash_on_every_modification": true,
+    "no_deny_bypass": true,
+    "no_success_reached_through_deny": true,
+    "no_token_minted": true,
+    "total_action_modifications": 29
+  },
+  "status_distribution": {
+    "ALLOW_SUCCESS": 42,
+    "ESCALATED_HUMAN": 48,
+    "OSCILLATION": 5,
+    "STUCK": 10,
+    "TERMINAL": 48
+  },
+  "successful_remediation_rate": 0.2745,
+  "terminal_rate": 0.3137,
+  "total_scenarios": 153,
+  "verdict": {
+    "action_modification_autonomous_success_rate": 0.6087,
+    "action_modification_share_of_all": 0.1503,
+    "deterministic_remediation": "LIMITED_GO",
+    "measured_planning_gap_rate": 0.0,
+    "planner_automation": "STOP",
+    "rationale": "LLM-planner recommendation = STOP. Action-modification is 15% of scenarios and 61% of those are already resolved by a DETERMINISTIC numeric transform (no planning). Every action-modification failure is a safety stop (modification unbinds a hard precondition/approval -> DENY) or a capability/quota limit, so the residual planning gap an LLM could close is 0%. A deterministic remediation loop is LIMITED_GO for the mechanical, policy-opted-in classes; an LLM planner is not justified by measured evidence."
+  }
+}
