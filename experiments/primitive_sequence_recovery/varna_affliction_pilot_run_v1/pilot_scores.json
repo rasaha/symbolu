@@ -1,0 +1,286 @@
+[
+  {
+    "word": "śānti",
+    "gloss": "peace",
+    "components": [
+      [
+        "ś",
+        100
+      ],
+      [
+        "n",
+        75
+      ],
+      [
+        "t",
+        75
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "jñāna",
+    "gloss": "knowledge",
+    "components": [
+      [
+        "j",
+        50
+      ],
+      [
+        "ñ",
+        75
+      ],
+      [
+        "n",
+        100
+      ]
+    ],
+    "mean": 75.0,
+    "min": 50,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "satya",
+    "gloss": "truth",
+    "components": [
+      [
+        "s",
+        50
+      ],
+      [
+        "t",
+        75
+      ],
+      [
+        "y",
+        75
+      ]
+    ],
+    "mean": 66.7,
+    "min": 50,
+    "embodiment_count": 0,
+    "verdict": "PARTIAL_FIT"
+  },
+  {
+    "word": "jala",
+    "gloss": "water",
+    "components": [
+      [
+        "j",
+        100
+      ],
+      [
+        "l",
+        100
+      ]
+    ],
+    "mean": 100.0,
+    "min": 100,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "puṣpa",
+    "gloss": "flower",
+    "components": [
+      [
+        "p",
+        100
+      ],
+      [
+        "ṣ",
+        75
+      ],
+      [
+        "p",
+        100
+      ]
+    ],
+    "mean": 91.7,
+    "min": 75,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "gaja",
+    "gloss": "elephant",
+    "components": [
+      [
+        "g",
+        75
+      ],
+      [
+        "j",
+        75
+      ]
+    ],
+    "mean": 75.0,
+    "min": 75,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "sūrya",
+    "gloss": "sun",
+    "components": [
+      [
+        "s",
+        75
+      ],
+      [
+        "r",
+        75
+      ],
+      [
+        "y",
+        100
+      ]
+    ],
+    "mean": 83.3,
+    "min": 75,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "hasta",
+    "gloss": "hand",
+    "components": [
+      [
+        "h",
+        50
+      ],
+      [
+        "s",
+        75
+      ],
+      [
+        "t",
+        50
+      ]
+    ],
+    "mean": 58.3,
+    "min": 50,
+    "embodiment_count": 0,
+    "verdict": "PARTIAL_FIT"
+  },
+  {
+    "word": "nadī",
+    "gloss": "river",
+    "components": [
+      [
+        "n",
+        100
+      ],
+      [
+        "d",
+        75
+      ]
+    ],
+    "mean": 87.5,
+    "min": 75,
+    "embodiment_count": 0,
+    "verdict": "PASS"
+  },
+  {
+    "word": "krodha",
+    "gloss": "anger",
+    "components": [
+      [
+        "k",
+        25
+      ],
+      [
+        "r",
+        0
+      ],
+      [
+        "dh",
+        25
+      ]
+    ],
+    "mean": 16.7,
+    "min": 0,
+    "embodiment_count": 3,
+    "verdict": "FAIL"
+  },
+  {
+    "word": "kāma",
+    "gloss": "desire",
+    "components": [
+      [
+        "k",
+        0
+      ],
+      [
+        "m",
+        25
+      ]
+    ],
+    "mean": 12.5,
+    "min": 0,
+    "embodiment_count": 2,
+    "verdict": "FAIL"
+  },
+  {
+    "word": "lobha",
+    "gloss": "greed",
+    "components": [
+      [
+        "l",
+        25
+      ],
+      [
+        "bh",
+        0
+      ]
+    ],
+    "mean": 12.5,
+    "min": 0,
+    "embodiment_count": 2,
+    "verdict": "FAIL"
+  },
+  {
+    "word": "bhaya",
+    "gloss": "fear",
+    "components": [
+      [
+        "bh",
+        25
+      ],
+      [
+        "y",
+        0
+      ]
+    ],
+    "mean": 12.5,
+    "min": 0,
+    "embodiment_count": 2,
+    "verdict": "FAIL"
+  },
+  {
+    "word": "sarpa",
+    "gloss": "snake",
+    "components": [
+      [
+        "s",
+        75
+      ],
+      [
+        "r",
+        25
+      ],
+      [
+        "p",
+        25
+      ]
+    ],
+    "mean": 41.7,
+    "min": 25,
+    "embodiment_count": 2,
+    "verdict": "FAIL"
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "schema": "varna_affliction_pilot_wordlist_precommit_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "methodology": "VARNA_AFFLICTION_RESOLUTION_TEST_PREREG_V1_1.md (frozen; PMM/PR/CR)",
+  "lexicon": "frozen/varna_native_stage1_merged_v3.json (65116f37 — ś/ṣ corrected)",
+  "parser": "sanskrit_stage1_parser.py",
+  "selection_rule": "chosen by CATEGORY and ordinary stable meaning only; deliberately spans expected PASS/PARTIAL/FAIL; NOT chosen to maximize PASS; frozen before any scoring",
+  "words": [
+    {"iast":"śānti","dev":"शान्ति","gloss":"peace","category":"peaceful concept","expected":"PASS"},
+    {"iast":"jñāna","dev":"ज्ञान","gloss":"knowledge","category":"knowledge/wisdom","expected":"PASS/PARTIAL"},
+    {"iast":"satya","dev":"सत्य","gloss":"truth","category":"positive virtue","expected":"PASS/PARTIAL"},
+    {"iast":"jala","dev":"जल","gloss":"water","category":"natural object","expected":"PASS/PARTIAL"},
+    {"iast":"puṣpa","dev":"पुष्प","gloss":"flower","category":"natural object","expected":"PARTIAL"},
+    {"iast":"gaja","dev":"गज","gloss":"elephant","category":"animal","expected":"PARTIAL"},
+    {"iast":"sūrya","dev":"सूर्य","gloss":"sun","category":"natural force","expected":"PARTIAL"},
+    {"iast":"hasta","dev":"हस्त","gloss":"hand","category":"body part","expected":"PARTIAL/INDETERMINATE"},
+    {"iast":"nadī","dev":"नदी","gloss":"river","category":"natural object","expected":"PASS/PARTIAL"},
+    {"iast":"krodha","dev":"क्रोध","gloss":"anger","category":"afflictive concept","expected":"FAIL"},
+    {"iast":"kāma","dev":"काम","gloss":"desire","category":"afflictive concept","expected":"FAIL"},
+    {"iast":"lobha","dev":"लोभ","gloss":"greed","category":"afflictive concept","expected":"FAIL"},
+    {"iast":"bhaya","dev":"भय","gloss":"fear","category":"emotional/afflictive","expected":"FAIL/PARTIAL"},
+    {"iast":"sarpa","dev":"सर्प","gloss":"snake","category":"destructive animal","expected":"PARTIAL/FAIL"}
+  ]
+}
