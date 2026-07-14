@@ -7,11 +7,15 @@
   "headline_findings": [
     "ś/ṣ SWAP_ERROR: frozen merged has ś=kāma/tamoguṇa and ṣ=artha/rajoguṇa; primary source says ś(sha)=artha/rajoguṇa and ṣ(s'a)=kāma/tamoguṇa. The two are INVERTED in the frozen artifact.",
     "This REVERSES the prior VARNA_SHA_SWAP_PROVENANCE_AUDIT verdict (SWAP_PROVENANCE_RESOLVED_NO_DATA_ERROR) — a data error IS present.",
-    "VOWELS ARE DELIBERATELY EXCLUDED (not a gap): Sarkar maps vowels to the surasaptaka MUSICAL NOTES / bīja sounds (a..aḥ incl. oṃ, hummm, phaṭ, vauṣaṭ, vaṣaṭ, svāhā, namaḥ), a different domain from affliction/vṛtti. The operator intentionally uses their own authored vowel intuition (DEVELOPMENT_ONLY) instead; the musical-note roots are NOT to be reconciled into the affliction mappings."
+    "VOWELS ARE A TWO-LAYER CASE (correcting the earlier 'entirely intuition' framing): Sarkar gives each vowel a MUSICAL-NOTE root AND, for several, a distinct SEMANTIC import. The operator's vowel glosses are GROUNDED in that semantic import for a=creation, e=vauṣaṭ/knowledge, ai=vaṣaṭ/welfare, o=svāhā/completion, au=namaḥ/surrender (near-verbatim), and are the operator's own AUTHORED reasoning only where Sarkar gives just a note (ā,i,ī,u,ū). The MUSICAL-NOTE layer is separately set aside as out-of-domain.",
+    "Sarkar-backed vowel semantics NOT yet mapped (optional to add): ṝ=oṃ, ḷ=hummm, ḹ=phaṭ."
   ],
   "counts": {
     "sibilant_swap_errors": 2,
-    "vowels_deliberately_excluded": 16,
+    "vowels_sarkar_semantic_grounded": 5,
+    "vowels_operator_authored": 7,
+    "vowels_sarkar_semantic_not_yet_mapped": 3,
+    "vowels_operator_absent": 1,
     "consonant_vritti_match": 31
   },
   "rows": [
@@ -19,161 +23,225 @@
       "iast": "a",
       "category": "vowel",
       "primary_source": {
-        "assoc": "creation; controller of the seven notes (surasaptaka); 1st note ṣaḍja"
+        "assoc": "creation; controller of the seven notes (surasaptaka); 1st note ṣaḍja",
+        "sarkar_semantic_import": "creation",
+        "operator_liberating": "Birth of cognition / raw potential",
+        "operator_binding": "restless starting without sustaining",
+        "grounding": "GROUNDED"
       },
       "merged_binding_vritti": "restless starting without sustaining",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'creation' (not intuition): liberating='Birth of cognition / raw potential'. The MUSICAL-NOTE layer is separately set aside."
     },
     {
       "iast": "ā",
       "category": "vowel",
       "primary_source": {
-        "assoc": "ṛṣabha — the 2nd musical note"
+        "assoc": "ṛṣabha — the 2nd musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Ongoing thought / expansion",
+        "operator_binding": "overextension, inflation",
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": "overextension, inflation",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Ongoing thought / expansion' is the operator's own authored reasoning here."
     },
     {
       "iast": "i",
       "category": "vowel",
       "primary_source": {
-        "assoc": "gāndhāra — the 3rd musical note"
+        "assoc": "gāndhāra — the 3rd musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "I-ness, doing self",
+        "operator_binding": "self-absorption, ego-centric doing",
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": "self-absorption, ego-centric doing",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='I-ness, doing self' is the operator's own authored reasoning here."
     },
     {
       "iast": "ī",
       "category": "vowel",
       "primary_source": {
-        "assoc": "madhyama — the 4th musical note"
+        "assoc": "madhyama — the 4th musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Specialization of self",
+        "operator_binding": "over-specialization, isolation",
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": "over-specialization, isolation",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Specialization of self' is the operator's own authored reasoning here."
     },
     {
       "iast": "u",
       "category": "vowel",
       "primary_source": {
-        "assoc": "pañcama — the 5th musical note (+ 'a few other factors, the force of…')"
+        "assoc": "pañcama — the 5th musical note (+ 'a few other factors, the force of…')",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Zoom, contraction",
+        "operator_binding": "tunnel vision, missing the whole picture",
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": "tunnel vision, missing the whole picture",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Zoom, contraction' is the operator's own authored reasoning here."
     },
     {
       "iast": "ū",
       "category": "vowel",
       "primary_source": {
-        "assoc": "dhaivata — the 6th musical note"
+        "assoc": "dhaivata — the 6th musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": "Sustained attention, holding",
+        "operator_binding": "fixation, obsessive holding",
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": "fixation, obsessive holding",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Sustained attention, holding' is the operator's own authored reasoning here."
     },
     {
       "iast": "ṛ",
       "category": "vowel",
       "primary_source": {
-        "assoc": "niṣāda — the 7th musical note"
+        "assoc": "niṣāda — the 7th musical note",
+        "sarkar_semantic_import": null,
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "OPERATOR_ABSENT"
       },
       "merged_binding_vritti": null,
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice. (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"
+      "reconciliation_status": "VOWEL_OPERATOR_ABSENT",
+      "detail": "Sarkar gives only a musical note (niṣāda); operator has no gloss."
     },
     {
       "iast": "ṝ",
       "category": "vowel",
       "primary_source": {
-        "assoc": "oṃ (onm) — creation/preservation/destruction; Saguṇa & Nirguṇa"
+        "assoc": "oṃ (onm) — creation/preservation/destruction; Saguṇa & Nirguṇa",
+        "sarkar_semantic_import": "oṃ — creation/preservation/destruction; Saguṇa & Nirguṇa",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "SARKAR_SEMANTIC_NOT_YET_MAPPED"
       },
       "merged_binding_vritti": null,
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice. (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"
+      "reconciliation_status": "VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED",
+      "detail": "Sarkar gives a SEMANTIC import 'oṃ — creation/preservation/destruction; Saguṇa & Nirguṇa' but the operator has no gloss yet — available Sarkar-backed content, optional to add (rare vocalic sound)."
     },
     {
       "iast": "ḷ",
       "category": "vowel",
       "primary_source": {
-        "assoc": "the sound hummm — struggle, sādhanā, kuṇḍalinī (Tantra); the 'battle cry'"
+        "assoc": "the sound hummm — struggle, sādhanā, kuṇḍalinī (Tantra); the 'battle cry'",
+        "sarkar_semantic_import": "hummm — struggle, sādhanā, kuṇḍalinī",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "SARKAR_SEMANTIC_NOT_YET_MAPPED"
       },
       "merged_binding_vritti": null,
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice. (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"
+      "reconciliation_status": "VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED",
+      "detail": "Sarkar gives a SEMANTIC import 'hummm — struggle, sādhanā, kuṇḍalinī' but the operator has no gloss yet — available Sarkar-backed content, optional to add (rare vocalic sound)."
     },
     {
       "iast": "ḹ",
       "category": "vowel",
       "primary_source": {
-        "assoc": "phaṭ — putting theory into practice; the atibīja/mahābīja of phaṭ"
+        "assoc": "phaṭ — putting theory into practice; the atibīja/mahābīja of phaṭ",
+        "sarkar_semantic_import": "phaṭ — putting a theory into practice",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "SARKAR_SEMANTIC_NOT_YET_MAPPED"
       },
       "merged_binding_vritti": null,
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice. (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"
+      "reconciliation_status": "VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED",
+      "detail": "Sarkar gives a SEMANTIC import 'phaṭ — putting a theory into practice' but the operator has no gloss yet — available Sarkar-backed content, optional to add (rare vocalic sound)."
     },
     {
       "iast": "e",
       "category": "vowel",
       "primary_source": {
-        "assoc": "vauṣaṭ (mahābīja) — mundane knowledge/welfare and its sprouting"
+        "assoc": "vauṣaṭ (mahābīja) — mundane knowledge/welfare and its sprouting",
+        "sarkar_semantic_import": "vauṣaṭ — mundane knowledge / welfare",
+        "operator_liberating": "Practical thought, benefit",
+        "operator_binding": "overthinking, nitpicking",
+        "grounding": "GROUNDED"
       },
       "merged_binding_vritti": "overthinking, nitpicking",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'vauṣaṭ — mundane knowledge / welfare' (not intuition): liberating='Practical thought, benefit'. The MUSICAL-NOTE layer is separately set aside."
     },
     {
       "iast": "ai",
       "category": "vowel",
       "primary_source": {
-        "assoc": "vaṣaṭ — welfare in the subtler sphere; six stages of vocalization (parā/paśyantī/madhyamā…)"
+        "assoc": "vaṣaṭ — welfare in the subtler sphere; six stages of vocalization (parā/paśyantī/madhyamā…)",
+        "sarkar_semantic_import": "vaṣaṭ — welfare in the subtler sphere",
+        "operator_liberating": "Welfare, materialization",
+        "operator_binding": "paternalism, overcontrol 'for your own good'",
+        "grounding": "GROUNDED"
       },
       "merged_binding_vritti": "paternalism, overcontrol 'for your own good'",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'vaṣaṭ — welfare in the subtler sphere' (not intuition): liberating='Welfare, materialization'. The MUSICAL-NOTE layer is separately set aside."
     },
     {
       "iast": "o",
       "category": "vowel",
       "primary_source": {
-        "assoc": "svāhā — completion of an action (total effacement into the fire)"
+        "assoc": "svāhā — completion of an action (total effacement into the fire)",
+        "sarkar_semantic_import": "svāhā — completion of an action",
+        "operator_liberating": "Completion, closure",
+        "operator_binding": "premature closure, stagnation",
+        "grounding": "GROUNDED"
       },
       "merged_binding_vritti": "premature closure, stagnation",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'svāhā — completion of an action' (not intuition): liberating='Completion, closure'. The MUSICAL-NOTE layer is separately set aside."
     },
     {
       "iast": "au",
       "category": "vowel",
       "primary_source": {
-        "assoc": "namaḥ mudrā — surrender to the greatness of another/Supreme"
+        "assoc": "namaḥ mudrā — surrender to the greatness of another/Supreme",
+        "sarkar_semantic_import": "namaḥ — surrender to greatness",
+        "operator_liberating": "Surrender, Letting-go",
+        "operator_binding": "abandonment, cutting off prematurely",
+        "grounding": "GROUNDED"
       },
       "merged_binding_vritti": "abandonment, cutting off prematurely",
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice."
+      "reconciliation_status": "VOWEL_GROUNDED",
+      "detail": "Operator gloss is GROUNDED in Sarkar's SEMANTIC import 'namaḥ — surrender to greatness' (not intuition): liberating='Surrender, Letting-go'. The MUSICAL-NOTE layer is separately set aside."
     },
     {
       "iast": "aṃ",
       "category": "anusvara",
       "primary_source": {
-        "assoc": "an idea (same sound, different ideation → different meaning)"
+        "assoc": "an idea (same sound, different ideation → different meaning)",
+        "sarkar_semantic_import": "an idea",
+        "operator_liberating": null,
+        "operator_binding": null,
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": null,
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice. (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='None' is the operator's own authored reasoning here."
     },
     {
       "iast": "aḥ",
       "category": "visarga",
       "primary_source": {
-        "assoc": "words neither good nor bad — positive/negative by utterance"
+        "assoc": "words neither good nor bad — positive/negative by utterance",
+        "sarkar_semantic_import": "positive/negative by utterance",
+        "operator_liberating": "Attraction, Nectar-pull",
+        "operator_binding": "compulsion, clinging pull",
+        "grounding": "AUTHORED"
       },
       "merged_binding_vritti": null,
-      "reconciliation_status": "DELIBERATELY_EXCLUDED_DEV_INTUITION",
-      "detail": "DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition (DEVELOPMENT_ONLY), by choice. (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"
+      "reconciliation_status": "VOWEL_AUTHORED",
+      "detail": "Sarkar gives ONLY a musical note (no semantic import); operator gloss liberating='Attraction, Nectar-pull' is the operator's own authored reasoning here."
     },
     {
       "iast": "k",

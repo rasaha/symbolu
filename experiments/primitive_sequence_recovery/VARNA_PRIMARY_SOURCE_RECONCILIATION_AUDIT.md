@@ -11,10 +11,12 @@ DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE`.
    and it **reverses** the earlier `VARNA_SHA_SWAP_PROVENANCE_AUDIT.md` verdict
    (`SWAP_PROVENANCE_RESOLVED_NO_DATA_ERROR`). That verdict was **wrong** — I trusted the intermediate `b1_2`
    ledger as the primary-text authority; the real primary text shows the opposite.
-2. **The vowel acoustic-root layer is deliberately excluded (not a gap).** Sarkar assigns vowels to the
-   surasaptaka **musical notes** and bīja sounds — a different domain from affliction/vṛtti — so the operator
-   intentionally left them out and uses their own authored vowel intuition instead. Recorded here so it is not
-   re-flagged as an omission.
+2. **Vowels are a two-layer case — not "entirely intuition" (correcting an earlier overstatement).** Sarkar gives
+   each vowel a **musical-note** root *and*, for several, a distinct **semantic import**. The operator's vowel
+   glosses are **grounded in Sarkar's semantic import** for **a=creation, e=vauṣaṭ (knowledge), ai=vaṣaṭ
+   (welfare), o=svāhā (completion), au=namaḥ (surrender)** — near-verbatim — and are the operator's **own authored**
+   reasoning only where Sarkar gives *just* a note (ā, i, ī, u, ū). The **musical-note** layer is separately set
+   aside as out-of-domain.
 
 ## 1. The ś/ṣ swap — what the primary source actually says
 
@@ -61,14 +63,28 @@ The source is unambiguous and states the sibilants **three times**, including a 
 the kāma/tamasic gloss (should be artha/rajasic) and words with `ṣ` the reverse. Because it is exactly two
 consonants transposed, it is a contained but real error — it should be fixed before the lift run, not after.
 
-## 2. The vowel layer (16 units) — deliberately excluded, NOT to be reconciled
+## 2. The vowel layer — two layers, and the operator's glosses are partly Sarkar-grounded
 
-**Design decision (operator-confirmed):** in Sarkar's text the vowels are acoustic roots of the **surasaptaka
-musical notes** and bīja sounds — a **different semantic domain** from the affliction/vṛtti mappings. Folding
-musical-note roots into an affliction feature would be a category error. The operator therefore intentionally
-**excludes** these and substitutes their own authored vowel intuition (already flagged `AUTHORED_PROVISIONAL /
-DEVELOPMENT_ONLY` in the merged lexicon via varna_lens). The table below is recorded for provenance only — it is
-**not** a reconciliation gap and should **not** be merged into the affliction mappings:
+**Correction to an earlier overstatement.** I first called the vowel glosses "entirely intuition." That is wrong.
+Sarkar gives each vowel **two** things: (a) a **musical-note** root (the surasaptaka — a=ṣaḍja … ṛ=niṣāda), which
+*is* a different domain and is set aside; and (b) for several vowels, a distinct **semantic/cosmological import**.
+The operator's vowel glosses are **grounded in that semantic layer** where it exists:
+
+| Vowel | Sarkar semantic import | Operator liberating gloss | Grounding |
+|---|---|---|---|
+| **a** | **creation** | "Birth of cognition / raw potential" | **Sarkar-grounded** |
+| **e** | vauṣaṭ — mundane knowledge / welfare | "Practical thought, benefit" | **Sarkar-grounded** |
+| **ai** | vaṣaṭ — welfare (subtler sphere) | "Welfare, materialization" | **Sarkar-grounded** |
+| **o** | svāhā — completion of an action | "Completion, closure" | **Sarkar-grounded** |
+| **au** | namaḥ — surrender | "Surrender, Letting-go" | **Sarkar-grounded** |
+| ā, i, ī, u, ū | (Sarkar gives only a musical note) | expansion / I-ness / specialization / zoom / holding | operator-authored |
+| **ṝ, ḷ, ḹ** | oṃ · hummm · phaṭ | (no operator gloss) | **Sarkar semantic available, not yet mapped** |
+| ṛ | (only musical note niṣāda) | (no gloss) | operator-absent |
+
+So five vowels (**a, e, ai, o, au**) are near-verbatim Sarkar semantics, not invention; five (ā, i, ī, u, ū) are
+the operator's own reasoning where Sarkar gives only a note; and three (**ṝ=oṃ, ḷ=hummm, ḹ=phaṭ**) carry
+Sarkar-backed semantics the mapping doesn't yet include (optional to add — rare vocalic sounds). The **musical
+notes** themselves remain out-of-domain for the affliction mappings.
 
 | Vowel | Primary-source acoustic root |
 |---|---|
@@ -98,7 +114,10 @@ passage — so it is neither confirmed nor contradicted here.)
 | Status | Count | Units |
 |---|---|---|
 | **SWAP_ERROR** (must fix) | 2 | ś, ṣ |
-| **vowels DELIBERATELY EXCLUDED** (musical-note domain; operator uses own intuition) | 16 | a ā i ī u ū ṛ ṝ ḷ ḹ e ai o au aṃ aḥ |
+| vowels — Sarkar-semantic-grounded operator gloss | 5 | a e ai o au |
+| vowels — operator-authored (Sarkar gives only a note) | 7 | ā i ī u ū aṃ aḥ |
+| vowels — Sarkar semantics available, not yet mapped | 3 | ṝ (oṃ) ḷ (hummm) ḹ (phaṭ) |
+| vowels — operator-absent (only a note) | 1 | ṛ |
 | MATCH (consonant vṛtti) | 31 | all other consonants |
 | out of atomic scope | 1 | kṣ (conjunct) |
 
@@ -113,8 +132,9 @@ Machine-readable: `varna_acoustic_roots_primary_source.json` (sha256 `553fc3ee�
    **feature-lift dataset**, I have not done it — it needs your go-ahead.
 2. **Rebuild the feature-lift prerun** after the correction (only words containing ś or ṣ change; a targeted
    rebuild suffices), or explicitly accept the swap and document it — but the honest path is to fix it.
-3. **Vowels: no action.** Their acoustic roots (musical notes) are deliberately out of scope for the affliction
-   mappings; the authored vowel intuition stays as the operator's chosen development-only layer.
+3. **Vowels: mostly settled.** The musical-note layer stays out of scope; the operator's glosses for a/e/ai/o/au
+   are Sarkar-grounded and correct to keep. The only optional addition is the three unmapped Sarkar semantics
+   (ṝ=oṃ, ḷ=hummm, ḹ=phaṭ) — rare vocalic sounds; add only if the vowel layer is developed further.
 
 ## Guardrails
 Read-only reconciliation; no frozen mapping, preregistration, feature-lift dataset, or prior result modified. The

@@ -10,10 +10,36 @@ Romanization key in the source (verified across the document):
 """
 import json, hashlib
 
+import os
 MERGED = "frozen/varna_native_stage1_merged_v1.json"
 def sha(p): return hashlib.sha256(open(p, "rb").read()).hexdigest()
 
 merged = {r["canonical_parser_unit"]: r for r in json.load(open(MERGED))["rows"]}
+_vlp = "varna_lens/lexicon_authoritative_varna.json"
+_vlp = _vlp if os.path.exists(_vlp) else "../../varna_lens/lexicon_authoritative_varna.json"
+_vl = json.load(open(_vlp)).get("vowels", {})
+VLIB = {}  # iast -> (liberating, binding)
+for _k, _v in _vl.items():
+    VLIB[_v.get("iast", "").split()[0]] = (_v.get("liberating_state"), _v.get("binding_state"))
+
+# Sarkar's SEMANTIC vowel import (beyond the musical note), and grounding of the
+# operator's vowel gloss: GROUNDED where the gloss tracks Sarkar's semantic import;
+# AUTHORED where Sarkar gives only a musical note; SARKAR_SEMANTIC_NOT_YET_MAPPED
+# where a semantic import exists but the operator has no gloss.
+VOWEL_SEMANTIC = {
+ "a":("creation","GROUNDED"),
+ "ā":(None,"AUTHORED"), "i":(None,"AUTHORED"), "ī":(None,"AUTHORED"),
+ "u":(None,"AUTHORED"), "ū":(None,"AUTHORED"),
+ "ṛ":(None,"OPERATOR_ABSENT"),
+ "ṝ":("oṃ — creation/preservation/destruction; Saguṇa & Nirguṇa","SARKAR_SEMANTIC_NOT_YET_MAPPED"),
+ "ḷ":("hummm — struggle, sādhanā, kuṇḍalinī","SARKAR_SEMANTIC_NOT_YET_MAPPED"),
+ "ḹ":("phaṭ — putting a theory into practice","SARKAR_SEMANTIC_NOT_YET_MAPPED"),
+ "e":("vauṣaṭ — mundane knowledge / welfare","GROUNDED"),
+ "ai":("vaṣaṭ — welfare in the subtler sphere","GROUNDED"),
+ "o":("svāhā — completion of an action","GROUNDED"),
+ "au":("namaḥ — surrender to greatness","GROUNDED"),
+ "aṃ":("an idea","AUTHORED"), "aḥ":("positive/negative by utterance","AUTHORED"),
+}
 
 # Primary-source acoustic-root facts, transcribed verbatim (no inference).
 # Each: iast -> dict(vritti/guna/purushartha/tattva/deity/other, quote)
@@ -93,12 +119,22 @@ for iast,fact in PRIMARY.items():
             status = "SWAP_ERROR" if ("artha" in mb or "rajasic" in mb) else "MATCH"
             detail = "primary: ṣ=tamoguṇa+kāma; merged binding = artha/rajasic → SWAPPED with ś"
     elif fact.get("cat") in ("vowel","anusvara","visarga"):
-        has = bool((m or {}).get("binding_vritti"))
-        status = "DELIBERATELY_EXCLUDED_DEV_INTUITION"
-        detail = ("DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja "
-                  "sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally "
-                  "NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition "
-                  "(DEVELOPMENT_ONLY), by choice." + ("" if has else " (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"))
+        sem, grounding = VOWEL_SEMANTIC.get(iast, (None, "AUTHORED"))
+        lib, bnd = VLIB.get(iast, (None, None))
+        status = "VOWEL_" + grounding
+        if grounding == "GROUNDED":
+            detail = (f"Operator gloss is GROUNDED in Sarkar's SEMANTIC import '{sem}' (not intuition): "
+                      f"liberating='{lib}'. The MUSICAL-NOTE layer is separately set aside.")
+        elif grounding == "SARKAR_SEMANTIC_NOT_YET_MAPPED":
+            detail = (f"Sarkar gives a SEMANTIC import '{sem}' but the operator has no gloss yet — "
+                      f"available Sarkar-backed content, optional to add (rare vocalic sound).")
+        elif grounding == "OPERATOR_ABSENT":
+            detail = "Sarkar gives only a musical note (niṣāda); operator has no gloss."
+        else:  # AUTHORED
+            detail = (f"Sarkar gives ONLY a musical note (no semantic import); operator gloss "
+                      f"liberating='{lib}' is the operator's own authored reasoning here.")
+        fact = {**fact, "sarkar_semantic_import": sem, "operator_liberating": lib,
+                "operator_binding": bnd, "grounding": grounding}
     elif iast=="kṣ":
         status="OUT_OF_ATOMIC_SCOPE"; detail="conjunct; not one of the 33 atomic backbone consonants"
     else:
@@ -116,11 +152,15 @@ out={"schema":"varna_primary_source_reconciliation_v1",
      "headline_findings":[
        "ś/ṣ SWAP_ERROR: frozen merged has ś=kāma/tamoguṇa and ṣ=artha/rajoguṇa; primary source says ś(sha)=artha/rajoguṇa and ṣ(s'a)=kāma/tamoguṇa. The two are INVERTED in the frozen artifact.",
        "This REVERSES the prior VARNA_SHA_SWAP_PROVENANCE_AUDIT verdict (SWAP_PROVENANCE_RESOLVED_NO_DATA_ERROR) — a data error IS present.",
-       "VOWELS ARE DELIBERATELY EXCLUDED (not a gap): Sarkar maps vowels to the surasaptaka MUSICAL NOTES / bīja sounds (a..aḥ incl. oṃ, hummm, phaṭ, vauṣaṭ, vaṣaṭ, svāhā, namaḥ), a different domain from affliction/vṛtti. The operator intentionally uses their own authored vowel intuition (DEVELOPMENT_ONLY) instead; the musical-note roots are NOT to be reconciled into the affliction mappings.",
+       "VOWELS ARE A TWO-LAYER CASE (correcting the earlier 'entirely intuition' framing): Sarkar gives each vowel a MUSICAL-NOTE root AND, for several, a distinct SEMANTIC import. The operator's vowel glosses are GROUNDED in that semantic import for a=creation, e=vauṣaṭ/knowledge, ai=vaṣaṭ/welfare, o=svāhā/completion, au=namaḥ/surrender (near-verbatim), and are the operator's own AUTHORED reasoning only where Sarkar gives just a note (ā,i,ī,u,ū). The MUSICAL-NOTE layer is separately set aside as out-of-domain.",
+       "Sarkar-backed vowel semantics NOT yet mapped (optional to add): ṝ=oṃ, ḷ=hummm, ḹ=phaṭ.",
      ],
      "counts":{
         "sibilant_swap_errors":sum(1 for r in recon if r["reconciliation_status"]=="SWAP_ERROR"),
-        "vowels_deliberately_excluded":sum(1 for r in recon if r["reconciliation_status"]=="DELIBERATELY_EXCLUDED_DEV_INTUITION"),
+        "vowels_sarkar_semantic_grounded":sum(1 for r in recon if r["reconciliation_status"]=="VOWEL_GROUNDED"),
+        "vowels_operator_authored":sum(1 for r in recon if r["reconciliation_status"]=="VOWEL_AUTHORED"),
+        "vowels_sarkar_semantic_not_yet_mapped":sum(1 for r in recon if r["reconciliation_status"]=="VOWEL_SARKAR_SEMANTIC_NOT_YET_MAPPED"),
+        "vowels_operator_absent":sum(1 for r in recon if r["reconciliation_status"]=="VOWEL_OPERATOR_ABSENT"),
         "consonant_vritti_match":sum(1 for r in recon if r["reconciliation_status"]=="MATCH_VRITTI"),
      },
      "rows":recon}
