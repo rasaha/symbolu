@@ -30,8 +30,11 @@ no-feature on held-out data.
 
 - Parser `sanskrit_stage1_parser.py` (`d885391f…`), `PARSER_SPEC_v1`; consonant occurrences only
   (`type=="consonant"`), matching the Resolution Test primary arm.
-- Lexicon `frozen/varna_native_stage1_merged_v1.json` (`af4c1f54…`); **33 confirmatory-backbone consonants**,
-  each with its verbatim frozen binding gloss.
+- Lexicon `frozen/varna_native_stage1_merged_v3.json` (`65116f37…`); **33 confirmatory-backbone consonants**,
+  each with its verbatim frozen binding gloss. **(Repointed from v1 `af4c1f54…` to v3 after the ś/ṣ
+  sibilant-swap correction + vowel completion; see `VARNA_MERGED_V3_SIBILANT_CORRECTION_FREEZE.md`. Word list
+  unchanged — selection is by consonant unit; only the ś/ṣ glosses are corrected. The run uses
+  `varna_feature_lift_prerun_v2/`.)**
 - **Composition = multiset, no order** (multiplicity preserved via occurrence-level inclusion; order **not** used
   — consistent with the frozen AND-composition / no-progression theory). This makes the feature theory-faithful
   *and* sidesteps the order question entirely.
