@@ -1,0 +1,37 @@
+{
+  "schema": "b1_12_bsr_model_manifest_v1",
+  "gate": "GATE_1_REQUIRED_MODELS",
+  "required_model_families": [
+    {
+      "family": "Qwen 3",
+      "size_class": "~30B-32B",
+      "role": "author/scorer (crossover)"
+    },
+    {
+      "family": "Mistral Small 3.x",
+      "size_class": "~24B",
+      "role": "author/scorer (crossover)"
+    }
+  ],
+  "capability_check": {
+    "gpu": "none (no nvidia-smi)",
+    "local_runners": {
+      "ollama": false,
+      "vllm": false,
+      "llama-server": false,
+      "text-generation-launcher": false,
+      "lmdeploy": false
+    },
+    "python_inference_libs": {
+      "torch": false,
+      "transformers": false,
+      "vllm": false,
+      "llama_cpp": false
+    },
+    "local_qwen_or_mistral_weights": "none found",
+    "external_qwen_or_mistral_api_keys": "none set"
+  },
+  "pinned_settings": "NOT PINNED — models unavailable; per prereg, config (revision/quant/temp/top-p/top-k/rep-penalty/max-tokens/seed/chat-template/Qwen-reasoning-mode) is recorded only when the models are actually loaded",
+  "substitution_policy": "PROHIBITED — no silent substitution performed",
+  "verdict": "BLOCKED_REQUIRED_MODEL_UNAVAILABLE"
+}
