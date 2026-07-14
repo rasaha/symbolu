@@ -32,13 +32,21 @@ from .constraints import (ConstraintKind, ConstraintResult,
 from .envelopes import (ActionDecision, ActionType, CanonicalActionCandidate)
 from .authorization import (ControlAuthorization, ReferenceCommitRevalidator,
                             ReferenceControlAuthorizer)
-from .action_selection import (DeterministicActionSelector, SelectionOutcome,
-                               SoftObjective)
+from .action_selection import (AdmissibilityResult, DeterministicActionSelector,
+                               LexicographicActionSelector, SelectionOutcome,
+                               SoftObjective, filter_admissible)
 from .decision_trace import (DecisionTrace, InMemoryDecisionTraceSink,
                              RejectedCandidate)
 from .failure_state import (FailureState, FailureStateMachine, TransitionRecord,
                             LEGAL_TRANSITIONS, MANUAL_RESET_TRANSITIONS,
                             is_legal, requires_manual_reset)
+# Phase 1 — hard-constraint library, call-site adapters, shadow evaluation.
+from .constraint_library import (SafeFallbackConstraint, ThresholdConstraint,
+                                 conflict_constraints, deliberative_constraints,
+                                 evaluate_constraint_set, task_allocation_constraints)
+from .adapters import (AdaptedSet, adapt_conflict, adapt_deliberative,
+                       adapt_task_allocation)
+from .shadow import ShadowClass, ShadowRecord, acp_evaluate, classify
 
 __all__ = [
     "__version__",
@@ -61,11 +69,17 @@ __all__ = [
     "ControlAuthorization", "ReferenceControlAuthorizer",
     "ReferenceCommitRevalidator",
     # selection
-    "DeterministicActionSelector", "SoftObjective", "SelectionOutcome",
+    "DeterministicActionSelector", "LexicographicActionSelector", "SoftObjective",
+    "SelectionOutcome", "AdmissibilityResult", "filter_admissible",
     # trace
     "DecisionTrace", "RejectedCandidate", "InMemoryDecisionTraceSink",
     # failure state
     "FailureState", "FailureStateMachine", "TransitionRecord",
     "LEGAL_TRANSITIONS", "MANUAL_RESET_TRANSITIONS", "is_legal",
     "requires_manual_reset",
+    # Phase 1
+    "ThresholdConstraint", "SafeFallbackConstraint", "evaluate_constraint_set",
+    "deliberative_constraints", "conflict_constraints", "task_allocation_constraints",
+    "AdaptedSet", "adapt_deliberative", "adapt_conflict", "adapt_task_allocation",
+    "ShadowClass", "ShadowRecord", "acp_evaluate", "classify",
 ]
