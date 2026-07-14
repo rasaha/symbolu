@@ -1,0 +1,573 @@
+{
+  "eval_seeds": [
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149
+  ],
+  "bcvf_margin_threshold": 1.5,
+  "tune_families": [
+    "gaussian_noise",
+    "constant_bias",
+    "linear_drift",
+    "accelerating",
+    "noisy_unbiased"
+  ],
+  "test_families": [
+    "slow_bias",
+    "abrupt_jump",
+    "stuck_sensor",
+    "delayed_predictor",
+    "stale_predictor",
+    "correlated_failure",
+    "all_wrong",
+    "precise_biased",
+    "calibration_drift"
+  ],
+  "per_detector": {
+    "DeterministicBaseline": {
+      "aggregate_all": {
+        "fault_detection_recall": 1.0,
+        "false_alarm_rate": 0.04,
+        "n_benign_families_with_false_alarm": 2,
+        "common_mode_false_detection_rate": 0.0,
+        "detection_delay_ticks": 17.0125,
+        "attribution_accuracy": 0.8889,
+        "common_mode_abstain_rate": 0.0,
+        "abstention_correctness": 0.8571,
+        "runtime_us_per_episode": 5417.2804
+      },
+      "aggregate_test_only": {
+        "fault_detection_recall": 1.0,
+        "false_alarm_rate": 0.02,
+        "n_benign_families_with_false_alarm": 1,
+        "common_mode_false_detection_rate": 0.0,
+        "detection_delay_ticks": 15.796,
+        "attribution_accuracy": 0.8333,
+        "common_mode_abstain_rate": 0.0,
+        "abstention_correctness": 0.7778,
+        "runtime_us_per_episode": 5339.7229
+      },
+      "per_family": {
+        "gaussian_noise": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5657.1
+        },
+        "constant_bias": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 18.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5404.9
+        },
+        "slow_bias": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 23.2,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5412.2
+        },
+        "linear_drift": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 18.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5537.9
+        },
+        "accelerating": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 21.1,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5950.4
+        },
+        "abrupt_jump": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 9.8,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5628.9
+        },
+        "stuck_sensor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 10.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5574.9
+        },
+        "delayed_predictor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 18.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5416.0
+        },
+        "stale_predictor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 0.0,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 4889.1
+        },
+        "correlated_failure": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5352.3
+        },
+        "all_wrong": {
+          "harm_class": "common_mode",
+          "fault_active": true,
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5266.1
+        },
+        "precise_biased": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 18.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5262.0
+        },
+        "noisy_unbiased": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.1,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": true,
+          "runtime_us": 5234.2
+        },
+        "calibration_drift": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.02,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": true,
+          "runtime_us": 5256.1
+        }
+      }
+    },
+    "BCVF": {
+      "aggregate_all": {
+        "fault_detection_recall": 0.9,
+        "false_alarm_rate": 0.6667,
+        "n_benign_families_with_false_alarm": 2,
+        "common_mode_false_detection_rate": 0.86,
+        "detection_delay_ticks": 5.0075,
+        "attribution_accuracy": 0.8889,
+        "common_mode_abstain_rate": 0.0,
+        "abstention_correctness": 0.8571,
+        "runtime_us_per_episode": 491.1258
+      },
+      "aggregate_test_only": {
+        "fault_detection_recall": 0.8571,
+        "false_alarm_rate": 1.0,
+        "n_benign_families_with_false_alarm": 1,
+        "common_mode_false_detection_rate": 0.86,
+        "detection_delay_ticks": 2.404,
+        "attribution_accuracy": 0.8333,
+        "common_mode_abstain_rate": 0.0,
+        "abstention_correctness": 0.7778,
+        "runtime_us_per_episode": 537.7899
+      },
+      "per_family": {
+        "gaussian_noise": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 240.5
+        },
+        "constant_bias": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 11.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 451.6
+        },
+        "slow_bias": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 1.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 467.6
+        },
+        "linear_drift": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 11.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 446.2
+        },
+        "accelerating": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 6.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 448.2
+        },
+        "abrupt_jump": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 0.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 445.6
+        },
+        "stuck_sensor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 0.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 453.1
+        },
+        "delayed_predictor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 11.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 465.4
+        },
+        "stale_predictor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 0.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 449.3
+        },
+        "correlated_failure": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 442.9
+        },
+        "all_wrong": {
+          "harm_class": "common_mode",
+          "fault_active": true,
+          "detected_rate": 0.86,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 428.6
+        },
+        "precise_biased": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 0.0,
+          "attribution_acc": 0.0,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 232.1
+        },
+        "noisy_unbiased": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 1.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": true,
+          "runtime_us": 449.1
+        },
+        "calibration_drift": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 1.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": true,
+          "runtime_us": 1455.6
+        }
+      }
+    },
+    "Fusion(Baseline+BCVF)": {
+      "aggregate_all": {
+        "fault_detection_recall": 1.0,
+        "false_alarm_rate": 0.04,
+        "n_benign_families_with_false_alarm": 2,
+        "common_mode_false_detection_rate": 0.0,
+        "detection_delay_ticks": 7.2575,
+        "attribution_accuracy": 0.8889,
+        "common_mode_abstain_rate": 0.0,
+        "abstention_correctness": 0.8571,
+        "runtime_us_per_episode": 5822.2113
+      },
+      "aggregate_test_only": {
+        "fault_detection_recall": 1.0,
+        "false_alarm_rate": 0.02,
+        "n_benign_families_with_false_alarm": 1,
+        "common_mode_false_detection_rate": 0.0,
+        "detection_delay_ticks": 6.004,
+        "attribution_accuracy": 0.8333,
+        "common_mode_abstain_rate": 0.0,
+        "abstention_correctness": 0.7778,
+        "runtime_us_per_episode": 5863.4724
+      },
+      "per_family": {
+        "gaussian_noise": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5617.3
+        },
+        "constant_bias": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 11.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5819.3
+        },
+        "slow_bias": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 1.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5779.4
+        },
+        "linear_drift": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 11.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5757.9
+        },
+        "accelerating": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 6.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5777.4
+        },
+        "abrupt_jump": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 0.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 6124.3
+        },
+        "stuck_sensor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 0.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5853.5
+        },
+        "delayed_predictor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 11.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5711.3
+        },
+        "stale_predictor": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 0.0,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5256.7
+        },
+        "correlated_failure": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5749.5
+        },
+        "all_wrong": {
+          "harm_class": "common_mode",
+          "fault_active": true,
+          "detected_rate": 0.0,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5759.7
+        },
+        "precise_biased": {
+          "harm_class": "harmful_state_error",
+          "fault_active": true,
+          "detected_rate": 1.0,
+          "attribution_acc": 1.0,
+          "mean_delay": 18.0,
+          "abstain_rate": 0.0,
+          "false_alarm": false,
+          "runtime_us": 5628.6
+        },
+        "noisy_unbiased": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.1,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": true,
+          "runtime_us": 5767.8
+        },
+        "calibration_drift": {
+          "harm_class": "benign",
+          "fault_active": false,
+          "detected_rate": 0.02,
+          "attribution_acc": null,
+          "mean_delay": null,
+          "abstain_rate": 0.0,
+          "false_alarm": true,
+          "runtime_us": 6908.1
+        }
+      }
+    }
+  }
+}
