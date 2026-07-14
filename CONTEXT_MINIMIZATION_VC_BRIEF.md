@@ -18,44 +18,51 @@
 
 ---
 
-## Page 1 — The Problem
+## Page 1 — The Problem & The Category
 
-### Enterprise agents are getting expensive, and the obvious fix quietly breaks authorization.
+### Enterprise agents re-send authorization-bearing context on every step — and compressing it the usual way silently breaks authorization.
 
-**The business problem comes first.** Enterprises are now putting autonomous,
-tool-calling agents into production — agents that approve payments, change
-infrastructure, grant access, file and act on tickets. Every one of these agents
-is expensive to run, and the expense has a specific shape: on **every turn**, the
-agent re-sends the same heavy context — the governing policy, the running state,
-the supporting evidence, the ticket and approval history, the standing
-instructions. A single agent workflow can make dozens of such turns, and an
-enterprise runs many workflows in parallel. The context is re-transmitted again
-and again, and input tokens dominate the bill.
+Enterprise AI agents repeatedly send the same authorization-bearing context —
+policies, approvals, state, evidence, and history — to an LLM on **every step**.
+As agents move into production and fleets grow, this repeated context is becoming
+**one of the largest recurring inference costs in enterprise AI.**
 
-The industry's reflex is to **compress that context** to cut the cost:
-summarize the transcript, paraphrase the policy, drop "low-salience" spans, or
-hand the whole thing to a smaller model to rewrite shorter. This does save money.
-It also introduces a risk that is invisible to the tools creating it: **the
-compression can change what the agent decides to do.** A summarizer that drops
-one clause of a policy, a paraphrase that softens a "FORBID" into a "prefer not
-to," or a salience filter that removes the amount field of a payment can silently
-alter the authorized action. The token bill went down; a decision moved with it —
-and in an authorization-bearing workflow, the moved decision is the payment that
-should not have gone out, the deletion that should have been blocked, the scope
-that should not have been granted.
+Existing compression reduces that cost by **rewriting or summarizing** the
+context — and in doing so can **silently change the authorization decision the
+context would produce.** A dropped policy clause, a "FORBID" softened to a "prefer
+not to," a removed payment amount: the token bill falls, and a decision moves with
+it — the payment that should not have gone out, the deletion that should have been
+blocked, the scope that should not have been granted.
 
-That failure is undetectable to the compressor that caused it. Summarization
-quality is graded on text-similarity metrics (ROUGE, human fidelity), never on
-*"would an authorization gate reach the same verdict on the shorter context?"*
-The question an enterprise buyer actually needs answered is not "is the summary
-faithful?" but "**can I cut context cost without ever moving an authorization
-decision?**" — and no general-purpose compressor is built to answer it.
+**ActionGate Context Minimization is the first deterministic context layer that
+removes only information proven irrelevant to authorization — reducing cost
+without changing decisions.** It is extractive (it never rewrites), every keep/drop
+choice is gated by a deterministic authorization engine, and it fails closed.
 
-**ActionGate Context Minimization is built to answer exactly that.** It removes
-tokens *only where a deterministic authorization gate proves the removal cannot
-change the decision*, it never rewrites text, and it fails closed — retaining a
-span whenever its detector is unsure. Compression becomes a cost lever an
-enterprise can pull without taking on authorization risk.
+### The category: three layers of enterprise AI infrastructure
+
+We believe enterprise AI infrastructure resolves into three foundational layers
+that sit **around** the model rather than competing with it:
+
+| Layer | What it governs | Ugence Labs product |
+|---|---|---|
+| **Context Layer** | what the model is allowed to *read* | **Context Minimization** |
+| **Reasoning Layer** | the model's inference itself | *(the LLM — not ours)* |
+| **Execution Layer** | what the model is allowed to *do* | **ActionGate** |
+
+Ugence Labs builds **two of the three** — the deterministic layers on either side
+of the model. Context Minimization governs the context going in; ActionGate
+governs the action coming out. This brief is about the Context Layer; the two are
+tied together into a company-level thesis on Page 4.
+
+### Why every enterprise agent needs this
+
+**Every enterprise agent already assembles context before calling an LLM, and
+every enterprise agent already executes actions after the LLM responds.** These
+two insertion points exist regardless of the underlying model — which is exactly
+what makes both products **horizontal infrastructure** rather than point
+solutions: the same two layers front a finance agent, an infrastructure agent, and
+an access agent alike, no matter which model sits between them.
 
 **In one line:** *ActionGate Context Minimization cuts the token cost of running
 authorization-bearing agents by removing only the context a deterministic gate
@@ -103,26 +110,32 @@ application an enterprise adopts for one workflow; it is a middleware stage the
 whole fleet passes through.
 
 ```
-                        User
-                          │
-                          ▼
-                       Planner
-                          │
-                          ▼
-                  Context Assembly            (policy · state · evidence · history · instructions)
-                          │
-                          ▼
-        ██  ActionGate Context Minimization  ██   ← removes only spans a deterministic
-                          │                          gate proves inert; fails closed
-                          ▼
-                         LLM                    (reads a smaller, authorization-invariant context)
-                          │
-                          ▼
-                      ActionGate               (authorizes / denies the resulting action)
-                          │
-                          ▼
-                  Enterprise System            (payment · deployment · access · ticket)
+              Enterprise Context
+                      │
+                      ▼
+            Context Minimization
+                      │
+                      ▼
+                     LLM
+                      │
+                      ▼
+                 ActionGate
+                      │
+                      ▼
+             Enterprise Systems
 ```
+
+Each layer has one job:
+
+- **Enterprise Context** — the policy, state, evidence, and history assembled for
+  the agent's turn.
+- **Context Minimization** — removes only the spans a deterministic gate proves are
+  irrelevant to authorization; fails closed. *(This product.)*
+- **LLM** — reads a smaller, authorization-invariant context and proposes an action.
+- **ActionGate** — makes and enforces the deterministic authorization decision on
+  that action.
+- **Enterprise Systems** — the payment, deployment, access change, or ticket that
+  actually executes.
 
 **Two complementary products, separate responsibilities.** Context Minimization
 and ActionGate are distinct layers of the same stack:
@@ -364,10 +377,19 @@ everywhere else.
 
 ### Why this is difficult to replicate
 
-The differentiation is **not any single algorithm** — the span-extraction and
-budget-fill mechanics are, on their own, replicable. What is hard to reproduce is
-the **complete system**, because the measured properties emerge only when six
-pieces work together:
+Put in business terms first:
+
+> **Competitors can build compressors. Competitors can build authorization
+> engines. The hard part is *proving that compression never changes an
+> authorization decision* — and that proof requires both systems working
+> together.** A compressor alone has nothing to check itself against; an
+> authorization engine alone does not reduce cost. The defensible asset is the
+> proven equivalence between the two, plus the frozen evidence that it holds.
+
+That is why the differentiation is **not any single algorithm** — the
+span-extraction and budget-fill mechanics are, on their own, replicable. What is
+hard to reproduce is the **complete system**, because the measured properties
+emerge only when six pieces work together:
 
 1. a **deterministic authorization engine** to serve as the ground-truth oracle;
 2. a **protected-span detector** that identifies load-bearing spans;
@@ -568,22 +590,27 @@ afford to move.
 ### The strategic picture
 
 Step back and the two Ugence Labs products form one coherent story for autonomous
-enterprise agents:
+enterprise agents. The positioning statement, in two lines:
 
-- **ActionGate governs execution** — it makes and enforces the deterministic
-  decision about whether an agent's action may commit.
-- **Context Minimization governs context** — it reduces what the model reads while
-  proving, against that same deterministic gate, that the reduction changes no
-  authorization outcome.
+> ## ActionGate governs execution.
+> ## Context Minimization governs context.
 
 One decides what an agent is allowed to *do*; the other decides what an agent is
-allowed to *read*, and guarantees that decision is preserved. **Together they give
-an enterprise a deterministic control plane around its autonomous agents** — the
-context going in and the action coming out are both governed by the same
-authoritative, reproducible engine, rather than left to the statistical behavior of
-a language model. That is the position this raise is meant to build: not a
-compressor, but the context half of deterministic infrastructure for enterprise
-agents.
+allowed to *read*, and guarantees that decision is preserved — the Execution Layer
+and the Context Layer from Page 1, the two deterministic layers on either side of
+the model.
+
+**Why Ugence Labs becomes the company customers buy both from.** Together, Context
+Minimization and ActionGate create a **deterministic control plane around
+enterprise AI.** One governs what the model reads; the other governs what the model
+is allowed to do. As enterprises deploy larger fleets of autonomous agents, we
+believe these two layers become foundational infrastructure that sits *around*
+every model rather than competing with any model — the context going in and the
+action coming out both governed by the same authoritative, reproducible engine
+instead of left to a language model's statistical behavior. That is the position
+this raise is meant to build: not a compressor, but the Context Layer of
+deterministic infrastructure for enterprise agents — bought alongside the Execution
+Layer, from one company.
 
 ---
 
