@@ -378,7 +378,11 @@ class TestZeroRuntimeBehaviourChange(unittest.TestCase):
         loaded = set(sys.modules)
         # ACP itself is loaded; ensure its own submodules don't require numpy
         for name in list(loaded):
-            if name.startswith("symbolu_robotics.autonomous_control_plane"):
+            # safety_adapters/ is the integration layer and is allowed to bind
+            # numpy + the real safety modules (Phase 2); the CORE must not.
+            if (name.startswith("symbolu_robotics.autonomous_control_plane")
+                    and "safety_adapters" not in name
+                    and ".tests" not in name):
                 mod = sys.modules[name]
                 self.assertFalse(getattr(mod, "np", None),
                                  f"{name} unexpectedly bound numpy as np")

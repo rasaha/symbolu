@@ -116,7 +116,9 @@ class TestShadowIsolationAndDeterminism(unittest.TestCase):
             re.MULTILINE)
         offenders = []
         for f in pkg.rglob("*.py"):
-            if "/tests/" in str(f):
+            # safety_adapters/ is the Phase-2 integration layer (numpy + safety
+            # allowed by design); the core stays stdlib-only.
+            if "/tests/" in str(f) or "/safety_adapters/" in str(f):
                 continue
             if forbidden.search(f.read_text()):
                 offenders.append(f.name)

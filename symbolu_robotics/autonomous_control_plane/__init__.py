@@ -47,6 +47,9 @@ from .constraint_library import (SafeFallbackConstraint, ThresholdConstraint,
 from .adapters import (AdaptedSet, adapt_conflict, adapt_deliberative,
                        adapt_task_allocation)
 from .shadow import ShadowClass, ShadowRecord, acp_evaluate, classify
+# Phase 2 — physical-evidence contract (stdlib core; adapters live in the
+# safety_adapters/ subpackage and are imported on demand, not here).
+from .physical_evidence import PhysicalEvidence, PhysicalValidity
 
 __all__ = [
     "__version__",
