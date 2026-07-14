@@ -1,0 +1,1313 @@
+{
+  "schema": "varna_classical_associations_33_v1",
+  "label": "READ_ONLY_EXTRACTION / EXPLICIT_ONLY_NO_INFERENCE",
+  "n_consonants": 33,
+  "source_precedence": "corrected v3.1 (primary-text-verified) joined to frozen merged lexicon",
+  "explicit_value_vocabulary": [
+    "ATTESTED",
+    "DEVELOPMENT_ONLY",
+    "MISSING",
+    "CONFLICTED"
+  ],
+  "coverage": {
+    "tattva": {
+      "count": 5,
+      "varnas": [
+        "y",
+        "r",
+        "l",
+        "v",
+        "h"
+      ]
+    },
+    "guna": {
+      "count": 3,
+      "varnas": [
+        "ś",
+        "ṣ",
+        "s"
+      ]
+    },
+    "deity": {
+      "count": 1,
+      "varnas": [
+        "v"
+      ]
+    },
+    "no_classical_association_field": {
+      "count": 6,
+      "varnas": [
+        "c",
+        "ch",
+        "j",
+        "ṇ",
+        "th",
+        "d"
+      ]
+    }
+  },
+  "resolved_swap": {
+    "phonemes": [
+      "ś",
+      "ṣ"
+    ],
+    "verdict": "SWAP_PROVENANCE_RESOLVED_NO_DATA_ERROR",
+    "detail": "See VARNA_SHA_SWAP_PROVENANCE_AUDIT.md"
+  },
+  "artifact_hashes": {
+    "frozen/varna_native_stage1_merged_v1.json": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+    "frozen/varna_polarity_table_v3_1_metadata_refreeze.json": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27",
+    "track_g_varna_polarity_table_v2_named_vritti.json": "7bc0b7c8c11c68c80d76ac974657611946e076a839f2a053bce9f639cd4a2694",
+    "b1_2_mapping_fidelity/b1_2_varna_source_lexicon.json": "e8aeb105027907092b28eb17896fc699cf780f180fe38ca645f7ca94751b5bb7",
+    "b1_2_mapping_fidelity/b1_2_varna_classical_verifications.json": "a1ad271fae62514284123deb879e58973e82843d186f41aa175710dc9217e1b2"
+  },
+  "rows": [
+    {
+      "index": 1,
+      "atomic_varna": "k",
+      "stable_id": "cons_ka",
+      "iast": "k",
+      "devanagari": "क",
+      "source_key_v31": "ka",
+      "unicode_codepoints": [
+        "U+006B"
+      ],
+      "binding_gloss": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+      "liberating_gloss": "aspiring hope held WITHOUT attachment — forward-orientation that acts while releasing the grip on the result (oriented toward the Great, not the object)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "ka = Kārya Brahma (the expressed / created universe; Saguṇarasātmaka Brahma; controller of the living world); 'that which produces sound'; 'water' / flowing water (va = water in general); 'hair on the head' (kesha = ka+iisha, also a name of Nārāyaṇa); Buddhist Saṃvṛtti Bodhicitta. These are cosmological / etymological ASSOCIATIONS of ka, NOT poles.",
+      "primary_text_citation": "Sarkar: Ka = acoustic root of the abhiipśātmaka āśā vṛtti (the propensity of hope), which goads creatures — especially humans — to work in various ways. Ka is ALSO the acoustic root of Kārya Brahma (the expressed universe). Etymology: ka (kae + ḍa) = 'that which produces sound'; also 'water' (flowing water; va = water in general); also 'hair grown on the head' (kac = glossy). Ka + iisha = kesha (hair; also Nārāyaṇa). Kārya Brahma (Saguṇarasātmaka Brahma), represented by ka, is the controller of the living world; Buddhist Saṃvṛtti Bodhicitta = the created world = Kārya Brahma (kāpālika: 'Kaṃ saṃvṛtti bodhicittaṃ pālayati').",
+      "attested_vs_authored_verbatim": "ATTESTED: ka = āśā vṛtti (hope that goads action) AND ka = Kārya Brahma (expressed universe) + sound/water/hair associations. AUTHORED: the binding/liberating SPLIT of hope (grasping vs non-attached) applies the general attachment principle — the source states āśā goads action but does not itself split it into poles.",
+      "binding_pole_provenance": "INFERRED",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 2,
+      "atomic_varna": "kh",
+      "stable_id": "cons_kha",
+      "iast": "kh",
+      "devanagari": "ख",
+      "source_key_v31": "kha",
+      "unicode_codepoints": [
+        "U+006B",
+        "U+0068"
+      ],
+      "binding_gloss": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+      "liberating_gloss": "cintā as composed, impersonal reflection — holding an unsettled situation open without forcing premature closure; objective contemplation in which one is 'not a direct player' (e.g. weighing how a failing industry might be revived), reflection without anxious grip",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Paired with ka: ka = āśā (hope) goads action; kha = cintā (worry / objective thought) reflects. kha MEANS 'sky' and 'heaven' but is NOT their acoustic root — the SKY's root is ha; kha = the CRUDE aspects of heaven, while the transcendent sphere = kṣa (ksha). Structurally ka + ha = kha (hence kha follows ka, the first consonant / Kārya Brahma, in the alphabet). These are meanings/associations, NOT poles.",
+      "primary_text_citation": "Sarkar: The acoustic root of āśā vṛtti is ka; that of cintā vṛtti (the propensity of worry) is kha. If your train runs late you think not only of the delay but of the probable inconveniences (the host, arriving late for food, deciding to eat near the station) — such consequential thoughts are symbolized by kha. Travelling elsewhere you might reflect on a collapsing brassware industry and whether it could be revived, though you are 'not personally affected' and 'not a direct player in your own thoughts' — such impersonal thoughts are also kha. Kha MEANS 'sky' but is NOT the acoustic root of the sky (that is ha); kha also means 'heaven', but only its CRUDE aspects — the sphere of heaven that transcends the crude is kṣa. Ka = Kārya Brahma is the first consonant; and since ka + ha = kha, kha immediately follows ka in the Indo-Aryan alphabet.",
+      "attested_vs_authored_verbatim": "ATTESTED: kha = cintā vṛtti; the personal (train) vs impersonal (industry) modes; kha ≠ the sky's root (ha is), kha = crude heaven vs kṣa = transcendent heaven; ka + ha = kha. AUTHORED: labelling anxious/gripping rumination as binding and composed impersonal openness as liberating applies the framework's fixation-vs-detachment principle (consistent with the source lexicon); the passage describes both modes as cintā without itself labelling them binding/liberating.",
+      "binding_pole_provenance": "INFERRED",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 3,
+      "atomic_varna": "g",
+      "stable_id": "cons_ga",
+      "iast": "g",
+      "devanagari": "ग",
+      "source_key_v31": "ga",
+      "unicode_codepoints": [
+        "U+0067"
+      ],
+      "binding_gloss": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+      "liberating_gloss": "will-force applied to arouse one's dormant higher potential — purposeful effort that exerts and then rests into poised, alert repose without inertia; the effort behind spiritual elevation",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "ceṣṭā = the effort to arouse dormant potentiality (latent genius -> applied will-force -> expression; else unexpressed). Described as the MAIN CAUSE of BOTH mundane development AND spiritual elevation, operating across the physical, psychic and spiritual spheres. (Scope/significance of the vṛtti — NOT a separate cosmological association.)",
+      "primary_text_citation": "Sarkar: Every entity has the potentiality of expression; an animate entity can arouse that dormant potentiality through both internal and external means. If poetic genius lies dormant in someone and he arouses it by applying his will-force, he becomes a renowned poet; if lethargy prevents it, the genius stays unexpressed. The effort made to arouse one's dormant potentiality is called ceṣṭā. Ceṣṭā is one of the psychic vṛttis and is the MAIN CAUSE of mundane development AND spiritual elevation — its value in the mundane and supramundane spheres is immense. Ga, the acoustic root of ceṣṭā, plays an important role in the physical, psychic and spiritual spheres.",
+      "attested_vs_authored_verbatim": "ATTESTED: ga = ceṣṭā vṛtti (effort to arouse dormant potential); its immense value in BOTH the mundane and supramundane spheres. AUTHORED: the binding/liberating split (restless-can't-stop striving vs poised effort-that-rests / spiritually-elevating will-force) applies the framework's restlessness-vs-poise principle (consistent with the source lexicon); the passage frames ceṣṭā as valuable in both spheres and does not itself label a binding pole.",
+      "binding_pole_provenance": "INFERRED",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 4,
+      "atomic_varna": "gh",
+      "stable_id": "cons_gha",
+      "iast": "gh",
+      "devanagari": "घ",
+      "source_key_v31": "gha",
+      "unicode_codepoints": [
+        "U+0067",
+        "U+0068"
+      ],
+      "binding_gloss": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+      "liberating_gloss": "mamatā made to TRANSCEND time, space and individuality — love expanded past its relative boundaries into universal affection that holds the loved on an open hand (achievable only by human beings, through persistent, intense effort)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "mamatā is related to time, space and individuality; its bounded form shows as place-attachment (praising one's own poor goods over better foreign ones — a 'psychic disease'), individuality (the mother who cherishes her child yet slices kai fish unmoved), and time (the cow that licks its calf today, kicks it away grown tomorrow). (Illustrations/scope of the vṛtti — not a separate cosmological association.)",
+      "primary_text_citation": "Sarkar: Mamatā, the vṛtti of love and attachment, is related to time, space and individuality. People praise even the poorest goods made in their own country and criticize the best goods made elsewhere — irrational attachment for a place, a psychic disease (SPACE). A mother who sacrifices everything for her child mercilessly slices living kai fish without feeling, deaf to their agony (INDIVIDUALITY). The mother cow who lovingly licks her calf today kicks it away when it grows tomorrow (TIME). Thus mamatā is limited by the relative factors. Only human beings can make mamatā TRANSCEND the boundaries of time, space and individuality, after persistent and intense effort — impossible for other beings. Gha is the acoustic root of mamatā vṛtti.",
+      "attested_vs_authored_verbatim": "ATTESTED — and unusually so: gha = mamatā vṛtti (love/attachment); its limitation by time/space/individuality; and that only humans can make it TRANSCEND those boundaries through effort. The binding (bounded attachment) vs liberating (boundary-transcending universal love) split is directly SUPPORTED by the passage's own bounded-vs-transcendent contrast — lighter authored component than most entries.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 5,
+      "atomic_varna": "ṅ",
+      "stable_id": "cons_nga",
+      "iast": "ṅ",
+      "devanagari": "ङ",
+      "source_key_v31": "nga",
+      "unicode_codepoints": [
+        "U+1E45"
+      ],
+      "binding_gloss": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+      "liberating_gloss": "conduct that stands without outward performance — action done for its own sake, needing no audience or applause",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Phonetic-historical (NOT poles): per the legend, una was learned by Vashiṣṭha in China and introduced to India, and is used across the Indo-Chinese languages (Tibetan/Ladakhi/Sherpa/Manpa). Its transmission is tied to the Tárā cult — but the Tárā deities have their OWN acoustic roots (aeṃ for Vajra/Nīla Tárā; krīṃ = ka[Kārya Brahma] + ra[luminous factor] for Bhrāmarī Tárā / Kālī), NOT una. Record as history/association; do not fold aeṃ/krīṃ/Tárā into nga's poles.",
+      "primary_text_citation": "Sarkar: Uṋa (ṅa) is the acoustic root of dambha vṛtti (vanity). The popular story: the sage Vashiṣṭha travelled to China to learn the Chinese school of Tantra, learned the use of una in Tantric mantras, and introduced it in India; una is used extensively across the Indo-Chinese languages (Tibetan, Ladakhi, Sherpa, Manpa). Its transmission is linked to the Tárā cult, trifurcated as Ugra/Vajra Tárā (India), Nīla Tárā / Nīla Sarasvatī (Tibet), and Bhrāmarī / Kṛṣṇa Tárā (China). The acoustic root of Vajra Tárā and Nīla Tárā is aeṃ; that of the black Bhrāmarī Tárā (= Kālī in Varṇāśrama Dharma) is krīṃ (ka = Kārya Brahma + ra = the luminous factor).",
+      "attested_vs_authored_verbatim": "ATTESTED: nga (uṋa/ṅa) = dambha vṛtti (vanity); the phonetic history (Chinese-origin legend, Indo-Chinese usage) and the Tárā-cult context with the deities' SEPARATE roots aeṃ/krīṃ. AUTHORED: the binding/liberating split (displayed-for-others vs conduct-without-performance) applies the framework's display-vs-unselfconscious principle (consistent with the source lexicon); the passage states the vṛtti but does not itself split it into poles.",
+      "binding_pole_provenance": "INFERRED",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 6,
+      "atomic_varna": "c",
+      "stable_id": "cons_ca",
+      "iast": "c",
+      "devanagari": "च",
+      "source_key_v31": "ca",
+      "unicode_codepoints": [
+        "U+0063"
+      ],
+      "binding_gloss": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+      "liberating_gloss": "falsehood-discerning insight without egoic superiority — clear conscience distinguishing real from unreal, held without pride",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "MISSING",
+      "primary_text_citation": "Sarkar: 'Ca is the acoustic root of viveka [conscience].' — This is the ENTIRE classical passage: it attests ONLY the vṛtti name. No binding/liberating contrast and no further associations are given.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: ca = viveka (conscience/discernment), a LIBERATING-oriented faculty (its natural pole is the clear-conscience side; the binding pole is its DISTORTION, not its absence). AUTHORED (fully): BOTH pole texts are supplied by the source lexicon / framework — the one-line passage gives no binding/liberating contrast. Highest authored component so far; treat the poles as lexicon-supplied, not primary-verified.",
+      "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "no classical_associations field in v3.1 source (MISSING, not inferred)"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 7,
+      "atomic_varna": "ch",
+      "stable_id": "cons_cha",
+      "iast": "ch",
+      "devanagari": "छ",
+      "source_key_v31": "cha",
+      "unicode_codepoints": [
+        "U+0063",
+        "U+0068"
+      ],
+      "binding_gloss": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+      "liberating_gloss": "steadiness that keeps mental function intact under load — holding the mind operational under a strain that would otherwise break it",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "MISSING",
+      "primary_text_citation": "Sarkar: Cha is the acoustic root of vikalatā vṛtti (nervous breakdown). A nervous breakdown occurs when one's mind, which had previously been functioning properly, either starts malfunctioning or stops functioning altogether. [Attests the vṛtti name + a definition of the state — no binding/liberating contrast is given; the poles below are lexicon/framework-supplied.]",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: cha = vikalatā vṛtti (nervous breakdown), defined as a properly-functioning mind that starts malfunctioning or ceases — this MATCHES the binding pole. AUTHORED: the LIBERATING pole (steadiness that keeps function intact under load) is lexicon/framework-supplied; the passage defines the breakdown state but gives no liberating pole.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "no classical_associations field in v3.1 source (MISSING, not inferred)"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 8,
+      "atomic_varna": "j",
+      "stable_id": "cons_ja",
+      "iast": "j",
+      "devanagari": "ज",
+      "source_key_v31": "ja",
+      "unicode_codepoints": [
+        "U+006A"
+      ],
+      "binding_gloss": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+      "liberating_gloss": "agency exercised WITHOUT inflating the 'I' — acting and functioning while not claiming sole doership",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "MISSING",
+      "primary_text_citation": "Sarkar: Ja is the acoustic root of ahaṃkāra vṛtti (ego). The ego becomes inflated when one allows one's 'I' feeling to take a predominant role. 'Since I was there, I was able to control the situation... had I not been there the world would have met its final destruction.' — so spoke Aurangzeb; it is an expression of ahaṃkāra vṛtti. [Attests the vṛtti name + an illustration of the INFLATED (binding) form; no liberating pole is given.]",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + ILLUSTRATION. ATTESTED: ja = ahaṃkāra vṛtti (ego), with the Aurangzeb illustration of the inflated 'I' — matching the BINDING pole. AUTHORED: the LIBERATING pole (agency without inflating the I) is lexicon-supplied; the passage illustrates only the inflated (binding) form.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "no classical_associations field in v3.1 source (MISSING, not inferred)"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 9,
+      "atomic_varna": "jh",
+      "stable_id": "cons_jha",
+      "iast": "jh",
+      "devanagari": "झ",
+      "source_key_v31": "jha",
+      "unicode_codepoints": [
+        "U+006A",
+        "U+0068"
+      ],
+      "binding_gloss": "greed / avarice — hoarding accumulation without limit; the insatiable greedy fascination (nolā) that always wants more",
+      "liberating_gloss": "sufficiency — appetite that releases at 'enough'; wanting stilled at contentment, the surplus grip let go",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Etymology: the Bengali nolā (a cat's or dog's greedy fascination) derives from lola / lolatā. (An etymological illustration of the vṛtti — not a separate association or pole.)",
+      "primary_text_citation": "Sarkar: Jha is the acoustic root of lolupatā, lobha (greed) and lolatā (avarice) vṛttis. The Bengali word nolā (the greedy fascination of a cat or a dog) is derived from lola / lolatā.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + ETYMOLOGY. ATTESTED: jha = lolupatā/lobha/lolatā vṛttis (greed/avarice), illustrated by nolā. AUTHORED: the binding/liberating split (limitless hoarding vs sufficiency-that-releases) is lexicon/framework-supplied; the passage names the vṛtti and its etymology but gives no pole contrast.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 10,
+      "atomic_varna": "ñ",
+      "stable_id": "cons_nya",
+      "iast": "ñ",
+      "devanagari": "ञ",
+      "source_key_v31": "nya",
+      "unicode_codepoints": [
+        "U+00F1"
+      ],
+      "binding_gloss": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+      "liberating_gloss": "transparency — inner intent and outer act coincide; no pretense, being what one appears",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Sanskrit páśaṇḍa / Hindi pākhaṇḍī = hypocrite. Three illustrated forms of hypocrisy (all of the BINDING pole): exploit/cheat to serve one's purpose; dominate to conceal one's ignorance/weakness; feign morality by condemning others' secretly-shared sins.",
+      "primary_text_citation": "Sarkar: Iṋa (ña) is the acoustic root of kapaṭatā vṛtti (hypocrisy). Another Sanskrit word for hypocrite is páśaṇḍa; in Hindi, pākhaṇḍī. Hypocrisy takes many forms; three common ones: (1) getting one's purpose served by exploiting or cheating others; (2) unnecessarily dominating somebody to conceal one's own ignorance or weakness; (3) pretending to be moral by criticizing the sins of others which one secretly commits oneself.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + FORMS. ATTESTED: nya = kapaṭatā vṛtti (hypocrisy), with three illustrated forms — all of the BINDING pole. AUTHORED: the LIBERATING pole (transparency, inner=outer) is lexicon-supplied; the passage illustrates only the hypocritical (binding) form.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 11,
+      "atomic_varna": "ṭ",
+      "stable_id": "cons_tta",
+      "iast": "ṭ",
+      "devanagari": "ट",
+      "source_key_v31": "tta",
+      "unicode_codepoints": [
+        "U+1E6D"
+      ],
+      "binding_gloss": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+      "liberating_gloss": "pramita vāk — balanced, measured speech using only relevant words; saying just what is warranted (the helpful, to-the-point reply)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Vitarka = bad temper + garrulousness; explicitly NOT kaśāya vṛtti (speaking harshly to hurt others). Its liberated contrast term is pramita vāk (balanced statement). (Distinctions/illustration, not a separate cosmological association.)",
+      "primary_text_citation": "Sarkar: Ṭa is the acoustic root of vitarka vṛtti (overstating one's case). Vitarka is not merely debating; it means overstating one's case to the point of garrulousness — a combination of bad temper and garrulousness. It is NOT synonymous with kaśāya vṛtti (speaking harshly to hurt others). Example (Howrah station): asked whether the Uluberia local has left, one gentleman snaps abusively ('Am I a railway timetable?... People like you make life hell...') — uncontrolled vitarka; a second replies helpfully with just the relevant facts (platform eleven, five minutes) — pramita vāk (balanced statement, only relevant words).",
+      "attested_vs_authored_verbatim": "ATTESTED — BOTH poles: the passage explicitly contrasts uncontrolled vitarka (garrulous, bad-tempered overstatement — the abusive gentleman) with pramita vāk (balanced speech, only relevant words — the helpful gentleman), and distinguishes vitarka from kaśāya. Light authored component (the pole split is in the source).",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 12,
+      "atomic_varna": "ṭh",
+      "stable_id": "cons_ttha",
+      "iast": "ṭh",
+      "devanagari": "ठ",
+      "source_key_v31": "ttha",
+      "unicode_codepoints": [
+        "U+1E6D",
+        "U+0068"
+      ],
+      "binding_gloss": "anutāpa as gripping remorse — the 'after-heat' that torments, replaying one's own past wrong without release",
+      "liberating_gloss": "repentance discharged into acceptance — the remorse over one's past act released, the realization-of-impropriety turned into amendment rather than endless self-torment",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "COSMOLOGICAL (from the ha passage): ṭha is the acoustic root of nighttime, the moon, bhúvarloka, and the kāmamaya kośa — the contractive OPPOSITE of ha (day/sun/svarloka/parā-vidyā). ETYMOLOGY: anutāpa = anu ('after') + tāpa ('heat'); N. Indian paścāttāpa = paschāt ('after') + tāpa ('heat') = 'after-heat'. This RESOLVES the earlier ttha discrepancy: night/moon are ṭha's ASSOCIATIONS; its VṚTTI is anutāpa (repentance) — associations vs pole, as with ha/ka.",
+      "primary_text_citation": "Sarkar: Ṭha is the acoustic root of anutāpa vṛtti (repentance). One is seized by repentance on realizing (from within, or with a second person's help) the impropriety of one's action. In northern India anutāpa is called paścāttāpa. Anu and paschāt both mean 'later / after'; tāpa means 'heat' (so repentance = 'after-heat').",
+      "attested_vs_authored_verbatim": "ATTESTED: ṭha = anutāpa vṛtti (repentance); its definition (remorse on realizing impropriety); the anutāpa/paścāttāpa='after-heat' etymology; and (from the ha passage) its cosmological associations night/moon/bhúvarloka/kāmamaya kośa as ha's opposite. AUTHORED: the binding/liberating split (gripping remorse vs remorse-released-into-acceptance) is lexicon-supplied; this passage defines the state, not a pole contrast.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 13,
+      "atomic_varna": "ḍ",
+      "stable_id": "cons_dda",
+      "iast": "ḍ",
+      "devanagari": "ड",
+      "source_key_v31": "dda",
+      "unicode_codepoints": [
+        "U+1E0D"
+      ],
+      "binding_gloss": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+      "liberating_gloss": "acting unhindered by social shame — natural, unselfconscious conduct; healthy modesty without inhibition",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Cross-reference: lajjā is one of the eight pāshas (fetters) listed under pa (hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism). (Not a pole.)",
+      "primary_text_citation": "Sarkar: 'Ḍa is the acoustic root of lajjā vṛtti [the propensity of shyness].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: dda = lajjā vṛtti (shyness); and (from the pa passage) lajjā is one of the eight pāshas/fetters. AUTHORED (fully): BOTH poles are lexicon-supplied — this one-line passage gives no binding/liberating contrast.",
+      "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 14,
+      "atomic_varna": "ḍh",
+      "stable_id": "cons_ddha",
+      "iast": "ḍh",
+      "devanagari": "ढ",
+      "source_key_v31": "ddha",
+      "unicode_codepoints": [
+        "U+1E0D",
+        "U+0068"
+      ],
+      "binding_gloss": "piśunatā — senseless, sadistic cruelty: harming/killing with gratuitous torture (dismembering a creature piece by piece; impaling, flaying), inflicting maximal suffering for its own sake; malice toward the maligned",
+      "liberating_gloss": "compassion that shields the maligned — restraint from gratuitous cruelty; if life must be taken, with the minimum of pain (the spirit of Neohumanism)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Distinctions: piśunatā (sadistic torture) is NOT ordinary least-pain killing; it is a sharper/darker sibling of krūratā (la — cruelty / physical harm to the weak) and ENTIRELY DIFFERENT from dha (dental aspirate = tṛṣṇā / craving — operator-flagged 'different from Dha'). Held contrary to the spirit of Neohumanism.",
+      "primary_text_citation": "Sarkar: Senseless, sadistic killing is called piśunatā vṛtti. Slaughtering in the way that inflicts the LEAST pain is NOT piśunatā; but killing slowly and cruelly — first chopping off legs, then tail, then head — is definitely piśunatā. (A live tortoise part-chopped and left crawling in its own blood; criminals impaled on spikes, half-buried and salted for dogs, or flayed alive — all examples of piśunatā.) The killing of animals, however done, is contrary to the spirit of Neohumanism.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION/illustration. ATTESTED: ddha = piśunatā vṛtti (sadistic cruelty), vividly illustrated (torturous slaughter; the tortoise; impaling/flaying) — the BINDING pole; plus the attested contrast that least-pain killing is NOT piśunatā. AUTHORED: the LIBERATING pole (compassion shielding the maligned) is lexicon-supplied, though the passage's least-pain / Neohumanism contrast supports it.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 15,
+      "atomic_varna": "ṇ",
+      "stable_id": "cons_nna",
+      "iast": "ṇ",
+      "devanagari": "ण",
+      "source_key_v31": "nna",
+      "unicode_codepoints": [
+        "U+1E47"
+      ],
+      "binding_gloss": "envy — the sting at another's success; covetous resentment at another's good fortune",
+      "liberating_gloss": "muditā — sympathetic gladness at another's fortune; rejoicing in others' good rather than being stung by it",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "MISSING",
+      "primary_text_citation": "Sarkar: 'Ṇa is the acoustic root of īrṣā vṛtti [the propensity of envy].' — This is the ENTIRE classical passage: it attests only the vṛtti name.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME ONLY. ATTESTED: nna = īrṣā vṛtti (envy). AUTHORED (fully): BOTH poles are lexicon-supplied — the one-line passage gives no binding/liberating contrast.",
+      "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "no classical_associations field in v3.1 source (MISSING, not inferred)"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 16,
+      "atomic_varna": "t",
+      "stable_id": "cons_ta",
+      "iast": "t",
+      "devanagari": "त",
+      "source_key_v31": "ta",
+      "unicode_codepoints": [
+        "U+0074"
+      ],
+      "binding_gloss": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+      "liberating_gloss": "the cessation of dullness/staticity — awakening from torpor into expansion (tan); alert wakefulness rising from torpor (the movement that liberates from jāḍya, which the word 'Tantra' names)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Etymology of Tantra: 'Taṃ jāḍyāt tārayet yastu sa tantraḥ' — that which liberates (tārayet) from jāḍya (staticity/dullness) is Tantra; and tan = 'to expand' — as a rope-bound body expands to snap the ropes, that which liberates through expansion (vistāra) is also Tantra. (Etymological association naming the liberating DIRECTION — not a separate pole.)",
+      "primary_text_citation": "Sarkar: Ta is the acoustic root of staticity, long sleep and deep sleep; also of intellectual dullness and spiritual inertness. That which brings about the cessation of dullness and staticity is Tantra — 'Taṃ jāḍyāt tārayet yastu sa tantraḥ'. The root-verb tan means 'to expand'; if a rope-bound person expands his body the ropes snap of themselves — that which liberates through tan (expansion) is also Tantra — 'Taṃ vistāreṇa tārayet yastu sah tantraḥ'.",
+      "attested_vs_authored_verbatim": "ATTESTED: ta = jāḍya/nidrā (staticity, long/deep sleep, intellectual dullness, spiritual inertness) — BINDING pole richly attested; and the LIBERATING DIRECTION (liberation from jāḍya via expansion) is attested through the Tantra etymology. AUTHORED: the specific liberated-mode wording ('alert wakefulness rising from torpor') is lexicon-supplied but well-aligned with the attested direction.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 17,
+      "atomic_varna": "th",
+      "stable_id": "cons_tha",
+      "iast": "th",
+      "devanagari": "थ",
+      "source_key_v31": "tha",
+      "unicode_codepoints": [
+        "U+0074",
+        "U+0068"
+      ],
+      "binding_gloss": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+      "liberating_gloss": "warm buoyancy lifting one's own dejection — the mood rising out of melancholy into brightness",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "MISSING",
+      "primary_text_citation": "Sarkar: Tha is the acoustic root of viśāda vṛtti — melancholy (melancholiness, melancholia). [Phonetic note (operator): थ is the ASPIRATED DENTAL STOP (ant-hill/pot-hole/light-house), NOT the English 'th' of think/this — Sanskrit lacks those fricatives.]",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: tha = viśāda vṛtti (melancholy); and (operator phonetic note) थ = aspirated dental stop, NOT the English /θ/,/ð/ fricatives. AUTHORED: both poles are lexicon-supplied (binding=dejection matches the name; liberating=buoyancy authored).",
+      "binding_pole_provenance": "SECONDARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "no classical_associations field in v3.1 source (MISSING, not inferred)"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 18,
+      "atomic_varna": "d",
+      "stable_id": "cons_da",
+      "iast": "d",
+      "devanagari": "द",
+      "source_key_v31": "da",
+      "unicode_codepoints": [
+        "U+0064"
+      ],
+      "binding_gloss": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+      "liberating_gloss": "forbearance that absorbs provocation — an even, unreactive temper that does not discharge irritation",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "MISSING",
+      "primary_text_citation": "Sarkar: Da is the acoustic root of peevishness. If one speaks in a nice way to a peevish person, he or she reacts adversely; if one speaks in a harsh way, he or she takes it calmly.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + DEFINITION. ATTESTED: da = peevishness/irritability (krodha/karkaśatā), with the contrary-reaction illustration — the BINDING pole. AUTHORED: the LIBERATING pole (forbearance) is lexicon-supplied.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "no classical_associations field in v3.1 source (MISSING, not inferred)"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 19,
+      "atomic_varna": "dh",
+      "stable_id": "cons_dha",
+      "iast": "dh",
+      "devanagari": "ध",
+      "source_key_v31": "dha",
+      "unicode_codepoints": [
+        "U+0064",
+        "U+0068"
+      ],
+      "binding_gloss": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+      "liberating_gloss": "the acquisitive thirst quenched at its root — all thoughts (pure and impure) redirected wholly toward the Supreme (Parama Puruṣa), the attested cure",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Explicitly NOT 'thirst for water' — tṛṣṇā = psychic craving for acquisition. Attested cure / liberating direction: diverting all thoughts of the mind, pure and impure, toward Parama Puruṣa.",
+      "primary_text_citation": "Sarkar: Dha is the acoustic root of thirst for acquisition — the limitless craving for wealth, name, fame, power and prestige, called tṛṣṇā in Sanskrit. Here tṛṣṇā does NOT mean 'thirst for water'. To divert all the pure and impure thoughts of the mind toward Parama Puruṣa is the only cure for limitless psychic craving.",
+      "attested_vs_authored_verbatim": "ATTESTED: dha = tṛṣṇā (limitless craving for wealth/name/fame/power/prestige, NOT thirst-for-water) — BINDING pole richly attested; and the LIBERATING DIRECTION (divert all thoughts to Parama Puruṣa) is the attested cure. AUTHORED: the exact liberated-mode wording ('quenched at its root') is lexicon-supplied but aligned with the attested cure.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 20,
+      "atomic_varna": "n",
+      "stable_id": "cons_na",
+      "iast": "n",
+      "devanagari": "न",
+      "source_key_v31": "na",
+      "unicode_codepoints": [
+        "U+006E"
+      ],
+      "binding_gloss": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+      "liberating_gloss": "de-fascination from false attraction — superimposing indifference and diverting the mind toward Parama Puruṣa (the attested cure); freedom from fixation",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Moha divides into FOUR categories: space (deshagata moha / geo-sentiment), time (kālagata moha), idea, and individuality/object (ādhāragata moha / object-fascination). Attested cure / liberating direction: superimpose the ideation of indifference and divert thoughts to Parama Puruṣa — sublimation by spiritual ideation, NOT by law or philosophy. Cross-ref: the moha ripu underlies the pa fetter of hatred/fear.",
+      "primary_text_citation": "Sarkar: Na is the acoustic root of moha vṛtti (blind attachment / infatuation), usually divided into four categories — time, space, idea, individuality. deshagata moha ('geo-sentiment') = losing rationality out of blind attachment for one's country (praising a barren, starving, food-importing land as abundant). kālagata moha = blind attachment to a period of time (old-timers who 'could digest iron pans' disparaging the present age). idea = a strong idea pulls the mind back again and again (the thief who broods on the crime scene and returns into the police's hands). ādhāragata moha = fascination for a long-used object (a rich man's attachment to a battered one-armed chair; a bell-metal pot that broke up a family). The only way to free oneself is to superimpose the ideation of INDIFFERENCE and divert one's thoughts toward Parama Puruṣa; intimidation or laws control it only temporarily — the mind is sublimated by spiritual ideation, not by high-sounding philosophy.",
+      "attested_vs_authored_verbatim": "ATTESTED: na = moha vṛtti (blind attachment/infatuation), its four categories (desha/kāla/idea/ādhāra) richly illustrated — BINDING pole; and the LIBERATING DIRECTION (indifference + redirection to Parama Puruṣa) is the attested cure. AUTHORED: the exact liberated-mode wording ('de-fascination from false attraction') is lexicon-supplied but aligned.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 21,
+      "atomic_varna": "p",
+      "stable_id": "cons_pa",
+      "iast": "p",
+      "devanagari": "प",
+      "source_key_v31": "pa",
+      "unicode_codepoints": [
+        "U+0070"
+      ],
+      "binding_gloss": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+      "liberating_gloss": "the upward turn — goodwill that dissolves revulsion; anurakti (attraction for the Great) consummating in devotion (ūrdhva gam)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "ghṛṇā = the fetter of hatred (one of the eight pāshas: hatred, doubt, fear, shyness, dissemblance, vanity-of-lineage, cultural-superiority, egotism); six ripus = kāma, krodha, lobha, mada, moha, mātsarya; downward attraction (pat) -> downfall vs upward anurakti -> devotion. VAIRĀGYA NOTE (preserving the earlier option-A reading): ghṛṇā's energy CAN be redirected — revulsion turned against the crude/vices is a legitimate sublimation (vairāgya) path — but that is a sublimation ROUTE, not an inversion of the pole; hatred remains the binding fetter.",
+      "primary_text_citation": "Sarkar: Pa = acoustic root of ghṛṇā vṛtti (hatred/revulsion), the FETTER of hatred (one of the eight pāshas), stemming mainly from moha. 'When one's psychic attraction is toward the crude, the mind has a downward tendency (pat/patati) leading to downfall; when the mind moves upward it is anurakti (attraction for the Great), whose consummation is devotion.'",
+      "attested_vs_authored_verbatim": "ATTESTED (primary text) — v3 OPTION B: pa = ghṛṇā (hatred/revulsion), classically THE FETTER OF HATRED (a pāsha) = BINDING; its liberating direction is the upward anurakti -> devotion. v3 follows the attested assignment (hatred = binding, goodwill/anurakti = liberating), consistent with every other ripu/pāsha entry. SUPERSEDES the earlier option-A inversion (binding=attraction, liberating=revulsion-of-ripus); no inversion flag remains. The vairāgya insight is preserved as a note in classical_associations.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 22,
+      "atomic_varna": "ph",
+      "stable_id": "cons_pha",
+      "iast": "ph",
+      "devanagari": "फ",
+      "source_key_v31": "pha",
+      "unicode_codepoints": [
+        "U+0070",
+        "U+0068"
+      ],
+      "binding_gloss": "bhaya — fear: collapse or flight before danger; the shrinking, dread and panic under threat",
+      "liberating_gloss": "abhaya — steadiness meeting a genuine threat; unshaken presence in the face of danger",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Cross-ref: bhaya (fear) is one of the eight pāshas (listed under pa) and, like the fetter of hatred (pa), is mainly born of the moha ripu — moha 'makes others the objects of fear.' (Etiology, not a pole.)",
+      "primary_text_citation": "Sarkar: Pha is the acoustic root of bhaya vṛtti (fear). Though fear is generally caused by more than one factor, it is mainly born of the moha ripu (blind attachment).",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + ETIOLOGY. ATTESTED: pha = bhaya vṛtti (fear), born mainly of moha; and (from pa passage) bhaya is one of the eight pāshas. AUTHORED: both poles are lexicon-supplied (binding=collapse/flight matches the name; liberating=steadiness authored).",
+      "binding_pole_provenance": "SECONDARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 23,
+      "atomic_varna": "b",
+      "stable_id": "cons_ba",
+      "iast": "b",
+      "devanagari": "ब",
+      "source_key_v31": "ba",
+      "unicode_codepoints": [
+        "U+0062"
+      ],
+      "binding_gloss": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+      "liberating_gloss": "regard that recognizes and attends to worth — giving due attention to what has value (and reserving indifference/upekṣā only for the truly unacceptable)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Distinctions: avajñā (neglect of the valuable) vs upekṣā (ignoring the unacceptable — not always bad) vs avahelā (negative disregard). The brahmavihāra four attitudes: maitrī (happy), karuṇā (suffering), muditā (virtuous), upekṣā (wicked) — with the caveat that indifference to SOCIALLY-HARMFUL wickedness is not acceptable.",
+      "primary_text_citation": "Sarkar: Ba is the acoustic root of avajñā vṛtti (indifference). Ignoring something actually UNACCEPTABLE is upekṣā; NEGLECTING something which may actually have VALUE is avajñā (~ avahelā, a negative term; upekṣā is not always bad). The Yoga-sūtra four attitudes (maitrī-karuṇā-muditā-upekṣā): develop maitrī (benign gladness) toward the happy ('may he stay that way'), karuṇā (compassion) toward the miserable, muditā (goodwill) toward the virtuous ('let his intellect inspire him'), and upekṣā (indifference — 'that's his own business') toward the wicked — BUT if the person's sinful actions harm society, one can no longer afford to be indifferent.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + rich DEFINITION. ATTESTED: ba = avajñā vṛtti (neglect of what has value), sharply distinguished from upekṣā/avahelā, with the brahmavihāra frame — BINDING pole attested. AUTHORED: the LIBERATING pole (regard that attends to worth) is lexicon-supplied but supported by the passage's proper-attitude ideal.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 24,
+      "atomic_varna": "bh",
+      "stable_id": "cons_bha",
+      "iast": "bh",
+      "devanagari": "भ",
+      "source_key_v31": "bha",
+      "unicode_codepoints": [
+        "U+0062",
+        "U+0068"
+      ],
+      "binding_gloss": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+      "liberating_gloss": "breaking the entrancing spell into clear sense — withdrawing the mind (pratyāhāra) along the path of righteousness, no longer spellbound (aided by kīrtana / devotional song)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Cure / liberating direction: pratyāhāra yoga (directing the mind along righteousness); or, for those without the technique, kīrtana / devotional singing. NOTE: mūrcchā here is NOT fainting/senselessness — it is losing common sense under a ripu's hypnotic spell.",
+      "primary_text_citation": "Sarkar: Bha is the acoustic root of mūrcchā vṛtti. Here mūrcchā does NOT mean senselessness (fainting); it means to lose one's common sense under the hypnotic spell of a particular ripu. To avoid its unsalutary effects one should direct the mind along the path of righteousness through pratyāhāra yoga; those who have not learned pratyāhāra should do kīrtana aloud or sing devotional songs to escape the clutches of mūrcchā.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + cure. ATTESTED: bha = mūrcchā vṛtti (losing common sense under a ripu's spell, explicitly NOT fainting); and the LIBERATING DIRECTION (pratyāhāra / kīrtana) is the attested remedy. AUTHORED: the exact liberated-mode wording ('breaking the entrancing spell into clear sense') is lexicon-supplied but aligned with the attested cure.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 25,
+      "atomic_varna": "m",
+      "stable_id": "cons_ma",
+      "iast": "m",
+      "devanagari": "म",
+      "source_key_v31": "ma",
+      "unicode_codepoints": [
+        "U+006D"
+      ],
+      "binding_gloss": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+      "liberating_gloss": "disciplined containment that holds form — latitude restrained and sublimated so the dissolving tendency is contained rather than annihilating",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Two linked vṛttis on one root: praṇāśa (annihilation) and prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — unchecked latitude running to dissolution.",
+      "primary_text_citation": "Sarkar: Ma is the acoustic root of praṇāśa (the propensity of annihilation). It is also the acoustic root of prashraya vṛtti — giving latitude / treating with indulgence (Hindi: baṛhvā denā).",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME(s) + gloss. ATTESTED: ma = praṇāśa (annihilation) AND prashraya (giving latitude / indulgence, Hindi baṛhvā denā) — the BINDING pole (indulgence-to-dissolution). AUTHORED: the LIBERATING pole (disciplined containment that holds form) is lexicon-supplied.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "MISSING",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 26,
+      "atomic_varna": "y",
+      "stable_id": "cons_ya",
+      "iast": "y",
+      "devanagari": "य",
+      "source_key_v31": "ya",
+      "unicode_codepoints": [
+        "U+0079"
+      ],
+      "binding_gloss": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+      "liberating_gloss": "self-efficacy — the confidence to commit and to rely: steady trust in oneself, others and the path",
+      "tattva_association": "vāyu / air",
+      "tattva_source_verbatim": "vāyu (motion/tattva association)",
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "Also the acoustic root of CONSTANT MOVEMENT (like the movement of air / vāyu) — a motion/tattva association, distinct from the aviśvāsa pole.",
+      "primary_text_citation": "Sarkar: Ya is the acoustic root of aviśvāsa vṛtti (lack of confidence), and also the acoustic root of constant movement (like the movement of air). People with no self-confidence say to the end of their lives 'Shall I be able to do it?' and can never accomplish anything great; as they also lack confidence in others, others have no confidence in them.",
+      "attested_vs_authored_verbatim": "PRIMARY-TEXT SCOPE = NAME + DEFINITION + movement association. ATTESTED: ya = aviśvāsa vṛtti (lack of confidence), illustrated; and the association with constant movement (air/vāyu). BINDING pole attested. AUTHORED: the LIBERATING pole (self-efficacy) is lexicon-supplied.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 27,
+      "atomic_varna": "r",
+      "stable_id": "cons_ra",
+      "iast": "r",
+      "devanagari": "र",
+      "source_key_v31": "ra",
+      "unicode_codepoints": [
+        "U+0072"
+      ],
+      "binding_gloss": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+      "liberating_gloss": "prāṇaśakti — the fire of life-force directed as vitality and winning resolve ('I have come to win, I am destined to win'; 'Parama Puruṣa is mine'); directed energy without bondage",
+      "tattva_association": "agni / fire",
+      "tattva_source_verbatim": "agnitattva",
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "ra = agnitattva (the fire element) and prāṇaśakti (vitality); the RAM bīja mantra (triangular, red-glowing — 'Raṃ bījaṃ śikhinaṃ dhyāyet'); the monosyllable ra = 'fire'. Cure / liberating direction: the auto-suggestion 'Parama Puruṣa is mine' (guru mantra) and 'I am destined to win.' Classical side is DUAL (vitality AND annihilation).",
+      "primary_text_citation": "Sarkar: Ra is the acoustic root of agnitattva (the fire element) / prāṇaśakti (vitality) — 'Raṃ bījaṃ śikhinaṃ dhyāyet, trikoṇam-aruṇaprabham' (the RAM bīja, triangular, red-glowing). It is ALSO the acoustic root of sarvanāśa (the thought of annihilation): 'I have nothing of my own, everything is gone, I am undone.' Its cure is the constant auto-suggestion 'Parama Puruṣa is mine' (guru mantra); the feeling of defeat is ra-bījātmak, its cure the auto-suggestion 'I have come to win, I am destined to win.' Ra also means 'fire' (the monosyllable ra = fire).",
+      "attested_vs_authored_verbatim": "ATTESTED — both poles: sarvanāśa (defeatism) as binding and the vital/winning cure (prāṇaśakti / 'I am destined to win' / 'Parama Puruṣa is mine') as the liberating direction; plus the agni/prāṇaśakti/RAM/fire associations. Light authored component (the pole split is in the source; ra is classically DUAL).",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 28,
+      "atomic_varna": "l",
+      "stable_id": "cons_la",
+      "iast": "l",
+      "devanagari": "ल",
+      "source_key_v31": "la",
+      "unicode_codepoints": [
+        "U+006C"
+      ],
+      "binding_gloss": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+      "liberating_gloss": "compassion (karuṇā) that protects the vulnerable — the counter-measure to cruelty; the will to reduce another's misery and help arouse their latent intellect",
+      "tattva_association": "kṣiti / earth (pṛthvī)",
+      "tattva_source_verbatim": "kṣititattva",
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "la = kṣititattva (the solid / earth factor, dharaṇī / pṛthvī); the LAM bīja mantra (four-sided/square, deep-yellow — 'Laṃ bījaṃ dharaṇīṃ dhyāyet'). ('Earth-bound hardness' echoes this solid factor.) An element/bīja association, distinct from the kruratā pole.",
+      "primary_text_citation": "Sarkar: La is the acoustic root of kruratā vṛtti (cruelty), counteracted by the propensity of compassion (seeing another's misery: 'what great misery he suffers; can I reduce it? how crude he is in thought and behaviour — can I help arouse his latent intellect?'). La is ALSO the acoustic root of kṣititattva, the solid factor — 'Laṃ bījaṃ dharaṇīṃ dhyāyet, caturasrāṃ supītābhām' (the LAM bīja, four-sided/square, deep-yellow).",
+      "attested_vs_authored_verbatim": "ATTESTED — both poles: kruratā (cruelty) as binding and compassion/karuṇā as the explicit counter-measure (liberating); plus the kṣititattva/earth + LAM bīja associations. Light authored component.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 29,
+      "atomic_varna": "v",
+      "stable_id": "cons_va",
+      "iast": "v",
+      "devanagari": "व",
+      "source_key_v31": "va",
+      "unicode_codepoints": [
+        "U+0076"
+      ],
+      "binding_gloss": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+      "liberating_gloss": "dharma — ensconcement in one's original (true) stance; the sustaining principle ('that which sustains'), the unbroken movement toward subtlety and merger into Parama Puruṣa (mānava dharma)",
+      "tattva_association": "jala / water",
+      "tattva_source_verbatim": "jalatattva",
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "Varuṇa",
+      "deity_source_verbatim": "Varuṇa Deva (rain-god)",
+      "classical_or_philosophical_association_verbatim": "va = jalatattva (the liquid factor — water and any liquid) and the rain-god Varuṇa Deva. Dharma = 'that which sustains' (dhriyate dharma); the innate longing for happiness is its origin ('sukhaṃ vāñchati sarvo hi'); diverging from dharma rushes toward annihilation. (Element/deity association, distinct from the dharma pole.)",
+      "primary_text_citation": "Sarkar: Va is the acoustic root of dharma — 'ensconcement in one's original stance'. The innate propensity of human beings is to move toward subtlety in the psychic/spiritual spheres and finally merge into Parama Puruṣa; this unbroken movement is mānava dharma. 'Sukhaṃ vāñchati sarvo hi... ' (all beings long for happiness; dharma originates from that innate propensity, so dharma should be observed by all). 'Dhriyate dharma ityāhuḥ' — dharma is that which SUSTAINS. To diverge from dharma is to rush toward total annihilation. Va is ALSO the acoustic root of jalatattva (the liquid factor — water and any liquid) and of the rain-god Varuṇa Deva.",
+      "attested_vs_authored_verbatim": "ATTESTED (primary text): va = dharma = ENSCONCEMENT in one's original stance + 'that which sustains' + movement toward subtlety/Parama Puruṣa; plus the jalatattva/water + Varuṇa association; classical side liberating-oriented. The binding (rigid over-holding) is the distortion of ensconcement. Light authored component.",
+      "binding_pole_provenance": "INFERRED",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 30,
+      "atomic_varna": "ś",
+      "stable_id": "cons_sha",
+      "iast": "ś",
+      "devanagari": "श",
+      "source_key_v31": "sha",
+      "unicode_codepoints": [
+        "U+015B"
+      ],
+      "binding_gloss": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+      "liberating_gloss": "physical longing sublimated / redirected toward the higher — desire turned from kāma toward mokṣa (the longing for liberation); worldly grasping released",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "tamas (static)",
+      "guna_source_verbatim": "tamoguṇa",
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "śa = tamoguṇa (the static principle). The four puruṣārthas (longings): dharma (psycho-spiritual), artha (psychic), kāma (physical), mokṣa (liberation) — kāma = all physical longings. (Guṇa association + longing-hierarchy frame.)",
+      "primary_text_citation": "Sarkar: Śa is the acoustic root of tamoguṇa (the static principle), and also of all kinds of worldly desires — wealth, opulence, name, fame, social position. The collective Sanskrit term is kāma. The four recognized longings of human life are dharma (psycho-spiritual), artha (psychic), kāma (PHYSICAL), and mokṣa (spiritual / liberation). kāma = all types of PHYSICAL longings.",
+      "attested_vs_authored_verbatim": "ATTESTED (primary text): śa = TAMOGUṆA (static principle) + KĀMA (all PHYSICAL worldly desires); the four-puruṣārtha frame. BINDING pole (kāma) attested. AUTHORED: the LIBERATING pole (sublimation toward mokṣa) is inferred from the puruṣārtha hierarchy, not stated as a pole.",
+      "binding_pole_provenance": "PRIMARY_ATTESTED",
+      "source_status": "ATTESTED",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "RESOLVED sibilant swap: this guṇa/puruṣārtha was mis-filed in b1_1 draft / b1_2_varna_source_lexicon / track_g_v2 (śa<->ṣa) and corrected at v3.1 per primary text; see VARNA_SHA_SWAP_PROVENANCE_AUDIT.md"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 31,
+      "atomic_varna": "ṣ",
+      "stable_id": "cons_ssa",
+      "iast": "ṣ",
+      "devanagari": "ष",
+      "source_key_v31": "ssa",
+      "unicode_codepoints": [
+        "U+1E63"
+      ],
+      "binding_gloss": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+      "liberating_gloss": "purposeful action without possessive bondage — rajasic energy directed to legitimate purpose/means without clinging (artha pursued without attachment)",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "tamas (static)",
+      "guna_source_verbatim": "tamoguṇa",
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "ṣa = rajoguṇa (the mutative principle); artha = the psychic longing / the means that removes worldly wants. Part of the four-varga sibilant scheme (śa=tamoguṇa/kāma, ṣa=rajoguṇa/artha, sa=sattva/mokṣa).",
+      "primary_text_citation": "Sarkar (four-varga passage): ṣa ('sha') is the acoustic root of artha — 'the removal of worldly wants' — and of rajoguṇa (the mutative principle). artha is the PSYCHIC longing among the four (dharma/artha/kāma/mokṣa).",
+      "attested_vs_authored_verbatim": "ATTESTED (primary text): ṣa = artha (psychic longing / worldly purpose, 'removal of worldly wants') + rajoguṇa (mutative principle). AUTHORED: the binding/liberating split (possessive acquisition vs purposeful action without bondage) is lexicon-supplied — and these pole texts are taken from the lexicon's MIS-FILED 'sha' entry (see swap).",
+      "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [
+        "RESOLVED sibilant swap: this guṇa/puruṣārtha was mis-filed in b1_1 draft / b1_2_varna_source_lexicon / track_g_v2 (śa<->ṣa) and corrected at v3.1 per primary text; see VARNA_SHA_SWAP_PROVENANCE_AUDIT.md"
+      ],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 32,
+      "atomic_varna": "s",
+      "stable_id": "cons_sa",
+      "iast": "s",
+      "devanagari": "स",
+      "source_key_v31": "sa",
+      "unicode_codepoints": [
+        "U+0073"
+      ],
+      "binding_gloss": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+      "liberating_gloss": "mokṣa — unqualified liberation; sentient clarity realized WITHOUT attachment to it ('clarity without attachment to clarity')",
+      "tattva_association": "MISSING",
+      "tattva_source_verbatim": null,
+      "guna_association": "tamas (static)",
+      "guna_source_verbatim": "tamoguṇa",
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "sa = sattvaguṇa (the sentient principle) and mokṣa (unqualified liberation) — the highest of the four longings (dharma/artha/kāma/mokṣa). Part of the four-varga sibilant scheme: śa(sha)=tamoguṇa/kāma, ṣa(ssa)=rajoguṇa/artha, sa=sattvaguṇa/mokṣa.",
+      "primary_text_citation": "Sarkar: Sa is the acoustic root of mokṣa (salvation, unqualified liberation) and of sattvaguṇa (the sentient principle). In the four-varga scheme: va = dharma (+ liquid factor); ṣa ('sha') = artha (removal of worldly wants) + rajoguṇa; śa = kāma (worldly/physical wants) + tamoguṇa; sa = mokṣa + sattvaguṇa.",
+      "attested_vs_authored_verbatim": "ATTESTED (primary text): sa = mokṣa (unqualified liberation) + sattvaguṇa (sentient principle); classical side liberating-oriented. AUTHORED: the binding pole (sattva clung to as purity/superiority — the golden chain) is lexicon-supplied but a standard reading of sattvic attachment; liberating = mokṣa / clarity-without-attachment.",
+      "binding_pole_provenance": "INFERRED",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    },
+    {
+      "index": 33,
+      "atomic_varna": "h",
+      "stable_id": "cons_ha",
+      "iast": "h",
+      "devanagari": "ह",
+      "source_key_v31": "ha",
+      "unicode_codepoints": [
+        "U+0068"
+      ],
+      "binding_gloss": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+      "liberating_gloss": "intuitional vision (parā-vidyā) — inner, subtle seeing/knowing",
+      "tattva_association": "ākāśa / ether",
+      "tattva_source_verbatim": "ether (ākāśa) factor",
+      "guna_association": "MISSING",
+      "guna_source_verbatim": null,
+      "deity_association": "MISSING",
+      "deity_source_verbatim": null,
+      "classical_or_philosophical_association_verbatim": "ether (ākāśa) factor; daytime; sun; svarloka; parā-vidyā. OPPOSITE varṇa = ṭha (night, moon, bhúvarloka, kāmamaya kośa). COMPOUND ha+ao = hao = Shiva's táṇḍava. (Associations + an opposite varṇa — NOT an intra-ha polarity.)",
+      "primary_text_citation": "Sarkar: Ha = acoustic root of the ethereal (ākāśa) factor, of daytime, of the sun, of svarloka, and of parā-vidyā. Opposite to ha is ṭha, the acoustic root of nighttime, of the moon, of bhúvarloka, and of the kāmamaya kośa. Ha + ao = hao = acoustic root of Shiva in His táṇḍava posture.",
+      "attested_vs_authored_verbatim": "ATTESTED: the associations above. AUTHORED: the binding/liberating SPLIT (outward-visible vs inner-intuitional) is researcher-imposed; motivated partly by making 'happy' cohere — freeze + pre-register before word/context authoring.",
+      "binding_pole_provenance": "AUTHORED_PROVISIONAL",
+      "source_status": "DEVELOPMENT_ONLY",
+      "guna_tattva_deity_status": "ATTESTED",
+      "provenance_path": [
+        "b1_2_varna_classical_verifications.json (primary-text authority; swap detected here)",
+        "-> b1_2_varna_source_lexicon.json / b1_1 draft (swap present for śa/ṣa)",
+        "-> track_g_varna_polarity_table_v2_named_vritti.json (swap present for śa/ṣa)",
+        "-> frozen/varna_polarity_table_v3_1_metadata_refreeze.json (CORRECTED)",
+        "-> frozen/varna_native_stage1_merged_v1.json (consumed by feature-lift study)"
+      ],
+      "ambiguity_or_conflict_notes": [],
+      "artifact_hashes": {
+        "merged_v1": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+        "polarity_v3_1": "9ac712a6afab2d9c1497ea5d085ccac28942fb093f355284ffb0ece55bd64b27"
+      }
+    }
+  ]
+}
