@@ -1,0 +1,2140 @@
+{
+ "seed": "BWR_SHUFFLE_1",
+ "shuffle_map": {
+  "k": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+  "kh": "viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+  "g": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+  "gh": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+  "ṅ": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+  "c": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+  "ch": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+  "j": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+  "jh": "outward / visible vision — fixation on the manifest, physically-seen, outward-facing world",
+  "ñ": "bhaya — fear: collapse or flight before danger; the shrinking, dread and panic under threat",
+  "ṭ": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+  "ṭh": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+  "ḍ": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+  "ḍh": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+  "ṇ": "artha as possessive acquisition — worldly purpose pursued and possessed as acquisition, status or control (rajasic grasping to acquire)",
+  "t": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+  "th": "cintā as anxious rumination — the mind churning over unresolved contingencies and personal consequences (e.g. worrying through the late-train inconveniences), gripping the what-ifs",
+  "d": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+  "dh": "hypocrisy / concealment — inner and outer diverging: cheating to serve one's purpose, domineering to hide one's own weakness, condemning in others the sins one secretly commits",
+  "n": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+  "p": "greed / avarice — hoarding accumulation without limit; the insatiable greedy fascination (nolā) that always wants more",
+  "ph": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+  "b": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+  "bh": "envy — the sting at another's success; covetous resentment at another's good fortune",
+  "m": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+  "y": "restless striving that cannot stop — effort compulsively driven on, unable to cease (and, clung to mundane ends, ceaseless outward striving)",
+  "r": "avajñā — neglect / disregard of what actually has value; indifference misapplied so that genuine worth goes unattended",
+  "l": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+  "v": "kāma — worldly / physical desire and longing: grasping for wealth, opulence, name, fame, social position; the tamasic pull toward the crude",
+  "ś": "anutāpa as gripping remorse — the 'after-heat' that torments, replaying one's own past wrong without release",
+  "ṣ": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+  "s": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+  "h": "piśunatā — senseless, sadistic cruelty: harming/killing with gratuitous torture (dismembering a creature piece by piece; impaling, flaying), inflicting maximal suffering for its own sake; malice toward the maligned"
+ },
+ "words": [
+  {
+   "iast": "śānti",
+   "gloss": "peace",
+   "cat": "resolution",
+   "cons": [
+    "ś",
+    "n",
+    "t"
+   ],
+   "real": [
+    [
+     "ś",
+     "artha as possessive acquisition"
+    ],
+    [
+     "n",
+     "moha"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ]
+   ],
+   "shuf": [
+    [
+     "ś",
+     "anutāpa as gripping remorse"
+    ],
+    [
+     "n",
+     "jāḍya"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ]
+   ]
+  },
+  {
+   "iast": "mokṣa",
+   "gloss": "liberation",
+   "cat": "resolution",
+   "cons": [
+    "m",
+    "k",
+    "ṣ"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "ṣ",
+     "kāma"
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "ṣ",
+     "the sentient / sattvic impulse clung to"
+    ]
+   ]
+  },
+  {
+   "iast": "śama",
+   "gloss": "calm",
+   "cat": "resolution",
+   "cons": [
+    "ś",
+    "m"
+   ],
+   "real": [
+    [
+     "ś",
+     "artha as possessive acquisition"
+    ],
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "ś",
+     "anutāpa as gripping remorse"
+    ],
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ]
+   ]
+  },
+  {
+   "iast": "kṣamā",
+   "gloss": "forgiveness",
+   "cat": "resolution",
+   "cons": [
+    "k",
+    "ṣ",
+    "m"
+   ],
+   "real": [
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "ṣ",
+     "kāma"
+    ],
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "ṣ",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ]
+   ]
+  },
+  {
+   "iast": "dhairya",
+   "gloss": "fortitude",
+   "cat": "resolution",
+   "cons": [
+    "dh",
+    "r",
+    "y"
+   ],
+   "real": [
+    [
+     "dh",
+     "tṛṣṇā"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "dh",
+     "hypocrisy / concealment"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "maitrī",
+   "gloss": "friendliness",
+   "cat": "resolution",
+   "cons": [
+    "m",
+    "t",
+    "r"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ],
+    [
+     "r",
+     "avajñā"
+    ]
+   ]
+  },
+  {
+   "iast": "karuṇā",
+   "gloss": "compassion",
+   "cat": "resolution",
+   "cons": [
+    "k",
+    "r",
+    "ṇ"
+   ],
+   "real": [
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "ṇ",
+     "envy"
+    ]
+   ],
+   "shuf": [
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "ṇ",
+     "artha as possessive acquisition"
+    ]
+   ]
+  },
+  {
+   "iast": "tyāga",
+   "gloss": "renunciation",
+   "cat": "resolution",
+   "cons": [
+    "t",
+    "y",
+    "g"
+   ],
+   "real": [
+    [
+     "t",
+     "jāḍya"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ],
+    [
+     "g",
+     "restless striving that cannot stop"
+    ]
+   ],
+   "shuf": [
+    [
+     "t",
+     "ensconcement gone rigid"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ],
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ]
+   ]
+  },
+  {
+   "iast": "vairāgya",
+   "gloss": "dispassion",
+   "cat": "resolution",
+   "cons": [
+    "v",
+    "r",
+    "g",
+    "y"
+   ],
+   "real": [
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "g",
+     "restless striving that cannot stop"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "ānanda",
+   "gloss": "bliss",
+   "cat": "resolution",
+   "cons": [
+    "n",
+    "n",
+    "d"
+   ],
+   "real": [
+    [
+     "n",
+     "moha"
+    ],
+    [
+     "n",
+     "moha"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ]
+   ],
+   "shuf": [
+    [
+     "n",
+     "jāḍya"
+    ],
+    [
+     "n",
+     "jāḍya"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ]
+   ]
+  },
+  {
+   "iast": "krodha",
+   "gloss": "anger",
+   "cat": "affliction",
+   "cons": [
+    "k",
+    "r",
+    "dh"
+   ],
+   "real": [
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "dh",
+     "tṛṣṇā"
+    ]
+   ],
+   "shuf": [
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "dh",
+     "hypocrisy / concealment"
+    ]
+   ]
+  },
+  {
+   "iast": "kāma",
+   "gloss": "desire",
+   "cat": "affliction",
+   "cons": [
+    "k",
+    "m"
+   ],
+   "real": [
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ]
+   ]
+  },
+  {
+   "iast": "lobha",
+   "gloss": "greed",
+   "cat": "affliction",
+   "cons": [
+    "l",
+    "bh"
+   ],
+   "real": [
+    [
+     "l",
+     "kruratā"
+    ],
+    [
+     "bh",
+     "mūrcchā"
+    ]
+   ],
+   "shuf": [
+    [
+     "l",
+     "dambha as vanity"
+    ],
+    [
+     "bh",
+     "envy"
+    ]
+   ]
+  },
+  {
+   "iast": "moha",
+   "gloss": "delusion",
+   "cat": "affliction",
+   "cons": [
+    "m",
+    "h"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "h",
+     "outward / visible vision"
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "h",
+     "piśunatā"
+    ]
+   ]
+  },
+  {
+   "iast": "mada",
+   "gloss": "pride",
+   "cat": "affliction",
+   "cons": [
+    "m",
+    "d"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ]
+   ]
+  },
+  {
+   "iast": "dveṣa",
+   "gloss": "hatred",
+   "cat": "affliction",
+   "cons": [
+    "d",
+    "v",
+    "ṣ"
+   ],
+   "real": [
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "ṣ",
+     "kāma"
+    ]
+   ],
+   "shuf": [
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "ṣ",
+     "the sentient / sattvic impulse clung to"
+    ]
+   ]
+  },
+  {
+   "iast": "bhaya",
+   "gloss": "fear",
+   "cat": "affliction",
+   "cons": [
+    "bh",
+    "y"
+   ],
+   "real": [
+    [
+     "bh",
+     "mūrcchā"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "bh",
+     "envy"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "īrṣyā",
+   "gloss": "jealousy",
+   "cat": "affliction",
+   "cons": [
+    "r",
+    "ṣ",
+    "y"
+   ],
+   "real": [
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "ṣ",
+     "kāma"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "ṣ",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "ahaṃkāra",
+   "gloss": "ego",
+   "cat": "affliction",
+   "cons": [
+    "h",
+    "k",
+    "r"
+   ],
+   "real": [
+    [
+     "h",
+     "outward / visible vision"
+    ],
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "h",
+     "piśunatā"
+    ],
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "r",
+     "avajñā"
+    ]
+   ]
+  },
+  {
+   "iast": "mātsarya",
+   "gloss": "envy",
+   "cat": "affliction",
+   "cons": [
+    "m",
+    "t",
+    "s",
+    "r",
+    "y"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ],
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ],
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "jala",
+   "gloss": "water",
+   "cat": "inanimate",
+   "cons": [
+    "j",
+    "l"
+   ],
+   "real": [
+    [
+     "j",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "l",
+     "kruratā"
+    ]
+   ],
+   "shuf": [
+    [
+     "j",
+     "collapse of mental function under strain"
+    ],
+    [
+     "l",
+     "dambha as vanity"
+    ]
+   ]
+  },
+  {
+   "iast": "aśma",
+   "gloss": "stone",
+   "cat": "inanimate",
+   "cons": [
+    "ś",
+    "m"
+   ],
+   "real": [
+    [
+     "ś",
+     "artha as possessive acquisition"
+    ],
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "ś",
+     "anutāpa as gripping remorse"
+    ],
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ]
+   ]
+  },
+  {
+   "iast": "ghaṭa",
+   "gloss": "pot",
+   "cat": "inanimate",
+   "cons": [
+    "gh",
+    "ṭ"
+   ],
+   "real": [
+    [
+     "gh",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "ṭ",
+     "vitarka"
+    ]
+   ],
+   "shuf": [
+    [
+     "gh",
+     "kruratā"
+    ],
+    [
+     "ṭ",
+     "āśā as grasping / clinging hope"
+    ]
+   ]
+  },
+  {
+   "iast": "pustaka",
+   "gloss": "book",
+   "cat": "inanimate",
+   "cons": [
+    "p",
+    "s",
+    "t",
+    "k"
+   ],
+   "real": [
+    [
+     "p",
+     "ghṛṇā"
+    ],
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ],
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ]
+   ],
+   "shuf": [
+    [
+     "p",
+     "greed / avarice"
+    ],
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ],
+    [
+     "k",
+     "tṛṣṇā"
+    ]
+   ]
+  },
+  {
+   "iast": "gṛha",
+   "gloss": "house",
+   "cat": "inanimate",
+   "cons": [
+    "g",
+    "h"
+   ],
+   "real": [
+    [
+     "g",
+     "restless striving that cannot stop"
+    ],
+    [
+     "h",
+     "outward / visible vision"
+    ]
+   ],
+   "shuf": [
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "h",
+     "piśunatā"
+    ]
+   ]
+  },
+  {
+   "iast": "suvarṇa",
+   "gloss": "gold",
+   "cat": "inanimate",
+   "cons": [
+    "s",
+    "v",
+    "r",
+    "ṇ"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "ṇ",
+     "envy"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "ṇ",
+     "artha as possessive acquisition"
+    ]
+   ]
+  },
+  {
+   "iast": "gaja",
+   "gloss": "elephant",
+   "cat": "animal",
+   "cons": [
+    "g",
+    "j"
+   ],
+   "real": [
+    [
+     "g",
+     "restless striving that cannot stop"
+    ],
+    [
+     "j",
+     "the inflated 'I did / I control this'"
+    ]
+   ],
+   "shuf": [
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "j",
+     "collapse of mental function under strain"
+    ]
+   ]
+  },
+  {
+   "iast": "siṃha",
+   "gloss": "lion",
+   "cat": "animal",
+   "cons": [
+    "s",
+    "h"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "h",
+     "outward / visible vision"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "h",
+     "piśunatā"
+    ]
+   ]
+  },
+  {
+   "iast": "sarpa",
+   "gloss": "snake",
+   "cat": "animal",
+   "cons": [
+    "s",
+    "r",
+    "p"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "p",
+     "ghṛṇā"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "p",
+     "greed / avarice"
+    ]
+   ]
+  },
+  {
+   "iast": "vyāghra",
+   "gloss": "tiger",
+   "cat": "animal",
+   "cons": [
+    "v",
+    "y",
+    "gh",
+    "r"
+   ],
+   "real": [
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ],
+    [
+     "gh",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ],
+    [
+     "gh",
+     "kruratā"
+    ],
+    [
+     "r",
+     "avajñā"
+    ]
+   ]
+  },
+  {
+   "iast": "aśva",
+   "gloss": "horse",
+   "cat": "animal",
+   "cons": [
+    "ś",
+    "v"
+   ],
+   "real": [
+    [
+     "ś",
+     "artha as possessive acquisition"
+    ],
+    [
+     "v",
+     "ensconcement gone rigid"
+    ]
+   ],
+   "shuf": [
+    [
+     "ś",
+     "anutāpa as gripping remorse"
+    ],
+    [
+     "v",
+     "kāma"
+    ]
+   ]
+  },
+  {
+   "iast": "go",
+   "gloss": "cow",
+   "cat": "animal",
+   "cons": [
+    "g"
+   ],
+   "real": [
+    [
+     "g",
+     "restless striving that cannot stop"
+    ]
+   ],
+   "shuf": [
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ]
+   ]
+  },
+  {
+   "iast": "mṛga",
+   "gloss": "deer",
+   "cat": "animal",
+   "cons": [
+    "m",
+    "g"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "g",
+     "restless striving that cannot stop"
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ]
+   ]
+  },
+  {
+   "iast": "vṛka",
+   "gloss": "wolf",
+   "cat": "animal",
+   "cons": [
+    "v",
+    "k"
+   ],
+   "real": [
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ]
+   ],
+   "shuf": [
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "k",
+     "tṛṣṇā"
+    ]
+   ]
+  },
+  {
+   "iast": "sukha",
+   "gloss": "happiness",
+   "cat": "emotion",
+   "cons": [
+    "s",
+    "kh"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "kh",
+     "cintā as anxious rumination"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "kh",
+     "viśāda"
+    ]
+   ]
+  },
+  {
+   "iast": "duḥkha",
+   "gloss": "sorrow",
+   "cat": "emotion",
+   "cons": [
+    "d",
+    "kh"
+   ],
+   "real": [
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "kh",
+     "cintā as anxious rumination"
+    ]
+   ],
+   "shuf": [
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "kh",
+     "viśāda"
+    ]
+   ]
+  },
+  {
+   "iast": "harṣa",
+   "gloss": "joy",
+   "cat": "emotion",
+   "cons": [
+    "h",
+    "r",
+    "ṣ"
+   ],
+   "real": [
+    [
+     "h",
+     "outward / visible vision"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "ṣ",
+     "kāma"
+    ]
+   ],
+   "shuf": [
+    [
+     "h",
+     "piśunatā"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "ṣ",
+     "the sentient / sattvic impulse clung to"
+    ]
+   ]
+  },
+  {
+   "iast": "śoka",
+   "gloss": "grief",
+   "cat": "emotion",
+   "cons": [
+    "ś",
+    "k"
+   ],
+   "real": [
+    [
+     "ś",
+     "artha as possessive acquisition"
+    ],
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ]
+   ],
+   "shuf": [
+    [
+     "ś",
+     "anutāpa as gripping remorse"
+    ],
+    [
+     "k",
+     "tṛṣṇā"
+    ]
+   ]
+  },
+  {
+   "iast": "satya",
+   "gloss": "truth",
+   "cat": "virtue",
+   "cons": [
+    "s",
+    "t",
+    "y"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "dāna",
+   "gloss": "charity",
+   "cat": "virtue",
+   "cons": [
+    "d",
+    "n"
+   ],
+   "real": [
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "n",
+     "moha"
+    ]
+   ],
+   "shuf": [
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "n",
+     "jāḍya"
+    ]
+   ]
+  },
+  {
+   "iast": "ahiṃsā",
+   "gloss": "non-violence",
+   "cat": "virtue",
+   "cons": [
+    "h",
+    "s"
+   ],
+   "real": [
+    [
+     "h",
+     "outward / visible vision"
+    ],
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ]
+   ],
+   "shuf": [
+    [
+     "h",
+     "piśunatā"
+    ],
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ]
+   ]
+  },
+  {
+   "iast": "dayā",
+   "gloss": "mercy",
+   "cat": "virtue",
+   "cons": [
+    "d",
+    "y"
+   ],
+   "real": [
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "bhakti",
+   "gloss": "devotion",
+   "cat": "virtue",
+   "cons": [
+    "bh",
+    "k",
+    "t"
+   ],
+   "real": [
+    [
+     "bh",
+     "mūrcchā"
+    ],
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ]
+   ],
+   "shuf": [
+    [
+     "bh",
+     "envy"
+    ],
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ]
+   ]
+  },
+  {
+   "iast": "jñāna",
+   "gloss": "knowledge",
+   "cat": "abstract",
+   "cons": [
+    "j",
+    "ñ",
+    "n"
+   ],
+   "real": [
+    [
+     "j",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "ñ",
+     "hypocrisy / concealment"
+    ],
+    [
+     "n",
+     "moha"
+    ]
+   ],
+   "shuf": [
+    [
+     "j",
+     "collapse of mental function under strain"
+    ],
+    [
+     "ñ",
+     "bhaya"
+    ],
+    [
+     "n",
+     "jāḍya"
+    ]
+   ]
+  },
+  {
+   "iast": "vidyā",
+   "gloss": "learning",
+   "cat": "abstract",
+   "cons": [
+    "v",
+    "d",
+    "y"
+   ],
+   "real": [
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "buddhi",
+   "gloss": "intellect",
+   "cat": "abstract",
+   "cons": [
+    "b",
+    "d",
+    "dh"
+   ],
+   "real": [
+    [
+     "b",
+     "avajñā"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "dh",
+     "tṛṣṇā"
+    ]
+   ],
+   "shuf": [
+    [
+     "b",
+     "sarvanāśa"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "dh",
+     "hypocrisy / concealment"
+    ]
+   ]
+  },
+  {
+   "iast": "smṛti",
+   "gloss": "memory",
+   "cat": "abstract",
+   "cons": [
+    "s",
+    "m",
+    "t"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ]
+   ]
+  },
+  {
+   "iast": "kāla",
+   "gloss": "time",
+   "cat": "abstract",
+   "cons": [
+    "k",
+    "l"
+   ],
+   "real": [
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "l",
+     "kruratā"
+    ]
+   ],
+   "shuf": [
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "l",
+     "dambha as vanity"
+    ]
+   ]
+  },
+  {
+   "iast": "agni",
+   "gloss": "fire",
+   "cat": "natural",
+   "cons": [
+    "g",
+    "n"
+   ],
+   "real": [
+    [
+     "g",
+     "restless striving that cannot stop"
+    ],
+    [
+     "n",
+     "moha"
+    ]
+   ],
+   "shuf": [
+    [
+     "g",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "n",
+     "jāḍya"
+    ]
+   ]
+  },
+  {
+   "iast": "vāyu",
+   "gloss": "wind",
+   "cat": "natural",
+   "cons": [
+    "v",
+    "y"
+   ],
+   "real": [
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "sūrya",
+   "gloss": "sun",
+   "cat": "natural",
+   "cons": [
+    "s",
+    "r",
+    "y"
+   ],
+   "real": [
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "candra",
+   "gloss": "moon",
+   "cat": "natural",
+   "cons": [
+    "c",
+    "n",
+    "d",
+    "r"
+   ],
+   "real": [
+    [
+     "c",
+     "viveka distorted"
+    ],
+    [
+     "n",
+     "moha"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "c",
+     "ghṛṇā"
+    ],
+    [
+     "n",
+     "jāḍya"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "r",
+     "avajñā"
+    ]
+   ]
+  },
+  {
+   "iast": "megha",
+   "gloss": "cloud",
+   "cat": "natural",
+   "cons": [
+    "m",
+    "gh"
+   ],
+   "real": [
+    [
+     "m",
+     "praśraya / praṇāśa"
+    ],
+    [
+     "gh",
+     "mamatā bounded by the relative factors ("
+    ]
+   ],
+   "shuf": [
+    [
+     "m",
+     "mamatā bounded by the relative factors ("
+    ],
+    [
+     "gh",
+     "kruratā"
+    ]
+   ]
+  },
+  {
+   "iast": "vidyut",
+   "gloss": "lightning",
+   "cat": "natural",
+   "cons": [
+    "v",
+    "d",
+    "y",
+    "t"
+   ],
+   "real": [
+    [
+     "v",
+     "ensconcement gone rigid"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ]
+   ],
+   "shuf": [
+    [
+     "v",
+     "kāma"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ]
+   ]
+  },
+  {
+   "iast": "hasta",
+   "gloss": "hand",
+   "cat": "body",
+   "cons": [
+    "h",
+    "s",
+    "t"
+   ],
+   "real": [
+    [
+     "h",
+     "outward / visible vision"
+    ],
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ]
+   ],
+   "shuf": [
+    [
+     "h",
+     "piśunatā"
+    ],
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ]
+   ]
+  },
+  {
+   "iast": "netra",
+   "gloss": "eye",
+   "cat": "body",
+   "cons": [
+    "n",
+    "t",
+    "r"
+   ],
+   "real": [
+    [
+     "n",
+     "moha"
+    ],
+    [
+     "t",
+     "jāḍya"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ]
+   ],
+   "shuf": [
+    [
+     "n",
+     "jāḍya"
+    ],
+    [
+     "t",
+     "ensconcement gone rigid"
+    ],
+    [
+     "r",
+     "avajñā"
+    ]
+   ]
+  },
+  {
+   "iast": "śiras",
+   "gloss": "head",
+   "cat": "body",
+   "cons": [
+    "ś",
+    "r",
+    "s"
+   ],
+   "real": [
+    [
+     "ś",
+     "artha as possessive acquisition"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "s",
+     "the sentient / sattvic impulse clung to"
+    ]
+   ],
+   "shuf": [
+    [
+     "ś",
+     "anutāpa as gripping remorse"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "s",
+     "peevishness / reactive irritability"
+    ]
+   ]
+  },
+  {
+   "iast": "hṛdaya",
+   "gloss": "heart",
+   "cat": "body",
+   "cons": [
+    "h",
+    "d",
+    "y"
+   ],
+   "real": [
+    [
+     "h",
+     "outward / visible vision"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ],
+    [
+     "y",
+     "aviśvāsa"
+    ]
+   ],
+   "shuf": [
+    [
+     "h",
+     "piśunatā"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ],
+    [
+     "y",
+     "restless striving that cannot stop"
+    ]
+   ]
+  },
+  {
+   "iast": "pāda",
+   "gloss": "foot",
+   "cat": "body",
+   "cons": [
+    "p",
+    "d"
+   ],
+   "real": [
+    [
+     "p",
+     "ghṛṇā"
+    ],
+    [
+     "d",
+     "peevishness / reactive irritability"
+    ]
+   ],
+   "shuf": [
+    [
+     "p",
+     "greed / avarice"
+    ],
+    [
+     "d",
+     "the inflated 'I did / I control this'"
+    ]
+   ]
+  },
+  {
+   "iast": "karṇa",
+   "gloss": "ear",
+   "cat": "body",
+   "cons": [
+    "k",
+    "r",
+    "ṇ"
+   ],
+   "real": [
+    [
+     "k",
+     "āśā as grasping / clinging hope"
+    ],
+    [
+     "r",
+     "sarvanāśa"
+    ],
+    [
+     "ṇ",
+     "envy"
+    ]
+   ],
+   "shuf": [
+    [
+     "k",
+     "tṛṣṇā"
+    ],
+    [
+     "r",
+     "avajñā"
+    ],
+    [
+     "ṇ",
+     "artha as possessive acquisition"
+    ]
+   ]
+  }
+ ]
+}

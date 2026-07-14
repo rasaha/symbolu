@@ -1,0 +1,302 @@
+{
+ "śānti": [
+  "resolution",
+  8.3,
+  8.3
+ ],
+ "mokṣa": [
+  "resolution",
+  0,
+  0
+ ],
+ "śama": [
+  "resolution",
+  0,
+  0
+ ],
+ "kṣamā": [
+  "resolution",
+  0,
+  0
+ ],
+ "dhairya": [
+  "resolution",
+  0,
+  0
+ ],
+ "maitrī": [
+  "resolution",
+  8.3,
+  8.3
+ ],
+ "karuṇā": [
+  "resolution",
+  0,
+  0
+ ],
+ "tyāga": [
+  "resolution",
+  8.3,
+  0
+ ],
+ "vairāgya": [
+  "resolution",
+  0,
+  6.25
+ ],
+ "ānanda": [
+  "resolution",
+  0,
+  0
+ ],
+ "krodha": [
+  "affliction",
+  83.3,
+  25
+ ],
+ "kāma": [
+  "affliction",
+  87.5,
+  87.5
+ ],
+ "lobha": [
+  "affliction",
+  100,
+  50
+ ],
+ "moha": [
+  "affliction",
+  75,
+  37.5
+ ],
+ "mada": [
+  "affliction",
+  75,
+  75
+ ],
+ "dveṣa": [
+  "affliction",
+  66.7,
+  16.7
+ ],
+ "bhaya": [
+  "affliction",
+  100,
+  25
+ ],
+ "īrṣyā": [
+  "affliction",
+  83.3,
+  33.3
+ ],
+ "ahaṃkāra": [
+  "affliction",
+  66.7,
+  50
+ ],
+ "mātsarya": [
+  "affliction",
+  50,
+  50
+ ],
+ "jala": [
+  "inanimate",
+  12.5,
+  0
+ ],
+ "aśma": [
+  "inanimate",
+  0,
+  0
+ ],
+ "ghaṭa": [
+  "inanimate",
+  0,
+  0
+ ],
+ "pustaka": [
+  "inanimate",
+  18.75,
+  6.25
+ ],
+ "gṛha": [
+  "inanimate",
+  25,
+  12.5
+ ],
+ "suvarṇa": [
+  "inanimate",
+  31.25,
+  31.25
+ ],
+ "gaja": [
+  "animal",
+  12.5,
+  0
+ ],
+ "siṃha": [
+  "animal",
+  25,
+  37.5
+ ],
+ "sarpa": [
+  "animal",
+  50,
+  0
+ ],
+ "vyāghra": [
+  "animal",
+  31.25,
+  25
+ ],
+ "aśva": [
+  "animal",
+  0,
+  0
+ ],
+ "go": [
+  "animal",
+  0,
+  0
+ ],
+ "mṛga": [
+  "animal",
+  25,
+  0
+ ],
+ "vṛka": [
+  "animal",
+  37.5,
+  62.5
+ ],
+ "sukha": [
+  "emotion",
+  12.5,
+  0
+ ],
+ "duḥkha": [
+  "emotion",
+  62.5,
+  50
+ ],
+ "harṣa": [
+  "emotion",
+  33.3,
+  8.3
+ ],
+ "śoka": [
+  "emotion",
+  62.5,
+  62.5
+ ],
+ "satya": [
+  "virtue",
+  16.7,
+  16.7
+ ],
+ "dāna": [
+  "virtue",
+  0,
+  12.5
+ ],
+ "ahiṃsā": [
+  "virtue",
+  25,
+  0
+ ],
+ "dayā": [
+  "virtue",
+  0,
+  0
+ ],
+ "bhakti": [
+  "virtue",
+  33.3,
+  16.7
+ ],
+ "jñāna": [
+  "abstract",
+  25,
+  0
+ ],
+ "vidyā": [
+  "abstract",
+  16.7,
+  16.7
+ ],
+ "buddhi": [
+  "abstract",
+  25,
+  25
+ ],
+ "smṛti": [
+  "abstract",
+  33.3,
+  33.3
+ ],
+ "kāla": [
+  "abstract",
+  25,
+  0
+ ],
+ "agni": [
+  "natural",
+  37.5,
+  0
+ ],
+ "vāyu": [
+  "natural",
+  0,
+  37.5
+ ],
+ "sūrya": [
+  "natural",
+  8.3,
+  0
+ ],
+ "candra": [
+  "natural",
+  18.75,
+  0
+ ],
+ "megha": [
+  "natural",
+  0,
+  0
+ ],
+ "vidyut": [
+  "natural",
+  6.25,
+  6.25
+ ],
+ "hasta": [
+  "body",
+  33.3,
+  16.7
+ ],
+ "netra": [
+  "body",
+  25,
+  0
+ ],
+ "śiras": [
+  "body",
+  8.3,
+  0
+ ],
+ "hṛdaya": [
+  "body",
+  16.7,
+  16.7
+ ],
+ "pāda": [
+  "body",
+  25,
+  0
+ ],
+ "karṇa": [
+  "body",
+  0,
+  0
+ ]
+}
