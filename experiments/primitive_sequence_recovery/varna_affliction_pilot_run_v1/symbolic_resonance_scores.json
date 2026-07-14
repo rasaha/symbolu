@@ -1,0 +1,1402 @@
+[
+ {
+  "word": "śānti",
+  "category": "resolution",
+  "components": [
+   [
+    "ś",
+    100,
+    "RES"
+   ],
+   [
+    "n",
+    75,
+    "RES"
+   ],
+   [
+    "t",
+    50,
+    "OPP"
+   ]
+  ],
+  "resonance": 75.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "RES"
+ },
+ {
+  "word": "mokṣa",
+  "category": "resolution",
+  "components": [
+   [
+    "m",
+    100,
+    "RES"
+   ],
+   [
+    "k",
+    100,
+    "RES"
+   ],
+   [
+    "ṣ",
+    100,
+    "RES"
+   ]
+  ],
+  "resonance": 100.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 3,
+  "dominant_relationship": "RES"
+ },
+ {
+  "word": "śama",
+  "category": "resolution",
+  "components": [
+   [
+    "ś",
+    100,
+    "OPP"
+   ],
+   [
+    "m",
+    75,
+    "RES"
+   ]
+  ],
+  "resonance": 87.5,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "kṣamā",
+  "category": "resolution",
+  "components": [
+   [
+    "k",
+    75,
+    "RES"
+   ],
+   [
+    "ṣ",
+    50,
+    "OPP"
+   ],
+   [
+    "m",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 66.7,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "dhairya",
+  "category": "resolution",
+  "components": [
+   [
+    "dh",
+    75,
+    "OPP"
+   ],
+   [
+    "r",
+    100,
+    "RES"
+   ],
+   [
+    "y",
+    100,
+    "RES"
+   ]
+  ],
+  "resonance": 91.7,
+  "level": "STRONG",
+  "components_naturally_accounted": 3,
+  "dominant_relationship": "RES"
+ },
+ {
+  "word": "maitrī",
+  "category": "resolution",
+  "components": [
+   [
+    "m",
+    75,
+    "OPP"
+   ],
+   [
+    "t",
+    50,
+    "OPP"
+   ],
+   [
+    "r",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 66.7,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "karuṇā",
+  "category": "resolution",
+  "components": [
+   [
+    "k",
+    75,
+    "OPP"
+   ],
+   [
+    "r",
+    75,
+    "OPP"
+   ],
+   [
+    "ṇ",
+    100,
+    "OPP"
+   ]
+  ],
+  "resonance": 83.3,
+  "level": "STRONG",
+  "components_naturally_accounted": 3,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "tyāga",
+  "category": "resolution",
+  "components": [
+   [
+    "t",
+    50,
+    "OPP"
+   ],
+   [
+    "y",
+    75,
+    "OPP"
+   ],
+   [
+    "g",
+    100,
+    "RES"
+   ]
+  ],
+  "resonance": 75.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "vairāgya",
+  "category": "resolution",
+  "components": [
+   [
+    "v",
+    75,
+    "RES"
+   ],
+   [
+    "r",
+    50,
+    "OPP"
+   ],
+   [
+    "g",
+    100,
+    "RES"
+   ],
+   [
+    "y",
+    50,
+    "OPP"
+   ]
+  ],
+  "resonance": 68.8,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "RES"
+ },
+ {
+  "word": "ānanda",
+  "category": "resolution",
+  "components": [
+   [
+    "n",
+    75,
+    "RES"
+   ],
+   [
+    "n",
+    75,
+    "RES"
+   ],
+   [
+    "d",
+    100,
+    "OPP"
+   ]
+  ],
+  "resonance": 83.3,
+  "level": "STRONG",
+  "components_naturally_accounted": 3,
+  "dominant_relationship": "RES"
+ },
+ {
+  "word": "krodha",
+  "category": "affliction",
+  "components": [
+   [
+    "k",
+    75,
+    "CON"
+   ],
+   [
+    "r",
+    100,
+    "EMB"
+   ],
+   [
+    "dh",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 83.3,
+  "level": "STRONG",
+  "components_naturally_accounted": 3,
+  "dominant_relationship": "CON"
+ },
+ {
+  "word": "kāma",
+  "category": "affliction",
+  "components": [
+   [
+    "k",
+    100,
+    "EMB"
+   ],
+   [
+    "m",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 87.5,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "lobha",
+  "category": "affliction",
+  "components": [
+   [
+    "l",
+    100,
+    "CON"
+   ],
+   [
+    "bh",
+    100,
+    "CON"
+   ]
+  ],
+  "resonance": 100.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "CON"
+ },
+ {
+  "word": "moha",
+  "category": "affliction",
+  "components": [
+   [
+    "m",
+    50,
+    "CON"
+   ],
+   [
+    "h",
+    100,
+    "EMB"
+   ]
+  ],
+  "resonance": 75.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "CON"
+ },
+ {
+  "word": "mada",
+  "category": "affliction",
+  "components": [
+   [
+    "m",
+    75,
+    "EMB"
+   ],
+   [
+    "d",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 75.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "dveṣa",
+  "category": "affliction",
+  "components": [
+   [
+    "d",
+    100,
+    "EMB"
+   ],
+   [
+    "v",
+    75,
+    "EMB"
+   ],
+   [
+    "ṣ",
+    50,
+    "OPP"
+   ]
+  ],
+  "resonance": 75.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "bhaya",
+  "category": "affliction",
+  "components": [
+   [
+    "bh",
+    100,
+    "EMB"
+   ],
+   [
+    "y",
+    100,
+    "EMB"
+   ]
+  ],
+  "resonance": 100.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "īrṣyā",
+  "category": "affliction",
+  "components": [
+   [
+    "r",
+    75,
+    "EMB"
+   ],
+   [
+    "ṣ",
+    100,
+    "EMB"
+   ],
+   [
+    "y",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 83.3,
+  "level": "STRONG",
+  "components_naturally_accounted": 3,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "ahaṃkāra",
+  "category": "affliction",
+  "components": [
+   [
+    "h",
+    75,
+    "EMB"
+   ],
+   [
+    "k",
+    75,
+    "CON"
+   ],
+   [
+    "r",
+    50,
+    "IMP"
+   ]
+  ],
+  "resonance": 66.7,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "mātsarya",
+  "category": "affliction",
+  "components": [
+   [
+    "m",
+    25,
+    "NR"
+   ],
+   [
+    "t",
+    25,
+    "NR"
+   ],
+   [
+    "s",
+    50,
+    "IMP"
+   ],
+   [
+    "r",
+    75,
+    "EMB"
+   ],
+   [
+    "y",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "jala",
+  "category": "inanimate",
+  "components": [
+   [
+    "j",
+    25,
+    "NR"
+   ],
+   [
+    "l",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 25.0,
+  "level": "MINIMAL",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "aśma",
+  "category": "inanimate",
+  "components": [
+   [
+    "ś",
+    25,
+    "NR"
+   ],
+   [
+    "m",
+    50,
+    "OPP"
+   ]
+  ],
+  "resonance": 37.5,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "ghaṭa",
+  "category": "inanimate",
+  "components": [
+   [
+    "gh",
+    25,
+    "NR"
+   ],
+   [
+    "ṭ",
+    0,
+    "NR"
+   ]
+  ],
+  "resonance": 12.5,
+  "level": "MINIMAL",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "pustaka",
+  "category": "inanimate",
+  "components": [
+   [
+    "p",
+    0,
+    "NR"
+   ],
+   [
+    "s",
+    50,
+    "IMP"
+   ],
+   [
+    "t",
+    50,
+    "EMB"
+   ],
+   [
+    "k",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 31.2,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "gṛha",
+  "category": "inanimate",
+  "components": [
+   [
+    "g",
+    50,
+    "OPP"
+   ],
+   [
+    "h",
+    75,
+    "EMB"
+   ]
+  ],
+  "resonance": 62.5,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "suvarṇa",
+  "category": "inanimate",
+  "components": [
+   [
+    "s",
+    75,
+    "IMP"
+   ],
+   [
+    "v",
+    50,
+    "IMP"
+   ],
+   [
+    "r",
+    25,
+    "NR"
+   ],
+   [
+    "ṇ",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 56.2,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "IMP"
+ },
+ {
+  "word": "gaja",
+  "category": "animal",
+  "components": [
+   [
+    "g",
+    75,
+    "OPP"
+   ],
+   [
+    "j",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "siṃha",
+  "category": "animal",
+  "components": [
+   [
+    "s",
+    25,
+    "NR"
+   ],
+   [
+    "h",
+    50,
+    "EMB"
+   ]
+  ],
+  "resonance": 37.5,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "sarpa",
+  "category": "animal",
+  "components": [
+   [
+    "s",
+    25,
+    "NR"
+   ],
+   [
+    "r",
+    75,
+    "EMB"
+   ],
+   [
+    "p",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 58.3,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "vyāghra",
+  "category": "animal",
+  "components": [
+   [
+    "v",
+    25,
+    "NR"
+   ],
+   [
+    "y",
+    50,
+    "OPP"
+   ],
+   [
+    "gh",
+    50,
+    "CON"
+   ],
+   [
+    "r",
+    75,
+    "EMB"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "aśva",
+  "category": "animal",
+  "components": [
+   [
+    "ś",
+    25,
+    "NR"
+   ],
+   [
+    "v",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 25.0,
+  "level": "MINIMAL",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "go",
+  "category": "animal",
+  "components": [
+   [
+    "g",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 75.0,
+  "level": "STRONG",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "mṛga",
+  "category": "animal",
+  "components": [
+   [
+    "m",
+    25,
+    "NR"
+   ],
+   [
+    "g",
+    50,
+    "EMB"
+   ]
+  ],
+  "resonance": 37.5,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "vṛka",
+  "category": "animal",
+  "components": [
+   [
+    "v",
+    25,
+    "NR"
+   ],
+   [
+    "k",
+    75,
+    "EMB"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "sukha",
+  "category": "emotion",
+  "components": [
+   [
+    "s",
+    25,
+    "NR"
+   ],
+   [
+    "kh",
+    100,
+    "OPP"
+   ]
+  ],
+  "resonance": 62.5,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "duḥkha",
+  "category": "emotion",
+  "components": [
+   [
+    "d",
+    50,
+    "CON"
+   ],
+   [
+    "kh",
+    75,
+    "EMB"
+   ]
+  ],
+  "resonance": 62.5,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "CON"
+ },
+ {
+  "word": "harṣa",
+  "category": "emotion",
+  "components": [
+   [
+    "h",
+    50,
+    "EMB"
+   ],
+   [
+    "r",
+    75,
+    "OPP"
+   ],
+   [
+    "ṣ",
+    50,
+    "CON"
+   ]
+  ],
+  "resonance": 58.3,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "śoka",
+  "category": "emotion",
+  "components": [
+   [
+    "ś",
+    50,
+    "IMP"
+   ],
+   [
+    "k",
+    75,
+    "CON"
+   ]
+  ],
+  "resonance": 62.5,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "IMP"
+ },
+ {
+  "word": "satya",
+  "category": "virtue",
+  "components": [
+   [
+    "s",
+    50,
+    "IMP"
+   ],
+   [
+    "t",
+    25,
+    "NR"
+   ],
+   [
+    "y",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "IMP"
+ },
+ {
+  "word": "dāna",
+  "category": "virtue",
+  "components": [
+   [
+    "d",
+    75,
+    "OPP"
+   ],
+   [
+    "n",
+    100,
+    "RES"
+   ]
+  ],
+  "resonance": 87.5,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "ahiṃsā",
+  "category": "virtue",
+  "components": [
+   [
+    "h",
+    25,
+    "NR"
+   ],
+   [
+    "s",
+    50,
+    "IMP"
+   ]
+  ],
+  "resonance": 37.5,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "dayā",
+  "category": "virtue",
+  "components": [
+   [
+    "d",
+    100,
+    "OPP"
+   ],
+   [
+    "y",
+    75,
+    "RES"
+   ]
+  ],
+  "resonance": 87.5,
+  "level": "STRONG",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "bhakti",
+  "category": "virtue",
+  "components": [
+   [
+    "bh",
+    50,
+    "EMB"
+   ],
+   [
+    "k",
+    50,
+    "CON"
+   ],
+   [
+    "t",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 41.7,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "jñāna",
+  "category": "abstract",
+  "components": [
+   [
+    "j",
+    50,
+    "CON"
+   ],
+   [
+    "ñ",
+    25,
+    "NR"
+   ],
+   [
+    "n",
+    100,
+    "RES"
+   ]
+  ],
+  "resonance": 58.3,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "CON"
+ },
+ {
+  "word": "vidyā",
+  "category": "abstract",
+  "components": [
+   [
+    "v",
+    50,
+    "CON"
+   ],
+   [
+    "d",
+    25,
+    "NR"
+   ],
+   [
+    "y",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "CON"
+ },
+ {
+  "word": "buddhi",
+  "category": "abstract",
+  "components": [
+   [
+    "b",
+    50,
+    "CON"
+   ],
+   [
+    "d",
+    25,
+    "NR"
+   ],
+   [
+    "dh",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 33.3,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "smṛti",
+  "category": "abstract",
+  "components": [
+   [
+    "s",
+    50,
+    "EMB"
+   ],
+   [
+    "m",
+    25,
+    "NR"
+   ],
+   [
+    "t",
+    50,
+    "IMP"
+   ]
+  ],
+  "resonance": 41.7,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "kāla",
+  "category": "abstract",
+  "components": [
+   [
+    "k",
+    25,
+    "NR"
+   ],
+   [
+    "l",
+    75,
+    "EMB"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "agni",
+  "category": "natural",
+  "components": [
+   [
+    "g",
+    75,
+    "EMB"
+   ],
+   [
+    "n",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "vāyu",
+  "category": "natural",
+  "components": [
+   [
+    "v",
+    100,
+    "OPP"
+   ],
+   [
+    "y",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 62.5,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "sūrya",
+  "category": "natural",
+  "components": [
+   [
+    "s",
+    25,
+    "NR"
+   ],
+   [
+    "r",
+    75,
+    "OPP"
+   ],
+   [
+    "y",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 58.3,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "candra",
+  "category": "natural",
+  "components": [
+   [
+    "c",
+    25,
+    "NR"
+   ],
+   [
+    "n",
+    50,
+    "CON"
+   ],
+   [
+    "d",
+    25,
+    "NR"
+   ],
+   [
+    "r",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 31.2,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "megha",
+  "category": "natural",
+  "components": [
+   [
+    "m",
+    25,
+    "NR"
+   ],
+   [
+    "gh",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "vidyut",
+  "category": "natural",
+  "components": [
+   [
+    "v",
+    100,
+    "OPP"
+   ],
+   [
+    "d",
+    50,
+    "EMB"
+   ],
+   [
+    "y",
+    50,
+    "OPP"
+   ],
+   [
+    "t",
+    75,
+    "OPP"
+   ]
+  ],
+  "resonance": 68.8,
+  "level": "MODERATE",
+  "components_naturally_accounted": 2,
+  "dominant_relationship": "OPP"
+ },
+ {
+  "word": "hasta",
+  "category": "body",
+  "components": [
+   [
+    "h",
+    75,
+    "EMB"
+   ],
+   [
+    "s",
+    50,
+    "IMP"
+   ],
+   [
+    "t",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 50.0,
+  "level": "MODERATE",
+  "components_naturally_accounted": 1,
+  "dominant_relationship": "EMB"
+ },
+ {
+  "word": "netra",
+  "category": "body",
+  "components": [
+   [
+    "n",
+    50,
+    "CON"
+   ],
+   [
+    "t",
+    25,
+    "NR"
+   ],
+   [
+    "r",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 33.3,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "śiras",
+  "category": "body",
+  "components": [
+   [
+    "ś",
+    25,
+    "NR"
+   ],
+   [
+    "r",
+    25,
+    "NR"
+   ],
+   [
+    "s",
+    50,
+    "IMP"
+   ]
+  ],
+  "resonance": 33.3,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "hṛdaya",
+  "category": "body",
+  "components": [
+   [
+    "h",
+    25,
+    "NR"
+   ],
+   [
+    "d",
+    25,
+    "NR"
+   ],
+   [
+    "y",
+    50,
+    "IMP"
+   ]
+  ],
+  "resonance": 33.3,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ },
+ {
+  "word": "pāda",
+  "category": "body",
+  "components": [
+   [
+    "p",
+    50,
+    "IMP"
+   ],
+   [
+    "d",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 37.5,
+  "level": "WEAK",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "IMP"
+ },
+ {
+  "word": "karṇa",
+  "category": "body",
+  "components": [
+   [
+    "k",
+    25,
+    "NR"
+   ],
+   [
+    "r",
+    25,
+    "NR"
+   ],
+   [
+    "ṇ",
+    25,
+    "NR"
+   ]
+  ],
+  "resonance": 25.0,
+  "level": "MINIMAL",
+  "components_naturally_accounted": 0,
+  "dominant_relationship": "NR"
+ }
+]
