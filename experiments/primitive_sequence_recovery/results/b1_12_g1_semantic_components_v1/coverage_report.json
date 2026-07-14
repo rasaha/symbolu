@@ -1,0 +1,9 @@
+{
+  "coverage_outcome": "G1_COMPONENT_COVERAGE_COMPLETE",
+  "n_developmental_gap": 0,
+  "n_required": 18,
+  "n_source_backed": 18,
+  "note": "all required identities have a frozen binding-pole gloss (consonants CONFIRMATORY_BACKBONE, vowels DEVELOPMENT_ONLY); coverage is complete from the merged lexicon (not from VARNA_PLAIN).",
+  "schema": "b1_12_coverage_report_v1",
+  "selected_set_coverage_pct": 100.0
+}

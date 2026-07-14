@@ -1,0 +1,12 @@
+{
+  "coverage_complete": true,
+  "descriptor_ready": false,
+  "domain_match": false,
+  "pre_run_length_leakage": true,
+  "quality_outcomes": [
+    "DESCRIPTOR_LENGTH_LEAKAGE",
+    "DESCRIPTOR_SOURCE_TIER_LEAKAGE",
+    "DESCRIPTOR_NEUTRALITY_FAILURE"
+  ],
+  "verdict": "G1_BLOCKED_DESCRIPTOR_QUALITY"
+}

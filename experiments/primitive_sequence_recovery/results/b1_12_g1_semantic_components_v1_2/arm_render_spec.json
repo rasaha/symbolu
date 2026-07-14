@@ -1,0 +1,14 @@
+{
+  "arm_A": "true pronunciation order; repetition preserved",
+  "arm_B": "same multiset, seeded scramble != A and != sorted; no resample",
+  "arm_D": "same multiset, canonical order by stable_component_id; no pronunciation semantics",
+  "prohibited": [
+    "prose paragraphs",
+    "connectives",
+    "progression/causal language",
+    "word-level packet prose"
+  ],
+  "schema": "b1_12_arm_render_spec_v1_2",
+  "scramble_seed": 20260101,
+  "template": "position i: <normalized_component_descriptor> (one line/varṇa; no connectives)"
+}

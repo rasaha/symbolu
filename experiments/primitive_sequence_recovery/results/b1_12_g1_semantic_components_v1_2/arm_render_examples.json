@@ -1,0 +1,290 @@
+{
+  "arms": {
+    "W03": {
+      "A_multiset_ids": [
+        "C07",
+        "C08",
+        "C13",
+        "C15"
+      ],
+      "A_true_order": [
+        "position 1: restless starting without sustaining",
+        "position 2: the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment",
+        "position 3: viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+        "position 4: self-absorption, ego-centric doing"
+      ],
+      "B_multiset_ids": [
+        "C07",
+        "C08",
+        "C13",
+        "C15"
+      ],
+      "B_order_scramble": [
+        "position 1: the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment",
+        "position 2: restless starting without sustaining",
+        "position 3: self-absorption, ego-centric doing",
+        "position 4: viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits"
+      ],
+      "D_multiset_ids": [
+        "C07",
+        "C08",
+        "C13",
+        "C15"
+      ],
+      "D_unordered_inventory": [
+        "position 1: the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment",
+        "position 2: viśāda — melancholy, dejection that sinks one's own mood; gloom, the sinking of spirits",
+        "position 3: restless starting without sustaining",
+        "position 4: self-absorption, ego-centric doing"
+      ],
+      "masked": [
+        "position 1: •",
+        "position 2: •",
+        "position 3: •",
+        "position 4: •"
+      ]
+    },
+    "W15": {
+      "A_multiset_ids": [
+        "C02",
+        "C06",
+        "C09",
+        "C16",
+        "C17"
+      ],
+      "A_true_order": [
+        "position 1: restless striving that cannot stop — effort compulsively driven on, unable to cease",
+        "position 2: sarvanāśa — the defeatist annihilation-thought",
+        "position 3: over-specialization, isolation",
+        "position 4: ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "position 5: overextension, inflation"
+      ],
+      "B_multiset_ids": [
+        "C02",
+        "C06",
+        "C09",
+        "C16",
+        "C17"
+      ],
+      "B_order_scramble": [
+        "position 1: ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "position 2: sarvanāśa — the defeatist annihilation-thought",
+        "position 3: over-specialization, isolation",
+        "position 4: overextension, inflation",
+        "position 5: restless striving that cannot stop — effort compulsively driven on, unable to cease"
+      ],
+      "D_multiset_ids": [
+        "C02",
+        "C06",
+        "C09",
+        "C16",
+        "C17"
+      ],
+      "D_unordered_inventory": [
+        "position 1: restless striving that cannot stop — effort compulsively driven on, unable to cease",
+        "position 2: sarvanāśa — the defeatist annihilation-thought",
+        "position 3: ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+        "position 4: overextension, inflation",
+        "position 5: over-specialization, isolation"
+      ],
+      "masked": [
+        "position 1: •",
+        "position 2: •",
+        "position 3: •",
+        "position 4: •",
+        "position 5: •"
+      ]
+    },
+    "W20": {
+      "A_multiset_ids": [
+        "C03",
+        "C05",
+        "C11",
+        "C13",
+        "C16"
+      ],
+      "A_true_order": [
+        "position 1: the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership",
+        "position 2: hypocrisy / concealment — inner and outer diverging",
+        "position 3: overextension, inflation",
+        "position 4: moha — blind attachment / infatuation",
+        "position 5: restless starting without sustaining"
+      ],
+      "B_multiset_ids": [
+        "C03",
+        "C05",
+        "C11",
+        "C13",
+        "C16"
+      ],
+      "B_order_scramble": [
+        "position 1: the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership",
+        "position 2: overextension, inflation",
+        "position 3: hypocrisy / concealment — inner and outer diverging",
+        "position 4: moha — blind attachment / infatuation",
+        "position 5: restless starting without sustaining"
+      ],
+      "D_multiset_ids": [
+        "C03",
+        "C05",
+        "C11",
+        "C13",
+        "C16"
+      ],
+      "D_unordered_inventory": [
+        "position 1: the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership",
+        "position 2: moha — blind attachment / infatuation",
+        "position 3: hypocrisy / concealment — inner and outer diverging",
+        "position 4: restless starting without sustaining",
+        "position 5: overextension, inflation"
+      ],
+      "masked": [
+        "position 1: •",
+        "position 2: •",
+        "position 3: •",
+        "position 4: •",
+        "position 5: •"
+      ]
+    },
+    "W23": {
+      "A_multiset_ids": [
+        "C04",
+        "C12",
+        "C13",
+        "C14"
+      ],
+      "A_true_order": [
+        "position 1: āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "position 2: overthinking, nitpicking",
+        "position 3: kāma — worldly / physical desire and longing",
+        "position 4: restless starting without sustaining"
+      ],
+      "B_multiset_ids": [
+        "C04",
+        "C12",
+        "C13",
+        "C14"
+      ],
+      "B_order_scramble": [
+        "position 1: restless starting without sustaining",
+        "position 2: āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "position 3: kāma — worldly / physical desire and longing",
+        "position 4: overthinking, nitpicking"
+      ],
+      "D_multiset_ids": [
+        "C04",
+        "C12",
+        "C13",
+        "C14"
+      ],
+      "D_unordered_inventory": [
+        "position 1: āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+        "position 2: kāma — worldly / physical desire and longing",
+        "position 3: restless starting without sustaining",
+        "position 4: overthinking, nitpicking"
+      ],
+      "masked": [
+        "position 1: •",
+        "position 2: •",
+        "position 3: •",
+        "position 4: •"
+      ]
+    },
+    "W30": {
+      "A_multiset_ids": [
+        "C01",
+        "C05",
+        "C13",
+        "C17"
+      ],
+      "A_true_order": [
+        "position 1: moha — blind attachment / infatuation",
+        "position 2: restless starting without sustaining",
+        "position 3: peevishness / reactive irritability — perverse, contrary reactivity discharged at others",
+        "position 4: over-specialization, isolation"
+      ],
+      "B_multiset_ids": [
+        "C01",
+        "C05",
+        "C13",
+        "C17"
+      ],
+      "B_order_scramble": [
+        "position 1: peevishness / reactive irritability — perverse, contrary reactivity discharged at others",
+        "position 2: restless starting without sustaining",
+        "position 3: moha — blind attachment / infatuation",
+        "position 4: over-specialization, isolation"
+      ],
+      "D_multiset_ids": [
+        "C01",
+        "C05",
+        "C13",
+        "C17"
+      ],
+      "D_unordered_inventory": [
+        "position 1: peevishness / reactive irritability — perverse, contrary reactivity discharged at others",
+        "position 2: moha — blind attachment / infatuation",
+        "position 3: restless starting without sustaining",
+        "position 4: over-specialization, isolation"
+      ],
+      "masked": [
+        "position 1: •",
+        "position 2: •",
+        "position 3: •",
+        "position 4: •"
+      ]
+    },
+    "W35": {
+      "A_multiset_ids": [
+        "C06",
+        "C07",
+        "C10",
+        "C13",
+        "C18"
+      ],
+      "A_true_order": [
+        "position 1: the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment",
+        "position 2: fixation, obsessive holding",
+        "position 3: sarvanāśa — the defeatist annihilation-thought",
+        "position 4: aviśvāsa — self-doubt that cannot commit",
+        "position 5: restless starting without sustaining"
+      ],
+      "B_multiset_ids": [
+        "C06",
+        "C07",
+        "C10",
+        "C13",
+        "C18"
+      ],
+      "B_order_scramble": [
+        "position 1: fixation, obsessive holding",
+        "position 2: aviśvāsa — self-doubt that cannot commit",
+        "position 3: the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment",
+        "position 4: restless starting without sustaining",
+        "position 5: sarvanāśa — the defeatist annihilation-thought"
+      ],
+      "D_multiset_ids": [
+        "C06",
+        "C07",
+        "C10",
+        "C13",
+        "C18"
+      ],
+      "D_unordered_inventory": [
+        "position 1: sarvanāśa — the defeatist annihilation-thought",
+        "position 2: the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment",
+        "position 3: aviśvāsa — self-doubt that cannot commit",
+        "position 4: restless starting without sustaining",
+        "position 5: fixation, obsessive holding"
+      ],
+      "masked": [
+        "position 1: •",
+        "position 2: •",
+        "position 3: •",
+        "position 4: •",
+        "position 5: •"
+      ]
+    }
+  },
+  "schema": "b1_12_arm_render_examples_v1_2"
+}

@@ -1,0 +1,320 @@
+{
+  "all_distinct_inventories": true,
+  "any_pair_same_multiset_diff_order": false,
+  "classification": "MIXED_ORDER_AND_INVENTORY",
+  "classification_note": "all six words have distinct inventories and no repeated units; cross-word discrimination is inventory-separable, so a CROSS-WORD identification task would test inventory recognition, not order. Order must be tested WITHIN-word.",
+  "n_pairs": 15,
+  "n_pairs_inventory_dominated": 7,
+  "n_pairs_positive_order": 8,
+  "n_pairs_zero_order": 7,
+  "pairs": {
+    "W03|W15": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.0,
+      "same_multiset_diff_order": false
+    },
+    "W03|W20": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.2,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.125,
+      "same_multiset_diff_order": false
+    },
+    "W03|W23": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.25,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.142857,
+      "same_multiset_diff_order": false
+    },
+    "W03|W30": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.25,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.142857,
+      "same_multiset_diff_order": false
+    },
+    "W03|W35": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.4,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.285714,
+      "same_multiset_diff_order": false
+    },
+    "W15|W20": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.111111,
+      "same_multiset_diff_order": false
+    },
+    "W15|W23": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.0,
+      "same_multiset_diff_order": false
+    },
+    "W15|W30": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.2,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.125,
+      "same_multiset_diff_order": false
+    },
+    "W15|W35": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.111111,
+      "same_multiset_diff_order": false
+    },
+    "W20|W23": {
+      "d_edit": 0.8,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.125,
+      "same_multiset_diff_order": false
+    },
+    "W20|W30": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.4,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.285714,
+      "same_multiset_diff_order": false
+    },
+    "W20|W35": {
+      "d_edit": 0.8,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.111111,
+      "same_multiset_diff_order": false
+    },
+    "W23|W30": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.25,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.142857,
+      "same_multiset_diff_order": false
+    },
+    "W23|W35": {
+      "d_edit": 0.8,
+      "d_ord_given_inv": 0.0,
+      "inventory_dominated": true,
+      "multiset_jaccard": 0.125,
+      "same_multiset_diff_order": false
+    },
+    "W30|W35": {
+      "d_edit": 1.0,
+      "d_ord_given_inv": 0.2,
+      "inventory_dominated": false,
+      "multiset_jaccard": 0.125,
+      "same_multiset_diff_order": false
+    }
+  },
+  "schema": "b1_12_g1_selected_set_structural_audit_v1",
+  "selected_six": [
+    "W03",
+    "W15",
+    "W20",
+    "W23",
+    "W30",
+    "W35"
+  ],
+  "words": {
+    "W03": {
+      "bigrams": [
+        "U17U19",
+        "U19U27",
+        "U25U17"
+      ],
+      "first_unit": "U25",
+      "gloss": "bone",
+      "iast": "asthi",
+      "last_unit": "U27",
+      "length": 4,
+      "ordered_opaque_sequence": [
+        "U25",
+        "U17",
+        "U19",
+        "U27"
+      ],
+      "repeated_units": {},
+      "s_selforder": 0.5,
+      "trigrams": [
+        "U17U19U27",
+        "U25U17U19"
+      ],
+      "unordered_inventory": [
+        "U17",
+        "U19",
+        "U25",
+        "U27"
+      ]
+    },
+    "W15": {
+      "bigrams": [
+        "U06U16",
+        "U16U30",
+        "U20U29",
+        "U30U20"
+      ],
+      "first_unit": "U06",
+      "gloss": "neck",
+      "iast": "grīvā",
+      "last_unit": "U29",
+      "length": 5,
+      "ordered_opaque_sequence": [
+        "U06",
+        "U16",
+        "U30",
+        "U20",
+        "U29"
+      ],
+      "repeated_units": {},
+      "s_selforder": 0.4,
+      "trigrams": [
+        "U06U16U30",
+        "U16U30U20",
+        "U30U20U29"
+      ],
+      "unordered_inventory": [
+        "U06",
+        "U16",
+        "U20",
+        "U29",
+        "U30"
+      ]
+    },
+    "W20": {
+      "bigrams": [
+        "U09U22",
+        "U14U25",
+        "U22U29",
+        "U29U14"
+      ],
+      "first_unit": "U09",
+      "gloss": "knowledge",
+      "iast": "jñāna",
+      "last_unit": "U25",
+      "length": 5,
+      "ordered_opaque_sequence": [
+        "U09",
+        "U22",
+        "U29",
+        "U14",
+        "U25"
+      ],
+      "repeated_units": {},
+      "s_selforder": 0.8,
+      "trigrams": [
+        "U09U22U29",
+        "U22U29U14",
+        "U29U14U25"
+      ],
+      "unordered_inventory": [
+        "U09",
+        "U14",
+        "U22",
+        "U25",
+        "U29"
+      ]
+    },
+    "W23": {
+      "bigrams": [
+        "U10U26",
+        "U23U25",
+        "U26U23"
+      ],
+      "first_unit": "U10",
+      "gloss": "hair",
+      "iast": "keśa",
+      "last_unit": "U25",
+      "length": 4,
+      "ordered_opaque_sequence": [
+        "U10",
+        "U26",
+        "U23",
+        "U25"
+      ],
+      "repeated_units": {},
+      "s_selforder": 0.5,
+      "trigrams": [
+        "U10U26U23",
+        "U26U23U25"
+      ],
+      "unordered_inventory": [
+        "U10",
+        "U23",
+        "U25",
+        "U26"
+      ]
+    },
+    "W30": {
+      "bigrams": [
+        "U05U30",
+        "U14U25",
+        "U25U05"
+      ],
+      "first_unit": "U14",
+      "gloss": "river",
+      "iast": "nadī",
+      "last_unit": "U30",
+      "length": 4,
+      "ordered_opaque_sequence": [
+        "U14",
+        "U25",
+        "U05",
+        "U30"
+      ],
+      "repeated_units": {},
+      "s_selforder": 0.5,
+      "trigrams": [
+        "U14U25U05",
+        "U25U05U30"
+      ],
+      "unordered_inventory": [
+        "U05",
+        "U14",
+        "U25",
+        "U30"
+      ]
+    },
+    "W35": {
+      "bigrams": [
+        "U16U21",
+        "U17U31",
+        "U21U25",
+        "U31U16"
+      ],
+      "first_unit": "U17",
+      "gloss": "sun",
+      "iast": "sūrya",
+      "last_unit": "U25",
+      "length": 5,
+      "ordered_opaque_sequence": [
+        "U17",
+        "U31",
+        "U16",
+        "U21",
+        "U25"
+      ],
+      "repeated_units": {},
+      "s_selforder": 0.8,
+      "trigrams": [
+        "U16U21U25",
+        "U17U31U16",
+        "U31U16U21"
+      ],
+      "unordered_inventory": [
+        "U16",
+        "U17",
+        "U21",
+        "U25",
+        "U31"
+      ]
+    }
+  }
+}

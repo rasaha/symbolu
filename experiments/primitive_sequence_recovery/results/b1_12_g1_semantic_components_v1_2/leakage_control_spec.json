@@ -1,0 +1,74 @@
+{
+  "deterministic_findings": {
+    "content_masked_arms_identical_within_word": true,
+    "descriptor_length_still_leaks_cv": true,
+    "first_descriptor_unique_per_word": true,
+    "last_descriptor_multiplicity": {
+      "C13": 3,
+      "C15": 1,
+      "C16": 1,
+      "C17": 1
+    },
+    "length_groups": {
+      "4": [
+        "W03",
+        "W23",
+        "W30"
+      ],
+      "5": [
+        "W15",
+        "W20",
+        "W35"
+      ]
+    },
+    "raw_sanskrit_in_evaluator_facing_descriptors": [
+      "consonant:k",
+      "consonant:n",
+      "consonant:r",
+      "consonant:s",
+      "consonant:th",
+      "consonant:y",
+      "consonant:ś"
+    ],
+    "unordered_inventory_identifies_word": true,
+    "words_with_a_unique_single_descriptor": {
+      "W03": [
+        "C08",
+        "C15"
+      ],
+      "W15": [
+        "C09",
+        "C02"
+      ],
+      "W20": [
+        "C11",
+        "C03"
+      ],
+      "W23": [
+        "C14",
+        "C12",
+        "C04"
+      ],
+      "W30": [
+        "C01"
+      ],
+      "W35": [
+        "C18",
+        "C10"
+      ]
+    }
+  },
+  "leakage_tolerance": "any ablation above chance 1/6 beyond CI in a later probe => CONTROL_LEAKAGE",
+  "note": "with distinct inventories, the UNORDERED inventory (arm D) already uniquely identifies each word -> if descriptors were referent-diagnostic, order would add nothing (no headroom); and the first descriptor is unique per word (first-position shortcut). These are structural shortcut/leakage risks independent of the domain mismatch.",
+  "required_ablations": [
+    "first_position_only",
+    "last_position_only",
+    "unordered_inventory",
+    "single_most_diagnostic_descriptor",
+    "descriptor_content_masked",
+    "candidate_meanings_without_component_info",
+    "source_backed_only_positions",
+    "developmental_only_positions"
+  ],
+  "schema": "b1_12_leakage_control_spec_v1_2"
+}

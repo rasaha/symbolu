@@ -1,0 +1,14 @@
+{
+  "base_must_not_receive_varna_packet": true,
+  "dimensionality": 768,
+  "encoder_class": "frozen sentence-embedding model",
+  "encoder_revision": "PIN_AT_RUN (id+revision+hash fixed before any metric; encoder never tuned)",
+  "executed": false,
+  "feature_encoder": "SAME frozen sentence encoder applied to each varṇa's binding gloss; f(w)=mean-pool, multiplicity preserved, order-free (prereg §4)",
+  "normalization": "L2",
+  "pooling": "mean",
+  "primary_base_input": "controlling English gloss text (lowercased lemma)",
+  "recommended_id": "sentence-transformers/all-mpnet-base-v2",
+  "schema": "varna_lift_base_rep_v1",
+  "secondary_base_input": "Sanskrit IAST form (weaker base; reported separately)"
+}

@@ -1,0 +1,45 @@
+{
+  "abd_parity_multiset_equal": true,
+  "controlling_commits": {
+    "g0_audit": "1713311",
+    "g1_opaque": "9e8da86",
+    "g1_reassessment": "bb2051e",
+    "g1_semantic_v1": "d48ae9f",
+    "pool": "d50fbb9",
+    "prereg": "2c613f4",
+    "v1_1": "6f197fd",
+    "v1_2_order": "7935f48"
+  },
+  "coverage": {
+    "developmental_gap": 0,
+    "outcome": "G1_COMPONENT_COVERAGE_COMPLETE",
+    "pct": 100.0,
+    "source_backed": 18,
+    "unmapped": 0
+  },
+  "descriptor_quality_outcomes": [
+    "DESCRIPTOR_LENGTH_LEAKAGE",
+    "DESCRIPTOR_SOURCE_TIER_LEAKAGE",
+    "DESCRIPTOR_NEUTRALITY_FAILURE"
+  ],
+  "domain_match": false,
+  "iteration": "v1.2 (normalized labels) — supersedes v1 block (d48ae9f) with fuller audit; same verdict",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "length_leakage_persists_after_normalization": true,
+  "lexicon_sha256": "af4c1f54adbfac2b0e2be88993860dcca5e1ebf41631efec23672786584cca96",
+  "no_g0_pool_selected_parser_lexicon_change": true,
+  "parser_ok": true,
+  "schema": "b1_12_g1_v1_2_manifest",
+  "selected_six": [
+    "W03",
+    "W15",
+    "W20",
+    "W23",
+    "W30",
+    "W35"
+  ],
+  "structural_quality_pass_ignoring_domain": false,
+  "task_identifiable": false,
+  "unordered_inventory_identifies_word": true,
+  "verdict": "G1_BLOCKED_DESCRIPTOR_QUALITY"
+}

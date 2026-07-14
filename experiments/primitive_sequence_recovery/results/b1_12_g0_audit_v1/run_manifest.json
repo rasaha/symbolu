@@ -1,0 +1,57 @@
+{
+  "controlling_commits": {
+    "B1_12_ORDERED_VARNA_COMPOSITION_PREREG.md": "2c613f4",
+    "B1_12_ORDERED_VARNA_COMPOSITION_PREREG_V1_1.md": "6f197fd",
+    "B1_12_ORDERED_VARNA_COMPOSITION_PREREG_V1_2.md": "7935f48",
+    "b1_12_candidate_pool_v1/b1_12_candidate_pool_v1.json": "d50fbb9"
+  },
+  "frozen_contract": {
+    "bigram_jaccard_cap": 0.5,
+    "endpoint_majority_cap": 3,
+    "k": 6,
+    "length_band": [
+      2,
+      6
+    ],
+    "length_span_cap": 2,
+    "objective": "maximize min pairwise d_edit",
+    "tau_edit": 0.34,
+    "tau_self": 0.34,
+    "tie_break": [
+      "max mean d_edit",
+      "max mean unique-trigram count",
+      "min mean multiset-jaccard",
+      "alphabetical"
+    ],
+    "trigram_jaccard_cap": 0.34
+  },
+  "invalid_reasons": [],
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "length_distribution": {
+    "3": 1,
+    "4": 25,
+    "5": 8,
+    "6": 1
+  },
+  "n_eligible": 35,
+  "n_length_ok": 35,
+  "n_parser_valid": 35,
+  "n_satisfying_all": 178234,
+  "n_selforder_ok": 35,
+  "n_words_frozen": 35,
+  "no_pool_membership_changed": true,
+  "no_thresholds_changed": true,
+  "opaque_map_sha256": "7f6e6f8fd7e2ebabcc010c3e5442a2cd929cddd5d646041a6d192a66529b300b",
+  "parser_sha256": "d885391ffc269803ae776191181a509c7880ace76bc631318eb0270103721947",
+  "pool_sha256": "8cf857891f95bb07e66a3048f7eabe4f1e5814777889abdf6dadb0d5d296d0b4",
+  "role": "G0 AUDITOR (V1.1 \u00a713) \u2014 pool frozen at curator commit d50fbb9; membership unchanged",
+  "schema": "b1_12_g0_audit_run_manifest_v1",
+  "selforder_distribution": {
+    "max": 1.0,
+    "min": 0.4,
+    "n_ge_0.34": 35,
+    "n_lt_0.34": 0
+  },
+  "status": "G0_PASS",
+  "total_size6_subsets": 1623160
+}
