@@ -135,9 +135,32 @@ and ActionGate are distinct layers of the same stack:
 Context Minimization does not run the agent, hold credentials, or make the
 authorization decision; those belong to ActionGate. Its guarantee is precisely
 *"the smaller context I hand the model produces the same authorization envelope
-and decision the full context would."* It uses the real deterministic gate as its
-**oracle** — the thing it proves invariance against — not as a capability it
-claims to be.
+and decision the full context would."*
+
+The relationship is tighter than "two products in the same portfolio":
+**Context Minimization uses ActionGate as the deterministic oracle that proves
+authorization equivalence.** ActionGate is not a downstream consumer here — it is
+the *ground truth* the compressor checks itself against on every reduction. That
+is exactly why this is not "just another compressor": a generic compressor has
+nothing that can tell it whether a dropped span mattered, whereas this one has a
+deterministic engine that computes the answer.
+
+```
+        ActionGate
+            │
+   proves authorization equivalence
+            │
+            ▼
+     Context Minimization
+   drops only authorization-invariant spans
+            │
+            ▼
+           LLM
+```
+
+Because the oracle is deterministic rather than a second model's opinion, the
+check is reproducible and byte-exact — the compressor keeps a span whenever
+dropping it would change the gate's envelope or decision, and only then.
 
 ### How it works
 
@@ -339,6 +362,37 @@ tokens — Context Minimization removes tokens only where a deterministic
 authorization gate proves the removal cannot change the decision, and fails closed
 everywhere else.
 
+### Why this is difficult to replicate
+
+The differentiation is **not any single algorithm** — the span-extraction and
+budget-fill mechanics are, on their own, replicable. What is hard to reproduce is
+the **complete system**, because the measured properties emerge only when six
+pieces work together:
+
+1. a **deterministic authorization engine** to serve as the ground-truth oracle;
+2. a **protected-span detector** that identifies load-bearing spans;
+3. an **extractive-only compressor** that can keep or drop but never rewrite;
+4. **fail-closed verification** that restores any span whose removal would move a
+   decision;
+5. a **frozen, reproducible benchmark** that pins the exact compressor, corpus,
+   prompts, budgets, scorer, and policy by fingerprint; and
+6. **cross-model validation** demonstrating the result holds across model families.
+
+A competitor can copy any one piece — token dropping is well understood, and a
+detector or a benchmark can be rebuilt. What is substantially harder is assembling
+*all six* into a system that produces the measured properties: the authorization
+oracle has to exist and be deterministic, the detector and the fail-closed check
+have to compose into a guarantee rather than a heuristic, and the whole thing has
+to be frozen and re-verified across models so the numbers mean something. The
+depth is in the **integration and the evidence discipline**, not in a clever
+transform.
+
+This is a real head start, **not an insurmountable moat.** The pieces are
+individually reproducible; what a fast follower would have to rebuild is the
+combination *and* the frozen, cross-model-verified evidence that it actually
+preserves authorization — and that is where the lead compounds, because the
+oracle (ActionGate) and the benchmark discipline already exist here.
+
 ---
 
 ## Page 4 — Evidence & Roadmap
@@ -444,6 +498,30 @@ measure absolute utility cleanly.
   by construction, the same frozen compressor can front any downstream model without
   re-tuning the safety property.
 
+#### An illustrative workflow (not benchmark evidence)
+
+To make the shape concrete — *this is an illustration of the mechanism, not a
+measured result:*
+
+> **Enterprise infrastructure agent.** An agent is asked to execute a production
+> change. Its assembled context carries the **change ticket**, the **deployment
+> history**, the **approvals**, the governing **policy**, and the **rollback plan**.
+>
+> Context Minimization runs the deterministic gate over that context, identifies
+> which spans are load-bearing for the authorization decision (e.g. the approval
+> status, the policy conditions, the change scope), and **removes only the spans
+> proven authorization-invariant** — verbose history narration, redundant
+> restatements — while the protected spans and the fail-closed check hold everything
+> the decision depends on.
+>
+> Result: a **smaller context**, the **identical authorization outcome**, and
+> **lower inference cost** for that turn — with no rewriting and no chance the
+> reduction moved the decision.
+
+The measured savings and decision-preservation numbers behind this shape are on the
+frozen benchmark above; this scenario simply shows where they land in a real
+workflow.
+
 ### Roadmap — a maturity timeline, not a coding schedule
 
 The prototype phase — frozen extractive compressor, protected-span detector,
@@ -477,13 +555,35 @@ absolute-utility runs, a real-customer-data pilot, and the external review that
 turns a validated prototype into a deployable cost-and-safety layer for autonomous
 agents.
 
-We are deliberate about what is proved and what is not. **The safety property is
-definitional** — it holds for any reader because the gate, not the model, computes
-it. **Utility non-regression is empirical** — replicated on every model measured so
-far, and honestly labeled `LIMITED_GO` until absolute accuracy is measured clean on
-the repaired benchmark and confirmed on real data. Authorization-invariant
-compression — not merely cheaper summarization — is what lets an enterprise cut
-agent context cost without ever moving a decision it cannot afford to move.
+We are deliberate about what is proved and what is not. **The authorization
+guarantee is structural** — it comes from how the deterministic gate validates the
+compressed context, rather than from statistical behavior of the language model, so
+it holds for any reader. **Utility non-regression is empirical** — replicated on
+every model measured so far, and honestly labeled `LIMITED_GO` until absolute
+accuracy is measured clean on the repaired benchmark and confirmed on real data.
+Authorization-invariant compression — not merely cheaper summarization — is what
+lets an enterprise cut agent context cost without ever moving a decision it cannot
+afford to move.
+
+### The strategic picture
+
+Step back and the two Ugence Labs products form one coherent story for autonomous
+enterprise agents:
+
+- **ActionGate governs execution** — it makes and enforces the deterministic
+  decision about whether an agent's action may commit.
+- **Context Minimization governs context** — it reduces what the model reads while
+  proving, against that same deterministic gate, that the reduction changes no
+  authorization outcome.
+
+One decides what an agent is allowed to *do*; the other decides what an agent is
+allowed to *read*, and guarantees that decision is preserved. **Together they give
+an enterprise a deterministic control plane around its autonomous agents** — the
+context going in and the action coming out are both governed by the same
+authoritative, reproducible engine, rather than left to the statistical behavior of
+a language model. That is the position this raise is meant to build: not a
+compressor, but the context half of deterministic infrastructure for enterprise
+agents.
 
 ---
 
