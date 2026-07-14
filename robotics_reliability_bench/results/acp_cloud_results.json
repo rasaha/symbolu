@@ -1,0 +1,475 @@
+{
+  "cloud_shadow_metrics": {
+    "decision_distribution": {
+      "EXECUTE": 6,
+      "NO_SAFE_ACTION": 13
+    },
+    "fail_closed_all_hold": true,
+    "fail_closed_count": 3,
+    "recommendation_distribution": {
+      "HOLD": 13,
+      "PROCEED": 6
+    }
+  },
+  "composition_metrics": {
+    "acp_decisive_count": 12,
+    "acp_decisive_scenarios": [
+      "insufficient_capacity",
+      "stale_state",
+      "invalid_manifest",
+      "excessive_replica_increase",
+      "excessive_blast_radius",
+      "missing_rollback",
+      "dependency_unhealthy",
+      "active_freeze_window",
+      "all_strategies_unsafe",
+      "ag_allows_acp_holds",
+      "missing_state",
+      "state_binding_mismatch"
+    ],
+    "authorization_blocked_count": 1,
+    "authorization_blocked_scenarios": [
+      "ag_denies_acp_safe"
+    ],
+    "both_layers_proceed_count": 5,
+    "combined_distribution": {
+      "BLOCKED_BY_AUTHORIZATION": 1,
+      "HELD_BY_ACP": 12,
+      "PENDING_AUTHORIZATION": 1,
+      "PROCEED": 5
+    }
+  },
+  "correctness": {
+    "all_expectations_met": true,
+    "combined_mismatches": [],
+    "permissive_mismatches": []
+  },
+  "determinism": {
+    "rerun_identity": true,
+    "sink_dropped": 0,
+    "sink_seen": 19
+  },
+  "latency": {
+    "max_ms": 0.5567,
+    "mean_ms": 0.233,
+    "p95_ms": 0.446
+  },
+  "meta": {
+    "actuation": false,
+    "frozen_core_reused_unchanged": [
+      "identity.identity",
+      "identity.normalize_float",
+      "constraints.ConstraintResult",
+      "constraints.ConstraintKind",
+      "action_selection.filter_admissible",
+      "action_selection.LexicographicActionSelector",
+      "decision_trace.DecisionTrace",
+      "envelopes.ActionDecision",
+      "authorization.ReferenceCommitRevalidator",
+      "authorization.ControlAuthorization",
+      "errors.ACPError"
+    ],
+    "milestone": "ACP V2 cross-domain (cloud/K8s adapter)",
+    "n_scenarios": 19,
+    "provenance_counts": {
+      "AUTHORED_DETERMINISTIC": 7,
+      "REPOSITORY_MANIFEST": 3,
+      "REPOSITORY_SCENARIO": 4,
+      "SYNTHETIC_UNIT": 5
+    },
+    "real_cloud_controller_modules": [
+      "cloud_controller.action.readiness.ReadinessChecker",
+      "cloud_controller.action.policy.PolicyEngine",
+      "cloud_controller.action.policy.DeploymentPolicy",
+      "cloud_controller.recommend.safety.SafetyBounds"
+    ],
+    "shadow_only": true
+  },
+  "per_scenario": [
+    {
+      "acp_decision": "EXECUTE",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "PROCEED",
+      "combined_match": true,
+      "combined_outcome": "PROCEED",
+      "evidence_validity": "VALID",
+      "expect_combined": "PROCEED",
+      "expect_permissive": true,
+      "permissive": true,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_MANIFEST",
+      "reason_codes": [],
+      "revalidation": null,
+      "scenario_id": "healthy_rollout",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "INSUFFICIENT_CAPACITY"
+      ],
+      "revalidation": null,
+      "scenario_id": "insufficient_capacity",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "STALE",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "STATE_STALE"
+      ],
+      "revalidation": null,
+      "scenario_id": "stale_state",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "NO_ROLLBACK_REF"
+      ],
+      "revalidation": null,
+      "scenario_id": "invalid_manifest",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_SCENARIO",
+      "reason_codes": [
+        "BLAST_RADIUS_EXCEEDED"
+      ],
+      "revalidation": null,
+      "scenario_id": "excessive_replica_increase",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "REPLICA_LIMIT_VIOLATION"
+      ],
+      "revalidation": null,
+      "scenario_id": "excessive_blast_radius",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "NO_ROLLBACK_REF"
+      ],
+      "revalidation": null,
+      "scenario_id": "missing_rollback",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "DEPENDENCY_UNHEALTHY"
+      ],
+      "revalidation": null,
+      "scenario_id": "dependency_unhealthy",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_SCENARIO",
+      "reason_codes": [
+        "FREEZE_WINDOW_ACTIVE"
+      ],
+      "revalidation": null,
+      "scenario_id": "active_freeze_window",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "EXECUTE",
+      "authorization": "ALLOW_WITH_CONSTRAINTS",
+      "cloud_recommendation": "PROCEED",
+      "combined_match": true,
+      "combined_outcome": "PROCEED",
+      "evidence_validity": "VALID",
+      "expect_combined": "PROCEED",
+      "expect_permissive": true,
+      "permissive": true,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_MANIFEST:deploy/gke/demo-app.yaml",
+      "reason_codes": [],
+      "revalidation": null,
+      "scenario_id": "safe_constrained_rollout",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ESCALATE_TO_HUMAN",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "PENDING_AUTHORIZATION",
+      "evidence_validity": "VALID",
+      "expect_combined": "PENDING_AUTHORIZATION",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "reason_codes": [
+        "REPLICA_LIMIT_VIOLATION"
+      ],
+      "revalidation": null,
+      "scenario_id": "destructive_delete_small",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "EXECUTE",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "PROCEED",
+      "combined_match": true,
+      "combined_outcome": "PROCEED",
+      "evidence_validity": "VALID",
+      "expect_combined": "PROCEED",
+      "expect_permissive": true,
+      "permissive": true,
+      "permissive_match": true,
+      "provenance": "SYNTHETIC_UNIT",
+      "reason_codes": [],
+      "revalidation": {
+        "reason": "AuthorizationBindingError: authorization does not bind this candidate (action changed)",
+        "still_valid": false
+      },
+      "scenario_id": "modified_manifest_after_eval",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "EXECUTE",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "PROCEED",
+      "combined_match": true,
+      "combined_outcome": "PROCEED",
+      "evidence_validity": "VALID",
+      "expect_combined": "PROCEED",
+      "expect_permissive": true,
+      "permissive": true,
+      "permissive_match": true,
+      "provenance": "SYNTHETIC_UNIT",
+      "reason_codes": [],
+      "revalidation": {
+        "reason": "StaleAuthorizationError: world-state version changed since authorization",
+        "still_valid": false
+      },
+      "scenario_id": "state_drift",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "SYNTHETIC_UNIT",
+      "reason_codes": [
+        "FREEZE_WINDOW_ACTIVE",
+        "BLAST_RADIUS_EXCEEDED",
+        "REPLICA_LIMIT_VIOLATION"
+      ],
+      "revalidation": null,
+      "scenario_id": "all_strategies_unsafe",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "VALID",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_SCENARIO",
+      "reason_codes": [
+        "NOT_READY"
+      ],
+      "revalidation": null,
+      "scenario_id": "ag_allows_acp_holds",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "EXECUTE",
+      "authorization": "DENY",
+      "cloud_recommendation": "PROCEED",
+      "combined_match": true,
+      "combined_outcome": "BLOCKED_BY_AUTHORIZATION",
+      "evidence_validity": "VALID",
+      "expect_combined": "BLOCKED_BY_AUTHORIZATION",
+      "expect_permissive": true,
+      "permissive": true,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_SCENARIO",
+      "reason_codes": [],
+      "revalidation": null,
+      "scenario_id": "ag_denies_acp_safe",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "MISSING",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "SYNTHETIC_UNIT",
+      "reason_codes": [
+        "STATE_MISSING"
+      ],
+      "revalidation": null,
+      "scenario_id": "missing_state",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "NO_SAFE_ACTION",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "HOLD",
+      "combined_match": true,
+      "combined_outcome": "HELD_BY_ACP",
+      "evidence_validity": "MISSING",
+      "expect_combined": "HELD_BY_ACP",
+      "expect_permissive": false,
+      "permissive": false,
+      "permissive_match": true,
+      "provenance": "SYNTHETIC_UNIT",
+      "reason_codes": [
+        "STATE_BINDING_MISMATCH"
+      ],
+      "revalidation": null,
+      "scenario_id": "state_binding_mismatch",
+      "shadow_error": false,
+      "shadow_only": true
+    },
+    {
+      "acp_decision": "EXECUTE",
+      "authorization": "ALLOW",
+      "cloud_recommendation": "PROCEED",
+      "combined_match": true,
+      "combined_outcome": "PROCEED",
+      "evidence_validity": "VALID",
+      "expect_combined": "PROCEED",
+      "expect_permissive": true,
+      "permissive": true,
+      "permissive_match": true,
+      "provenance": "REPOSITORY_MANIFEST:deploy/gke/deployment.yaml",
+      "reason_codes": [],
+      "revalidation": null,
+      "scenario_id": "ncc_controller_scale",
+      "shadow_error": false,
+      "shadow_only": true
+    }
+  ],
+  "safety_invariants": {
+    "I1_deny_never_proceed": true,
+    "I2_acp_hold_never_proceed": true,
+    "I3_proceed_requires_both_layers": true,
+    "I4_all_records_shadow_only": true,
+    "I5_no_uncontained_shadow_error": true,
+    "I6_decisive_boundary_scenarios": true,
+    "I7_commit_revalidation_rejects_drift": true
+  }
+}

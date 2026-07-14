@@ -1,0 +1,719 @@
+{
+  "shadow_only": true,
+  "n_physical_scenarios": 15,
+  "records": [
+    {
+      "scenario": "safe_within_limits",
+      "provenance": "INTEGRATION_TEST",
+      "family": "physical",
+      "required_case": "clear_safe_maneuver",
+      "candidate_ids": [
+        "safe"
+      ],
+      "acp_decision": "EXECUTE",
+      "acp_selected": "safe",
+      "acp_surviving": [
+        "safe"
+      ],
+      "acp_rejected": [],
+      "physical_evidence": {
+        "safe": {
+          "validity": "VALID",
+          "is_safe": true,
+          "safety_score": 1.0,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [],
+      "physical_detected_unsafe": [],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "safe",
+      "current_runtime_physically_inadmissible": false,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": false,
+      "shadow_only": true
+    },
+    {
+      "scenario": "position_limit_violation",
+      "provenance": "INTEGRATION_TEST",
+      "family": "physical",
+      "required_case": "invalid_trajectory",
+      "candidate_ids": [
+        "pos"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "pos",
+          "POSITION_LIMIT_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "pos": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.49500000000000005,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 position 3.500 above max 3.142"
+          ]
+        }
+      },
+      "ground_truth_unsafe": [
+        "pos"
+      ],
+      "physical_detected_unsafe": [
+        "pos"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "pos",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "velocity_limit_breach",
+      "provenance": "INTEGRATION_TEST",
+      "family": "physical",
+      "required_case": "velocity_limit_breach",
+      "candidate_ids": [
+        "vel"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "vel",
+          "VELOCITY_LIMIT_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "vel": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.7450000000000001,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 velocity 10.000 exceeds limit 1.800"
+          ]
+        }
+      },
+      "ground_truth_unsafe": [
+        "vel"
+      ],
+      "physical_detected_unsafe": [
+        "vel"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "vel",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "obstacle_too_close",
+      "provenance": "INTEGRATION_TEST",
+      "family": "physical",
+      "required_case": "obstacle_too_close",
+      "candidate_ids": [
+        "obs"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "obs",
+          "COLLISION_PREDICTED"
+        ]
+      ],
+      "physical_evidence": {
+        "obs": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.7733333333333332,
+          "ttc_s": 0.0,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [
+        "obs"
+      ],
+      "physical_detected_unsafe": [
+        "obs"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "obs",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "human_proximity",
+      "provenance": "INTEGRATION_TEST",
+      "family": "physical",
+      "required_case": "emergency_stop_candidate",
+      "candidate_ids": [
+        "hum"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "hum",
+          "HUMAN_PROXIMITY_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "hum": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.6066666666666667,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [
+        "hum"
+      ],
+      "physical_detected_unsafe": [
+        "hum"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "hum",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "acceleration_breach",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "acceleration_or_jerk_breach",
+      "candidate_ids": [
+        "acc"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "acc",
+          "ACCEL_LIMIT_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "acc": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.7450000000000001,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 acceleration 50.000 exceeds limit 5.000"
+          ]
+        }
+      },
+      "ground_truth_unsafe": [
+        "acc"
+      ],
+      "physical_detected_unsafe": [
+        "acc"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "acc",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "emergency_stop_candidate",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "emergency_stop_candidate",
+      "candidate_ids": [
+        "stop"
+      ],
+      "acp_decision": "EXECUTE",
+      "acp_selected": "stop",
+      "acp_surviving": [
+        "stop"
+      ],
+      "acp_rejected": [],
+      "physical_evidence": {
+        "stop": {
+          "validity": "VALID",
+          "is_safe": true,
+          "safety_score": 1.0,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [],
+      "physical_detected_unsafe": [],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "stop",
+      "current_runtime_physically_inadmissible": false,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": false,
+      "shadow_only": true
+    },
+    {
+      "scenario": "recovery_maneuver",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "recovery_maneuver",
+      "candidate_ids": [
+        "recover"
+      ],
+      "acp_decision": "EXECUTE",
+      "acp_selected": "recover",
+      "acp_surviving": [
+        "recover"
+      ],
+      "acp_rejected": [],
+      "physical_evidence": {
+        "recover": {
+          "validity": "VALID",
+          "is_safe": true,
+          "safety_score": 1.0,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [],
+      "physical_detected_unsafe": [],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "recover",
+      "current_runtime_physically_inadmissible": false,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": false,
+      "shadow_only": true
+    },
+    {
+      "scenario": "all_candidates_unsafe",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "all_candidates_unsafe",
+      "candidate_ids": [
+        "u1",
+        "u2"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "u1",
+          "POSITION_LIMIT_VIOLATION"
+        ],
+        [
+          "u2",
+          "VELOCITY_LIMIT_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "u1": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.49500000000000005,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 position 3.500 above max 3.142"
+          ]
+        },
+        "u2": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.7450000000000001,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 velocity 10.000 exceeds limit 1.800"
+          ]
+        }
+      },
+      "ground_truth_unsafe": [
+        "u1",
+        "u2"
+      ],
+      "physical_detected_unsafe": [
+        "u1",
+        "u2"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "u1",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "missing_physical_evidence",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "missing_physical_evidence",
+      "candidate_ids": [
+        "empty"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "empty",
+          "MISSING_TRAJECTORY"
+        ]
+      ],
+      "physical_evidence": {
+        "empty": {
+          "validity": "MISSING",
+          "is_safe": null,
+          "safety_score": null,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [
+        "empty"
+      ],
+      "physical_detected_unsafe": [
+        "empty"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "empty",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "stale_perception_state",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "stale_perception_state",
+      "candidate_ids": [
+        "stale"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "stale",
+          "STALE_PHYSICAL_EVIDENCE"
+        ]
+      ],
+      "physical_evidence": {
+        "stale": {
+          "validity": "STALE",
+          "is_safe": null,
+          "safety_score": null,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [
+        "stale"
+      ],
+      "physical_detected_unsafe": [
+        "stale"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "stale",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "planner_constraint_disagreement",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "physical",
+      "required_case": "planner_constraint_disagreement",
+      "candidate_ids": [
+        "planner_pick",
+        "safe_alt"
+      ],
+      "acp_decision": "EXECUTE",
+      "acp_selected": "safe_alt",
+      "acp_surviving": [
+        "safe_alt"
+      ],
+      "acp_rejected": [
+        [
+          "planner_pick",
+          "VELOCITY_LIMIT_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "planner_pick": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.7450000000000001,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 velocity 10.000 exceeds limit 1.800"
+          ]
+        },
+        "safe_alt": {
+          "validity": "VALID",
+          "is_safe": true,
+          "safety_score": 1.0,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [
+        "planner_pick"
+      ],
+      "physical_detected_unsafe": [
+        "planner_pick"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "planner_pick",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [],
+      "acp_no_safe_action": false,
+      "shadow_only": true
+    },
+    {
+      "scenario": "abstract_safe_physically_unsafe",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "abstract_vs_physical",
+      "required_case": "abstract_score_disagrees_with_physical",
+      "candidate_ids": [
+        "hi_abstract"
+      ],
+      "acp_decision": "NO_SAFE_ACTION",
+      "acp_selected": null,
+      "acp_surviving": [],
+      "acp_rejected": [
+        [
+          "hi_abstract",
+          "VELOCITY_LIMIT_VIOLATION"
+        ]
+      ],
+      "physical_evidence": {
+        "hi_abstract": {
+          "validity": "VALID",
+          "is_safe": false,
+          "safety_score": 0.7450000000000001,
+          "ttc_s": null,
+          "violations": [
+            "Joint 0 velocity 10.000 exceeds limit 1.800"
+          ]
+        }
+      },
+      "ground_truth_unsafe": [
+        "hi_abstract"
+      ],
+      "physical_detected_unsafe": [
+        "hi_abstract"
+      ],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "hi_abstract",
+      "current_runtime_physically_inadmissible": true,
+      "abstract_vs_physical": [
+        {
+          "id": "hi_abstract",
+          "abstract_admits": true,
+          "physical_admits": false,
+          "agree": false
+        }
+      ],
+      "acp_no_safe_action": true,
+      "shadow_only": true
+    },
+    {
+      "scenario": "abstract_unsafe_physically_safe",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "abstract_vs_physical",
+      "required_case": "abstract_score_disagrees_with_physical",
+      "candidate_ids": [
+        "lo_abstract"
+      ],
+      "acp_decision": "EXECUTE",
+      "acp_selected": "lo_abstract",
+      "acp_surviving": [
+        "lo_abstract"
+      ],
+      "acp_rejected": [],
+      "physical_evidence": {
+        "lo_abstract": {
+          "validity": "VALID",
+          "is_safe": true,
+          "safety_score": 1.0,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [],
+      "physical_detected_unsafe": [],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "lo_abstract",
+      "current_runtime_physically_inadmissible": false,
+      "abstract_vs_physical": [
+        {
+          "id": "lo_abstract",
+          "abstract_admits": false,
+          "physical_admits": true,
+          "agree": false
+        }
+      ],
+      "acp_no_safe_action": false,
+      "shadow_only": true
+    },
+    {
+      "scenario": "abstract_physical_agree_safe",
+      "provenance": "AUTHORED_DETERMINISTIC",
+      "family": "abstract_vs_physical",
+      "required_case": "abstract_score_disagrees_with_physical",
+      "candidate_ids": [
+        "agree_safe"
+      ],
+      "acp_decision": "EXECUTE",
+      "acp_selected": "agree_safe",
+      "acp_surviving": [
+        "agree_safe"
+      ],
+      "acp_rejected": [],
+      "physical_evidence": {
+        "agree_safe": {
+          "validity": "VALID",
+          "is_safe": true,
+          "safety_score": 1.0,
+          "ttc_s": null,
+          "violations": []
+        }
+      },
+      "ground_truth_unsafe": [],
+      "physical_detected_unsafe": [],
+      "false_rejected_safe": [],
+      "current_runtime_pick": "agree_safe",
+      "current_runtime_physically_inadmissible": false,
+      "abstract_vs_physical": [
+        {
+          "id": "agree_safe",
+          "abstract_admits": true,
+          "physical_admits": true,
+          "agree": true
+        }
+      ],
+      "acp_no_safe_action": false,
+      "shadow_only": true
+    }
+  ],
+  "authorization": [
+    {
+      "scenario": "state_changes_before_commit",
+      "mutate": "state",
+      "rejected": true,
+      "error": "StaleAuthorizationError",
+      "shadow_only": true
+    },
+    {
+      "scenario": "modified_trajectory_after_auth",
+      "mutate": "trajectory",
+      "rejected": true,
+      "error": "AuthorizationBindingError",
+      "shadow_only": true
+    }
+  ],
+  "metrics": {
+    "overall": {
+      "n": 15,
+      "real_physical_evidence_coverage": 0.882,
+      "stale_evidence_rate": 0.059,
+      "missing_evidence_rate": 0.059,
+      "physical_detection_recall": 1.0,
+      "false_rejection_rate": 0.0,
+      "current_runtime_physically_inadmissible_rate": 0.667,
+      "acp_inadmissible_selection_count": 0,
+      "acp_no_safe_action_rate": 0.6
+    },
+    "per_provenance": {
+      "AUTHORED_DETERMINISTIC": {
+        "n": 10,
+        "real_physical_evidence_coverage": 0.833,
+        "stale_evidence_rate": 0.083,
+        "missing_evidence_rate": 0.083,
+        "physical_detection_recall": 1.0,
+        "false_rejection_rate": 0.0,
+        "current_runtime_physically_inadmissible_rate": 0.6,
+        "acp_inadmissible_selection_count": 0,
+        "acp_no_safe_action_rate": 0.5
+      },
+      "INTEGRATION_TEST": {
+        "n": 5,
+        "real_physical_evidence_coverage": 1.0,
+        "stale_evidence_rate": 0.0,
+        "missing_evidence_rate": 0.0,
+        "physical_detection_recall": 1.0,
+        "false_rejection_rate": 0.0,
+        "current_runtime_physically_inadmissible_rate": 0.8,
+        "acp_inadmissible_selection_count": 0,
+        "acp_no_safe_action_rate": 0.8
+      }
+    },
+    "per_family": {
+      "abstract_vs_physical": {
+        "n": 3,
+        "real_physical_evidence_coverage": 1.0,
+        "stale_evidence_rate": 0.0,
+        "missing_evidence_rate": 0.0,
+        "physical_detection_recall": 1.0,
+        "false_rejection_rate": 0.0,
+        "current_runtime_physically_inadmissible_rate": 0.333,
+        "acp_inadmissible_selection_count": 0,
+        "acp_no_safe_action_rate": 0.333
+      },
+      "physical": {
+        "n": 12,
+        "real_physical_evidence_coverage": 0.857,
+        "stale_evidence_rate": 0.071,
+        "missing_evidence_rate": 0.071,
+        "physical_detection_recall": 1.0,
+        "false_rejection_rate": 0.0,
+        "current_runtime_physically_inadmissible_rate": 0.75,
+        "acp_inadmissible_selection_count": 0,
+        "acp_no_safe_action_rate": 0.667
+      }
+    },
+    "abstract_vs_physical_agreement_rate": 0.333,
+    "abstract_vs_physical_pairs": [
+      {
+        "id": "hi_abstract",
+        "abstract_admits": true,
+        "physical_admits": false,
+        "agree": false
+      },
+      {
+        "id": "lo_abstract",
+        "abstract_admits": false,
+        "physical_admits": true,
+        "agree": false
+      },
+      {
+        "id": "agree_safe",
+        "abstract_admits": true,
+        "physical_admits": true,
+        "agree": true
+      }
+    ],
+    "state_revalidation_rejection_rate": 1.0,
+    "evidence_binding_rejection_verified": true,
+    "modified_trajectory_rejection_verified": true,
+    "deterministic_rerun_identity_pct": 100.0,
+    "mean_latency_us": 445.67,
+    "current_runtime_behavior_change_count": 0
+  }
+}
