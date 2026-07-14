@@ -94,9 +94,11 @@ for iast,fact in PRIMARY.items():
             detail = "primary: ṣ=tamoguṇa+kāma; merged binding = artha/rajasic → SWAPPED with ś"
     elif fact.get("cat") in ("vowel","anusvara","visarga"):
         has = bool((m or {}).get("binding_vritti"))
-        status = "MISSING_ACOUSTIC_ROOT_IN_MERGED"
-        detail = ("vowel present in merged as authored binding gloss only (no acoustic-root/musical-note layer)"
-                  if has else "vowel ABSENT from merged entirely (source None)")
+        status = "DELIBERATELY_EXCLUDED_DEV_INTUITION"
+        detail = ("DESIGN DECISION (not a gap): Sarkar assigns vowels to the surasaptaka MUSICAL NOTES / bīja "
+                  "sounds — a different domain from affliction/vṛtti — so the musical-note roots are intentionally "
+                  "NOT folded in. The merged vowel gloss is the operator's own AUTHORED intuition "
+                  "(DEVELOPMENT_ONLY), by choice." + ("" if has else " (ṛ/ṝ/ḷ/ḹ absent from merged: source None.)"))
     elif iast=="kṣ":
         status="OUT_OF_ATOMIC_SCOPE"; detail="conjunct; not one of the 33 atomic backbone consonants"
     else:
@@ -114,11 +116,11 @@ out={"schema":"varna_primary_source_reconciliation_v1",
      "headline_findings":[
        "ś/ṣ SWAP_ERROR: frozen merged has ś=kāma/tamoguṇa and ṣ=artha/rajoguṇa; primary source says ś(sha)=artha/rajoguṇa and ṣ(s'a)=kāma/tamoguṇa. The two are INVERTED in the frozen artifact.",
        "This REVERSES the prior VARNA_SHA_SWAP_PROVENANCE_AUDIT verdict (SWAP_PROVENANCE_RESOLVED_NO_DATA_ERROR) — a data error IS present.",
-       "VOWEL LAYER (16 units) entirely absent from the consonant backbone: acoustic roots for a..aḥ incl. the surasaptaka musical notes, oṃ, hummm, phaṭ, vauṣaṭ, vaṣaṭ, svāhā, namaḥ.",
+       "VOWELS ARE DELIBERATELY EXCLUDED (not a gap): Sarkar maps vowels to the surasaptaka MUSICAL NOTES / bīja sounds (a..aḥ incl. oṃ, hummm, phaṭ, vauṣaṭ, vaṣaṭ, svāhā, namaḥ), a different domain from affliction/vṛtti. The operator intentionally uses their own authored vowel intuition (DEVELOPMENT_ONLY) instead; the musical-note roots are NOT to be reconciled into the affliction mappings.",
      ],
      "counts":{
         "sibilant_swap_errors":sum(1 for r in recon if r["reconciliation_status"]=="SWAP_ERROR"),
-        "vowels_missing":sum(1 for r in recon if r["reconciliation_status"]=="MISSING_ACOUSTIC_ROOT_IN_MERGED"),
+        "vowels_deliberately_excluded":sum(1 for r in recon if r["reconciliation_status"]=="DELIBERATELY_EXCLUDED_DEV_INTUITION"),
         "consonant_vritti_match":sum(1 for r in recon if r["reconciliation_status"]=="MATCH_VRITTI"),
      },
      "rows":recon}
