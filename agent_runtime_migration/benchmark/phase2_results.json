@@ -1,0 +1,49 @@
+{
+  "canary": {
+    "budget_stop_success": true,
+    "cancellation_success": true,
+    "explicit_fallback": true,
+    "fallback_count": 1,
+    "governed_tool_refused": true,
+    "no_silent_fallback": true,
+    "read_only_task_success": true,
+    "unauthorized_handler_invocations": 0
+  },
+  "governance": {
+    "boundary_violations": 0,
+    "deny_blocks": true,
+    "deny_outcome": "BLOCKED_BY_AUTHORIZATION",
+    "hold_blocks": true,
+    "hold_outcome": "HELD_BY_ACP",
+    "pending_blocks": true,
+    "pending_outcome": "PENDING_AUTHORIZATION",
+    "proceed_executes": true,
+    "proceed_outcome": "PROCEED"
+  },
+  "legacy_parity": {
+    "all_parity_met": true,
+    "governance_outcomes_correct": true,
+    "metrics": {
+      "argument_agreement": 16,
+      "governed_scenarios": 8,
+      "intentional_differences": 10,
+      "new_governance_outcome_correct": 8,
+      "parity_expected": 6,
+      "parity_met": 6,
+      "plan_agreement": 16,
+      "scenarios": 16,
+      "tool_agreement": 16,
+      "unexplained_regressions": 0
+    },
+    "unexplained_regressions": 0
+  },
+  "model_integration": {
+    "deterministic_replay": true,
+    "live_model_used": false,
+    "malformed_rejected": 3,
+    "model_latency_ms": null,
+    "parse_success": 1,
+    "token_use": null
+  },
+  "phase": "agent-runtime-phase-2"
+}
