@@ -32,14 +32,31 @@ def extract_json(text):
                     return None
     return None
 
-def call_validated(be, sysm, user, validate, raw, meta):
+def canon_relationships(obj, field):
+    """Canonicalize orthographic typos in the controlled-vocab relationship token, in place.
+    Returns a list of coercion records (empty if none) for transparent logging."""
+    notes = []
+    if not isinstance(obj, dict):
+        return notes
+    for c in obj.get("components", []) or []:
+        if isinstance(c, dict) and field in c:
+            canon, coerced = R.canonicalize_relationship(c[field])
+            if coerced:
+                notes.append({"occurrence_index": c.get("occurrence_index"), "field": field,
+                              "from": c[field], "to": canon})
+                c[field] = canon
+    return notes
+
+def call_validated(be, sysm, user, validate, raw, meta, rel_field=None):
     reason = ""
     for attempt in range(1, MAX_RETRIES + 1):
         u = user if attempt == 1 else f"Your previous output was invalid ({reason}). Return corrected STRICT JSON only.\n\n{user}"
         out, h = be.generate(sysm, u)
         obj = extract_json(out)
+        coercions = canon_relationships(obj, rel_field) if (obj is not None and rel_field) else []
         ok, reason = (False, "malformed_json") if obj is None else validate(obj)
-        raw.append({**meta, "attempt": attempt, "valid": ok, "reason": reason, **h, "raw": out})
+        raw.append({**meta, "attempt": attempt, "valid": ok, "reason": reason,
+                    "coercions": coercions, **h, "raw": out})
         if ok:
             return obj
     return None
@@ -54,7 +71,8 @@ def do_author(be, words, model_id, run_id, raw):
         vn = {o["occurrence_index"]: o["varna"] for o in mapped}
         sysm, user = PROMPTS.build_author_prompt(w["iast"], w["dev"], w["gloss"], mapped)
         obj = call_validated(be, sysm, user, lambda o: R.validate_author(o, occ), raw,
-                             {"run": run_id, "role": "author", "model": model_id, "word": w["iast"]})
+                             {"run": run_id, "role": "author", "model": model_id, "word": w["iast"]},
+                             rel_field="proposed_relationship")
         if obj is None:
             raise SystemExit(f"RUN_INVALID:author_invalid:{w['iast']}")
         profiles.append({"run": run_id, "word": w["iast"], "gloss": w["gloss"],
@@ -79,7 +97,8 @@ def do_score(be, words, model_id, run_id, author_data, raw):
         amap = {c["occurrence_index"]: c for c in acomps}
         sysm, user = PROMPTS.build_scorer_prompt(word, w["gloss"], prof[word]["profile"], acomps)
         obj = call_validated(be, sysm, user, lambda o: R.validate_scorer(o, occ, gl), raw,
-                             {"run": run_id, "role": "score", "model": model_id, "word": word})
+                             {"run": run_id, "role": "score", "model": model_id, "word": word},
+                             rel_field="final_relationship")
         if obj is None:
             raise SystemExit(f"RUN_INVALID:scorer_invalid:{word}")
         cs = [c["bsr_score"] for c in obj["components"]]

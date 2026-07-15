@@ -21,6 +21,43 @@ _COMPAT_GROUPS = (
     {"regulation", "containment"},
 )
 
+# ---- controlled-vocabulary canonicalization (orthographic typos ONLY; never semantic remapping) ----
+def _lev(a, b):
+    """Levenshtein edit distance (iterative, O(len(a)*len(b)))."""
+    if a == b:
+        return 0
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
+
+def canonicalize_relationship(rel):
+    """Map an orthographic variant of a relationship token to its exact taxonomy form.
+
+    Coerces ONLY when the intent is unambiguous: (a) exact match, (b) case/separator normalization
+    lands on a taxonomy token, or (c) exactly one taxonomy token is the unique nearest within edit
+    distance <=2 of the normalized string. Anything ambiguous or semantically distinct returns
+    (None, False) so the caller rejects it as invented_relationship. Returns (canonical|None, coerced).
+    """
+    if rel in RELATIONSHIP_TYPES:
+        return rel, False
+    if not isinstance(rel, str):
+        return None, False
+    norm = re.sub(r"[^a-z]+", "_", rel.strip().lower()).strip("_")
+    if norm in RELATIONSHIP_TYPES:
+        return norm, True
+    if not norm:
+        return None, False
+    ranked = sorted(((t, _lev(norm, t)) for t in RELATIONSHIP_TYPES), key=lambda x: x[1])
+    best_d = ranked[0][1]
+    nearest = [t for t, d in ranked if d == best_d]
+    if best_d <= 2 and len(nearest) == 1:
+        return nearest[0], True
+    return None, False
+
 # ---- component aggregation & word verdict (mechanical; combined never changes verdict) ----
 def aggregate(scores):
     """scores: list[int] in BSR_SCALE. Returns dict(mean,min,counts)."""
