@@ -1,0 +1,37 @@
+{
+  "any_model_credential": false,
+  "conclusion": "BLOCKED_NO_REAL_MODEL",
+  "credential_file_found": false,
+  "credential_files_checked": [
+    "~/.mistral",
+    "~/.config/mistral/config",
+    "~/.mistralrc",
+    "~/.config/mistral.json",
+    "/run/secrets/mistral_api_key"
+  ],
+  "credentials_present": {
+    "ANTHROPIC_API_KEY": false,
+    "MISTRAL_API_KEY": false,
+    "OPENAI_API_KEY": false,
+    "RUNTIME_MODEL_ID": false,
+    "RUNTIME_MODEL_PROVIDER": false
+  },
+  "egress": {
+    "api.mistral.ai": "000",
+    "codestral.mistral.ai": "000"
+  },
+  "egress_allowlist_model_hosts": [
+    "anthropic.com only (no mistral/openai/hf)"
+  ],
+  "not_done": [
+    "did not fabricate a Mistral response",
+    "did not route around the egress proxy",
+    "did not repurpose non-model credentials",
+    "did not modify any frozen artifact"
+  ],
+  "phase": "agent-runtime-phase-3-resume",
+  "reason": "No model credential is configured in this environment (frozen resolver returns None), and the Mistral API hosts are denied by the egress policy (403 CONNECT). Per proxy policy the blocked host is reported, not routed around. No credential was fabricated or repurposed (AWS/GH/harness OAuth are NOT model credentials and were not used).",
+  "resolution_path": "agent_runtime_migration.model.live.build_live_model_from_env (frozen)",
+  "resolved_a_model": false,
+  "trigger": "user reported a Mistral API key is now available"
+}
