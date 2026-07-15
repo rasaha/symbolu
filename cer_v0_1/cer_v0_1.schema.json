@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.example/cer/v0.1/cer_v0_1.schema.json",
+  "title": "Canonical Execution Request (CER) V0.1 — kubernetes.scale profile",
+  "description": "Machine-readable mirror of CER_V0_1_SPEC.md. Structural validation only; the ENFORCED validator (spec.validate_cer) additionally fails closed on unknown profiles/extensions and pins the actuation surface. Identity is the ActionGate v2 action_hash of the derived envelope (provenance excluded).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cer_version", "profile", "identity"],
+  "properties": {
+    "cer_version": {"const": "0.1"},
+    "profile": {"const": "cer.k8s.scale/0.1"},
+    "risk_tier": {
+      "description": "Consequence class. Policy/tool-profile controlled, NEVER model-asserted.",
+      "enum": ["GOVERNED", "LOW_RISK"]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Identity-bearing fields ONLY. These define the exact requested actuation and participate in the action digest.",
+      "required": ["operation", "actuation_interface", "target", "arguments", "requested_state_transition", "authority", "external_state_binding", "policy_ref", "reversibility"],
+      "properties": {
+        "operation": {"enum": ["DEPLOY", "DB_MUTATION", "DB_DELETE", "IAM_GRANT_ADMIN", "NET_EXPOSE", "SECRET_READ", "MONITORING_DISABLE", "KEY_ROTATE", "CLOUD_SPEND_INCREASE", "EXTERNAL_COMMS"]},
+        "actuation_interface": {"const": "kubernetes.scale"},
+        "target": {
+          "type": "object",
+          "required": ["cluster", "namespace", "deployment"],
+          "properties": {
+            "cluster": {"type": "string"},
+            "namespace": {"type": "string"},
+            "deployment": {"type": "string"}
+          }
+        },
+        "arguments": {"type": "object", "description": "Canonical arguments; numerics as typed strings (JCS Action Profile)."},
+        "requested_state_transition": {
+          "type": "object",
+          "required": ["replicas"],
+          "properties": {
+            "replicas": {
+              "type": "object",
+              "required": ["from", "to"],
+              "properties": {"from": {"type": "string"}, "to": {"type": "string"}}
+            }
+          }
+        },
+        "authority": {
+          "type": "object",
+          "required": ["principal", "permissions"],
+          "properties": {
+            "principal": {"type": "string"},
+            "permissions": {"type": "array", "items": {"type": "string"}},
+            "key_id": {"type": "string"},
+            "delegator": {"type": "object"},
+            "delegation_chain": {"type": "array"}
+          }
+        },
+        "external_state_binding": {
+          "type": "object",
+          "required": ["resource_version", "state_hash", "as_of"],
+          "properties": {
+            "resource_version": {"type": "string"},
+            "state_hash": {"type": "string", "pattern": "^(?:sha-?256:)?[0-9a-f]{64}$"},
+            "as_of": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}Z$"},
+            "source": {"type": "string"},
+            "correlation_id": {"type": "string"},
+            "sequence_id": {"type": "string"},
+            "rollback_ref": {"type": "string"},
+            "operational": {
+              "type": "object",
+              "description": "Live-state facts for the ACP operational-safety layer (pulled from the domain; carried here for the reproducible fixture).",
+              "required": ["generation", "desired_replicas", "current_replicas", "available_replicas", "readiness_plasticity", "active_rollback_watches", "seconds_since_last_action", "dependency_healthy", "freeze_active", "observation_time_s"]
+            }
+          }
+        },
+        "policy_ref": {
+          "type": "object",
+          "required": ["version"],
+          "properties": {
+            "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+\\+.+$"},
+            "digest": {"type": "string"}
+          }
+        },
+        "reversibility": {"enum": ["REVERSIBLE", "REVERSIBLE_WITH_COST", "IRREVERSIBLE"]}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Non-identity. Retained for audit; MUST NOT affect the action digest.",
+      "properties": {
+        "runtime": {"type": "string"},
+        "runtime_version": {"type": "string"},
+        "model_provider": {"type": "string"},
+        "model": {"type": "string"},
+        "planner": {"type": "string"},
+        "objective": {"type": "string"},
+        "reasoning_trace_ref": {"type": "string"},
+        "adapter_version": {"type": "string"},
+        "explanation": {"type": "string"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Optional, scrutiny-only. May raise scrutiny; never lowers a bar."
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Reserved. A non-empty, unrecognized extension fails closed in the enforced validator."
+    }
+  }
+}

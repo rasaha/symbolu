@@ -81,12 +81,20 @@ def verify_approval(
     approval: dict, envelope: dict, *, active_policy_hash: str, now: str,
     used_nonces: Iterable[str] = (), expected_constraints: dict | None = None,
     algorithm_id: str = cp.DEFAULT_HASH_ALGORITHM_ID,
+    identity_profile: str = cp.DEFAULT_IDENTITY_PROFILE,
 ) -> bool:
-    """Return True if the approval validly authorizes this envelope, else raise."""
+    """Return True if the approval validly authorizes this envelope, else raise.
+
+    ``identity_profile`` must match the profile the approval was bound under
+    (v1 legacy / v2 CER V0.1). An approval built against a v2 action_hash will
+    NOT verify under v1 and vice-versa, because the recomputed ``action_hash``
+    differs — exact-action binding is preserved within each profile.
+    """
     p = approval["payload"]
 
     # 1. action modification
-    ah = projection.action_hash(envelope, algorithm_id=algorithm_id)
+    ah = projection.action_hash(envelope, algorithm_id=algorithm_id,
+                                identity_profile=identity_profile)
     if ah != p["action_hash"]:
         raise ActionHashMismatchError("approval does not bind this action")
 

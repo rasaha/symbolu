@@ -1,0 +1,466 @@
+{
+  "all_passed": true,
+  "base_digests": {
+    "01_scale_valid_all_runtimes": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+    "02_rollout_valid_all_runtimes": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+  },
+  "cases": [
+    {
+      "case_id": "01_scale_valid_all_runtimes",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "openai-agents": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "ugence": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "02_rollout_valid_all_runtimes",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "openai-agents": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "ugence": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "03_scale_diff_provenance",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "openai-agents": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "ugence": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "04_rollout_diff_objective",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "openai-agents": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "ugence": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "05_scale_changed_target",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "comp_equiv": true,
+        "deterministic": true,
+        "differs_from_base": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf",
+        "openai-agents": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf",
+        "ugence": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+      },
+      "expect": "different",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "06_scale_changed_replicas",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "comp_equiv": true,
+        "deterministic": true,
+        "differs_from_base": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124",
+        "openai-agents": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124",
+        "ugence": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+      },
+      "expect": "different",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "07_rollout_changed_image",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "comp_equiv": true,
+        "deterministic": true,
+        "differs_from_base": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "df9121fd3911b72195495b349958692bf35da0505c0b04a657c1371cb6610508",
+        "openai-agents": "df9121fd3911b72195495b349958692bf35da0505c0b04a657c1371cb6610508",
+        "ugence": "df9121fd3911b72195495b349958692bf35da0505c0b04a657c1371cb6610508"
+      },
+      "expect": "different",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "08_rollout_changed_strategy",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "comp_equiv": true,
+        "deterministic": true,
+        "differs_from_base": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "b8845e7d524bb99c693bba926ae71ca2fdae12a3d9ea12179a58e6ef817deaa4",
+        "openai-agents": "b8845e7d524bb99c693bba926ae71ca2fdae12a3d9ea12179a58e6ef817deaa4",
+        "ugence": "b8845e7d524bb99c693bba926ae71ca2fdae12a3d9ea12179a58e6ef817deaa4"
+      },
+      "expect": "different",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "09_same_intent_diff_surface",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "comp_equiv": true,
+        "cross_profile_differ": true,
+        "deterministic": true
+      },
+      "composed": {
+        "rollout": "PROCEED",
+        "scale": "PROCEED"
+      },
+      "digests": {
+        "rollout": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "scale": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+      },
+      "expect": "different",
+      "passed": true,
+      "profile": null
+    },
+    {
+      "case_id": "10_rollout_stale",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "deterministic": true,
+        "state_drift_rejected": true
+      },
+      "composed": {
+        "langgraph": "HELD_BY_ACP",
+        "openai-agents": "HELD_BY_ACP",
+        "ugence": "HELD_BY_ACP"
+      },
+      "digests": {
+        "langgraph": "92f80704a3aff896a8088c971086db887ec2f714ce18582cf897adb8352f9b88",
+        "openai-agents": "92f80704a3aff896a8088c971086db887ec2f714ce18582cf897adb8352f9b88",
+        "ugence": "92f80704a3aff896a8088c971086db887ec2f714ce18582cf897adb8352f9b88"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "11_scale_policy_update",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "BLOCKED_BY_AUTHORIZATION",
+        "openai-agents": "BLOCKED_BY_AUTHORIZATION",
+        "ugence": "BLOCKED_BY_AUTHORIZATION"
+      },
+      "digests": {
+        "langgraph": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "openai-agents": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "ugence": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "12_rollout_missing_evidence",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "PENDING_AUTHORIZATION",
+        "openai-agents": "PENDING_AUTHORIZATION",
+        "ugence": "PENDING_AUTHORIZATION"
+      },
+      "digests": {
+        "langgraph": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "openai-agents": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "ugence": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "13_scale_auth_deny_acp_pass",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "BLOCKED_BY_AUTHORIZATION",
+        "openai-agents": "BLOCKED_BY_AUTHORIZATION",
+        "ugence": "BLOCKED_BY_AUTHORIZATION"
+      },
+      "digests": {
+        "langgraph": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f",
+        "openai-agents": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f",
+        "ugence": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "14_rollout_auth_pass_acp_hold",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true
+      },
+      "composed": {
+        "langgraph": "HELD_BY_ACP",
+        "openai-agents": "HELD_BY_ACP",
+        "ugence": "HELD_BY_ACP"
+      },
+      "digests": {
+        "langgraph": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "openai-agents": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "ugence": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "15_unsupported_profile",
+      "checks": {
+        "fails_closed": true
+      },
+      "expect": "invalid",
+      "passed": true,
+      "profile": null
+    },
+    {
+      "case_id": "16_unsupported_extension",
+      "checks": {
+        "fails_closed": true
+      },
+      "expect": "invalid",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "17_malformed_payload",
+      "checks": {
+        "fails_closed": true
+      },
+      "expect": "invalid",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    },
+    {
+      "case_id": "18_profile_downgrade",
+      "checks": {
+        "fails_closed": true
+      },
+      "expect": "invalid",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "19_direct_bypass",
+      "checks": {
+        "all_equal": true,
+        "bypass_prevented": true,
+        "deterministic": true
+      },
+      "digests": {
+        "langgraph": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "openai-agents": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51",
+        "ugence": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.scale.v1"
+    },
+    {
+      "case_id": "20_observation_return",
+      "checks": {
+        "acp_equiv": true,
+        "ag_equiv": true,
+        "all_equal": true,
+        "comp_equiv": true,
+        "cp_class": true,
+        "deterministic": true,
+        "observation_return": true
+      },
+      "composed": {
+        "langgraph": "PROCEED",
+        "openai-agents": "PROCEED",
+        "ugence": "PROCEED"
+      },
+      "digests": {
+        "langgraph": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "openai-agents": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3",
+        "ugence": "72ddae264f4bb757fdeb137bbea0d44dfb36bf60161571447a82be0695c770e3"
+      },
+      "expect": "equal",
+      "passed": true,
+      "profile": "kubernetes.rollout.v1"
+    }
+  ],
+  "cases_passed": 20,
+  "cases_total": 20,
+  "cer_version": "0.2",
+  "identity_governance_metrics": {
+    "acp_equiv": 15,
+    "ag_equiv": 15,
+    "bypass_prevented": 1,
+    "comp_equiv": 15,
+    "cp_class_ok": 7,
+    "cp_class_total": 7,
+    "cross_profile_collisions": 0,
+    "deterministic_ok": 16,
+    "different_ok": 5,
+    "different_total": 5,
+    "equal_ok": 11,
+    "equal_total": 11,
+    "evidence_transfer_rejected": 1,
+    "invalid_ok": 4,
+    "invalid_total": 4,
+    "modified_action_rejected": 4,
+    "observation_return_ok": 1,
+    "state_drift_rejected": 1
+  },
+  "ownership_no_runtime_switch": true,
+  "profiles": [
+    "kubernetes.scale.v1",
+    "kubernetes.rollout.v1"
+  ],
+  "runtime_metrics": {
+    "langgraph": {
+      "cases": 15,
+      "exec": true,
+      "provenance_invariant": 11,
+      "schema_ok": 15
+    },
+    "openai-agents": {
+      "cases": 15,
+      "exec": true,
+      "provenance_invariant": 11,
+      "schema_ok": 15
+    },
+    "ugence": {
+      "cases": 15,
+      "exec": true,
+      "provenance_invariant": 11,
+      "schema_ok": 15
+    }
+  },
+  "runtimes": [
+    "ugence",
+    "langgraph",
+    "openai-agents"
+  ]
+}

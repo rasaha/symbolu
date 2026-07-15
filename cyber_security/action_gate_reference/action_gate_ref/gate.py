@@ -70,7 +70,8 @@ def extract_facts(envelope: dict) -> dict[str, Any]:
     }
 
 
-def _approver_satisfied(envelope, approvals, active_policy_hash, now, used_nonces, algorithm_id):
+def _approver_satisfied(envelope, approvals, active_policy_hash, now, used_nonces,
+                        algorithm_id, identity_profile=cp.DEFAULT_IDENTITY_PROFILE):
     """(satisfied, present_but_invalid). Absent -> escalate; invalid -> deny."""
     if not approvals:
         return False, False
@@ -79,7 +80,8 @@ def _approver_satisfied(envelope, approvals, active_policy_hash, now, used_nonce
         try:
             approval_mod.verify_approval(
                 ap, envelope, active_policy_hash=active_policy_hash, now=now,
-                used_nonces=used_nonces, algorithm_id=algorithm_id)
+                used_nonces=used_nonces, algorithm_id=algorithm_id,
+                identity_profile=identity_profile)
             return True, False
         except GateError as exc:  # noqa: PERF203
             first_err = first_err or exc
@@ -145,8 +147,16 @@ def evaluate(
     envelope: dict, signed_policy: dict, *, evidence: list | None = None,
     approvals: list | None = None, now: str, used_nonces=(),
     algorithm_id: str = cp.DEFAULT_HASH_ALGORITHM_ID,
+    identity_profile: str = cp.DEFAULT_IDENTITY_PROFILE,
 ) -> dict:
-    """Run the deterministic state machine. Returns a decision dict."""
+    """Run the deterministic state machine. Returns a decision dict.
+
+    ``identity_profile`` selects the action-identity projection (v1 legacy /
+    v2 CER V0.1, provenance-excluded). It changes only the ``action_hash`` used
+    for evidence/approval binding and reported in the decision; no decision
+    predicate reads provenance, so the *outcome* for a given actuation is
+    identical across profiles when no provenance-bound artifacts are involved.
+    """
     evidence = evidence or []
     approvals = approvals or []
     trace = ["RECEIVED"]
@@ -166,7 +176,8 @@ def evaluate(
                          reason="policy signature/hash invalid")
     active_policy_hash = signed_policy["policy_hash"]
 
-    ah = projection.action_hash(envelope, algorithm_id=algorithm_id)
+    ah = projection.action_hash(envelope, algorithm_id=algorithm_id,
+                                identity_profile=identity_profile)
     facts = extract_facts(envelope)
     rules = [r for r in signed_policy["bundle"]["rules"] if r["operation"] == envelope["operation"]]
 
@@ -218,7 +229,8 @@ def evaluate(
                     consider(3, SIMULATE_AND_RETRY, rid)
             elif op == "REQUIRE_APPROVER":
                 sat, invalid = _approver_satisfied(
-                    envelope, approvals, active_policy_hash, now, used_nonces, algorithm_id)
+                    envelope, approvals, active_policy_hash, now, used_nonces, algorithm_id,
+                    identity_profile=identity_profile)
                 if invalid:
                     consider(0, DENY, rid)
                 elif not sat:
