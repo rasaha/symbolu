@@ -2,7 +2,11 @@
 
 **Ugence Labs | Autonomous Runtime — the execution-supervision runtime for autonomous systems**
 *Runtime Trust Engine · runtime state machine · calibration · drift detection · replay · diagnostics · certification evidence*
-*Version 1.2 — Prepared July 2026*
+*Version 1.3 — Prepared July 2026*
+
+> **Planning + Execution Supervision + Certification = Autonomous Runtime.**
+> *(A positioning statement, not a formula: the runtime is what turns planned actions into
+> supervised, certifiable execution on a real machine.)*
 
 > **Portfolio.** The Autonomous Runtime is a **Specialized AI System** in the Ugence Labs
 > platform. Its job is to *supervise execution* on autonomous machines — arbitrate predictors,
@@ -31,6 +35,11 @@ Ugence Labs
 ## Page 1 — The Problem
 
 ### Operators want autonomous robots. There is no runtime layer between autonomy software and certified deployment.
+
+Today's autonomy stacks excel at perception and planning but lack a runtime that continuously
+supervises execution and produces certification evidence. That missing layer — not more perception,
+not a better planner — is what keeps safety-critical programs from deploying. **The Autonomous
+Runtime is that layer.**
 
 Modern autonomous-vehicle, drone, mobile-robot, and humanoid stacks all arrived at the same
 architectural pattern: **fuse multiple predictors.** A typical stack runs an HD-map prior, a
@@ -187,10 +196,11 @@ predictors*); **continue**, recording every transition as replayable evidence.
 
 ### The Runtime Trust Engine — the invariance nothing else in the market has
 
-Powered by the **BCVF trust kernel**, the Runtime Trust Engine turns predictor disagreement into a
-signal with a **mathematically proven invariance**: constant offsets and linear drifts between
-predictors produce **exactly zero** trust signal; only **accelerating** divergence produces a
-positive one. This is a structural property of a 2nd-order operator on the vector-valued
+Powered by the **BCVF trust kernel**, the Runtime Trust Engine **continuously evaluates execution
+consistency and trust throughout mission execution** — at every planning step, not as a one-time
+check. It turns predictor disagreement into a signal with a **mathematically proven invariance**:
+constant offsets and linear drifts between predictors produce **exactly zero** trust signal; only
+**accelerating** divergence produces a positive one. This is a structural property of a 2nd-order operator on the vector-valued
 disagreement (Lemma 1, formally proven) — not an empirically calibrated score. No bolt-on
 uncertainty estimator shipping in autonomy stacks has it. Lemma 1 is what lets a reviewer say:
 *"this signal cannot fire on the benign patterns — therefore a non-zero signal is informative."*
@@ -249,6 +259,13 @@ Within each, the economic buyer is increasingly the **safety / certification own
 SOTIF / ISO 26262 / UN R155 deliverable and today has no runtime artifact to point their clauses at.
 
 ### Where this fits with the rest of Ugence
+
+The Autonomous Runtime is the **physical-AI counterpart to the Agent Runtime** — the same
+supervision discipline, applied to machines instead of agents:
+
+| Digital AI | Physical AI |
+|---|---|
+| **Agent Runtime** — supervises AI agent reasoning | **Autonomous Runtime** — supervises autonomous machines |
 
 > **The Autonomous Runtime supervises robot execution; the AI Control Plane governs AI decisions.
 > Together they form an end-to-end governed autonomy stack** — one runtime accountable for what the
@@ -341,6 +358,36 @@ in every modern multi-model autonomy stack, across every vertical from AV to hum
 calcify proprietary solutions into lock-in and before open stacks bake un-certifiable glue into
 their reference modules. A proven invariance, a runtime that supervises execution around it, and a
 pure-NumPy engine that drops into any planner give Ugence a defensible position in that window.
+
+### One platform
+
+This brief funds one layer of a unified, governed AI platform:
+
+```
+   Applications
+        │
+        ▼
+   Specialized AI Systems
+        ├── Agent Runtime            — supervises AI agent reasoning
+        └── Autonomous Runtime       — supervises autonomous machines
+        │
+        ▼
+   AI Control Plane
+        ├── Context Minimization
+        ├── ActionGate
+        └── Autonomous Control Plane (ACP)
+        │
+        ▼
+   AI Infrastructure
+        ├── Hybrid LLM
+        ├── KVPro
+        └── Cloud Infrastructure
+```
+
+Together, **Agent Runtime, Autonomous Runtime, the AI Control Plane, and AI Infrastructure form a
+unified governed AI platform spanning digital agents, autonomous machines, and enterprise
+infrastructure.** Every layer reinforces the others — and the runtime that supervises physical
+execution is the one that carries the platform's governance story into the real world.
 
 ---
 
