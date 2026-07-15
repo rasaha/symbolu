@@ -1,0 +1,5 @@
+{
+  "model_kind": "none",
+  "reason": "no live/local model configured and no captured-replay fixture supplied; Phase-3 evaluation cannot run (replay-only is NOT Phase-3 evidence).",
+  "status": "BLOCKED_NO_REAL_MODEL"
+}

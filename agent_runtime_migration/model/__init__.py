@@ -14,6 +14,11 @@ from .interface import LanguageModel
 from .replay import ReplayModel
 from .mock import RealisticPlannerModel
 from .parsing import parse_plan_payload, ModelParseError
+from .live import LiveHTTPModel, LiveModelConfig, build_live_model_from_env
+from .capture import CaptureRecorder, replay_from_capture
+
 
 __all__ = ["LanguageModel", "ReplayModel", "RealisticPlannerModel",
-           "parse_plan_payload", "ModelParseError"]
+           "parse_plan_payload", "ModelParseError",
+           "LiveHTTPModel", "LiveModelConfig", "build_live_model_from_env",
+           "CaptureRecorder", "replay_from_capture"]
