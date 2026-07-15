@@ -1,0 +1,40 @@
+{
+  "any_live_credential": false,
+  "conclusion": "BLOCKED_NO_REAL_MODEL",
+  "hf_cache_present": false,
+  "huggingface_reachable": false,
+  "inference_libs": {
+    "llama_cpp": false,
+    "ollama_binary": false,
+    "torch": false,
+    "transformers": false
+  },
+  "live_credentials_present": {
+    "ANTHROPIC_API_KEY": false,
+    "ANTHROPIC_AUTH_TOKEN": false,
+    "GEMINI_API_KEY": false,
+    "GROQ_API_KEY": false,
+    "MISTRAL_API_KEY": false,
+    "OLLAMA_HOST": false,
+    "OPENAI_API_KEY": false,
+    "OPENROUTER_API_KEY": false,
+    "TOGETHER_API_KEY": false
+  },
+  "local_servers": {
+    "127.0.0.1:11434": false,
+    "127.0.0.1:1234": false,
+    "127.0.0.1:8000": false,
+    "127.0.0.1:8080": false
+  },
+  "local_weights_on_disk": false,
+  "note": "No live/local model can run. HuggingFace blocked (403) so weights cannot be downloaded; no weights on disk; no server; no credentials. Harness OAuth token deliberately NOT used for model calls (credential-misuse avoidance).",
+  "phase": "agent-runtime-phase-3",
+  "probe_order": [
+    "live_credentials",
+    "local_server",
+    "installable_local_inference",
+    "remote_endpoint"
+  ],
+  "pypi_reachable": true,
+  "remote_endpoint_usable": false
+}

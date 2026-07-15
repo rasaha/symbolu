@@ -1,0 +1,254 @@
+{
+  "all_parity_met": true,
+  "governance_outcomes_correct": true,
+  "metrics": {
+    "argument_agreement": 16,
+    "governed_scenarios": 8,
+    "intentional_differences": 10,
+    "new_governance_outcome_correct": 8,
+    "parity_expected": 6,
+    "parity_met": 6,
+    "plan_agreement": 16,
+    "scenarios": 16,
+    "tool_agreement": 16,
+    "unexplained_regressions": 0
+  },
+  "scenarios": [
+    {
+      "argument_agreement": true,
+      "label": "PARITY",
+      "legacy_tools": [
+        "search"
+      ],
+      "new_tools": [
+        "search"
+      ],
+      "parity_met": true,
+      "plan_agreement": true,
+      "scenario": "read_only_research",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "PARITY",
+      "legacy_tools": [
+        "search",
+        "search",
+        "generate"
+      ],
+      "new_tools": [
+        "search",
+        "search",
+        "generate"
+      ],
+      "parity_met": true,
+      "plan_agreement": true,
+      "scenario": "multi_step_info_gathering",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "PARITY",
+      "legacy_tools": [
+        "validate"
+      ],
+      "new_tools": [
+        "validate"
+      ],
+      "parity_met": true,
+      "plan_agreement": true,
+      "scenario": "structured_extraction",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "PARITY",
+      "legacy_tools": [
+        "compute"
+      ],
+      "new_tools": [
+        "compute"
+      ],
+      "parity_met": true,
+      "plan_agreement": true,
+      "scenario": "file_analysis",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "PARITY",
+      "legacy_tools": [
+        "compute"
+      ],
+      "new_tools": [
+        "compute"
+      ],
+      "parity_met": true,
+      "plan_agreement": true,
+      "scenario": "local_deterministic_transformation",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "PROCEED",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "kubernetes.scale"
+      ],
+      "new_composed_outcome": "PROCEED",
+      "new_tools": [
+        "kubernetes.scale"
+      ],
+      "plan_agreement": true,
+      "scenario": "kubernetes_scale_proposal",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "PROCEED",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "kubernetes.rollout"
+      ],
+      "new_composed_outcome": "PROCEED",
+      "new_tools": [
+        "kubernetes.rollout"
+      ],
+      "plan_agreement": true,
+      "scenario": "kubernetes_rollout_proposal",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "PROCEED",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "database.mutation"
+      ],
+      "new_composed_outcome": "PROCEED",
+      "new_tools": [
+        "database.mutation"
+      ],
+      "plan_agreement": true,
+      "scenario": "database_mutation_proposal",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "BLOCKED_BY_AUTHORIZATION",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "database.mutation"
+      ],
+      "new_composed_outcome": "BLOCKED_BY_AUTHORIZATION",
+      "new_tools": [
+        "database.mutation"
+      ],
+      "plan_agreement": true,
+      "scenario": "authorization_denial",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "HELD_BY_ACP",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "database.mutation"
+      ],
+      "new_composed_outcome": "HELD_BY_ACP",
+      "new_tools": [
+        "database.mutation"
+      ],
+      "plan_agreement": true,
+      "scenario": "acp_operational_hold",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "PENDING_AUTHORIZATION",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "database.mutation"
+      ],
+      "new_composed_outcome": "PENDING_AUTHORIZATION",
+      "new_tools": [
+        "database.mutation"
+      ],
+      "plan_agreement": true,
+      "scenario": "more_evidence_request",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "HELD_BY_ACP",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "database.mutation"
+      ],
+      "new_composed_outcome": "HELD_BY_ACP",
+      "new_tools": [
+        "database.mutation"
+      ],
+      "plan_agreement": true,
+      "scenario": "human_escalation",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "compute"
+      ],
+      "new_tools": [
+        "compute"
+      ],
+      "plan_agreement": true,
+      "scenario": "execution_failure",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "compute"
+      ],
+      "new_tools": [
+        "compute"
+      ],
+      "plan_agreement": true,
+      "scenario": "retry",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "label": "PARITY",
+      "legacy_tools": [
+        "search"
+      ],
+      "new_tools": [
+        "search"
+      ],
+      "parity_met": true,
+      "plan_agreement": true,
+      "scenario": "cancellation",
+      "tool_agreement": true
+    },
+    {
+      "argument_agreement": true,
+      "expected_new_outcome": "BLOCKED_BY_AUTHORIZATION",
+      "label": "INTENTIONAL_DIFFERENCE",
+      "legacy_tools": [
+        "database.mutation"
+      ],
+      "new_composed_outcome": "BLOCKED_BY_AUTHORIZATION",
+      "new_tools": [
+        "database.mutation"
+      ],
+      "plan_agreement": true,
+      "scenario": "observation_reflection_replan",
+      "tool_agreement": true
+    }
+  ],
+  "shared_model": "deterministic replay (same model drives legacy + new)",
+  "unexplained_regressions": 0
+}
