@@ -44,6 +44,12 @@ class ActuationRequest:
     # optional: evidence the enterprise/runtime attaches (scrutiny-only)
     attach_evidence: bool = False
     rollback_ref: str = ""
+    # delegation grant backing the requested permissions (default "*" covers all).
+    # A non-covering grant models an UNAUTHORIZED request (privilege monotonicity).
+    delegation_grant: str = "*"
+    # live cluster resourceVersion, if it advanced past what the runtime observed
+    # (models TOCTOU staleness for the ACP binding). Empty = fresh (== observed).
+    live_resource_version: str = ""
     extras: Dict[str, object] = field(default_factory=dict)
 
     def identity_block(self) -> dict:
@@ -60,7 +66,7 @@ class ActuationRequest:
                 "principal": self.principal,
                 "permissions": list(self.permissions),
                 "delegator": {"id": self.delegator_id, "type": "HUMAN"},
-                "delegation_chain": [{"grant": "*"}],
+                "delegation_chain": [{"grant": self.delegation_grant}],
             },
             "external_state_binding": {
                 "resource_version": self.resource_version,
@@ -70,6 +76,8 @@ class ActuationRequest:
                 "correlation_id": self.correlation_id,
                 "sequence_id": self.sequence_id,
                 "rollback_ref": self.rollback_ref,
+                **({"live_resource_version": self.live_resource_version}
+                   if self.live_resource_version else {}),
                 "operational": dict(self.operational),
             },
             "policy_ref": {"version": self.policy_version, "digest": self.policy_digest},

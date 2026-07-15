@@ -126,13 +126,15 @@ class LangGraphCERAdapter:
             "authority": {
                 "principal": req["principal"], "permissions": list(req["permissions"]),
                 "delegator": {"id": req["delegator_id"], "type": "HUMAN"},
-                "delegation_chain": [{"grant": "*"}],
+                "delegation_chain": [{"grant": req.get("delegation_grant", "*")}],
             },
             "external_state_binding": {
                 "resource_version": req["resource_version"], "state_hash": req["state_hash"],
                 "as_of": req["as_of"], "source": "kubernetes",
                 "correlation_id": req["correlation_id"], "sequence_id": req["sequence_id"],
                 "rollback_ref": req.get("rollback_ref", ""),
+                **({"live_resource_version": req["live_resource_version"]}
+                   if req.get("live_resource_version") else {}),
                 "operational": dict(req["operational"]),
             },
             "policy_ref": {"version": req["policy_version"], "digest": req["policy_digest"]},
@@ -172,6 +174,8 @@ class LangGraphCERAdapter:
             "risk_tier": req.risk_tier, "operation": req.operation,
             "reversibility": req.reversibility, "rollback_ref": req.rollback_ref,
             "attach_evidence": req.attach_evidence,
+            "delegation_grant": req.delegation_grant,
+            "live_resource_version": req.live_resource_version,
         }
 
     def run(self, req: ActuationRequest) -> Dict:

@@ -1,0 +1,164 @@
+{
+  "cer_version": "0.1",
+  "identity_profile": "v2",
+  "algorithm": "sha-256",
+  "note": "Frozen CER->action_digest conformance vectors. Deterministic; any conforming implementation must reproduce these for the same CER.",
+  "vectors": [
+    {
+      "case": "01_valid_scale",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "01_valid_scale",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "02_unauthorized",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+    },
+    {
+      "case": "02_unauthorized",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "5766584bb465cb8943adeaf1f505601189f59e6fb24a42b0c7953d4d65c5cf5f"
+    },
+    {
+      "case": "03_operationally_unsafe",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "03_operationally_unsafe",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "04_diff_actuation_surface",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "7f531bc82d0453040020255448f9e19c1efda2bbc2a0ab73d68d1d86ce812fdf"
+    },
+    {
+      "case": "04_diff_actuation_surface",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "7f531bc82d0453040020255448f9e19c1efda2bbc2a0ab73d68d1d86ce812fdf"
+    },
+    {
+      "case": "05_diff_runtime_provenance",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "05_diff_runtime_provenance",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "06_diff_objective_prose",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "06_diff_objective_prose",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "07_modified_replicas",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+    },
+    {
+      "case": "07_modified_replicas",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "084f7dda5d3226f89eefbf95f61b6936274447b187e84be7b9a7b64a76959124"
+    },
+    {
+      "case": "08_modified_target",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+    },
+    {
+      "case": "08_modified_target",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "de12a169ca7e87a5b0e7710e3441852b87a80ab32f66b66f39b304e5b2e0d1bf"
+    },
+    {
+      "case": "09_stale_state",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "6e8d3a6419052b9b9a5911de4d98bc5264b8ebf83f45412add7991ab2f1c921c"
+    },
+    {
+      "case": "09_stale_state",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "6e8d3a6419052b9b9a5911de4d98bc5264b8ebf83f45412add7991ab2f1c921c"
+    },
+    {
+      "case": "10_policy_update",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "10_policy_update",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "11_missing_evidence",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "11_missing_evidence",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "12_direct_bypass",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "12_direct_bypass",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "15_observation_return",
+      "producer": "ugence",
+      "runtime": "ugence-agent-runtime",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    },
+    {
+      "case": "15_observation_return",
+      "producer": "langgraph",
+      "runtime": "langgraph",
+      "action_digest": "07f7a6aaf20a55a8f03fc31f232420774c7361264cabf66b3a2ac74ffd3f7b51"
+    }
+  ]
+}
