@@ -162,8 +162,8 @@ def action_digest(cer: Dict[str, Any], *, algorithm_id: str = "sha-256") -> str:
 # CER -> ACP cloud envelopes (operational-safety layer)
 # --------------------------------------------------------------------------- #
 
-def to_cloud_world(cer: Dict[str, Any]):
-    """CER external-state binding -> ACP CloudWorldState (live-state model)."""
+def _world_for(cer: Dict[str, Any], resource_version: str):
+    """Build a CloudWorldState at a given resource_version (for identity/binding)."""
     from symbolu_robotics.autonomous_control_plane.cloud.envelopes import CloudWorldState
     ident = cer["identity"]
     tgt = ident["target"]
@@ -171,7 +171,36 @@ def to_cloud_world(cer: Dict[str, Any]):
     op = esb["operational"]
     return CloudWorldState(
         cluster=tgt["cluster"], namespace=tgt["namespace"], deployment=tgt["deployment"],
-        resource_version=esb["resource_version"],
+        resource_version=resource_version,
+        generation=int(op["generation"]),
+        desired_replicas=int(op["desired_replicas"]),
+        current_replicas=int(op["current_replicas"]),
+        available_replicas=int(op["available_replicas"]),
+        readiness_plasticity=float(op["readiness_plasticity"]),
+        active_rollback_watches=int(op["active_rollback_watches"]),
+        seconds_since_last_action=float(op["seconds_since_last_action"]),
+        dependency_healthy=bool(op["dependency_healthy"]),
+        freeze_active=bool(op["freeze_active"]),
+        observation_time_s=float(op["observation_time_s"]),
+    )
+
+
+def to_cloud_world(cer: Dict[str, Any]):
+    """CER external-state binding -> ACP CloudWorldState (LIVE-state model).
+
+    ``live_resource_version`` (if present) models a cluster whose state advanced
+    after the runtime observed it (TOCTOU); otherwise the live state equals the
+    observed binding (fresh).
+    """
+    from symbolu_robotics.autonomous_control_plane.cloud.envelopes import CloudWorldState
+    ident = cer["identity"]
+    tgt = ident["target"]
+    esb = ident["external_state_binding"]
+    op = esb["operational"]
+    live_rv = esb.get("live_resource_version", esb["resource_version"])
+    return CloudWorldState(
+        cluster=tgt["cluster"], namespace=tgt["namespace"], deployment=tgt["deployment"],
+        resource_version=live_rv,
         generation=int(op["generation"]),
         desired_replicas=int(op["desired_replicas"]),
         current_replicas=int(op["current_replicas"]),
@@ -204,5 +233,9 @@ def to_cloud_candidate(cer: Dict[str, Any]):
         rollback_ref=esb.get("rollback_ref", ""),
         rollout_strategy="RollingUpdate",
         max_unavailable=0, max_surge=1, timeout_s=60.0,
-        origin_state_version=esb["resource_version"],
+        # The candidate binds to the identity of the state the runtime OBSERVED.
+        # When live == observed (fresh) this equals to_cloud_world().version and
+        # the ACP binding holds; when the live cluster advanced (stale) it differs
+        # and ACP fails closed (STATE_BINDING_MISMATCH).
+        origin_state_version=_world_for(cer, esb["resource_version"]).version,
     )
