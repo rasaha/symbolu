@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ugence.example/cer/v0.2/profiles/kubernetes.scale.v1.schema.json",
+  "title": "CER actuation payload — kubernetes.scale.v1",
+  "description": "Identity-equivalent to CER V0.1 scale. ActionGate tool.tool_name='scale', operation DEPLOY.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["operation", "target", "arguments", "requested_state_transition", "reversibility"],
+  "properties": {
+    "operation": {"const": "DEPLOY"},
+    "target": {"type": "object", "required": ["cluster", "namespace", "deployment"]},
+    "arguments": {"type": "object", "required": ["replicas"],
+                  "properties": {"replicas": {"type": "string"}}},
+    "requested_state_transition": {
+      "type": "object", "required": ["replicas"],
+      "properties": {"replicas": {"type": "object", "required": ["from", "to"],
+        "properties": {"from": {"type": "string"}, "to": {"type": "string"}}}}},
+    "reversibility": {"enum": ["REVERSIBLE", "REVERSIBLE_WITH_COST", "IRREVERSIBLE"]}
+  },
+  "prohibited_fields_note": "image_digest, current_manifest_digest, rollout_strategy, max_surge, max_unavailable, timeout_s, rollback_ref are PROHIBITED (profile-downgrade guard); enforced by the validator."
+}
