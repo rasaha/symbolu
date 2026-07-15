@@ -1,419 +1,277 @@
 # Autonomous Robotics — VC Brief
 
-**Ugence Labs | BCVF Autonomy Runtime — Trust-Weighted Predictor Consensus for Safety-Critical Robotics**
-*Version 0.1 — Prepared April 2026*
+**Ugence Labs | Safety Runtime for Autonomous Robotics — a certifiable trust-and-safety layer for multi-predictor robotics**
+*Version 1.0 — Prepared July 2026*
+
+> **Portfolio.** The Safety Runtime is a **Specialized AI System** in the Ugence Labs
+> portfolio, alongside the **AI Control Plane** (governance for autonomous agents) and
+> **AI Infrastructure** (Hybrid LLM, KVPro, cloud). It is the safety-and-certification
+> layer for physical autonomy; it complements — and does not overlap — the other two. This
+> brief positions the runtime for investors, not its full engineering surface.
 
 ---
 
 ## Page 1 — The Problem
 
-### Operators want autonomous robots. Predictor disagreement is blocking deployment in safety-critical settings.
+### Operators want autonomous robots. Predictor disagreement — and the safety scaffolding around it — is blocking deployment.
 
-Modern autonomous-vehicle, drone, mobile-robot, and humanoid stacks all
-arrived at the same architectural pattern: **fuse multiple predictors**.
-A typical stack runs an HD-map prior, a learned end-to-end predictor, a
-classical kinematic model, and at least one redundant sensor channel.
-When the predictors agree, planning is easy. **When they disagree, the
-planner has no principled way to decide which one to trust** — and
-predictor disagreement is exactly the regime where the failures that
-matter live.
+Modern autonomous-vehicle, drone, mobile-robot, and humanoid stacks all arrived at the same
+architectural pattern: **fuse multiple predictors.** A typical stack runs an HD-map prior, a
+learned end-to-end predictor, a classical kinematic model, and at least one redundant sensor
+channel. When the predictors agree, planning is easy. **When they disagree, the planner has no
+principled way to decide which one to trust** — and predictor disagreement is exactly the regime
+where the failures that matter live.
 
-Industry has converged on a small set of ad-hoc responses to this:
-majority voting across redundant channels, weighted averages with
-hand-tuned weights, a designated "primary" predictor that the others
-back up, and threshold-switching heuristics that escalate to a fallback
-controller. Each of these works in nominal regimes and degrades — often
-silently — in exactly the corner cases that drive disengagement
-statistics, recall events, and safety-case escalations.
+Industry has converged on a small set of ad-hoc responses: majority voting, hand-tuned weighted
+averages, a designated "primary" predictor, threshold-switching to a fallback controller. Each
+works in nominal regimes and degrades — often silently — in exactly the corner cases that drive
+disengagement statistics, recall events, and safety-case escalations.
 
-In safety reviews and AV-operator post-mortems we and our design
-partners have read, four questions consistently come up early — and
-most current stacks answer them only partially:
+But arbitration is only the visible tip. Even a team that solves disagreement still has to build
+**everything that turns a working algorithm into a deployable, certifiable system**: a system-level
+safety state machine, runtime diagnostics, replay for recall investigation, calibration
+management, drift detection, sensor attestation, ROS 2 / DDS integration, and the certification
+traceability that a SOTIF / ISO 26262 safety case is argued against. Today every program rebuilds
+that scaffolding in-house, per stack, per release. The four questions a safety review asks earliest
+are the ones current stacks answer least crisply:
 
 | The question a safety case asks | What most current autonomy stacks offer |
 |---|---|
 | *"When two predictors disagree, can the system identify which one is failing — not which one the heuristic prefers?"* | Designated primary or majority vote; both fail when the primary or majority is the one drifting. |
-| *"Is there a mathematically defined invariance property — something that provably ignores benign disagreement and only fires on genuine failure?"* | Threshold-tuned heuristics with no formal invariance; behavior characterized empirically per stack. |
-| *"When the system down-weights a predictor at runtime, can the operator reconstruct *why* that predictor was distrusted at that moment?"* | Per-component logs with no causal trace tying the trust decision to the underlying disagreement signal. |
-| *"Can the trust mechanism be tuned without retraining any of the predictor models or rewiring the planner?"* | Most fusion layers are entangled with the predictors that feed them; tuning is a release-cycle event. |
+| *"Is there a stated mathematical invariance — something that provably ignores benign disagreement and only fires on genuine failure?"* | Threshold-tuned heuristics with no formal invariance; behavior characterized empirically per stack. |
+| *"When a predictor is down-weighted at runtime, can the operator reconstruct why — and replay the exact incident for a recall investigation?"* | Per-component logs with no causal trace and no bit-identical replay artifact. |
+| *"Can the whole layer be handed to a certification team mapped to the clauses it grounds?"* | Certification evidence is assembled by hand, late, and separately from the runtime. |
 
-In practice, most AV / robotics programs we have visited treat
-predictor-disagreement handling as an in-house engineering problem
-rebuilt per stack, per program, and per release. Disagreement detection,
-trust weighting, and arbitration are scattered across the perception
-output, the planner cost function, and the safety monitor — and the
-seam between them is where corner-case regressions hide. The problem
-is not lack of redundancy; it is lack of a *principled, testable
-runtime contract* for what should happen in the disagreement regime.
+The problem is not lack of redundancy. It is the absence of a **portable, testable safety runtime**
+for the disagreement regime and the certification work that surrounds it. That layer does not exist
+as a product today — it is in-house glue, rebuilt every time.
 
-### Why retrofitting trust-weighting onto existing fusion loops is hard
+### Why this is a missing software layer, not a tooling gap
 
-In most current stacks, predictor outputs feed into a fusion layer
-(weighted average, Kalman blend, late-fusion ensemble) that was
-designed primarily to *combine* predictions, not to *distrust* them. A
-designated-primary scheme is easy to reason about until the primary is
-the failure source; a majority vote is easy until two redundant
-predictors fail in correlated ways (a common pattern when they share
-training data or sensor modality). Bolt-on uncertainty estimators
-(ensemble disagreement scores, Monte-Carlo dropout, evidential layers)
-produce numbers, but those numbers have **no formal invariance
-property** — they are calibrated empirically and their behavior in
-unseen regimes is the unknown the stack was supposed to defend
-against.
+Fusion layers (Kalman / EKF, weighted averages, late-fusion ensembles) were designed to *combine*
+honest noisy signals, not to *distrust* a predictor that is silently wrong. Bolt-on uncertainty
+estimators (deep ensembles, MC dropout, evidential networks) produce numbers with **no formal
+invariance property** — their behavior on unseen failure shapes is the unknown the safety case was
+supposed to bound. And none of them ship with the surrounding safety machinery a certification body
+now expects.
 
-Safety-case engineering against ISO 21448 (SOTIF — Safety of the
-Intended Functionality) and the emerging UNECE / ISO 26262 functional
-safety regimes increasingly asks for explicit handling of *predictor
-miscalibration and silent model error*, not just sensor failure.
-Operators and certification bodies want a runtime layer that can say,
-under a stated mathematical invariance, "this predictor is no longer
-trustworthy — here is the signal, here is the threshold, here is the
-attribution to the specific source." That layer does not exist as a
-portable, testable runtime today.
-
-Our view is that the market needs a runtime where predictor-trust is
-a **first-class property of the planning loop itself** — where
-disagreement detection is performed by a kernel with a *proven*
-invariance (constant disagreement and linear drift produce zero
-signal; only accelerating divergence does), where the trust-weight
-construction is normalized for context-dependent baselines, and where
-the integration into the planner's consensus is a tested runtime
-contract rather than per-stack glue code. That is the category we are
-building for.
+ISO 21448 (SOTIF), ISO 26262 (functional safety), and UN ECE R155 (cybersecurity) increasingly ask
+for explicit handling of *silent predictor miscalibration*, *system-level fault posture*, and
+*sensor integrity* — not just sensor dropout. Operators want a runtime layer that can say, under a
+stated invariance, "this predictor is no longer trustworthy — here is the signal, here is the
+attribution, here is the state transition, here is the replayable evidence, and here is the clause
+it grounds." **That is the category we build for: the safety runtime between prediction, planning,
+execution, and certification.**
 
 ---
 
-## Page 2 — The Architecture
+## Page 2 — The Runtime
 
-### BCVF Autonomy Runtime — predictor-trust wired into the planning loop
+### One coherent safety runtime, with a mathematical trust kernel at its core
 
-BCVF Autonomy Runtime is a **pure-NumPy Python library** that wraps any
-multi-predictor robotics stack (vision/LiDAR/radar fusion, multi-model
-trajectory predictors, classical-plus-learned ensembles) and turns
-predictor disagreement into a trust-weighted planning consensus. The
-disagreement detector has a **mathematically proven invariance
-property**, the consumer-layer normalization is the result of paired
-N=21 ablation experiments on a controlled failure scenario, and the
-integration into the planner is a tested runtime contract — not glue
-code rebuilt per stack.
-
-### The trust-weighted planning loop (pinned by the test suite)
+The Ugence Safety Runtime is a **code-first Python runtime** that wraps any multi-predictor robotics
+stack and turns predictor disagreement into a trust-weighted, supervised, auditable, certifiable
+planning consensus. At its center is the **BCVF trust kernel** — pure NumPy, with a mathematically
+proven invariance property. Around that kernel the runtime provides the system-level safety
+machinery that deployment and certification actually require, presented as one contract rather than
+a bag of features.
 
 ```
-  perception/prediction outputs at time t
-      │
-      ▼
-  M predictor trajectories  ──► (M, H, 3) per MPPI rollout
-      │
-      ▼
-  K MPPI rollouts × M predictors ──► (K, M, H, 3)
-      │
-      ▼
-  BCVFKernel              ──► per_source_cost  (K, M)
-      │   (Lemma 1: constant + linear drift → 0; only accel → positive)
-      ▼
-  ConsumerNormalization   ──► EMA mean centering, then significance gate
-      │   (per §2.7.11 / §5.1 — autonomy-validated two-stage pattern)
-      ▼
-  TrustSoftmin            ──► trust weights (K, M)
-      │
-      ▼
-  WeightedConsensus       ──► consensus trajectory (K, H, 3)
-      │   (atan2-safe SE(2) heading composition)
-      ▼
-  PlannerCost on consensus ──► (K,) performance cost per rollout
-      │
-      ▼
-  MPPI softmax             ──► applied control u_t
-      │
-      ▼
-  RUN_COMPLETED  +  AgentRunTrace  (per-step BCVF, weights, consensus)
+                       Applications  (AV · drone · mobile robot · humanoid)
+                                 │
+                                 ▼
+                            Planning  (MPPI / MPC / sampling)
+                                 │
+        ┌────────────────────────────────────────────────────────────┐
+        │            UGENCE SAFETY RUNTIME (v0.4.0)                    │
+        │                                                             │
+        │   BCVF trust kernel        — Lemma-1 invariant disagreement │
+        │   Safety state machine     — NORMAL/DEGRADED/FAULT/FAILSAFE │
+        │   Sensor attestation       — UN ECE R155 integrity gate     │
+        │   Calibration + drift      — signed config sets, drift alerts│
+        │   Runtime diagnostics      — per-tick / episode / fleet      │
+        │   Replay framework         — bit-identical recall replay     │
+        │   Safety evidence + traceability — SOTIF / ISO 26262 index   │
+        └────────────────────────────────────────────────────────────┘
+                                 │
+                                 ▼
+                            ROS 2 / DDS  (typed msgs · QoS profile · SBOM)
+                                 │
+                                 ▼
+                            Robot hardware
 ```
 
-The ordering — **predict → score → normalize → trust → consensus →
-plan → act** — is a runtime invariant verified by the test suite, not
-a configurable option. A predictor whose 2nd-order disagreement is
-zero (constant offset or linear drift) cannot affect the trust weights.
-A residual below the significance threshold cannot shape the softmin.
-A trust distribution cannot bypass the consensus stage. This is a
-deliberately narrow, tested contract — the property an autonomy safety
-case can point to during certification review.
+### The trust kernel — the invariance nothing else in the market has
 
-### Two complementary layers
+The **BCVF kernel** turns predictor disagreement into a trust signal with a **mathematically proven
+invariance**: constant offsets between predictors (different calibration, fixed bias) produce
+**exactly zero** trust signal; linear drifts produce **exactly zero** trust signal; only
+**accelerating** divergence produces a positive signal. This is a structural property of a 2nd-order
+operator on the vector-valued disagreement (Lemma 1, formally proven in the design spec) — not an
+empirically calibrated score.
 
-| Layer | Scope | What it decides |
+No bolt-on uncertainty estimator shipping in autonomy stacks has this property. Their numbers are
+calibrated on regimes the data covered; their behavior on unseen failure shapes is the unknown a
+safety case struggles to bound. Lemma 1 is what lets a reviewer say: *"this signal cannot fire on
+the benign patterns — therefore a non-zero signal is informative."* The runtime contract that
+carries it — **predict → score → normalize → trust → consensus → plan → act** — is pinned by the
+test suite, not a configurable option. A predictor whose disagreement is flat or linearly drifting
+cannot move a trust weight; a residual below the significance gate cannot shape the softmin; a
+trust distribution cannot bypass the consensus stage.
+
+### The safety machinery around the kernel
+
+Each subsystem is real code, independently testable, composing into one runtime:
+
+| Subsystem | What it provides | Why a safety case needs it |
 |---|---|---|
-| **BCVFKernel** | Per outer step, all (K, M) rollouts | *"What is the per-source disagreement signal under the Lemma 1 invariance?"* |
-| **ConsumerNormalization + TrustSoftmin** | Per outer step, single trust distribution | *"Given the kernel signal and the per-context baseline, which predictors should the consensus down-weight right now?"* |
+| **Safety state machine** | A four-state system posture — NORMAL / DEGRADED / FAULT / FAILSAFE — with documented per-transition triggers, ASIL decomposition, direct-jump prohibition, and a manual-reset audit trail. | The system-level supervisor an ISO 26262 case is argued against; the kernel's per-tick signal composes into a named posture instead of stopping at the algorithm boundary. |
+| **Sensor attestation** | A per-message integrity gate (firmware allowlist, freshness/replay windows, HMAC-SHA256, constant-time compare) upstream of the kernel; the integrator wires their own HSM/TPM key resolver. | Closes the UN ECE R155 loop: a stealth-bias spoof the kernel's invariance cannot see by construction is rejected *before* it reaches the kernel. |
+| **Calibration + drift detection** | A frozen, SHA-256-identified calibration set bundling every runtime config into one signable, version-controlled artifact; a drift detector that alerts when live fleet metrics leave the calibrated envelope. | Configuration management and field monitoring — the difference between a lab result and a fleet you can operate and re-certify. |
+| **Runtime diagnostics** | Per-tick trust traces, per-episode records, and a streaming fleet monitor with rolling-window summaries and threshold alerts. | Turns "why did the runtime distrust that predictor" from a forensics project into a live SRE surface. |
+| **Replay framework** | A single serializable bundle (config + recorded episode + version) that a recall investigator opens and re-runs against current code, with **bit-identical** divergence localization to the offending field and tick. | The post-incident-recall evidence artifact SOTIF and ISO 26262 V&V ask for. |
+| **ROS 2 / DDS integration** | Framework-agnostic node with typed `.msg` schemas, a documented DDS QoS profile, rate-limiting and per-predictor deadline tracking, plus a CycloneDX SBOM. | Answers the first three questions every Tier-1 / OEM asks — *does it speak ROS 2? what's the DDS QoS? where's the SBOM?* — with code a reviewer can `cd` into. |
+| **Safety evidence + traceability** | A machine-generated index mapping runtime artifacts to the SOTIF (ISO 21448) and ISO 26262 Part 6 clauses they ground. | Lets a buyer's safety team begin a clause-by-clause diligence walk-through on day one, not after a separate workstream. |
 
-The two layers compose but are **independently testable and
-independently tunable**. The kernel is pure math: a 2nd-order
-finite-difference operator on per-pair body-frame errors, a sigmoid
-gate, a pseudo-Huber penalty, a per-source attribution sum. Its output
-is provably invariant under constant and linear-drift disagreement
-(Lemma 1, V3.1 §3.5) and provably positive under accelerating
-divergence above the noise gate. The consumer layer is the autonomy-
-validated pattern from §2.7.11 / §5.1: per-source EMA mean
-subtraction, then a significance gate (or hinge-φ shaping) before
-softmin, then non-anchor pairwise enumeration at M ≥ 3.
+The kernel is pure NumPy — no torch, no GPU, milliseconds per step on a single CPU core, evaluable
+on synthetic predictors before any procurement conversation. The safety machinery is stdlib-first
+and dependency-light for the same reason: it drops into a customer's CI without provisioning new
+infrastructure.
 
-### The Lemma 1 invariance is our differentiation
+### Honest scope (stated up front, because for a safety product the boundary *is* the credibility)
 
-When a multi-predictor robotics stack uses BCVF Autonomy Runtime,
-disagreement decisions can be enriched with a *mathematically
-guaranteed* invariance — constant offsets between predictors (different
-calibration, fixed bias) produce **exactly zero** trust signal; linear
-drifts (predictors disagreeing at a constant rate) produce **exactly
-zero** trust signal; only **accelerating** divergence produces a
-positive signal. This is a structural property of the 2nd-order
-operator on the vector-valued disagreement, formally stated and
-proven in §2.6 of the design specification (`docs/design/
-BCVF_LLM_TRUST_ROUTING_DESIGN.md`).
-
-No bolt-on uncertainty estimator (ensemble disagreement, MC dropout,
-evidential layers) currently shipping in autonomy stacks has this
-property. They produce calibrated numbers in regimes the calibration
-data covers; their behavior on unseen failure shapes is the unknown
-that safety cases struggle to bound. The Lemma 1 invariance is what
-lets a safety reviewer say "this signal cannot fire on the benign
-patterns enumerated in §2.6 — therefore a non-zero signal is
-informative" — a property no current autonomy-stack uncertainty layer
-can match because none of them are derived from a 2nd-order operator
-in the first place.
-
-When the runtime is composed with a non-CG-instrumented predictor
-stack (which is most production stacks today), the same kernel runs
-against the predictor trajectories themselves. When future stacks
-expose model-internal coherence signals — entropy, attention
-inconsistency, latent disagreement — the consumer-normalization layer
-can absorb them with the same pattern. Customers can therefore start
-on existing predictor stacks today and absorb internal-signal sources
-later without rewiring.
-
-### Developer surface — one factory call, full BCVF planning loop
-
-```python
-from symbolu_robotics.bcvf_autonomous import (
-    BCVFConfig, MPPIConfig, MPPIPlanner, CostOrder,
-)
-
-bcvf_cfg = BCVFConfig(
-    gate_threshold=0.05,        # autonomy-validated default
-    gate_beta=400.0,
-    huber_delta=0.5,
-    cost_order=CostOrder.SECOND,
-    use_anchor_pairing=False,    # all-pairs at M >= 3 (§2.4.5)
-)
-mppi_cfg = MPPIConfig(
-    num_rollouts=256, horizon=20, lambda_c=1.0, bcvf_config=bcvf_cfg,
-)
-
-planner = MPPIPlanner(mppi_cfg, perf_cfg, predictors, road, obstacles)
-planner.set_ema_alpha(0.05)         # per-source baseline normalization
-planner.set_deadband_k_sigma(2.0)   # significance gate
-
-result = planner.plan()
-# result.first_control       — applied to the actuator
-# result.bcvf_cost           — diagnostic per-step BCVF total
-# result.predictor_trajectories — full M-predictor rollouts for trace
-```
-
-One factory call composes the full stack: BCVF kernel, MPPI sampler,
-consumer-layer normalization, weighted-consensus planner, and the
-per-step diagnostic trace. The same code runs against a synthetic
-multi-predictor harness (no compute, no sensors) and a live perception/
-prediction stack with no wiring changes — which makes the library
-easy to evaluate before any procurement conversation. The kernel
-itself is **pure NumPy with 166 passing tests**, runs in milliseconds
-per outer step on a single CPU core, and has no dependency on torch,
-ROS, or any robotics-platform-specific stack.
+The runtime **arbitrates and supervises** predictors — it does not replace perception, prediction,
+fusion, or planning, and it does not catch failures that never manifest as predictor *disagreement*
+(a degradation all predictors share is out of scope, documented explicitly). It has **no production
+deployment yet**: validation is on synthetic and realistic-noise predictors, with a real-sensor
+pilot as the next scheduled step. Every number in this brief is from our own repository and CI, not
+a third-party benchmark. The internal LLM-trust transfer probe returned a clean null and is **not**
+positioned as a product. Selling the boundary honestly is what makes the part inside it certifiable.
 
 ---
 
-## Page 3 — Competitive Landscape
+## Page 3 — Market Position & Competitive Landscape
 
-BCVF Autonomy Runtime sits in a category that does not yet have a
-clean name in the autonomy market — the layer between *"the predictor
-stack produced multiple disagreeing trajectories"* and *"the planner
-chose a control input."* That layer exists in every production AV /
-robotics stack, but it is almost universally **in-house engineering
-glue** rather than a portable runtime with a stated mathematical
-property. The table below positions us against each family of
-adjacent technology, stating for every row both *how* we differ and
-*why* that difference matters for an operator building a defensible
-safety case.
+### The missing software layer between prediction, planning, execution, and certification
 
-| Category | Representative players | What they ship | How BCVF Autonomy Runtime differs — and why it is better |
-|---|---|---|---|
-| **Classical sensor / state fusion** | Kalman / EKF / UKF filters, particle filters, late-fusion ensembles, ROS `robot_localization`, MRPT, Apollo perception fusion | Deterministic blending of redundant sensor / state channels with hand-tuned weights or covariance models. Strong at combining noisy-but-honest signals into a single estimate. | We do not *fuse* signals — we **detect predictor disagreement** with a formal invariance and gate trust accordingly. **Better because:** classical fusion assumes the predictors are noisy-but-correctly-modeled; the failure mode our runtime targets (a predictor that is silently wrong) is exactly the case the Kalman covariance model cannot represent. We compose with classical fusion: the fusion layer can still combine sensors, and BCVF Autonomy Runtime sits one level up arbitrating between *predictors* whose outputs the fusion layer fed into. |
-| **ML uncertainty estimation** | Deep ensembles, Monte-Carlo dropout, evidential deep learning, conformal prediction, Bayesian deep learning libraries | Bolt-on uncertainty scores attached to per-prediction outputs, calibrated against held-out data and used as inputs to a downstream decision rule. | These produce *numbers* but **no formal invariance property** — their behavior on unseen failure shapes is exactly the unknown the safety case was supposed to bound. **Better because:** the Lemma 1 invariance gives a safety reviewer a structural statement ("this signal cannot fire on constant or linear-drift disagreement — therefore a non-zero signal is informative") that no empirically-calibrated uncertainty score can match. We are additive: a stack can keep its existing per-model uncertainty and feed it into our trust-weighting layer as additional context. |
-| **Closed AV / robotics platform stacks** | Waymo Driver, Cruise, Mobileye REM, Tesla Autopilot, NVIDIA DRIVE, Apollo (Baidu), Toyota Woven Driver | Full closed perception → prediction → planning stacks, often with proprietary internal arbitration logic between competing predictors. | These are end-to-end stacks with **proprietary, non-portable** internal trust mechanisms — the customer cannot inspect, certify, or substitute the predictor-arbitration logic. **Better because:** we ship the arbitration layer as a *portable, inspectable runtime* with a published Lemma 1 proof. A customer using NVIDIA DRIVE today can adopt our runtime as an explicit predictor-trust layer between DRIVE's perception output and the customer's own planning code, without giving up the rest of their stack — a capability no closed platform offers because none of them sell their internal arbitration as a separable component. |
-| **Open-source AV / robotics stacks** | Autoware (TIER IV), Apollo OSS, OpenPilot, CARLA, NAV2, MoveIt | Reference open-source autonomy stacks providing perception, prediction, and planning modules with community-developed glue between them. | They ship **stack components** and leave predictor-arbitration as glue code in `behavior_planner` / `decision_maker` modules that are configured per integrator, not pinned by tests. **Better because:** we provide the missing tested runtime contract for the disagreement regime. We integrate as a planning-layer dependency (`pip install symbolu_robotics`) and produce a structured `MPPIResult` that an Autoware or Apollo planning node can consume directly — replacing per-integrator decision-maker glue with a tested kernel + consumer pattern. |
-| **Functional-safety tooling** | ANSYS Medini Analyze, Vector vTESTstudio, dSPACE SystemDesk, Foretellix Foretify, Applied Intuition | Safety-case authoring, requirements traceability, FMEA / HARA / SOTIF documentation, scenario-based regression testing. | These tools document *what* the system should do; they do not enforce it at runtime. **Better because:** we provide the runtime artifact that those documents need to refer to. A SOTIF safety case asks "how does the system handle silent predictor miscalibration?" — without a runtime layer with a stated invariance, the answer has to be empirical ("we tested N scenarios"); with our runtime, the answer can be structural ("Lemma 1 guarantees no false trust shift on benign disagreement, and the consumer-layer pattern is validated to N=21 paired"). The two are complementary, not competing. |
-| **Robotics simulation + verification** | NVIDIA Isaac Sim, MathWorks Automated Driving Toolbox, CARLA, LGSVL, MORAI | Scenario libraries, simulation environments, regression-test infrastructure for autonomy stacks. | Simulation platforms test *whether* a stack passes a scenario; they do not provide a portable runtime *property* to test against. **Better because:** we ship the property (Lemma 1 invariance + autonomy-validated consumer pattern). The simulation platforms become a *consumer* of our test surface — they instantiate the BCVF kernel, run scenarios against it, and report regressions against a known mathematical baseline rather than against an opaque stack. |
+The Safety Runtime is **not** another planner, another perception stack, or another robotics
+platform. It is the layer that sits *between* those and the certification file — the layer every
+production stack has as in-house glue and no vendor sells as a portable, inspectable, testable
+runtime with a stated mathematical property.
 
-### Feature-level differentiation on predictor-trust primitives
+**Who buys this.** AV and robotics OEMs and their Tier-1 suppliers; drone-delivery, warehouse, and
+industrial-mobile-robot programs; and — critically — the **safety and certification teams** inside
+those programs, who own the SOTIF / ISO 26262 / UN R155 deliverable and currently have no runtime
+artifact to point their clauses at.
 
-For autonomy program leads who want the one-page side-by-side on the
-primitives that come up in safety-review conversations, here is the
-honest comparison against the two most common competitor families:
+**Why now.** Multi-predictor stacks are universal; certification is the bottleneck. SOTIF, ISO
+26262, and UN ECE R155 are simultaneously tightening the requirements for silent-miscalibration
+handling, system-level fault posture, and sensor integrity. Programs are hitting the wall where the
+algorithm works but the *safety case* cannot be assembled fast enough to deploy.
 
-| Area | BCVF Autonomy Runtime | Classical fusion (Kalman / late-fusion) | ML uncertainty (ensemble / MC dropout / evidential) |
-|---|---|---|---|
-| Lemma 1 invariance proof (constant + linear drift → 0) | **Yes** | Not applicable (no invariance concept) | No — calibrated empirically |
-| Per-source attribution at M ≥ 3 (2:1 outlier discrimination) | **Yes** (symmetric all-pairs) | Partial (per-channel residuals) | Partial (per-model variance) |
-| Per-context baseline normalization (EMA mean centering) | **Yes** (autonomy-validated, §2.7.11) | Static covariance | Static calibration |
-| Significance gate / hinge-φ to suppress noise residuals | **Yes** (k=2σ default, §5.1) | No | No |
-| Non-anchor pairing at M ≥ 3 (avoids anchor-failure collusion) | **Yes** (default) | Often anchor-biased | Not applicable |
-| Pure-NumPy kernel, no GPU / torch dependency | **Yes** (166 tests, ms/step on CPU) | Varies; typically C++ | Typically requires torch/tf |
-| Tested runtime contract (predict→score→normalize→trust→consensus→plan→act) | **Yes** (pinned by tests) | No (per-stack glue) | No (per-stack glue) |
-| Drop-in to existing AV stacks | Drop-in to MPPI-style planners; adapter needed for non-MPPI planners | Mature | Mature |
-| Production AV deployments | Not yet — pilots in design | **Mature** (decades of deployment) | **Mature** (multiple production stacks) |
-| Ecosystem breadth (sensor drivers, simulation, perception primitives) | Narrow, focused on the arbitration layer | **Broad** | **Broad** |
-| Multi-stack platform integrations (ROS / Apollo / Autoware / DRIVE) | Not yet — on roadmap | **Mature** | **Mature** |
+**Why existing stacks still need it.** Perception, prediction, and planning stacks — open or
+closed — produce trajectories. None of them ship a portable, certifiable trust-and-safety runtime
+with an invariance a reviewer can rely on, and the closed platforms bury their arbitration inside
+proprietary code the customer cannot inspect or certify.
 
-### Why the overall bet is better, not just different
+**What deployment pain it removes.** It replaces the per-program rebuild of the entire safety
+scaffold — state machine, attestation, calibration, drift, replay, diagnostics, ROS/DDS glue,
+traceability — with one adopted runtime, evaluable on a laptop before procurement.
 
-- **The Lemma 1 invariance is a structural property no incumbent can match.** It is not a tuning improvement on existing uncertainty estimators — it is a *different kind of guarantee*. A 2nd-order operator on vector-valued disagreement is provably zero on constant offsets and linear drifts; the proof is dimension-agnostic and three pages of algebra (§2.6). No bolt-on uncertainty layer in the competitive table is derived from a structurally-zero-on-benign operator, because they are all calibration-based rather than invariance-based.
-- **We arbitrate predictors; we do not replace stacks.** A customer using Autoware for perception, Mobileye REM for HD-map priors, and a custom learned predictor can adopt BCVF Autonomy Runtime at the planning-layer arbitration boundary without giving up any of those investments. We are the missing layer for the disagreement regime, not a rival to perception/prediction or to planning.
-- **The autonomy-validated consumer-layer pattern is non-obvious and now empirically published.** EMA-mean centering + significance gate + non-anchor pairing was the configuration that produced the first statistically significant improvement (sign test p < 0.01) over a no-shaping baseline in our N=21 paired companion experiment. Each component alone underperforms; the combination is the result. A competitor would have to either reproduce the experiment or guess the same recipe — neither is fast.
-- **Pure-NumPy kernel, no GPU dependency.** Autonomy validation, regression testing, and CI for the kernel run on a laptop in seconds. Customers can add the runtime to their CI pipeline without provisioning GPU runners or modifying their build environment — a procurement-friendly property that closed AV stacks and torch-dependent uncertainty libraries do not match.
-- **Composes with, rather than replaces, the rest of the stack.** A customer can keep their existing classical fusion for sensor-level blending, their existing per-model uncertainty estimator for prediction-level scoring, and their existing functional-safety tooling for documentation — and still put BCVF Autonomy Runtime at the planner-arbitration boundary. We are additive at the layer where additive is hardest to provide today.
-- **Honest scope on where we do not compete (year one).** We are not trying to win on perception, on sensor drivers, on full-stack ecosystem breadth, on production-AV deployment count, or on multi-stack platform integrations in the first twelve months. We are trying to win on the one property that an autonomy safety case currently has no portable answer for: a runtime layer with a *proven* invariance for predictor-trust, validated end-to-end on a controlled failure scenario, with a pure-NumPy implementation that any program can drop into its existing planner without giving up the rest of its stack.
+**Why it is hard to replace once adopted.** Once a program's calibration sets are signed against it,
+its recall investigations replay through it, its sensor attestation policies are wired to it, and —
+above all — its **certification traceability is argued against it**, the runtime is load-bearing in
+the safety case. Ripping it out means re-opening the safety file. That is the durable moat.
+
+### How it differs from adjacent technology
+
+| Category | Representative players | How the Safety Runtime differs — and why it is better |
+|---|---|---|
+| **Classical sensor / state fusion** | Kalman / EKF / UKF, particle filters, ROS `robot_localization`, Apollo perception fusion | Fusion *combines* noisy-but-honest signals; it cannot represent a predictor that is silently wrong. We sit one level up, **detecting disagreement** under a formal invariance and gating trust — and we compose with fusion rather than replacing it. |
+| **ML uncertainty estimation** | Deep ensembles, MC dropout, evidential / Bayesian DL, conformal prediction | These produce calibrated numbers with **no invariance**; their unseen-regime behavior is the unknown a safety case must bound. Lemma 1 gives a *structural* statement no empirical score can. We ingest their scores as additional context — additive, not rival. |
+| **Closed AV / robotics platforms** | Waymo, Cruise, Mobileye, Tesla, NVIDIA DRIVE, Apollo, Woven | Proprietary, non-portable internal arbitration the customer cannot inspect, certify, or substitute. We ship the arbitration-and-safety layer as a *portable, inspectable runtime* a DRIVE or Apollo user drops in without giving up the rest of the stack. |
+| **Open-source AV / robotics stacks** | Autoware, Apollo OSS, OpenPilot, Nav2, MoveIt | They ship stack components and leave arbitration + safety machinery as per-integrator glue. We provide the missing tested runtime contract *and* the surrounding safety subsystems, as a single dependency. |
+| **Functional-safety & security tooling** | ANSYS medini, Vector, dSPACE, Foretellix | These document *what* the system should do; they do not enforce it at runtime. We produce the runtime artifact — and the machine-generated traceability index — those documents refer to. Complementary, not competing. |
+
+### Where we do not compete (year one)
+
+We are not trying to win on perception, sensor drivers, full-stack ecosystem breadth, or production
+deployment count in the first twelve months. We win on the one thing an autonomy safety case has no
+portable answer for today: **a runtime with a proven trust invariance and the certifiable safety
+machinery around it.**
 
 ### In one sentence
 
-Classical fusion combines signals. ML uncertainty estimates noise.
-Closed AV stacks bury arbitration inside proprietary code. Open-source
-stacks leave it to integrators. BCVF Autonomy Runtime gives the
-planner a **provably invariant trust signal for its competing
-predictors** — and that is a different product category than any of
-the incumbents in this table are building for.
+Classical fusion combines signals; ML uncertainty estimates noise; closed stacks bury arbitration
+in proprietary code; open stacks leave it to integrators. The Ugence Safety Runtime gives autonomy
+programs a **provably invariant trust signal, a supervised safety posture, and a certification-ready
+evidence trail** — a different product category than any incumbent is building for.
 
 ---
 
 ## Page 4 — Evidence & Roadmap
 
-### What is proved today (v0.1, internal evidence)
+### What exists today (runtime v0.4.0, internal evidence)
 
 | Area | Current state |
 |---|---|
-| **Test suite** | 166 tests passing across kernel, MPPI planner, runner, scenarios, predictors, manifold, traces, metrics, experiments |
-| **Kernel modules shipped** | `core.py` (BCVF cost functional, V3.1 §3.3–§3.5 + Lemma 1), `manifold.py` (SE(2) body-frame error), `mppi_planner.py` (MPPI + Ketu→Rahu trust-weighted consensus), `runner.py`, `scenarios.py` (6 failure scenarios S1–S6), `predictors/` (M1–M4 SE(2) variants with failure injection) |
-| **Lines of code** | ~4,100 LOC across 11 modules + tests, pure NumPy |
-| **Lemma 1 invariance** | Mathematically proven (V3.1 §3.5; LLM analogue restated in `docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` §2.6) and verified by unit tests on constructed constant-bias and linear-drift inputs |
-| **Cost-order ablation** | ZEROTH / FIRST / SECOND empirically validated on linear-drift family — FIRST fails on linear drift as Lemma 1 case 2 predicts; SECOND passes; ZEROTH gates correctly |
-| **Runtime contract ordering** | `predict → score → normalize → trust → consensus → plan → act` is pinned by tests, not configurable |
-| **Companion experiment (autonomy validation)** | N=21 paired, scenario `S3_map_error_accel`, M=4 predictors, M4 failing-anchor injected. Final config: T=0.05, β=400, EMA α=0.05, deadband k=2σ, non-anchor pairing. Result: catastrophe rate 14.3% vs A0 23.8%; mean lateral deviation 1.79 m vs 4.30 m (best of all variants tested); std 5.76 vs 8.01; **sign test p = 0.0072** (17/21 seeds improve, 4 worsen). First statistically significant improvement over no-shaping baseline. |
-| **Iterative ablation evidence** | Six bounded experiments traced the path from "additive-cost BCVF — directionless" to the validated config, with each architectural step (Ketu→Rahu refactor, EMA centering, deadband gate, non-anchor pairing) isolated and individually committed. Per-step trust-state logs available for the four resistant seeds. |
-| **Design specification** | `docs/design/BCVF_LLM_TRUST_ROUTING_DESIGN.md` — §0–§3 closed end-to-end (~3700 lines), §5.1/§5.2 autonomy-validated consumer pattern committed, §4/§6+ skeleton-only awaiting LLM-domain execution |
-| **Known gaps** | No real-sensor data (synthetic predictors only); no multi-platform integration (ROS / Autoware / Apollo adapters not yet shipped); only the `S3_map_error_accel` scenario family deeply validated; LLM-domain transfer is design-stage only, no execution evidence yet |
+| **BCVF trust kernel** | Pure-NumPy 2nd-order operator with the **Lemma 1 invariance proven** and CI-verified on constructed constant-bias and linear-drift inputs; cost-order ablation (ZEROTH/FIRST/SECOND) confirms the proof empirically. |
+| **Validated configuration** | End-to-end on a controlled failure scenario (`S3_map_error_accel`, N=21 paired): catastrophe rate 14.3% vs 23.8% baseline, mean lateral deviation **1.79 m vs 4.30 m**, **sign test p = 0.0072**. First statistically significant improvement over a no-shaping baseline. |
+| **Baseline shootout** | BCVF built at the same arbitration interface as EKF (Mahalanobis 3σ), Majority-Vote, and a null floor, across the full failure taxonomy. **BCVF is the only arbitrator with zero false-attribution on Lemma-1-invariant disagreement** (constant-bias: BCVF 0.0 vs EKF 1.1 vs Majority 16.7), and 8–19× faster per tick than EKF / Majority. |
+| **Safety state machine** | Four-state supervisor (NORMAL/DEGRADED/FAULT/FAILSAFE) with ASIL decomposition, direct-jump prohibition, and manual-reset audit trail. |
+| **Sensor attestation** | Stdlib HMAC-SHA256 integrity gate (seven ordered checks, constant-time compare, integrator-supplied key resolver), upstream of the kernel — UN ECE R155 scope. |
+| **Calibration + drift** | SHA-256-identified, signable calibration sets; drift detector against live fleet summaries with typed range-violation alerts. |
+| **Diagnostics + replay** | Per-tick/episode/fleet diagnostics with a streaming monitor; a replay framework with **bit-identical** divergence localization for recall investigation. |
+| **Real-time budget** | A typed worst-case-execution-time contract with p99 / p999 / p9999 percentile monitoring (the AUTOSAR-Adaptive "what's your WCET?" answer). |
+| **ROS 2 / DDS + SBOM** | Framework-agnostic node, typed `.msg` schemas, documented DDS QoS profile, and a CycloneDX 1.5 SBOM manifest. |
+| **Certification traceability** | Machine-generated SOTIF (ISO 21448) + ISO 26262 Part 6 clause index, refreshed by a doc-render test so it cannot drift from the code. |
+| **Test suite** | A comprehensive, CI-pinned suite — **900+ tests** across kernel, planner, safety machinery, integration contracts, and evidence generators. All numbers internal; no third-party benchmarks. |
 
-All numbers above are from our own repository and CI — not third-party
-benchmarks. An external multi-scenario benchmark and at least one
-real-sensor-data pilot are planned (see roadmap).
+### 18-month roadmap (forward-looking — completed capabilities above are not roadmap items)
 
-### Empirical iteration that arrived at the validated config
+**Near term — pilots and real sensor data**
+- **OEM / design-partner pilots** in adjacent robotics domains (drone, warehouse, industrial mobile
+  robot) where the multi-predictor pattern exists and safety-case pressure is real.
+- **Real-sensor validation** on public multi-predictor traces (KITTI / nuScenes) to move beyond
+  synthetic and realistic-noise predictors.
 
-| Experiment | Config | N | Headline | Outcome |
-|---|---|---|---|---|
-| Initial Ketu→Rahu smoke | T=0.2, β=100, raw cost softmin, anchor pairing | 26 | A3 vs A0 directionless | 4/26 cat (vs 5 A0); McNemar p = 1.00 |
-| Lower-T sweep | T=0.1, β=200, raw cost softmin, anchor pairing | 26 | Worse than baseline (active-floor regression) | 8/26 cat; McNemar p = 0.55 |
-| Add EMA centering | T=0.1, β=200, EMA α=0.05, anchor pairing | 26 | Rescued all 5 A0 catastrophes but 4 new regressions | 4/26 cat; McNemar p = 0.73 |
-| Add deadband gate | T=0.05, β=400, EMA α=0.05, deadband k=2σ, anchor pairing | 21 | Best mean / std among single-fix variants | 3/21 cat; McNemar p = 0.625; mean 2.13 m |
-| **Add non-anchor pairing (validated)** | T=0.05, β=400, EMA α=0.05, deadband k=2σ, **non-anchor pairing** | 21 | First statistically significant improvement | **3/21 cat; sign test p = 0.0072; mean 1.79 m** |
+**Mid term — certification and production**
+- **ISO 26262 certification** engagement — advance the traceability index into a partner-authored,
+  auditor-reviewed safety case against a specific operational design domain.
+- **SOTIF certification package** — complete the ISO 21448 evidence set (triggering conditions,
+  functional insufficiencies, V&V) as a deliverable a certification body signs.
+- **First production deployment** with a reference customer, behind the safety state machine and
+  the read-only diagnostics surface.
 
-The trajectory above — published in our session repo with per-experiment
-seed-by-seed traces and a deep-dive trust-state log on the resistant
-seed set — is the empirical record an external reviewer can replay
-end-to-end without GPU or sensor-data access. Each architectural
-addition (EMA, deadband, non-anchor pairing) was isolated and committed
-individually so the ablation is per-step inspectable.
-
-### Developer-ergonomics and design improvements (this development cycle)
-
-| Measure | Before BCVF runtime | After |
-|---|---|---|
-| Lines to compose a trust-weighted multi-predictor MPPI planner | Hand-written per stack (typically 200–500 LOC of arbitration glue) | ~10 lines (one factory call + two setters) |
-| Empirically-validated trust-weighting recipe | None published | `T=0.05, β=400, ema_alpha=0.05, deadband_k_sigma=2.0, use_anchor_pairing=False` (autonomy-validated, sign p<0.01) |
-| Replayable per-step trust-state trace | Custom logging per integration | First-class `set_trust_log_enabled(True)` + JSON dump |
-| Per-source attribution at M ≥ 3 | Per-stack derivation | Shipped: `BCVFLLMResult.per_source_costs` with symmetric all-pairs sum |
-| Lemma 1 verification in CI | Implicit / per-stack | Explicit unit tests on constructed invariance inputs |
-| Switching between cost orders for ablation | Code change + retest | `cost_order = CostOrder.ZEROTH / FIRST / SECOND` config flag |
-
-### 12-month roadmap
-
-**Quarter 1 — External validation and ROS adapter**
-- 2–3 external design-partner pilots in adjacent robotics domains
-  (drones, mobile robots, manipulator arms — domains where the
-  multi-predictor pattern exists and the safety-case pressure is
-  real but the AV-program inertia is lower)
-- ROS 2 adapter — the most common gap raised by robotics integrators
-  in our early conversations; lets the runtime drop into a Nav2 /
-  MoveIt planning node as a single dependency
-- Multi-scenario validation: extend the N=21 sign-test result to all
-  six S1–S6 scenarios at the validated config; publish per-scenario
-  results
-
-**Quarter 2 — Platform integrations and real-sensor pilot**
-- Autoware perception → BCVF arbitrator → Autoware planner integration
-  spike with a TIER IV-compatible reference customer
-- Apollo OSS adapter (Baidu's open-source AV stack)
-- KITTI / nuScenes replay pilot — validate the runtime on real-sensor
-  multi-predictor traces rather than only synthetic SE(2) trajectories
-- Begin the second domain track: drone-swarm trajectory arbitration
-  (M = 5–10 predictor case where per-source attribution becomes more
-  discriminative)
-
-**Quarter 3 — Safety case template and certification path**
-- Publish a safety-case template for the predictor-trust gap that maps
-  the Lemma 1 invariance and the autonomy-validated consumer pattern
-  to SOTIF (ISO 21448) and ISO 26262 traceability
-- Regulator workshop preparation with two operators in BFSI-adjacent
-  industrial-robotics or drone-delivery contexts
-- First-party benchmark suite: extend S1–S6 with community-contributed
-  scenarios and publish baseline numbers
-
-**Quarter 4 — Production reference and managed offering**
-- Target a production reference customer in an adjacent robotics domain
-  (industrial mobile robot, drone delivery, warehouse automation)
-- Optional managed runtime preview for teams that prefer a hosted
-  trust-arbitration service over a library
-- Begin SOC 2 process if the managed runtime is part of the offering
-- Generalization beyond MPPI planners: adapter pattern for MPC, hybrid
-  A*, sampling-based planners — kernel stays pure NumPy, integration
-  layer adds adapters
+**Longer term — scale and commercial breadth**
+- **Fleet deployment** — the streaming monitor, drift detection, and calibration bundles operated
+  across a live fleet as a managed field-monitoring surface.
+- **Hardware acceleration** — an accelerated kernel path for high-rate stacks while preserving the
+  pure-NumPy reference as the certifiable baseline.
+- **Multi-robot support** — the hierarchical / group-level trust design advanced from proposal to
+  shipped capability for swarms and multi-agent coordination.
+- **Commercial integrations** — first-class Autoware / Apollo / DRIVE integration paths and a
+  managed runtime offering.
 
 ### The ask
 
-We are raising seed to evolve BCVF Autonomy Runtime from a pure-Python
-research-grade kernel with one statistically-significant validated
-configuration into a portable, multi-platform predictor-trust runtime
-that operators can adopt without giving up their existing perception/
-planning stack. The technology is live, internally tested with 166
-passing tests, and validated end-to-end on a controlled failure
-scenario with a published statistically-significant result. The
-capital is earmarked for: external design-partner pilots in adjacent
-robotics domains, ROS / Autoware / Apollo adapters, real-sensor-data
-pilots (KITTI / nuScenes), the safety-case template work required for
-SOTIF / ISO 26262 traceability, and the multi-scenario benchmark
-expansion needed to make the validated configuration claim hold across
-families beyond `S3_map_error_accel`.
+We are raising seed to evolve the Safety Runtime from an internally-tested, statistically-validated
+runtime into a **pilot-proven, certification-track product** operators adopt without giving up their
+existing perception and planning stacks. The technology is live: a proven trust invariance, a
+supervised safety posture, sensor attestation, calibration and drift management, bit-identical
+replay, ROS 2 / DDS integration, and a machine-generated certification index — all CI-pinned. The
+capital is earmarked for OEM pilots, real-sensor validation, the ISO 26262 / SOTIF certification
+work, and the first production and fleet deployments.
 
-Predictor disagreement handling is a structural gap in every modern
-multi-model autonomy stack. The next 12–24 months are the right window
-to establish a credible portable default for that layer — before the
-incumbent AV platforms calcify their proprietary in-house solutions
-into vendor-locked dependencies, and before the open-source robotics
-stacks bake decision-maker glue code into their reference modules in
-ways that are hard to displace later. We believe the combination of a
-mathematically-proven invariance, an autonomy-validated consumer
-pattern, and a pure-NumPy kernel that drops into any planner gives
-BCVF Autonomy Runtime a defensible position in that window.
+Predictor disagreement — and the safety scaffolding around it — is a structural gap in every modern
+multi-model autonomy stack. The next 12–24 months are the window to establish the portable default
+for that layer, before incumbents calcify proprietary in-house solutions into vendor lock-in and
+before open stacks bake un-certifiable glue into their reference modules. A proven invariance, a
+certifiable safety runtime around it, and a pure-NumPy kernel that drops into any planner give
+Ugence a defensible position in that window.
 
 ---
 
 *Contact: Rakesh Mohan — Ugence Labs*
-*Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/`*
-*v0.1 · 166 internal tests · autonomy-validated at sign-test p<0.01 (N=21)*
-
+*Repo: `rasaha/symbolu` · Module: `symbolu_robotics/bcvf_autonomous/` · Runtime v0.4.0*
+*Positioning: Specialized AI System · safety runtime for autonomous robotics · BCVF trust kernel + safety, integrity, operations, and certification subsystems*
