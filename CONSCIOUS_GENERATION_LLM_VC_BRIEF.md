@@ -1,6 +1,6 @@
 # Conscious Generation LLM — VC Brief
 
-**Xozence Labs — a model-agnostic semantic-control & audit layer for LLMs, with a deeper symbolic-architecture research moat**
+**Ugence Labs — a model-agnostic semantic-control & audit layer for LLMs, with a deeper symbolic-architecture research moat**
 *Updated June 2026*
 
 > **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
@@ -244,7 +244,7 @@ Every quantitative claim in this brief is reproducible from the repo. Branch:
 | Human-labeling packet exported (220 rows, leakage-checked); evaluator built + tested | `docs/CSR_SUPERVISED_OBSERVATION_PREREG.md`, `export_supervised_observation_packet.py`, `eval_supervised_observation.py`, `validate_labels.py` |
 | Deeper `mistral_cg` architecture: CG off by default, scorer lambdas 0.0, field-integrated softmax curriculum-gated | `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md`; `scripts/train_mistral_cg.sh` |
 
-*Contact: Rakesh Mohan — Xozence Labs*
+*Contact: Rakesh Mohan — Ugence Labs*
 *Repo: `rasaha/symbolu` · Validated product: `scripts/cg_wrapper_ablation/csr_match_filter/` ·
 Deeper architecture: `symbolu_training/training/conscious_generation/`, `agentic/agentic_framework/inference_mistral.py`*
 *Design & audits: `docs/design/CONSCIOUS_GENERATION_DESIGN.md` · `docs/audits/CG_MISTRAL_SIGNAL_AUDIT.md`*

@@ -1,6 +1,6 @@
 # KVPro — Investor Brief
 
-**Xozence Labs**
+**Ugence Labs**
 *Quality-safe KV-cache compression for long-context LLM serving*
 
 > This is the investor-facing brief. It states **measured results** and the **market**; it does

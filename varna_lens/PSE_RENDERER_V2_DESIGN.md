@@ -215,14 +215,14 @@ LAYER 3 — Reflection ({mode})
   - RESOLUTION · `−⤳` · a hardness that still leans toward softening
 - **L3 (Reflection):** *"This shape opens on a reaching that is asked to loosen its grip, like a hand closing on stone and then easing. It presses forward through a self that wants to act, and it ends not in stillness but on an edge — a hardness that still carries, quietly, the lean toward softening. Where in you does the grip want to hold, and where might it ease? There are no right answers; the reading is the one you bring."*
 
-### Xozence — Brand Persona  *(illustrative schematic)*
+### Ugence — Brand Persona  *(illustrative schematic)*
 - **L1 chain (schematic):** `−[seed]⤳[counter] → −[tension] → +[anchor] → ⟹[open essence]` · valence: mixed
 - **L2 trajectory:** `SOURCE → TENSION → INTEGRATION → RESOLUTION` · controlling element: **air** · tone: `turning·suspended`
   - SOURCE · `−⤳` · a sharp intake, then release
   - TENSION · `−` · a held, charged pause
   - INTEGRATION · `+` · a clean settling
   - RESOLUTION · `⟹` · an open, unresolved breath outward
-- **L3 (Brand Persona):** *"Xozence reads like a sharp intake of air that releases on a held, charged pause, then settles clean and breathes outward without quite closing. It evokes precision with an open horizon — modern, kinetic, unfinished on purpose. Tags: edge · clarity · motion · openness."*
+- **L3 (Brand Persona):** *"Ugence reads like a sharp intake of air that releases on a held, charged pause, then settles clean and breathes outward without quite closing. It evokes precision with an open horizon — modern, kinetic, unfinished on purpose. Tags: edge · clarity · motion · openness."*
 
 ### Cognade — Micro Myth  *(illustrative schematic)*
 - **L1 chain (schematic):** `−[seed] → +[anchor] → −[tension]⤳[counter] → +[anchor] ⟹[grounded essence]` · valence: liberating-leaning

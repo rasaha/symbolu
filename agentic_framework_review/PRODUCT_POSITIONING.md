@@ -61,7 +61,7 @@ So: not "one product reclassified," but "**one product split, with its control-p
 
 ### 9.2 Naming (avoid generic buzzwords)
 
-**FACT — the naming problem is real and documented:** the product is variously "Agentic Framework," "Sentinel," and shipped under "Xozence Labs"/"Ugence Labs"; the word "control plane" is used in *four* unrelated places (ACP, the framework's `policy_control_plane`, CSR's "vendor-agnostic control plane," the Cloud Controller). "Agentic Framework" is itself a generic industry term (every vendor has one).
+**FACT — the naming problem is real and documented:** the product is variously "Agentic Framework," "Sentinel," and shipped under "Ugence Labs"/"Ugence Labs"; the word "control plane" is used in *four* unrelated places (ACP, the framework's `policy_control_plane`, CSR's "vendor-agnostic control plane," the Cloud Controller). "Agentic Framework" is itself a generic industry term (every vendor has one).
 
 **RECOMMENDATION — names for the Agent Runtime product** (avoiding "framework," "platform," "AI," "agentic," "control plane"):
 

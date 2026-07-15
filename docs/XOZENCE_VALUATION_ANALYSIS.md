@@ -1,4 +1,4 @@
-# Xozence Labs — Valuation Analysis (Indicative)
+# Ugence Labs — Valuation Analysis (Indicative)
 
 **Prepared from:** `docs/XOZENCE_PITCHBOOK.md` and the supporting VC briefs
 (`INT4_PROTECTED_VC_BRIEF`, `docs/CTM_PLUS_VC_BRIEF`, `KVPro_VC_brief`, `docs/CLOUD_SCALING_CONTROLLER_VC_BRIEF`,
@@ -27,7 +27,7 @@
 
 ## 1. What is actually being valued
 
-Xozence Labs is a **pre-revenue, pre-seed / accelerator-stage** company presenting **one AI-infrastructure
+Ugence Labs is a **pre-revenue, pre-seed / accelerator-stage** company presenting **one AI-infrastructure
 platform of five composing LLM-stack modules plus two standalone verticals** (seven products total), built
 by what the documents describe as a **small / solo-founder-led team** (only Rakesh Mohan is named; stated
 immediate hire is "GTM and design-partner-facing roles").
@@ -114,7 +114,7 @@ line-item valuations.
 *Indicative ranges for pre-revenue AI-infrastructure companies, early-2026 knowledge cutoff — directional,
 not a quote.*
 
-| Comparable class | Typical post-money | Fit to Xozence |
+| Comparable class | Typical post-money | Fit to Ugence |
 |---|---|---|
 | Pre-seed AI-infra, strong technical founder, **no traction** (global/US) | ~$4–10M | Partial — strong artifact, but solo + no external proof pulls low-to-mid |
 | Pre-seed deep-tech, **India / accelerator (e.g. T-Hub-class)** | ~$1–5M | Fits the accelerator-application posture; global-facing infra can later raise a global seed |
