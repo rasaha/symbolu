@@ -1,8 +1,8 @@
 # Ugence Platform — Architecture Overview
 
 **Ugence Labs | The Governed AI Platform**
-*How six products across three layers form one architecture — not six unrelated tools.*
-*Version 1.0 — July 2026*
+*How three architectural layers containing nine platform components form one architecture — not nine unrelated tools.*
+*Version 1.1 — July 2026*
 
 > **How to read this document.** This is an architecture overview, in the spirit of an AWS or
 > NVIDIA platform document — not a marketing flyer and not a research paper. Every section answers
@@ -41,9 +41,10 @@ belong together as one platform.
 
 ## Page 2 — Platform Architecture
 
-Ugence is one platform with **three layers** and **six core products**. Four are applied AI software
-systems; two are the infrastructure substrate they run on. A cross-cutting **AI Control Plane**
-governs everything above the infrastructure.
+Ugence is one platform: **three architectural layers containing nine platform components.**
+**Specialized AI Systems** (four components) reason, steer, and execute; the **AI Control Plane**
+(three components) governs every action they propose; **AI Infrastructure** (two components) runs the
+result efficiently — and never governs.
 
 ```
                                  APPLICATIONS
@@ -100,13 +101,33 @@ but together they close a loop no single vendor closes today.
 generation happens, and drive a supervised execution loop. This layer owns the applied intelligence.
 It proposes; it never authorizes itself.
 
-It has four products in two natural groups.
+Its four components are **not flat peers** — they compose into a conceptual stack:
+
+```
+                 Hybrid LLM                 — provides reasoning
+                     │
+                     ▼
+          LLM Steering Controller           — governs how generation happens
+                     │
+             ┌───────┴───────┐
+             ▼               ▼
+       Agent Runtime   Autonomous Runtime   — consume both, then execute
+        (digital)          (physical)
+```
+
+**Hybrid LLM provides reasoning; the LLM Steering Controller governs how that generation happens; the
+two runtimes consume both** and turn the result into supervised, governed execution. This is a
+*composition order, not an ownership change* — each component still owns exactly one responsibility,
+and the runtimes remain free to run on other models. The four fall into two natural groups.
 
 ### Reasoning & steering
 
-**Hybrid LLM** — the reasoning substrate. It fuses linear, sliding-window, and binding-cache
-attention into a single long-context engine, so the platform reasons over long horizons without
-paying quadratic cost. *Its one responsibility: reasoning quality over long context.* It does not
+**Hybrid LLM** — the **shared reasoning foundation for every AI system in the platform.** It fuses
+linear, sliding-window, and binding-cache attention into a single long-context engine, so the
+platform reasons over long horizons without paying quadratic cost. It is the reasoning substrate
+beneath **both** the Agent Runtime and the Autonomous Runtime — the common foundation they build on —
+though neither is locked to it: both runtimes are model-agnostic and can run on other models where a
+deployment requires it. *Its one responsibility: reasoning quality over long context.* It does not
 route requests, execute actions, or govern them.
 
 **LLM Steering Controller** — a deterministic, model-agnostic layer that steers and audits *the act
@@ -174,12 +195,25 @@ across every runtime**. That is the AI Control Plane's job — and only its job.
    Authorized + cleared → execution
 ```
 
-- **Context Minimization** decides what context is even admissible before a decision is made — the
-  context layer for autonomous enterprise agents. It bounds *what the decision is allowed to see*.
-- **ActionGate** authorizes the *exact* action, pre-commit. Identity is bound to a content hash, so
-  what was proposed is provably what is authorized and what executes.
-- **ACP** clears an authorized action against **live operational state** — freeze windows, current
-  load, blast radius — and can hold an action that is authorized in principle but unsafe right now.
+Each control-plane component owns exactly one stage of governance:
+
+**Context Minimization**
+- *Purpose:* the context layer for autonomous enterprise agents.
+- *Responsibility:* decide what context is admissible before a decision is made — it bounds *what the
+  decision is allowed to see*.
+- *Not responsible for:* authorizing the action, or judging operational safety.
+
+**ActionGate**
+- *Purpose:* deterministic, pre-commit authorization of the exact action.
+- *Responsibility:* allow / deny / approve / escalate a single action, with identity bound to a
+  content hash — so what was proposed is provably what is authorized and what executes.
+- *Not responsible for:* generating the action, or clearing it against live state.
+
+**Autonomous Control Plane (ACP)**
+- *Purpose:* operational-safety clearance against the live world.
+- *Responsibility:* clear an authorized action against **live operational state** — freeze windows,
+  current load, blast radius — and hold an action that is authorized in principle but unsafe right now.
+- *Not responsible for:* deciding whether the action is *allowed* (that is ActionGate), or producing it.
 
 **Why governance is external.** If the same loop that *chose* an action also *approved* it, there is
 no independent check — the failure mode of every "governance baked into the framework" design. By
@@ -294,20 +328,25 @@ platform** those models and orchestrators plug into.
 
 ## Page 8 — The Ugence Flywheel
 
-The layers do not just coexist — each one makes the others better.
+The layers do not just coexist — each one makes the others better, and that technical compounding is
+also a commercial one:
 
 ```
-        Better Runtime
-              │
-              ▼
-     Better Control Plane
-              │
-              ▼
-     Better Infrastructure
-              │
-              ▼
-        Better Runtime   ──►  (repeat)
+     More customers
+          │
+          ▼
+     More governed executions
+          │
+          ▼
+     Better Runtime  ──►  Better Control Plane  ──►  Better Infrastructure
+          │                                                  │
+          │                                                  ▼
+          │                                     Lower cost + higher quality
+          │                                                  │
+          └────────────────────  More customers  ◄───────────┘
 ```
+
+The **technical** loop:
 
 - **A better runtime** produces richer, more structured action proposals (CERs) — which gives the
   **control plane** more to reason about and makes its authorization sharper.
@@ -317,9 +356,14 @@ The layers do not just coexist — each one makes the others better.
 - **Better infrastructure** makes long-context reasoning and high-throughput execution affordable —
   which lets the **runtime** plan more ambitiously and take on harder work.
 
-Every product improves the substrate the next one depends on. A competitor cloning one box inherits
+The **commercial** loop rides on the same mechanism: more customers mean more governed executions,
+which sharpen every layer, which lowers cost and raises quality — the two things that win the next
+customer. Nothing here assumes a market size or a growth rate; it only states the direction each
+improvement pushes the next.
+
+Every component improves the substrate the next one depends on. A competitor cloning one box inherits
 none of this compounding: the value is in the *governed loop*, not any single module. That is why
-the platform is defensible as a whole in a way no individual product is alone.
+the platform is defensible as a whole in a way no individual component is alone.
 
 ---
 
@@ -354,4 +398,4 @@ that stays scarce — and that every serious autonomous deployment will eventual
 
 *Ugence Labs — the governed AI platform.*
 *Specialized AI Systems · AI Control Plane · AI Infrastructure*
-*Six core products, one architecture: Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime · KVPro · Cloud Scaling Controller — governed by Context Minimization · ActionGate · Autonomous Control Plane.*
+*Nine platform components across three architectural layers, one architecture — Specialized AI Systems: Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime; AI Control Plane: Context Minimization · ActionGate · Autonomous Control Plane; AI Infrastructure: KVPro · Cloud Scaling Controller.*
