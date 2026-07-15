@@ -70,12 +70,12 @@ Each entry includes the **file path** relative to the repository root for locati
 > This contract establishes immutable governance rules for the frozen ontology substrate used by the Symbolu pipeline. The ontology files contain authoritative ground-truth data that MUST NOT be modified, inferred from, or accessed outside of designated pathways.
 
 ### `PITCH_DECK_XOZENCE_LABS.md`
-**Xozence Labs — Pitch Deck**
+**Ugence Labs — Pitch Deck**
 
-> **Xozence Labs** *Making AI Trustworthy — From Chip to Chat*
+> **Ugence Labs** *Making AI Trustworthy — From Chip to Chat*
 
 ### `STARTUP_SUMMARY_MATH_NUAGE.md`
-**Xozence Labs — Startup Summary for MATH Nuage Program**
+**Ugence Labs — Startup Summary for MATH Nuage Program**
 
 > Phase Quad LLM Model is a deterministic Augmented General Intelligence (AGI) engine that adds coherence, memory, safety, and governance layers on top of existing LLMs — making AI reliable, predictable, and enterprise-ready.
 
@@ -1061,7 +1061,7 @@ Each entry includes the **file path** relative to the repository root for locati
 > Intelligent memory offloading for DeepSpeed using CTM+ (Coherence-Tier Memory Plus).
 
 ### `CTM_plus/INVESTOR_PITCH.md`
-**Xozence: The Future of Efficient AI Computing**
+**Ugence: The Future of Efficient AI Computing**
 
 > **The Problem:** Today's AI models are economically unsustainable. A single GPT-4 query costs 10x more than traditional search. At 100K queries/day, enterprises spend $1M+ annually on inference alone. The culprit? Quadratic attention complexity (O(n²)) that explodes memory and compute costs as context grows.
 

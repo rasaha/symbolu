@@ -1,10 +1,10 @@
-# Xozence: The Future of Efficient AI Computing
+# Ugence: The Future of Efficient AI Computing
 
 ## Solving the Trillion-Dollar AI Efficiency Crisis
 
 **The Problem:** Today's AI models are economically unsustainable. A single GPT-4 query costs 10x more than traditional search. At 100K queries/day, enterprises spend $1M+ annually on inference alone. The culprit? Quadratic attention complexity (O(n²)) that explodes memory and compute costs as context grows.
 
-**Our Solution:** Xozence's Phase-Quad architecture delivers **O(n) linear complexity**—the same quality at a fraction of the cost. Combined with our CTM+ intelligent memory controller and purpose-built silicon, we enable AI deployment at scale without breaking the bank.
+**Our Solution:** Ugence's Phase-Quad architecture delivers **O(n) linear complexity**—the same quality at a fraction of the cost. Combined with our CTM+ intelligent memory controller and purpose-built silicon, we enable AI deployment at scale without breaking the bank.
 
 ---
 
@@ -130,7 +130,7 @@ Our chip architectures deliver 1000x improvements over GPU software implementati
 
 **Phase-Quad Model Results:**
 
-| Benchmark | Standard | Xozence | Advantage |
+| Benchmark | Standard | Ugence | Advantage |
 |-----------|----------|---------|-----------|
 | WikiText-103 PPL | 21.46 (355M params) | 21.46 (162M params) | **54% fewer parameters** |
 | Long-Range Arena | 65% | **100%** | Pathfinder 8K solved |
@@ -224,7 +224,7 @@ Current autonomous agents (AutoGPT, LangChain) are either dangerous (no safety g
 | Local models (standard GPU) | $6,000 | 8x A100 |
 | **Sentinel + Phase-Quad** | **$900** | **1x A100** |
 
-**Sentinel Synergy with Xozence Stack:**
+**Sentinel Synergy with Ugence Stack:**
 
 | Layer | Component | Benefit |
 |-------|-----------|---------|
@@ -351,7 +351,7 @@ items are engineering work, not measurements:
 
 ## Summary
 
-Xozence isn't incremental optimization—it's a fundamental rethinking of how AI computes attention. Our four-layer technology stack delivers enterprise AI that's economically viable at scale:
+Ugence isn't incremental optimization—it's a fundamental rethinking of how AI computes attention. Our four-layer technology stack delivers enterprise AI that's economically viable at scale:
 
 | Layer | Product | Key Benefit |
 |-------|---------|-------------|

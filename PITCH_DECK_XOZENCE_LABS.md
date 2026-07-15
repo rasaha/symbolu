@@ -1,11 +1,11 @@
-# Xozence Labs — Pitch Deck
+# Ugence Labs — Pitch Deck
 ### MATH Nuage Program | T-Hub, Telangana
 
 ---
 
 ## Slide 1: Title
 
-**Xozence Labs**
+**Ugence Labs**
 *Making AI Trustworthy — From Chip to Chat*
 
 Applying to: MATH Nuage Program (T-Hub / DST, Telangana)
@@ -29,7 +29,7 @@ AI is powerful but **broken for enterprise use**.
 
 ## Slide 3: Our Solution — The Full Stack
 
-Xozence Labs builds a **full-stack deterministic intelligence layer** — four products, one mission: make AI trustworthy at every level.
+Ugence Labs builds a **full-stack deterministic intelligence layer** — four products, one mission: make AI trustworthy at every level.
 
 ```
 ┌─────────────────────────────────────────┐
@@ -117,7 +117,7 @@ Xozence Labs builds a **full-stack deterministic intelligence layer** — four p
 
 ## Slide 9: Key Differentiators
 
-| Aspect | Xozence Labs | Typical AI Companies |
+| Aspect | Ugence Labs | Typical AI Companies |
 |--------|-------------|---------------------|
 | Approach | Deterministic, formula-based | Probabilistic, learned |
 | Scope | Full stack (chip to chat) | Single layer |
@@ -197,7 +197,7 @@ Xozence Labs builds a **full-stack deterministic intelligence layer** — four p
 
 ## Slide 16: Why MATH Nuage?
 
-| Program Offering | How Xozence Labs Benefits |
+| Program Offering | How Ugence Labs Benefits |
 |-----------------|--------------------------|
 | **Data Lake Access** | Validate ontological models against large-scale real datasets |
 | **Strategic Partners** | Enterprise pilot opportunities in BFSI and healthcare |
@@ -223,8 +223,8 @@ Phase Quad frontier LLM model aligns directly with MATH's AI/ML focus — it's i
 
 > **A world where every AI system is deterministic, governed, and trustworthy — from the chip it runs on to the chat it delivers.**
 
-**Xozence Labs — Making AI Trustworthy, From Chip to Chat.**
+**Ugence Labs — Making AI Trustworthy, From Chip to Chat.**
 
 ---
 
-*Contact: Rakesh Mohan | Xozence Labs*
+*Contact: Rakesh Mohan | Ugence Labs*

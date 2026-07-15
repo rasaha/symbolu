@@ -1,6 +1,6 @@
 # LLM Steering Controller — VC Brief
 
-**Xozence Labs — a deterministic, model-agnostic steering & audit layer for LLM generation**
+**Ugence Labs — a deterministic, model-agnostic steering & audit layer for LLM generation**
 *June 2026*
 
 > **Name (locked).** This product ships as the **LLM Steering Controller**. Its internal engine is the
@@ -254,6 +254,6 @@ moat is the auditable steering layer plus the compounding observation data on wh
 | Diagnostics are explanation-only (not wired to runtime decisions) | `scripts/cg_wrapper_ablation/csr_match_filter/{trajectory.py,guna.py}` |
 | Match-filter `MATCH = C×R×S` (multiplicative veto) **untested**, deferred | `docs/STL_CSR_REFACTOR_PLAN.md` §scope note |
 
-*Contact: Rakesh Mohan — Xozence Labs · Repo: `rasaha/symbolu`*
+*Contact: Rakesh Mohan — Ugence Labs · Repo: `rasaha/symbolu`*
 *Honesty boundary: this product is firewalled from any "decoded meaning" claim; the symbolic vocabulary
 names **designed control axes**, not demonstrated phenomena.*

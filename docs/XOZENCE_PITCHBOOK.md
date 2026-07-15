@@ -1,13 +1,13 @@
-# Xozence Labs — Platform Overview
+# Ugence Labs — Platform Overview
 
 **AI Infrastructure Platform | Five Composing Modules + Two Standalone Verticals (PSE · Robotics) | Prepared April 2026**
-*Contact: Rakesh Mohan — Xozence Labs*
+*Contact: Rakesh Mohan — Ugence Labs*
 
 ---
 
 ## Executive Summary
 
-Xozence Labs is building an **AI infrastructure platform** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
+Ugence Labs is building an **AI infrastructure platform** — the decision-quality, memory-policy, governance, and generation layers that sit between raw compute and reliable production behavior.
 
 Our thesis is that the next wave of value in AI infrastructure comes not from bigger models or faster hardware, but from **smarter decisions at the seams** — where an autoscaler decides whether to scale, where an inference engine decides which cache block to evict, where an agent decides whether to execute a tool call, and where a language model decides which token to emit next. Each of those seams is currently handled by a shallow heuristic, a single-signal policy, or no policy at all. We build the multi-signal, feedback-aware, governance-ready layers that fill those gaps.
 
@@ -17,13 +17,36 @@ Our thesis is that the next wave of value in AI infrastructure comes not from bi
 |---|---|---|---|---|
 | 1 | **KV Pro** | KV-cache optimization (eviction + compression) | Two engines: CTM+/PCAM eviction (+50% concurrent, −29% p99 vs LRU) and int4_protected/WarmTier compression (~1.8× net density, quality-safe where measured; decode throughput still < FP) — **measured independently, not yet combined** | **Eviction: production-ready (software). Compression: shipped via vLLM; throughput recovery active work** |
 | 2 | **Neural Cloud Scaling Controller** | Cloud decision quality | Stops futile scale-outs before they ship — 0 SLO regressions across 19 *simulated* scenarios; further checked on *real workload traces* (simulated system dynamics) | **Shadow + recommend mode** (built/tested); validated in simulation + real-workload-trace replay; live-shadow harness built but **not yet run on a cluster**; third-party pending |
-| 3 | **Agentic Framework** | Agent governance | Governed runtime where `cancel → budget → approve → execute` is a tested invariant, not middleware | **Pilot-ready** — v1.10.0, 1,550+ tests, 2 internal pilots |
+| 3 | **Agent Runtime** | Specialized AI System (proposer) | Stateful runtime that plans, orchestrates tools, and emits Canonical Execution Requests (CER); governance is external (AI Control Plane) | **Pilot-ready** — 1,550+ tests, 2 internal pilots; CER-native seam in progress |
 | 4 | **LLM Steering Controller** | Token / frame selection | Deterministic C×R×S frame-control + answer audit (validated near-term); multi-field token evaluation on frozen Mistral-7B as the research moat | **Mixed** — frame-control + audit validated on one open model; field-integration research-stage |
 | 5 | **PSE — Phoneme Symbolic Engine** *(standalone vertical)* | Naming / verbal identity | Deterministic naming & verbal-identity control layer — intent + constraints → reproducible, explainable, *available* name/sound-form candidates; AI authoring over the scaffold; compounding observation graph | **Engine + architecture built**; commercial surfaces (studio, observation platform, enterprise APIs) the build ahead; **standalone, does not compose with the LLM stack** |
 | 6 | **Hybrid LLM** | Long-context attention | Serial fusion of linear, local, and quadratic attention over shared phase memory — O(n) long-range, O(n·k) precision | **Research-stage** — training stack built; external benchmarks Q1 |
 | 7 | **Autonomous Robotics (BCVF)** *(standalone vertical)* | Predictor-trust arbitration | Predictor-trust runtime between a robotics stack's predictors and its planner — Lemma-1 invariance a safety case can point to | **Research prototype** — validated on synthetic + realistic-noise predictors; no production deployment; **does not compose with the LLM stack** |
 
-The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **LLM Steering Controller** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **KV Pro** keeps long context affordable on the same GPU — choosing what to keep (CTM+/PCAM eviction) and compressing what's kept (int4_protected/WarmTier) — and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Xozence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
+The modules compose vertically: the **Hybrid LLM** provides the long-context attention substrate, the **LLM Steering Controller** adds multi-field token evaluation and an interpretable internal state, the **Agentic Framework** consumes that state for signal-enriched governance, **KV Pro** keeps long context affordable on the same GPU — choosing what to keep (CTM+/PCAM eviction) and compressing what's kept (int4_protected/WarmTier) — and the **Cloud Scaling Controller** ensures the infrastructure underneath scales only when scaling actually helps. Two further products — **PSE (module 5, naming & verbal-identity control)** and **Autonomous Robotics (BCVF, module 7)** — are **standalone verticals**, not part of this vertical composition: each applies the platform's determinism/trust thesis to its own domain (sound-form decisions; a robotics planner's predictor-arbitration seam), but neither composes with the LLM stack above and both are pitched standalone. (PSE is deliberately firewalled from the §4 Steering Controller; the robotics predictor-trust "BCVF" is unrelated to the LLM-coherence "BCVF" used elsewhere in Ugence materials.) Commercialization is phased, not simultaneous — the near-term GTM question is sequencing, not whether these modules are viable. The production-ready modules enter the market first; the research-stage modules mature behind them.
+
+---
+
+## Portfolio taxonomy — three buckets
+
+The portfolio resolves into three layers with distinct roles. This is the top-level story; the
+detailed module sections below map into these buckets.
+
+| Bucket | What it does | Products |
+|---|---|---|
+| **Specialized AI Systems** | *create intelligence* | **Hybrid LLM** (long-context attention) · **CG LLM** (Conscious-Generation / interpretable state) · **Agent Runtime** (plans, orchestrates, emits CER) |
+| **AI Control Plane** | *governs its execution* | **Context Minimization** · **ActionGate** (exact-action authorization) · **Autonomous Control Plane** (operational safety). **CER** is the versioned **interface contract** between runtimes and the control plane — not a separate commercial product. |
+| **AI Infrastructure** | *operates it efficiently* | **KV Pro** (KV-cache optimization) · **Cloud Scaling Controller** (scale-decision quality) |
+
+> **Specialized AI Systems create intelligence. The AI Control Plane governs its execution. AI
+> Infrastructure operates it efficiently.**
+
+Two further products — **PSE** (naming / verbal-identity) and **Autonomous Robotics (BCVF)** — are
+**standalone verticals** that apply the platform's determinism/trust thesis to their own domains and
+do not compose with the LLM stack. The **Agent Runtime** is the **native reference producer** for the
+**AI Control Plane**; third-party runtimes can also emit CER via an adapter. Authoritative
+positioning for the runtime and the control plane lives in `AGENTIC_FRAMEWORK_VC_BRIEF.md` and
+`AI_CONTROL_PLANE_VC_BRIEF.md`.
 
 ---
 
@@ -31,7 +54,7 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 
 1. [KV Pro — Quality-Safe KV-Cache Optimization](#1-kv-pro--quality-safe-kv-cache-optimization-for-long-context-llm-serving)
 2. [Neural Cloud Scaling Controller](#2-neural-cloud-scaling-controller)
-3. [Agentic Framework — Governed Runtime for Autonomous AI Agents](#3-agentic-framework--governed-runtime-for-autonomous-ai-agents)
+3. [Agent Runtime — Planning, Orchestration, and Governable Execution Proposals](#3-agent-runtime--planning-orchestration-and-governable-execution-proposals)
 4. [LLM Steering Controller](#4-llm-steering-controller)
 5. [PSE — Phoneme Symbolic Engine (Naming / Verbal-Identity Control) — *standalone vertical*](#5-pse--phoneme-symbolic-engine)
 6. [Hybrid LLM — Algorithmic Fusion of Attention Mechanisms](#6-hybrid-llm--algorithmic-fusion-of-attention-mechanisms)
@@ -44,7 +67,7 @@ The modules compose vertically: the **Hybrid LLM** provides the long-context att
 # 1. KV Pro — Quality-Safe KV-Cache Optimization for Long-Context LLM Serving
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**KV Pro is Xozence Labs' KV-cache optimization product line for long-context LLM serving.** It attacks the KV bottleneck from two sides with two complementary engines: **CTM+/PCAM** for intelligent eviction (*choose what to keep*), and **int4_protected / WarmTier** for protected compression and tiering (*store what you keep more efficiently*). PCAM decides which KV entries remain valuable; int4_protected/WarmTier reduces the footprint of retained KV and enables reuse/tiering.
+**KV Pro is Ugence Labs' KV-cache optimization product line for long-context LLM serving.** It attacks the KV bottleneck from two sides with two complementary engines: **CTM+/PCAM** for intelligent eviction (*choose what to keep*), and **int4_protected / WarmTier** for protected compression and tiering (*store what you keep more efficiently*). PCAM decides which KV entries remain valuable; int4_protected/WarmTier reduces the footprint of retained KV and enables reuse/tiering.
 
 > **Reading note.** *KV Pro* is the **product line**; it wraps **two complementary engines**, covered together in this section: the **eviction engine** (CTM+ scoring spec + PCAM vLLM runtime) and the **compression / tiering engine** (int4_protected codec + WarmTier snapshot/restore). The two are **measured independently** today and are **architecturally complementary but not yet benchmarked as a single integrated stack** (§1.4). Full per-engine detail: `docs/CTM_PLUS_VC_BRIEF.md` (eviction) · `INT4_PROTECTED_VC_BRIEF.md` (compression).
 
@@ -644,30 +667,43 @@ This isn't a research prototype. It's been staged, tested, and written to be dep
 
 We are the **decision-quality layer** for cloud autoscaling — the missing piece between "what's happening" and "what should we do about it." The product is validated in simulation and real-trace replay (the live-cluster run is built but not yet executed, §2.4), and genuinely easy to try: shadow mode has zero write permissions and auto-generates a proof-of-value report, which means any platform team can turn it on, watch for two weeks, and see exactly which futile scale-outs it would have caught — without taking on any risk.
 
-The near-term path is Stage 5 (active mode), first design-partner deployments, and the learning loop that turns every customer into a self-improving control surface. This module is one of Xozence's most commercially ready wedges.
+The near-term path is Stage 5 (active mode), first design-partner deployments, and the learning loop that turns every customer into a self-improving control surface. This module is one of Ugence's most commercially ready wedges.
 
 > *"Scale because it works, not because the metrics say so."*
 
 ---
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-# 3. Agentic Framework — Governed Runtime for Autonomous AI Agents
+# 3. Agent Runtime — Planning, Orchestration, and Governable Execution Proposals
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 
-**Governed Runtime for Autonomous AI Agents** — v1.10.0
+**Agent Runtime** — a stateful autonomous runtime that plans work, coordinates tools, and emits
+Canonical Execution Requests (CER) for deterministic governance.
+
+> **Repositioned (July 2026).** This module was formerly framed as "Agentic Framework — Governed
+> Runtime." The proven architecture separates generation from governance: the **runtime proposes**
+> and orchestrates; **CER** normalizes the requested actuation; **ActionGate** authorizes it; **ACP**
+> clears operational safety; the result returns to the runtime for observation, memory, and
+> reflection. Final governance lives in the **AI Control Plane**, not the runtime. The authoritative,
+> up-to-date positioning is `AGENTIC_FRAMEWORK_VC_BRIEF.md` (Agent Runtime) and
+> `AI_CONTROL_PLANE_VC_BRIEF.md`. The competitive detail below is retained for reference and is being
+> migrated to the proposer/governor framing; where it says the runtime *owns* authorization, read
+> that as **the AI Control Plane owns authorization; the runtime produces the request**.
 
 ## 3.1 The Problem
 
-### Enterprises want autonomous agents. Governance is blocking deployment.
+### Generation and governance are improperly coupled.
 
-The last 18 months produced a wave of agent frameworks — LangChain,
+The last two years produced a wave of agent runtimes — LangChain,
 LangGraph, CrewAI, AutoGen, AWS Bedrock Agents, Vertex AI Agent Builder.
-They have made it straightforward to wire an LLM to a tool-calling loop.
-What remains genuinely hard is the layer between *"the model decided to
-act"* and *"the action executed against a production system"* — the
-governance, approval, budget, and audit layer that regulated buyers
-require before an autonomous agent can be put in front of customers,
-money, or infrastructure.
+They made it straightforward to wire an LLM to a tool-calling loop. But each
+combines planning, tool selection, policy checks, and execution in one
+framework-specific loop, exposing a different action representation and
+enforcement seam — so enterprises cannot govern actions **consistently across
+runtimes**. The Agent Runtime instead creates structured, evidence-rich
+execution requests (CER) and lets an external control plane decide whether and
+how they execute.
 
 In enterprise pilots we and our design partners have observed, four
 questions consistently come up early — and most current frameworks
@@ -955,7 +991,7 @@ but not yet established at statistical power; **RESEARCH** = open question, off 
   boundary
 - First-party retrieval adapter with coherence-scored provenance
 - Phase Quad LLM integration as a first-class CG adapter, enabling
-  signal-enriched governance by default for Xozence customers
+  signal-enriched governance by default for Ugence customers
 
 **Quarter 4 — Scale and certification**
 - Begin SOC 2 Type II process on the managed runtime
@@ -1743,7 +1779,7 @@ accelerators for this work.
 > **safety-critical autonomy** (AV / drone / mobile-robot / humanoid), not LLM serving. It does **not** compose with the LLM
 > stack — and an internal probe found the math does **not** transfer to LLM trust routing (clean null,
 > AUC ≈ 0.48–0.53). The predictor-trust "BCVF" here is unrelated to the LLM-coherence "BCVF" used elsewhere in
-> Xozence materials. Full brief: `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`; dependency map:
+> Ugence materials. Full brief: `AUTONOMOUS_ROBOTICS_VC_BRIEF_V2.md`; dependency map:
 > `AUTONOMOUS_ROBOTICS_DEPENDENCY_MAP.md`.
 
 ## 6.1 The Problem
@@ -1799,7 +1835,7 @@ ROS 2 install, target hardware, design-partner engagement — not open research.
 
 ## How the Platform Composes
 
-Xozence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others (modules 5 (PSE) and 7 (Autonomous Robotics) are **standalone verticals** pitched separately — they share the determinism / trust-at-a-seam thesis but sit outside this LLM-stack composition):
+Ugence Labs is not five unrelated projects — it is **one AI infrastructure platform with five differentiated modules**, where each layer feeds the others (modules 5 (PSE) and 7 (Autonomous Robotics) are **standalone verticals** pitched separately — they share the determinism / trust-at-a-seam thesis but sit outside this LLM-stack composition):
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -1847,7 +1883,7 @@ Each module is independently deployable and independently valuable. Initial comm
 | **PSE — Phoneme Symbolic Engine** *(standalone vertical)* | Engine + architecture built; commercial surfaces pending | Naming / sonic-branding wedge; observation platform; trajectory-schema standard |
 | **Autonomous Robotics (BCVF)** *(standalone vertical)* | Research prototype; validated on synthetic + realistic-noise; no production deployment | nuScenes pilot + first design partner; Series-A gate = one production reference |
 
-## Why Xozence for This Accelerator
+## Why Ugence for This Accelerator
 
 **The platform thesis is coherent.** The five modules compose into a single vertical stack, share common architectural patterns (multi-signal scoring, phase-aware state, spec-and-runtime separation), and reinforce each other's competitive position. They are one thesis — smarter decisions at the seams — applied at five layers of the AI infrastructure stack, not five independent bets. Two further products — **PSE** (naming / verbal-identity control) and **Autonomous Robotics** (predictor-trust) — extend the same determinism / trust-at-a-seam thesis into adjacent domains, pitched as standalone verticals rather than part of the LLM-stack composition.
 
@@ -1871,11 +1907,11 @@ Each module is independently deployable and independently valuable. Initial comm
 
 ## What Success Looks Like in 6–12 Months
 
-**Why now:** Every layer of AI infrastructure that Xozence addresses — autoscaling decision quality, KV-cache eviction, agent governance, token-selection quality, long-context attention — is under active pressure from the shift to larger models, longer contexts, and more autonomous agents. These are not future problems; they are problems that production teams are spending engineering time on today with inadequate tooling.
+**Why now:** Every layer of AI infrastructure that Ugence addresses — autoscaling decision quality, KV-cache eviction, agent governance, token-selection quality, long-context attention — is under active pressure from the shift to larger models, longer contexts, and more autonomous agents. These are not future problems; they are problems that production teams are spending engineering time on today with inadequate tooling.
 
 **Why this team:** The execution evidence speaks for itself: **4,300+ tests** across the platform and the two standalone verticals, adversarial safety validation, a robotics baseline-shootout win under a published mathematical invariance, and production-grade implementations spanning cloud infrastructure, LLM inference, agent governance, model architecture, safety-critical autonomy, and verbal-identity control. The platform reflects unusual cross-layer technical range, and the shared architectural patterns across modules suggest that the breadth is disciplined rather than scattered. The immediate hiring priority is GTM and design-partner-facing roles.
 
-**Why this accelerator:** Xozence's primary bottleneck is not technology — it is access to the enterprise design partners, pilot validation infrastructure, and GTM mentorship that convert internally validated technology into externally validated commercial products. An accelerator with a strong enterprise network and infrastructure-company experience is the highest-leverage intervention at this stage.
+**Why this accelerator:** Ugence's primary bottleneck is not technology — it is access to the enterprise design partners, pilot validation infrastructure, and GTM mentorship that convert internally validated technology into externally validated commercial products. An accelerator with a strong enterprise network and infrastructure-company experience is the highest-leverage intervention at this stage.
 
 **Concrete 6–12 month goals:**
 
@@ -1885,5 +1921,5 @@ Each module is independently deployable and independently valuable. Initial comm
 
 ---
 
-*Contact: Rakesh Mohan — Xozence Labs*
+*Contact: Rakesh Mohan — Ugence Labs*
 *Repo: `rasaha/symbolu`*
