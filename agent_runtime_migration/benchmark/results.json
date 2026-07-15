@@ -1,0 +1,179 @@
+{
+  "all_executions_ok": true,
+  "all_status_ok": true,
+  "governance_boundary_violations": 0,
+  "intended_differences": [
+    "runtime no longer owns authoritative allow/deny; the AI Control Plane decides eligibility",
+    "governed tools run only via the governed executor on a control-plane execution reference",
+    "approvals bind in ActionGate, not the runtime; the runtime only requests human input",
+    "uncertainty signals are advisory (may raise scrutiny, never authorize)",
+    "research-signal governance (CG/JEPA/vritti/sovereign) is absent from the production runtime"
+  ],
+  "repository_impact": {
+    "acp_lines_changed": 0,
+    "actiongate_lines_changed": 0,
+    "cer_lines_changed": 0,
+    "legacy_package_loc_untouched": 68097,
+    "legacy_package_modules_untouched": 131,
+    "new_package_loc": 2446,
+    "new_package_modules": 69
+  },
+  "runtime": "agent_runtime_migration",
+  "scenarios": [
+    {
+      "boundary_violation": false,
+      "cer_digests": [],
+      "executions_ok": true,
+      "expected_status": "completed",
+      "expected_tool_executions": 1,
+      "governed": false,
+      "memory_count": 1,
+      "scenario": "read_only_research",
+      "status": "completed",
+      "status_ok": true,
+      "tool_executions": 1,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [],
+      "executions_ok": true,
+      "expected_status": "completed",
+      "expected_tool_executions": 3,
+      "governed": false,
+      "memory_count": 3,
+      "scenario": "multi_step_workflow",
+      "status": "completed",
+      "status_ok": true,
+      "tool_executions": 3,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [
+        "07f7a6aaf20a55a8"
+      ],
+      "executions_ok": true,
+      "expected_status": "completed",
+      "expected_tool_executions": 1,
+      "governed": true,
+      "memory_count": 1,
+      "scenario": "kubernetes_scale_proceed",
+      "status": "completed",
+      "status_ok": true,
+      "tool_executions": 1,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [
+        "de61725e43f9b441"
+      ],
+      "executions_ok": true,
+      "expected_status": "completed",
+      "expected_tool_executions": 1,
+      "governed": true,
+      "memory_count": 1,
+      "scenario": "database_mutation_proceed",
+      "status": "completed",
+      "status_ok": true,
+      "tool_executions": 1,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [
+        "42fa57aeb3edcb61"
+      ],
+      "executions_ok": true,
+      "expected_status": "stopped",
+      "expected_tool_executions": 0,
+      "governed": true,
+      "memory_count": 1,
+      "scenario": "denied_action",
+      "status": "stopped",
+      "status_ok": true,
+      "tool_executions": 0,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [
+        "de61725e43f9b441"
+      ],
+      "executions_ok": true,
+      "expected_status": "awaiting_human",
+      "expected_tool_executions": 0,
+      "governed": true,
+      "memory_count": 1,
+      "scenario": "acp_operational_hold",
+      "status": "awaiting_human",
+      "status_ok": true,
+      "tool_executions": 0,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [],
+      "executions_ok": true,
+      "expected_status": "stopped",
+      "expected_tool_executions": 0,
+      "governed": false,
+      "memory_count": 1,
+      "scenario": "execution_failure",
+      "status": "stopped",
+      "status_ok": true,
+      "tool_executions": 0,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [],
+      "executions_ok": true,
+      "expected_status": "cancelled",
+      "expected_tool_executions": 0,
+      "governed": false,
+      "memory_count": 0,
+      "scenario": "cancellation",
+      "status": "cancelled",
+      "status_ok": true,
+      "tool_executions": 0,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [
+        "de61725e43f9b441"
+      ],
+      "executions_ok": true,
+      "expected_status": "awaiting_human",
+      "expected_tool_executions": 0,
+      "governed": true,
+      "memory_count": 1,
+      "scenario": "human_intervention",
+      "status": "awaiting_human",
+      "status_ok": true,
+      "tool_executions": 0,
+      "trace_complete": true
+    },
+    {
+      "boundary_violation": false,
+      "cer_digests": [
+        "42fa57aeb3edcb61"
+      ],
+      "executions_ok": true,
+      "expected_status": "completed",
+      "expected_tool_executions": 0,
+      "governed": true,
+      "memory_count": 1,
+      "scenario": "observe_reflect_replan",
+      "status": "completed",
+      "status_ok": true,
+      "tool_executions": 0,
+      "trace_complete": true
+    }
+  ],
+  "scenarios_executions_ok": 10,
+  "scenarios_status_ok": 10,
+  "scenarios_total": 10
+}
