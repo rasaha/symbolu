@@ -66,3 +66,41 @@ thresholds. Nothing in the evaluation needs to change.
 `FACT`. Branch `claude/agentic-framework-architecture-review-v1qmrd`. Blocked host reported:
 `api.mistral.ai` (403, egress policy). 74 migration tests still pass; legacy runtime, ActionGate, ACP,
 CER unchanged.
+
+---
+
+## Addendum — Second resume attempt (owner reports Mistral configured)
+
+`FACT`. Triggered by "the environment owner has now configured the real Mistral endpoint and key"
+(provider openai-compatible, model `mistral-small-latest`, base `https://api.mistral.ai/v1`). Resolved
+**only** via the frozen `build_live_model_from_env()`. Evidence:
+`model/fixtures/phase3_resume2_probe.json`.
+
+**Result: the configuration is NOT visible to this session's process → `BLOCKED_NO_REAL_MODEL`.**
+- `build_live_model_from_env()` → `None` (also under a login shell).
+- No `RUNTIME_MODEL_PROVIDER` / `RUNTIME_MODEL_ID` / `RUNTIME_MODEL_BASE_URL` / `OPENAI_API_KEY` /
+  `MISTRAL_API_KEY` set in this process; no `.env`/config file present.
+- Steps 1 and 4 of the resume instruction apply: the resolver did not return a live adapter, so **no
+  minimal Mistral request was attempted** — stop and report the sanitized error (no genuine model
+  response). No credential was fabricated, self-set, or repurposed; no frozen artifact was modified.
+
+### Config bug found in the expected setup (fix required, not a runtime change)
+`FACT`. For `provider=openai` the **frozen** adapter POSTs to
+`{RUNTIME_MODEL_BASE_URL}/v1/chat/completions`. The expected base `https://api.mistral.ai/v1` would
+yield `https://api.mistral.ai/v1/v1/chat/completions` (**double `/v1` → 404**). The correct value is:
+```
+RUNTIME_MODEL_BASE_URL=https://api.mistral.ai      # NO trailing /v1
+```
+
+### To make the config reach this session (env owner)
+Export these in the **session's** process environment (the values must be present where the runner
+runs, not only in a separate config store), then re-run:
+```
+RUNTIME_MODEL_PROVIDER=openai
+RUNTIME_MODEL_BASE_URL=https://api.mistral.ai       # not .../v1
+RUNTIME_MODEL_ID=mistral-small-latest
+OPENAI_API_KEY=<the Mistral key>                    # adapter reads OPENAI_API_KEY for provider=openai
+python -m agent_runtime_migration.benchmark.real_model_eval --json .../phase3_real_model_results.json
+```
+Also required: `api.mistral.ai` allowlisted in the egress policy (it returned 403 in the prior probe).
+Verdicts are unchanged from Phase 3 until the runner reports `"status": "EVALUATED"` with real numbers.
