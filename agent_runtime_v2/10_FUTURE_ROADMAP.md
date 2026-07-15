@@ -46,7 +46,7 @@ Labels: `FACT` (current state) / `RECOMMENDATION` (planned work). Sequencing rat
 |---|---|---|
 | **6–12 mo** | **KVPro** under the runtime's model calls (drop-in vLLM backend path, FACT) | Cut serving cost for reasoning-heavy loops (many LLM calls per task) |
 | **9–15 mo** | **Hybrid LLM** as a first-class long-context model option in `llm_adapters` | Better long-context reasoning for IT-ops/healthcare workflows |
-| **12–18 mo** | **CG LLM** as an optional generation-control + answer-audit layer (advisory, not governance) | Frame control + audit for regulated domains; the 32-D signal is *evidence*, not a gate (FACT: falsified as governance) |
+| **12–18 mo** | **LLM Steering Controller** as an optional generation-control + answer-audit layer (advisory, not governance) | Frame control + audit for regulated domains; the 32-D signal is *evidence*, not a gate (FACT: falsified as governance) |
 | **15–24 mo** | **Cloud Scaling Controller** scales the runtime's own serving fleet — itself governed by ACP (FACT: ACP already consumes `cloud_controller`) | Closed loop: the platform scales and governs itself |
 
 ---
@@ -57,8 +57,11 @@ Labels: `FACT` (current state) / `RECOMMENDATION` (planned work). Sequencing rat
         0────3────6────9────12───15───18───24────────30────────36 (months)
 Core    │truth│dedup│durable│OTel │identity/registry│  multi-agent → hierarchical
 CtrlP   │           │proposal│AGClient│verdicts│CMClient│approval│runtime-agnostic│domain adapters
-Infra   │                    │KVPro   │HybridLLM │CG LLM  │CSC self-scaling
+Spec'd  │                    │        │HybridLLM │Steering│
+Infra   │                    │KVPro   │          │        │CSC self-scaling
 ```
+
+> Rows map to canonical families — **Spec'd** = Specialized AI Systems (Hybrid LLM · LLM Steering Controller); **CtrlP** = AI Control Plane; **Infra** = AI Infrastructure (KVPro · Cloud Scaling Controller). Canonical taxonomy: `UGENCE_PLATFORM_OVERVIEW.md`.
 
 ---
 

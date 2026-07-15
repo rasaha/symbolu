@@ -10,13 +10,15 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
 
 | Family | Products | What the family sells |
 |---|---|---|
-| **Specialized AI Systems** | Hybrid LLM · CG LLM · **Agent Runtime** | Applied intelligence — models and agents that *do the work* |
+| **Specialized AI Systems** | Hybrid LLM · LLM Steering Controller · **Agent Runtime** · Autonomous Runtime | Applied intelligence — models and agents that *do the work* |
 | **AI Control Plane** | Context Minimization · ActionGate · Autonomous Control Plane (ACP) | Deterministic governance — *what is allowed, authorized, and safe* |
 | **AI Infrastructure** | KVPro · Cloud Scaling Controller | Efficiency substrate — *making inference cheap, fast, and scalable* |
 
+> **Canonical taxonomy:** the definitive Ugence platform architecture is `UGENCE_PLATFORM_OVERVIEW.md`.
+
 **FACT — each product, from its own brief:**
 - **Hybrid LLM** (`HYBRID_LLM_VC_BRIEF.md`): `HybridPhaseTransformer` — algorithmic *fusion* of linear + sliding-window + binding-cache attention; a long-context attention substrate.
-- **CG LLM / Conscious Generation** (`CONSCIOUS_GENERATION_LLM_VC_BRIEF.md`): a "model-agnostic semantic-control layer for LLMs that improves answer framing, reduces semantic drift, and audits generated responses — without modifying model weights" (C×R×S), with a deeper 32-D symbolic-generation research moat. (This subsumes the CSR/CRS steering engine.)
+- **LLM Steering Controller** (Conscious Generation engine; `CONSCIOUS_GENERATION_LLM_VC_BRIEF.md`): a "model-agnostic semantic-control layer for LLMs that improves answer framing, reduces semantic drift, and audits generated responses — without modifying model weights" (C×R×S), with a deeper 32-D symbolic-generation research moat. (This subsumes the CSR/CRS steering engine.)
 - **Agent Runtime** (this design): governed single-agent→hierarchical reasoning + workflow-execution runtime that proposes to the Control Plane.
 - **Context Minimization** (`CONTEXT_MINIMIZATION_VC_BRIEF.md`): deterministic authorization-preserving context compression.
 - **ActionGate** (`ACTIONGATE_VC_BRIEF.md`): deterministic pre-commit authorization; grants one exact action, once.
@@ -32,7 +34,7 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
 
 - **Agent Runtime** — *"The agent that proposes; the Control Plane disposes."* A model-agnostic runtime that turns a goal into a reasoned, reflected, tool-using workflow — and routes every consequential action through the AI Control Plane for authorization and safety. It owns intelligence and execution, never authority.
 - **Hybrid LLM** — *"One attention mechanism that retrieves globally, attends locally, and scales linearly — by fusion, not stacking."* The long-context model substrate.
-- **CG LLM** — *"Control the meaning-frame the model answers in, and audit every answer — on any model, no weight changes."* The generation-control + audit layer.
+- **LLM Steering Controller** — *"Control the meaning-frame the model answers in, and audit every answer — on any model, no weight changes."* The generation-control + audit layer.
 - **Context Minimization** — *"Remove only what the decision provably doesn't need."* Deterministic, authorization-preserving context reduction.
 - **ActionGate** — *"Authorize one exact action, once."* The deterministic pre-commit authority.
 - **ACP** — *"Is this safe against live state right now?"* The deterministic operational-safety runtime, cross-domain.
@@ -50,7 +52,7 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
                  │        │                                     │ generation on   │
                  │        │ uses a model:                       ▼                 │
                  │        │   HYBRID LLM (long-context substrate)                 │
-                 │        │   + CG LLM (frame control + answer audit)             │
+                 │        │   + LLM Steering Controller (frame control + audit)   │
                  │        │                                                       │
                  │        │ builds an Execution Proposal (+risk/uncertainty)      │
                  └────────┼───────────────────────────────────────────────────────┘
@@ -70,7 +72,7 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
 ```
 
 **FACT-anchored interaction points:**
-- **Runtime → Hybrid LLM / CG LLM.** The runtime is model-agnostic (FACT: `llm_adapters` for OpenAI/Anthropic/Mistral + `MistralCGAdapter`). It can run on Hybrid LLM (better long-context) and enrich generation with CG LLM (frame control + the 32-D signal — now *advisory* per the falsification finding, useful as evidence not governance).
+- **Runtime → Hybrid LLM / LLM Steering Controller.** The runtime is model-agnostic (FACT: `llm_adapters` for OpenAI/Anthropic/Mistral + `MistralCGAdapter`). It can run on Hybrid LLM (better long-context) and enrich generation with the LLM Steering Controller (frame control + the 32-D signal — now *advisory* per the falsification finding, useful as evidence not governance).
 - **Runtime → Control Plane.** The Execution Proposal (Deliverable 3) is the single seam. Context Minimization optionally compresses the runtime's context; ActionGate authorizes; ACP safety-checks.
 - **Control Plane → Infrastructure.** ACP already *consumes* the Cloud Scaling Controller as its cloud operational-safety evaluator (FACT: `acp/AI_CONTROL_PLANE_ARCHITECTURE.md` — "ACP (frozen core + cloud_controller)"). KVPro sits under all model inference.
 - **Infrastructure is beneath everything.** KVPro reduces serving cost for every model call the runtime makes; the Cloud Scaling Controller scales the serving fleet — itself governed by ACP.
@@ -82,11 +84,11 @@ Labels: `FACT` (from the product's own brief) / `INTERPRETATION` / `RECOMMENDATI
 ## 4. Why the Agent Runtime belongs in Specialized AI Systems (not the other families)
 
 **FACT-anchored:**
-- **Not AI Infrastructure.** It is not compute/memory/attention/serving plumbing (that is KVPro / Hybrid LLM's substrate / Cloud Controller). It is an applied system built *on top of* infrastructure.
+- **Not AI Infrastructure.** It is not compute/memory/attention/serving plumbing (that is KVPro / Cloud Scaling Controller). It is an applied system built *on top of* infrastructure.
 - **Not AI Control Plane.** The prior review established it is probabilistic, threshold-based, and its authorization parts duplicate ActionGate; reclassifying it there re-introduces the exact overlap the Control Plane forbids.
-- **It is a Specialized AI System** — an applied, probabilistic system that produces intelligence and executes workflows, siblings to the two model products (Hybrid LLM, CG LLM). Where those two make *a better model*, the Agent Runtime makes *a better agent from any model*.
+- **It is a Specialized AI System** — an applied, probabilistic system that produces intelligence and executes workflows, siblings to the model + steering products (Hybrid LLM, LLM Steering Controller). Where those two make *a better model*, the Agent Runtime makes *a better agent from any model*.
 
-**INTERPRETATION.** The three Specialized AI Systems form a natural sub-stack: **Hybrid LLM** (the substrate) → **CG LLM** (generation control on the substrate) → **Agent Runtime** (agency on top). This mirrors the pitchbook's own vertical-composition claim (FACT: `docs/XOZENCE_PITCHBOOK.md` — "Hybrid LLM → Steering/CG → Agentic Framework consumes state for governance").
+**INTERPRETATION.** The three Specialized AI Systems form a natural sub-stack: **Hybrid LLM** (the substrate) → **LLM Steering Controller** (generation control on the substrate) → **Agent Runtime** (agency on top). This mirrors the pitchbook's own vertical-composition claim (FACT: `docs/XOZENCE_PITCHBOOK.md` — "Hybrid LLM → Steering/CG → Agentic Framework consumes state for governance").
 
 ---
 

@@ -3,9 +3,11 @@
 **Ugence Labs | `HybridPhaseTransformer` — Algorithmic Fusion of Linear, Sliding-Window, and Binding-Cache Attention**
 *Prepared April 2026*
 
-> **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
-> products share elements of the same symbolic-control patent architecture, but each brief describes a
-> distinct product boundary, validation state, and commercialization path.
+> **Product family.** Hybrid LLM is a **Specialized AI System** in the Ugence Labs platform — the
+> long-context reasoning substrate, sibling to the LLM Steering Controller, Agent Runtime, and
+> Autonomous Runtime. The canonical platform architecture is defined in `UGENCE_PLATFORM_OVERVIEW.md`.
+> (This product also traces to the broader SymbolU / Conscious Generation research lineage; each brief
+> describes a distinct product boundary, validation state, and commercialization path.)
 
 ---
 

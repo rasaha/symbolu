@@ -5,10 +5,11 @@
 *Version 2.1.0 — Refined July 2026 (external / evidence-based)*
 
 > **Product family.** The Agent Runtime is a **Specialized AI System** in the Ugence Labs
-> portfolio, which spans three layers: **Specialized AI Systems** (this runtime), the
+> portfolio, which spans three layers: **Specialized AI Systems** (Hybrid LLM · LLM Steering Controller · Agent
+> Runtime · Autonomous Runtime — this runtime is one of them), the
 > **AI Control Plane** (Context Minimization · ActionGate · Autonomous Control Plane — its own
-> product, `AI_CONTROL_PLANE_VC_BRIEF.md`), and **AI Infrastructure** (Hybrid LLM, KVPro, cloud
-> infrastructure). The runtime is the **native reference producer** for the Control Plane. This
+> product, `AI_CONTROL_PLANE_VC_BRIEF.md`), and **AI Infrastructure** (KVPro · Cloud Scaling Controller — canonical taxonomy in
+> `UGENCE_PLATFORM_OVERVIEW.md`). The runtime is the **native reference producer** for the Control Plane. This
 > document positions the runtime; it does **not** carry the Control Plane story, and the two
 > products are **not** merged.
 

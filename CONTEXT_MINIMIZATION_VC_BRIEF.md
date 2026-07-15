@@ -3,8 +3,9 @@
 **Ugence Labs | The Context Layer for Autonomous Enterprise Agents**
 *Version 1.0.0 — Updated July 2026 (external / evidence-based)*
 
-> **Product family.** ActionGate Context Minimization is part of the Ugence Labs
-> autonomous-systems portfolio. It is a *complementary* product to the ActionGate
+> **Product family.** ActionGate Context Minimization is part of the **AI Control Plane** in the
+> Ugence Labs platform (canonical taxonomy in `UGENCE_PLATFORM_OVERVIEW.md`). It is a *complementary*
+> product to the ActionGate
 > authorization engine, not the same product, and the two have separate
 > responsibilities: **ActionGate decides whether an agent's action may commit;
 > Context Minimization shrinks the *context* an agent reads before it ever gets

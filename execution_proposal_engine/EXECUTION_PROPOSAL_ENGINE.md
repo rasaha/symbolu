@@ -133,10 +133,10 @@ See `UNIVERSAL_RUNTIME_AUDIT.md` for the full per-framework table. Summary verdi
 
 **Is `Specialized AI Systems → Execution Proposal → AI Control Plane → AI Infrastructure` a cleaner story?**
 
-**RECOMMENDATION — yes, with one addition: make the Execution Proposal an explicit, named seam, and show the return path.** The three-family taxonomy is sound (`FACT`: consistent with `../agent_runtime_v2/07` and `../ai_control_plane_v3/09`). The Execution Proposal is the *interface* between family 1 and family 2, and naming it is what turns "a collection of products" into "a platform with a contract."
+**RECOMMENDATION — yes, with one addition: make the Execution Proposal an explicit, named seam, and show the return path.** The three-family taxonomy is sound (`FACT`: consistent with `../agent_runtime_v2/07` and `../ai_control_plane_v3/09`). The Execution Proposal is the *interface* between family 1 and family 2, and naming it is what turns "a collection of products" into "a platform with a contract." (Canonical portfolio taxonomy: `UGENCE_PLATFORM_OVERVIEW.md`.)
 
 ```
-   Specialized AI Systems  (Hybrid LLM · CG LLM · Agent Runtime · future)
+   Specialized AI Systems  (Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime · future)
             │  emit
             ▼
    ══════ EXECUTION PROPOSAL (open contract) ══════

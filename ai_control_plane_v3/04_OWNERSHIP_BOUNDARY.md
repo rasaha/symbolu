@@ -1,6 +1,6 @@
 # Part 4 — Ownership Boundary
 
-The definitive three-tier ownership matrix for a runtime-agnostic platform: **Runtime** owns intelligence + execution, **Control Plane** owns governance, **Infrastructure** owns efficiency + scale. Every responsibility has exactly one owner. No overlap.
+The definitive three-tier ownership matrix for a runtime-agnostic platform: **Runtime** owns intelligence + execution, **Control Plane** owns governance, **Infrastructure** owns efficiency + scale. Every responsibility has exactly one owner. No overlap. (Canonical portfolio taxonomy: `UGENCE_PLATFORM_OVERVIEW.md`.)
 
 Labels: `FACT` (repo evidence) · `RECOMMENDATION`. This extends `../agent_runtime_v2/06_RUNTIME_VS_CONTROL_PLANE_OWNERSHIP.md` to the runtime-agnostic case (any runtime, not only Ugence's).
 
@@ -31,7 +31,7 @@ Labels: `FACT` (repo evidence) · `RECOMMENDATION`. This extends `../agent_runti
 | 19 | Verdict composition / eligibility | **Control Plane (Composition)** | FACT: `composition.py`, 8 classes |
 | 20 | World-state modeling per domain | **Control Plane (ACP domain adapter)** | FACT: `WorldStateProvider` (`interfaces.py:24–36`) |
 | 21 | Infrastructure rollback (single action) | **Control Plane (ACP)** | FACT: rollback-availability gating |
-| 22 | Model inference (long-context / semantic control) | **Infrastructure/Specialized** (Hybrid LLM, CG LLM) | model substrate |
+| 22 | Model inference (long-context / semantic control) | **Specialized** (Hybrid LLM, LLM Steering Controller) | model substrate |
 | 23 | KV-cache efficiency | **Infrastructure (KVPro)** | FACT: drop-in vLLM path |
 | 24 | Serving autoscaling (safety-gated) | **Infrastructure (Cloud Scaling Controller)** — itself governed by ACP | FACT: ACP consumes `cloud_controller` |
 | 25 | Reasoning trace / runtime telemetry export | **Runtime** | distinct from ActionGate's decision audit |

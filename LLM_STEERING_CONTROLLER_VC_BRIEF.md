@@ -9,6 +9,10 @@
 > intelligence and does not decode meaning. This brief supersedes the framing in
 > `CONSCIOUS_GENERATION_LLM_VC_BRIEF.md` for this product boundary; the deeper multi-field research
 > architecture is referenced, not re-pitched, here.
+>
+> **Product family.** The LLM Steering Controller is a **Specialized AI System** in the Ugence Labs
+> platform (sibling to Hybrid LLM, Agent Runtime, and Autonomous Runtime). The canonical platform
+> architecture is defined in `UGENCE_PLATFORM_OVERVIEW.md`.
 
 ---
 

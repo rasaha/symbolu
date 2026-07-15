@@ -4,7 +4,7 @@ Complete enterprise workflows showing where each Ugence product participates. Ea
 
 Labels: `FACT` (a product capability verified in the repo) / `INTERPRETATION` / `RECOMMENDATION`. Where a capability is a V2 gap, it is marked.
 
-Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate · **ACP**=Autonomous Control Plane · **HLM**=Hybrid LLM · **CG**=CG LLM · **KV**=KVPro · **CSC**=Cloud Scaling Controller.
+Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate · **ACP**=Autonomous Control Plane · **HLM**=Hybrid LLM · **CG**=LLM Steering Controller · **KV**=KVPro · **CSC**=Cloud Scaling Controller. Canonical taxonomy: `UGENCE_PLATFORM_OVERVIEW.md`.
 
 ---
 
@@ -37,7 +37,7 @@ Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate
 | Step | Product | What happens |
 |---|---|---|
 | Read policy, positions, market context | **CM** | Preserve authorization-critical spans (limits, mandates); drop noise |
-| Reason about the rebalance | **AR** + **CG** | Runtime plans; CG LLM controls the answer-frame and audits the rationale (FACT: CG = frame control + answer audit) |
+| Reason about the rebalance | **AR** + **CG** | Runtime plans; LLM Steering Controller controls the answer-frame and audits the rationale (FACT: CG = frame control + answer audit) |
 | Domain-behavior policy (FINANCE profile) | **AR** | `domain_policy` FINANCE profile shapes conservatism (FACT: built-in FINANCE profile) |
 | Propose "execute trade / release payment" | **AR → AG** | Proposal + risk evidence (irreversibility, blast radius flagged) |
 | Hard authorization | **AG** | MAX_COST / MAX_IRREVERSIBILITY / REQUIRE_APPROVER hard invariants (FACT: operators in `gate.py`); four-eyes quorum |
@@ -57,7 +57,7 @@ Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate
 | Step | Product | What happens |
 |---|---|---|
 | Assemble patient chart context (large) | **CM** + **HLM** | Compress to decision-critical spans; Hybrid LLM for long-record retrieval |
-| Draft note / propose order | **AR** + **CG** | Runtime reasons; CG LLM keeps the answer in the correct clinical frame and audits it (reduces the "wrong-frame" failure, FACT: CG's stated failure mode) |
+| Draft note / propose order | **AR** + **CG** | Runtime reasons; LLM Steering Controller keeps the answer in the correct clinical frame and audits it (reduces the "wrong-frame" failure, FACT: CG's stated failure mode) |
 | PHI-minimal context | **CM** | Deterministic minimization limits what the model reads (FACT: authorization-preserving) — a privacy control by construction |
 | Propose a lab order / referral | **AR → AG** | Proposal; high-risk clinical actions flagged |
 | Authorize the order | **AG** | REQUIRE_ATTESTATION / clinician approver quorum (FACT: operators exist) |
@@ -93,7 +93,7 @@ Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate
 | Step | Product | What happens |
 |---|---|---|
 | Read ticket + account + KB | **CM** | Compress; preserve entitlement/authorization spans |
-| Understand & plan resolution | **AR** + **CG** | Runtime reasons; CG LLM keeps the answer on-frame (reduces drift/generic answers, FACT: CG failure modes) |
+| Understand & plan resolution | **AR** + **CG** | Runtime reasons; LLM Steering Controller keeps the answer on-frame (reduces drift/generic answers, FACT: CG failure modes) |
 | Multi-role handoff (diagnose → remediate) | **AR (multi-agent, V2)** | Hierarchical: a triage agent hands off to a remediation agent (Deliverable 5) — **V2 gap** |
 | Propose a refund / account change | **AR → AG** | Proposal + risk (refund amount → MAX_COST) |
 | Authorize | **AG** | Policy + approver for large refunds (quorum) |
@@ -114,7 +114,7 @@ Legend: **AR**=Agent Runtime · **CM**=Context Minimization · **AG**=ActionGate
 | **ActionGate** | ✅ | ✅ (hard) | ✅ | ✅ | ✅ |
 | **ACP** | ✅ (native cloud) | ◻ (adapter) | ◻ (adapter) | ✅ (native robotics) | ◻ (adapter) |
 | **Hybrid LLM** | ✅ (long ctx) | ◻ | ✅ (long record) | ◻ | ◻ |
-| **CG LLM** | ◻ | ✅ (audit) | ✅ (frame) | ◻ | ✅ (frame) |
+| **LLM Steering Controller** | ◻ | ✅ (audit) | ✅ (frame) | ◻ | ✅ (frame) |
 | **KVPro** | ✅ | ✅ | ✅ | ◻ | ✅ |
 | **Cloud Scaling Controller** | ✅ (native) | ✅ | ✅ | ◻ | ✅ |
 

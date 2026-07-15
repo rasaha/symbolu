@@ -1,6 +1,6 @@
 # Agent Runtime (migration package)
 
-**Specialized AI System · proposer, not governor.** A new, additive runtime built to the frozen
+**Specialized AI System · proposer, not governor.** *(Canonical platform taxonomy: `UGENCE_PLATFORM_OVERVIEW.md`.)* A new, additive runtime built to the frozen
 architectural boundary:
 
 > The runtime converts a goal and observations into a **governed execution request (CER)**, submits

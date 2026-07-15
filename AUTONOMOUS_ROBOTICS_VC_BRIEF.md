@@ -18,6 +18,8 @@
 ```
 Ugence Labs
 ├── Specialized AI Systems
+│     ├── Hybrid LLM               — long-context reasoning substrate
+│     ├── LLM Steering Controller  — generation steering & audit
 │     ├── Agent Runtime            — reasoning → governed proposals
 │     └── Autonomous Runtime       — autonomy software → certified deployment   ◄ this brief
 ├── AI Control Plane
@@ -25,10 +27,11 @@ Ugence Labs
 │     ├── ActionGate
 │     └── Autonomous Control Plane (ACP)
 └── AI Infrastructure
-      ├── Hybrid LLM
       ├── KVPro
-      └── Cloud Infrastructure
+      └── Cloud Scaling Controller
 ```
+
+> **Canonical taxonomy:** the definitive Ugence platform architecture is `UGENCE_PLATFORM_OVERVIEW.md`.
 
 ---
 
@@ -368,6 +371,8 @@ This brief funds one layer of a unified, governed AI platform:
         │
         ▼
    Specialized AI Systems
+        ├── Hybrid LLM               — long-context reasoning substrate
+        ├── LLM Steering Controller  — generation steering & audit
         ├── Agent Runtime            — supervises AI agent reasoning
         └── Autonomous Runtime       — supervises autonomous machines
         │
@@ -379,9 +384,8 @@ This brief funds one layer of a unified, governed AI platform:
         │
         ▼
    AI Infrastructure
-        ├── Hybrid LLM
         ├── KVPro
-        └── Cloud Infrastructure
+        └── Cloud Scaling Controller
 ```
 
 Together, **Agent Runtime, Autonomous Runtime, the AI Control Plane, and AI Infrastructure form a
