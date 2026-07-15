@@ -31,8 +31,9 @@ class CleanRoomProfile:
     rollback_plan: Callable[[Dict[str, Any]], Optional[Dict[str, str]]] = \
         field(default=lambda a: None)
     validate_extra: Callable[[Dict[str, Any]], None] = field(default=lambda a: None)
-    # database-domain only: fields that must never carry secret material
-    secret_guarded: Tuple[str, ...] = ()
+    # runs BEFORE field-presence/unknown-field checks (e.g. the secret-material guard,
+    # so a secret-bearing key is reported as secret material, not as an unknown field)
+    pre_check: Callable[[Dict[str, Any]], None] = field(default=lambda a: None)
 
 
 _REGISTRY: Dict[str, CleanRoomProfile] = {}
@@ -132,4 +133,126 @@ register(CleanRoomProfile(
     arguments=_rollout_arguments,
     rollback_plan=lambda a: {"ref": a["rollback_ref"]} if a.get("rollback_ref") else None,
     validate_extra=_rollout_validate,
+))
+
+
+# ----------------------------------------------------------------------------
+# database.mutation.v1  (V0.3 — written from CER_DATABASE_MUTATION_PROFILE.md)
+# ----------------------------------------------------------------------------
+import re as _re  # noqa: E402  (kept local to the DB profile)
+
+from .errors import SecretMaterialError  # noqa: E402
+
+_DB_SQL_OPS = ("INSERT", "UPDATE", "DDL")
+_DB_ISOLATION = ("READ_COMMITTED", "REPEATABLE_READ", "SERIALIZABLE")
+_DB_TXN_MODES = ("in_transaction",)
+_DB_SECRET_KEYS = {"password", "passwd", "secret", "dsn", "connection_string",
+                   "conn_string", "credentials", "credential", "token", "api_key",
+                   "private_key", "statement", "sql", "sql_text", "query_text"}
+_DB_SECRET_VALUE = _re.compile(
+    r"(password\s*=)|(://[^/\s:]+:[^/\s@]+@)|(-----BEGIN [A-Z ]*PRIVATE KEY-----)",
+    _re.IGNORECASE)
+
+
+def _db_is_digest(v: Any) -> bool:
+    return isinstance(v, str) and v.startswith("sha256:") and len(v) == 71
+
+
+def _db_walk(value: Any):
+    if isinstance(value, dict):
+        for k, v in value.items():
+            yield k, v
+            yield from _db_walk(v)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            yield from _db_walk(v)
+
+
+def _db_secret_scan(a: Dict[str, Any]) -> None:
+    """Secret-material guard — runs BEFORE unknown-field checks (fail closed)."""
+    for k, v in _db_walk(a):
+        if isinstance(k, str) and k.lower() in _DB_SECRET_KEYS:
+            raise SecretMaterialError(f"secret-bearing key {k!r} in database actuation",
+                                      path=f"actuation.{k}")
+        if isinstance(v, str) and _DB_SECRET_VALUE.search(v):
+            raise SecretMaterialError(f"embedded credential material under {k!r}",
+                                      path="actuation")
+
+
+def _db_validate(a: Dict[str, Any]) -> None:
+    _db_secret_scan(a)
+    t = a["target"]
+    for f in ("connection_ref", "schema", "table"):
+        if not isinstance(t.get(f), str) or not t.get(f):
+            raise ValueFormatError(f"database target missing/invalid {f}",
+                                   path=f"actuation.target.{f}")
+    if a["sql_operation"] not in _DB_SQL_OPS:
+        raise ValueFormatError(f"unsupported sql_operation {a['sql_operation']!r}",
+                               path="actuation.sql_operation")
+    if not _db_is_digest(a["statement_digest"]):
+        raise ValueFormatError("statement_digest must be sha256:<64hex>",
+                               path="actuation.statement_digest")
+    for opt in ("parameters_digest", "predicate_digest"):
+        if opt in a and not _db_is_digest(a[opt]):
+            raise ValueFormatError(f"{opt} must be sha256:<64hex>", path=f"actuation.{opt}")
+    scope = a["affected_scope"]
+    if not isinstance(scope, dict) or "estimated_rows" not in scope or "unbounded" not in scope:
+        raise ValueFormatError("affected_scope{estimated_rows,unbounded} required",
+                               path="actuation.affected_scope")
+    if not str(scope["estimated_rows"]).isdigit():
+        raise ValueFormatError("affected_scope.estimated_rows must be integer string",
+                               path="actuation.affected_scope.estimated_rows")
+    if not isinstance(scope["unbounded"], bool):
+        raise ValueFormatError("affected_scope.unbounded must be boolean",
+                               path="actuation.affected_scope.unbounded")
+    txn = a["transaction"]
+    if not isinstance(txn, dict) or txn.get("mode") not in _DB_TXN_MODES:
+        raise ValueFormatError(f"transaction.mode must be one of {_DB_TXN_MODES}",
+                               path="actuation.transaction.mode")
+    if txn.get("isolation") not in _DB_ISOLATION:
+        raise ValueFormatError(f"transaction.isolation must be one of {_DB_ISOLATION}",
+                               path="actuation.transaction.isolation")
+    if not isinstance(a["expected_row_version"], str) or not a["expected_row_version"]:
+        raise ValueFormatError("expected_row_version required (string)",
+                               path="actuation.expected_row_version")
+
+
+def _db_target(a: Dict[str, Any]) -> str:
+    t = a["target"]
+    return f"{t['connection_ref']}/{t['schema']}/{t['table']}"
+
+
+def _db_arguments(a: Dict[str, Any]) -> Dict[str, Any]:
+    scope = a["affected_scope"]
+    txn = a["transaction"]
+    args: Dict[str, Any] = {
+        "sql_operation": a["sql_operation"],
+        "statement_digest": a["statement_digest"],
+        "affected_count": str(scope["estimated_rows"]),
+        "unbounded": bool(scope["unbounded"]),
+        "transaction_mode": txn["mode"],
+        "isolation": txn["isolation"],
+        "expected_row_version": a["expected_row_version"],
+    }
+    if "parameters_digest" in a:
+        args["parameters_digest"] = a["parameters_digest"]
+    if "predicate_digest" in a:
+        args["predicate_digest"] = a["predicate_digest"]
+    return args
+
+
+register(CleanRoomProfile(
+    profile_id="database.mutation.v1", operation="DB_MUTATION", server_id="database",
+    tool_name="mutation", freshness_source="database",
+    required=("operation", "target", "sql_operation", "statement_digest",
+              "affected_scope", "transaction", "expected_row_version", "reversibility"),
+    optional=("parameters_digest", "predicate_digest", "compensation_ref"),
+    prohibited=("replicas", "image_digest", "current_manifest_digest", "rollout_strategy",
+                "requested_state_transition", "max_surge", "max_unavailable", "timeout_s",
+                "rollback_ref"),
+    target_id=_db_target,
+    arguments=_db_arguments,
+    rollback_plan=lambda a: {"ref": a["compensation_ref"]} if a.get("compensation_ref") else None,
+    validate_extra=_db_validate,
+    pre_check=_db_secret_scan,
 ))

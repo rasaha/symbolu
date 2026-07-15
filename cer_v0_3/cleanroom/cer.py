@@ -91,6 +91,7 @@ def validate(cer: Dict[str, Any]) -> None:
             f"actuation.operation {actuation.get('operation')!r} inconsistent with "
             f"profile {prof.profile_id} (expected {prof.operation})", path="actuation.operation")
 
+    prof.pre_check(actuation)   # e.g. secret-material guard, before unknown-field checks
     _check_actuation_fields(actuation, prof)
     prof.validate_extra(actuation)
 
