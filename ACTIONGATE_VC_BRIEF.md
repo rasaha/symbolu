@@ -3,7 +3,8 @@
 **Ugence Labs | Pre-Commit Admissibility and Enforcement for Autonomous AI Agents**
 *Version 1.0.0 — Updated July 2026 (external / evidence-based)*
 
-> **Product family.** ActionGate is part of the Ugence Labs autonomous-systems portfolio.
+> **Product family.** ActionGate is part of the **AI Control Plane** in the Ugence Labs platform
+> (canonical taxonomy in `UGENCE_PLATFORM_OVERVIEW.md`).
 > Some products in that portfolio produce behavioral, semantic, identity, attestation, or
 > model-risk *evidence*. ActionGate can consume such evidence as optional inputs, but its
 > product boundary is narrower and stands on its own: **deterministic pre-commit

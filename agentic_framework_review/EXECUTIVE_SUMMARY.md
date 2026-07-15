@@ -18,7 +18,7 @@ Labels: `FACT` / `INTERPRETATION` / `RECOMMENDATION` / `SPECULATION`.
 
 **INTERPRETATION.** So the honest one-line classification is: *the Agentic Framework is a **Specialized AI System (an Agent Runtime)** that is currently carrying a duplicate, softer copy of the AI Control Plane inside it. Extract the duplicate, give authority to the real control plane, and what remains is a clean, valuable Specialized AI System.*
 
-**It is not AI Infrastructure** (it is not compute/memory/attention/scaling plumbing — that is KV Pro / Hybrid LLM / Cloud Controller). **It is not the AI Control Plane** (that is the deterministic Context-Min + ActionGate + ACP stack). It is the applied agent that both of those serve.
+**It is not AI Infrastructure** (it is not compute/memory/attention/scaling plumbing — that is KV Pro / Cloud Scaling Controller). **It is not the AI Control Plane** (that is the deterministic Context-Min + ActionGate + ACP stack). It is the applied agent that both of those serve.
 
 ---
 
@@ -81,10 +81,10 @@ The integration seam is already natural: `FACT` ActionGate accepts optional evid
 
 ```
 Ugence Labs
-├── AI Infrastructure       — KV Pro · Hybrid LLM · Cloud Scaling Controller
+├── Specialized AI Systems  — Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime
 ├── AI Control Plane        — Context Minimization · ActionGate · ACP   (deterministic governor)
-└── Specialized AI Systems  — Agent Runtime ("Proposer"/Sentinel) · CSR Steering Controller
-                              · PSE (naming) · Autonomous Robotics
+└── AI Infrastructure       — KV Pro · Cloud Scaling Controller
+                              (PSE naming remains a standalone vertical; canonical taxonomy: UGENCE_PLATFORM_OVERVIEW.md)
 ```
 
 `FACT-caveat`. The three-family taxonomy is a *proposed* structure. The repo today calls itself an "AI Infrastructure Platform" (pitchbook); "AI Control Plane" is internal-only; "Specialized AI Systems" appears nowhere. Adopting the taxonomy above is a portfolio decision this review recommends, not a description of current documents.

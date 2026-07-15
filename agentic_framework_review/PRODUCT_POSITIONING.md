@@ -46,7 +46,7 @@ Candidate categories offered by the task: Agent Runtime · Agent Operating Syste
 ### 9.1 Where it belongs
 
 **FACT — the three tiers as they actually exist in the repo:**
-- **AI Infrastructure** = the substrate modules (KV Pro, Hybrid LLM, Cloud Scaling Controller) — compute/memory/attention/scaling plumbing.
+- **AI Infrastructure** = the substrate modules (KV Pro, Cloud Scaling Controller) — compute/memory/scaling plumbing.
 - **AI Control Plane** = the deterministic governor stack (Context Minimization + ActionGate + ACP) — authorize/operational-safety.
 - **Specialized AI Systems** (proposed) = the standalone verticals + applied runtimes (PSE naming vertical, Autonomous Robotics, and — by this analysis — the Agent Runtime).
 
@@ -80,10 +80,10 @@ So: not "one product reclassified," but "**one product split, with its control-p
 
 ```
 Ugence Labs
-├── AI Infrastructure          — KV Pro · Hybrid LLM · Cloud Scaling Controller
+├── Specialized AI Systems     — Hybrid LLM · LLM Steering Controller · Agent Runtime · Autonomous Runtime
 ├── AI Control Plane           — Context Minimization · ActionGate · ACP   (deterministic governor)
-└── Specialized AI Systems     — Agent Runtime ("Proposer"/Sentinel) · CSR Steering Controller
-                                  · PSE (naming) · Autonomous Robotics
+└── AI Infrastructure          — KV Pro · Cloud Scaling Controller
+                                  (PSE naming remains a standalone vertical; canonical taxonomy: UGENCE_PLATFORM_OVERVIEW.md)
 ```
 
 **INTERPRETATION.** In this picture the story is clean and non-overlapping: *Infrastructure* makes AI cheap and fast; the *Control Plane* makes AI actions safe and authorized; *Specialized Systems* (including the Agent Runtime) do the actual applied work and *feed* the control plane. The Agent Runtime's tagline writes itself without buzzwords: **"the agent that proposes; the control plane disposes."**

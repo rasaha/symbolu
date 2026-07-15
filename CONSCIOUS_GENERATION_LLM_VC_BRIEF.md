@@ -3,8 +3,10 @@
 **Ugence Labs — a model-agnostic semantic-control & audit layer for LLMs, with a deeper symbolic-architecture research moat**
 *Updated June 2026*
 
-> **Product family.** This product is part of a broader SymbolU / Conscious Generation portfolio. The
-> products share elements of the same symbolic-control patent architecture, but each brief describes a
+> **Product family.** Conscious Generation is the research architecture that powers the **LLM Steering
+> Controller** — a **Specialized AI System** in the Ugence Labs platform (see
+> `LLM_STEERING_CONTROLLER_VC_BRIEF.md`, which supersedes this framing for the product boundary). The
+> canonical platform architecture is defined in `UGENCE_PLATFORM_OVERVIEW.md`. Each brief describes a
 > distinct product boundary, validation state, and commercialization path.
 
 ---

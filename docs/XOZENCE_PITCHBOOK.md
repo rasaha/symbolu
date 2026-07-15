@@ -34,16 +34,19 @@ detailed module sections below map into these buckets.
 
 | Bucket | What it does | Products |
 |---|---|---|
-| **Specialized AI Systems** | *create intelligence* | **Hybrid LLM** (long-context attention) · **CG LLM** (Conscious-Generation / interpretable state) · **Agent Runtime** (plans, orchestrates, emits CER) |
+| **Specialized AI Systems** | *create intelligence* | **Hybrid LLM** (long-context attention) · **LLM Steering Controller** (generation steering & audit) · **Agent Runtime** (plans, orchestrates, emits CER) · **Autonomous Runtime** (supervises autonomous machines) |
 | **AI Control Plane** | *governs its execution* | **Context Minimization** · **ActionGate** (exact-action authorization) · **Autonomous Control Plane** (operational safety). **CER** is the versioned **interface contract** between runtimes and the control plane — not a separate commercial product. |
 | **AI Infrastructure** | *operates it efficiently* | **KV Pro** (KV-cache optimization) · **Cloud Scaling Controller** (scale-decision quality) |
 
 > **Specialized AI Systems create intelligence. The AI Control Plane governs its execution. AI
 > Infrastructure operates it efficiently.**
+>
+> **Canonical taxonomy:** the definitive Ugence platform architecture is `UGENCE_PLATFORM_OVERVIEW.md`.
 
-Two further products — **PSE** (naming / verbal-identity) and **Autonomous Robotics (BCVF)** — are
-**standalone verticals** that apply the platform's determinism/trust thesis to their own domains and
-do not compose with the LLM stack. The **Agent Runtime** is the **native reference producer** for the
+**PSE** (naming / verbal-identity) is a **standalone vertical** that applies the platform's
+determinism/trust thesis to its own domain and does not compose with the LLM stack. **Autonomous
+Robotics (BCVF)** is the **Autonomous Runtime** — a Specialized AI System in the canonical taxonomy
+(`UGENCE_PLATFORM_OVERVIEW.md`). The **Agent Runtime** is the **native reference producer** for the
 **AI Control Plane**; third-party runtimes can also emit CER via an adapter. Authoritative
 positioning for the runtime and the control plane lives in `AGENTIC_FRAMEWORK_VC_BRIEF.md` and
 `AI_CONTROL_PLANE_VC_BRIEF.md`.

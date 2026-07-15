@@ -8,7 +8,8 @@
 > portfolio. It governs execution requests produced by the **Ugence Agent Runtime** (its native
 > reference producer, see `AGENTIC_FRAMEWORK_VC_BRIEF.md`) **and by third-party runtimes** via
 > the Canonical Execution Request (CER) contract. This is the broader platform moat; the runtime
-> is one (native) producer in front of it.
+> is one (native) producer in front of it. The canonical platform architecture — **Specialized AI
+> Systems · AI Control Plane · AI Infrastructure** — is defined in `UGENCE_PLATFORM_OVERVIEW.md`.
 
 ---
 
