@@ -52,14 +52,6 @@ def build_mask_from_maxabs(maxabs_by_layer, protect_fraction: float):
     return mask, n_protect
 
 
-def _layer_key(pkv, i):
-    """Post-RoPE K for layer i across transformers Cache / legacy-tuple past_key_values."""
-    kc = getattr(pkv, "key_cache", None)
-    if kc is not None:
-        return kc[i]
-    return pkv[i][0]
-
-
 def main(argv=None):
     ap = argparse.ArgumentParser(description="protect-mask calibration via transformers (pod-only)")
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
@@ -82,7 +74,8 @@ def main(argv=None):
         pkv = out.past_key_values
         n_layers = model.config.num_hidden_layers
         for li in range(n_layers):
-            k = _layer_key(pkv, li)[0].float()            # (H_kv, S, D)
+            kt, _ = FQ.layer_kv(pkv, li)                  # (B, H_kv, S, D)
+            k = kt[0].float()                             # (H_kv, S, D)
             ma = k.abs().amax(dim=1).cpu()                # (H_kv, D)
             mn = k.amin(dim=1).cpu(); mx = k.amax(dim=1).cpu()
             maxabs[li] = ma if li not in maxabs else torch.maximum(maxabs[li], ma)

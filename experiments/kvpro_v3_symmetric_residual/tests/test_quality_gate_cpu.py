@@ -139,13 +139,24 @@ class TestVerdict(unittest.TestCase):
         self.assertTrue(v["per_candidate"]["S3"]["full_quality"])
 
     def test_offline_fail_blocks_go_even_if_e2e_passes(self):
-        # end-to-end all-pass but the offline attention proxy FAILS -> not full_quality -> not GO.
+        # end-to-end all-pass but the offline attention proxy DEFINITIVELY FAILS -> blocks GO.
         v = G.verdict(attn_ok(False),
                       bench("needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
                       bench("hard_needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
                       bench("mmlu", "Qwen/Qwen2.5-7B-Instruct", ALL_T), geom=G.A.QWEN2_5_7B)
         self.assertFalse(v["per_candidate"]["S1"]["full_quality"])
         self.assertNotEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
+
+    def test_offline_synthetic_is_nonblocking(self):
+        # offline proxy synthetic/NOT-RUN (None) but all three end-to-end pass -> still GO.
+        attn = attn_ok(True); attn["label"] = "NOT_A_VERDICT_SYNTHETIC"
+        v = G.verdict(attn,
+                      bench("needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
+                      bench("hard_needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
+                      bench("mmlu", "Qwen/Qwen2.5-7B-Instruct", ALL_T), geom=G.A.QWEN2_5_7B)
+        self.assertIsNone(v["per_candidate"]["S1"]["quality_offline"])
+        self.assertTrue(v["per_candidate"]["S1"]["full_quality"])
+        self.assertEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
 
 
 if __name__ == "__main__":

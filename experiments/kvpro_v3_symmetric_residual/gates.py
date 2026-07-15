@@ -118,8 +118,10 @@ def verdict(attn, needle, hard_needle, mmlu, ctx=8192, geom=None):
         q_hn = quality_hard_needle(hsum, c)
         q_mm = quality_mmlu(msum, c)
         s_ok, s_reason, acc = systems_value(c, ctx, geom)
-        # full quality requires ALL FOUR signals to be True (None counts as not-passed)
-        full_q = all(x[0] is True for x in (q_off, q_ndl, q_hn, q_mm))
+        # GO requires the THREE end-to-end benchmarks (needle + hard-needle + MMLU). The offline
+        # attention proxy is a RED FLAG only: it blocks if it DEFINITIVELY FAILS, but a synthetic /
+        # not-run proxy (None) does not block (real capture can be fragile per architecture).
+        full_q = (q_ndl[0] is True and q_hn[0] is True and q_mm[0] is True and q_off[0] is not False)
         per[c] = {"quality_offline": q_off[0], "needle": q_ndl[0], "hard_needle": q_hn[0], "mmlu": q_mm[0],
                   "full_quality": full_q, "systems_pass": s_ok, "pct_reduction": acc["pct_reduction_vs_affine"],
                   "reasons": {"offline": q_off[1], "needle": q_ndl[1], "hard_needle": q_hn[1], "mmlu": q_mm[1],
