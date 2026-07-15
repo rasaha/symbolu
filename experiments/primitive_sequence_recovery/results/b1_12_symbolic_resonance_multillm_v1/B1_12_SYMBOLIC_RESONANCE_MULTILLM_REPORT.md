@@ -129,36 +129,67 @@ predicted by a confound, not by the hypothesis: the frozen v3 consonant glosses 
 overlapping the affective class of the gloss, not evidence that the individual varṇas carry composable meaning.
 
 Consistently, **all four evaluator-sensitive words are concrete/body/abstract** (dīpa lamp, kāka crow, nāsā nose,
-pāṭha lesson) — where no such class-overlap exists, the "resonance" is whatever the more generous model (Qwen)
-manufactures. Qwen (Run B) rated a lamp, a boat (naukā), clothing (vastra), a nose, and a crow as **MODERATE**
-resonant with affliction mappings; Mistral (Run A) rated the same words MINIMAL/WEAK/NO. That a boat and a nose can
-be scored "plausibly resonant with affliction" is a textbook Barnum outcome — the rubric's 50-level ("plausible
-but requires interpretation") is reachable for almost anything by a sufficiently accommodating reader.
+pāṭha lesson) — where no such class-overlap exists, the score tracks the generosity of the scorer. Qwen (Run B)
+rated a lamp, a boat (naukā), clothing (vastra), a nose, and a crow as **MODERATE**; Mistral (Run A) rated the same
+words MINIMAL/WEAK/NO.
+
+**This is a construct-validity concern, not a demonstrated Barnum effect.** A Barnum result requires *non-specific*
+fitting — the mappings resonating roughly equally with everything. The data show the opposite in part: there is a
+real **category gradient** (afflictive/virtue well above concrete/animal/abstract) and Mistral actively rejects
+concrete words. That gradient means the instrument *does* discriminate; it is not indiscriminately fitting. A
+genuine Barnum test would require running shuffled or alternate-mapping packets and showing they fit equally well —
+which this run deliberately did **not** do (no-shuffle is preregistered; specificity was out of scope here). What
+the data support is therefore weaker and more specific than "Barnum": (a) a **domain confound** — the frozen
+consonant glosses are drawn almost entirely from the affliction/vṛtti domain, so affective words share a semantic
+field with the glosses for reasons unrelated to per-varṇa composability; and (b) **interpretive flexibility** at
+the rubric's 50-level ("plausible but requires interpretation"), which one model (Qwen) reaches for concrete words
+and the other (Mistral) does not. Whether that flexibility is correctable prompt/rubric ambiguity or an inherent
+property of symbolic-resonance judgment is exactly what a disagreement audit (§6.1) would resolve — it is not
+settled by this run.
 
 ---
 
 ## 5. Interpretation (honest, adversarial)
 
-1. **No confirmation of composable varṇa meaning.** Zero STRONG verdicts; the ceiling is MODERATE; the overall
-   mean sits between WEAK and MODERATE. Under fixed mappings and a no-shuffle rubric, the bare words do not
-   robustly "account for" their varṇa mappings.
-2. **The signal is evaluator-manufactured, not intrinsic.** SIGNIFICANT role-dependence, a systematic ~11-point
-   scorer bias, only 50% verdict agreement, and 35% *incompatible* relationship assignments (including
-   implication/opposition sign-flips) mean the result is not stable across who judges. A real symbolic-composition
-   effect should not depend this much on the evaluator.
-3. **What remains is consistent with a construct confound + Barnum latitude.** The only stably-MODERATE words are
-   afflictive/virtue words whose class already matches the affliction gloss layer; elsewhere the score tracks the
-   generosity of the scorer. This is the preregistered *limitation* framing — resonance can be narratively fitted,
-   but the fit is neither strong nor evaluator-stable and does not exceed trivial word-class/gloss-class overlap.
+**Scope first.** This run tested *one* instrument, not Symbol-U as a whole: one frozen mapping layer (v3 consonant
+binding-vṛtti glosses), one bare-word symbolic-resonance rubric, 20 words, two model families, one author/scorer
+crossover, no shuffle/alternate controls. Conclusions below are about **the B1.12 LLM-adjudicated resonance
+instrument**, not about whether the varṇa mappings have value.
 
-**Bottom line:** this crossover does not support Symbol-U. It shows that "bare-word symbolic resonance" under the
-frozen mappings is weak, capped at MODERATE, evaluator-dependent, and concentrated exactly where an affliction-word
-/ affliction-gloss confound would put it. Treat as a negative/limitation result, per the prereg (Barnum is a
-limitation, not a verdict — here it is the most parsimonious explanation of the residual).
+1. **The instrument does not yet provide robust support.** Zero STRONG verdicts; ceiling MODERATE; overall mean
+   between WEAK and MODERATE. Under fixed mappings and a no-shuffle rubric, the bare words do not *robustly*
+   account for their varṇa mappings — but see (2): most of that is instrument instability, not a clean null.
+2. **Scoring is significantly evaluator-dependent.** SIGNIFICANT role-dependence, a systematic ~11-point scorer
+   bias (Mistral stricter, Qwen more generous), only 50% verdict agreement, and 35% *incompatible* relationship
+   assignments (including implication/opposition sign-flips). The models agree on *what the words mean* (14/20
+   identical profiles) but not on *how strongly the mappings resonate*. A word's verdict currently depends too
+   much on which model scores it for the score to be treated as model-independent.
+3. **The residual pattern has more than one explanation.** The stably-MODERATE words are afflictive/virtue words
+   whose semantic field overlaps the affliction gloss layer (a domain confound), and the concrete-word scores
+   track scorer generosity (interpretive flexibility). This is *not* a demonstrated Barnum effect — the category
+   gradient shows the instrument discriminates, and no shuffle/alternate-mapping control was run (§4). Whether the
+   flexibility is correctable rubric/prompt ambiguity or an inherent property of the judgment is unresolved.
+
+**Bottom line:** this is a **methodological-limitation result about the instrument**, not a verdict on Symbol-U.
+The reliable finding is that the two LLMs agree reasonably on word meaning but not sufficiently on mapping
+resonance, so the current B1.12 LLM scorer is not yet stable enough to serve as an evaluator. It does **not**
+establish that the symbolic mappings lack a signal; that question is not answerable from this run.
 
 ---
 
-## 6. Method integrity notes
+## 6. Recommended next step — disagreement audit (before any further run)
+
+Do not re-run yet. First preserve the missing per-token artifacts (`run_a_scores.json`, `run_b_scores.json`,
+`raw_all.jsonl` — see §8), then audit every component where the two runs' scores differ by ≥ 50: inspect the exact
+frozen mapping, each model's evidence, the final relationship chosen, and classify the cause as (a) one model
+adding semantic supplementation, (b) one model simply stricter, or (c) the rubric genuinely permitting two
+reasonable scores. That classification — correctable ambiguity vs. inherent model-dependence — determines whether
+the instrument can be tightened or whether LLM adjudication is the wrong tool here. It is the prerequisite for any
+claim beyond "evaluator-dependent."
+
+---
+
+## 7. Method integrity notes
 
 - **Frozen before any model call:** BSR scale, 10-type relationship taxonomy, verdict thresholds, role-dependence
   rule, and the 20-word list (all FRESH_UNINSPECTED at selection; glosses read only at scoring time, never during
@@ -176,7 +207,7 @@ limitation, not a verdict — here it is the most parsimonious explanation of th
   whole run, both `constituitive_property → constitutive_property`** — no other token was touched.
 - **No forced consensus.** Run A and Run B judgments are both retained; disagreement is reported, not averaged away.
 
-## 7. Artifacts
+## 8. Artifacts
 
 Archived in this directory (reconstructed verbatim from the completed RunPod execution): `run_manifest.json`
 (`status: COMPLETED`), `model_manifest.json`, `input_hashes.json`, `wordlist_manifest.json`,
@@ -186,7 +217,7 @@ The full per-component score files (`run_{a,b}_scores.json`), profiles/evidence,
 access, so the word- and occurrence-level aggregates above (which fully determine every claim in this report) were
 transcribed verbatim and the per-token raw logs remain on the pod unless separately exported.
 
-## 8. Repository discipline
+## 9. Repository discipline
 
 No frozen input, controlling preregistration, prior B1.12 artifact, calibration score, feature-lift artifact, or
 resolution-study output was modified. This run reads frozen glosses only at scoring time. Structure and reported
