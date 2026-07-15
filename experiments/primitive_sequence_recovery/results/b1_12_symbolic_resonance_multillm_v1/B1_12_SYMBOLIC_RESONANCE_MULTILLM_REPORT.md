@@ -177,15 +177,23 @@ establish that the symbolic mappings lack a signal; that question is not answera
 
 ---
 
-## 6. Recommended next step — disagreement audit (before any further run)
+## 6. Disagreement audit — DONE (see `B1_12_BSR_DISAGREEMENT_AUDIT.md`)
 
-Do not re-run yet. First preserve the missing per-token artifacts (`run_a_scores.json`, `run_b_scores.json`,
-`raw_all.jsonl` — see §8), then audit every component where the two runs' scores differ by ≥ 50: inspect the exact
-frozen mapping, each model's evidence, the final relationship chosen, and classify the cause as (a) one model
-adding semantic supplementation, (b) one model simply stricter, or (c) the rubric genuinely permitting two
-reasonable scores. That classification — correctable ambiguity vs. inherent model-dependence — determines whether
-the instrument can be tightened or whether LLM adjudication is the wrong tool here. It is the prerequisite for any
-claim beyond "evaluator-dependent."
+The audit was performed on the archived per-component score files. **Result: the disagreements are predominantly
+correctable, not evidence of inherent model-dependence.** Only 3 of 54 components differ by ≥ 50 (94.4% within one
+25-point step), and the divergence resolves into three named, fixable causes:
+
+1. **A global scorer-strictness offset (~+10 pts, Qwen over Mistral)** that persists even on the 27 components
+   where both models choose the *identical* relationship — a calibration difference, not a factual one.
+2. **An unspecified opposition-scale convention:** for `final_relationship = opposition`, Mistral means 40.9 vs
+   Qwen 66.7 (a 25.8-pt gap). The rubric never says whether a clean opposition should score high or low; the models
+   filled the gap oppositely (santoṣa#1: Qwen 75 via opposition, Mistral 25). A specification gap.
+3. **Under-enforced supplementation control at scoring** (dīpa#1: Qwen accepts an invented "lamp reveals unpleasant
+   truths → revulsion" chain for 50; Mistral zeroes it).
+
+All three are correctable by rubric/prompt amendment + calibration in a *future* instrument version; v1's verdict
+stands as recorded. See the audit doc for worked examples and proposed fixes. **Do not re-run before the instrument
+is amended** — re-running v1 would only reproduce the same structured gaps.
 
 ---
 
