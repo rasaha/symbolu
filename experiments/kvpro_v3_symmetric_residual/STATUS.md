@@ -1,7 +1,30 @@
 # KVPro V3 Gate-1 — status (end-to-end quality harness complete)
 
-**Date:** 2026-07-15 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae` · **Current verdict: `INCONCLUSIVE`**
-(the end-to-end quality drivers are built but NOT RUN — this container has no GPU).
+**Date:** 2026-07-15 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae`
+**First MEASURED verdict (Qwen2.5-7B, `--quick-quality`): `NO_GO_QUALITY`** — but this is a *small-sample*
+sanity run (2 items/mode, seed 0, 8 MMLU Q), **NOT decisive**. The decisive `--full-quality` run is pending.
+
+## Session update — first real pod run (Qwen2.5-7B, `--quick-quality`)
+The harness ran end-to-end on real weights; all four benchmarks are `MEASURED` (not modeled/synthetic).
+Two things drove `NO_GO_QUALITY`, only one of which is a quality signal:
+- **S1** flipped **one** hard-needle item (multi mode) HIT→MISS_K vs affine. On the marginal model the
+  rule is zero regressions, so S1 fails — but it's 1/8 on seed 0, at the noise floor. Consistent with
+  symmetric-K-without-bias being genuinely worse (S1 also has the worst offline numbers).
+- **Every** candidate is blocked by the offline attention proxy, and that block is **mis-specified**:
+  S3 keeps K affine, and softmax-KL is a pure function of K, so **S3's KL (0.255) == affine's own KL vs
+  fp**, which is **12× over the `TH_SOFTMAX_KL_MAX=0.02` threshold**. Two of the three offline sub-checks
+  (`cos≥0.999`, `kl≤0.02`) are absolute-vs-fp at levels the *accepted affine baseline itself fails*; only
+  `mse ≤ 1.25×affine` is a valid relative bar. **Decision deferred:** thresholds stay FROZEN until the
+  full run (no post-hoc loosening); the offline-gate question is revisited with non-noisy data in hand.
+- **S2** (symmetric-K **+ coarse bias**, symmetric-V) passed needle **and** hard-needle **and** MMLU and
+  clears the 9.3% floor — blocked *only* by the offline proxy. It is the lead candidate to confirm at
+  scale. (9.3% is **modeled read-bandwidth**, not measured TPS.)
+
+**Performance:** `quantize_k_sequence` is now vectorized (batched per-block reduction instead of a Python
+loop) — **numerically bit-identical** to the loop (proven by `test_vectorized_k_matches_loop`), CPU-neutral,
+and on the GPU generation path it collapses ~`ceil(S/32)`×9 kernel launches/layer/step down to ~18, which
+was the launch-bound cost of `--full-quality`. The cache still re-quantizes the full sequence each step
+(kept intentionally: incremental caching is invalid for S2, whose bias is a global per-sequence mean).
 
 ## The gate now requires end-to-end quality (not proxies)
 A candidate can receive **`GO_KERNEL_PROTOTYPE`** only if it passes **all** of, on the model under test:
@@ -22,9 +45,10 @@ evaluated **first** and gets the strict rule: **zero** hard-needle regressions v
   Gate-1 most honestly points to `NO_GO_SYSTEMS_VALUE` unless folded into that larger kernel.
 
 ## CPU-tested this session (MEASURED-on-CPU / analytical)
-- **Unit tests: 26/26 pass** — quantizer↔production fidelity + protected-exact (10);
-  results parsing / per-seed aggregation / regression detection / verdict tree / NOT_RUN (11);
-  driver builders **reuse** the repo needle/hard-needle/MMLU protocols (5).
+- **Unit tests: 34/34 pass** — quantizer↔production fidelity + protected-exact + **vectorized==loop
+  bit-for-bit** (11); results parsing / per-seed aggregation / regression detection / verdict tree /
+  NOT_RUN (11); driver builders **reuse** the repo needle/hard-needle/MMLU protocols (5);
+  transformers cache-API accessor variants (3); mask-builder top-k/rounding (3); offline-nonblocking (1).
 - Accounting: −9.30% (both xmin) / −4.65% (one), Qwen2.5-7B & Llama-3.1-8B.
 - Shell gate + `candidate_summary.csv` validated on crafted all-pass inputs (→ GO for S1/S2; S3/S4 show
   `systems=False` at 4.65%).
