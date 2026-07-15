@@ -1,0 +1,1123 @@
+{
+  "schema": "b1_12_bsr_parser_coverage_audit_v2",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "note": "coverage computed via mapped-unit SET membership only; mapping gloss text NOT read",
+  "audit": [
+    {
+      "iast": "īrṣyā",
+      "dev": "ईर्ष्या",
+      "iast_parser": "īrṣyā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "r",
+        "ṣ",
+        "y"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "mada",
+      "dev": "मद",
+      "iast_parser": "mada",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "m",
+        "d"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "dveṣa",
+      "dev": "द्वेष",
+      "iast_parser": "dveṣa",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "d",
+        "v",
+        "ṣ"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "śoka",
+      "dev": "शोक",
+      "iast_parser": "śoka",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "ś",
+        "k"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "rāga",
+      "dev": "राग",
+      "iast_parser": "rāga",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "r",
+        "g"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "cintā",
+      "dev": "चिन्ता",
+      "iast_parser": "cintā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "c",
+        "n",
+        "t"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "bhrama",
+      "dev": "भ्रम",
+      "iast_parser": "bhrama",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "bh",
+        "r",
+        "m"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "asūyā",
+      "dev": "असूया",
+      "iast_parser": "asūyā",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "s",
+        "y"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "mātsarya",
+      "dev": "मात्सर्य",
+      "iast_parser": "mātsarya",
+      "n_consonant_occ": 5,
+      "consonants": [
+        "m",
+        "t",
+        "s",
+        "r",
+        "y"
+      ],
+      "n_mapped": 5,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kārpaṇya",
+      "dev": "कार्पण्य",
+      "iast_parser": "kārpaṇya",
+      "n_consonant_occ": 5,
+      "consonants": [
+        "k",
+        "r",
+        "p",
+        "ṇ",
+        "y"
+      ],
+      "n_mapped": 5,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "matsya",
+      "dev": "मत्स्य",
+      "iast_parser": "matsya",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "m",
+        "t",
+        "s",
+        "y"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "markaṭa",
+      "dev": "मर्कट",
+      "iast_parser": "markaṭa",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "m",
+        "r",
+        "k",
+        "ṭ"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "mahiṣa",
+      "dev": "महिष",
+      "iast_parser": "mahiṣa",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "m",
+        "h",
+        "ṣ"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "uṣṭra",
+      "dev": "उष्ट्र",
+      "iast_parser": "uṣṭra",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "ṣ",
+        "ṭ",
+        "r"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "vṛka",
+      "dev": "वृक",
+      "iast_parser": "vṛka",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "v",
+        "k"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kūrma",
+      "dev": "कूर्म",
+      "iast_parser": "kūrma",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "k",
+        "r",
+        "m"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "maṇḍūka",
+      "dev": "मण्डूक",
+      "iast_parser": "maṇḍūka",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "m",
+        "ṇ",
+        "ḍ",
+        "k"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "śṛgāla",
+      "dev": "शृगाल",
+      "iast_parser": "śṛgāla",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "ś",
+        "g",
+        "l"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kapāla",
+      "dev": "कपाल",
+      "iast_parser": "kapāla",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "k",
+        "p",
+        "l"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "grīvā",
+      "dev": "ग्रीवा",
+      "iast_parser": "grīvā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "g",
+        "r",
+        "v"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "jaṅghā",
+      "dev": "जङ्घा",
+      "iast_parser": "jaṅghā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "j",
+        "ṅ",
+        "gh"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "oṣṭha",
+      "dev": "ओष्ठ",
+      "iast_parser": "oṣṭha",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "ṣ",
+        "ṭh"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "lalāṭa",
+      "dev": "ललाट",
+      "iast_parser": "lalāṭa",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "l",
+        "l",
+        "ṭ"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "pṛṣṭha",
+      "dev": "पृष्ठ",
+      "iast_parser": "pṛṣṭha",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "p",
+        "ṣ",
+        "ṭh"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "ratha",
+      "dev": "रथ",
+      "iast_parser": "ratha",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "r",
+        "th"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "ghaṭa",
+      "dev": "घट",
+      "iast_parser": "ghaṭa",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "gh",
+        "ṭ"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "maṇi",
+      "dev": "मणि",
+      "iast_parser": "maṇi",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "m",
+        "ṇ"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "pustaka",
+      "dev": "पुस्तक",
+      "iast_parser": "pustaka",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "p",
+        "s",
+        "t",
+        "k"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "śara",
+      "dev": "शर",
+      "iast_parser": "śara",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "ś",
+        "r"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "darpaṇa",
+      "dev": "दर्पण",
+      "iast_parser": "darpaṇa",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "d",
+        "r",
+        "p",
+        "ṇ"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kuṇḍala",
+      "dev": "कुण्डल",
+      "iast_parser": "kuṇḍala",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "k",
+        "ṇ",
+        "ḍ",
+        "l"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "khaḍga",
+      "dev": "खड्ग",
+      "iast_parser": "khaḍga",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "kh",
+        "ḍ",
+        "g"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "mukura",
+      "dev": "मुकुर",
+      "iast_parser": "mukura",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "m",
+        "k",
+        "r"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "cāpa",
+      "dev": "चाप",
+      "iast_parser": "cāpa",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "c",
+        "p"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "megha",
+      "dev": "मेघ",
+      "iast_parser": "megha",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "m",
+        "gh"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "vāyu",
+      "dev": "वायु",
+      "iast_parser": "vāyu",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "v",
+        "y"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "parvata",
+      "dev": "पर्वत",
+      "iast_parser": "parvata",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "p",
+        "r",
+        "v",
+        "t"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "samudra",
+      "dev": "समुद्र",
+      "iast_parser": "samudra",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "s",
+        "m",
+        "d",
+        "r"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "vṛṣṭi",
+      "dev": "वृष्टि",
+      "iast_parser": "vṛṣṭi",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "v",
+        "ṣ",
+        "ṭ"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "gamana",
+      "dev": "गमन",
+      "iast_parser": "gamana",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "g",
+        "m",
+        "n"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "smṛti",
+      "dev": "स्मृति",
+      "iast_parser": "smṛti",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "s",
+        "m",
+        "t"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "nidrā",
+      "dev": "निद्रा",
+      "iast_parser": "nidrā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "n",
+        "d",
+        "r"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "taḍit",
+      "dev": "तडित्",
+      "iast_parser": "taḍit",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "t",
+        "ḍ",
+        "t"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "pavana",
+      "dev": "पवन",
+      "iast_parser": "pavana",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "p",
+        "v",
+        "n"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kāla",
+      "dev": "काल",
+      "iast_parser": "kāla",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "k",
+        "l"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "tejas",
+      "dev": "तेजस्",
+      "iast_parser": "tejas",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "t",
+        "j",
+        "s"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "tuṣāra",
+      "dev": "तुषार",
+      "iast_parser": "tuṣāra",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "t",
+        "ṣ",
+        "r"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "pralaya",
+      "dev": "प्रलय",
+      "iast_parser": "pralaya",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "p",
+        "r",
+        "l",
+        "y"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "sṛṣṭi",
+      "dev": "सृष्टि",
+      "iast_parser": "sṛṣṭi",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "s",
+        "ṣ",
+        "ṭ"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "vega",
+      "dev": "वेग",
+      "iast_parser": "vega",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "v",
+        "g"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "dhvani",
+      "dev": "ध्वनि",
+      "iast_parser": "dhvani",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "dh",
+        "v",
+        "n"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "chāyā",
+      "dev": "छाया",
+      "iast_parser": "chāyā",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "ch",
+        "y"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "taraṅga",
+      "dev": "तरङ्ग",
+      "iast_parser": "taraṅga",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "t",
+        "r",
+        "ṅ",
+        "g"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "hima",
+      "dev": "हिम",
+      "iast_parser": "hima",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "h",
+        "m"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kṣamā",
+      "dev": "क्षमा",
+      "iast_parser": "kṣamā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "k",
+        "ṣ",
+        "m"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "karuṇā",
+      "dev": "करुणा",
+      "iast_parser": "karuṇā",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "k",
+        "r",
+        "ṇ"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "maitrī",
+      "dev": "मैत्री",
+      "iast_parser": "maitrī",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "m",
+        "t",
+        "r"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "dhṛti",
+      "dev": "धृति",
+      "iast_parser": "dhṛti",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "dh",
+        "t"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "vinaya",
+      "dev": "विनय",
+      "iast_parser": "vinaya",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "v",
+        "n",
+        "y"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "śraddhā",
+      "dev": "श्रद्धा",
+      "iast_parser": "śraddhā",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "ś",
+        "r",
+        "d",
+        "dh"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "dāna",
+      "dev": "दान",
+      "iast_parser": "dāna",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "d",
+        "n"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "viveka",
+      "dev": "विवेक",
+      "iast_parser": "viveka",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "v",
+        "v",
+        "k"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "audārya",
+      "dev": "औदार्य",
+      "iast_parser": "audārya",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "d",
+        "r",
+        "y"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "ārjava",
+      "dev": "आर्जव",
+      "iast_parser": "ārjava",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "r",
+        "j",
+        "v"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "mārdava",
+      "dev": "मार्दव",
+      "iast_parser": "mārdava",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "m",
+        "r",
+        "d",
+        "v"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "tyāga",
+      "dev": "त्याग",
+      "iast_parser": "tyāga",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "t",
+        "y",
+        "g"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "dama",
+      "dev": "दम",
+      "iast_parser": "dama",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "d",
+        "m"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "śama",
+      "dev": "शम",
+      "iast_parser": "śama",
+      "n_consonant_occ": 2,
+      "consonants": [
+        "ś",
+        "m"
+      ],
+      "n_mapped": 2,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "akrodha",
+      "dev": "अक्रोध",
+      "iast_parser": "akrodha",
+      "n_consonant_occ": 3,
+      "consonants": [
+        "k",
+        "r",
+        "dh"
+      ],
+      "n_mapped": 3,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    },
+    {
+      "iast": "kṣānti",
+      "dev": "क्षान्ति",
+      "iast_parser": "kṣānti",
+      "n_consonant_occ": 4,
+      "consonants": [
+        "k",
+        "ṣ",
+        "n",
+        "t"
+      ],
+      "n_mapped": 4,
+      "n_missing": 0,
+      "missing_units": [],
+      "coverage": 1.0,
+      "warnings": []
+    }
+  ]
+}

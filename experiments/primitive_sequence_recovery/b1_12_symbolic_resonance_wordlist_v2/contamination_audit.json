@@ -1,0 +1,569 @@
+{
+  "schema": "b1_12_bsr_contamination_audit_v2",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "sources_checked": [
+    "ALL_repo_wordlist_artifacts (glob **/*.json iast fields)",
+    "b1_12_symbolic_resonance_wordlist_v1",
+    "60word/affliction/resolution",
+    "feature_lift",
+    "b1_12_dev"
+  ],
+  "n_previously_seen_words_indexed": 269,
+  "included_all_fresh": true,
+  "audit": [
+    {
+      "iast": "īrṣyā",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "mada",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "excluded_word_manifest.json"
+      ]
+    },
+    {
+      "iast": "dveṣa",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "śoka",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "rāga",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "cintā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "bhrama",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "asūyā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "mātsarya",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json"
+      ]
+    },
+    {
+      "iast": "kārpaṇya",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "matsya",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "markaṭa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "mahiṣa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "uṣṭra",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_source_list.json",
+        "contamination_audit.json",
+        "excluded_candidates.json",
+        "parser_coverage_audit.json"
+      ]
+    },
+    {
+      "iast": "vṛka",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_source_list.json",
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "kūrma",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "maṇḍūka",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "śṛgāla",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "kapāla",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "grīvā",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "arm_render_examples.json",
+        "b1_12_candidate_pool_v1.json",
+        "b1_12_candidate_source_list.json",
+        "candidate_level_metrics.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "included_word_manifest.json",
+        "parser_outputs.json",
+        "selected_set_structural_audit.json",
+        "selection.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "jaṅghā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "oṣṭha",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "lalāṭa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "pṛṣṭha",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "ratha",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_inventory.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "ghaṭa",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "maṇi",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_pool_v1.json",
+        "b1_12_candidate_source_list.json",
+        "candidate_level_metrics.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "parser_outputs.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "pustaka",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "śara",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_inventory.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json"
+      ]
+    },
+    {
+      "iast": "darpaṇa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "kuṇḍala",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "khaḍga",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_inventory.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "mukura",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "cāpa",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "megha",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_pool_v1.json",
+        "b1_12_candidate_source_list.json",
+        "bwr_shuffle_setup.json",
+        "candidate_inventory.json",
+        "candidate_level_metrics.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "parser_outputs.json",
+        "set_A_manifest.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "vāyu",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_source_list.json",
+        "bwr_shuffle_setup.json",
+        "candidate_inventory.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "parvata",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_inventory.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "excluded_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json"
+      ]
+    },
+    {
+      "iast": "samudra",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_inventory.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "vṛṣṭi",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "gamana",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_source_list.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "excluded_word_manifest.json"
+      ]
+    },
+    {
+      "iast": "smṛti",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "nidrā",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_inventory.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "taḍit",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "pavana",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "kāla",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_inventory.json",
+        "native_merged_word_resolution.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json"
+      ]
+    },
+    {
+      "iast": "tejas",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "tuṣāra",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_source_list.json",
+        "contamination_audit.json",
+        "excluded_candidates.json",
+        "parser_coverage_audit.json"
+      ]
+    },
+    {
+      "iast": "pralaya",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "sṛṣṭi",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "vega",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "dhvani",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "chāyā",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "taraṅga",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "hima",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_pool_v1.json",
+        "b1_12_candidate_source_list.json",
+        "candidate_level_metrics.json",
+        "candidate_source_list.json",
+        "included_word_manifest.json",
+        "parser_outputs.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "kṣamā",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json",
+        "candidate_inventory.json",
+        "native_merged_word_resolution.json",
+        "per_word_classification.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json"
+      ]
+    },
+    {
+      "iast": "karuṇā",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json"
+      ]
+    },
+    {
+      "iast": "maitrī",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json"
+      ]
+    },
+    {
+      "iast": "dhṛti",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "vinaya",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_source_list.json",
+        "contamination_audit.json",
+        "excluded_candidates.json",
+        "parser_coverage_audit.json"
+      ]
+    },
+    {
+      "iast": "śraddhā",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "candidate_source_list.json",
+        "contamination_audit.json",
+        "excluded_candidates.json",
+        "parser_coverage_audit.json",
+        "word_resolution.json"
+      ]
+    },
+    {
+      "iast": "dāna",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "b1_12_candidate_pool_v1.json",
+        "b1_12_candidate_source_list.json",
+        "bwr_shuffle_setup.json",
+        "candidate_inventory.json",
+        "candidate_level_metrics.json",
+        "candidate_source_list.json",
+        "descriptor_example_data.json",
+        "included_word_manifest.json",
+        "native_merged_word_resolution.json",
+        "parser_outputs.json",
+        "trackg_decomposition_diff.json",
+        "word_resolution.json",
+        "word_target_table.json"
+      ]
+    },
+    {
+      "iast": "viveka",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "audārya",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "ārjava",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "mārdava",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "tyāga",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json"
+      ]
+    },
+    {
+      "iast": "dama",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "śama",
+      "contamination": "DEVELOPMENT_CONTAMINATED",
+      "prior_sources": [
+        "bwr_shuffle_setup.json"
+      ]
+    },
+    {
+      "iast": "akrodha",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    },
+    {
+      "iast": "kṣānti",
+      "contamination": "FRESH_UNINSPECTED",
+      "prior_sources": []
+    }
+  ]
+}

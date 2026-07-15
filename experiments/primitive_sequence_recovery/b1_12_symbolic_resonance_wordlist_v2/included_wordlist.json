@@ -1,0 +1,129 @@
+{
+  "schema": "b1_12_bsr_wordlist_v2",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "N": 20,
+  "attestation": "all entries are attested Classical Sanskrit lexemes; ordinary bare-word gloss only; varṇa mapping glosses not consulted during selection",
+  "wordlist_sha256": "7a558008a22151a48f7770790bbfb01cdef190b64d3ae6feb8677b0b360457b4",
+  "words": [
+    {
+      "iast": "akrodha",
+      "dev": "अक्रोध",
+      "gloss": "non-anger",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "asūyā",
+      "dev": "असूया",
+      "gloss": "envy/detraction",
+      "category": "afflictive"
+    },
+    {
+      "iast": "audārya",
+      "dev": "औदार्य",
+      "gloss": "magnanimity",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "bhrama",
+      "dev": "भ्रम",
+      "gloss": "delusion/confusion",
+      "category": "afflictive"
+    },
+    {
+      "iast": "chāyā",
+      "dev": "छाया",
+      "gloss": "shadow",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "cintā",
+      "dev": "चिन्ता",
+      "gloss": "anxiety",
+      "category": "afflictive"
+    },
+    {
+      "iast": "cāpa",
+      "dev": "चाप",
+      "gloss": "bow",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "dama",
+      "dev": "दम",
+      "gloss": "self-restraint",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "darpaṇa",
+      "dev": "दर्पण",
+      "gloss": "mirror",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "dhvani",
+      "dev": "ध्वनि",
+      "gloss": "sound",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "dhṛti",
+      "dev": "धृति",
+      "gloss": "fortitude",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "jaṅghā",
+      "dev": "जङ्घा",
+      "gloss": "shank",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "kapāla",
+      "dev": "कपाल",
+      "gloss": "skull",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "kuṇḍala",
+      "dev": "कुण्डल",
+      "gloss": "earring",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "kārpaṇya",
+      "dev": "कार्पण्य",
+      "gloss": "miserliness/pettiness",
+      "category": "afflictive"
+    },
+    {
+      "iast": "kūrma",
+      "dev": "कूर्म",
+      "gloss": "tortoise",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "lalāṭa",
+      "dev": "ललाट",
+      "gloss": "forehead",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "mukura",
+      "dev": "मुकुर",
+      "gloss": "mirror",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "pavana",
+      "dev": "पवन",
+      "gloss": "wind",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "pralaya",
+      "dev": "प्रलय",
+      "gloss": "dissolution",
+      "category": "natural_action_abstract"
+    }
+  ]
+}
