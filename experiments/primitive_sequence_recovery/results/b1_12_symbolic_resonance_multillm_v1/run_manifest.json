@@ -1,16 +1,11 @@
 {
-  "schema": "b1_12_bsr_multillm_run_manifest_v1",
+  "schema": "b1_12_bsr_run_manifest_v1",
   "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
-  "phase": "SETUP_ONLY (gate verification)",
-  "status": "BLOCKED",
-  "block_reasons": [
-    "BLOCKED_REQUIRED_MODEL_UNAVAILABLE",
-    "BLOCKED_WORDLIST_NOT_PRECOMMITTED"
-  ],
+  "status": "COMPLETED",
+  "mode": "vllm_sequential_single_gpu",
   "controlling_preregistration": "VARNA_SYMBOLIC_RESONANCE_PREREG_V1.md",
-  "scope_artifact": "B1_12_SCOPE_UPDATE_AND_CONTROLLING_PREREG.md",
-  "design": "two-LLM cross-over (Run A / Run B, roles swapped) — NOT executed (blocked at setup)",
-  "no_model_substitution": "required models were not available; no other model (incl. this assistant) was substituted",
-  "no_words_selected": "word list NOT created here (selecting words in the scoring task is prohibited; precommitment is a separate gate)",
-  "confirmatory_status": "NOT inferred; no evidence-freeze declaration validated"
+  "verdict_role_freeze": "B1_12_BSR_VERDICT_AND_ROLE_STABILITY_FREEZE.md",
+  "wordlist_sha256": "9779384dcb82e0c6d86fa88ed1f000317ed387ea5f227cb32f96f38b95f8a6ba",
+  "role_dependence": "SIGNIFICANT_ROLE_DEPENDENCE",
+  "no_forced_consensus": true
 }
