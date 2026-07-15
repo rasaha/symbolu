@@ -26,7 +26,22 @@ def dump(n, o):
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / n).write_text(json.dumps(o, ensure_ascii=False, indent=2), encoding="utf-8")
 
+def phase_done(jobs):
+    """Resume guard: a phase is already complete iff every job's output JSON exists and parses."""
+    for j in jobs:
+        p = pathlib.Path(j["out"])
+        if not p.exists():
+            return False
+        try:
+            json.load(open(p, encoding="utf-8"))
+        except Exception:
+            return False
+    return True
+
 def run_worker(model, jobs, tmp, wl, args, tag):
+    if phase_done(jobs):
+        print("SKIP (resume: outputs already present)", tag, [j["out"] for j in jobs], flush=True)
+        return
     jf = tmp / f"jobs_{tag}.json"
     jf.write_text(json.dumps(jobs), encoding="utf-8")
     cmd = [sys.executable, str(HERE / "phase_worker.py"), "--model", model, "--jobs", str(jf),
@@ -67,7 +82,11 @@ def main():
     tmp = OUT / "_tmp"; tmp.mkdir(exist_ok=True)
     A_auth, A_sc = tmp / "A_author.json", tmp / "A_scores.json"
     B_auth, B_sc = tmp / "B_author.json", tmp / "B_scores.json"
-    (OUT / "raw_all.jsonl").write_text("", encoding="utf-8")
+    resuming = any(p.exists() for p in (A_auth, A_sc, B_auth, B_sc))
+    if not resuming:  # fresh run truncates the raw log; resume appends to preserve completed phases
+        (OUT / "raw_all.jsonl").write_text("", encoding="utf-8")
+    elif not (OUT / "raw_all.jsonl").exists():
+        (OUT / "raw_all.jsonl").write_text("", encoding="utf-8")
 
     run_worker(args.qwen, [{"run": "A", "role": "author", "out": str(A_auth)}], tmp, wl, args, "qwen_A_author")
     run_worker(args.mistral, [{"run": "A", "role": "score", "author_file": str(A_auth), "out": str(A_sc)},

@@ -25,29 +25,32 @@ class VLLMBackend:
     """Offline vLLM. Deterministic: temperature=0, fixed seed. One model loaded at a time (isolation)."""
     def __init__(self, model_id, seed, dtype="bfloat16", max_model_len=8192, gpu_mem_util=0.90,
                  tensor_parallel_size=1, quantization=None, qwen_enable_thinking=False, max_tokens=2048):
+        import json as _json
         from vllm import LLM, SamplingParams
+        self._json = _json
         self.model_id = model_id
         self.seed = seed
         self.qwen_enable_thinking = qwen_enable_thinking
         self.family = "qwen" if "qwen" in model_id.lower() else ("mistral" if "mistral" in model_id.lower() else "other")
+        kw = {}
+        if self.family == "mistral":
+            # native mistral format: loads only consolidated.safetensors (no redundant sharded copy) + correct tokenizer
+            kw.update(tokenizer_mode="mistral", load_format="mistral", config_format="mistral")
         self.llm = LLM(model=model_id, dtype=dtype, seed=seed, max_model_len=max_model_len,
                        gpu_memory_utilization=gpu_mem_util, tensor_parallel_size=tensor_parallel_size,
-                       quantization=quantization, trust_remote_code=True)
+                       quantization=quantization, trust_remote_code=True, **kw)
         self.sp = SamplingParams(temperature=0.0, top_p=1.0, top_k=-1, repetition_penalty=1.0,
                                  seed=seed, max_tokens=max_tokens)
-        self.tok = self.llm.get_tokenizer()
-
-    def _render(self, system, user):
-        msgs = [{"role": "system", "content": system}, {"role": "user", "content": user}]
-        kw = {}
-        if self.family == "qwen":
-            kw["enable_thinking"] = self.qwen_enable_thinking  # one fixed Qwen mode for the whole run
-        return self.tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, **kw)
 
     def generate(self, system, user):
-        prompt = self._render(system, user)
-        out = self.llm.generate([prompt], self.sp)[0].outputs[0].text
-        return out, {"prompt_sha256": sha_text(prompt), "output_sha256": sha_text(out)}
+        # llm.chat() handles the chat template for both HF (Qwen) and mistral tokenizers robustly
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        kw = {}
+        if self.family == "qwen":
+            kw["chat_template_kwargs"] = {"enable_thinking": self.qwen_enable_thinking}
+        out = self.llm.chat(messages, self.sp, use_tqdm=False, **kw)[0].outputs[0].text
+        ph = sha_text(self._json.dumps(messages, ensure_ascii=False) + str(kw))
+        return out, {"prompt_sha256": ph, "output_sha256": sha_text(out)}
 
 class OpenAICompatBackend:
     """For a served vLLM OpenAI-compatible endpoint (base_url + model)."""
