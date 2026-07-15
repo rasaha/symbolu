@@ -120,19 +120,22 @@ def main():
     be = backends.VLLMBackend(a.model, seed=a.seed, qwen_enable_thinking=a.qwen_thinking,
                               max_tokens=a.max_tokens, gpu_mem_util=a.gpu_mem_util, max_model_len=a.max_model_len)
     raw = []
-    for job in jobs:
-        if job["role"] == "author":
-            prof, ev = do_author(be, words, a.model, job["run"], raw)
-            json.dump({"author_model": a.model, "profiles": prof, "evidence": ev},
-                      open(job["out"], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-        else:
-            ad = json.load(open(job["author_file"], encoding="utf-8"))
-            sc = do_score(be, words, a.model, job["run"], ad, raw)
-            json.dump({"scorer_model": a.model, "scores": sc},
-                      open(job["out"], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-    with open(a.raw_out, "a", encoding="utf-8") as f:
-        for r in raw:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    try:
+        for job in jobs:
+            if job["role"] == "author":
+                prof, ev = do_author(be, words, a.model, job["run"], raw)
+                json.dump({"author_model": a.model, "profiles": prof, "evidence": ev},
+                          open(job["out"], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+            else:
+                ad = json.load(open(job["author_file"], encoding="utf-8"))
+                sc = do_score(be, words, a.model, job["run"], ad, raw)
+                json.dump({"scorer_model": a.model, "scores": sc},
+                          open(job["out"], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+    finally:
+        # always flush the raw log — even when a job aborts with RUN_INVALID — so failures are diagnosable
+        with open(a.raw_out, "a", encoding="utf-8") as f:
+            for r in raw:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
     print("PHASE_OK", a.model, [j["role"] + ":" + j["run"] for j in jobs])
 
 if __name__ == "__main__":
