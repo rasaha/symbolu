@@ -1,48 +1,75 @@
-# KVPro V3 Gate-1 — status (what is decided vs pod-required)
+# KVPro V3 Gate-1 — status (end-to-end quality harness complete)
 
 **Date:** 2026-07-15 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae` · **Current verdict: `INCONCLUSIVE`**
-(the quality question needs real captured KV on a GPU pod; this container has no GPU).
+(the end-to-end quality drivers are built but NOT RUN — this container has no GPU).
+
+## The gate now requires end-to-end quality (not proxies)
+A candidate can receive **`GO_KERNEL_PROTOTYPE`** only if it passes **all** of, on the model under test:
+**standard needle** AND **hard-needle (MANDATORY)** AND **MMLU** AND the offline attention proxy AND the
+≥5% systems floor. **Reconstruction error, attention error, perplexity, and token agreement can NEVER
+GO on their own** — enforced in `gates.py` (verified by `tests/test_quality_gate_cpu.py`). Qwen2.5-7B is
+evaluated **first** and gets the strict rule: **zero** hard-needle regressions vs affine.
+
+## Systems interpretation (read before acting on any GO)
+- Dropping **both** K and V xmin reduces **modeled** read bytes by **~9.3%**; dropping **only one** by
+  **~4.65%** (`accounting.py`, analytical).
+- **This does NOT establish an equivalent TPS increase.** It is a read-bandwidth reduction; decode is
+  bandwidth-bound so it is the relevant *proxy*, but the realized speedup depends on the kernel, and
+  the scattered **protect** stream + the packed nibbles remain the larger costs.
+- **Symmetric quantization is NOT a standalone V3 throughput solution.** ~9.3% is modest.
+- **Even a passing quality result would justify kernel work only in combination with a broader
+  decode-path redesign** (in-kernel paged gather + store-as-consumed layout). On its own, a passing
+  Gate-1 most honestly points to `NO_GO_SYSTEMS_VALUE` unless folded into that larger kernel.
 
 ## CPU-tested this session (MEASURED-on-CPU / analytical)
-- **Unit tests: 15/15 pass** — the affine quantizer is bit-faithful to the production writer math
-  (`_ASYM_DIV=15`, per-block K / per-token-group V), protected channels reconstruct **exact**, the
-  candidate wiring (S1–S4) is correct, and the pre-registered gate decision tree returns the right
-  label in each branch (INCONCLUSIVE / GO_KERNEL_PROTOTYPE / NO_GO_QUALITY / GO_WITH_MODIFICATION).
-- **Accounting (analytical, real):** dropping **both** xmins (S1/S2) = **−9.30%** decode read-bandwidth;
-  dropping **one** (S3/S4) = **−4.65%** — **below the 5% floor**. Identical % for Qwen2.5-7B and
-  Llama-3.1-8B (same D/BS/group geometry). prot-int8 protect nudges these to −9.64% / −4.82%.
-- **Synthetic pipeline** (recon → attention-error → gate) runs end-to-end and correctly yields
-  `INCONCLUSIVE` (synthetic data is explicitly **not** a quality verdict).
+- **Unit tests: 26/26 pass** — quantizer↔production fidelity + protected-exact (10);
+  results parsing / per-seed aggregation / regression detection / verdict tree / NOT_RUN (11);
+  driver builders **reuse** the repo needle/hard-needle/MMLU protocols (5).
+- Accounting: −9.30% (both xmin) / −4.65% (one), Qwen2.5-7B & Llama-3.1-8B.
+- Shell gate + `candidate_summary.csv` validated on crafted all-pass inputs (→ GO for S1/S2; S3/S4 show
+  `systems=False` at 4.65%).
 
 ## NOT RUN — requires a GPU pod (the actual falsifier)
-- `capture_kv.py` — capture real post-RoPE Q/K/V + the frozen mask (no int4 fork needed).
-- reconstruction + **attention-error on REAL tensors** — the decisive offline quality signal.
-- `fakequant_quality.py` — end-to-end fake-quant perplexity + token-agreement (no int4 fork needed).
-- hard-needle / MMLU end-to-end (add a driver alongside, per the pre-registered e2e thresholds).
-- `capture_kv.py` and `fakequant_quality.py` are **HARDWARE-UNTESTED** — verify the rotary/Cache
-  patches against the pod's `transformers` version (they target the Llama/Qwen2 style).
+- `capture_kv.py`, `needle_driver.py`, `hard_needle_driver.py`, `mmlu_driver.py`,
+  `token_agreement.py`, `fakequant_quality.py`, and `fakequant_model.py` — all need **GPU + model +
+  mask** and are **HARDWARE-UNTESTED**. They do NOT need the int4 decode fork (fake-quant study).
+  - Prompt-set builders (`build_prompt_set` / `build_item_set` / `build_question_set`) ARE CPU-tested
+    (they reuse the repo functions); the **generation** paths are pod-only.
+  - Verify against your `transformers` version: `capture_kv.py` patches `apply_rotary_pos_emb`; the
+    drivers use `transformers.cache_utils.DynamicCache` + `model.generate(past_key_values=…)`.
 
-## Deviation (stated openly): the int4 decode fork is NOT gated on
-This is a **fake-quant** study (quantize→dequantize in fp), so it does not use the int4 CUDA kernel or
-the `int4_protected` backend. The harness reports the fork as **INFO**, not a hard failure — this is a
-deliberate, documented choice, **not** a silent fallback. Hard deps for pod steps remain **GPU + model
-+ mask**. If you want a production-path capture instead, that's a separate extension.
+## Exact RunPod command sequence
+```bash
+cd <repo-root>/experiments/kvpro_v3_symmetric_residual
 
-## What result justifies kernel work (the branch this gate decides)
-| Outcome on a real pod run | Verdict | Action |
+# 0) mask for the marginal model first (skip if you already have one)
+bash ../../scripts/kvpro_v2_validation/01_calibrate_mask.sh \
+     Qwen/Qwen2.5-7B-Instruct /workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt
+export PROTECT_MASK_PATH=/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt
+
+# 1) quick gate first (small needle + hard-needle + builtin MMLU) — fast sanity
+bash run_all.sh --model Qwen/Qwen2.5-7B-Instruct --mask "$PROTECT_MASK_PATH" --quick-quality
+
+# 2) full quality gate on Qwen2.5-7B (the marginal model) — the decisive run
+bash run_all.sh --model Qwen/Qwen2.5-7B-Instruct --mask "$PROTECT_MASK_PATH" --full-quality
+#   -> runs/<ts>/ : needle_results.json hard_needle_results.json knowledge_results.json
+#      token_agreement.json attention_error_metrics.json candidate_summary.csv verdict.json + logs
+#   For the FULL prior MMLU battery add:  MM_ARGS real -> edit run_all (or run mmlu_driver.py --real --num-questions 200)
+
+# 3) read the verdict
+cat runs/<ts>/verdict.json ; cat runs/<ts>/candidate_summary.csv
+
+# 4) (only if step 2 passes on Qwen) repeat on a second model
+bash run_all.sh --model meta-llama/Llama-3.1-8B-Instruct --mask <llama_mask.pt> --full-quality
+```
+Individual stages: `--needle-only`, `--hard-needle-only`, `--mmlu-only`, `--reconstruction-only`,
+`--quality-only`. Each fails loudly if GPU/model/mask are missing (no silent fallback, no easier bench).
+
+## What result justifies kernel work
+| Real pod outcome | Verdict | Action |
 |---|---|---|
-| S1/S2 quality passes (offline **and** e2e) **and** ≥5% systems (S1/S2 = 9.3% ✓) | **GO_KERNEL_PROTOTYPE** | build the V3 symmetric fused kernel |
-| Symmetric fails on Qwen2.5-7B (or any candidate below threshold everywhere) | **NO_GO_QUALITY** | abandon symmetric residual **before** kernel effort |
-| Quality fine but reduction <5% (e.g., only single-xmin drops viable) | **NO_GO_SYSTEMS_VALUE** | keep affine INT4; spend effort on in-kernel gather / store-as-consumed |
-| Only K (S4) or only V (S3) passes quality | **GO_WITH_MODIFICATION** | pursue an **asymmetric** format, not one universal representation |
-
-## Honest caveats (challenging the hypothesis, including my own prior numbers)
-- The systems win from xmin removal is **modest**: **~9.3%** (both xmins) or **~4.65%** (one). This
-  **corrects my earlier speculative "15–35% TPS"** — that was unsupported. Even a perfect symmetric
-  kernel recovers **≤~9.3%** at long context from xmin alone; the packed nibbles (128 B) and the
-  scattered **protect** stream remain and likely become the next bottleneck. So a **quality-passes /
-  systems-too-small** outcome (`NO_GO_SYSTEMS_VALUE`) is a genuinely plausible result of this gate — and
-  if that happens, the honest recommendation is to keep affine and pursue in-kernel gather / layout
-  instead. This gate is designed to surface that, not to rationalize a kernel.
-- Reconstruction MSE alone is **not** trusted; the decision leans on the attention-output error and
-  end-to-end quality, per the study design.
+| S1/S2 pass needle+hard-needle+MMLU+offline **and** ≥5% (9.3% ✓) on Qwen2.5-7B | **GO_KERNEL_PROTOTYPE** | build the V3 symmetric kernel — but **only** inside the broader gather/layout redesign |
+| Any candidate flips a hard-needle answer on Qwen2.5-7B (or fails a benchmark everywhere) | **NO_GO_QUALITY** | abandon symmetric residual before kernel effort |
+| Quality fine but reduction <5% (single-xmin only) | **NO_GO_SYSTEMS_VALUE** | keep affine; do in-kernel gather / store-as-consumed |
+| Only K (S4) or only V (S3) safe | **GO_WITH_MODIFICATION** | asymmetric format, not one universal representation |
+| End-to-end not fully run | **INCONCLUSIVE** | (current state — run it on a pod) |

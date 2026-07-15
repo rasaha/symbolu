@@ -105,44 +105,5 @@ class TestMetrics(unittest.TestCase):
         self.assertLess(am["softmax_kl_max"], 1e-6)
 
 
-class TestGateDecisionTree(unittest.TestCase):
-    def _attn(self, label, cos, mse_x, kl):
-        s = {c: {"attn_out_cos_min": cos, "attn_out_mse_vs_affine_max": mse_x,
-                 "softmax_kl_max_max": kl, "attn_out_mse_max": 0.0, "softmax_kl_mean_max": 0.0}
-             for c in ("affine", "S1", "S2", "S3", "S4")}
-        return {"summary": s, "label": label}
-
-    def _e2e(self, ok):
-        base = {"hard_needle": 0.96, "token_agree": 99.0, "mmlu": 70.0}
-        cand = dict(base) if ok else {"hard_needle": 0.80, "token_agree": 90.0, "mmlu": 65.0}
-        return {"affine": base, "bf16": base, "S1": cand, "S2": cand, "S3": cand, "S4": cand}
-
-    def test_synthetic_is_inconclusive(self):
-        v = G.verdict(None, self._attn("NOT_A_VERDICT_SYNTHETIC", 1.0, 1.0, 0.0), None)
-        self.assertEqual(v["verdict"], "INCONCLUSIVE")
-
-    def test_offline_pass_no_e2e_inconclusive(self):
-        v = G.verdict(None, self._attn("MEASURED", 0.9999, 1.1, 0.01), None)
-        self.assertEqual(v["verdict"], "INCONCLUSIVE")
-
-    def test_offline_and_e2e_pass_go(self):
-        v = G.verdict(None, self._attn("MEASURED", 0.9999, 1.1, 0.01), self._e2e(True))
-        self.assertEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
-
-    def test_quality_fail_no_go(self):
-        v = G.verdict(None, self._attn("MEASURED", 0.90, 3.0, 0.5), self._e2e(False))
-        self.assertEqual(v["verdict"], "NO_GO_QUALITY")
-
-    def test_only_v_passes_go_with_modification(self):
-        attn = self._attn("MEASURED", 0.90, 3.0, 0.5)          # most fail
-        attn["summary"]["S3"] = {"attn_out_cos_min": 0.9999, "attn_out_mse_vs_affine_max": 1.1,
-                                 "softmax_kl_max_max": 0.01, "attn_out_mse_max": 0.0,
-                                 "softmax_kl_mean_max": 0.0}     # S3 (sym V) passes offline
-        e2e = self._e2e(False)
-        e2e["S3"] = {"hard_needle": 0.96, "token_agree": 99.0, "mmlu": 70.0}   # S3 passes e2e
-        v = G.verdict(None, attn, e2e)
-        self.assertEqual(v["verdict"], "GO_WITH_MODIFICATION")
-
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)

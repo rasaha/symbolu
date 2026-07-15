@@ -28,38 +28,52 @@ metrics.py               MSE/cos/maxabs, per-head, protected-vs-unprotected, QK�
 accounting.py            analytical bytes/token, metadata, ops removed (Qwen2.5-7B, Llama-3.1-8B)
 reconstruction_eval.py   low-level error (real capture or --synthetic plumbing fixture)
 attention_error_eval.py  DECISIVE offline proxy (logits→softmax→output), relative to affine
-gates.py                 PRE-REGISTERED thresholds → one verdict label
+gates.py                 PRE-REGISTERED gate → one verdict (needle+hard-needle+MMLU REQUIRED for GO)
+results.py               pure parsing/aggregation/regression detection (CPU-tested)
 capture_kv.py            POD: capture real post-RoPE Q/K/V + frozen mask (no fork needed)
-fakequant_quality.py     POD: end-to-end fake-quant ppl + token-agreement (no fork needed)
-SPEC.md                  current-format + candidate-format specification (code-cited)
-RESULT_SCHEMA.md         JSON/CSV result schemas
-STATUS.md                what is CPU-tested vs pod-required, and what result justifies kernel work
-tests/                   CPU unit tests (quantizer↔production fidelity, accounting, gates)
-run_*.sh / run_all.sh    orchestration (CPU offline evals + pod capture/e2e)
+fakequant_model.py       POD: shared fake-quant generation backend (per-candidate KV cache)
+needle_driver.py         POD: STANDARD needle — reuses verify_phase5b_5_needle protocol
+hard_needle_driver.py    POD: HARD-needle (MANDATORY) — reuses phase6k12_hard_needle build_item/classify
+mmlu_driver.py           POD: MMLU/knowledge — reuses bench_phase6n build_prompt/parse_answer/_load_mmlu
+token_agreement.py       POD: teacher-forced AND autoregressive agreement (separate, secondary)
+fakequant_quality.py     POD: perplexity + token-agreement (secondary signal)
+SPEC.md / RESULT_SCHEMA.md / STATUS.md   format spec / result schemas / status + RunPod sequence
+tests/                   CPU unit tests (quantizer↔production, accounting, results, gate, builder reuse)
+run_*.sh / run_all.sh    orchestration (CPU offline evals + pod quality drivers)
 ```
+
+The end-to-end drivers **reuse the repo's existing quality battery** (same prompts, scoring,
+seeds, acceptance conventions) and run it through **fake-quant** so the symmetric candidates can be
+evaluated with identical scoring — no new incompatible protocol, no int4 CUDA kernel.
 
 ## Run
 ```bash
 cd experiments/kvpro_v3_symmetric_residual
 
-# CPU-runnable now (plumbing + analytical): unit tests, accounting, synthetic pipeline
-python3 -m unittest tests.test_symmetric_residual_cpu -v
+# CPU-runnable now (plumbing + analytical): unit tests, accounting
+python3 -m unittest discover -s tests -p 'test_*.py'
 python3 accounting.py
 bash run_all.sh --reconstruction-only        # synthetic fixture if no real capture (NOT a verdict)
 
-# On a GPU pod (the real falsifier):
-export PROTECT_MASK_PATH=/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt   # or build via calibrate
-bash run_all.sh --model Qwen/Qwen2.5-7B-Instruct --mask "$PROTECT_MASK_PATH"
-#   -> capture real KV -> reconstruction + attention-error -> fake-quant e2e -> verdict.json + CSV
-bash run_all.sh --quality-only               # attn + e2e + gate (reuses an existing capture)
+# On a GPU pod (the real falsifier) — Qwen2.5-7B (marginal model) FIRST:
+export PROTECT_MASK_PATH=/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.pt
+bash run_all.sh --model Qwen/Qwen2.5-7B-Instruct --mask "$PROTECT_MASK_PATH" --quick-quality   # fast sanity
+bash run_all.sh --model Qwen/Qwen2.5-7B-Instruct --mask "$PROTECT_MASK_PATH" --full-quality     # decisive
+#   -> runs/<ts>/: needle_results.json hard_needle_results.json knowledge_results.json
+#      token_agreement.json candidate_summary.csv verdict.json + logs
+# Stages: --needle-only  --hard-needle-only  --mmlu-only  --quality-only
 ```
+(See `STATUS.md` for the exact RunPod sequence and the honest hardware-untested list.)
 
 ## Honesty rules (enforced in code)
 - Every result is labeled **MEASURED** / **NOT RUN** / **NOT_A_VERDICT_SYNTHETIC**.
-- Reconstruction MSE is **never** the sole decision metric — the attention-output error + end-to-end are.
-- Thresholds are **pre-registered** in `gates.py` and not loosened after seeing results.
-- Analytical bandwidth numbers are **not** presented as measured TPS.
+- **GO requires standard-needle + hard-needle + MMLU** on the model under test — reconstruction /
+  attention-error / perplexity / token-agreement can **never** GO alone.
+- Thresholds are **pre-registered** in `gates.py` and not loosened after results.
+- Analytical bandwidth numbers (~9.3% both-xmin / ~4.65% one) are **not** presented as measured TPS,
+  and symmetric alone is **not** a standalone V3 throughput solution (see STATUS.md §systems).
 - If symmetric fails on Qwen2.5-7B, the verdict says so plainly (`NO_GO_QUALITY`).
+- Existing benchmarks are reused, never silently replaced with an easier one.
 - Scope is strictly xmin-removal-via-symmetric; **no** sparse attention / rotation / TP / WarmTier.
 
 See `STATUS.md` for exactly what is decided vs still pod-required, and `SPEC.md` for the formats.
