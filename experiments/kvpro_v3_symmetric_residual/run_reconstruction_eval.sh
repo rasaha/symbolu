@@ -9,10 +9,10 @@ CAPTURE="${CAPTURE:-${1:-}}"
 section "Reconstruction eval"
 if [[ -n "$CAPTURE" && -f "$CAPTURE" ]]; then
   run_step "reconstruction (MEASURED, real capture)" "$RUN/recon.log" \
-    python3 "$KVV3_LIB_DIR/reconstruction_eval.py" --capture "$CAPTURE" --out "$RUN/reconstruction_metrics.json"
+    "$PY" "$KVV3_LIB_DIR/reconstruction_eval.py" --capture "$CAPTURE" --out "$RUN/reconstruction_metrics.json"
 else
   warn "no capture file — running SYNTHETIC fixture (plumbing only, NOT a verdict)."
   run_step "reconstruction (SYNTHETIC)" "$RUN/recon.log" \
-    python3 "$KVV3_LIB_DIR/reconstruction_eval.py" --synthetic --out "$RUN/reconstruction_metrics.json"
+    "$PY" "$KVV3_LIB_DIR/reconstruction_eval.py" --synthetic --out "$RUN/reconstruction_metrics.json"
 fi
 ok "-> $RUN/reconstruction_metrics.json"

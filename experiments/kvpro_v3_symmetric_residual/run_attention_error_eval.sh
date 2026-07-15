@@ -8,10 +8,10 @@ CAPTURE="${CAPTURE:-${1:-}}"
 section "Attention-error eval (logits -> softmax -> output)"
 if [[ -n "$CAPTURE" && -f "$CAPTURE" ]]; then
   run_step "attention error (MEASURED, real capture)" "$RUN/attn.log" \
-    python3 "$KVV3_LIB_DIR/attention_error_eval.py" --capture "$CAPTURE" --out "$RUN/attention_error_metrics.json"
+    "$PY" "$KVV3_LIB_DIR/attention_error_eval.py" --capture "$CAPTURE" --out "$RUN/attention_error_metrics.json"
 else
   warn "no capture file — SYNTHETIC fixture (plumbing only, NOT a verdict)."
   run_step "attention error (SYNTHETIC)" "$RUN/attn.log" \
-    python3 "$KVV3_LIB_DIR/attention_error_eval.py" --synthetic --out "$RUN/attention_error_metrics.json"
+    "$PY" "$KVV3_LIB_DIR/attention_error_eval.py" --synthetic --out "$RUN/attention_error_metrics.json"
 fi
 ok "-> $RUN/attention_error_metrics.json"
