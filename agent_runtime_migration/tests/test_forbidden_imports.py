@@ -28,9 +28,14 @@ FORBIDDEN_NAMES = {
 }
 
 
+# Evaluation harnesses that DELIBERATELY import the legacy runtime to compare against
+# it are not part of the production runtime import path and are excluded from this scan.
+_EXCLUDED_DIRS = (f"{os.sep}tests", f"{os.sep}parity")
+
+
 def _py_files():
     for root, _dirs, files in os.walk(PKG):
-        if "__pycache__" in root or f"{os.sep}tests" in root:
+        if "__pycache__" in root or any(d in root for d in _EXCLUDED_DIRS):
             continue
         for fn in files:
             if fn.endswith(".py"):
@@ -62,12 +67,18 @@ def test_no_forbidden_imports():
 
 
 def test_production_import_does_not_pull_legacy_or_research():
-    # Importing the package must NOT load any module from the legacy ``agentic``
-    # runtime (which carries the research-signal governance). The frozen control
-    # plane's own dependencies under ``symbolu_robotics`` / ``action_gate_ref`` are
-    # allowed — those are the governance layer the runtime legitimately talks to.
+    # Importing the production package must NOT load any module from the legacy
+    # ``agentic`` runtime. Checked in a CLEAN subprocess so it is not contaminated by
+    # other tests (e.g. the parity harness) that legitimately import the legacy runtime.
+    import subprocess
     import sys
-    import agent_runtime_migration  # noqa: F401
-    leaked = [m for m in sys.modules
-              if m == "agentic" or m.startswith("agentic.")]
+    code = (
+        "import sys, agent_runtime_migration\n"
+        "leaked=[m for m in sys.modules if m=='agentic' or m.startswith('agentic.')]\n"
+        "print('LEAKED:'+','.join(leaked))\n"
+    )
+    proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=PKG + "/..")
+    assert proc.returncode == 0, proc.stderr
+    line = [l for l in proc.stdout.splitlines() if l.startswith("LEAKED:")][0]
+    leaked = [x for x in line[len("LEAKED:"):].split(",") if x]
     assert not leaked, f"legacy/research modules leaked into sys.modules: {leaked}"
