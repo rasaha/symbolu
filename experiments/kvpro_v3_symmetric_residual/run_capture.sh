@@ -10,7 +10,7 @@ section "Capture KV: $MODEL"
 pod_gate_or_die "$MASK"
 RUN="$(kvv3_run_dir)"
 run_step "capture Q/K/V + frozen mask" "$RUN/capture.log" \
-  python3 "$KVV3_LIB_DIR/capture_kv.py" --model "$MODEL" --mask "$MASK" --seed "$SEED" \
+  "$PY" "$KVV3_LIB_DIR/capture_kv.py" --model "$MODEL" --mask "$MASK" --seed "$SEED" \
     --out "$RUN/captured_kv.pt"
 if [[ -f "$RUN/captured_kv.pt" ]]; then
   ok "capture -> $RUN/captured_kv.pt"

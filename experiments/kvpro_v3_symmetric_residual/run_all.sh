@@ -35,7 +35,7 @@ RUN="$(kvv3_run_dir)"; export KVV3_RUN_DIR="$RUN"
 GATE_MODEL=qwen; case "$MODEL" in *[Ll]lama*) GATE_MODEL=llama;; esac; export GATE_MODEL
 section "KVPro V3 Gate-1 — mode=$MODE quick=$QUICK — model=$MODEL — run=$RUN"
 
-DRV() { python3 "$HERE/$1" "${@:2}"; }
+DRV() { "$PY" "$HERE/$1" "${@:2}"; }
 NDL_ARGS=(--model "$MODEL" --mask "$MASK" --out "$RUN/needle_results.json")
 HN_ARGS=(--model "$MODEL" --mask "$MASK" --out "$RUN/hard_needle_results.json")
 MM_ARGS=(--model "$MODEL" --mask "$MASK" --out "$RUN/knowledge_results.json")

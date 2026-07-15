@@ -8,6 +8,10 @@ KVV3_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$KVV3_LIB_DIR/../.." && pwd)"
 export REPO
 export PYTHONPATH="$KVV3_LIB_DIR:$REPO/CTM_plus/KVPolicy:$REPO:${PYTHONPATH:-}"
+# Interpreter used for ALL torch/transformers work. Override to a driver-matching env, e.g.
+#   PYBIN=/workspace/venv-vllm/bin/python3 bash run_all.sh ...
+# (the pod's default python3 may have a torch built for a newer CUDA than the GPU driver supports).
+export PY="${PYBIN:-python3}"
 
 log()  { echo "[$(date -u +%H:%M:%S)] $*"; }
 ok()   { echo "  [PASS] $*"; }
@@ -31,13 +35,14 @@ gpu_count() {
     nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l | tr -d ' ' || echo 0
 }
 
-have_torch()   { python3 -c "import torch" >/dev/null 2>&1; }
-have_cuda()    { python3 -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" >/dev/null 2>&1; }
+have_torch()   { "$PY" -c "import torch" >/dev/null 2>&1; }
+have_cuda()    { "$PY" -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" >/dev/null 2>&1; }
+cuda_diag()    { "$PY" -c "import torch;print('torch',torch.__version__,'built-for-cuda',torch.version.cuda,'gpu_visible',torch.cuda.is_available())" 2>&1 | tail -1; }
 mask_ok()      { [[ -n "${1:-}" && -f "${1:-/nonexistent}" ]]; }
 
 # int4 fork: INFO ONLY — this fake-quant study does not use it (stated, not a silent fallback).
 report_fork() {
-  if python3 -c "from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache" >/dev/null 2>&1; then
+  if "$PY" -c "from vllm.vllm_flash_attn import flash_attn_with_int4_kvcache" >/dev/null 2>&1; then
     info "int4 decode fork present (NOT used by this fake-quant study)."
   else
     info "int4 decode fork absent — OK: this study is fake-quant (fp simulate) and does not need it."
@@ -49,8 +54,11 @@ report_fork() {
 pod_gate_or_die() {
   local mask="${1:-}"
   [[ "$(gpu_count)" -ge 1 ]] || { fail "no GPU — capture/fake-quant need a CUDA GPU + model weights."; exit 2; }
-  have_torch || { fail "torch not importable."; exit 2; }
-  have_cuda  || { fail "torch.cuda.is_available()==False."; exit 2; }
+  have_torch || { fail "torch not importable by '$PY'."; exit 2; }
+  have_cuda  || { fail "torch.cuda.is_available()==False for '$PY':"; fail "  $(cuda_diag)";
+                  fail "  -> the interpreter's torch was built for a CUDA newer than the GPU driver, OR wrong env.";
+                  fail "  Fix: point PYBIN at a driver-matching env, e.g. PYBIN=/path/to/venv/bin/python3 bash run_all.sh ...";
+                  exit 2; }
   mask_ok "$mask" || { fail "mask missing: '${mask}'. Build via calibrate_phase5b_protect_mask.py, then pass --mask / \$PROTECT_MASK_PATH."; exit 2; }
   report_fork
 }
