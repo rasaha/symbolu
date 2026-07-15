@@ -1,0 +1,22 @@
+{
+  "all_identity_agree": true,
+  "cer_version": "0.3",
+  "differences": [],
+  "identity_affecting_differences": 0,
+  "implementations": [
+    "reference (cer_v0_2 + action_gate_ref)",
+    "clean-room (cer_v0_3.cleanroom)"
+  ],
+  "metrics": {
+    "bytes_agree": 73,
+    "digest_agree": 73,
+    "error_category_agree": 4,
+    "invalid_items": 4,
+    "items": 77,
+    "payload_agree": 73,
+    "v0_1_identity_reproduced": 26,
+    "v0_1_items": 26,
+    "valid_items": 73,
+    "validation_agree": 77
+  }
+}
