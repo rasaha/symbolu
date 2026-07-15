@@ -7,6 +7,14 @@ from __future__ import annotations
 
 CANONICALIZATION_VERSION = "1"
 ENVELOPE_SCHEMA_VERSION = "1.0.0"
+# Identity-profile v2 (CER V0.1): identical canonicalization + hashing, but the
+# action-identity projection excludes the decision-inert provenance fields
+# (runtime, model_provider, objective). A distinct envelope_schema_version keeps
+# a v1 and a v2 action_hash of the same envelope domain-separated (never
+# confusable) even before their projected payloads differ. See projection.py.
+ENVELOPE_SCHEMA_VERSION_V2 = "2.0.0"
+DEFAULT_IDENTITY_PROFILE = "v1"
+IDENTITY_PROFILES = frozenset({"v1", "v2"})
 POLICY_SCHEMA_VERSION = "1.0.0"
 SIGNATURE_FORMAT_VERSION = "ref-hmac-1"  # reference-only signing scheme (see signing.py)
 
