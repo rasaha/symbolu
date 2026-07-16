@@ -138,8 +138,12 @@ def summarize(kernels: list, ncu: dict | None = None, events: dict | None = None
         "sources": {"nsys": have_kernels, "ncu": bool(ncu), "cuda_events": bool(events),
                     "fused_ablation": events_pct is not None},
         "label": "GPU-measured" if (have_kernels or events_pct is not None) else "NOT_RUN",
-        "note": "time columns from nsys/events; counter columns UNAVAILABLE unless ncu counters were "
-                "unblocked. Fused route-A path: only protect% is measurable (ablation); gather already inlined.",
+        "note": "time columns from nsys/events; counters UNAVAILABLE unless ncu unblocked. Fused route-A "
+                "path: the protect ablation isolates the overlay SELECT, NOT the sidecar LOAD — the kernel "
+                "reads FULL fp16 K regardless of the mask (int4_fused_attention_kernel.py:140), so protect% "
+                "UNDER-states the protect-stream opportunity (see cost_accounting.route_a_protect_load: a "
+                "compact int8 sidecar saves ~251 B/tok/head). Gather is already inlined.",
+        "caveat_protect_stream_not_isolated": events_pct is not None,
     }
 
 

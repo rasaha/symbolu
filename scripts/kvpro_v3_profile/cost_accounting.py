@@ -99,6 +99,28 @@ def staging_byte_model(context_len: int, H_kv: int = 4, n_layers: int = 28, n_pr
     }
 
 
+def route_a_protect_load(n_protect: int = N_PROTECT, D: int = 128):
+    """The in-repo route-A Triton kernel (int4_fused_attention_kernel.py:140) loads the FULL fp16 K for
+    ALL D channels per position for the protect overlay — masked only by sequence-validity, NOT by the
+    protect mask — then tl.where-selects the protected channels. So it reads 2*D bytes/token/head of fp16
+    K ON TOP of the int4 K. A COMPACT protected sidecar (load only the n_protect protected channels)
+    shrinks that to 2*n_protect (bf16) or n_protect (int8 == P8prod). ANALYTICAL HBM, not measured TPS."""
+    full = 2 * D                                    # 256 B/tok/head — what route-A reads today
+    return {
+        "route_a_full_fp16_k_load_bytes": full,
+        "int4_protected_payload_bytes": TOTAL,      # 170 — the full load EXCEEDS this
+        "compact_bf16_sidecar_bytes": 2 * n_protect,
+        "compact_int8_sidecar_bytes": n_protect,
+        "saving_vs_compact_bf16": full - 2 * n_protect,
+        "saving_vs_compact_int8": full - n_protect,
+        "note": "The route-A prototype's full-fp16-K load (256 B/tok/head) EXCEEDS the entire int4_protected "
+                "payload (170 B) and is the single largest HBM term. A compact protected sidecar is the top "
+                "available saving. The 03 protect ablation measures the overlay SELECT, not this LOAD (the "
+                "kernel reads full fp16 K regardless of the mask), so the pipeline's protect% UNDER-states "
+                "the opportunity. Verified: int4_fused_attention_kernel.py:140. INT8 form is gated by P8prod.",
+    }
+
+
 def implementation_removal_ceiling(stage_summary: dict | None):
     """MEASURED time ceiling = profiled (gather+staging+splice) share of decode kernel time. UNAVAILABLE
     without a GPU profile — this ceiling is a measurement, not a model."""
@@ -132,6 +154,7 @@ def build(stage_summary=None, context_len=8192, H_kv=4, n_layers=28, mask_path=N
         "geom": {"D": 128, "BS": 32, "n_protect": n_protect, "v_n_groups": 4,
                  "H_kv": H_kv, "n_layers": n_layers, "context_len": context_len},
         "format_change_ceiling_modeled_bytes": format_change_ceiling(n_protect),
+        "route_a_protect_load_analytical": route_a_protect_load(n_protect, 128),
         "implementation_removal_ceiling_measured_time": implementation_removal_ceiling(stage_summary),
         "staging_byte_model_structural": staging_byte_model(context_len, H_kv, n_layers, n_protect),
         "block_table_bytes_per_token": round(4.0 / 32, 4),   # int32 block id per BS=32 tokens (amortized)

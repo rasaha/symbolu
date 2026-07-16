@@ -166,6 +166,13 @@ class TestCost(unittest.TestCase):
         self.assertEqual(b["n_protect_source"], "mask-file")
         self.assertEqual(b["total_bytes_per_tok_head_layer"], 64 + 64 + 8 + 8 + 14 + 8 + 8)   # 174
 
+    def test_route_a_full_fp16_k_load_is_the_big_lever(self):
+        r = CA.route_a_protect_load(n_protect=5, D=128)
+        self.assertEqual(r["route_a_full_fp16_k_load_bytes"], 256)                 # 2*D
+        self.assertGreater(r["route_a_full_fp16_k_load_bytes"], r["int4_protected_payload_bytes"])
+        self.assertEqual(r["compact_int8_sidecar_bytes"], 5)
+        self.assertEqual(r["saving_vs_compact_int8"], 251)                         # 256 - 5
+
 
 class TestRouteABuilderAndGate(unittest.TestCase):
     """Parts A + B: the builder produces the writer's packed view faithfully, and the correctness gate

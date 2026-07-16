@@ -62,19 +62,22 @@ for ctx in ctxs:
         kw_np = dict(kw); kw_np["protect_mask"] = torch.zeros_like(kw["protect_mask"])   # ablation: protect off
         noprot = ev_ms(lambda: call(kw_np), iters)
         per_ctx[str(ctx)] = {"fused_ms": round(full, 4), "no_protect_ms": round(noprot, 4),
-                             "protect_ablation_ms": round(full - noprot, 4), "S_kv": meta["S_kv"], "iters": iters}
-        print(f"  ctx={ctx:6} fused={full:.4f}ms no_protect={noprot:.4f}ms protect_delta={full-noprot:+.4f}ms")
+                             "protect_overlay_select_ms": round(full - noprot, 4),   # SELECT only, NOT the load
+                             "S_kv": meta["S_kv"], "iters": iters}
+        print(f"  ctx={ctx:6} fused={full:.4f}ms no_protect={noprot:.4f}ms overlay_select_delta={full-noprot:+.4f}ms")
     except Exception as e:  # noqa: BLE001
         per_ctx[str(ctx)] = {"error": str(e)}
         print(f"  ctx={ctx}: [error] {e}")
 
 mid = str(ctxs[len(ctxs) // 2])
-prot = per_ctx.get(mid, {}).get("protect_ablation_ms", "UNAVAILABLE")
+prot = per_ctx.get(mid, {}).get("protect_overlay_select_ms", "UNAVAILABLE")
 blob = {"label": "GPU-measured", "kernel": "int4_fused_attention_kernel.fused_protected_k_decode_attention",
         "geom": {"H_kv": H_kv, "D": D, "G": G, "BS": BS}, "per_ctx": per_ctx,
         "stage_wall_ms": {"attention": per_ctx.get(mid, {}).get("fused_ms", "UNAVAILABLE"), "protect": prot},
-        "note": "fused kernel; protect isolated by ablation (protect_mask off). gather/dequant are inlined "
-                "and not separable without ncu source counters. Inputs CPU-validated vs the sketch oracle."}
+        "note": "fused kernel. The ablation isolates the overlay SELECT, NOT the sidecar LOAD: the kernel "
+                "reads FULL fp16 K regardless of the mask (int4_fused_attention_kernel.py:140), so this "
+                "UNDER-states the protect-stream cost. gather/dequant inlined; not separable without ncu "
+                "source counters. Inputs CPU-validated vs the sketch oracle."}
 json.dump(blob, open(OUT, "w"), indent=2)
 print(f"[GPU-measured] route-A CUDA-event timing -> {OUT}")
 PY
