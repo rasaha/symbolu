@@ -78,6 +78,17 @@
     "build_deps": ["ninja", "pybind11", "cmake"]
   },
 
+  "k0_build_confirmation": {
+    "status": "GREEN — recovery reproduced on A100 (2026-07-16 pod run)",
+    "path": "Path A (untarred vllm-flash-attn-dev-src.tar.gz) -> rebuild_all_kernels.sh --clean --verify-source",
+    "wheel_built": "vllm_flash_attn-2.7.2.post1+cu128-cp312-cp312-linux_x86_64.whl",
+    "wheel_size_bytes": 214150426,
+    "wheel_sha256": "4f2d5c20fcc3fe09e9808fbfda5b00446305003ce0180671e82447fb03aa904d",
+    "smoke": "PASS — FA p50@16k drift -0.1% (<=10%); Cell A@32k drift -0.2% (<=5%) vs the 2026-05-20 baselines",
+    "gates": {"build": "ok", "gate_import": "ok", "gate_hash": "recorded",
+              "gate_contract": "ok_16_16", "gate_smoke": "ok", "recovery_verdict": "recorded"},
+    "note": "Wheel NAME + SIZE match the documented build and smoke is byte-behaviorally identical; the original build's sha256 was not recorded, so this sha256 establishes the reproducible-build hash going forward. stack pins: torch 2.5.1 + vLLM 0.7.3 + transformers 4.48.3 + tokenizers 0.21.1."
+  },
   "recoverability": {
     "from_git_history": "PARTIAL — the INT4 additions are in-repo as apply_phase*_patches.py (the source-of-truth for the patch); the BASE is not vendored in this repo.",
     "from_remote_repo": "YES (expected) — base is a public pinned SHA on github.com/vllm-project/flash-attention (fetch NOT re-verified this session).",
