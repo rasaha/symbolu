@@ -165,3 +165,23 @@ CONTEXTS="4096 16384 32768" ITERS=100 bash 10_alpha_decode_share.sh
 cat runs/alpha_decode_share.json
 ```
 Raw artifact: `runs/alpha_decode_share.json` (on the run pod; decisive numbers recorded above).
+
+## Why a full page-local decode-kernel prototype is UNNECESSARY (analytical)
+
+The page-local layout `(H, n_blocks, BS, *)` is **the SAME memory layout** the production decode kernel
+already reads. `int4_protected_k_cache.kernel_inputs` (line 542) permute-copies the cache to **head-major
+`(H, S, *)`** before the kernel runs, and page-local is head-major with `S` factored into `(n_blocks, BS)` —
+identical bytes, identical flat offsets:
+
+```
+head-major (H,S,*):        offset(h,s)      = (h·S + s)·DH
+page-local (H,n_blocks,BS,*): offset(h,blk,t) = ((h·n_blocks + blk)·BS + t)·DH = (h·S + s)·DH   # s = blk·BS + t
+```
+
+Verified: `page_local.reshape(H, S, DH) == head_major` (bit-exact). So a page-local decode-kernel prototype
+would read **byte-identical** memory to the current kernel → **0% kernel change by construction**. The 44.8%
+fetch gain was `native (S,H,*)` → `head-major/page-local` coalescing, which the production kernel **already
+realises** (via the per-step permute-copy). Page-local's *only* benefit is letting the writer emit that
+layout directly, removing the copy — exactly the measured **α = 15.7%**, with **β_needed > 1**. There is no
+residual "does the 45% survive inside attention" question: the kernel already reads coalesced, so the gain is
+already inside it. **STOP stands; no prototype required.**
