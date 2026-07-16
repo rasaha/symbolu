@@ -5,8 +5,46 @@ into any rank model, ask the neutral question: **what structure do they actually
 low-rank · clustered · temporally stable · low-entropy · or effectively unstructured.
 No end-to-end quality here; no kernel; no rank assumed in advance.
 
-> **Status: TOOLING COMMITTED + CPU-verified on synthetic ground truth. No real capture
-> yet → no verdict.** Fill this in from the pod run (`run_both_models_structure.sh`).
+> **RESULT (measured, Qwen2.5-7B + Llama-3.1-8B, 8 captures each):
+> `STRUCTURE_LOW_ENTROPY` → `CLOSE_QUERY_FOLD_NO_STRUCTURE`.** Query-folding is
+> falsified on real data — on BOTH models, for scale AND xmin. No work-reducing
+> (foldable) representation clears the frozen `rel_frob_worst ≤ 0.10` gate; only
+> per-element byte-compression reconstructs accurately, which is not a hot-path win.
+> Raw artifacts live in `out/` on the run pod (not committed — pod push failed); the
+> decisive numbers are recorded below.
+
+### Measured method comparison — worst-case rel-Frobenius (frozen gate ≤ 0.10)
+
+| Representation | reduces work? | Qwen scale | Llama scale | Qwen xmin | Llama xmin |
+|---|:--:|--:|--:|--:|--:|
+| rank-1 `α_d·β_b` (QF1) | ✅ | 0.200 | 0.209 | 0.381 | 0.431 |
+| rank-2 SVD (QF3) | ✅ | 0.159 | 0.174 | 0.336 | 0.386 |
+| rank-4 SVD (4× fold, not clean) | ✅ | 0.140 | 0.149 | 0.274 | 0.324 |
+| per-head template | ✅ | 0.208 | 0.219 | 0.378 | 0.436 |
+| per-layer template | ✅ | 0.602 | 0.676 | **10.63** | 0.826 |
+| codebook (compress) | ❌ | 0.096 | 0.122 | 0.262 | 0.199 |
+| delta-from-prev (compress) | ❌ | 0.000 | 0.000 | 0.000 | 0.000 |
+
+**No `reduces_work=True` method clears 0.10 worst-case on either model, for either
+tensor.** The clean rank-1 fold is 20% worst on scale, 38–43% on xmin. Even rank-4
+(no longer a single Q-transform) fails. The only accurate methods are `delta`/`piecewise`
+— lossless per-element storage (≈18–22% byte saving), NOT a fold. Both models fail
+identically → it is a property of the int4-protected format, not a model quirk.
+
+### Answers (Phase H)
+1. **What structure exists?** Scale has a strongly *shared per-channel profile*
+   (cross-head cosine **0.95**, identity variance **79%**, `calibratable=True`) but a
+   per-block×per-channel residual too rich for rank ≤ 4. xmin is weaker (cosine 0.47–0.54).
+   Moderate entropy (8.4 / 9.66 bits); losslessly delta/piecewise-representable, not
+   rank-foldable.
+2. **Shared across Qwen & Llama?** Yes — near-identical failure.
+3. **Stable enough for offline calibration?** Yes (cross-prompt corr 0.85–0.96) — but
+   irrelevant, because it is not foldable.
+4. **Reduces real decode work or only storage?** Only storage.
+5. **Which representation enters the attention gate?** None — CLOSE before it.
+6. **Retain / revise / abandon QF1–QF3?** **Abandon all three.**
+
+Original template (kept for method reference):
 
 ## Why a pre-gate
 

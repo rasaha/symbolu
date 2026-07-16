@@ -1,7 +1,13 @@
 # STATUS — KVPro V3 query-fold structural gate
 
-> Honest running status. **No verdict yet — no real metadata has been captured.**
-> The structural gate is the make-or-break and it needs the pod capture (Phase B).
+> **FINAL (measured on Qwen2.5-7B + Llama-3.1-8B): NO-GO — query-fold CLOSED.**
+> The neutral pre-gate ran on both models (8 captures each). Verdict
+> `STRUCTURE_LOW_ENTROPY` → `CLOSE_QUERY_FOLD_NO_STRUCTURE`: no work-reducing
+> (foldable) representation clears the frozen 0.10 worst-case gate on either model —
+> rank-1 fold is 20% worst on scale, 38–43% on xmin; only per-element byte-compression
+> reconstructs accurately (not a hot-path win). See METADATA_STRUCTURE_REPORT.md.
+> The rank-based attention/quality gate below is now MOOT (do not run `run_all.sh`).
+> Raw `out/` artifacts are on the run pod (pod push failed); numbers recorded in the report.
 
 ## Built + CPU-verified (no GPU)
 - **Phase A** production K format verified in source → `README.md` (with `phase5b_4c_paged_writer.py` line refs).
