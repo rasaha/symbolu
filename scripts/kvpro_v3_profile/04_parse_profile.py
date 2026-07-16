@@ -88,7 +88,11 @@ def parse_ncu_csv(rows) -> dict:
 
 
 def summarize(kernels: list, ncu: dict | None = None, events: dict | None = None) -> dict:
-    """kernels: parse_nsys_kernsum output; events: {stage: wall_ms}. Attributes time to stages."""
+    """kernels: parse_nsys_kernsum output; events: {stage: wall_ms}. Attributes time to stages.
+    Two sources: (a) nsys per-kernel times -> full stage split; (b) route-A CUDA-events (a FUSED kernel)
+    -> only protect% is recoverable, via the protect-off ablation (`attention`=fused total, `protect`=
+    ablation ms). In the fused case gather/staging/splice/dequant read 0 — route-A already inlines them."""
+    events = events or {}
     stage_ns = {s: 0.0 for s in STAGES}
     stage_kernels = {s: [] for s in STAGES}
     total = 0.0
@@ -97,13 +101,28 @@ def summarize(kernels: list, ncu: dict | None = None, events: dict | None = None
         stage_ns[s] += k["total_ns"] or 0.0
         total += k["total_ns"] or 0.0
         stage_kernels[s].append(k["name"])
+    have_kernels = bool(kernels) and total > 0
+    # events-only fused-kernel path: derive protect% by ablation
+    ev_fused, ev_prot = events.get("attention"), events.get("protect")
+    events_pct = None
+    if not have_kernels and isinstance(ev_fused, (int, float)) and ev_fused > 0:
+        p = round(100.0 * ev_prot / ev_fused, 2) if isinstance(ev_prot, (int, float)) else 0.0
+        events_pct = {s: 0.0 for s in STAGES}
+        events_pct["protect"] = max(0.0, p)
+        events_pct["attention"] = round(100.0 - max(0.0, p), 2)
     stages = {}
     for s in STAGES:
+        if have_kernels:
+            pct = round(100.0 * stage_ns[s] / total, 2)
+        elif events_pct is not None:
+            pct = events_pct[s]
+        else:
+            pct = _UNAVAIL
         stages[s] = {
-            "time_ns": round(stage_ns[s], 1) if kernels else _UNAVAIL,
-            "pct_of_kernel_time": round(100.0 * stage_ns[s] / total, 2) if (kernels and total > 0) else _UNAVAIL,
+            "time_ns": round(stage_ns[s], 1) if have_kernels else _UNAVAIL,
+            "pct_of_kernel_time": pct,
             "n_kernels": len(stage_kernels[s]),
-            "event_wall_ms": (events or {}).get(s, _UNAVAIL),
+            "event_wall_ms": events.get(s, _UNAVAIL),
         }
     # counter-derived (ncu) roll-up — UNAVAILABLE unless ncu present
     counters = {}
@@ -114,11 +133,13 @@ def summarize(kernels: list, ncu: dict | None = None, events: dict | None = None
         counters[metric] = round(sum(v for v in vals if v is not None), 3) if vals else _UNAVAIL
     return {
         "stages": stages,
-        "kernel_time_total_ns": round(total, 1) if kernels else _UNAVAIL,
+        "kernel_time_total_ns": round(total, 1) if have_kernels else _UNAVAIL,
         "counters": counters,
-        "sources": {"nsys": bool(kernels), "ncu": bool(ncu), "cuda_events": bool(events)},
-        "label": "GPU-measured" if kernels or events else "NOT_RUN",
-        "note": "time columns from nsys/events; counter columns UNAVAILABLE unless ncu counters were unblocked.",
+        "sources": {"nsys": have_kernels, "ncu": bool(ncu), "cuda_events": bool(events),
+                    "fused_ablation": events_pct is not None},
+        "label": "GPU-measured" if (have_kernels or events_pct is not None) else "NOT_RUN",
+        "note": "time columns from nsys/events; counter columns UNAVAILABLE unless ncu counters were "
+                "unblocked. Fused route-A path: only protect% is measurable (ablation); gather already inlined.",
     }
 
 

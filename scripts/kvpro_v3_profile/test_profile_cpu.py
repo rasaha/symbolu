@@ -56,6 +56,18 @@ class TestParse(unittest.TestCase):
         self.assertEqual(s["label"], "NOT_RUN")
         self.assertEqual(s["stages"]["gather"]["pct_of_kernel_time"], "UNAVAILABLE")
 
+    def test_summarize_route_a_events_ablation(self):
+        # fused route-A cuda-events: protect% from the ablation; gather already inlined -> 0
+        s = PP.summarize([], events={"attention": 10.0, "protect": 2.0})
+        self.assertEqual(s["label"], "GPU-measured")
+        self.assertEqual(s["stages"]["protect"]["pct_of_kernel_time"], 20.0)
+        self.assertEqual(s["stages"]["gather"]["pct_of_kernel_time"], 0.0)
+        self.assertEqual(s["stages"]["attention"]["pct_of_kernel_time"], 80.0)
+
+    def test_summarize_events_unusable_is_not_run(self):
+        s = PP.summarize([], events={"attention": "UNAVAILABLE", "protect": "UNAVAILABLE"})
+        self.assertEqual(s["label"], "NOT_RUN")
+
 
 def _stages(g=0, st=0, sp=0, de=0, pr=0, at=0, ot=0):
     tot = g + st + sp + de + pr + at + ot
@@ -99,6 +111,17 @@ class TestDecision(unittest.TestCase):
         vals = [r["measured_removable_pct"] for r in d["ranked"]
                 if isinstance(r["measured_removable_pct"], (int, float))]
         self.assertEqual(vals, sorted(vals, reverse=True))
+
+    def test_decide_from_route_a_events(self):
+        # route-A already fuses gather (0%); the measurable removable pole is protect (via ablation)
+        s = PP.summarize([], events={"attention": 10.0, "protect": 3.0})   # protect 30%
+        d = DM.decide(stages=s)
+        self.assertEqual(d["recommendation"], "BUILD_PROTECT_STREAM_FIRST")
+
+    def test_decide_route_a_small_protect_no_project(self):
+        s = PP.summarize([], events={"attention": 100.0, "protect": 2.0})  # protect 2% < 8%
+        d = DM.decide(stages=s)
+        self.assertEqual(d["recommendation"], "NO_KERNEL_PROJECT_JUSTIFIED")
 
 
 class TestCost(unittest.TestCase):
@@ -182,6 +205,15 @@ class TestRouteABuilderAndGate(unittest.TestCase):
         r = CG.run_cpu(H=2, D=16, BS=32, v_group_size=8)
         self.assertTrue(r["all_pass"])
         self.assertGreaterEqual(r["n_cases"], 10)
+
+    def test_kernel_input_adapter_matches_fp_oracle(self):
+        # the Route-A kernel-input adapter, run through the sketch oracle, matches fp attention within
+        # int4 error — proves the adapter feeds the kernel numerically-correct inputs (no GPU needed).
+        for pint8 in (False, True):
+            kw, meta = RB.make_kernel_inputs(context_len=128, H_kv=4, D=64, G=2, BS=32, seed=2, prot_int8=pint8)
+            orc, ref = RB.oracle_attention(kw, meta).float().reshape(-1), RB.reference_fp_attention(meta).float().reshape(-1)
+            cos = float((orc @ ref) / (orc.norm() * ref.norm()))
+            self.assertGreater(cos, 0.98, f"prot_int8={pint8} cos={cos}")
 
 
 if __name__ == "__main__":

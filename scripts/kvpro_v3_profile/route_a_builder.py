@@ -23,6 +23,7 @@ phase6f_read_fusion.py):
 """
 from __future__ import annotations
 
+import math
 import os
 import sys
 
@@ -128,3 +129,75 @@ def dequant_from_view(view):
                                view["k_protect_bf16"], view["protect_slot"], view["group_size"])
     v = RF.dequant_v_reference(v_codes, view["v_scale"], view["v_xmin"])
     return k, v
+
+
+# --------------------------------------------------------------------------- #
+# Route-A KERNEL input adapter (for 03_profile_cuda_events.sh). Converts the writer view to the Triton
+# kernel's contract (int4_fused_attention_kernel.fused_protected_k_decode_attention): head-major
+# (B,H_kv,S,D), SIGNED nibbles (value=nibble-8) with offset=xmin+8*scale, per-group scales. The SAME
+# packed bytes are shared with the writer; only the layout + offset convention differ. Numerically
+# validated on CPU against int4_fused_attention_sketch.fused_int4_attention_reference (no GPU needed).
+# --------------------------------------------------------------------------- #
+def make_kernel_inputs(context_len, H_kv=4, D=128, G=7, BS=32, v_group_size=32, seed=0,
+                       device="cpu", prot_int8=False, protect_fraction=0.04):
+    """Synthetic Route-A kernel inputs at a given context length (padded to full BS-blocks — timing does
+    not need partial tails; the correctness gate covers those). Returns (kernel_kwargs, meta)."""
+    torch.manual_seed(seed)
+    n_blocks = (context_len + BS - 1) // BS
+    S = n_blocks * BS
+    H_q = H_kv * G
+    K_fp, V_fp = torch.randn(S, H_kv, D), torch.randn(S, H_kv, D)
+    n_protect = max(1, round(D * protect_fraction))
+    mask = torch.zeros(H_kv, D, dtype=torch.int8)
+    for h in range(H_kv):
+        mask[h, torch.randperm(D)[:n_protect]] = 1
+    kmin, kmax = torch.full((H_kv, D), -3.0), torch.full((H_kv, D), 3.0)
+    view = build_packed_view(K_fp, V_fp, mask, BS, v_group_size, kmin, kmax, prot_int8)
+
+    k_packed = view["k_int4"][0].permute(1, 0, 2).contiguous().unsqueeze(0)         # (1,H_kv,S,D/2)
+    v_packed = view["v_int4"][0].permute(1, 0, 2).contiguous().unsqueeze(0)
+    k_scale = view["k_scale"].to(torch.float16).contiguous()                        # (1,n_blocks,H_kv,D)
+    k_offset = (view["k_xmin"] + 8.0 * view["k_scale"]).to(torch.float16).contiguous()
+    v_scale = view["v_scale"].to(torch.float16).contiguous()                        # (1,S,H_kv,vng)
+    v_offset = (view["v_xmin"] + 8.0 * view["v_scale"]).to(torch.float16).contiguous()
+    kfp = K_fp
+    if prot_int8:                                                                   # protected = int8-restored
+        import protected_int8 as P8
+        restored, _ = P8.protected_int8_prod(K_fp, kmin, kmax)
+        kfp = torch.where(mask.to(torch.bool).unsqueeze(0).expand_as(K_fp), restored, K_fp)
+    k_fp16 = kfp.permute(1, 0, 2).contiguous().unsqueeze(0).to(torch.float16)       # (1,H_kv,S,D)
+    q = torch.randn(1, H_q, D)                                                      # decode single token
+
+    kw = dict(q=q.to(torch.float16).to(device), k_packed=k_packed.to(device),
+              k_scale=k_scale.to(device), k_offset=k_offset.to(device), k_fp16=k_fp16.to(device),
+              protect_mask=mask.to(torch.bool).to(device), v_packed=v_packed.to(device),
+              v_scale=v_scale.to(device), v_offset=v_offset.to(device),
+              group_size_k=BS, group_size_v=v_group_size, asymmetric=True)
+    meta = dict(S_kv=S, H_q=H_q, H_kv=H_kv, D=D, n_blocks=n_blocks, K_fp=K_fp, V_fp=V_fp, q=q, mask=mask)
+    return kw, meta
+
+
+def oracle_attention(kw, meta):
+    """CPU oracle: run the sketch reference on the kernel inputs -> (1,H_q,D). This is what the Triton
+    kernel must match numerically (validated by reference_fp_attention below)."""
+    import int4_fused_attention_sketch as SK
+    spec = SK.FusedAttentionSpec(B=1, H_q=meta["H_q"], H_kv=meta["H_kv"], S_q=1, S_kv=meta["S_kv"],
+                                 D=meta["D"], block_size=kw["group_size_k"],
+                                 group_size_k=kw["group_size_k"], group_size_v=kw["group_size_v"],
+                                 asymmetric=True)
+    out = SK.fused_int4_attention_reference(
+        kw["q"].unsqueeze(2), kw["k_packed"], kw["k_scale"], kw["k_offset"],
+        kw["v_packed"], kw["v_scale"], kw["v_offset"], spec=spec,
+        k_fp16=kw["k_fp16"], k_protect_mask=kw["protect_mask"])
+    return out[:, :, 0, :]                                                          # (1,H_q,D)
+
+
+def reference_fp_attention(meta):
+    """Ground-truth fp attention on the ORIGINAL K_fp/V_fp — the oracle's int4 output must be close."""
+    q, K_fp, V_fp, H_kv = meta["q"], meta["K_fp"], meta["V_fp"], meta["H_kv"]
+    H_q, D = q.shape[1], q.shape[2]
+    G = H_q // H_kv
+    Ke = K_fp.permute(1, 0, 2).repeat_interleave(G, dim=0)                          # (H_q,S,D)
+    Ve = V_fp.permute(1, 0, 2).repeat_interleave(G, dim=0)
+    logits = torch.einsum("hd,hsd->hs", q[0].float(), Ke.float()) / math.sqrt(D)
+    return torch.einsum("hs,hsd->hd", torch.softmax(logits, -1), Ve.float()).unsqueeze(0)   # (1,H_q,D)
