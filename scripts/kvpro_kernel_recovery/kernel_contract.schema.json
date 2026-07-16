@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "KVPro INT4 decode kernel contract",
+  "type": "object",
+  "required": ["kernel", "torch_op", "arguments", "output", "invariants", "semantics"],
+  "properties": {
+    "kernel": {"type": "string"},
+    "torch_op": {"type": "string"},
+    "contract_source": {"type": "string"},
+    "status": {"type": "string"},
+    "geometry_example_qwen2_5_7b": {"type": "object"},
+    "invariants": {"type": "object", "minProperties": 5},
+    "arguments": {
+      "type": "array", "minItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["name", "shape", "dtype", "role"],
+        "properties": {
+          "name": {"type": "string"},
+          "position": {"type": "integer"},
+          "shape": {"type": "string"},
+          "dtype": {"type": "string"},
+          "role": {"type": "string"},
+          "contiguous": {"type": "boolean"},
+          "ownership": {"type": "string"},
+          "lifetime": {"type": "string"},
+          "optional": {"type": "boolean"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["shape", "dtype", "role"],
+      "properties": {
+        "shape": {"type": "string"}, "dtype": {"type": "string"}, "role": {"type": "string"},
+        "optional_second": {"type": "object"}
+      }
+    },
+    "semantics": {"type": "object", "minProperties": 5}
+  },
+  "additionalProperties": true
+}
