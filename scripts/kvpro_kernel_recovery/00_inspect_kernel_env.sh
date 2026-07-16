@@ -8,6 +8,8 @@
 #   PYBIN=/workspace/venv-vllm/bin/python3 ./00_inspect_kernel_env.sh
 set -u
 PYBIN="${PYBIN:-python3}"
+command -v "$PYBIN" >/dev/null 2>&1 || { echo "[warn] PYBIN='$PYBIN' not found; falling back to python3"; PYBIN="$(command -v python3 || true)"; }
+[ -n "$PYBIN" ] || { echo "[UNAVAILABLE] no python3 on PATH"; exit 3; }
 OUT="${OUT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/runs/kernel_env.json}"
 mkdir -p "$(dirname "$OUT")"
 

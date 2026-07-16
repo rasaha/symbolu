@@ -6,7 +6,11 @@
 # (PYBIN must be the forked-vLLM venv so vllm.vllm_flash_attn resolves to the int4 build.)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYBIN="${PYBIN:-python3}"; export PYBIN
+PYBIN="${PYBIN:-python3}"
+command -v "$PYBIN" >/dev/null 2>&1 || { echo "[warn] PYBIN='$PYBIN' not found; falling back to python3"; PYBIN="$(command -v python3 || true)"; }
+[ -n "$PYBIN" ] || { echo "[UNAVAILABLE] no python3 on PATH — cannot run the audit"; exit 3; }
+export PYBIN
+echo "[info] using PYBIN=$PYBIN"
 RUNS="$HERE/runs"; mkdir -p "$RUNS"
 
 echo "== Phase B.0 — kernel environment =="; bash "$HERE/00_inspect_kernel_env.sh" || true

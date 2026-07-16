@@ -7,6 +7,8 @@ set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT="${OUT:-$HERE/runs/build_artifacts.json}"; mkdir -p "$(dirname "$OUT")"
 PYBIN="${PYBIN:-python3}"
+command -v "$PYBIN" >/dev/null 2>&1 || { echo "[warn] PYBIN='$PYBIN' not found; falling back to python3"; PYBIN="$(command -v python3 || true)"; }
+[ -n "$PYBIN" ] || { echo "[UNAVAILABLE] no python3 on PATH"; exit 3; }
 
 # Candidate locations (from KERNEL_6C3C_RUNBOOK.md provenance).
 DEV_TREE="${DEV_TREE:-/workspace/dev/vllm-flash-attn-dev}"
