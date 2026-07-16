@@ -80,6 +80,11 @@ export PROTECT_MASK_PATH=/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.
 # -> out/structure_verdict.json ; commit with: git add -f experiments/kvpro_v3_query_fold/out
 ```
 
+Runtime: the CPU analysis (all 5 analyzers × scale+xmin) is **~1–2 min per model** on the
+full 28–32-layer capture, with a progress line every 200 (layer,head) pairs; the GPU
+capture is a handful of short forward passes. (The analyzers were vectorized after a
+pre-run audit found the naive per-channel loops took ~25 min — see git history.)
+
 ## CPU self-checks (no GPU)
 
 ```bash

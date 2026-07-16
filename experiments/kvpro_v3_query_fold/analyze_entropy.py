@@ -61,22 +61,31 @@ def dist_stats(x: torch.Tensor, positive: bool) -> Dict[str, float]:
             "hist32": [round(h, 2) for h in hist]}
 
 
-def run(manifest: dict, kind: str) -> dict:
+def run(manifest: dict, kind: str, chan_stride: int = 4) -> dict:
     positive = (kind == "scale")
     all_vals: List[torch.Tensor] = []
     per_layer: Dict[int, List[torch.Tensor]] = {}
     head_entropy, head_cv, chan_entropy, block_cv = [], [], [], []
     head_loc, chan_loc = [], []
+    n = 0
     for meta, M in EC.iter_heads(manifest, kind):           # M: (B, D)
         all_vals.append(M.reshape(-1))
         per_layer.setdefault(meta["layer"], []).append(M.reshape(-1))
-        head_entropy.append(entropy_bits(M)); head_cv.append(dist_stats(M, positive)["cv"])
+        head_entropy.append(entropy_bits(M))
+        # cheap head CV (vectorized) instead of the full dist_stats
+        hm = M.mean().abs().item()
+        head_cv.append(M.std(unbiased=False).item() / hm if hm > 1e-30 else float("inf"))
         head_loc.append(meta)
-        # per-channel series entropy (across blocks) — median over channels for this head
-        ce = [entropy_bits(M[:, d]) for d in range(M.shape[1])]
+        # per-channel series entropy — SUBSAMPLED (stride) descriptive median; worst tracked below
+        ce = [entropy_bits(M[:, d]) for d in range(0, M.shape[1], max(1, chan_stride))]
         chan_entropy.append(median(ce)); chan_loc.append(meta)
-        # per-block CV (across channels within a block) — median over blocks
-        block_cv.append(median([dist_stats(M[b], positive)["cv"] for b in range(M.shape[0])]))
+        # per-block CV across channels — VECTORIZED over blocks
+        bm = M.mean(dim=1).abs().clamp_min(1e-30)
+        bcv = (M.std(dim=1, unbiased=False) / bm)
+        block_cv.append(float(bcv.median()))
+        n += 1
+        if n % 200 == 0:
+            print(f"  [entropy/{kind}] {n} heads...", flush=True)
     g = dist_stats(torch.cat(all_vals), positive)
     layers = {int(li): dist_stats(torch.cat(v), positive) for li, v in sorted(per_layer.items())}
     return {

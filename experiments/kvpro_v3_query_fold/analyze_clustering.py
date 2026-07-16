@@ -33,7 +33,7 @@ def _profile(M: torch.Tensor, positive: bool) -> torch.Tensor:
     return M.clamp_min(1e-8).log().mean(0) if positive else M.mean(0)
 
 
-def _kmeans(X: torch.Tensor, k: int, iters: int = 30, seed: int = 0):
+def _kmeans(X: torch.Tensor, k: int, iters: int = 15, seed: int = 0):
     N = X.shape[0]; k = min(k, N)
     g = torch.Generator().manual_seed(seed)
     C = X[torch.randperm(N, generator=g)[:k]].clone()

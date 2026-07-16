@@ -82,8 +82,16 @@ def _channel_baseline_sparse(M, pos, keep=0.1):
     return Mh, round(keep * M.shape[1], 1), M.shape[1], False, "block_varying_compress"
 
 def _codebook(M, pos, k=16):
-    flat = M.reshape(-1, 1); a, C = _kmeans(flat, k); Mh = C[a].reshape(M.shape)
+    # low-entropy codebook: uniform k-level quantization over the value range (O(N),
+    # not per-head k-means). Same "can k codes represent these values" question, fast.
     import math
+    lo, hi = M.min(), M.max()
+    if (hi - lo).abs() < 1e-30:
+        return M.clone(), round(M.shape[1] * math.log2(max(k, 2)) / 16.0, 2), k, False, "block_varying_compress"
+    edges = torch.linspace(float(lo), float(hi), k + 1, dtype=M.dtype)
+    idx = torch.bucketize(M, edges[1:-1].contiguous())
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    Mh = centers[idx.clamp(max=k - 1)]
     return Mh, round(M.shape[1] * math.log2(max(k, 2)) / 16.0, 2), k, False, "block_varying_compress"
 
 def _delta_prev(M, pos):
@@ -112,12 +120,16 @@ def run(manifest: dict, kind: str) -> dict:
     acc: Dict[str, dict] = {m: {"rf": [], "wb": [], "loc": [], "bm": None, "cm": None,
                                 "rw": None, "cls": None} for m in _METHODS}
     # per-head methods
+    n = 0
     for meta, M in EC.iter_heads(manifest, kind):
         for name, fn in _METHODS.items():
             Mh, bm, cm, rw, cls = fn(M, pos)
             a = acc[name]
             a["rf"].append(EC.rel_frob(M, Mh)); a["wb"].append(_worst_block_err(M, Mh))
             a["loc"].append(meta); a["bm"], a["cm"], a["rw"], a["cls"] = bm, cm, rw, cls
+        n += 1
+        if n % 200 == 0:
+            print(f"  [methods/{kind}] {n} heads...", flush=True)
     # per-layer template (needs cross-head): layer profile shared across its heads
     pl = _per_layer_template(manifest, kind, pos)
 
