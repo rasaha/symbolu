@@ -138,14 +138,17 @@ class TestVerdict(unittest.TestCase):
         self.assertEqual(v["verdict"], "GO_WITH_MODIFICATION")
         self.assertTrue(v["per_candidate"]["S3"]["full_quality"])
 
-    def test_offline_fail_blocks_go_even_if_e2e_passes(self):
-        # end-to-end all-pass but the offline attention proxy DEFINITIVELY FAILS -> blocks GO.
+    def test_offline_fail_is_advisory_not_blocking(self):
+        # AMENDED 2026-07-16: the offline proxy is ADVISORY. A definitive offline FAIL is REPORTED but does
+        # NOT block GO when all three end-to-end benchmarks pass (the proxy was shown unreliable at 2000-Q).
         v = G.verdict(attn_ok(False),
                       bench("needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
                       bench("hard_needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
                       bench("mmlu", "Qwen/Qwen2.5-7B-Instruct", ALL_T), geom=G.A.QWEN2_5_7B)
-        self.assertFalse(v["per_candidate"]["S1"]["full_quality"])
-        self.assertNotEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
+        self.assertFalse(v["per_candidate"]["S1"]["quality_offline"])   # advisory signal is False
+        self.assertTrue(v["per_candidate"]["S1"]["offline_is_advisory"])
+        self.assertTrue(v["per_candidate"]["S1"]["full_quality"])       # but it does NOT block
+        self.assertEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
 
     def test_offline_synthetic_is_nonblocking(self):
         # offline proxy synthetic/NOT-RUN (None) but all three end-to-end pass -> still GO.

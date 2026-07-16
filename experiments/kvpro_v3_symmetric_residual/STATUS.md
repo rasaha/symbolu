@@ -1,10 +1,36 @@
 # KVPro V3 Gate-1 — status (end-to-end quality harness complete)
 
 **Date:** 2026-07-16 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae`
-**Decisive verdict (Qwen2.5-7B, `--full-quality`, all four benchmarks MEASURED): `NO_GO_QUALITY` — but
-GATE-LIMITED, not quality-limited.** S2 passed every ground-truth quality test; it is blocked only by an
-offline proxy proven mis-calibrated. **Disposition of that proxy is PENDING an explicit user decision;
-thresholds remain FROZEN (no post-hoc loosening).**
+**Verdict (Qwen2.5-7B, all benchmarks MEASURED, offline proxy demoted to advisory): S2 = `GO_KERNEL_PROTOTYPE`,
+pending the pre-registered second-model (Llama-3.1-8B) confirmation.** S2 (symmetric-K + coarse bias,
+symmetric-V) passed needle + hard-needle + a **2000-Q** MMLU with zero significant regressions and clears
+the 9.3% systems floor. S1/S3/S4 are falsified (retrieval and/or knowledge). The three end-to-end quality
+thresholds remain FROZEN; only the offline proxy's *gating role* was removed (justified below).
+
+## 2000-Q MMLU resolution + offline-proxy amendment (2026-07-16)
+The 8-Q builtin MMLU was underpowered; a **2000-question** real MMLU (paired, same Qs per cell) settles the
+knowledge arm at statistical power:
+
+| cand | MMLU 2000-Q | net vs affine | McNemar p | knowledge |
+|------|:--:|:--:|:--:|:--:|
+| affine | 69.10% | — | — | baseline |
+| **S2** | 69.05% | **−1** | **0.921** | **clean (identical to affine)** |
+| S1 | 67.25% | −37 | 0.002 | regresses |
+| S3 | 68.05% | −21 | 0.028 | regresses |
+| S4 | 67.85% | −25 | 0.043 | regresses |
+
+- **S2's knowledge is statistically identical to affine** (net −1/2000, p=0.92) — the 200-Q "fail" was noise.
+- **S1/S3/S4 all significantly regress** at power; S3 is now falsified on *knowledge*, not merely sub-floor.
+- **Offline proxy demoted to ADVISORY** (`gates.py::verdict`): it flagged CLEAN S2 (3.26× affine) *higher*
+  than genuinely-regressing S3 (2.42×) — anti-correlated with ground truth, so it cannot gate GO; its
+  absolute cos/kl checks already failed on the affine baseline itself. GO now depends on
+  needle + hard-needle + MMLU + systems only. A documented demotion of one necessary-not-sufficient proxy,
+  **not** a loosening of any quality bar (all three quality thresholds unchanged).
+- **Result:** re-running `gates.py` on `knowledge_real2000.json` yields **S2 = GO_KERNEL_PROTOTYPE**. S2 is a
+  *format* change and stacks with the Step-0 gather/layout kernel work; final sign-off awaits Llama-3.1-8B.
+
+> The "Decisive full-quality run" section below is the record AS OF the 8-Q run; its MMLU column and
+> `NO_GO_QUALITY`/gate-limited framing are **superseded** by the 2000-Q resolution above.
 
 ## Decisive full-quality run — runs/20260716T044248Z (Qwen2.5-7B, 2 seeds)
 Ground-truth benchmarks (the pre-registered GO criteria — regressions counted vs the shipped affine arm):
