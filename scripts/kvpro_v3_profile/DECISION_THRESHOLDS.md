@@ -129,3 +129,29 @@ decision context using the 6F-A read gain.
 write < 25% of read gain **and** oracle exact. Any miss → stop at 6F-A and report. (This is the reviewer's
 frozen decision rule; the fp16-pool compact-sidecar swap is a ~7% side-lever, **not** the primary Route-C
 optimisation, and is not on this path.)
+
+## Measurement #1 — α (decode-path share the layout improves) — FROZEN
+
+The A100 6F-A result left exactly one gate PROVISIONAL: the aggregate projection depends on how much of
+the real decode step the improved read path represents. `10_alpha_decode_share.py` measures it **without
+6F-C code**, grounded in the actual production decode path (`int4_protected_k_cache.py:520-548`): the
+standard `kernel_inputs` **permute-copies the whole KV** native `(S,H,*)` → head-major every decode step
+(O(context)); page-local (store-as-consumed) **eliminates that per-step copy**. So:
+
+```
+α = permute_copy_ms / (permute_copy_ms + decode_kernel_ms)      # the (copy+kernel) share page-local removes
+aggregate ≈ α × β × realizability     β = decode-attn-block share of the whole step (needs an nsys trace)
+```
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `ALPHA_STOP` | **0.50** | α < 0.50 → improved path too small a share → **LIKELY_STOP** |
+| `ALPHA_STRONG` | **0.70** | α > 0.70 → **STRONG_RUN_BETA** (run the nsys β trace — the final gate) |
+| — | 0.50–0.70 | **AMBIGUOUS_NEED_BETA** (β measurement mandatory) |
+| `REALIZABILITY` | **0.70–0.80** | conservative factor (never 1.0) |
+
+The decode kernel is oracle-checked (cosine ≥ 0.99 vs the fp reference) before its timing is trusted.
+Median **and** p95 are reported per context. The tool prints `β_needed = 0.15/(α·r)` at r∈{0.7,0.8}: a
+value ≤ ~0.7 is plausible for long-context decode, > 1 is impossible → stop. **Measurement #1 is necessary
+but not sufficient**: a STRONG α authorises the β trace, not 6F-C directly. 6F-C is authorised only once
+measured α and β imply ≥ 15% aggregate under conservative realizability.

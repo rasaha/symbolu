@@ -295,6 +295,23 @@ def _time_ms(fn, iters):
     return s.elapsed_time(e) / iters
 
 
+def _time_dist(fn, iters, warmup=5):
+    """Per-iteration CUDA-event timing -> (median_ms, p95_ms). Records all event pairs first,
+    then syncs once, so per-iter measurement doesn't serialise the stream (minimal perturbation)."""
+    for _ in range(warmup):
+        fn()
+    torch.cuda.synchronize()
+    starts = [torch.cuda.Event(True) for _ in range(iters)]
+    stops = [torch.cuda.Event(True) for _ in range(iters)]
+    for i in range(iters):
+        starts[i].record(); fn(); stops[i].record()
+    torch.cuda.synchronize()
+    ts = sorted(starts[i].elapsed_time(stops[i]) for i in range(iters))
+    med = ts[len(ts) // 2]
+    p95 = ts[min(len(ts) - 1, int(round(0.95 * (len(ts) - 1))))]
+    return round(med, 5), round(p95, 5)
+
+
 def run_probe(contexts, iters, H_kv, D, BS, v_group_size, n_protect, seed=0):
     """Per context, time the unzip in BOTH physical layouts (current (S,H,*) vs 6F-A page-local
     per-head-contiguous), same values/numerics. Reports fetch/full for each + MATH (layout-

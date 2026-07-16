@@ -24,6 +24,7 @@ def _load(fname, mod):
 PROBE = _load("unzip_bound_probe.py", "unzip_bound_probe")
 CLS = _load("08_classify_unzip_bound.py", "classify_unzip_bound")
 SPIKE = _load("09_append_feasibility_spike.py", "append_feasibility_spike")
+ALPHA = _load("10_alpha_decode_share.py", "alpha_decode_share")
 
 _n = 0
 
@@ -233,10 +234,36 @@ def test_append_gate():
     check("append gate fail when write dominates", gf["gate_pass"] is False)
 
 
+# --------------------------------------------------------------- alpha (measurement #1) ----
+def test_alpha_decision():
+    check("alpha low -> stop", ALPHA.alpha_decision(0.40)["verdict"] == "LIKELY_STOP")
+    check("alpha mid -> ambiguous", ALPHA.alpha_decision(0.60)["verdict"] == "AMBIGUOUS_NEED_BETA")
+    check("alpha high -> strong", ALPHA.alpha_decision(0.80)["verdict"] == "STRONG_RUN_BETA")
+    d = ALPHA.alpha_decision(0.80)
+    # beta needed = 0.15/(0.8*0.7)=0.268 and 0.15/(0.8*0.8)=0.234 -> both feasible (<=1)
+    check("beta_needed present", "r70" in d["beta_needed_to_clear_15pct"])
+    check("beta feasible at high alpha", all(d["beta_feasible_le_1"].values()))
+    check("alpha bad -> unavailable", ALPHA.alpha_decision(1.7)["verdict"] == "UNAVAILABLE")
+    # very low alpha: even if beta_needed <= 1, verdict is STOP (alpha rule is conservative)
+    low = ALPHA.alpha_decision(0.30)
+    check("alpha 0.30 stop", low["verdict"] == "LIKELY_STOP")
+
+
+def test_alpha_build_verdict():
+    per = {"4096": {"alpha_copy": 0.2, "decode_kernel_oracle_cosine": 0.999},
+           "32768": {"alpha_copy": 0.78, "decode_kernel_oracle_cosine": 0.999}}
+    v = ALPHA.build_verdict(per)
+    check("build_verdict uses largest ctx", v["decision_context"] == 32768)
+    check("build_verdict alpha", v["alpha_copy"] == 0.78)
+    check("build_verdict decision strong", v["decision"]["verdict"] == "STRONG_RUN_BETA")
+    check("build_verdict alpha-by-context", v["alpha_by_context"]["4096"] == 0.2)
+
+
 def main():
     for t in (test_byte_flop_model, test_classify_times, test_roofline,
               test_peaks_for, test_analyse_end_to_end,
-              test_project_aggregate, test_sixfa_analysis, test_append_gate):
+              test_project_aggregate, test_sixfa_analysis, test_append_gate,
+              test_alpha_decision, test_alpha_build_verdict):
         t()
     print(f"unzip-probe CPU checks: {_n}/{_n} PASS")
     return 0
