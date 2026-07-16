@@ -41,42 +41,48 @@ def main(argv=None):
              "Create it with CTM_plus/Bench/scripts/calibrate_phase5b_protect_mask.py.")
     try:
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
-        import transformers.models.llama.modeling_llama as llama_mod
+        import fakequant_model as FQ
+        from transformers import AutoModelForCausalLM, AutoTokenizer  # noqa: F401
     except Exception as e:  # noqa: BLE001
         _die(f"transformers/torch import failed: {e}")
-    if not torch.cuda.is_available():
-        _die("no CUDA GPU — capture needs a GPU + model weights.")
     torch.manual_seed(args.seed)
 
-    # --- patch rotary to stash post-RoPE q,k per call (Llama/Qwen2 share this fn) --- #
-    stash = {"qk": []}
-    orig = llama_mod.apply_rotary_pos_emb
-
-    def patched(q, k, cos, sin, *a, **kw):
-        q2, k2 = orig(q, k, cos, sin, *a, **kw)
-        stash["qk"].append((q2.detach(), k2.detach()))
-        return q2, k2
-    llama_mod.apply_rotary_pos_emb = patched
-
     print(f"[capture] loading {args.model} ...")
-    tok = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.bfloat16,
-                                                 device_map="cuda")
-    model.eval()
+    model, tok = FQ.load_model(args.model)          # dtype-safe (torch_dtype/dtype) + GPU
+
+    # Patch the model's OWN rotary fn (arch-specific) to stash post-RoPE Q per layer. K/V come from the
+    # cache (post-RoPE, arch-agnostic). If the patch can't fire, we save K/V without Q (recon eval still
+    # works; attention-error eval — a NON-BLOCKING proxy — just skips).
+    stash = {"q": []}
+    mt = getattr(model.config, "model_type", "")
+    rot_mod = None
+    try:
+        rot_mod = __import__(f"transformers.models.{mt}.modeling_{mt}", fromlist=["apply_rotary_pos_emb"])
+    except Exception:  # noqa: BLE001
+        rot_mod = None
+    orig = getattr(rot_mod, "apply_rotary_pos_emb", None) if rot_mod is not None else None
+    if orig is not None:
+        def _patched(q, k, *a, **kw):
+            q2, k2 = orig(q, k, *a, **kw)
+            stash["q"].append(q2.detach())
+            return q2, k2
+        rot_mod.apply_rotary_pos_emb = _patched
+
     ids = tok(args.prompt, return_tensors="pt").input_ids.to("cuda")
     with torch.no_grad():
         out = model(ids, use_cache=True)
-    llama_mod.apply_rotary_pos_emb = orig
+    if orig is not None:
+        rot_mod.apply_rotary_pos_emb = orig
 
-    if not stash["qk"]:
-        _die("captured 0 rotary calls — the patch did not fire; adjust for your transformers version "
-             "(the model may not use transformers.models.llama.modeling_llama.apply_rotary_pos_emb).")
-
-    pkv = out.past_key_values                      # per-layer (key, value); value = post-proj V
-    n_layers = len(stash["qk"])
+    pkv = out.past_key_values
+    n_layers = FQ.num_cache_layers(pkv)
     if args.max_layers:
         n_layers = min(n_layers, args.max_layers)
+    have_q = len(stash["q"]) >= n_layers
+    if not have_q:
+        print(f"[warn] rotary patch captured {len(stash['q'])}/{n_layers} Q (model_type={mt!r}); "
+              "saving K/V WITHOUT Q — attention-error eval (non-blocking proxy) will skip.")
+
     mask_blob = torch.load(args.mask, map_location="cpu", weights_only=False)
     full_mask = mask_blob.get("mask", mask_blob.get("protect_mask"))     # (L, H_kv, D) int8
     if full_mask is None:
@@ -84,20 +90,20 @@ def main(argv=None):
 
     layers = []
     for li in range(n_layers):
-        q, k = stash["qk"][li]                      # (B, Hq, S, D), (B, Hkv, S, D)
-        v = pkv[li][1] if not hasattr(pkv, "layers") else pkv.layers[li].values   # (B, Hkv, S, D)
-        # to (S, H, D), drop batch 0
-        K = k[0].transpose(0, 1).contiguous().float().cpu()      # (S, Hkv, D)
-        V = v[0].transpose(0, 1).contiguous().float().cpu()
-        Q = q[0].transpose(0, 1).contiguous().float().cpu()      # (S, Hq, D)
-        layers.append({"K": K, "V": V, "Q": Q[-8:] if Q.shape[0] > 8 else Q,   # a few decode queries
-                       "protect_mask": full_mask[li].to(torch.int8).cpu()})
+        kt, vt = FQ.layer_kv(pkv, li)               # (B, Hkv, S, D)
+        entry = {"K": kt[0].transpose(0, 1).contiguous().float().cpu(),   # (S, Hkv, D)
+                 "V": vt[0].transpose(0, 1).contiguous().float().cpu(),
+                 "protect_mask": full_mask[li].to(torch.int8).cpu()}
+        if have_q:
+            Q = stash["q"][li][0].transpose(0, 1).contiguous().float().cpu()   # (S, Hq, D)
+            entry["Q"] = Q[-8:] if Q.shape[0] > 8 else Q
+        layers.append(entry)
 
-    blob = {"layers": layers, "meta": {"model": args.model, "mask": args.mask,
+    blob = {"layers": layers, "meta": {"model": args.model, "mask": args.mask, "has_Q": have_q,
             "n_layers": n_layers, "prompt_tokens": int(ids.shape[1]), "synthetic": False}}
     torch.save(blob, args.out)
-    print(f"[MEASURED] captured {n_layers} layers -> {args.out} "
-          f"(K/V/Q shapes: {tuple(layers[0]['K'].shape)}/{tuple(layers[0]['Q'].shape)})")
+    qshape = tuple(layers[0]["Q"].shape) if have_q else None
+    print(f"[MEASURED] captured {n_layers} layers -> {args.out} (K {tuple(layers[0]['K'].shape)}, Q {qshape})")
     return 0
 
 

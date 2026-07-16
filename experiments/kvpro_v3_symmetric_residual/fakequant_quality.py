@@ -23,37 +23,17 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 sys.path.insert(0, os.path.join(_HERE, "..", "..", "CTM_plus", "KVPolicy"))
-import quantizers as Q          # noqa: E402
+import fakequant_model as FQ    # noqa: E402  (shared robust cache/loader)
 
 
 def _die(m, c=2):
     print(f"\n[FAIL] {m}", file=sys.stderr); sys.exit(c)
 
 
-def _build_cache(candidate, masks, BS=32, v_group_size=32):
-    import torch
-    from transformers.cache_utils import DynamicCache
-
-    class FakeQuantCache(DynamicCache):
-        def update(self, key, value, layer_idx, cache_kwargs=None):
-            k, v = super().update(key, value, layer_idx, cache_kwargs)
-            if candidate == "fp":
-                return k, v
-            mask = masks[layer_idx].to(k.device)                     # (Hkv, D)
-            # (B, Hkv, S, D) -> (S, Hkv, D) per batch item 0 (eval uses B=1)
-            Kf = k[0].transpose(0, 1).float()
-            Vf = v[0].transpose(0, 1).float()
-            Kh, Vh = Q.reconstruct(Kf, Vf, mask, candidate, BS=BS, v_group_size=v_group_size)
-            k[0] = Kh.transpose(0, 1).to(k.dtype)
-            v[0] = Vh.transpose(0, 1).to(v.dtype)
-            return k, v
-    return FakeQuantCache()
-
-
 def _ppl_and_agreement(model, ids, cand, masks):
     import torch
     with torch.no_grad():
-        cache = _build_cache(cand, masks)
+        cache = FQ.build_fakequant_cache(cand, masks)
         out = model(ids, use_cache=True, past_key_values=cache)
         logits = out.logits[0, :-1].float()                          # (S-1, vocab)
         tgt = ids[0, 1:]
@@ -76,15 +56,11 @@ def main(argv=None):
     if not args.mask or not os.path.isfile(args.mask):
         _die(f"protect mask missing: {args.mask!r}")
     try:
-        import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        import torch  # noqa: F401
     except Exception as e:  # noqa: BLE001
-        _die(f"transformers/torch import failed: {e}")
-    if not torch.cuda.is_available():
-        _die("no CUDA GPU.")
+        _die(f"torch import failed: {e}")
 
-    tok = AutoTokenizer.from_pretrained(args.model)
-    model = AutoModelForCausalLM.from_pretrained(args.model, torch_dtype=torch.bfloat16, device_map="cuda").eval()
+    model, tok = FQ.load_model(args.model)          # dtype-safe + GPU check
     ids = tok(args.text, return_tensors="pt").input_ids.to("cuda")
     mask_blob = torch.load(args.mask, map_location="cpu", weights_only=False)
     masks = mask_blob.get("mask", mask_blob.get("protect_mask"))

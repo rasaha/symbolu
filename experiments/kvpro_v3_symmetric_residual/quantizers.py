@@ -64,18 +64,31 @@ def symmetric_int4(x: torch.Tensor, red_dim: int,
 def quantize_k_sequence(K: torch.Tensor, BS: int, scheme: str,
                         bias: Optional[torch.Tensor] = None) -> torch.Tensor:
     """K: (S, H, D) fp -> reconstructed (S, H, D). scheme in {affine, symmetric}. Partial last block
-    quantized over its real tokens (matches the writer). bias (H,D) only for scheme=symmetric (S2)."""
+    quantized over its real tokens (matches the writer). bias (H,D) only for scheme=symmetric (S2).
+
+    Vectorized: the full BS-token blocks are quantized in one batched per-(block,H,D) reduction
+    (reshape S->(n_full,BS) and reduce the within-block token axis); any partial trailing block is
+    quantized over its real tokens. Numerically IDENTICAL to the per-block loop — the pre-registered
+    numerics are unchanged (see tests/test_symmetric_residual_cpu.py::test_vectorized_k_matches_loop)."""
+    if scheme not in ("affine", "symmetric"):
+        raise ValueError(f"unknown K scheme {scheme!r}")
     S, H, D = K.shape
     out = torch.empty_like(K, dtype=torch.float32)
-    for s0 in range(0, S, BS):
-        blk = K[s0:s0 + BS]                       # (T<=BS, H, D)
+    n_full = S // BS
+    if n_full:                                    # all complete blocks in one batched reduction
+        head = K[:n_full * BS].to(torch.float32).reshape(n_full, BS, H, D)
         if scheme == "affine":
-            deq, _, _ = affine_int4(blk, red_dim=0)
-        elif scheme == "symmetric":
-            deq, _ = symmetric_int4(blk, red_dim=0, bias=bias)
+            deq, _, _ = affine_int4(head, red_dim=1)              # reduce the within-block token axis
         else:
-            raise ValueError(f"unknown K scheme {scheme!r}")
-        out[s0:s0 + blk.shape[0]] = deq
+            deq, _ = symmetric_int4(head, red_dim=1, bias=bias)  # bias (H,D) broadcasts over (block,token)
+        out[:n_full * BS] = deq.reshape(n_full * BS, H, D)
+    if S - n_full * BS:                           # partial trailing block: reduce over its real tokens
+        tail = K[n_full * BS:].to(torch.float32)                  # (rem, H, D)
+        if scheme == "affine":
+            deq, _, _ = affine_int4(tail, red_dim=0)
+        else:
+            deq, _ = symmetric_int4(tail, red_dim=0, bias=bias)
+        out[n_full * BS:] = deq
     return out
 
 

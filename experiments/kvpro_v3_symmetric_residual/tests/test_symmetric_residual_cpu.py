@@ -22,7 +22,40 @@ import accounting as A          # noqa: E402
 import gates as G               # noqa: E402
 
 
+def _k_loop_reference(K, BS, scheme, bias=None):
+    """The original per-block Python loop — the numerical ORACLE the vectorized path must match."""
+    S, H, D = K.shape
+    out = torch.empty_like(K, dtype=torch.float32)
+    for s0 in range(0, S, BS):
+        blk = K[s0:s0 + BS]                       # (T<=BS, H, D)
+        if scheme == "affine":
+            deq, _, _ = Q.affine_int4(blk, red_dim=0)
+        elif scheme == "symmetric":
+            deq, _ = Q.symmetric_int4(blk, red_dim=0, bias=bias)
+        else:
+            raise ValueError(scheme)
+        out[s0:s0 + blk.shape[0]] = deq
+    return out
+
+
 class TestQuantizers(unittest.TestCase):
+    def test_vectorized_k_matches_loop(self):
+        # The vectorization must NOT change the pre-registered numerics: batched == per-block loop,
+        # bit-for-bit (max/min reductions are order-invariant; the rest is elementwise). Covers
+        # divisible, partial-tail, sub-block (S<BS), and full+partial sequence lengths.
+        g = torch.Generator().manual_seed(7)
+        for S in (32, 64, 96, 100, 17, 31, 33, 128):
+            for H, D in ((2, 8), (4, 16)):
+                K = torch.randn(S, H, D, generator=g)
+                bias = torch.randn(H, D, generator=g)
+                for scheme, b in (("affine", None), ("symmetric", None), ("symmetric", bias)):
+                    ref = _k_loop_reference(K, 32, scheme, bias=b)
+                    vec = Q.quantize_k_sequence(K, 32, scheme, bias=b)
+                    self.assertTrue(torch.equal(ref, vec),
+                                    f"vectorized K != loop for S={S} H={H} D={D} "
+                                    f"scheme={scheme} bias={b is not None}")
+
+
     def test_affine_matches_production_formula(self):
         # production: scale=((amax-amin)/15).clamp(1e-8); q=round((x-xmin)/scale).clamp(0,15); x_hat=q*scale+xmin
         g = torch.Generator().manual_seed(0)

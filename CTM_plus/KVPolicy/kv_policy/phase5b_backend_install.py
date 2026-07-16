@@ -1187,14 +1187,21 @@ if _VLLM_FA_AVAILABLE:
                                     )
                                     slot_idx_t = _slot_idx_buf
                                     _pre_synced = False
-                            writer.write_decode_batched(
-                                key=key,
-                                value=value,
-                                kv_cache=kv_cache,
-                                slot_mapping=slot_mapping_flat,
-                                slot_idx_t=slot_idx_t,
-                                pre_synced=_pre_synced,
-                            )
+                            # Phase 6M.7: time the decode WRITE path as its own
+                            # bucket (write-quantize+pack of the new token) so the
+                            # attribution can test the "write >= 10% of decode"
+                            # threshold. No-op context when the profiler is off
+                            # (production / graph-capture default), same as the
+                            # read-path regions below — cannot alter numerics.
+                            with _maybe_region("batched.write"):
+                                writer.write_decode_batched(
+                                    key=key,
+                                    value=value,
+                                    kv_cache=kv_cache,
+                                    slot_mapping=slot_mapping_flat,
+                                    slot_idx_t=slot_idx_t,
+                                    pre_synced=_pre_synced,
+                                )
                             Int4ProtectedAttentionImpl._call_stats[
                                 "write_decode_batched_calls"
                             ] += 1

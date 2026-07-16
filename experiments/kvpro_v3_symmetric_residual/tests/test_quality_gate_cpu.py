@@ -138,14 +138,53 @@ class TestVerdict(unittest.TestCase):
         self.assertEqual(v["verdict"], "GO_WITH_MODIFICATION")
         self.assertTrue(v["per_candidate"]["S3"]["full_quality"])
 
-    def test_offline_fail_blocks_go_even_if_e2e_passes(self):
-        # end-to-end all-pass but the offline attention proxy FAILS -> not full_quality -> not GO.
+    def test_offline_fail_is_advisory_not_blocking(self):
+        # AMENDED 2026-07-16: the offline proxy is ADVISORY. A definitive offline FAIL is REPORTED but does
+        # NOT block GO when all three end-to-end benchmarks pass (the proxy was shown unreliable at 2000-Q).
         v = G.verdict(attn_ok(False),
                       bench("needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
                       bench("hard_needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
                       bench("mmlu", "Qwen/Qwen2.5-7B-Instruct", ALL_T), geom=G.A.QWEN2_5_7B)
-        self.assertFalse(v["per_candidate"]["S1"]["full_quality"])
-        self.assertNotEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
+        self.assertFalse(v["per_candidate"]["S1"]["quality_offline"])   # advisory signal is False
+        self.assertTrue(v["per_candidate"]["S1"]["offline_is_advisory"])
+        self.assertTrue(v["per_candidate"]["S1"]["full_quality"])       # but it does NOT block
+        self.assertEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
+
+    def test_offline_synthetic_is_nonblocking(self):
+        # offline proxy synthetic/NOT-RUN (None) but all three end-to-end pass -> still GO.
+        attn = attn_ok(True); attn["label"] = "NOT_A_VERDICT_SYNTHETIC"
+        v = G.verdict(attn,
+                      bench("needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
+                      bench("hard_needle", "Qwen/Qwen2.5-7B-Instruct", ALL_T),
+                      bench("mmlu", "Qwen/Qwen2.5-7B-Instruct", ALL_T), geom=G.A.QWEN2_5_7B)
+        self.assertIsNone(v["per_candidate"]["S1"]["quality_offline"])
+        self.assertTrue(v["per_candidate"]["S1"]["full_quality"])
+        self.assertEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
+
+
+class TestOfflineGateBaselineFix(unittest.TestCase):
+    """The 2026-07-16 fix: offline proxy is relative-to-affine only; it must not reject the affine baseline
+    (which fails the old absolute cos/kl bars), and must still block candidates worse than affine on MSE."""
+    def _attn(self, cos, mse_x, kl):
+        s = {c: {"attn_out_cos_min": cos, "attn_out_mse_vs_affine_max": mse_x, "softmax_kl_max_max": kl,
+                 "attn_out_mse_max": 0.0, "softmax_kl_mean_max": 0.0} for c in CELLS}
+        return {"summary": s, "label": "MEASURED"}
+
+    def test_baseline_numbers_now_pass(self):
+        # affine's OWN decisive-run numbers: cos 0.9951 (< old 0.999), kl 0.2481 (>> old 0.02), mse 1.0.
+        ok, why = G.quality_offline(self._attn(0.9951, 1.0, 0.2481), "S3")
+        self.assertTrue(ok, f"baseline-like numbers must not be blocked, got {why}")
+
+    def test_still_blocks_worse_than_affine(self):
+        # S2's decisive-run numbers: mse 3.26x affine -> still a red flag (NOT loosened to pass S2).
+        ok, why = G.quality_offline(self._attn(0.9882, 3.264, 0.7557), "S2")
+        self.assertFalse(ok)
+        self.assertTrue(any("mse" in w.lower() for w in why))
+
+    def test_kl_and_cos_no_longer_gate(self):
+        # huge KL / low cos but MSE within the affine bound -> passes (cos/kl are diagnostics only now).
+        ok, _ = G.quality_offline(self._attn(0.90, 1.10, 16.0), "S1")
+        self.assertTrue(ok)
 
 
 if __name__ == "__main__":

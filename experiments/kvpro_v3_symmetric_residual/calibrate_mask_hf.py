@@ -52,12 +52,15 @@ def build_mask_from_maxabs(maxabs_by_layer, protect_fraction: float):
     return mask, n_protect
 
 
-def _layer_key(pkv, i):
-    """Post-RoPE K for layer i across transformers Cache / legacy-tuple past_key_values."""
-    kc = getattr(pkv, "key_cache", None)
-    if kc is not None:
-        return kc[i]
-    return pkv[i][0]
+def widen_minmax(k_min, k_max, margin: float = 1.1):
+    """Pure (CPU-testable): Phase-6N deployment margin — push each per-channel bound OUTWARD by
+    (margin-1)*range so live values slightly past calibration do not clip under prot-int8. Byte-identical
+    to production calibrate_phase5b_protect_mask._widen_minmax:  pad=(margin-1)*(k_max-k_min);
+    return k_min-pad, k_max+pad. The writer/P8prod consume the stored (already-widened) bounds as-is."""
+    if margin < 1.0:
+        raise ValueError(f"minmax margin must be >= 1.0; got {margin}")
+    pad = (margin - 1.0) * (k_max - k_min)
+    return k_min - pad, k_max + pad
 
 
 def main(argv=None):
@@ -66,6 +69,8 @@ def main(argv=None):
     ap.add_argument("--output", required=True)
     ap.add_argument("--protect-fraction", type=float, default=0.04)
     ap.add_argument("--num-prompts", type=int, default=0, help="0 = use the whole built-in corpus")
+    ap.add_argument("--minmax-margin", type=float, default=1.1,
+                    help="Phase-6N prot-int8 deployment margin (widen k_min/k_max outward); matches production")
     args = ap.parse_args(argv)
 
     import torch
@@ -82,7 +87,8 @@ def main(argv=None):
         pkv = out.past_key_values
         n_layers = model.config.num_hidden_layers
         for li in range(n_layers):
-            k = _layer_key(pkv, li)[0].float()            # (H_kv, S, D)
+            kt, _ = FQ.layer_kv(pkv, li)                  # (B, H_kv, S, D)
+            k = kt[0].float()                             # (H_kv, S, D)
             ma = k.abs().amax(dim=1).cpu()                # (H_kv, D)
             mn = k.amin(dim=1).cpu(); mx = k.amax(dim=1).cpu()
             maxabs[li] = ma if li not in maxabs else torch.maximum(maxabs[li], ma)
@@ -92,12 +98,15 @@ def main(argv=None):
 
     mask, n_protect = build_mask_from_maxabs(maxabs, args.protect_fraction)
     L, H_kv, D = mask.shape
+    # widen raw min/max by the Phase-6N margin so k_min/k_max are PRODUCTION-FAITHFUL (P8prod uses them as-is)
+    kmin_raw = torch.stack([kmin[i] for i in sorted(kmin)])
+    kmax_raw = torch.stack([kmax[i] for i in sorted(kmax)])
+    kmin_w, kmax_w = widen_minmax(kmin_raw, kmax_raw, args.minmax_margin)
     artifact = {
         "mask": mask, "protect_fraction": args.protect_fraction, "n_protect": n_protect,
         "num_layers": L, "num_kv_heads": H_kv, "head_dim": D, "model": args.model,
-        "k_min": torch.stack([kmin[i] for i in sorted(kmin)]),
-        "k_max": torch.stack([kmax[i] for i in sorted(kmax)]),
-        "calibrated_by": "hf_maxabs_topk (transformers; matches production max-abs criterion)",
+        "k_min": kmin_w, "k_max": kmax_w, "minmax_margin": args.minmax_margin,
+        "calibrated_by": "hf_maxabs_topk (transformers; matches production max-abs criterion + minmax margin)",
     }
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     torch.save(artifact, args.output)

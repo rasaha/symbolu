@@ -41,9 +41,11 @@ def main(argv=None):
     ap.add_argument("--real", action="store_true", help="pull real MMLU via `datasets` (full prior battery)")
     ap.add_argument("--max-new-tokens", type=int, default=5)
     ap.add_argument("--out", default="knowledge_results.json")
+    ap.add_argument("--cells", default=",".join(CELLS), help="comma cells; P8 study: fp,affine,P8sym,P8aff")
     args = ap.parse_args(argv)
     if not args.mask or not os.path.isfile(args.mask):
         print(f"[FAIL] mask missing: {args.mask!r}", file=sys.stderr); return 2
+    cells = args.cells.split(",")
 
     questions = build_question_set(args.num_questions, real=args.real)
     if not questions:
@@ -57,13 +59,13 @@ def main(argv=None):
     for i, q in enumerate(questions):
         prompt = mm.build_prompt(q["q"], q["choices"])
         row = {"seed": 0, "gold": int(q["answer"]), "cells": {}}
-        for cell in CELLS:
+        for cell in cells:
             out = FQ.generate(model, tok, prompt, cell, masks, max_new_tokens=args.max_new_tokens)
             row["cells"][cell] = {"pred": mm.parse_answer(out), "output": out[:40]}
         items.append(row)
-        preds = ",".join(f"{c}:{row['cells'][c]['pred']}" for c in CELLS)
+        preds = ",".join(f"{c}:{row['cells'][c]['pred']}" for c in cells)
         print(f"  q {i+1}/{len(questions)} gold={q['answer']} preds={{{preds}}}")
-    blob = {"model": args.model, "label": "MEASURED", "cells": CELLS,
+    blob = {"model": args.model, "label": "MEASURED", "cells": cells,
             "dataset": "mmlu-real" if args.real else "builtin-deterministic", "items": items}
     json.dump(blob, open(args.out, "w"), indent=2)
     print(f"[MEASURED] knowledge -> {args.out}")
