@@ -47,6 +47,74 @@ def random_xmin(B: int, D: int, seed: int = 3) -> torch.Tensor:
     return torch.randn(B, D, generator=g) * 2.0
 
 
+def clustered_matrix(B: int, D: int, H: int, n_clusters: int = 2, seed: int = 0,
+                     template_seed: int = 777, jitter: float = 0.02,
+                     positive: bool = True) -> torch.Tensor:
+    """(B,H,D): heads fall into n_clusters per-channel templates (+ per-block gain).
+    Templates come from a SHARED seed (so a few templates cover heads across all layers/
+    captures — the real clustering signal); per-head gains + jitter come from `seed`."""
+    gt = torch.Generator().manual_seed(template_seed)
+    templates = [(torch.rand(D, generator=gt) * 2 + 0.2) if positive else torch.randn(D, generator=gt)
+                 for _ in range(n_clusters)]
+    g = torch.Generator().manual_seed(seed)
+    out = torch.empty(B, H, D)
+    for h in range(H):
+        t = templates[h % n_clusters] * torch.exp(jitter * torch.randn(D, generator=g))
+        if positive:
+            gain = torch.rand(B, generator=g) * 2 + 0.2
+            out[:, h, :] = gain[:, None] * t[None, :]
+        else:
+            out[:, h, :] = t[None, :] + 0.05 * torch.randn(B, 1, generator=g)   # per-block level shift
+    return out.clamp_min(1e-6) if positive else out
+
+
+def piecewise_matrix(B: int, D: int, H: int, n_seg: int = 3, seed: int = 0,
+                     positive: bool = True) -> torch.Tensor:
+    """(B,H,D): blocks are piecewise-constant across n_seg contiguous segments (long
+    run-lengths). Ground truth for temporal stability / delta-coding."""
+    g = torch.Generator().manual_seed(seed)
+    out = torch.empty(B, H, D)
+    per = max(1, B // n_seg)
+    for h in range(H):
+        segs = [(torch.rand(D, generator=g) * 2 + 0.2) if positive else torch.randn(D, generator=g)
+                for _ in range(n_seg)]
+        for b in range(B):
+            out[b, h] = segs[min(b // per, n_seg - 1)]
+    return out.clamp_min(1e-6) if positive else out
+
+
+def explore_manifest_synthetic(structure: str = "low_rank", n_captures: int = 2,
+                               n_layers: int = 2, H: int = 4, B: int = 12, D: int = 128,
+                               n_protect: int = 5, seed: int = 0) -> dict:
+    """Multi-capture (prompt,seed) explore manifest with a KNOWN structure type, for the
+    CPU tests. structure ∈ {low_rank, clustered, piecewise, random, stable}. 'stable'
+    reuses the SAME metadata across captures (identity variance dominates); the others
+    vary per capture so cross-prompt/seed variance is present."""
+    caps = []
+    for c in range(n_captures):
+        layers = []
+        for li in range(n_layers):
+            bs = (seed + li * H) if structure == "stable" else (seed + c * 1000 + li * H)
+            if structure in ("low_rank", "stable"):
+                s = torch.stack([factorable_scale(B, D, bs + h) for h in range(H)], 1)
+                x = torch.stack([factorable_xmin(B, D, bs + 50 + h) for h in range(H)], 1)
+            elif structure == "clustered":
+                s = clustered_matrix(B, D, H, seed=bs, positive=True)
+                x = clustered_matrix(B, D, H, seed=bs + 50, positive=False)
+            elif structure == "piecewise":
+                s = piecewise_matrix(B, D, H, seed=bs, positive=True)
+                x = piecewise_matrix(B, D, H, seed=bs + 50, positive=False)
+            else:  # random / unstructured
+                s = torch.stack([random_scale(B, D, bs + h) for h in range(H)], 1)
+                x = torch.stack([random_xmin(B, D, bs + 50 + h) for h in range(H)], 1)
+            mask = torch.zeros(H, D, dtype=torch.int8); mask[:, :n_protect] = 1
+            layers.append({"layer": li, "s_prod": s, "xmin_prod": x, "protect_mask": mask})
+        caps.append({"prompt_id": c, "seed": seed + c, "layers": layers})
+    return {"model": f"SYNTH_{structure}", "mask_path": None, "BS": 32, "n_protect": n_protect,
+            "geom": {"n_layers": n_layers, "H_kv": H, "D": D, "S": B * 32, "n_blocks": B},
+            "structure": structure, "captures": caps}
+
+
 def synthetic_metadata_manifest(n_layers: int = 2, H: int = 4, B: int = 8, D: int = 128,
                                 factorable: bool = True, seed: int = 0) -> dict:
     """A manifest whose s_prod/xmin_prod are set DIRECTLY from the (non)factorable
