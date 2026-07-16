@@ -37,6 +37,18 @@ export PROTECT_MASK_PATH=/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.
 - No production/Triton kernel (out of scope by directive).
 - No TPS/speedup claim. Systems value is MODELED bytes/ops only.
 
+## Neutral metadata PRE-GATE (added; CPU-verified, pod-pending)
+- `metadata_explore.py` (multi-prompt/seed, metadata-only), `analyze_entropy.py`,
+  `analyze_temporal_stability.py`, `analyze_clustering.py`, `analyze_variance_sources.py`,
+  `compare_structure_methods.py` (10 neutral methods, `reduces_per_element_work` flag),
+  `decide_structure.py` (natural-structure verdict + frozen stop rules),
+  `run_metadata_explore.sh`, `run_both_models_structure.sh`, `METADATA_STRUCTURE_REPORT.md`.
+- Runs BEFORE the rank-based gate: asks what structure exists without assuming rank; CLOSEs
+  cheaply if the structure isn't work-reducing + input-stable on both models.
+- Discrimination verified on synthetic ground truth (low_rank/clustered/piecewise/random/
+  stable). CPU tests: `test_explore_cpu.py` 10/10, `test_decide_structure_cpu.py` 9/9.
+- Pod-pending: real capture → the natural-structure verdict (no verdict yet).
+
 ## Decision discipline (frozen)
 Structure gate is the pre-filter; if scale (QF1/QF3) or xmin (QF2) fails the frozen
 structural thresholds on **either** model, stop → `NO_GO_STRUCTURE` before attention/

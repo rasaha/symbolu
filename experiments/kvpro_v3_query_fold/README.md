@@ -9,6 +9,15 @@ Do not assume it works. The structural gate (Phase C/D) comes first: if the real
 `scale`/`xmin` tensors don't factor, we stop before any attention or quality run.
 **No production kernel is implemented in this study.**
 
+> **Run the neutral PRE-GATE first.** `METADATA_STRUCTURE_REPORT.md` +
+> `run_both_models_structure.sh` ask *what structure the metadata naturally has*
+> (low-rank / clustered / temporally-stable / low-entropy / unstructured) WITHOUT
+> assuming rank — and CLOSE the whole line cheaply if the structure isn't a
+> work-reducing, input-stable one. Only advance to the rank-based gate below
+> (`run_all.sh`) if the pre-gate recommends `ADVANCE_EXISTING_QUERY_FOLD`. The pre-gate
+> adds: `metadata_explore.py`, `analyze_{entropy,temporal_stability,clustering,
+> variance_sources}.py`, `compare_structure_methods.py`, `decide_structure.py`.
+
 ---
 
 ## Phase A — production K format (verified in source, not from summaries)
