@@ -23,6 +23,7 @@ def _load(fname, mod):
 
 PROBE = _load("unzip_bound_probe.py", "unzip_bound_probe")
 CLS = _load("08_classify_unzip_bound.py", "classify_unzip_bound")
+SPIKE = _load("09_append_feasibility_spike.py", "append_feasibility_spike")
 
 _n = 0
 
@@ -125,11 +126,13 @@ def test_peaks_for():
 
 
 # --------------------------------------------------------------- analyse (end-to-end) ----
-def _synthetic_probe(f, m, Fc, Ff, ctxs=(4096, 16384, 32768)):
+def _synthetic_probe(f, m, Fc, Ff, ctxs=(4096, 16384, 32768), fp=None, Fp=None, oracle=0.0):
     per = {}
     for c in ctxs:
         per[str(c)] = {
             "fetch_only_ms": f, "math_only_ms": m, "full_compact_ms": Fc, "full_fullprotect_ms": Ff,
+            "fetch_pagelocal_ms": fp if fp is not None else f, "full_pagelocal_ms": Fp if Fp is not None else Fc,
+            "oracle_max_abs_diff": oracle,
             "S_padded": c, "n_blocks": c // 32, "iters": 100,
             "model_compact": PROBE.byte_flop_model(c, 4, 128, 32, 5, 32, "compact"),
             "model_fullprotect": PROBE.byte_flop_model(c, 4, 128, 32, 5, 32, "full"),
@@ -160,9 +163,73 @@ def test_analyse_end_to_end():
     check("analyse handles None", dN["verdict"] == "UNAVAILABLE")
 
 
+# --------------------------------------------------------------- 6F-A page-local ----
+def test_project_aggregate():
+    # large unzip improvement -> central (default) estimate clears 15% -> PASS
+    p = CLS.project_aggregate(0.70)
+    check("proj PASS when large (default clears)", p["gate_verdict"] == "PASS")
+    check("proj scenarios ordered", p["scenarios_pct"]["conservative"] <= p["scenarios_pct"]["optimistic"])
+    # tiny improvement -> even optimistic can't clear -> FAIL
+    p2 = CLS.project_aggregate(0.02)
+    check("proj FAIL when tiny", p2["gate_verdict"] == "FAIL")
+    # middling -> PROVISIONAL (optimistic clears, default does not)
+    p3 = CLS.project_aggregate(0.40)
+    check("proj PROVISIONAL when mid", p3["gate_verdict"] == "PROVISIONAL")
+    # measured-share override raises the central estimate
+    p4 = CLS.project_aggregate(0.50, {"alpha": 0.9, "beta": 0.9})
+    check("proj override applied", p4["scenarios_pct"]["default"] > CLS.project_aggregate(0.50)["scenarios_pct"]["default"])
+
+
+def test_sixfa_analysis():
+    # 25% read improvement, oracle exact -> read gate PASS
+    probe = _synthetic_probe(0.40, 0.05, 0.40, 0.80, fp=0.30, Fp=0.30, oracle=0.0)
+    d = CLS.analyse(probe)
+    s = d["sixfa_pagelocal"]
+    check("sixfa label", s["label"] == "GPU-measured")
+    check("sixfa read improvement ~25%", 24.0 <= s["read_improvement_pct"] <= 26.0)
+    check("sixfa read gate pass", s["read_gate_pass"] is True)
+    check("sixfa oracle ok", s["oracle_ok"] is True)
+    check("sixfa pagelocal faster BW", s["pagelocal"]["eff_read_gbps"] > s["current"]["eff_read_gbps"])
+    check("sixfa gates present", "aggregate_ge_15pct" in s["gates_6fa"])
+
+    # only 10% improvement -> read gate FAIL
+    probe2 = _synthetic_probe(0.40, 0.05, 0.40, 0.80, fp=0.36, Fp=0.36, oracle=0.0)
+    s2 = CLS.analyse(probe2)["sixfa_pagelocal"]
+    check("sixfa read gate fail at 10%", s2["read_gate_pass"] is False)
+
+    # non-zero oracle -> flagged not-ok (values diverged => a real bug)
+    probe3 = _synthetic_probe(0.40, 0.05, 0.40, 0.80, fp=0.30, Fp=0.30, oracle=1.3)
+    s3 = CLS.analyse(probe3)["sixfa_pagelocal"]
+    check("sixfa oracle mismatch flagged", s3["oracle_ok"] is False)
+
+    # probe without page-local fields -> UNAVAILABLE (not a crash)
+    old = _synthetic_probe(0.40, 0.05, 0.40, 0.80)
+    for c in old["per_ctx"].values():
+        c.pop("fetch_pagelocal_ms"); c.pop("full_pagelocal_ms")
+    su = CLS.analyse(old)["sixfa_pagelocal"]
+    check("sixfa unavailable w/o pagelocal", su["label"] == "UNAVAILABLE")
+
+
+def test_append_gate():
+    spike = {"1": {"append_no_repack": {"current_ms": 0.010, "pagelocal_ms": 0.013, "added_write_ms": 0.003}},
+             "256": {"append_no_repack": {"current_ms": 0.050, "pagelocal_ms": 0.062, "added_write_ms": 0.012}}}
+    # read gain per seq 0.07 ms, B=256 -> per-step read gain 17.9 ms; ratio ~0.0007 -> PASS
+    g = SPIKE.evaluate_gate(spike, read_gain_ms=0.07, decision_batch=256)
+    check("append gate measured", g["label"] == "MEASURED")
+    check("append gate ratio tiny", g["write_over_read_ratio"] < 0.01)
+    check("append gate PASS", g["gate_pass"] is True)
+    # no read gain -> INDETERMINATE (read gate must pass first)
+    gi = SPIKE.evaluate_gate(spike, read_gain_ms=None, decision_batch=256)
+    check("append gate indeterminate w/o read gain", gi["label"] == "INDETERMINATE")
+    # if write penalty were huge vs a tiny read gain -> FAIL
+    gf = SPIKE.evaluate_gate(spike, read_gain_ms=0.00001, decision_batch=256)
+    check("append gate fail when write dominates", gf["gate_pass"] is False)
+
+
 def main():
     for t in (test_byte_flop_model, test_classify_times, test_roofline,
-              test_peaks_for, test_analyse_end_to_end):
+              test_peaks_for, test_analyse_end_to_end,
+              test_project_aggregate, test_sixfa_analysis, test_append_gate):
         t()
     print(f"unzip-probe CPU checks: {_n}/{_n} PASS")
     return 0

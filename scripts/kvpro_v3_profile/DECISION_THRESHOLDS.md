@@ -86,3 +86,46 @@ route-A full-fp16-K ablation (`FULL_full − FULL_compact`) quantifies the fp16-
 read kernel would remove. Correctness of the kernel's addressing + arithmetic is anchored on CPU by
 `validate_kernel_interp.py` (Triton interpreter mode, exact match vs a numpy reference) — no GPU needed for
 the correctness half; the pod supplies only timing.
+
+---
+
+# Part 6F-A — FROZEN gates for the page-local (store-as-consumed) layout probe
+
+6F-A extends the probe with a per-head-contiguous **page-local** layout `(H, n_blocks, BS, *)` timed
+against the current native `(S,H,*)` layout on **identical values** (the page-local tensors are a
+permutation; the oracle diff MUST be 0). It asks: does coalescing the reads deliver, and is the write side
+affordable? These gates are **frozen before the GPU run**. `08_classify_unzip_bound.py` computes read/full
+improvement + the aggregate projection; `09_append_feasibility_spike.py` measures the write-side delta.
+
+| Gate | Constant | Value | Meaning |
+|---|---|---|---|
+| Read | `READ_GAIN_MIN` | **20%** | page-local must cut **fetch** latency by ≥ 20% at the decision context vs current layout |
+| Aggregate | `AGG_PROJ_MIN` | **15%** | projected aggregate-TPS improvement must be ≥ 15% to authorise 6F-C |
+| Write | `WRITE_COST_MAX` | **25%** | added per-token write cost must be **< 25%** of the per-step read gain (append spike) |
+| Oracle | — | **exact** | page-local output must equal current output bit-for-bit (same values, re-addressed) |
+
+**Aggregate projection (MODELED, not measured).** The decode-kernel-time breakdown is UNAVAILABLE without
+`ncu`/production `nsys`, so aggregate is projected:
+```
+projected_aggregate ≈ unzip_full_improvement × α × β × realizable
+  α = unzip-read share of the decode-attention kernel time
+  β = decode-attention kernel share of the whole decode step
+```
+Three labelled share scenarios are reported (conservative / **default** / optimistic = products
+0.09 / 0.245 / 0.567). Verdict: **FAIL** if even optimistic misses 15%; **PASS** if the *central* (default)
+estimate clears 15%; **PROVISIONAL** otherwise (only optimistic clears → measure the real shares with
+`--unzip-share α` / `--decode-attn-share β` or a `stage_summary.json` before deciding). α and β are
+**assumptions, never fabricated measurements** — the projection is explicitly `label: "MODELED"`.
+
+**Append spike (MEASURED write delta).** Only the store *pattern* differs by layout (the quantise math is
+common-mode), so the spike stores pre-quantised payloads and times: `append_no_repack` (a plain slot-write —
+the page-local layout needs **no** re-transpose per token), `block_rollover` (crossing a BS boundary +
+once-per-block K-scale write), `mixed_tail` (per-seq random block/offset — cost must be fill-independent),
+across a batch/concurrency sweep. Because a token is **written once but read every later step**, the gate is
+`ΔW_per_step / (B · ΔR_per_seq) < 25%` — the write penalty amortised over the context, evaluated at the
+decision context using the 6F-A read gain.
+
+**Authorise 6F-C only if ALL hold:** read ≥ 20% **and** projected aggregate ≥ 15% (not FAIL) **and** added
+write < 25% of read gain **and** oracle exact. Any miss → stop at 6F-A and report. (This is the reviewer's
+frozen decision rule; the fp16-pool compact-sidecar swap is a ~7% side-lever, **not** the primary Route-C
+optimisation, and is not on this path.)
