@@ -63,7 +63,10 @@ _PEAKS = [
     (("H100", "NVL"),  {"hbm_gbps": 3900.0, "fp32_tflops": 67.0}, "H100-NVL"),
     (("H100",),        {"hbm_gbps": 3350.0, "fp32_tflops": 67.0}, "H100-SXM"),
     (("H200",),        {"hbm_gbps": 4800.0, "fp32_tflops": 67.0}, "H200-SXM"),
-    (("A6000",),       {"hbm_gbps": 768.0,  "fp32_tflops": 38.7}, "A6000"),
+    (("A6000",),       {"hbm_gbps": 768.0,  "fp32_tflops": 38.7}, "RTX-A6000-Ampere-48GB"),
+    (("6000", "ADA"),  {"hbm_gbps": 960.0,  "fp32_tflops": 91.1}, "RTX-6000-Ada-48GB"),
+    (("QUADRO", "6000"), {"hbm_gbps": 672.0, "fp32_tflops": 16.3}, "Quadro-RTX-6000-Turing-24GB"),
+    (("6000",),        {"hbm_gbps": 768.0,  "fp32_tflops": 38.7}, "RTX-6000-family(assumed-A6000)"),
     (("L40",),         {"hbm_gbps": 864.0,  "fp32_tflops": 90.5}, "L40S"),
 ]
 _DEFAULT_PEAK = {"hbm_gbps": 2039.0, "fp32_tflops": 19.5, "assumed": "A100-SXM4-80GB"}

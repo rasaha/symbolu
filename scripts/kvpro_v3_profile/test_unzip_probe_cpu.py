@@ -118,6 +118,13 @@ def test_roofline():
 
 def test_peaks_for():
     check("H100 matched", CLS.peaks_for("NVIDIA H100 80GB HBM3")["hbm_gbps"] == 3350.0)
+    # RTX 6000 family disambiguation (Ampere A6000 / Ada / Turing Quadro)
+    check("A6000 Ampere", CLS.peaks_for("NVIDIA RTX A6000")["hbm_gbps"] == 768.0)
+    ada = CLS.peaks_for("NVIDIA RTX 6000 Ada Generation")
+    check("RTX 6000 Ada", ada["hbm_gbps"] == 960.0 and "Ada" in ada["matched_device"])
+    tur = CLS.peaks_for("Quadro RTX 6000")
+    check("Quadro RTX 6000 Turing", tur["hbm_gbps"] == 672.0 and "Turing" in tur["matched_device"])
+    check("Ada not mis-caught as A6000", "A6000" not in ada["matched_device"])
     d = CLS.peaks_for("Some Unlisted GPU")
     check("unknown falls back to default", d["hbm_gbps"] == CLS._DEFAULT_PEAK["hbm_gbps"])
     check("unknown labelled", "UNKNOWN" in d["matched_device"])
