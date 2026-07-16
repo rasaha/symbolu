@@ -1,0 +1,602 @@
+[
+  {
+    "word": "akrodha",
+    "occurrence_index": 0,
+    "varna": "k",
+    "score_Qwen": 25,
+    "score_Mistral": 75,
+    "abs_diff": 50,
+    "rel_Qwen": "regulation",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "akrodha",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 25,
+    "score_Mistral": 75,
+    "abs_diff": 50,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "resolution"
+  },
+  {
+    "word": "akrodha",
+    "occurrence_index": 2,
+    "varna": "dh",
+    "score_Qwen": 25,
+    "score_Mistral": 75,
+    "abs_diff": 50,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "bhrama",
+    "occurrence_index": 0,
+    "varna": "bh",
+    "score_Qwen": 75,
+    "score_Mistral": 25,
+    "abs_diff": 50,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "cintā",
+    "occurrence_index": 2,
+    "varna": "t",
+    "score_Qwen": 75,
+    "score_Mistral": 25,
+    "abs_diff": 50,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kapāla",
+    "occurrence_index": 0,
+    "varna": "k",
+    "score_Qwen": 0,
+    "score_Mistral": 50,
+    "abs_diff": 50,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "kapāla",
+    "occurrence_index": 1,
+    "varna": "p",
+    "score_Qwen": 0,
+    "score_Mistral": 50,
+    "abs_diff": 50,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "characteristic_expression"
+  },
+  {
+    "word": "kapāla",
+    "occurrence_index": 2,
+    "varna": "l",
+    "score_Qwen": 0,
+    "score_Mistral": 50,
+    "abs_diff": 50,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "characteristic_expression"
+  },
+  {
+    "word": "pralaya",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 100,
+    "score_Mistral": 50,
+    "abs_diff": 50,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "natural_consequence"
+  },
+  {
+    "word": "asūyā",
+    "occurrence_index": 1,
+    "varna": "y",
+    "score_Qwen": 25,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "generation"
+  },
+  {
+    "word": "audārya",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 75,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "bhrama",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 50,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "generation",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "bhrama",
+    "occurrence_index": 2,
+    "varna": "m",
+    "score_Qwen": 50,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "natural_consequence",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "chāyā",
+    "occurrence_index": 0,
+    "varna": "ch",
+    "score_Qwen": 50,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "cintā",
+    "occurrence_index": 0,
+    "varna": "c",
+    "score_Qwen": 50,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "darpaṇa",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 0,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "darpaṇa",
+    "occurrence_index": 2,
+    "varna": "p",
+    "score_Qwen": 0,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "darpaṇa",
+    "occurrence_index": 3,
+    "varna": "ṇ",
+    "score_Qwen": 0,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "dhvani",
+    "occurrence_index": 1,
+    "varna": "v",
+    "score_Qwen": 0,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "characteristic_expression"
+  },
+  {
+    "word": "dhvani",
+    "occurrence_index": 2,
+    "varna": "n",
+    "score_Qwen": 0,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "characteristic_expression"
+  },
+  {
+    "word": "dhṛti",
+    "occurrence_index": 1,
+    "varna": "t",
+    "score_Qwen": 50,
+    "score_Mistral": 75,
+    "abs_diff": 25,
+    "rel_Qwen": "resolution",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "kārpaṇya",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 25,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "natural_consequence",
+    "rel_Mistral": "natural_consequence"
+  },
+  {
+    "word": "kārpaṇya",
+    "occurrence_index": 3,
+    "varna": "ṇ",
+    "score_Qwen": 75,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "characteristic_expression",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kārpaṇya",
+    "occurrence_index": 4,
+    "varna": "y",
+    "score_Qwen": 25,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kūrma",
+    "occurrence_index": 0,
+    "varna": "k",
+    "score_Qwen": 25,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kūrma",
+    "occurrence_index": 2,
+    "varna": "m",
+    "score_Qwen": 25,
+    "score_Mistral": 0,
+    "abs_diff": 25,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "mukura",
+    "occurrence_index": 0,
+    "varna": "m",
+    "score_Qwen": 25,
+    "score_Mistral": 50,
+    "abs_diff": 25,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "pavana",
+    "occurrence_index": 0,
+    "varna": "p",
+    "score_Qwen": 0,
+    "score_Mistral": 25,
+    "abs_diff": 25,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "resolution"
+  },
+  {
+    "word": "asūyā",
+    "occurrence_index": 0,
+    "varna": "s",
+    "score_Qwen": 75,
+    "score_Mistral": 75,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "audārya",
+    "occurrence_index": 0,
+    "varna": "d",
+    "score_Qwen": 75,
+    "score_Mistral": 75,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "audārya",
+    "occurrence_index": 2,
+    "varna": "y",
+    "score_Qwen": 75,
+    "score_Mistral": 75,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "chāyā",
+    "occurrence_index": 1,
+    "varna": "y",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "cintā",
+    "occurrence_index": 1,
+    "varna": "n",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "cāpa",
+    "occurrence_index": 0,
+    "varna": "c",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "cāpa",
+    "occurrence_index": 1,
+    "varna": "p",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "dama",
+    "occurrence_index": 0,
+    "varna": "d",
+    "score_Qwen": 75,
+    "score_Mistral": 75,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "dama",
+    "occurrence_index": 1,
+    "varna": "m",
+    "score_Qwen": 75,
+    "score_Mistral": 75,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "darpaṇa",
+    "occurrence_index": 0,
+    "varna": "d",
+    "score_Qwen": 0,
+    "score_Mistral": 0,
+    "abs_diff": 0,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "dhvani",
+    "occurrence_index": 0,
+    "varna": "dh",
+    "score_Qwen": 0,
+    "score_Mistral": 0,
+    "abs_diff": 0,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "dhṛti",
+    "occurrence_index": 0,
+    "varna": "dh",
+    "score_Qwen": 75,
+    "score_Mistral": 75,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "jaṅghā",
+    "occurrence_index": 0,
+    "varna": "j",
+    "score_Qwen": 0,
+    "score_Mistral": 0,
+    "abs_diff": 0,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "jaṅghā",
+    "occurrence_index": 1,
+    "varna": "ṅ",
+    "score_Qwen": 0,
+    "score_Mistral": 0,
+    "abs_diff": 0,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "jaṅghā",
+    "occurrence_index": 2,
+    "varna": "gh",
+    "score_Qwen": 0,
+    "score_Mistral": 0,
+    "abs_diff": 0,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "kuṇḍala",
+    "occurrence_index": 0,
+    "varna": "k",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kuṇḍala",
+    "occurrence_index": 1,
+    "varna": "ṇ",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kuṇḍala",
+    "occurrence_index": 2,
+    "varna": "ḍ",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kuṇḍala",
+    "occurrence_index": 3,
+    "varna": "l",
+    "score_Qwen": 0,
+    "score_Mistral": 0,
+    "abs_diff": 0,
+    "rel_Qwen": "no_relationship",
+    "rel_Mistral": "no_relationship"
+  },
+  {
+    "word": "kārpaṇya",
+    "occurrence_index": 0,
+    "varna": "k",
+    "score_Qwen": 50,
+    "score_Mistral": 50,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kārpaṇya",
+    "occurrence_index": 2,
+    "varna": "p",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "kūrma",
+    "occurrence_index": 1,
+    "varna": "r",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "lalāṭa",
+    "occurrence_index": 0,
+    "varna": "l",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "characteristic_expression"
+  },
+  {
+    "word": "lalāṭa",
+    "occurrence_index": 1,
+    "varna": "l",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "characteristic_expression"
+  },
+  {
+    "word": "lalāṭa",
+    "occurrence_index": 2,
+    "varna": "ṭ",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "mukura",
+    "occurrence_index": 1,
+    "varna": "k",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "mukura",
+    "occurrence_index": 2,
+    "varna": "r",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "pavana",
+    "occurrence_index": 1,
+    "varna": "v",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "opposition"
+  },
+  {
+    "word": "pavana",
+    "occurrence_index": 2,
+    "varna": "n",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "opposition",
+    "rel_Mistral": "resolution"
+  },
+  {
+    "word": "pralaya",
+    "occurrence_index": 0,
+    "varna": "p",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "pralaya",
+    "occurrence_index": 2,
+    "varna": "l",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  },
+  {
+    "word": "pralaya",
+    "occurrence_index": 3,
+    "varna": "y",
+    "score_Qwen": 25,
+    "score_Mistral": 25,
+    "abs_diff": 0,
+    "rel_Qwen": "implication",
+    "rel_Mistral": "implication"
+  }
+]

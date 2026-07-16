@@ -1,0 +1,105 @@
+{
+  "material_disagreements": 2,
+  "rows": [
+    {
+      "word": "akrodha",
+      "similarity": 0.333,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "asūyā",
+      "similarity": 0.667,
+      "agreement": "same"
+    },
+    {
+      "word": "audārya",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "bhrama",
+      "similarity": 0.667,
+      "agreement": "same"
+    },
+    {
+      "word": "chāyā",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "cintā",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "cāpa",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "dama",
+      "similarity": 0.667,
+      "agreement": "same"
+    },
+    {
+      "word": "darpaṇa",
+      "similarity": 1.0,
+      "agreement": "same"
+    },
+    {
+      "word": "dhvani",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "dhṛti",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "jaṅghā",
+      "similarity": 0.167,
+      "agreement": "material_difference"
+    },
+    {
+      "word": "kapāla",
+      "similarity": 1.0,
+      "agreement": "same"
+    },
+    {
+      "word": "kuṇḍala",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "kārpaṇya",
+      "similarity": 0.667,
+      "agreement": "same"
+    },
+    {
+      "word": "kūrma",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "lalāṭa",
+      "similarity": 0.5,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "mukura",
+      "similarity": 0.0,
+      "agreement": "material_difference"
+    },
+    {
+      "word": "pavana",
+      "similarity": 0.333,
+      "agreement": "minor_difference"
+    },
+    {
+      "word": "pralaya",
+      "similarity": 0.333,
+      "agreement": "minor_difference"
+    }
+  ]
+}

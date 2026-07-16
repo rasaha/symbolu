@@ -1,0 +1,427 @@
+{
+  "exact": 36,
+  "compatible": 7,
+  "incompatible": 17,
+  "rows": [
+    {
+      "word": "akrodha",
+      "occurrence_index": 0,
+      "rel_Qwen": "regulation",
+      "rel_Mistral": "opposition",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "akrodha",
+      "occurrence_index": 1,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "resolution",
+      "agreement": "compatible"
+    },
+    {
+      "word": "akrodha",
+      "occurrence_index": 2,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "asūyā",
+      "occurrence_index": 0,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "asūyā",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "generation",
+      "agreement": "compatible"
+    },
+    {
+      "word": "audārya",
+      "occurrence_index": 0,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "audārya",
+      "occurrence_index": 1,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "audārya",
+      "occurrence_index": 2,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "bhrama",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "bhrama",
+      "occurrence_index": 1,
+      "rel_Qwen": "generation",
+      "rel_Mistral": "implication",
+      "agreement": "compatible"
+    },
+    {
+      "word": "bhrama",
+      "occurrence_index": 2,
+      "rel_Qwen": "natural_consequence",
+      "rel_Mistral": "implication",
+      "agreement": "compatible"
+    },
+    {
+      "word": "chāyā",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "chāyā",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "cintā",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "cintā",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "cintā",
+      "occurrence_index": 2,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "cāpa",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "cāpa",
+      "occurrence_index": 1,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "dama",
+      "occurrence_index": 0,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "dama",
+      "occurrence_index": 1,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "darpaṇa",
+      "occurrence_index": 0,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "no_relationship",
+      "agreement": "exact"
+    },
+    {
+      "word": "darpaṇa",
+      "occurrence_index": 1,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "darpaṇa",
+      "occurrence_index": 2,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "darpaṇa",
+      "occurrence_index": 3,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "dhvani",
+      "occurrence_index": 0,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "no_relationship",
+      "agreement": "exact"
+    },
+    {
+      "word": "dhvani",
+      "occurrence_index": 1,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "characteristic_expression",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "dhvani",
+      "occurrence_index": 2,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "characteristic_expression",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "dhṛti",
+      "occurrence_index": 0,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "dhṛti",
+      "occurrence_index": 1,
+      "rel_Qwen": "resolution",
+      "rel_Mistral": "opposition",
+      "agreement": "compatible"
+    },
+    {
+      "word": "jaṅghā",
+      "occurrence_index": 0,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "no_relationship",
+      "agreement": "exact"
+    },
+    {
+      "word": "jaṅghā",
+      "occurrence_index": 1,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "no_relationship",
+      "agreement": "exact"
+    },
+    {
+      "word": "jaṅghā",
+      "occurrence_index": 2,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "no_relationship",
+      "agreement": "exact"
+    },
+    {
+      "word": "kapāla",
+      "occurrence_index": 0,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "opposition",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "kapāla",
+      "occurrence_index": 1,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "characteristic_expression",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "kapāla",
+      "occurrence_index": 2,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "characteristic_expression",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "kuṇḍala",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kuṇḍala",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kuṇḍala",
+      "occurrence_index": 2,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kuṇḍala",
+      "occurrence_index": 3,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "no_relationship",
+      "agreement": "exact"
+    },
+    {
+      "word": "kārpaṇya",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kārpaṇya",
+      "occurrence_index": 1,
+      "rel_Qwen": "natural_consequence",
+      "rel_Mistral": "natural_consequence",
+      "agreement": "exact"
+    },
+    {
+      "word": "kārpaṇya",
+      "occurrence_index": 2,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kārpaṇya",
+      "occurrence_index": 3,
+      "rel_Qwen": "characteristic_expression",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "kārpaṇya",
+      "occurrence_index": 4,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kūrma",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "kūrma",
+      "occurrence_index": 1,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "implication",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "kūrma",
+      "occurrence_index": 2,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "no_relationship",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "lalāṭa",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "characteristic_expression",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "lalāṭa",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "characteristic_expression",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "lalāṭa",
+      "occurrence_index": 2,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "mukura",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "mukura",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "mukura",
+      "occurrence_index": 2,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "pavana",
+      "occurrence_index": 0,
+      "rel_Qwen": "no_relationship",
+      "rel_Mistral": "resolution",
+      "agreement": "incompatible"
+    },
+    {
+      "word": "pavana",
+      "occurrence_index": 1,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "opposition",
+      "agreement": "exact"
+    },
+    {
+      "word": "pavana",
+      "occurrence_index": 2,
+      "rel_Qwen": "opposition",
+      "rel_Mistral": "resolution",
+      "agreement": "compatible"
+    },
+    {
+      "word": "pralaya",
+      "occurrence_index": 0,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "pralaya",
+      "occurrence_index": 1,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "natural_consequence",
+      "agreement": "compatible"
+    },
+    {
+      "word": "pralaya",
+      "occurrence_index": 2,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    },
+    {
+      "word": "pralaya",
+      "occurrence_index": 3,
+      "rel_Qwen": "implication",
+      "rel_Mistral": "implication",
+      "agreement": "exact"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "b1_12_bsr_v2_model_manifest",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "mode": "vllm_independent_two_model_no_crossover",
+  "qwen": {
+    "model_id": "Qwen/Qwen3-32B",
+    "family": "Qwen3",
+    "param_class": "~30-32B",
+    "reasoning_mode": "non_thinking"
+  },
+  "mistral": {
+    "model_id": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+    "family": "Mistral Small 3.x",
+    "param_class": "~24B",
+    "load_format": "mistral"
+  },
+  "decoding": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "top_k": -1,
+    "repetition_penalty": 1.0,
+    "seed": 20260714,
+    "max_tokens": 2048,
+    "dtype": "bfloat16"
+  },
+  "loads": "2 sequential independent judges (Qwen; Mistral) — one model resident at a time; NO crossover",
+  "independence": "each model judged all words blind to the other's evidence/relationship/score/verdict",
+  "substitution_policy": "PROHIBITED"
+}
