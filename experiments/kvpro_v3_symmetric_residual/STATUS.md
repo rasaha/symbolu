@@ -1,11 +1,28 @@
 # KVPro V3 Gate-1 — status (end-to-end quality harness complete)
 
 **Date:** 2026-07-16 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae`
-**Verdict (Qwen2.5-7B, all benchmarks MEASURED, offline proxy demoted to advisory): S2 = `GO_KERNEL_PROTOTYPE`,
-pending the pre-registered second-model (Llama-3.1-8B) confirmation.** S2 (symmetric-K + coarse bias,
-symmetric-V) passed needle + hard-needle + a **2000-Q** MMLU with zero significant regressions and clears
-the 9.3% systems floor. S1/S3/S4 are falsified (retrieval and/or knowledge). The three end-to-end quality
-thresholds remain FROZEN; only the offline proxy's *gating role* was removed (justified below).
+**FINAL verdict: NO general GO.** S2 = `GO_KERNEL_PROTOTYPE` on Qwen2.5-7B but **FALSIFIED on Llama-3.1-8B** —
+the pre-registered two-model bar is NOT met. The symmetric-residual / drop-xmin lever (even with the coarse
+bias that rescued S2 on Qwen) is **model-specific, not robustly quality-safe**, and is CLOSED.
+
+## Two-model result (2026-07-16) — the study's decisive close
+| model | S2 needle | S2 hard-needle | S2 MMLU (2000-Q) | verdict |
+|-------|-----------|----------------|-------------------|---------|
+| Qwen2.5-7B | 30/30 | 0 regr | 69.05% (net −1, p=0.92, clean) | **GO_KERNEL_PROTOTYPE** |
+| Llama-3.1-8B | 28/30 (<0.98) | 3 regr (>1 allowed) | 59.65% vs 61.60% (net −39, **p=0.002**) | **NO_GO_QUALITY** |
+
+The Llama failures are REAL, not scoring artifacts (BPE-tokenizer concern ruled out by inspecting outputs):
+hard-needle regressions are genuine character corruptions (`3CGZMQ`/`3C4ZMQ`/`3CGZKQ`), needle misses are the
+model confused ("the code is SPECIAL"), and the 2000-Q MMLU regression is statistically significant
+(McNemar p=0.002, vs Qwen's p=0.92).
+
+**Study conclusion (NEGATIVE, clean):** the symmetric-residual falsification study is COMPLETE — **no candidate
+passes the two-model bar.** S1/S3/S4 were falsified earlier (retrieval and/or knowledge); S2 survived on Qwen
+but is falsified on Llama. Dropping xmin does not generalize across architectures. The offline-proxy demotion
+(below) still stands as a correct gate-design fix; it is the TWO-MODEL bar — not the proxy — that (correctly)
+fails S2. **Throughput path forward is UNAFFECTED and independent of S2:** the quality-neutral Step-0 kernel
+work (in-kernel gather / store-as-consumed / dense-protected stream, `scripts/kvpro_v3_profile/`) + the
+independent P8 protected-INT8 question. Neither depends on the (now-closed) symmetric-residual lever.
 
 ## 2000-Q MMLU resolution + offline-proxy amendment (2026-07-16)
 The 8-Q builtin MMLU was underpowered; a **2000-question** real MMLU (paired, same Qs per cell) settles the
