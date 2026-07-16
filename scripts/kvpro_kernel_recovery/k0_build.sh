@@ -47,7 +47,10 @@ if ! "$PY" -c "import vllm" 2>/dev/null; then
   pip install --upgrade pip wheel setuptools packaging >/dev/null 2>&1
   pip install --no-deps --force-reinstall torch==2.5.1 --index-url "$TORCH_INDEX" || { mark stack FAILED_torch; exit 1; }
   pip install vllm==0.7.3 || { mark stack FAILED_vllm; exit 1; }
-  pip install transformers accelerate huggingface_hub numpy tqdm ninja cmake pybind11 >/dev/null 2>&1
+  # PIN transformers/tokenizers to the vLLM-0.7.3-compatible versions (unpinned pulls a 5.x
+  # whose lazy imports break vLLM 0.7.3: "Could not import module 'ProcessorMixin'").
+  pip install transformers==4.48.3 tokenizers==0.21.1 || { mark stack FAILED_transformers; exit 1; }
+  pip install accelerate huggingface_hub numpy tqdm ninja cmake pybind11 >/dev/null 2>&1
   pip install -e "$SYMBOLU/CTM_plus/KVPolicy/" >/dev/null 2>&1
 fi
 "$PY" -c "import vllm,torch;print('vllm',vllm.__version__,'torch',torch.__version__)" \

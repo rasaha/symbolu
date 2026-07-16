@@ -32,7 +32,10 @@ pip install --upgrade pip wheel setuptools packaging
 # base runtime — the pins that MUST hold (a wrong stack builds but imports garbage):
 pip install --no-deps --force-reinstall torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
 pip install vllm==0.7.3
-pip install transformers accelerate huggingface_hub numpy tqdm ninja cmake pybind11
+# PIN transformers/tokenizers — unpinned pulls a 5.x incompatible with vLLM 0.7.3
+# ("Could not import module 'ProcessorMixin'"). 4.48.3 is the repo's known-good pin.
+pip install transformers==4.48.3 tokenizers==0.21.1
+pip install accelerate huggingface_hub numpy tqdm ninja cmake pybind11
 pip install -e CTM_plus/KVPolicy/          # the CTM+ python packages (backend install lives here)
 ```
 > The measured GREEN build used torch **2.5.1+cu124** + CUDA toolkit **12.8**; `rebuild_all_kernels.sh`
