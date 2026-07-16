@@ -1,30 +1,49 @@
 # KVPro V3 Gate-1 — status (end-to-end quality harness complete)
 
-**Date:** 2026-07-15 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae`
-**First MEASURED verdict (Qwen2.5-7B, `--quick-quality`): `NO_GO_QUALITY`** — but this is a *small-sample*
-sanity run (2 items/mode, seed 0, 8 MMLU Q), **NOT decisive**. The decisive `--full-quality` run is pending.
+**Date:** 2026-07-16 · **Branch:** `claude/kvpro-v2-tier1-d8b4ae`
+**Decisive verdict (Qwen2.5-7B, `--full-quality`, all four benchmarks MEASURED): `NO_GO_QUALITY` — but
+GATE-LIMITED, not quality-limited.** S2 passed every ground-truth quality test; it is blocked only by an
+offline proxy proven mis-calibrated. **Disposition of that proxy is PENDING an explicit user decision;
+thresholds remain FROZEN (no post-hoc loosening).**
 
-## Session update — first real pod run (Qwen2.5-7B, `--quick-quality`)
-The harness ran end-to-end on real weights; all four benchmarks are `MEASURED` (not modeled/synthetic).
-Two things drove `NO_GO_QUALITY`, only one of which is a quality signal:
-- **S1** flipped **one** hard-needle item (multi mode) HIT→MISS_K vs affine. On the marginal model the
-  rule is zero regressions, so S1 fails — but it's 1/8 on seed 0, at the noise floor. Consistent with
-  symmetric-K-without-bias being genuinely worse (S1 also has the worst offline numbers).
-- **Every** candidate is blocked by the offline attention proxy, and that block is **mis-specified**:
-  S3 keeps K affine, and softmax-KL is a pure function of K, so **S3's KL (0.255) == affine's own KL vs
-  fp**, which is **12× over the `TH_SOFTMAX_KL_MAX=0.02` threshold**. Two of the three offline sub-checks
-  (`cos≥0.999`, `kl≤0.02`) are absolute-vs-fp at levels the *accepted affine baseline itself fails*; only
-  `mse ≤ 1.25×affine` is a valid relative bar. **Decision deferred:** thresholds stay FROZEN until the
-  full run (no post-hoc loosening); the offline-gate question is revisited with non-noisy data in hand.
-- **S2** (symmetric-K **+ coarse bias**, symmetric-V) passed needle **and** hard-needle **and** MMLU and
-  clears the 9.3% floor — blocked *only* by the offline proxy. It is the lead candidate to confirm at
-  scale. (9.3% is **modeled read-bandwidth**, not measured TPS.)
+## Decisive full-quality run — runs/20260716T044248Z (Qwen2.5-7B, 2 seeds)
+Ground-truth benchmarks (the pre-registered GO criteria — regressions counted vs the shipped affine arm):
 
-**Performance:** `quantize_k_sequence` is now vectorized (batched per-block reduction instead of a Python
-loop) — **numerically bit-identical** to the loop (proven by `test_vectorized_k_matches_loop`), CPU-neutral,
-and on the GPU generation path it collapses ~`ceil(S/32)`×9 kernel launches/layer/step down to ~18, which
-was the launch-bound cost of `--full-quality`. The cache still re-quantizes the full sequence each step
-(kept intentionally: incremental caching is invalid for S2, whose bias is a global per-sequence mean).
+| cand | scheme | needle (30) | hard-needle (48) | MMLU (8) | systems | ground-truth |
+|------|--------|-------------|------------------|----------|---------|--------------|
+| S1 | sym-K, sym-V | 26/30, **4 regr** | 40/48, **3 regr** | 8/8 | 9.30% | **FAIL** |
+| **S2** | sym-K **+bias**, sym-V | **30/30, 0 regr** | **36/48, 0 regr** | **8/8** | **9.28%** | **PASS** |
+| S3 | affine-K, sym-V | 30/30, 0 regr | 39/48, 0 regr | 8/8 | 4.65% | pass (sub-floor) |
+| S4 | sym-K, affine-V | 26/30, **4 regr** | 37/48, **3 regr** | 8/8 | 4.65% | **FAIL** |
+
+**Findings (falsifiable, now tested at scale):**
+1. **The coarse per-channel K bias is decisive.** Symmetric-K *without* it (S1, S4) corrupts retrieval —
+   needle codes return off by one character (e.g. `E41-JRQ-X2D`→`E41-JRJ-X2D`) and hard-needle conflict
+   items flip. *With* the bias (S2): 0 regressions across 78 retrieval items on 2 seeds.
+2. **≥5% systems value needs BOTH xmins dropped** (S1/S2 = 9.3%); one xmin (S3/S4 = 4.65%) is sub-floor.
+3. **S2 is the unique candidate that is both quality-clean on ground truth AND ≥5% systems.**
+
+**Why the verdict is still NO_GO, and why that is gate-limited:** GO requires the offline attention proxy
+not to definitively fail; it fails for all four candidates. But the proxy is mis-calibrated, provable from
+the baseline alone:
+- affine (the shipped, validated quantizer) **fails two of the three offline sub-checks**: attn_out_cos
+  0.9951 < 0.999 and softmax_kl 0.2481 ≫ 0.02. A gate its own reference cannot pass is broken.
+- The one *relative* sub-check (mse ≤ 1.25×affine) is over-conservative: S2 (3.26×) and S3 (2.42×) trip it
+  yet pass EVERY ground-truth benchmark with 0 regressions. Absolute attn-out MSE is tiny (S2 0.016 vs
+  affine 0.009; KL *mean* 0.012, spiking only on a few outlier positions that never flip a real answer).
+
+**Honest conclusion:** the study did NOT falsify S2 on quality — S2 passed needle + hard-needle + MMLU with
+zero regressions on two seeds and clears the systems floor. `NO_GO_QUALITY` is produced solely by an offline
+proxy shown to reject the accepted baseline. The correct next step is to re-calibrate that proxy against
+affine (or demote it to the advisory role its own design doc always assigned it) — a **documented** decision,
+not a silent threshold change. Caveat: MMLU is only 8 builtin Q (collapse-guard); a `--real` 200-Q battery
+would harden the knowledge arm before any GO.
+
+**Performance:** `quantize_k_sequence` vectorized — bit-identical to the loop (`test_vectorized_k_matches_loop`),
+CPU-neutral, and on the GPU generation path it collapsed ~`ceil(S/32)`×9 kernel launches/layer/step to ~18
+(the launch-bound cost of `--full-quality`); the full run completed capture→recon→attn→hard-needle→needle→
+MMLU→token-agreement end-to-end. The cache still re-quantizes the full sequence each step on purpose
+(incremental caching is invalid for S2, whose bias is a global per-sequence mean).
 
 ## The gate now requires end-to-end quality (not proxies)
 A candidate can receive **`GO_KERNEL_PROTOTYPE`** only if it passes **all** of, on the model under test:
