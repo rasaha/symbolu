@@ -1,0 +1,156 @@
+{
+  "schema": "symbol_u_bridge_exclusions_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_excluded": 20,
+  "exclusion_taxonomy": [
+    "DUPLICATE_CONCERN",
+    "OVERLAPPING_DEFINITION",
+    "NO_CLEAR_SANSKRIT_CONCEPT",
+    "EXCESSIVE_POLYSEMY",
+    "TECHNICAL_OR_DOCTRINAL",
+    "TOO_CONTEXT_DEPENDENT",
+    "NOT_SUITABLE_FOR_SEED_SCOPE"
+  ],
+  "excluded": [
+    {
+      "iast": "dharma",
+      "devanagari": "धर्म",
+      "proposed_label": "duty",
+      "reason": "EXCESSIVE_POLYSEMY",
+      "detail": "hugely polysemous (law/virtue/nature/religion); kartavya chosen for 'duty'"
+    },
+    {
+      "iast": "karma",
+      "devanagari": "कर्म",
+      "proposed_label": "work/action",
+      "reason": "EXCESSIVE_POLYSEMY",
+      "detail": "doctrinal + polysemous (action/ritual/consequence)"
+    },
+    {
+      "iast": "ahaṃkāra",
+      "devanagari": "अहंकार",
+      "proposed_label": "ego",
+      "reason": "TECHNICAL_OR_DOCTRINAL",
+      "detail": "Sāṃkhya/Vedānta 'I-maker'; garva chosen for ordinary pride"
+    },
+    {
+      "iast": "ātman",
+      "devanagari": "आत्मन्",
+      "proposed_label": "self/identity",
+      "reason": "TECHNICAL_OR_DOCTRINAL",
+      "detail": "metaphysical 'self', not an ordinary personal concern"
+    },
+    {
+      "iast": "loneliness",
+      "devanagari": "—",
+      "proposed_label": "loneliness",
+      "reason": "NO_CLEAR_SANSKRIT_CONCEPT",
+      "detail": "no ordinary single lexeme for the modern emotional state; viraha covers separation only"
+    },
+    {
+      "iast": "validation",
+      "devanagari": "—",
+      "proposed_label": "need for recognition",
+      "reason": "TOO_CONTEXT_DEPENDENT",
+      "detail": "no clean ordinary lexeme; highly context-dependent"
+    },
+    {
+      "iast": "mamatā",
+      "devanagari": "ममता",
+      "proposed_label": "possessiveness",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps attachment (āsakti); narrower 'mine-ness'"
+    },
+    {
+      "iast": "rāga",
+      "devanagari": "राग",
+      "proposed_label": "passion/attachment",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps attachment; polysemous (color, musical mode)"
+    },
+    {
+      "iast": "icchā",
+      "devanagari": "इच्छा",
+      "proposed_label": "wish",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps craving (kāma); too generic"
+    },
+    {
+      "iast": "māna",
+      "devanagari": "मान",
+      "proposed_label": "pride/honor",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps pride (garva); polysemous (also 'respect/measure')"
+    },
+    {
+      "iast": "saṃyama",
+      "devanagari": "संयम",
+      "proposed_label": "restraint",
+      "reason": "TECHNICAL_OR_DOCTRINAL",
+      "detail": "Yoga-technical; regulation covered by kṣamā/śānti"
+    },
+    {
+      "iast": "vairāgya",
+      "devanagari": "वैराग्य",
+      "proposed_label": "dispassion",
+      "reason": "TECHNICAL_OR_DOCTRINAL",
+      "detail": "doctrinal renunciation term"
+    },
+    {
+      "iast": "duḥkha",
+      "devanagari": "दुःख",
+      "proposed_label": "suffering",
+      "reason": "TOO_CONTEXT_DEPENDENT",
+      "detail": "umbrella term for all suffering; too broad for one concern"
+    },
+    {
+      "iast": "īrṣyā",
+      "devanagari": "ईर्ष्या",
+      "proposed_label": "jealousy",
+      "reason": "NOT_SUITABLE_FOR_SEED_SCOPE",
+      "detail": "valid concern but deferred to keep the seed small"
+    },
+    {
+      "iast": "bhrama",
+      "devanagari": "भ्रम",
+      "proposed_label": "confusion",
+      "reason": "DUPLICATE_CONCERN",
+      "detail": "duplicates confusion (moha)"
+    },
+    {
+      "iast": "aniścaya",
+      "devanagari": "अनिश्चय",
+      "proposed_label": "indecision",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps doubt (saṃśaya)"
+    },
+    {
+      "iast": "spṛhā",
+      "devanagari": "स्पृहा",
+      "proposed_label": "ambition/longing",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps craving (kāma)"
+    },
+    {
+      "iast": "prayatna",
+      "devanagari": "प्रयत्न",
+      "proposed_label": "effort",
+      "reason": "DUPLICATE_CONCERN",
+      "detail": "duplicates diligence (udyoga)"
+    },
+    {
+      "iast": "vidyā",
+      "devanagari": "विद्या",
+      "proposed_label": "knowledge",
+      "reason": "DUPLICATE_CONCERN",
+      "detail": "duplicates knowledge (jñāna)"
+    },
+    {
+      "iast": "utkaṇṭhā",
+      "devanagari": "उत्कण्ठा",
+      "proposed_label": "longing",
+      "reason": "OVERLAPPING_DEFINITION",
+      "detail": "overlaps separation-longing (viraha)"
+    }
+  ]
+}
