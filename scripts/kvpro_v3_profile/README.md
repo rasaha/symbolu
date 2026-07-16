@@ -41,6 +41,10 @@ under-utilised → a compact-protect/coalesced read kernel (6F-style) first. The
 production-faithfully (compact bf16 protected sidecar); one ablation times the route-A full-fp16-K load
 (`int4_fused_attention_kernel.py:140`) so `FULL_full − FULL_compact` = the fp16-pool penalty.
 
+**MEASURED RESULT (A100-80GB): `MEMORY-BOUND`, scatter-limited (~3% HBM used) — see
+`UNZIP_BOUND_RESULT.md`.** The dequant math is ~7.5× under the fetch and fully hidden; the lever is a
+6F-style coalesced/store-as-consumed read layout, NOT faster hardware and NOT cheaper math.
+
 ## RunPod command sequence
 ```bash
 cd /workspace/symbolu
