@@ -135,7 +135,10 @@ if _HAVE_TRITON:
         slot = tl.load(protect_slot_ptr + h * D + d).to(tl.int32)   # (D,) slot or -1
         pm = slot >= 0                                              # (D,)
 
-        if MODE == MODE_MATH:
+        # NOTE: compare the constexpr params against integer LITERALS, not the module-level
+        # MODE_*/PROT_* names — Triton's JIT forbids reading non-constexpr globals from a kernel.
+        # MODE: 0=FETCH 1=MATH 2=FULL ; PROTECT: 0=none 1=compact 2=full.
+        if MODE == 1:  # MODE_MATH
             # ---- MATH-only: load ONE row's operands, broadcast to the (BS,D) tile, run the
             # affine perturbed per-row on a MULTIPLY operand (kt) so the compiler cannot hoist
             # the multiply out — the dequant mul is genuinely re-executed BS*D times. No
@@ -159,9 +162,9 @@ if _HAVE_TRITON:
             kp_off = (s[:, None] * H + h) * DH + byte_col[None, :]           # (BS,D)
             kcode = ((tl.load(k_packed_ptr + kp_off).to(tl.int32)
                       >> (4 * is_high[None, :])) & 0xF).to(tl.float32)
-            if PROTECT == PROT_FULL:                   # route-A: full fp16 K, all D channels
+            if PROTECT == 2:                           # PROT_FULL: route-A full fp16 K, all D
                 kf = tl.load(k_fp16_ptr + (s[:, None] * H + h) * D + d[None, :]).to(tl.float32)
-            elif PROTECT == PROT_COMPACT:              # production: compact n_protect sidecar
+            elif PROTECT == 1:                         # PROT_COMPACT: production n_protect sidecar
                 slot_idx = tl.where(pm, slot, 0)
                 kf = tl.load(k_protect_ptr + (s[:, None] * H + h) * n_protect + slot_idx[None, :],
                              mask=pm[None, :], other=0.0).to(tl.float32)
@@ -173,9 +176,9 @@ if _HAVE_TRITON:
             vs_off = (s[:, None] * H + h) * VNG + gv[None, :]
             v_sc = tl.load(v_scale_ptr + vs_off).to(tl.float32)
             v_xm = tl.load(v_xmin_ptr + vs_off).to(tl.float32)
-            if MODE == MODE_FETCH:                      # loads + unpack + reduce (no affine/select)
+            if MODE == 0:                               # MODE_FETCH: loads+unpack+reduce (no affine)
                 r_out = kcode + k_sc[None, :] + k_xm[None, :] + kf + vcode + v_sc + v_xm
-            else:                                       # MODE_FULL: the real unzip
+            else:                                       # MODE_FULL (2): the real unzip
                 k_dq = kcode * k_sc[None, :] + k_xm[None, :]
                 k_eff = tl.where(pm[None, :], kf, k_dq)
                 v_dq = vcode * v_sc + v_xm
