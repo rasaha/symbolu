@@ -43,9 +43,11 @@ def main(argv=None):
     ap.add_argument("--num-needles", type=int, default=5)
     ap.add_argument("--max-new-tokens", type=int, default=24)
     ap.add_argument("--out", default="needle_results.json")
+    ap.add_argument("--cells", default=",".join(CELLS), help="comma cells; P8 study: fp,affine,P8sym,P8aff")
     args = ap.parse_args(argv)
     if not args.mask or not os.path.isfile(args.mask):
         print(f"[FAIL] mask missing: {args.mask!r}", file=sys.stderr); return 2
+    cells = args.cells.split(",")
 
     import fakequant_model as FQ
     model, tok = FQ.load_model(args.model)
@@ -56,13 +58,13 @@ def main(argv=None):
     items = []
     for i, it in enumerate(pset):
         row = {"seed": it["seed"], "context_len": it["context_len"], "needle": it["needle"], "cells": {}}
-        for cell in CELLS:
+        for cell in cells:
             out = FQ.generate(model, tok, it["prompt"], cell, masks, max_new_tokens=args.max_new_tokens)
             row["cells"][cell] = {"hit": it["needle"].lower() in out.lower(), "output": out[:120]}
         items.append(row)
         print(f"  needle {i+1}/{len(pset)} seed={it['seed']} ctx={it['context_len']} "
-              f"hits={{{','.join(c for c in CELLS if row['cells'][c]['hit'])}}}")
-    blob = {"model": args.model, "label": "MEASURED", "cells": CELLS, "items": items}
+              f"hits={{{','.join(c for c in cells if row['cells'][c]['hit'])}}}")
+    blob = {"model": args.model, "label": "MEASURED", "cells": cells, "items": items}
     json.dump(blob, open(args.out, "w"), indent=2)
     print(f"[MEASURED] standard needle -> {args.out}")
     return 0

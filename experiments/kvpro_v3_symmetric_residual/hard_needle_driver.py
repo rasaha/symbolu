@@ -44,9 +44,11 @@ def main(argv=None):
     ap.add_argument("--target-tokens", type=int, default=6000)
     ap.add_argument("--max-new-tokens", type=int, default=24)
     ap.add_argument("--out", default="hard_needle_results.json")
+    ap.add_argument("--cells", default=",".join(CELLS), help="comma cells; P8 study: fp,affine,P8sym,P8aff")
     args = ap.parse_args(argv)
     if not args.mask or not os.path.isfile(args.mask):
         print(f"[FAIL] mask missing: {args.mask!r}", file=sys.stderr); return 2
+    cells = args.cells.split(",")
 
     import fakequant_model as FQ
     model, tok = FQ.load_model(args.model)
@@ -57,14 +59,14 @@ def main(argv=None):
     items = []
     for i, it in enumerate(iset):
         row = {"seed": it["seed"], "mode": it["mode"], "cells": {}}
-        for cell in CELLS:
+        for cell in cells:
             out = FQ.generate(model, tok, it["prompt"], cell, masks, max_new_tokens=args.max_new_tokens)
             label = hn.classify(out, it["expected"], it["distractors"], it["mode"])
             row["cells"][cell] = {"label": label, "output": out[:120]}
         items.append(row)
         print(f"  hard {i+1}/{len(iset)} seed={it['seed']} mode={it['mode']} "
-              f"HIT={{{','.join(c for c in CELLS if row['cells'][c]['label']=='HIT')}}}")
-    blob = {"model": args.model, "label": "MEASURED", "cells": CELLS, "items": items}
+              f"HIT={{{','.join(c for c in cells if row['cells'][c]['label']=='HIT')}}}")
+    blob = {"model": args.model, "label": "MEASURED", "cells": cells, "items": items}
     json.dump(blob, open(args.out, "w"), indent=2)
     print(f"[MEASURED] hard needle -> {args.out}")
     return 0

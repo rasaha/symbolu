@@ -17,6 +17,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)
 sys.path.insert(0, os.path.join(_HERE, "..", "..", "CTM_plus", "KVPolicy"))
 import quantizers as Q          # noqa: E402
+import protected_int8 as P8      # noqa: E402  (P8 protected-INT8 candidates; orthogonal to S1-S4)
 
 CELLS = ["fp", "affine", "S1", "S2", "S3", "S4"]
 
@@ -72,10 +73,11 @@ def build_fakequant_cache(candidate, masks, BS=32, v_group_size=32):
             if candidate == "fp":
                 return k, v
             mask = masks[layer_idx].to(k.device)
+            recon = P8.reconstruct_p8 if candidate.startswith("P8") else Q.reconstruct
             kh, vh = [], []
             for b in range(k.shape[0]):
-                Kh, Vh = Q.reconstruct(k[b].transpose(0, 1).float(), v[b].transpose(0, 1).float(),
-                                       mask, candidate, BS=BS, v_group_size=v_group_size)
+                Kh, Vh = recon(k[b].transpose(0, 1).float(), v[b].transpose(0, 1).float(),
+                               mask, candidate, BS=BS, v_group_size=v_group_size)
                 kh.append(Kh.transpose(0, 1)); vh.append(Vh.transpose(0, 1))
             return torch.stack(kh).to(k.dtype), torch.stack(vh).to(v.dtype)
     return FakeQuantCache()
