@@ -55,6 +55,18 @@ def production_k_metadata(K: torch.Tensor, BS: int = 32
     return s_prod, x_prod, codes
 
 
+def production_v(V: torch.Tensor, v_group_size: int = 32) -> torch.Tensor:
+    """Production-faithful V affine: per-TOKEN, per-(H, group of v_group_size).
+    Returns V_hat (S,H,D). Same for every query-fold candidate (V is not folded)."""
+    S, H, D = V.shape
+    if D % v_group_size != 0:
+        raise ValueError(f"D={D} not divisible by v_group_size={v_group_size}")
+    ng = D // v_group_size
+    vg = V.to(torch.float32).view(S, H, ng, v_group_size)
+    q, sc, xm = _affine(vg, red_dim=3)
+    return (q * sc + xm).view(S, H, D)
+
+
 def dequant_k(codes: torch.Tensor, s_prod: torch.Tensor, xmin_prod: torch.Tensor,
               BS: int = 32) -> torch.Tensor:
     """Inverse: codes (S,H,D) uint8 + per-block s/xmin (B,H,D) -> K_hat (S,H,D). Exact
