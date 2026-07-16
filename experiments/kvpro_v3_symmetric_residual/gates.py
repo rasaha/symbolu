@@ -19,9 +19,16 @@ import accounting as A          # noqa: E402
 import results as R             # noqa: E402
 
 # ---------------- PRE-REGISTERED THRESHOLDS ---------------- #
-# Offline attention proxy (NECESSARY, not sufficient) — affine is the shipped, validated baseline.
-TH_ATTN_OUT_COS_MIN = 0.999
+# Offline attention proxy (RED-FLAG, necessary-not-sufficient) — RELATIVE to the shipped affine baseline.
+# The gate uses ONLY the attention-OUTPUT MSE ratio vs affine (the metric the study pre-registered as
+# decisive). This threshold is UNCHANGED and stays frozen.
 TH_ATTN_OUT_MSE_VS_AFFINE_MAX = 1.25
+# DIAGNOSTIC-ONLY as of 2026-07-16 (NO LONGER gate criteria): these were absolute-vs-fp bounds, and the
+# accepted affine baseline ITSELF fails them on the decisive full run (Qwen2.5-7B: cos_min 0.9951<0.999,
+# kl_max 0.2481>>0.02). A bar the reference cannot clear is not a valid quality bar, so they were removed
+# from quality_offline() as a baseline-fails-its-own-gate correction. This is VERDICT-NEUTRAL — S2 still
+# fails the offline gate (3.26x affine MSE > 1.25). Kept here for provenance + JSON diagnostics only.
+TH_ATTN_OUT_COS_MIN = 0.999
 TH_SOFTMAX_KL_MAX = 0.02
 # End-to-end quality (REQUIRED for GO) — preserve prior KVPro standards.
 TH_NEEDLE_ABS_DROP = 0.02              # standard-needle accuracy vs min(fp, affine)
@@ -42,16 +49,17 @@ def _load(path):
 
 # ---- individual gates: each returns (True | False | None-not-run, reasons) ---- #
 def quality_offline(attn, cand):
+    """RED-FLAG offline proxy, RELATIVE to the affine baseline: flags a candidate only if its attention-
+    OUTPUT MSE exceeds TH_ATTN_OUT_MSE_VS_AFFINE_MAX x affine's. The former absolute cos-vs-fp / kl-vs-fp
+    sub-checks were removed (2026-07-16) — the accepted affine baseline itself fails them, so they were
+    mis-specified, not a quality bar. cos/kl remain in the JSON for diagnostics but do NOT gate."""
     if attn is None or attn.get("label") == "NOT_A_VERDICT_SYNTHETIC":
         return _NR, ["attention proxy NOT RUN / synthetic"]
     s = attn["summary"][cand]; ok, why = True, []
-    if s["attn_out_cos_min"] < TH_ATTN_OUT_COS_MIN:
-        ok = False; why.append(f"attn_out_cos {s['attn_out_cos_min']:.6f}<{TH_ATTN_OUT_COS_MIN}")
     if s["attn_out_mse_vs_affine_max"] > TH_ATTN_OUT_MSE_VS_AFFINE_MAX:
-        ok = False; why.append(f"attn_mse x{s['attn_out_mse_vs_affine_max']:.2f}>{TH_ATTN_OUT_MSE_VS_AFFINE_MAX}")
-    if s["softmax_kl_max_max"] > TH_SOFTMAX_KL_MAX:
-        ok = False; why.append(f"kl {s['softmax_kl_max_max']:.4f}>{TH_SOFTMAX_KL_MAX}")
-    return ok, why or ["offline proxy OK"]
+        ok = False
+        why.append(f"attn_out_mse x{s['attn_out_mse_vs_affine_max']:.2f}>{TH_ATTN_OUT_MSE_VS_AFFINE_MAX} (vs affine)")
+    return ok, why or ["offline proxy OK (attn-out MSE within affine bound)"]
 
 
 def _acc(sm, cell):

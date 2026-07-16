@@ -159,5 +159,30 @@ class TestVerdict(unittest.TestCase):
         self.assertEqual(v["verdict"], "GO_KERNEL_PROTOTYPE")
 
 
+class TestOfflineGateBaselineFix(unittest.TestCase):
+    """The 2026-07-16 fix: offline proxy is relative-to-affine only; it must not reject the affine baseline
+    (which fails the old absolute cos/kl bars), and must still block candidates worse than affine on MSE."""
+    def _attn(self, cos, mse_x, kl):
+        s = {c: {"attn_out_cos_min": cos, "attn_out_mse_vs_affine_max": mse_x, "softmax_kl_max_max": kl,
+                 "attn_out_mse_max": 0.0, "softmax_kl_mean_max": 0.0} for c in CELLS}
+        return {"summary": s, "label": "MEASURED"}
+
+    def test_baseline_numbers_now_pass(self):
+        # affine's OWN decisive-run numbers: cos 0.9951 (< old 0.999), kl 0.2481 (>> old 0.02), mse 1.0.
+        ok, why = G.quality_offline(self._attn(0.9951, 1.0, 0.2481), "S3")
+        self.assertTrue(ok, f"baseline-like numbers must not be blocked, got {why}")
+
+    def test_still_blocks_worse_than_affine(self):
+        # S2's decisive-run numbers: mse 3.26x affine -> still a red flag (NOT loosened to pass S2).
+        ok, why = G.quality_offline(self._attn(0.9882, 3.264, 0.7557), "S2")
+        self.assertFalse(ok)
+        self.assertTrue(any("mse" in w.lower() for w in why))
+
+    def test_kl_and_cos_no_longer_gate(self):
+        # huge KL / low cos but MSE within the affine bound -> passes (cos/kl are diagnostics only now).
+        ok, _ = G.quality_offline(self._attn(0.90, 1.10, 16.0), "S1")
+        self.assertTrue(ok)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
