@@ -60,11 +60,14 @@ required: one-token append (no repack), block rollover, mixed tail lengths, satu
 oracle exact** (frozen in `DECISION_THRESHOLDS.md` Part 6F-A). The route-A full-fp16 compact-sidecar swap is
 a ~7% side-lever, deliberately **not** the primary Route-C optimisation.
 
-**MEASURED RESULT (A100-80GB) — see `SIXFA_RESULT.md`:** read **+44.8%** (PASS), write **0.02%** of gain
-(PASS), oracle **exact** (PASS), aggregate projection **10.2% central → PROVISIONAL** (clears only under
-optimistic shares). **6F-C not yet authorised** — blocked on a *measured* decode-attention share (α·β) to
-convert PROVISIONAL → PASS/FAIL. The write-regression risk that could have killed 6F is **falsified** (a
-slot-write needs no repack; append cost is flat across concurrency).
+**MEASURED RESULT (A100-80GB) — see `SIXFA_RESULT.md`: STOP 6F-C.** 6F-A components pass (read **+44.8%**,
+write **0.02%** of gain, oracle **exact**) but measurement #1 (`10_alpha_decode_share.py`) resolved the
+aggregate gate against the layout: the improved read/copy is only **α = 15.7%** of the (copy+decode-kernel)
+block — the decode **kernel is ~5.4× the permute-copy** — so **β_needed > 1 (impossible)** to reach 15%
+aggregate. The read wins are real but the KV read/copy is a minority of decode-kernel time; the tall pole is
+the decode kernel (matmuls / split-K+combine / GQA padding / route-A fp16-K load), **not** the storage
+layout. The 6F layout line is **CLOSED on measured evidence** (the β nsys trace is moot). If the decode
+kernel is later optimised on its own, re-evaluate 6F then.
 
 ## RunPod command sequence
 ```bash
