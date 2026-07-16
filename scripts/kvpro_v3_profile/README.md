@@ -15,6 +15,9 @@ evaluate P8 independently before combining with S2.
 | 1 | Decode-pipeline map (cited) | `DECODE_PIPELINE_MAP.md` |
 | 2 | Env / prerequisite report | `00_env_gate.sh` → `env_gate.json` |
 | 3 | Profiling scripts | `01_profile_nsys.sh` `02_profile_ncu.sh` `03_profile_cuda_events.sh` |
+| — | Route-A input builder (Part A) | `route_a_builder.py` (writer-faithful packed view) |
+| — | Mandatory correctness gate (Part B) | `06_correctness_gate.py` → `correctness.json` (gates profiling) |
+| — | Frozen decision thresholds (Part E) | `DECISION_THRESHOLDS.md` |
 | 4 | Parsed profile (JSON+CSV) | `04_parse_profile.py` → `stage_summary.{json,csv}` |
 | 5 | Bottleneck table | `stage_summary.*` (per-stage % of kernel time) |
 | 6 | Protected-INT8 harness + quality | `../../experiments/kvpro_v3_symmetric_residual/{protected_int8.py,p8_gate.py,run_p8_quality.sh}` |
@@ -35,9 +38,11 @@ export PROTECT_MASK_PATH=/workspace/dev/build-logs/qwen2_5_7b_protect_mask_4pct.
 # --- A) profiling (needs GPU; production path needs the forked vLLM wheel) ---
 cd scripts/kvpro_v3_profile
 bash 00_env_gate.sh                       # PASS/FAIL/UNAVAILABLE/NOT_REQUIRED -> env_gate.json
-bash run_profile_all.sh                   # env -> nsys -> ncu -> cuda-events -> parse -> cost -> decision
-#   (each profiler skips honestly if its tool/fork is absent; route-A Triton (03) needs NO fork)
-cat runs/decision.json                    # ranked table + one recommendation
+python3 06_correctness_gate.py            # Part B: Route-A builder vs oracle; MUST pass before profiling
+bash run_profile_all.sh                   # env -> CORRECTNESS GATE -> nsys -> ncu -> cuda-events -> parse -> cost -> decision
+#   (aborts if the correctness gate fails; each profiler skips honestly if its tool/fork is absent;
+#    route-A Triton (03) needs NO fork; set KVV3_GPU_GATE=1 to also attempt the pod kernel-vs-oracle check)
+cat runs/decision.json                    # ranked table + one recommendation (uses DECISION_THRESHOLDS.md)
 
 # --- F) protected-INT8 quality (fake-quant; needs GPU+model+mask, NOT the fork) ---
 cd ../../experiments/kvpro_v3_symmetric_residual
@@ -56,7 +61,8 @@ python3 05_decision_matrix.py --env runs/env_gate.json --stages runs/stage_summa
 ## Honest status (this container is CPU-only; the pod is where GPU work happens)
 | Component | Status |
 |-----------|--------|
-| Decode-pipeline map, cost accounting, decision matrix, env-gate logic, P8 quantizers + gate | **CPU-tested** (`test_profile_cpu.py`, `tests/test_protected_int8_cpu.py`, `tests/test_p8_gate_cpu.py`) |
+| Decode map, cost accounting, decision matrix, env-gate, P8 quantizers + gate, **Route-A builder + correctness gate (Parts A/B), dynamic mask accounting (F), frozen thresholds (E), P8 production fidelity (I)** | **CPU-tested** (`test_profile_cpu.py` 21, `tests/test_protected_int8_cpu.py`, `tests/test_p8_gate_cpu.py`) |
+| Route-A builder round-trips vs the writer's reference dequant (full+partial tails, bf16+prod-int8) | **CPU-verified** — 12-case gate PASS; NO GPU needed for the layout/correctness half |
 | Format-change ceiling (bytes) | **Analytical** — modeled read-bytes, not TPS |
 | Implementation-removal ceiling (time) | **UNAVAILABLE until a GPU profile exists** (never modeled/fabricated) |
 | `01/02` nsys/ncu profiling, `run_profile_all.sh` | **HARDWARE-UNTESTED** — RunPod-ready, need GPU + Nsight (+ forked vLLM for the production kernel) |

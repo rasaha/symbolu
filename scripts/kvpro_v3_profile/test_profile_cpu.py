@@ -21,6 +21,8 @@ def _load(fname, mod):
 PP = _load("04_parse_profile.py", "parse_profile")
 DM = _load("05_decision_matrix.py", "decision_matrix")
 import cost_accounting as CA  # noqa: E402  (valid module name)
+import route_a_builder as RB  # noqa: E402
+CG = _load("06_correctness_gate.py", "correctness_gate")
 
 
 class TestParse(unittest.TestCase):
@@ -140,6 +142,46 @@ class TestCost(unittest.TestCase):
         self.assertEqual(b["n_protect_used"], 7)
         self.assertEqual(b["n_protect_source"], "mask-file")
         self.assertEqual(b["total_bytes_per_tok_head_layer"], 64 + 64 + 8 + 8 + 14 + 8 + 8)   # 174
+
+
+class TestRouteABuilderAndGate(unittest.TestCase):
+    """Parts A + B: the builder produces the writer's packed view faithfully, and the correctness gate
+    round-trips it against the in-repo reference dequant (full + partial tails, bf16 + prod-int8)."""
+    def _mask(self, H, D, k=2):
+        import torch
+        m = torch.zeros(H, D, dtype=torch.int8); m[:, :k] = 1
+        return m
+
+    def test_view_shapes_and_padding(self):
+        import torch
+        S, H, D = 70, 4, 16
+        v = RB.build_packed_view(torch.randn(S, H, D), torch.randn(S, H, D), self._mask(H, D), BS=32, v_group_size=8)
+        self.assertEqual(v["S_padded"], 96)                      # ceil(70/32)*32
+        self.assertEqual(tuple(v["k_int4"].shape), (1, 96, H, D // 2))
+        self.assertEqual(tuple(v["k_scale"].shape), (1, 3, H, D))   # per-block
+        self.assertEqual(v["active_in_last_block"], 70 - 64)
+        self.assertEqual(v["n_protect"], 2)
+
+    def test_roundtrip_full_and_partial_tails(self):
+        import torch
+        H, D = 4, 16
+        mask = self._mask(H, D)
+        kmin, kmax = torch.full((H, D), -3.0), torch.full((H, D), 3.0)
+        for S in (64, 64 + 1, 64 + 7, 64 + 31):
+            ck, _ = CG.roundtrip_checks(torch.randn(S, H, D), torch.randn(S, H, D), mask, 32, 8, kmin, kmax, False)
+            self.assertTrue(all(c["pass"] for c in ck.values()), f"S={S}: {ck}")
+
+    def test_prot_int8_overlay_matches_p8prod(self):
+        import torch
+        H, D = 4, 16
+        kmin, kmax = torch.full((H, D), -3.0), torch.full((H, D), 3.0)
+        ck, _ = CG.roundtrip_checks(torch.randn(64, H, D), torch.randn(64, H, D), self._mask(H, D), 32, 8, kmin, kmax, True)
+        self.assertTrue(ck["k_protect_overlay_exact"]["pass"])
+
+    def test_full_cpu_gate_passes(self):
+        r = CG.run_cpu(H=2, D=16, BS=32, v_group_size=8)
+        self.assertTrue(r["all_pass"])
+        self.assertGreaterEqual(r["n_cases"], 10)
 
 
 if __name__ == "__main__":

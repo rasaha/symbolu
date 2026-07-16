@@ -10,6 +10,14 @@ P8_VERDICT="${P8_VERDICT:-}"        # optional: path to the P8 quality verdict j
 echo "==== 00 env gate ===================================================="
 bash "$HERE/00_env_gate.sh" "$OUTDIR/env_gate.json" || true
 
+echo "==== B  MANDATORY correctness gate (Route-A builder vs CPU oracle) ==="
+# Never profile an incorrect kernel (Part J): the builder must round-trip against the writer's reference
+# dequant BEFORE any timing. A FAIL aborts the whole pipeline.
+if ! "$PYBIN" "$HERE/06_correctness_gate.py" --out "$OUTDIR/correctness.json" ${KVV3_GPU_GATE:+--gpu}; then
+  echo "[ABORT] correctness gate FAILED — refusing to profile. See $OUTDIR/correctness.json"
+  exit 2
+fi
+
 echo "==== 01 nsys ========================================================"
 OUTDIR="$OUTDIR" bash "$HERE/01_profile_nsys.sh" || echo "[skip] nsys stage unavailable/blocked"
 echo "==== 02 ncu ========================================================="
