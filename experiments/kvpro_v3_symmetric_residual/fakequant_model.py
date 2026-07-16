@@ -73,11 +73,18 @@ def build_fakequant_cache(candidate, masks, BS=32, v_group_size=32):
             if candidate == "fp":
                 return k, v
             mask = masks[layer_idx].to(k.device)
+            kwargs = {"BS": BS, "v_group_size": v_group_size}
+            if candidate == "P8prod":                       # production-faithful: static calibrated min/max
+                if _PROT_KMIN is None or _PROT_KMAX is None:
+                    raise SystemExit("[FAIL] P8prod needs k_min/k_max in the mask artifact (Phase-6N "
+                                     "calibrated). Rebuild the mask with minmax, or use P8aff/P8sym.")
+                kwargs["k_min"] = _PROT_KMIN[layer_idx].to(k.device)
+                kwargs["k_max"] = _PROT_KMAX[layer_idx].to(k.device)
             recon = P8.reconstruct_p8 if candidate.startswith("P8") else Q.reconstruct
             kh, vh = [], []
             for b in range(k.shape[0]):
                 Kh, Vh = recon(k[b].transpose(0, 1).float(), v[b].transpose(0, 1).float(),
-                               mask, candidate, BS=BS, v_group_size=v_group_size)
+                               mask, candidate, **kwargs)
                 kh.append(Kh.transpose(0, 1)); vh.append(Vh.transpose(0, 1))
             return torch.stack(kh).to(k.dtype), torch.stack(vh).to(v.dtype)
     return FakeQuantCache()
@@ -103,10 +110,16 @@ def teacher_forced_argmax(model, tok, text, candidate, masks):
     return out.logits[0, :-1].argmax(-1).cpu(), ids[0, 1:].cpu()
 
 
+_PROT_KMIN = None      # (L, H_kv, D) calibrated k_min for P8prod; set by load_masks, None if absent
+_PROT_KMAX = None
+
+
 def load_masks(mask_path):
     import torch
+    global _PROT_KMIN, _PROT_KMAX
     blob = torch.load(mask_path, map_location="cpu", weights_only=False)
     m = blob.get("mask", blob.get("protect_mask"))
     if m is None:
         raise SystemExit(f"[FAIL] mask file {mask_path} has no 'mask'/'protect_mask' key.")
+    _PROT_KMIN, _PROT_KMAX = blob.get("k_min"), blob.get("k_max")   # Phase-6N calibrated minmax (P8prod)
     return m

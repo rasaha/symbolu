@@ -16,8 +16,14 @@ import json
 import os
 import sys
 
-MIN_JUSTIFY_PCT = 8.0        # a removable bucket below this doesn't justify a kernel project on its own
-COMBINED_SPREAD_PCT = 8.0    # if >=2 removable buckets each exceed this, prefer a combined redesign
+# ---- FROZEN decision thresholds (documented + justified in DECISION_THRESHOLDS.md, BEFORE results) ----
+MIN_JUSTIFY_PCT = 8.0        # a removable bucket below this % of DECODE-KERNEL time can't justify a kernel
+COMBINED_SPREAD_PCT = 8.0    # >=2 removable buckets each above this -> combined redesign
+# Projected END-TO-END gain is bounded BELOW removable%: ~ removable% x decode_kernel_share x realizable.
+# The ~0.27-0.30x decode-recovery ceiling caps the realizable fraction; we freeze a conservative cap and an
+# end-to-end floor Z. MIN_JUSTIFY_PCT=8 is chosen so 8% x 0.5 ~= 4% clears Z=3% with margin.
+REALIZABLE_FRACTION_CAP = 0.5
+Z_MIN_PROJECTED_END_TO_END_PCT = 3.0
 
 CANDIDATES = [
     "in_kernel_paged_gather_only",
@@ -124,7 +130,9 @@ def decide(env=None, stages=None, p8=None, cost=None):
                f"In-kernel gather + store-as-consumed first (route-A Triton is the starting point).")
 
     return {"recommendation": rec, "rationale": why, "ranked": ranked,
-            "measured": {"have_profile": True, "buckets": buckets, "p8_ran": p8_ran, "p8_clean": p8_clean},
+            "measured": {"have_profile": True, "buckets": buckets, "p8_ran": p8_ran, "p8_clean": p8_clean,
+                         "projected_end_to_end_pct_upper": round(top_removable * REALIZABLE_FRACTION_CAP, 2),
+                         "z_floor_pct": Z_MIN_PROJECTED_END_TO_END_PCT},
             "label": "GPU-measured"}
 
 

@@ -33,8 +33,14 @@ _I8_SYM = 127                   # signed int8 levels [-127, 127]
 _I8_AFF = 255                   # unsigned int8 levels [0, 255]
 _CLAMP = 1e-8
 
-# P8 cell -> protected scheme. Baseline is the existing "affine" cell (exact/bf16 protected).
-_P8 = {"P8sym": "symmetric", "P8aff": "affine"}
+# P8 cell -> protected scheme.  Baseline is the existing "affine" cell (exact/bf16 protected).
+#   P8prod = PRODUCTION-FAITHFUL: static calibrated per-channel k_min/k_max from the mask artifact,
+#            uint8 asymmetric — byte-identical math to Phase-6N prot_int8 (phase5b_4c_paged_writer.py).
+#   P8sym / P8aff = EXPERIMENTAL variants that compute the scale DYNAMICALLY per captured sequence. They
+#            are NOT the production path (dynamic min/max is easier than production's frozen scale, so they
+#            would OVER-state production quality). Use them only as an upper-bound sanity check.
+_P8 = {"P8prod": "prod", "P8sym": "symmetric", "P8aff": "affine"}
+_P8_EXPERIMENTAL = {"P8sym", "P8aff"}
 
 
 def protected_int8_symmetric(x: torch.Tensor, red_dim: int) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -55,15 +61,29 @@ def protected_int8_affine(x: torch.Tensor, red_dim: int) -> Tuple[torch.Tensor, 
     return q * scale + xmin, scale, xmin
 
 
+def protected_int8_prod(x: torch.Tensor, kmin: torch.Tensor, kmax: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """PRODUCTION Phase-6N prot_int8 (byte-identical math). STATIC calibrated per-channel min/max — the
+    k_min/k_max stored in the mask artifact, already widened by minmax_margin. x:(S,H,D); kmin/kmax
+    broadcast over the token axis (shape (H,D) or (1,H,D)). Mirrors phase5b_4c_paged_writer.prot_int8_quantize:
+        scale = ((k_max - k_min) / 255).clamp(min=1e-8) ;  code = round((x - k_min)/scale).clamp(0,255) ;
+        x_hat = code*scale + k_min."""
+    xf, kmin, kmax = x.float(), kmin.float(), kmax.float()
+    scale = ((kmax - kmin) / _I8_AFF).clamp(min=_CLAMP)
+    q = ((xf - kmin) / scale).round().clamp(0, _I8_AFF)
+    return q * scale + kmin, scale
+
+
 def candidate_names():
     return list(_P8)
 
 
-def reconstruct_p8(K: torch.Tensor, V: torch.Tensor, protect_mask_hd: torch.Tensor,
-                   candidate: str, BS: int = 32, v_group_size: int = 32) -> Tuple[torch.Tensor, torch.Tensor]:
-    """Reconstruct (K_hat, V_hat) with the shipped affine INT4 residual + affine INT4 V UNCHANGED, and
-    the protected K channels stored INT8 (per-channel over the token axis) instead of exact.
-    candidate in {P8sym, P8aff}. protect_mask_hd: (H, D) bool/int, K-only (identical mask to production)."""
+def reconstruct_p8(K: torch.Tensor, V: torch.Tensor, protect_mask_hd: torch.Tensor, candidate: str,
+                   BS: int = 32, v_group_size: int = 32,
+                   k_min: torch.Tensor = None, k_max: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Reconstruct (K_hat, V_hat) with the shipped affine INT4 residual + affine INT4 V UNCHANGED, and the
+    protected K channels stored INT8 instead of exact. candidate in {P8prod, P8sym, P8aff}.
+    protect_mask_hd: (H, D) K-only (identical mask to production). P8prod REQUIRES calibrated k_min/k_max
+    (H,D) from the mask artifact (production-faithful static scale); the experimental variants ignore them."""
     if candidate not in _P8:
         raise ValueError(f"unknown P8 candidate {candidate!r}; choose {list(_P8)}")
     # residual + V: byte-identical to the 'affine' baseline arm
@@ -72,11 +92,16 @@ def reconstruct_p8(K: torch.Tensor, V: torch.Tensor, protect_mask_hd: torch.Tens
 
     m = protect_mask_hd.to(torch.bool)                       # (H, D)
     if m.any():
-        Kf = K.float()
-        if _P8[candidate] == "symmetric":
-            prot_hat, _ = protected_int8_symmetric(Kf, red_dim=0)          # per-(h,d) over tokens
+        Kf = K.float(); scheme = _P8[candidate]
+        if scheme == "prod":
+            if k_min is None or k_max is None:
+                raise ValueError("P8prod (production-faithful) requires calibrated k_min/k_max (H,D) from the "
+                                 "mask artifact; pass them, or use an experimental variant (P8sym/P8aff).")
+            prot_hat, _ = protected_int8_prod(Kf, k_min, k_max)
+        elif scheme == "symmetric":
+            prot_hat, _ = protected_int8_symmetric(Kf, red_dim=0)          # per-(h,d) over tokens (experimental)
         else:
-            prot_hat, _, _ = protected_int8_affine(Kf, red_dim=0)
+            prot_hat, _, _ = protected_int8_affine(Kf, red_dim=0)          # experimental
         prot = m.view(1, *m.shape).expand_as(K_hat)          # (S, H, D)
         K_hat = torch.where(prot, prot_hat, K_hat)
     return K_hat, V_hat

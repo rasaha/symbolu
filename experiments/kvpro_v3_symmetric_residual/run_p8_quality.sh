@@ -7,7 +7,8 @@
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$HERE/_lib.sh"
 
 MODEL="Qwen/Qwen2.5-7B-Instruct"; MASK="${PROTECT_MASK_PATH:-}"; QUICK=0; REAL_MMLU=0; MMLU_N=0
-CELLS="fp,affine,P8sym,P8aff"
+# P8prod = production-faithful (needs k_min/k_max in the mask). Add P8aff,P8sym for experimental upper bounds.
+CELLS="fp,affine,P8prod"
 while [[ $# -gt 0 ]]; do case "$1" in
   --model) MODEL="$2"; shift 2;;
   --mask) MASK="$2"; shift 2;;

@@ -19,7 +19,10 @@ import results as R           # noqa: E402
 import gates as G             # noqa: E402
 import protected_int8 as P8   # noqa: E402
 
-_P8_CANDS = ("P8sym", "P8aff")
+# P8prod (production-faithful, static calibrated k_min/k_max) DECIDES production validity. P8sym/P8aff are
+# experimental (dynamic per-sequence scale) and are reported as advisory upper bounds only.
+_P8_CANDS = ("P8prod", "P8sym", "P8aff")
+_P8_PROD = "P8prod"
 
 
 def _load(p):
@@ -30,35 +33,43 @@ def verdict(needle, hard_needle, mmlu, n_protect=5):
     nsum = R.summarize(needle, "needle", group_keys=("seed", "context_len"))
     hsum = R.summarize(hard_needle, "hard_needle", group_keys=("seed", "mode"))
     msum = R.summarize(mmlu, "mmlu", group_keys=("seed",))
+    ran_summaries = [s for s in (nsum, hsum, msum) if s.get("label") != "NOT_RUN"]
     per = {}
     for c in _P8_CANDS:
-        # only evaluate cands actually present in the runs
-        present = all(c in (s.get("agg") or {}) for s in (nsum, hsum, msum) if s.get("label") != "NOT_RUN")
+        # a candidate is present only if it appears in EVERY summary that ran (guard against KeyError on
+        # cells that were not part of this run — e.g. P8sym absent when only P8prod was measured)
+        present = bool(ran_summaries) and all(c in (s.get("agg") or {}) for s in ran_summaries)
+        if not present:
+            per[c] = {"present": False, "needle": None, "hard_needle": None, "mmlu": None, "clean": False,
+                      "reasons": {"note": ["not present in this run"]}}
+            continue
         q_ndl = G.quality_needle(nsum, c)
         q_hn = G.quality_hard_needle(hsum, c)
         q_mm = G.quality_mmlu(msum, c)
         clean = (q_ndl[0] is True and q_hn[0] is True and q_mm[0] is True)
-        per[c] = {"present": present, "needle": q_ndl[0], "hard_needle": q_hn[0], "mmlu": q_mm[0],
+        per[c] = {"present": True, "needle": q_ndl[0], "hard_needle": q_hn[0], "mmlu": q_mm[0],
                   "clean": clean, "reasons": {"needle": q_ndl[1], "hard_needle": q_hn[1], "mmlu": q_mm[1]}}
     ran = all(s.get("label") != "NOT_RUN" for s in (nsum, hsum, msum))
-    any_clean = any(per[c]["clean"] for c in _P8_CANDS)
-    any_present = any(per[c]["present"] for c in _P8_CANDS)
-    if not ran or not any_present:
-        label = "INCONCLUSIVE"
-    elif any_clean:
+    prod_present = per.get(_P8_PROD, {}).get("present", False)
+    prod_clean = prod_present and per[_P8_PROD]["clean"]
+    if not ran or not prod_present:
+        label = "INCONCLUSIVE"         # production validity REQUIRES P8prod; experimental variants don't count
+    elif prod_clean:
         label = "P8_CLEAN"
     else:
         label = "NO_GO_QUALITY"
     return {
         "verdict": label,
-        "p8_quality_clean": bool(any_clean and ran),
-        "recommended_variant": next((c for c in _P8_CANDS if per[c]["clean"]), None),
+        "p8_quality_clean": bool(prod_clean and ran),
+        "production_candidate": _P8_PROD,
+        "recommended_variant": _P8_PROD if prod_clean else None,
         "per_candidate": per,
         "protected_stream": P8.protected_stream_bytes(n_protect),
         "benchmarks": {"needle": nsum.get("label"), "hard_needle": hsum.get("label"), "mmlu": msum.get("label")},
-        "note": "P8 changes ONLY protected-K precision vs the affine baseline; the INT4 residual + V are "
-                "byte-identical. Systems value is the protected-stream byte reduction + coalescing, NOT a "
-                "standalone TPS claim; combine with a dense-stream kernel, and only combine with S2 later.",
+        "note": "Only P8prod (static calibrated k_min/k_max == Phase-6N prot_int8) determines PRODUCTION "
+                "validity; P8sym/P8aff are dynamic experimental upper bounds. P8 changes ONLY protected-K "
+                "precision vs affine (INT4 residual + V byte-identical). Systems value = protected-stream byte "
+                "reduction + coalescing, NOT a standalone TPS claim; evaluate independently, combine with S2 later.",
     }
 
 

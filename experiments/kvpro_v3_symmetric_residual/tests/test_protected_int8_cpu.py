@@ -78,5 +78,41 @@ class TestProtectedInt8(unittest.TestCase):
             P8.reconstruct_p8(K, V, torch.zeros(2, 8, dtype=torch.int8), "P8bogus")
 
 
+class TestP8ProductionFidelity(unittest.TestCase):
+    """Part I: P8prod must be byte-identical to the shipped Phase-6N prot_int8 (equation + calibrated,
+    margin-widened static k_min/k_max), else its quality result cannot speak for production."""
+    def test_prod_matches_documented_prot_int8_equation(self):
+        # documented production math (phase5b_4c_paged_writer.prot_int8_quantize): uint8 asymmetric /255.
+        g = torch.Generator().manual_seed(9)
+        x = torch.randn(40, 2, 8, generator=g)
+        kmin, kmax = x.amin(0), x.amax(0)                          # (H,D) static bounds
+        xhat, scale = P8.protected_int8_prod(x, kmin, kmax)
+        s = ((kmax - kmin) / 255.0).clamp(min=1e-8)
+        ref = ((x.float() - kmin) / s).round().clamp(0, 255) * s + kmin
+        self.assertTrue(torch.equal(xhat, ref))
+
+    def test_widen_matches_production_formula(self):
+        import calibrate_mask_hf as C                              # noqa: E402
+        kmin = torch.tensor([-2.0, -1.0]); kmax = torch.tensor([2.0, 3.0])
+        wmin, wmax = C.widen_minmax(kmin, kmax, 1.1)
+        pad = 0.1 * (kmax - kmin)                                  # production: pad=(margin-1)*range
+        self.assertTrue(torch.allclose(wmin, kmin - pad) and torch.allclose(wmax, kmax + pad))
+
+    def test_prod_static_scale_differs_from_dynamic(self):
+        # static (margin-widened) bounds quantize DIFFERENTLY than the experimental dynamic per-seq scale.
+        g = torch.Generator().manual_seed(10)
+        K = torch.randn(64, 2, 8, generator=g); V = torch.randn(64, 2, 8, generator=g)
+        mask = torch.zeros(2, 8, dtype=torch.int8); mask[0, 0] = 1
+        kmin, kmax = K.amin(0) - 1.0, K.amax(0) + 1.0             # wider than the sequence (like a margin)
+        Kp, _ = P8.reconstruct_p8(K, V, mask, "P8prod", BS=32, v_group_size=4, k_min=kmin, k_max=kmax)
+        Ka, _ = P8.reconstruct_p8(K, V, mask, "P8aff", BS=32, v_group_size=4)
+        self.assertFalse(torch.allclose(Kp[:, 0, 0], Ka[:, 0, 0]))   # production != experimental
+
+    def test_prod_requires_calibrated_minmax(self):
+        K, V = torch.randn(16, 2, 8), torch.randn(16, 2, 8)
+        with self.assertRaises(ValueError):
+            P8.reconstruct_p8(K, V, torch.ones(2, 8, dtype=torch.int8), "P8prod")   # no k_min/k_max
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -117,6 +117,30 @@ class TestCost(unittest.TestCase):
         ir = CA.implementation_removal_ceiling(_stages(g=20, st=8, sp=2, at=70))
         self.assertAlmostEqual(ir["max_time_gain_pct"], 30.0, places=1)
 
+    def test_read_mask_accounting_from_real_artifact(self):
+        # Part F: read n_protect from the ACTUAL mask, don't assume 5.
+        import torch, tempfile, os
+        L, H, D, k = 3, 4, 16, 5
+        m = torch.zeros(L, H, D, dtype=torch.int8); m[:, :, :k] = 1     # exactly k protected/head (topk-like)
+        p = os.path.join(tempfile.gettempdir(), "kvv3_mask_test.pt")
+        torch.save({"mask": m, "protect_fraction": 0.3125, "minmax_margin": 1.1,
+                    "k_min": torch.zeros(L, H, D), "k_max": torch.ones(L, H, D)}, p)
+        acc = CA.read_mask_accounting(p)
+        self.assertEqual(acc["n_protect"]["max"], k)
+        self.assertTrue(acc["n_protect"]["uniform_by_construction"])
+        self.assertTrue(acc["has_calibrated_minmax"])
+        self.assertEqual(acc["protected_bytes_per_tok_head_layer_bf16"], k * 2)
+
+    def test_build_adopts_mask_n_protect(self):
+        import torch, tempfile, os
+        m = torch.zeros(2, 4, 16, dtype=torch.int8); m[:, :, :7] = 1    # n_protect=7, not the default 5
+        p = os.path.join(tempfile.gettempdir(), "kvv3_mask7_test.pt")
+        torch.save({"mask": m}, p)
+        b = CA.build(mask_path=p)
+        self.assertEqual(b["n_protect_used"], 7)
+        self.assertEqual(b["n_protect_source"], "mask-file")
+        self.assertEqual(b["total_bytes_per_tok_head_layer"], 64 + 64 + 8 + 8 + 14 + 8 + 8)   # 174
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
