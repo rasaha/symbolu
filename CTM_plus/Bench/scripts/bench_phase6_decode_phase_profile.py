@@ -32,6 +32,7 @@ Run on the pod:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -162,6 +163,9 @@ def main(argv):
     parser.add_argument("--batch-sizes",            default="1,2,4,8")
     parser.add_argument("--n-runs",                 type=int,   default=2,
                         help="runs per B; summary reflects the LAST run's profiler state")
+    parser.add_argument("--json-out",               type=Path,  default=None,
+                        help="dump per-B region summary as JSON for "
+                             "analyze_phase6m7_decode_attribution.py")
     args = parser.parse_args(argv)
 
     try:
@@ -217,9 +221,10 @@ def main(argv):
     print("Cross-B comparison — per-call cpu_us_mean (Python dispatch time)")
     print("=" * 92)
     interesting = [
-        "batched.seqids_blockids", "batched.view_gather", "batched.splice",
-        "batched.bf16_backing", "batched.kernel_prep", "batched.kernel",
-        "one.view_gather", "one.splice", "one.bf16_backing",
+        "batched.write", "batched.seqids_blockids", "batched.view_gather",
+        "batched.splice", "batched.bf16_backing", "batched.kernel_prep",
+        "batched.kernel",
+        "one.write", "one.view_gather", "one.splice", "one.bf16_backing",
         "one.kernel_prep", "one.kernel",
     ]
     header = "  phase                          " + "".join(f"  B={r['B']:<4}" for r in results)
@@ -234,6 +239,13 @@ def main(argv):
             else:
                 row += f"  {v['cpu_us_mean']:>5.1f}"
         print(row)
+
+    if args.json_out:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        # `results` records are {B, wall_s_med, n_out_avg, summary, sample} —
+        # exactly the shape analyze_phase6m7_decode_attribution.load_summary reads.
+        args.json_out.write_text(json.dumps(results, indent=2))
+        print(f"\n[json] per-B region summary -> {args.json_out}")
 
     return 0
 
