@@ -60,6 +60,12 @@ required: one-token append (no repack), block rollover, mixed tail lengths, satu
 oracle exact** (frozen in `DECISION_THRESHOLDS.md` Part 6F-A). The route-A full-fp16 compact-sidecar swap is
 a ~7% side-lever, deliberately **not** the primary Route-C optimisation.
 
+**MEASURED RESULT (A100-80GB) — see `SIXFA_RESULT.md`:** read **+44.8%** (PASS), write **0.02%** of gain
+(PASS), oracle **exact** (PASS), aggregate projection **10.2% central → PROVISIONAL** (clears only under
+optimistic shares). **6F-C not yet authorised** — blocked on a *measured* decode-attention share (α·β) to
+convert PROVISIONAL → PASS/FAIL. The write-regression risk that could have killed 6F is **falsified** (a
+slot-write needs no repack; append cost is flat across concurrency).
+
 ## RunPod command sequence
 ```bash
 cd /workspace/symbolu
