@@ -1,0 +1,90 @@
+{
+  "schema": "symbol_u_utility_scenario_manifest_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "readiness_status": "UTILITY_SCENARIO_SET_V1_FROZEN",
+  "timestamp": "2026-07-16",
+  "commit": "recorded in git log for this commit",
+  "milestone": "M1 (scenario corpus) of SYMBOL_U_ASSISTANT_UTILITY_PREREG_V1",
+  "controlling_inputs": {
+    "prereg": {
+      "path": "SYMBOL_U_ASSISTANT_UTILITY_PREREG_V1.md",
+      "sha256": "c44d9eb3014ea6a574943cb51d7eed53784d7cb55c39855a4bcd3b250a685b1e"
+    },
+    "scenario_schema": {
+      "path": "symbol_u_utility_study/scenario.schema.json",
+      "sha256": "0c6d3207ae7cf89ffd0d2e0141f1ef52157f146e9ed9105f6c9badfa03b7b0ee"
+    },
+    "concern_ontology_v1": {
+      "path": "symbol_u_bridge/concern_ontology_v1.json",
+      "sha256": "175f9f6eec361721a004bbdfd3031af969db4456ea17422254f25114c8217840"
+    },
+    "concept_table_v1": {
+      "path": "symbol_u_bridge/concern_to_sanskrit_concept_v1.json",
+      "sha256": "1bdf45f082ef3bfa7ef55cc6a55eda016be6cb797678d8e086e211fdd15ebcb4"
+    },
+    "bridge_manifest": {
+      "path": "symbol_u_bridge/concern_bridge_manifest_v1.json",
+      "sha256": "ce400a9f12b0046c2086bafc43f77fe56c3c360cf321516b77a177281efbd10a"
+    },
+    "abstention_rules": {
+      "path": "symbol_u_bridge/abstention_rules.json",
+      "sha256": "90dca16b00218e262480a0c1856a5afaf826d79eaf43a7975d8c6bccd91fe3c2"
+    }
+  },
+  "final_scenario_set": {
+    "path": "symbol_u_utility_study/scenarios_v1/scenario_set_v1.json",
+    "scenario_set_sha256": "0e4519925f8bf8208502f98e55fed53b50411a9d92c42acc7eef36596521fb8c",
+    "n_scenarios": 50
+  },
+  "artifact_hashes": {
+    "scenario_candidate_pool_v1.json": "0297c1619d6df15be2588cc7e996ac8fc8060d6f1a20ce533d5fd8de55a7e0f7",
+    "scenario_set_v1.json": "0b2429fe3669252739a598fadb92dc926a4f504ad82b0755288ac507f3ae472f",
+    "scenario_exclusions_and_rewrites_v1.json": "ef959b55ea86b3391a95205856e60625d216c479b6a03e9d4de1473f006e94b0",
+    "scenario_difficulty_audit_v1.json": "9096afcd4d595e6e3e48083fb1ffbf14902fde113379993d9b1a472925ae26dd",
+    "scenario_balance_audit_v1.json": "709e66bf3173a98c5582767b42c820d9298bf8306626a3715c60c5ee1d43b96b",
+    "scenario_contamination_audit_v1.json": "f4dde5b3972dfcf50de09875d7d5925c02882a36e9f36b9b4ca5864a960b46cb"
+  },
+  "counts": {
+    "n_scenarios": 50,
+    "candidate_pool": 75,
+    "included": 50,
+    "excluded": 25,
+    "difficulty": {
+      "DIRECT": 20,
+      "CONTEXTUAL": 20,
+      "AMBIGUOUS_BUT_RESOLVABLE": 10
+    },
+    "single_concern": 40,
+    "multi_concern": 10,
+    "max_concerns_per_scenario": 2,
+    "each_concern_primary_twice": true
+  },
+  "selection_firewall": "scenarios authored ONLY from concern definitions/inclusion-exclusion/synonyms/clarification cues + ordinary personal-assistant situations + linguistic realism + safety/duplication checks. NOT used: Sanskrit concept decomposition, varna identities/meanings, mapping glosses/coverage beyond frozen eligibility, relationship families, B1.12 stability, Tier-1 mappings, expected symbolic reframing, or hypotheses about which arm performs better. The concern->Sanskrit concept table was read ONLY to populate expected_bridge_output; the parser and varna mapping table were NOT read.",
+  "known_deviation": {
+    "item": "scenario_id width",
+    "requested": "S0001-S0050 (4-digit)",
+    "used": "S001-S050 (3-digit)",
+    "reason": "the FROZEN scenario.schema.json pins scenario_id to ^S[0-9]{3}$; the task forbids modifying the schema, so 3-digit IDs were used so the corpus fully validates. This is the only deviation; recommend widening the schema pattern to ^S[0-9]{4}$ in a future schema revision if 4-digit IDs are desired."
+  },
+  "exclusion_taxonomy": [
+    "DUPLICATE_MESSAGE",
+    "NEAR_DUPLICATE_TEMPLATE",
+    "CONCERN_MISMATCH",
+    "EXCESSIVE_AMBIGUITY",
+    "LEADING_TO_DESIRED_RESPONSE",
+    "OUTSIDE_SAFETY_SCOPE",
+    "UNREALISTIC_USER_LANGUAGE",
+    "OVER_CATEGORY_QUOTA",
+    "MULTI_CONCERN_LIMIT",
+    "SCHEMA_INVALID"
+  ],
+  "interpretation_limits": [
+    "does not demonstrate Symbol-U utility",
+    "does not validate the varna mappings",
+    "does not test concern extraction",
+    "does not represent every user population or concern",
+    "only provides a fixed evaluation corpus for the preregistered four-arm study"
+  ],
+  "no_model_or_scoring_used": true,
+  "no_arm_prompt_or_response_present": true
+}

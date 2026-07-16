@@ -1,0 +1,50 @@
+{
+  "schema": "symbol_u_utility_scenario_balance_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "primary_distribution": {
+    "C0001 (fear)": 2,
+    "C0002 (anxiety)": 2,
+    "C0003 (anger)": 2,
+    "C0004 (resentment)": 2,
+    "C0005 (attachment)": 2,
+    "C0006 (grief)": 2,
+    "C0007 (craving)": 2,
+    "C0008 (greed)": 2,
+    "C0009 (confusion)": 2,
+    "C0010 (doubt)": 2,
+    "C0011 (pride)": 2,
+    "C0012 (shame)": 2,
+    "C0013 (separation-longing)": 2,
+    "C0014 (duty)": 2,
+    "C0015 (burden)": 2,
+    "C0016 (money-concern)": 2,
+    "C0017 (poverty)": 2,
+    "C0018 (diligence)": 2,
+    "C0019 (laziness)": 2,
+    "C0020 (purpose)": 2,
+    "C0021 (curiosity)": 2,
+    "C0022 (knowledge)": 2,
+    "C0023 (patience)": 2,
+    "C0024 (contentment)": 2,
+    "C0025 (calm)": 2
+  },
+  "every_concern_primary_exactly_twice": true,
+  "secondary_distribution": {
+    "C0001 (fear)": 1,
+    "C0002 (anxiety)": 2,
+    "C0004 (resentment)": 1,
+    "C0010 (doubt)": 2,
+    "C0014 (duty)": 1,
+    "C0015 (burden)": 1,
+    "C0019 (laziness)": 1,
+    "C0020 (purpose)": 1
+  },
+  "single_concern": 40,
+  "multi_concern": 10,
+  "max_concerns_per_scenario": 2,
+  "difficulty_distribution": {
+    "DIRECT": 20,
+    "CONTEXTUAL": 20,
+    "AMBIGUOUS_BUT_RESOLVABLE": 10
+  }
+}
