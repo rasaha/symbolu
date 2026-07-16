@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symbol_u/concern_ontology.schema.json",
+  "title": "Symbol-U Canonical Concern Ontology",
+  "description": "Frozen, versioned ontology of canonical human concerns. LLM concern-extraction may ONLY select entries from this set; it may never invent concern names. This schema defines the shape; the populated ontology is a separate versioned data artifact.",
+  "type": "object",
+  "required": ["schema_version", "ontology_sha256", "concerns"],
+  "properties": {
+    "schema_version": {"const": "concern_ontology_v1"},
+    "ontology_sha256": {"type": "string", "description": "hash of the concerns array, sorted by id"},
+    "concerns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "description", "inclusion_criteria", "exclusion_criteria",
+                     "parent", "children", "synonyms"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^C[0-9]{4}$", "description": "stable unique id, e.g. C0007"},
+          "label": {"type": "string", "description": "short English name, e.g. 'financial insecurity'"},
+          "description": {"type": "string", "description": "one-paragraph canonical definition"},
+          "inclusion_criteria": {"type": "array", "items": {"type": "string"},
+            "description": "conditions under which a conversation counts as this concern"},
+          "exclusion_criteria": {"type": "array", "items": {"type": "string"},
+            "description": "conditions that rule it out / distinguish it from sibling concerns"},
+          "parent": {"type": ["string", "null"], "description": "parent concern id, or null for a root"},
+          "children": {"type": "array", "items": {"type": "string"}, "description": "child concern ids"},
+          "synonyms": {"type": "array", "items": {"type": "string"},
+            "description": "surface phrasings that map to this concern (aids extraction, not authoritative)"}
+        }
+      }
+    }
+  }
+}
