@@ -1,0 +1,22 @@
+{
+  "schema": "symbol_u_bridge_implementation_roadmap_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "note": "Deterministic bridge only. Excludes LLM prompt engineering, evaluation, and utility testing (out of scope for this spec).",
+  "milestones": [
+    {"m": 1, "name": "Author + freeze the concern ontology",
+     "deliverable": "concern_ontology.json conforming to concern_ontology.schema.json (populated, hashed)",
+     "notes": "the load-bearing new degree of freedom; author a closed set with inclusion/exclusion criteria; freeze by hash."},
+    {"m": 2, "name": "Author + freeze the concern->concept table",
+     "deliverable": "concept_mapping.json conforming to concept_mapping.schema.json, bound to the ontology hash",
+     "notes": "one canonical Sanskrit concept per concern; deterministic selection_rule; candidates recorded for audit."},
+    {"m": 3, "name": "Deterministic core implementation",
+     "deliverable": "bridge_core: concern-id -> concept (table) -> frozen parser -> frozen v3 lexicon -> mapping glosses",
+     "notes": "reuses the frozen parser + lexicon UNCHANGED; fully deterministic + unit-tested; no model calls."},
+    {"m": 4, "name": "Confidence + abstention layer",
+     "deliverable": "confidence scoring (bridge/coverage/relationship-family/B1.12-tier) + abstention_rules enforcement",
+     "notes": "Tier-1 mappings (d,s,v,y) and relationship families (opposition,no_relationship) preferred."},
+    {"m": 5, "name": "Extraction + synthesis adapters (interface only)",
+     "deliverable": "typed I/O contracts for stage-1 extraction and stage-6 synthesis (NO prompts specified here)",
+     "notes": "extraction constrained to select from the frozen ontology; synthesis constrained by the allowed/forbidden contribution list."}
+  ]
+}

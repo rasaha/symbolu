@@ -1,0 +1,1165 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "scores": [
+    {
+      "word": "akrodha",
+      "gloss": "non-anger",
+      "category": "virtue_calm",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "akrodha",
+          "gloss": "non-anger",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Non-anger implies detachment, which opposes the grasping nature of āśā.",
+          "opposing_evidence": "There is no direct embodiment or characteristic expression of āśā in non-anger.",
+          "adjudication": "Non-anger directly opposes the grasping nature of āśā.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "akrodha",
+          "gloss": "non-anger",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "resolution",
+          "dbr_score": 75,
+          "supporting_evidence": "Non-anger implies a state of inner peace and acceptance, which resolves the destructive collapse of sarvanāśa.",
+          "opposing_evidence": "There is no direct embodiment or characteristic expression of sarvanāśa in non-anger.",
+          "adjudication": "Non-anger directly resolves the sense of total defeat in sarvanāśa.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "akrodha",
+          "gloss": "non-anger",
+          "occurrence_index": 2,
+          "varna": "dh",
+          "frozen_mapping": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Non-anger implies contentment and lack of craving, which opposes the unquenchable thirst of tṛṣṇā.",
+          "opposing_evidence": "There is no direct embodiment or characteristic expression of tṛṣṇā in non-anger.",
+          "adjudication": "Non-anger directly opposes the unquenchable craving of tṛṣṇā.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 75.0,
+      "min_dbr": 75,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 0,
+        "75": 3,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "STRONG_RESONANCE"
+    },
+    {
+      "word": "asūyā",
+      "gloss": "envy/detraction",
+      "category": "afflictive",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "asūyā",
+          "gloss": "envy/detraction",
+          "occurrence_index": 0,
+          "varna": "s",
+          "frozen_mapping": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Asūyā involves a sense of superiority and attachment to one's own qualities, which can be seen as a form of clinging to purity or harmony.",
+          "opposing_evidence": "The mapping implies a positive spiritual attainment, which is not directly conveyed by asūyā, which is negative.",
+          "adjudication": "Asūyā directly opposes the positive spiritual attainment implied in the mapping.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "asūyā",
+          "gloss": "envy/detraction",
+          "occurrence_index": 1,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "generation",
+          "dbr_score": 50,
+          "supporting_evidence": "Asūyā can generate self-doubt and distrust, as envy often leads to questioning one's own worth and the worth of others.",
+          "opposing_evidence": "The mapping specifically refers to a lack of confidence and wavering, which is not the primary characteristic of asūyā but a possible consequence.",
+          "adjudication": "Asūyā naturally generates self-doubt and distrust, which are components of the mapping.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 62.5,
+      "min_dbr": 50,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 1,
+        "75": 1,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "audārya",
+      "gloss": "magnanimity",
+      "category": "virtue_calm",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "audārya",
+          "gloss": "magnanimity",
+          "occurrence_index": 0,
+          "varna": "d",
+          "frozen_mapping": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Magnanimity implies a broad-minded and generous spirit, which naturally opposes petty irritability and reactivity.",
+          "opposing_evidence": "The mapping involves specific reactive behaviors that are not directly embodied in the concept of magnanimity.",
+          "adjudication": "Magnanimity directly opposes peevishness and reactive irritability, requiring little interpretive work.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "audārya",
+          "gloss": "magnanimity",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "opposition",
+          "dbr_score": 50,
+          "supporting_evidence": "Magnanimity, being generous and forgiving, stands in contrast to a sense of total defeat and annihilation.",
+          "opposing_evidence": "The mapping involves a specific mental state of defeat that is not directly embodied in the concept of magnanimity.",
+          "adjudication": "Magnanimity naturally opposes the sense of total defeat, but the connection is less direct and requires some interpretive work.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "audārya",
+          "gloss": "magnanimity",
+          "occurrence_index": 2,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Magnanimity implies confidence and trust, which naturally opposes self-doubt and lack of confidence.",
+          "opposing_evidence": "The mapping involves specific doubts and wavering that are not directly embodied in the concept of magnanimity.",
+          "adjudication": "Magnanimity directly opposes self-doubt and lack of confidence, requiring little interpretive work.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 66.67,
+      "min_dbr": 50,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 1,
+        "75": 2,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "bhrama",
+      "gloss": "delusion/confusion",
+      "category": "afflictive",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "bhrama",
+          "gloss": "delusion/confusion",
+          "occurrence_index": 0,
+          "varna": "bh",
+          "frozen_mapping": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Delusion can lead to a state of hypnotic entrancement where common sense is lost.",
+          "opposing_evidence": "The mapping specifies 'under the spell of a ripu,' which introduces an external actor.",
+          "adjudication": "The bare word 'delusion' implies a loss of discernment, but the specific context of 'under the spell of a ripu' requires supplementation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "bhrama",
+          "gloss": "delusion/confusion",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Delusion can lead to a sense of total defeat and annihilation-thought.",
+          "opposing_evidence": "The mapping specifies 'the defeatist annihilation-thought,' which is a specific scenario.",
+          "adjudication": "The bare word 'delusion' can imply a sense of total defeat, but the specific scenario of 'annihilation-thought' requires supplementation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "bhrama",
+          "gloss": "delusion/confusion",
+          "occurrence_index": 2,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Delusion can lead to unrestrained indulgence and dissolution.",
+          "opposing_evidence": "The mapping specifies 'giving latitude to the point of dissolution,' which is a specific scenario.",
+          "adjudication": "The bare word 'delusion' can imply unrestrained indulgence, but the specific scenario of 'dissolution' requires supplementation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "chāyā",
+      "gloss": "shadow",
+      "category": "natural_action_abstract",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "chāyā",
+          "gloss": "shadow",
+          "occurrence_index": 0,
+          "varna": "ch",
+          "frozen_mapping": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A shadow can obscure or block light, symbolizing the obscuring or blocking of mental function.",
+          "opposing_evidence": "A shadow does not inherently imply mental function or its collapse; it requires interpretation to connect the two.",
+          "adjudication": "The connection requires interpretation and external context, so the score is 25.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "chāyā",
+          "gloss": "shadow",
+          "occurrence_index": 1,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A shadow can represent uncertainty or lack of clarity, which can be associated with self-doubt and lack of confidence.",
+          "opposing_evidence": "A shadow does not directly embody self-doubt or distrust; it requires a metaphorical extension to connect the two.",
+          "adjudication": "The connection requires a metaphorical extension, so the score is 25.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 2,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 2,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "cintā",
+      "gloss": "anxiety",
+      "category": "afflictive",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "cintā",
+          "gloss": "anxiety",
+          "occurrence_index": 0,
+          "varna": "c",
+          "frozen_mapping": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Anxiety can lead to a distorted sense of self and others, causing judgmentalism and a sense of superiority as a defense mechanism.",
+          "opposing_evidence": "Anxiety does not directly imply judgmentalism or separation-pride without additional context.",
+          "adjudication": "Anxiety can imply judgmentalism but requires external context to fully account for the mapping.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "cintā",
+          "gloss": "anxiety",
+          "occurrence_index": 1,
+          "varna": "n",
+          "frozen_mapping": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Anxiety can cause fixation and irrational attachment to certain objects or ideas as a coping mechanism.",
+          "opposing_evidence": "Anxiety does not directly cause blind attachment without additional context.",
+          "adjudication": "Anxiety can imply blind attachment but requires external context to fully account for the mapping.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "cintā",
+          "gloss": "anxiety",
+          "occurrence_index": 2,
+          "varna": "t",
+          "frozen_mapping": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Anxiety can lead to mental and spiritual inertia as a result of overwhelming stress.",
+          "opposing_evidence": "Anxiety does not directly cause inertia without additional context.",
+          "adjudication": "Anxiety can imply inertia but requires external context to fully account for the mapping.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "cāpa",
+      "gloss": "bow",
+      "category": "concrete_object",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "cāpa",
+          "gloss": "bow",
+          "occurrence_index": 0,
+          "varna": "c",
+          "frozen_mapping": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A bow is a weapon that creates distance and separation between the archer and the target, symbolizing judgmentalism and separation-pride.",
+          "opposing_evidence": "A bow does not inherently imply judgmentalism or feeling superior to others without additional context.",
+          "adjudication": "A bow implies separation but requires external context to imply judgmentalism.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "cāpa",
+          "gloss": "bow",
+          "occurrence_index": 1,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A bow can be used as a weapon to cause harm and downfall, symbolizing hatred and revulsion.",
+          "opposing_evidence": "A bow does not inherently imply hatred or revulsion without additional context.",
+          "adjudication": "A bow implies downfall but requires external context to imply hatred.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 2,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 2,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "dama",
+      "gloss": "self-restraint",
+      "category": "virtue_calm",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "dama",
+          "gloss": "self-restraint",
+          "occurrence_index": 0,
+          "varna": "d",
+          "frozen_mapping": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Self-restraint implies control over one's reactions, which opposes the uncontrolled reactivity described in the mapping.",
+          "opposing_evidence": "The mapping describes a specific type of reactivity that is not directly addressed by the general concept of self-restraint.",
+          "adjudication": "Self-restraint directly opposes peevishness and reactive irritability, as it involves controlling one's reactions.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "dama",
+          "gloss": "self-restraint",
+          "occurrence_index": 1,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Self-restraint is the regulation of one's actions and desires, which stands in contrast to unrestrained indulgence.",
+          "opposing_evidence": "The mapping describes a specific outcome of unrestrained behavior that is not directly addressed by the general concept of self-restraint.",
+          "adjudication": "Self-restraint directly opposes unrestrained indulgence, as it involves regulating one's actions and desires to prevent excessive behavior.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 75.0,
+      "min_dbr": 75,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 0,
+        "75": 2,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "STRONG_RESONANCE"
+    },
+    {
+      "word": "darpaṇa",
+      "gloss": "mirror",
+      "category": "concrete_object",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 0,
+          "varna": "d",
+          "frozen_mapping": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "A mirror reflects back what is in front of it, which can be seen as a form of reactivity.",
+          "opposing_evidence": "A mirror does not inherently have emotions or the ability to take offense, which are required for peevishness.",
+          "adjudication": "A mirror does not account for peevishness without importing outside meaning.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect emptiness or nothingness, symbolizing a sense of loss or annihilation.",
+          "opposing_evidence": "A mirror does not inherently convey a sense of total defeat or destructive collapse without external context.",
+          "adjudication": "A mirror can imply emptiness, but accounting for total defeat requires external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 2,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect ugliness or negativity, symbolizing hatred or revulsion.",
+          "opposing_evidence": "A mirror does not inherently generate hatred or the downward pull toward the crude without external context.",
+          "adjudication": "A mirror can imply negativity, but accounting for hatred requires external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 3,
+          "varna": "ṇ",
+          "frozen_mapping": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect the success of others, potentially evoking envy.",
+          "opposing_evidence": "A mirror does not inherently cause envy or covetous resentment without external context.",
+          "adjudication": "A mirror can imply reflection of success, but accounting for envy requires external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 18.75,
+      "min_dbr": 0,
+      "counts": {
+        "0": 1,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 4,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "dhvani",
+      "gloss": "sound",
+      "category": "natural_action_abstract",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "dhvani",
+          "gloss": "sound",
+          "occurrence_index": 0,
+          "varna": "dh",
+          "frozen_mapping": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "Sound can be a manifestation of desire and craving, as in the sound of a siren or a call to action.",
+          "opposing_evidence": "Sound does not directly embody the concept of craving for wealth, name, fame, power, and prestige.",
+          "adjudication": "The bare word 'sound' does not account for 'limitless thirst to acquire' without external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "dhvani",
+          "gloss": "sound",
+          "occurrence_index": 1,
+          "varna": "v",
+          "frozen_mapping": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+          "relationship": "characteristic_expression",
+          "dbr_score": 25,
+          "supporting_evidence": "Sound can be rigid and fixed, as in a constant hum or a stuck note.",
+          "opposing_evidence": "The concept of 'ensconcement gone rigid' requires a metaphorical extension of the idea of sound.",
+          "adjudication": "The bare word 'sound' can express 'ensconcement gone rigid' only through metaphor.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "dhvani",
+          "gloss": "sound",
+          "occurrence_index": 2,
+          "varna": "n",
+          "frozen_mapping": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+          "relationship": "characteristic_expression",
+          "dbr_score": 25,
+          "supporting_evidence": "Sound can evoke strong emotional attachments, as in a favorite song or a familiar voice.",
+          "opposing_evidence": "The concept of 'blind attachment' requires an external actor or scenario to connect with sound.",
+          "adjudication": "The bare word 'sound' can express 'blind attachment' only through an external actor or scenario.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 16.67,
+      "min_dbr": 0,
+      "counts": {
+        "0": 1,
+        "25": 2,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "dhṛti",
+      "gloss": "fortitude",
+      "category": "virtue_calm",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "dhṛti",
+          "gloss": "fortitude",
+          "occurrence_index": 0,
+          "varna": "dh",
+          "frozen_mapping": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Fortitude implies a strong, unyielding character that can resist excessive desires and cravings.",
+          "opposing_evidence": "The mapping specifically refers to 'limitless thirst to acquire,' which is an excessive desire that fortitude would typically oppose rather than embody.",
+          "adjudication": "Fortitude directly opposes unquenchable craving for wealth, name, fame, power, and prestige.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "dhṛti",
+          "gloss": "fortitude",
+          "occurrence_index": 1,
+          "varna": "t",
+          "frozen_mapping": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Fortitude implies an active, resolute character that stands in contrast to inertia and dullness.",
+          "opposing_evidence": "The mapping describes a state of inactivity and dullness, which is the opposite of the active and resolute nature implied by fortitude.",
+          "adjudication": "Fortitude directly opposes inertia, staticity, dullness, and torpor.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 75.0,
+      "min_dbr": 75,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 0,
+        "75": 2,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "STRONG_RESONANCE"
+    },
+    {
+      "word": "jaṅghā",
+      "gloss": "shank",
+      "category": "animal_body_living",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "jaṅghā",
+          "gloss": "shank",
+          "occurrence_index": 0,
+          "varna": "j",
+          "frozen_mapping": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The shank is a strong, supporting part of the leg, symbolizing strength and control.",
+          "opposing_evidence": "There is no direct connection between the shank and the inflated sense of 'I' or sole doership without external context.",
+          "adjudication": "The bare word 'shank' does not account for the mapping without importing outside meaning.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "jaṅghā",
+          "gloss": "shank",
+          "occurrence_index": 1,
+          "varna": "ṅ",
+          "frozen_mapping": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The shank is a visible part of the body, often displayed in certain postures or actions.",
+          "opposing_evidence": "The shank itself does not inherently imply vanity or performance for others without additional context.",
+          "adjudication": "The bare word 'shank' does not account for the mapping without importing outside meaning.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "jaṅghā",
+          "gloss": "shank",
+          "occurrence_index": 2,
+          "varna": "gh",
+          "frozen_mapping": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The shank is a part of the body that is integral to movement and support, suggesting a sense of personal boundaries and possession.",
+          "opposing_evidence": "The shank does not directly imply possessiveness or exclusion without external context.",
+          "adjudication": "The bare word 'shank' does not account for the mapping without importing outside meaning.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 0.0,
+      "min_dbr": 0,
+      "counts": {
+        "0": 3,
+        "25": 0,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "NO_RESONANCE"
+    },
+    {
+      "word": "kapāla",
+      "gloss": "skull",
+      "category": "animal_body_living",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "kapāla",
+          "gloss": "skull",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "opposition",
+          "dbr_score": 50,
+          "supporting_evidence": "A skull can symbolize the impermanence of life and the futility of grasping desires, as it represents death and the end of all worldly attachments.",
+          "opposing_evidence": "The direct connection between a skull and grasping hope is not immediately apparent without additional context or interpretation.",
+          "adjudication": "A skull naturally opposes grasping hope by symbolizing the end of all desires.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kapāla",
+          "gloss": "skull",
+          "occurrence_index": 1,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "characteristic_expression",
+          "dbr_score": 50,
+          "supporting_evidence": "A skull can represent the crude and repulsive aspects of life, symbolizing the downward pull toward hatred and revulsion.",
+          "opposing_evidence": "The direct link between a skull and the specific emotion of hatred requires some interpretive work.",
+          "adjudication": "A skull characteristically expresses the crude and repulsive, aligning with the concept of hatred and revulsion.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kapāla",
+          "gloss": "skull",
+          "occurrence_index": 2,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "characteristic_expression",
+          "dbr_score": 50,
+          "supporting_evidence": "A skull can symbolize cruelty and the harm inflicted on the weak, as it represents the brutal and harsh realities of life and death.",
+          "opposing_evidence": "The direct connection between a skull and cruelty requires some interpretive work to establish.",
+          "adjudication": "A skull characteristically expresses cruelty through its association with death and harm.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 50.0,
+      "min_dbr": 50,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 3,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "kuṇḍala",
+      "gloss": "earring",
+      "category": "concrete_object",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Earrings are often worn to enhance personal appearance and attract attention, which can symbolize the grasping or clinging nature of hope directed toward a specific outcome.",
+          "opposing_evidence": "The direct connection between earrings and the concept of grasping or clinging hope is not immediately apparent without additional context or metaphor.",
+          "adjudication": "The connection requires metaphorical interpretation, so the score is 25.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 1,
+          "varna": "ṇ",
+          "frozen_mapping": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Earrings can be symbols of wealth and status, which might evoke envy in others who do not possess them.",
+          "opposing_evidence": "The direct link between earrings and the feeling of envy is not straightforward and requires external context.",
+          "adjudication": "The connection requires external context, so the score is 25.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 2,
+          "varna": "ḍ",
+          "frozen_mapping": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Earrings can be a source of self-consciousness, especially if they draw unwanted attention or if the wearer feels they do not suit them.",
+          "opposing_evidence": "The direct link between earrings and the concept of inhibition or shame is not immediately clear without additional context.",
+          "adjudication": "The connection requires external context, so the score is 25.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 3,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "There is no natural or conventional association between earrings and cruelty.",
+          "opposing_evidence": "Earrings are decorative items and have no inherent connection to cruelty or harmful behavior.",
+          "adjudication": "There is no defensible relationship without importing outside meaning.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 18.75,
+      "min_dbr": 0,
+      "counts": {
+        "0": 1,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 4,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "kārpaṇya",
+      "gloss": "miserliness/pettiness",
+      "category": "afflictive",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "Miserliness involves a strong attachment to possessions, which can be seen as a form of grasping hope for security.",
+          "opposing_evidence": "The mapping involves a specific outcome or object, which is not directly implied by miserliness alone.",
+          "adjudication": "Miserliness implies a form of grasping hope, but the specific outcome or object requires some interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "natural_consequence",
+          "dbr_score": 50,
+          "supporting_evidence": "Miserliness can lead to a sense of total defeat if one's possessions are lost, as they are seen as the only source of security.",
+          "opposing_evidence": "The mapping involves a destructive collapse, which is not directly implied by miserliness alone.",
+          "adjudication": "Miserliness can naturally lead to a sense of total defeat, but the destructive collapse requires some interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 2,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Miserliness can involve a form of hatred or revulsion towards spending or sharing, which can be seen as a downward pull.",
+          "opposing_evidence": "The mapping involves a specific cause of hatred (frustrated moha) and a downward pull towards the crude, which is not directly implied by miserliness alone.",
+          "adjudication": "Miserliness implies a form of hatred or revulsion, but the specific cause and downward pull require significant interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 3,
+          "varna": "ṇ",
+          "frozen_mapping": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "Miserliness can involve envy, as one may resent others who have more possessions.",
+          "opposing_evidence": "The mapping involves a specific emotion (the sting at another's success), which is not directly implied by miserliness alone.",
+          "adjudication": "Miserliness implies envy, but the specific emotion requires some interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 4,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "Miserliness can involve a lack of confidence in spending or sharing, which can be seen as a form of self-doubt.",
+          "opposing_evidence": "The mapping involves a specific emotion (distrust of self and others), which is not directly implied by miserliness alone.",
+          "adjudication": "Miserliness implies a form of self-doubt, but the specific emotion requires some interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 45.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 1,
+        "50": 4,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 1,
+      "verdict": "WEAK_RESONANCE"
+    },
+    {
+      "word": "kūrma",
+      "gloss": "tortoise",
+      "category": "animal_body_living",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "kūrma",
+          "gloss": "tortoise",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "A tortoise is known for its slow and steady progress, often symbolizing perseverance and determination toward a goal.",
+          "opposing_evidence": "The tortoise does not inherently grasp or cling to hope; it simply moves forward at its own pace.",
+          "adjudication": "The tortoise implies a steady pursuit of goals, but does not directly embody grasping hope.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kūrma",
+          "gloss": "tortoise",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A tortoise retreats into its shell when threatened, symbolizing withdrawal and a sense of being overwhelmed.",
+          "opposing_evidence": "The tortoise does not experience annihilation-thought; it merely protects itself.",
+          "adjudication": "The tortoise implies withdrawal but does not directly embody total defeat or annihilation-thought.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "kūrma",
+          "gloss": "tortoise",
+          "occurrence_index": 2,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "A tortoise's slow and steady nature can be seen as giving latitude to its actions, but it does not imply dissolution or annihilation.",
+          "opposing_evidence": "The tortoise does not indulge unrestrainedly; it moves deliberately and cautiously.",
+          "adjudication": "The tortoise does not account for unrestrained indulgence leading to annihilation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 0,
+      "counts": {
+        "0": 1,
+        "25": 1,
+        "50": 1,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 2,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "lalāṭa",
+      "gloss": "forehead",
+      "category": "animal_body_living",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "lalāṭa",
+          "gloss": "forehead",
+          "occurrence_index": 0,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "characteristic_expression",
+          "dbr_score": 25,
+          "supporting_evidence": "The forehead is a visible part of the face that can express emotions and intentions, including cruelty through facial expressions.",
+          "opposing_evidence": "The forehead itself does not directly embody cruelty; it requires interpretation of facial expressions.",
+          "adjudication": "The forehead can express cruelty through facial expressions, but this requires interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "lalāṭa",
+          "gloss": "forehead",
+          "occurrence_index": 1,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "characteristic_expression",
+          "dbr_score": 25,
+          "supporting_evidence": "The forehead is a visible part of the face that can express emotions and intentions, including cruelty through facial expressions.",
+          "opposing_evidence": "The forehead itself does not directly embody cruelty; it requires interpretation of facial expressions.",
+          "adjudication": "The forehead can express cruelty through facial expressions, but this requires interpretation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "lalāṭa",
+          "gloss": "forehead",
+          "occurrence_index": 2,
+          "varna": "ṭ",
+          "frozen_mapping": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "The forehead can be associated with thinking and expression, which can lead to overstating one's case.",
+          "opposing_evidence": "The forehead does not directly embody garrulousness or over-talk; it requires a constructed scenario.",
+          "adjudication": "The forehead can imply overstating one's case through thinking and expression, but this requires a constructed scenario.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "mukura",
+      "gloss": "mirror",
+      "category": "concrete_object",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "mukura",
+          "gloss": "mirror",
+          "occurrence_index": 0,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "A mirror reflects without restraint, potentially leading to a sense of dissolution of self or reality.",
+          "opposing_evidence": "The mapping implies a specific kind of indulgence and collapse that is not directly embodied in the ordinary meaning of a mirror.",
+          "adjudication": "A mirror implies unrestrained reflection, which can be seen as a natural consequence leading to a sense of dissolution.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "mukura",
+          "gloss": "mirror",
+          "occurrence_index": 1,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect desires and hopes, showing what one wishes to see or become.",
+          "opposing_evidence": "The mapping specifies a grasping or clinging hope, which is not a direct characteristic of a mirror.",
+          "adjudication": "A mirror can imply hope or desire through reflection, but the specific grasping nature requires supplementation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "mukura",
+          "gloss": "mirror",
+          "occurrence_index": 2,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect a sense of loss or emptiness, especially if it shows an absence or void.",
+          "opposing_evidence": "The mapping implies a specific defeatist thought and destructive collapse that is not directly embodied in the ordinary meaning of a mirror.",
+          "adjudication": "A mirror can imply a sense of loss or emptiness, but the specific defeatist thought requires supplementation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 33.33,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 2,
+        "50": 1,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 2,
+      "verdict": "WEAK_RESONANCE"
+    },
+    {
+      "word": "pavana",
+      "gloss": "wind",
+      "category": "natural_action_abstract",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "pavana",
+          "gloss": "wind",
+          "occurrence_index": 0,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "resolution",
+          "dbr_score": 25,
+          "supporting_evidence": "Wind can be seen as a force that can blow away negative emotions, including hatred and revulsion.",
+          "opposing_evidence": "There is no direct, conventional link between wind and the specific concept of hatred or revulsion without additional context.",
+          "adjudication": "The bare word 'wind' can be seen as resolving hatred, but this requires interpretation and external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "pavana",
+          "gloss": "wind",
+          "occurrence_index": 1,
+          "varna": "v",
+          "frozen_mapping": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "Wind can be seen as a force that disrupts rigidity and encourages movement and change.",
+          "opposing_evidence": "The concept of 'ensconcement gone rigid' is not directly embodied by wind without additional context.",
+          "adjudication": "The bare word 'wind' opposes rigidity, but this requires interpretation and external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "pavana",
+          "gloss": "wind",
+          "occurrence_index": 2,
+          "varna": "n",
+          "frozen_mapping": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+          "relationship": "resolution",
+          "dbr_score": 25,
+          "supporting_evidence": "Wind can be seen as a force that can blow away attachments and infatuations, clearing the mind.",
+          "opposing_evidence": "There is no direct, conventional link between wind and the specific concept of moha without additional context.",
+          "adjudication": "The bare word 'wind' can be seen as resolving moha, but this requires interpretation and external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "pralaya",
+      "gloss": "dissolution",
+      "category": "natural_action_abstract",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "components": [
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 0,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Dissolution can imply a breakdown of moral or ethical boundaries, leading to hatred and revulsion.",
+          "opposing_evidence": "The direct connection between dissolution and hatred is not immediately apparent without additional context.",
+          "adjudication": "The connection requires interpretation and external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "natural_consequence",
+          "dbr_score": 50,
+          "supporting_evidence": "Dissolution can naturally lead to a sense of total defeat and annihilation, as everything breaks down.",
+          "opposing_evidence": "The specific thought pattern of 'I have nothing' is not directly implied by dissolution.",
+          "adjudication": "Dissolution naturally leads to a sense of total defeat and annihilation.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 2,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Dissolution can lead to a breakdown of societal norms, resulting in cruelty and harm.",
+          "opposing_evidence": "The direct link between dissolution and cruelty is not immediately clear without additional context.",
+          "adjudication": "The connection requires interpretation and external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        },
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 3,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Dissolution can lead to a loss of confidence and trust, resulting in self-doubt.",
+          "opposing_evidence": "The specific thought pattern of self-doubt is not directly implied by dissolution.",
+          "adjudication": "The connection requires interpretation and external context.",
+          "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503"
+        }
+      ],
+      "mean_dbr": 31.25,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 1,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "WEAK_RESONANCE"
+    }
+  ]
+}

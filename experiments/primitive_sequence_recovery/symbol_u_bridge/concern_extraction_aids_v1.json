@@ -1,0 +1,484 @@
+{
+  "schema": "symbol_u_bridge_extraction_aids_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "note": "Companion to concern_ontology_v1.json; holds task-required per-concern extraction fields the frozen ontology schema cannot carry.",
+  "by_concern": {
+    "C0001": {
+      "label": "fear",
+      "confusable_with": [
+        "C0002"
+      ],
+      "clarification_cues": [
+        "names a specific feared outcome"
+      ],
+      "abstention_conditions": [
+        "no threat is expressed"
+      ],
+      "utterances_should_map": [
+        "I'm scared something bad will happen.",
+        "I'm afraid of what the results will say."
+      ],
+      "utterances_should_not_map": [
+        "I can't decide which option to take."
+      ]
+    },
+    "C0002": {
+      "label": "anxiety",
+      "confusable_with": [
+        "C0001"
+      ],
+      "clarification_cues": [
+        "worry is ongoing/future-directed"
+      ],
+      "abstention_conditions": [
+        "a concrete present danger (route to fear)"
+      ],
+      "utterances_should_map": [
+        "I keep worrying how things will turn out.",
+        "My mind won't stop turning it over."
+      ],
+      "utterances_should_not_map": [
+        "I'm terrified right now."
+      ]
+    },
+    "C0003": {
+      "label": "anger",
+      "confusable_with": [
+        "C0004"
+      ],
+      "clarification_cues": [
+        "heat/impulse in the moment"
+      ],
+      "abstention_conditions": [
+        "cold long-standing aversion (route to resentment)"
+      ],
+      "utterances_should_map": [
+        "I'm so angry I could shout.",
+        "It makes my blood boil."
+      ],
+      "utterances_should_not_map": [
+        "I just quietly can't stand them anymore."
+      ]
+    },
+    "C0004": {
+      "label": "resentment",
+      "confusable_with": [
+        "C0003"
+      ],
+      "clarification_cues": [
+        "dislike endures over time"
+      ],
+      "abstention_conditions": [
+        "a hot outburst (route to anger)"
+      ],
+      "utterances_should_map": [
+        "I still hold it against them.",
+        "I just resent how it went."
+      ],
+      "utterances_should_not_map": [
+        "I lost my temper for a second."
+      ]
+    },
+    "C0005": {
+      "label": "attachment",
+      "confusable_with": [
+        "C0007"
+      ],
+      "clarification_cues": [
+        "distress centers on potential loss"
+      ],
+      "abstention_conditions": [
+        "desire for something new (route to craving)"
+      ],
+      "utterances_should_map": [
+        "I can't let go of how it used to be.",
+        "I'm too attached to move on."
+      ],
+      "utterances_should_not_map": [
+        "I really want that new thing."
+      ]
+    },
+    "C0006": {
+      "label": "grief",
+      "confusable_with": [
+        "C0013"
+      ],
+      "clarification_cues": [
+        "a loss has occurred"
+      ],
+      "abstention_conditions": [
+        "longing while the person is merely absent (route to separation-longing)"
+      ],
+      "utterances_should_map": [
+        "I'm devastated that they're gone.",
+        "The loss still weighs on me."
+      ],
+      "utterances_should_not_map": [
+        "I miss them but they're back next week."
+      ]
+    },
+    "C0007": {
+      "label": "craving",
+      "confusable_with": [
+        "C0005",
+        "C0008"
+      ],
+      "clarification_cues": [
+        "object is prospective, not yet held"
+      ],
+      "abstention_conditions": [
+        "clinging to a current possession (route to attachment)"
+      ],
+      "utterances_should_map": [
+        "I really crave that recognition.",
+        "I want it so badly."
+      ],
+      "utterances_should_not_map": [
+        "I can't bear to lose what I already have."
+      ]
+    },
+    "C0008": {
+      "label": "greed",
+      "confusable_with": [
+        "C0007"
+      ],
+      "clarification_cues": [
+        "never-enough quality"
+      ],
+      "abstention_conditions": [
+        "a single proportionate want (route to craving)"
+      ],
+      "utterances_should_map": [
+        "I can never have enough money.",
+        "I keep grabbing for more."
+      ],
+      "utterances_should_not_map": [
+        "I'd like one of those."
+      ]
+    },
+    "C0009": {
+      "label": "confusion",
+      "confusable_with": [
+        "C0010"
+      ],
+      "clarification_cues": [
+        "global lack of clarity"
+      ],
+      "abstention_conditions": [
+        "choice between named options (route to doubt)"
+      ],
+      "utterances_should_map": [
+        "I'm completely confused about all of it.",
+        "Nothing makes sense right now."
+      ],
+      "utterances_should_not_map": [
+        "Should I pick A or B?"
+      ]
+    },
+    "C0010": {
+      "label": "doubt",
+      "confusable_with": [
+        "C0009"
+      ],
+      "clarification_cues": [
+        "specific alternatives in view"
+      ],
+      "abstention_conditions": [
+        "total mental fog (route to confusion)"
+      ],
+      "utterances_should_map": [
+        "I doubt whether this is the right call.",
+        "I'm not sure which way to go."
+      ],
+      "utterances_should_not_map": [
+        "I can't understand any of this."
+      ]
+    },
+    "C0011": {
+      "label": "pride",
+      "confusable_with": [
+        "C0012"
+      ],
+      "clarification_cues": [
+        "comparison / superiority over others"
+      ],
+      "abstention_conditions": [
+        "mere self-worth without superiority"
+      ],
+      "utterances_should_map": [
+        "I hate admitting I was wrong.",
+        "I'm better than the rest of them."
+      ],
+      "utterances_should_not_map": [
+        "I feel small and embarrassed."
+      ]
+    },
+    "C0012": {
+      "label": "shame",
+      "confusable_with": [
+        "C0011"
+      ],
+      "clarification_cues": [
+        "wish to hide/withdraw"
+      ],
+      "abstention_conditions": [
+        "superiority feeling (route to pride)"
+      ],
+      "utterances_should_map": [
+        "I'm so ashamed of how I acted.",
+        "I just want to disappear."
+      ],
+      "utterances_should_not_map": [
+        "I feel above all this."
+      ]
+    },
+    "C0013": {
+      "label": "separation-longing",
+      "confusable_with": [
+        "C0006"
+      ],
+      "clarification_cues": [
+        "the person is absent but not lost"
+      ],
+      "abstention_conditions": [
+        "the person has died (route to grief)"
+      ],
+      "utterances_should_map": [
+        "I miss them terribly while we're apart.",
+        "Being away from them aches."
+      ],
+      "utterances_should_not_map": [
+        "They passed away last year."
+      ]
+    },
+    "C0014": {
+      "label": "duty",
+      "confusable_with": [
+        "C0015"
+      ],
+      "clarification_cues": [
+        "framed as what one should do"
+      ],
+      "abstention_conditions": [
+        "obligation felt mainly as weight (route to burden)"
+      ],
+      "utterances_should_map": [
+        "It's my responsibility to handle this.",
+        "It's my duty to see it through."
+      ],
+      "utterances_should_not_map": [
+        "This is just crushing me."
+      ]
+    },
+    "C0015": {
+      "label": "burden",
+      "confusable_with": [
+        "C0014"
+      ],
+      "clarification_cues": [
+        "emphasis on heaviness/strain"
+      ],
+      "abstention_conditions": [
+        "neutral 'ought' without strain (route to duty)"
+      ],
+      "utterances_should_map": [
+        "I feel weighed down by everyone depending on me.",
+        "It's too much to carry."
+      ],
+      "utterances_should_not_map": [
+        "I know what I'm supposed to do here."
+      ]
+    },
+    "C0016": {
+      "label": "money-concern",
+      "confusable_with": [
+        "C0017"
+      ],
+      "clarification_cues": [
+        "money named as the object"
+      ],
+      "abstention_conditions": [
+        "destitution/lack framing (route to poverty)"
+      ],
+      "utterances_should_map": [
+        "I'm stressed about money.",
+        "I keep thinking about my finances."
+      ],
+      "utterances_should_not_map": [
+        "We simply have nothing left."
+      ]
+    },
+    "C0017": {
+      "label": "poverty",
+      "confusable_with": [
+        "C0016"
+      ],
+      "clarification_cues": [
+        "emphasis on lack/insufficiency"
+      ],
+      "abstention_conditions": [
+        "managing money one has (route to money-concern)"
+      ],
+      "utterances_should_map": [
+        "We can't afford the basics anymore.",
+        "I'm terrified of ending up with nothing."
+      ],
+      "utterances_should_not_map": [
+        "I want to invest my savings well."
+      ]
+    },
+    "C0018": {
+      "label": "diligence",
+      "confusable_with": [
+        "C0020"
+      ],
+      "clarification_cues": [
+        "emphasis on exertion/energy"
+      ],
+      "abstention_conditions": [
+        "naming a goal rather than effort (route to purpose)"
+      ],
+      "utterances_should_map": [
+        "I'm putting everything into this work.",
+        "I just need to keep grinding."
+      ],
+      "utterances_should_not_map": [
+        "I don't know what I'm even aiming for."
+      ]
+    },
+    "C0019": {
+      "label": "laziness",
+      "confusable_with": [
+        "C0018"
+      ],
+      "clarification_cues": [
+        "avoidance of exertion"
+      ],
+      "abstention_conditions": [
+        "working hard (route to diligence)"
+      ],
+      "utterances_should_map": [
+        "I just can't make myself start.",
+        "I keep putting everything off."
+      ],
+      "utterances_should_not_map": [
+        "I'm working flat out."
+      ]
+    },
+    "C0020": {
+      "label": "purpose",
+      "confusable_with": [
+        "C0018"
+      ],
+      "clarification_cues": [
+        "a target/end is in view"
+      ],
+      "abstention_conditions": [
+        "exertion without a stated aim (route to diligence)"
+      ],
+      "utterances_should_map": [
+        "I want my work to actually mean something.",
+        "I need a clear goal to aim at."
+      ],
+      "utterances_should_not_map": [
+        "I'm just exhausted from the effort."
+      ]
+    },
+    "C0021": {
+      "label": "curiosity",
+      "confusable_with": [
+        "C0022"
+      ],
+      "clarification_cues": [
+        "a question is being pursued"
+      ],
+      "abstention_conditions": [
+        "already understanding (route to knowledge)"
+      ],
+      "utterances_should_map": [
+        "I really want to understand how this works.",
+        "I'm curious what's behind it."
+      ],
+      "utterances_should_not_map": [
+        "I already know this well."
+      ]
+    },
+    "C0022": {
+      "label": "knowledge",
+      "confusable_with": [
+        "C0021"
+      ],
+      "clarification_cues": [
+        "framed as already understanding"
+      ],
+      "abstention_conditions": [
+        "seeking that is not yet knowing (route to curiosity)"
+      ],
+      "utterances_should_map": [
+        "I finally understand how it fits together.",
+        "I know this thoroughly."
+      ],
+      "utterances_should_not_map": [
+        "I wonder how this even works."
+      ]
+    },
+    "C0023": {
+      "label": "patience",
+      "confusable_with": [
+        "C0025"
+      ],
+      "clarification_cues": [
+        "holding steady through difficulty"
+      ],
+      "abstention_conditions": [
+        "general tranquility (route to calm)"
+      ],
+      "utterances_should_map": [
+        "I'm trying to be patient while it works out.",
+        "I can bear with this a while longer."
+      ],
+      "utterances_should_not_map": [
+        "I just feel totally at peace."
+      ]
+    },
+    "C0024": {
+      "label": "contentment",
+      "confusable_with": [
+        "C0025"
+      ],
+      "clarification_cues": [
+        "'enough' quality"
+      ],
+      "abstention_conditions": [
+        "mere absence of agitation (route to calm)"
+      ],
+      "utterances_should_map": [
+        "I feel content with where things are.",
+        "What I have is enough."
+      ],
+      "utterances_should_not_map": [
+        "My mind is finally quiet."
+      ]
+    },
+    "C0025": {
+      "label": "calm",
+      "confusable_with": [
+        "C0023",
+        "C0024"
+      ],
+      "clarification_cues": [
+        "quiet, undisturbed mind"
+      ],
+      "abstention_conditions": [
+        "enduring a hardship (route to patience)"
+      ],
+      "utterances_should_map": [
+        "I just want some peace of mind.",
+        "My mind feels calm and still."
+      ],
+      "utterances_should_not_map": [
+        "I'm content with what I've got."
+      ]
+    }
+  }
+}

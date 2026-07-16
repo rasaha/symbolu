@@ -1,0 +1,125 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "profiles": [
+    {
+      "word": "akrodha",
+      "gloss": "non-anger",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "akrodha (अक्रोध) — stable, ordinary, unqualified meaning: 'non-anger', the absence of anger or wrath"
+    },
+    {
+      "word": "asūyā",
+      "gloss": "envy/detraction",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "asūyā (असूया) — ordinary bare-word meaning: 'envy/detraction'"
+    },
+    {
+      "word": "audārya",
+      "gloss": "magnanimity",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "audārya (औदार्य) — ordinary bare-word meaning: 'magnanimity'"
+    },
+    {
+      "word": "bhrama",
+      "gloss": "delusion/confusion",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "bhrama (भ्रम) — ordinary bare-word meaning: 'delusion, confusion'"
+    },
+    {
+      "word": "chāyā",
+      "gloss": "shadow",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "chāyā (छाया) — ordinary bare-word meaning: 'shadow'"
+    },
+    {
+      "word": "cintā",
+      "gloss": "anxiety",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "cintā (चिन्ता) — ordinary bare-word meaning: 'anxiety'"
+    },
+    {
+      "word": "cāpa",
+      "gloss": "bow",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "cāpa (चाप) — ordinary bare-word meaning: 'bow'"
+    },
+    {
+      "word": "dama",
+      "gloss": "self-restraint",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "dama (दम) — ordinary bare-word meaning: 'self-restraint'"
+    },
+    {
+      "word": "darpaṇa",
+      "gloss": "mirror",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "mirror"
+    },
+    {
+      "word": "dhvani",
+      "gloss": "sound",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "dhvani (ध्वनि) — ordinary bare-word meaning: 'sound'"
+    },
+    {
+      "word": "dhṛti",
+      "gloss": "fortitude",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "dhṛti (धृति) — ordinary bare-word meaning: 'fortitude'"
+    },
+    {
+      "word": "jaṅghā",
+      "gloss": "shank",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "shank (the part of the leg between the knee and the ankle)"
+    },
+    {
+      "word": "kapāla",
+      "gloss": "skull",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "skull"
+    },
+    {
+      "word": "kuṇḍala",
+      "gloss": "earring",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "kuṇḍala (कुण्डल) — ordinary bare-word meaning: 'earring'"
+    },
+    {
+      "word": "kārpaṇya",
+      "gloss": "miserliness/pettiness",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "kārpaṇya (कार्पण्य) — ordinary bare-word meaning: 'miserliness/pettiness'"
+    },
+    {
+      "word": "kūrma",
+      "gloss": "tortoise",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "kūrma (कूर्म) — ordinary bare-word meaning: 'tortoise'"
+    },
+    {
+      "word": "lalāṭa",
+      "gloss": "forehead",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "lalāṭa (ललाट) — ordinary bare-word meaning: 'forehead'"
+    },
+    {
+      "word": "mukura",
+      "gloss": "mirror",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "mukura (मुकुर) — ordinary bare-word meaning: 'mirror'"
+    },
+    {
+      "word": "pavana",
+      "gloss": "wind",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "pavana (पवन) — ordinary bare-word meaning: 'wind'"
+    },
+    {
+      "word": "pralaya",
+      "gloss": "dissolution",
+      "judge_model": "Qwen/Qwen3-32B",
+      "profile": "pralaya (प्रलय) — ordinary bare-word meaning: 'dissolution'"
+    }
+  ]
+}

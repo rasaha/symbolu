@@ -1,0 +1,21 @@
+{
+  "schema": "symbol_u_bridge_abstention_rules_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "principle": "Mirror B1.12's most reliable signal: honestly emitting 'does not apply' beats forcing a link. Every stage may abstain; abstention propagates and the symbolic layer contributes nothing rather than fabricating.",
+  "signals": [
+    {"code": "NO_APPLICABLE_CONCERN", "stage": 1,
+     "condition": "no frozen-ontology concern scores at or above the extraction confidence threshold, OR the input carries no reflective concern (factual/transactional turn).",
+     "effect": "bridge halts; status=NO_APPLICABLE_CONCERN; no concept, no varna, no reflection."},
+    {"code": "NO_APPLICABLE_CONCEPT", "stage": 3,
+     "condition": "the selected concern has no entry in the frozen concern->concept table (or all candidates are marked non-mappable).",
+     "effect": "bridge halts; status=NO_APPLICABLE_CONCEPT; mirrors B1.12 no_relationship. Never force a concept."},
+    {"code": "NO_MAPPED_VARNA", "stage": 5,
+     "condition": "the concept word parses but has zero CONFIRMATORY_BACKBONE mapped consonants.",
+     "effect": "bridge halts; status=NO_MAPPED_VARNA; no reflection synthesized."},
+    {"code": "LOW_CONFIDENCE_SUPPRESS", "stage": 6,
+     "condition": "aggregate confidence below the deployment floor (e.g. no Tier-1 mapping present AND extraction confidence low).",
+     "effect": "reflection may be withheld or surfaced only as a low-confidence, clearly-hedged aside, per deployment policy."}
+  ],
+  "precedence": ["NO_APPLICABLE_CONCERN", "NO_APPLICABLE_CONCEPT", "NO_MAPPED_VARNA", "LOW_CONFIDENCE_SUPPRESS"],
+  "invariant": "Silent forcing is prohibited at every stage. Abstention is a first-class, logged outcome, not an error."
+}

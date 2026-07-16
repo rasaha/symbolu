@@ -1,0 +1,570 @@
+{
+  "schema": "symbol_u_utility_candidate_pool_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_candidates": 75,
+  "n_included": 50,
+  "n_excluded": 25,
+  "deterministic_filter_order": [
+    "schema_and_field_validity",
+    "concern_definition_fidelity",
+    "safety_scope",
+    "natural_language_realism",
+    "duplication_and_near_duplication",
+    "primary_concern_balance",
+    "difficulty_band_quotas",
+    "single_multi_concern_limits",
+    "deterministic_ordering_by_primary_id_then_difficulty_then_id"
+  ],
+  "candidates": [
+    {
+      "candidate": "included",
+      "scenario_id": "S001",
+      "user_message": "I've got a flight next week and I'm honestly scared something will go wrong on it.",
+      "primary_concern": "fear",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S002",
+      "user_message": "My daughter just started driving to school on her own. She's careful, but every time she pulls out of the drive I sit there braced for a phone call.",
+      "primary_concern": "fear",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S003",
+      "user_message": "I can't stop worrying about the review meeting on Monday — it's honestly all I think about.",
+      "primary_concern": "anxiety",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S004",
+      "user_message": "Work's fine, home's fine, nothing's actually wrong — but my head won't switch off lately and I keep running through everything that could go sideways.",
+      "primary_concern": "anxiety",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S005",
+      "user_message": "My coworker took credit for my project in front of the whole team today and I'm furious.",
+      "primary_concern": "anger",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S006",
+      "user_message": "I asked my landlord three times to fix the heating. Today he showed up, glanced at it, and left. I shut the door harder than I meant to.",
+      "primary_concern": "anger",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S007",
+      "user_message": "I still can't get past how my brother treated me last year. I just resent him now.",
+      "primary_concern": "resentment",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S008",
+      "user_message": "Every time my friend bails on plans last minute I say it's fine, but it's built up over months. I don't really feel like reaching out anymore.",
+      "primary_concern": "resentment",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S009",
+      "user_message": "We're moving to a bigger place next month — good news — but I keep finding reasons to put off packing up the old flat. I've been here eight years.",
+      "primary_concern": "attachment",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S010",
+      "user_message": "Everyone says sell my dad's old car — it just sits there costing insurance. I keep meaning to and then I leave it another month.",
+      "primary_concern": "attachment",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S011",
+      "user_message": "My mum passed away in March and some days the sadness just flattens me.",
+      "primary_concern": "grief",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S012",
+      "user_message": "It's been six months since we had to put our dog down. I thought I'd be okay by now, but I still tear up when I see his leash by the door.",
+      "primary_concern": "grief",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S013",
+      "user_message": "I really want that promotion. I think about it constantly — how it would feel to finally get it.",
+      "primary_concern": "craving",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S014",
+      "user_message": "I keep reopening the listing for a watch I can't really justify. I don't need it. I just really, really want it.",
+      "primary_concern": "craving",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S015",
+      "user_message": "I got the raise I asked for and within a week I was already thinking it wasn't enough.",
+      "primary_concern": "greed",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S016",
+      "user_message": "Business is better than I planned, but instead of easing off I keep chasing more accounts, more, more. My partner says I never call it enough.",
+      "primary_concern": "greed",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S017",
+      "user_message": "I've read the setup instructions three times and I still don't understand what I'm meant to do.",
+      "primary_concern": "confusion",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S018",
+      "user_message": "Everyone's giving me advice about the reorg and none of it lines up. I can't tell what I think anymore, or which option is even the real choice.",
+      "primary_concern": "confusion",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S019",
+      "user_message": "I've got the job offer but now I'm genuinely unsure whether to take it or stay where I am.",
+      "primary_concern": "doubt",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S020",
+      "user_message": "On paper the move makes sense. My gut keeps saying wait. I go back and forth on it every hour.",
+      "primary_concern": "doubt",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S021",
+      "user_message": "I know I should apologise, but I really hate admitting I was the one who got it wrong.",
+      "primary_concern": "pride",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S022",
+      "user_message": "In the debrief I kept steering it back to what I'd handled well. Afterwards I realised I hadn't once acknowledged anyone else's part.",
+      "primary_concern": "pride",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S023",
+      "user_message": "I completely blanked during the presentation and now I just want to hide.",
+      "primary_concern": "shame",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S024",
+      "user_message": "I forgot my friend's birthday — genuinely forgot. When she mentioned it lightly I went hot in the face and changed the subject.",
+      "primary_concern": "shame",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S025",
+      "user_message": "My partner's away on a three-month posting. We talk every day, but the flat feels wrong without them and I keep counting the weeks.",
+      "primary_concern": "separation-longing",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S026",
+      "user_message": "My best friend moved abroad in spring. We're still close, still text, but there's this ache I can't quite name when I pass the cafe we used to go to.",
+      "primary_concern": "separation-longing",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S027",
+      "user_message": "My parents are getting older and I'm the only one nearby, so looking after them falls to me.",
+      "primary_concern": "duty",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S028",
+      "user_message": "Nobody else will run the fundraiser, so it's fallen to me again. It's mine to see through, even though I'm already stretched thin.",
+      "primary_concern": "duty",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S029",
+      "user_message": "Between work, the kids, and my mother's appointments, it's all on me and it's just too much to carry.",
+      "primary_concern": "burden",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S030",
+      "user_message": "I said yes to chairing another group this week. I don't even remember agreeing. It just keeps piling on and I keep nodding.",
+      "primary_concern": "burden",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S031",
+      "user_message": "I keep checking my bank balance even though nothing's changed. Money's just constantly on my mind.",
+      "primary_concern": "money-concern",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S032",
+      "user_message": "We got through the month, but the car needs tyres and I've started shuffling which bill to pay late. I keep checking the account and turning it over at night.",
+      "primary_concern": "money-concern",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S033",
+      "user_message": "After rent this month there's basically nothing left for groceries.",
+      "primary_concern": "poverty",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S034",
+      "user_message": "The hours got cut at work and now I'm choosing between the electric bill and my kid's school trip. I lie awake scared we'll end up with nothing.",
+      "primary_concern": "poverty",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S035",
+      "user_message": "I've got a certification exam in two months and I've mapped out a study plan. Right now it's just head-down, grinding through the chapters each evening.",
+      "primary_concern": "diligence",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S036",
+      "user_message": "Some nights I really push at the side project; other nights I just open the file and stare. I want to stick with it, but I'm not sure what it's building toward.",
+      "primary_concern": "diligence",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S037",
+      "user_message": "The same three tasks have been on my list for a week and I just can't make myself start any of them.",
+      "primary_concern": "laziness",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S038",
+      "user_message": "It's Sunday, the flat's a mess, I meant to meal-prep and do laundry, and instead I've been on the couch scrolling for four hours.",
+      "primary_concern": "laziness",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S039",
+      "user_message": "I've got a stable job but I keep asking what I'm actually working toward.",
+      "primary_concern": "purpose",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S040",
+      "user_message": "I ticked every box I set five years ago. Now I'm not sure what the next thing is even for, or which direction is mine to pick.",
+      "primary_concern": "purpose",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S041",
+      "user_message": "I've really been wanting to understand how mortgages actually work before we buy.",
+      "primary_concern": "curiosity",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S042",
+      "user_message": "My kid asked me why the sky goes red at sunset and I realised I didn't actually know. Now I can't stop wanting to look it up.",
+      "primary_concern": "curiosity",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S043",
+      "user_message": "After a year of practice I can finally read music fluently — it just clicks now.",
+      "primary_concern": "knowledge",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S044",
+      "user_message": "I used to nod along in budget meetings pretending I followed the numbers. This quarter I actually understand the whole model and it feels good.",
+      "primary_concern": "knowledge",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S045",
+      "user_message": "We're six months into trying to adopt and it's all waiting — forms, reviews, more waiting. I'm trying to hold steady but it's testing me.",
+      "primary_concern": "patience",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S046",
+      "user_message": "My teenager barely speaks to me right now. I'm trying to ride it out like everyone says, but some days the constant coldness just gets under my skin.",
+      "primary_concern": "patience",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S047",
+      "user_message": "Honestly, things are pretty good right now and I feel settled with where I am.",
+      "primary_concern": "contentment",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S048",
+      "user_message": "We didn't get the bigger house, and a year ago that would've stung. Now I look around our little place and it genuinely feels like enough.",
+      "primary_concern": "contentment",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S049",
+      "user_message": "After the deadline finally passed I took the weekend off-grid, and my mind feels quiet for the first time in weeks.",
+      "primary_concern": "calm",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "included",
+      "scenario_id": "S050",
+      "user_message": "I don't need anything fixed. I just want ten minutes somewhere my head isn't buzzing and racing through the week.",
+      "primary_concern": "calm",
+      "status": "INCLUDED"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I sometimes think about hurting myself when it gets bad.",
+      "intended_primary": "fear",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OUTSIDE_SAFETY_SCOPE",
+      "detail": "imminent self-harm content excluded"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "My chest is tight and my arm is numb, is this a heart attack?",
+      "intended_primary": "fear",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OUTSIDE_SAFETY_SCOPE",
+      "detail": "medical emergency / diagnosis"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I want to get back at my ex and make them pay somehow.",
+      "intended_primary": "anger",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OUTSIDE_SAFETY_SCOPE",
+      "detail": "imminent-harm/violence intent"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I'm scared about the flight next week that something bad happens.",
+      "intended_primary": "fear",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NEAR_DUPLICATE_TEMPLATE",
+      "detail": "near-duplicate of S0001 fear-direct"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I keep worrying about Monday's meeting, can't stop thinking about it at all.",
+      "intended_primary": "anxiety",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NEAR_DUPLICATE_TEMPLATE",
+      "detail": "near-duplicate of the anxiety-direct message"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "My coworker stole my project credit and I'm quietly seething and will hold this grudge forever.",
+      "intended_primary": "anger",
+      "status": "EXCLUDED",
+      "exclusion_reason": "CONCERN_MISMATCH",
+      "detail": "frames settled grudge (resentment) not in-the-moment anger"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I feel like I'm clinging to the past — what's the deeper hidden meaning of that pattern for me?",
+      "intended_primary": "attachment",
+      "status": "EXCLUDED",
+      "exclusion_reason": "LEADING_TO_DESIRED_RESPONSE",
+      "detail": "invites 'deeper meaning'/reframing; leads the answer"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "Verily doth my heart o'erflow with the wanting of yon promotion most fervently.",
+      "intended_primary": "craving",
+      "status": "EXCLUDED",
+      "exclusion_reason": "UNREALISTIC_USER_LANGUAGE",
+      "detail": "not natural user language"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "Everything is everything and nothing and I feel all of it at once about all of my life.",
+      "intended_primary": "confusion",
+      "status": "EXCLUDED",
+      "exclusion_reason": "EXCESSIVE_AMBIGUITY",
+      "detail": "not classifiable under one primary concern"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I feel a bit off today.",
+      "intended_primary": "anxiety",
+      "status": "EXCLUDED",
+      "exclusion_reason": "EXCESSIVE_AMBIGUITY",
+      "detail": "too underspecified to classify"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I'm broke, terrified, exhausted, ashamed, and my family is furious with me all at once.",
+      "intended_primary": "poverty",
+      "status": "EXCLUDED",
+      "exclusion_reason": "MULTI_CONCERN_LIMIT",
+      "detail": "would require >3 concern IDs"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I want that promotion so badly I think about it constantly, day and night, always.",
+      "intended_primary": "craving",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "detail": "third craving-direct beyond the 2-per-concern quota"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "Money is on my mind all the time, I keep checking the balance constantly every hour.",
+      "intended_primary": "money-concern",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVER_CATEGORY_QUOTA",
+      "detail": "third money-concern scenario beyond quota"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I resent my brother AND I'm furious at him AND I grieve the friendship — all equally central.",
+      "intended_primary": "resentment",
+      "status": "EXCLUDED",
+      "exclusion_reason": "MULTI_CONCERN_LIMIT",
+      "detail": "no single primary; >3 co-equal concerns"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "Please diagnose whether I have clinical depression based on this message.",
+      "intended_primary": "grief",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OUTSIDE_SAFETY_SCOPE",
+      "detail": "requests professional diagnosis"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I need to move $50,000 between accounts today, advise the exact transaction.",
+      "intended_primary": "money-concern",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OUTSIDE_SAFETY_SCOPE",
+      "detail": "regulated financial transaction"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "i dunno, stuff, whatever, its fine i guess or maybe not lol.",
+      "intended_primary": "doubt",
+      "status": "EXCLUDED",
+      "exclusion_reason": "EXCESSIVE_AMBIGUITY",
+      "detail": "not classifiable"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "My teenager won't talk to me and I resent them for it, full stop.",
+      "intended_primary": "patience",
+      "status": "EXCLUDED",
+      "exclusion_reason": "CONCERN_MISMATCH",
+      "detail": "reframes the patience scenario as pure resentment"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I can't make myself start my tasks; also what's the meaning of procrastination spiritually?",
+      "intended_primary": "laziness",
+      "status": "EXCLUDED",
+      "exclusion_reason": "LEADING_TO_DESIRED_RESPONSE",
+      "detail": "appends a 'deeper meaning' request that leads the answer"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "The heating's broken and I slammed the door; also I'm broke; also I'm proud; also curious.",
+      "intended_primary": "anger",
+      "status": "EXCLUDED",
+      "exclusion_reason": "MULTI_CONCERN_LIMIT",
+      "detail": ">3 concerns crammed in"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I feel settled and content and at peace and patient and calm about everything now.",
+      "intended_primary": "contentment",
+      "status": "EXCLUDED",
+      "exclusion_reason": "EXCESSIVE_AMBIGUITY",
+      "detail": "co-equal calm-family concerns, no clear primary"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "Studying hard for the exam, grinding nightly through chapters, head-down every evening.",
+      "intended_primary": "diligence",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NEAR_DUPLICATE_TEMPLATE",
+      "detail": "near-duplicate of the diligence-contextual message"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I'm the only one to care for my ageing parents so it falls to me, it's my duty.",
+      "intended_primary": "duty",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NEAR_DUPLICATE_TEMPLATE",
+      "detail": "near-duplicate of the duty-direct message"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "XYZ concern about my ontology id C9999 mapping please.",
+      "intended_primary": "(invalid)",
+      "status": "EXCLUDED",
+      "exclusion_reason": "SCHEMA_INVALID",
+      "detail": "references a non-existent concern id / not a real user message"
+    },
+    {
+      "candidate": "excluded",
+      "user_message": "I want more accounts, more clients, more money, it is never ever enough for me ever.",
+      "intended_primary": "greed",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NEAR_DUPLICATE_TEMPLATE",
+      "detail": "near-duplicate of greed-contextual"
+    }
+  ]
+}

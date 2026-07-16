@@ -1,0 +1,31 @@
+{
+  "schema": "symbol_u_utility_analysis_plan_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "design": "4 arms (A base, B generic-reflection, C concern-ontology, D full-Symbol-U) x ~50 frozen scenarios; every arm sees only the user_message; arms C/D use the scenario's frozen concern IDs + expected_bridge_output during the primary analysis.",
+  "primary_endpoint": "overall_usefulness",
+  "nested_contrasts": [
+    {"name": "B_minus_A", "isolates": "does ANY second-pass reflection help over baseline", "hypothesis": "H1"},
+    {"name": "C_minus_B", "isolates": "does concern/concept framing beat generic reflection", "hypothesis": "H2"},
+    {"name": "D_minus_C", "isolates": "does the varna decomposition + mappings (the phonological layer) add anything over the ontology -- THE Symbol-U question", "hypothesis": "H3"},
+    {"name": "D_minus_C_overinterpretation", "isolates": "does the symbolic layer inflate unsupported interpretation", "hypothesis": "H4"}
+  ],
+  "forbidden_primary_contrast": "D_minus_A alone is NOT a valid primary contrast: it confounds reflection + ontology + phonology and cannot isolate the varna layer.",
+  "aggregation": "per metric: mean rating per (arm, scenario) across judges; then paired per-scenario differences for each nested contrast; report distribution of per-scenario deltas, not only the grand mean.",
+  "extraction_control": "primary analysis holds concern extraction FIXED via the frozen concern IDs. Live-extraction robustness is a SEPARATE, secondary/exploratory analysis, never the primary.",
+  "inter_rater_agreement": "report per-metric agreement across judges (exact + within-one-step for the 1-5 scale, and a chance-corrected coefficient e.g. Krippendorff alpha). Report separately for LLM judges and human judges if human judges are used.",
+  "blinding_integrity": "report how often judges' optional blind_guess_arm is correct; if arm D is identifiable above chance (e.g. via residual Sanskrit or style), flag the contrast as blinding-compromised.",
+  "statistical_significance": "NOT defined at preregistration time (per instruction). Success/failure are the preregistered ENGINEERING criteria below; formal inference, if any, is deferred to a later analysis addendum.",
+  "success_criteria_engineering": [
+    "D_minus_C shows a consistent positive usefulness delta across a majority of judges AND a majority of scenarios",
+    "the usefulness gain at D does NOT come with an increase in overinterpretation flags vs C (H4 holds)",
+    "reframing_quality improves at D without increased overinterpretation",
+    "gains are consistent (not driven by a few scenarios or one judge)"
+  ],
+  "failure_criteria": [
+    "ontology alone (C) explains all gains -> D_minus_C ~ 0",
+    "symbolic layer adds no measurable usefulness benefit (D_minus_C not consistently positive)",
+    "symbolic layer improves depth but harms understanding/relevance/grounding (factual regression)",
+    "symbolic layer increases unsupported interpretation (H4 violated)"
+  ],
+  "reporting": "report every nested contrast per metric even when null; report failure outcomes as prominently as success; no post-hoc arm redefinition."
+}

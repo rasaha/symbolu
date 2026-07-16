@@ -1,7 +1,7 @@
 {
-  "schema": "b1_12_bsr_model_manifest_v1",
+  "schema": "b1_12_bsr_v2_model_manifest",
   "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
-  "mode": "vllm_sequential_single_gpu",
+  "mode": "vllm_independent_two_model_no_crossover",
   "qwen": {
     "model_id": "Qwen/Qwen3-32B",
     "family": "Qwen3",
@@ -12,7 +12,7 @@
     "model_id": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
     "family": "Mistral Small 3.x",
     "param_class": "~24B",
-    "load_format": "mistral (native consolidated.safetensors + mistral tokenizer)"
+    "load_format": "mistral"
   },
   "decoding": {
     "temperature": 0.0,
@@ -23,7 +23,7 @@
     "max_tokens": 2048,
     "dtype": "bfloat16"
   },
-  "hardware": "single NVIDIA A100-SXM4-80GB (RunPod), vLLM 0.10.1.1, CUDA 12.8",
-  "loads": "3 sequential (Qwen A-author; Mistral A-score+B-author; Qwen B-score) — one model resident at a time",
+  "loads": "2 sequential independent judges (Qwen; Mistral) — one model resident at a time; NO crossover",
+  "independence": "each model judged all words blind to the other's evidence/relationship/score/verdict",
   "substitution_policy": "PROHIBITED"
 }

@@ -58,6 +58,18 @@ def test_relationship_and_score_agreement():
     assert R.score_step_agreement(75, 50) == {"exact": False, "within_one_step": True, "abs_diff": 25, "ge50": False}
     assert R.score_step_agreement(100, 25)["ge50"] is True
 
+def test_canonicalize_relationship():
+    # exact match: no coercion
+    assert R.canonicalize_relationship("embodiment") == ("embodiment", False)
+    # the observed Mistral typo (extra 'i') -> unique nearest within edit distance 2
+    assert R.canonicalize_relationship("constituitive_property") == ("constitutive_property", True)
+    # case / separator normalization
+    assert R.canonicalize_relationship("Natural-Consequence") == ("natural_consequence", True)
+    # semantically distinct / non-vocab token -> rejected (no coercion), caller flags invented_relationship
+    assert R.canonicalize_relationship("vibes") == (None, False)
+    assert R.canonicalize_relationship("causation") == (None, False)
+    assert R.canonicalize_relationship(None) == (None, False)
+
 def test_role_dependence_bands():
     assert R.role_dependence(0.9, 0.9, 0, 3) == "ROLE_STABLE"
     assert R.role_dependence(0.9, 0.9, 0, 20) == "SIGNIFICANT_ROLE_DEPENDENCE"   # systematic

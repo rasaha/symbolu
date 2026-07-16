@@ -1,0 +1,539 @@
+{
+  "schema": "symbol_u_bridge_ambiguity_audit_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "confusable_concern_pairs": [
+    {
+      "a": "C0001",
+      "a_label": "fear",
+      "b": "C0002",
+      "b_label": "anxiety",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0003",
+      "a_label": "anger",
+      "b": "C0004",
+      "b_label": "resentment",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0005",
+      "a_label": "attachment",
+      "b": "C0007",
+      "b_label": "craving",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0006",
+      "a_label": "grief",
+      "b": "C0013",
+      "b_label": "separation-longing",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0007",
+      "a_label": "craving",
+      "b": "C0008",
+      "b_label": "greed",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0009",
+      "a_label": "confusion",
+      "b": "C0010",
+      "b_label": "doubt",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0011",
+      "a_label": "pride",
+      "b": "C0012",
+      "b_label": "shame",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0014",
+      "a_label": "duty",
+      "b": "C0015",
+      "b_label": "burden",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0016",
+      "a_label": "money-concern",
+      "b": "C0017",
+      "b_label": "poverty",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0018",
+      "a_label": "diligence",
+      "b": "C0019",
+      "b_label": "laziness",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0018",
+      "a_label": "diligence",
+      "b": "C0020",
+      "b_label": "purpose",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0021",
+      "a_label": "curiosity",
+      "b": "C0022",
+      "b_label": "knowledge",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0023",
+      "a_label": "patience",
+      "b": "C0025",
+      "b_label": "calm",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    },
+    {
+      "a": "C0024",
+      "a_label": "contentment",
+      "b": "C0025",
+      "b_label": "calm",
+      "resolution": "distinguish by inclusion/exclusion criteria + clarification cues; if still unclear, extraction returns both (processed independently) or abstains"
+    }
+  ],
+  "concept_alternatives": [
+    {
+      "concern_id": "C0001",
+      "label": "fear",
+      "chosen": "bhaya",
+      "alternatives": [
+        {
+          "iast": "bhīti",
+          "why_not": "near-synonym; bhaya is the commoner headword"
+        },
+        {
+          "iast": "trāsa",
+          "why_not": "sudden terror, narrower"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0002",
+      "label": "anxiety",
+      "chosen": "cintā",
+      "alternatives": [
+        {
+          "iast": "udvega",
+          "why_not": "agitation/distress, broader"
+        },
+        {
+          "iast": "vyākulatā",
+          "why_not": "perturbation, less specific"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0003",
+      "label": "anger",
+      "chosen": "krodha",
+      "alternatives": [
+        {
+          "iast": "kopa",
+          "why_not": "near-synonym, often milder"
+        },
+        {
+          "iast": "roṣa",
+          "why_not": "fury/indignation, narrower"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0004",
+      "label": "resentment",
+      "chosen": "dveṣa",
+      "alternatives": [
+        {
+          "iast": "vaira",
+          "why_not": "enmity/feud, stronger"
+        },
+        {
+          "iast": "ghṛṇā",
+          "why_not": "disgust/contempt, narrower"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0005",
+      "label": "attachment",
+      "chosen": "āsakti",
+      "alternatives": [
+        {
+          "iast": "mamatā",
+          "why_not": "'mine-ness'/possessiveness, narrower"
+        },
+        {
+          "iast": "rāga",
+          "why_not": "passion; polysemous (color, musical mode)"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0006",
+      "label": "grief",
+      "chosen": "śoka",
+      "alternatives": [
+        {
+          "iast": "duḥkha",
+          "why_not": "suffering in general, far broader"
+        },
+        {
+          "iast": "viṣāda",
+          "why_not": "dejection, a mood not a loss-response"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0007",
+      "label": "craving",
+      "chosen": "kāma",
+      "alternatives": [
+        {
+          "iast": "icchā",
+          "why_not": "wish, more neutral/generic"
+        },
+        {
+          "iast": "spṛhā",
+          "why_not": "eager longing, less common headword"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0008",
+      "label": "greed",
+      "chosen": "lobha",
+      "alternatives": [
+        {
+          "iast": "tṛṣṇā",
+          "why_not": "thirst/craving, overlaps craving"
+        },
+        {
+          "iast": "matsara",
+          "why_not": "envious grasping, narrower"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0009",
+      "label": "confusion",
+      "chosen": "moha",
+      "alternatives": [
+        {
+          "iast": "bhrama",
+          "why_not": "error/confusion; also 'whirling', polysemous"
+        },
+        {
+          "iast": "sammoha",
+          "why_not": "stronger bewilderment"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0010",
+      "label": "doubt",
+      "chosen": "saṃśaya",
+      "alternatives": [
+        {
+          "iast": "vicikitsā",
+          "why_not": "doubt in a technical/ethical sense"
+        },
+        {
+          "iast": "aniścaya",
+          "why_not": "indecision, overlaps"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0011",
+      "label": "pride",
+      "chosen": "garva",
+      "alternatives": [
+        {
+          "iast": "māna",
+          "why_not": "pride/honor; polysemous (also 'respect')"
+        },
+        {
+          "iast": "ahaṃkāra",
+          "why_not": "'I-maker' ego, technical/doctrinal"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0012",
+      "label": "shame",
+      "chosen": "lajjā",
+      "alternatives": [
+        {
+          "iast": "hrī",
+          "why_not": "modesty/bashfulness, more archaic"
+        },
+        {
+          "iast": "vrīḍā",
+          "why_not": "bashful embarrassment, narrower"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0013",
+      "label": "separation-longing",
+      "chosen": "viraha",
+      "alternatives": [
+        {
+          "iast": "utkaṇṭhā",
+          "why_not": "longing/yearning, less tied to separation"
+        },
+        {
+          "iast": "virahavyathā",
+          "why_not": "compound, avoided"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0014",
+      "label": "duty",
+      "chosen": "kartavya",
+      "alternatives": [
+        {
+          "iast": "dharma",
+          "why_not": "hugely polysemous/doctrinal, excluded"
+        },
+        {
+          "iast": "kārya",
+          "why_not": "task/that-to-be-done, more generic"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0015",
+      "label": "burden",
+      "chosen": "bhāra",
+      "alternatives": [
+        {
+          "iast": "gurutā",
+          "why_not": "heaviness, more literal/physical"
+        },
+        {
+          "iast": "bhārabhūta",
+          "why_not": "compound, avoided"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0016",
+      "label": "money-concern",
+      "chosen": "dhana",
+      "alternatives": [
+        {
+          "iast": "artha",
+          "why_not": "polysemous: wealth, aim, meaning"
+        },
+        {
+          "iast": "vitta",
+          "why_not": "wealth/property, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0017",
+      "label": "poverty",
+      "chosen": "dāridrya",
+      "alternatives": [
+        {
+          "iast": "daridratā",
+          "why_not": "near-synonym abstract"
+        },
+        {
+          "iast": "nirdhanatā",
+          "why_not": "'moneylessness', less common"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0018",
+      "label": "diligence",
+      "chosen": "udyoga",
+      "alternatives": [
+        {
+          "iast": "prayatna",
+          "why_not": "effort/exertion, near-synonym"
+        },
+        {
+          "iast": "śrama",
+          "why_not": "toil/labor, connotes fatigue"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0019",
+      "label": "laziness",
+      "chosen": "ālasya",
+      "alternatives": [
+        {
+          "iast": "tandrī",
+          "why_not": "drowsiness/lassitude, narrower"
+        },
+        {
+          "iast": "jāḍya",
+          "why_not": "torpor/dullness, more physical"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0020",
+      "label": "purpose",
+      "chosen": "lakṣya",
+      "alternatives": [
+        {
+          "iast": "uddeśya",
+          "why_not": "objective/intention, near-synonym"
+        },
+        {
+          "iast": "prayojana",
+          "why_not": "purpose/motive, more 'reason'"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0021",
+      "label": "curiosity",
+      "chosen": "jijñāsā",
+      "alternatives": [
+        {
+          "iast": "kautūhala",
+          "why_not": "curiosity/eagerness, more 'wonder'"
+        },
+        {
+          "iast": "autsukya",
+          "why_not": "eagerness, broader"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0022",
+      "label": "knowledge",
+      "chosen": "jñāna",
+      "alternatives": [
+        {
+          "iast": "vidyā",
+          "why_not": "knowledge/learning, overlaps; also 'a science'"
+        },
+        {
+          "iast": "bodha",
+          "why_not": "understanding/awareness, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0023",
+      "label": "patience",
+      "chosen": "kṣamā",
+      "alternatives": [
+        {
+          "iast": "titikṣā",
+          "why_not": "endurance of hardship, narrower"
+        },
+        {
+          "iast": "sahiṣṇutā",
+          "why_not": "tolerance, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "medium",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0024",
+      "label": "contentment",
+      "chosen": "santoṣa",
+      "alternatives": [
+        {
+          "iast": "tṛpti",
+          "why_not": "satiation, more 'sated'"
+        },
+        {
+          "iast": "tuṣṭi",
+          "why_not": "satisfaction, near-synonym"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    },
+    {
+      "concern_id": "C0025",
+      "label": "calm",
+      "chosen": "śānti",
+      "alternatives": [
+        {
+          "iast": "praśānti",
+          "why_not": "deep calm, intensive"
+        },
+        {
+          "iast": "śama",
+          "why_not": "quietude/restraint, more technical"
+        }
+      ],
+      "ambiguity_risk": "low",
+      "resolution": "deterministic: primary=rank1 by semantic fit; alternatives never used at runtime; if two were genuinely indistinguishable by ordinary meaning -> NO_APPLICABLE_CONCEPT"
+    }
+  ],
+  "runtime_multi_concern_rules": {
+    "max_concerns_per_utterance": 3,
+    "ordering": "extraction confidence desc, then ascending concern_id",
+    "deduplication": "collapse identical concern_ids; if a parent-category and a specific concern both fire, keep the specific concern",
+    "confidence_threshold": "include a concern only at/above the extraction confidence floor (deployment-set); if none clear -> NO_APPLICABLE_CONCERN",
+    "tie_breaking": "ascending concern_id",
+    "no_hybrid": "never merge multiple concerns into an invented hybrid; each processed independently"
+  }
+}

@@ -1,0 +1,1165 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "scores": [
+    {
+      "word": "akrodha",
+      "gloss": "non-anger",
+      "category": "virtue_calm",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "akrodha",
+          "gloss": "non-anger",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "regulation",
+          "dbr_score": 25,
+          "supporting_evidence": "Non-anger (akrodha) does not directly or naturally account for grasping or clinging hope (āśā), but it may be seen as a regulatory state that opposes the emotional agitation that can accompany such attachment.",
+          "opposing_evidence": "The ordinary meaning of akrodha does not directly or conventionally express or regulate āśā as grasping hope. The link requires a constructed scenario or interpretive bridge.",
+          "adjudication": "The link requires a constructed interpretive bridge; akrodha does not directly or conventionally regulate āśā.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "akrodha",
+          "gloss": "non-anger",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "Non-anger (akrodha) may be seen as opposing the emotional intensity and destructive mindset of sarvanāśa, but this is not a direct or conventional relationship.",
+          "opposing_evidence": "The ordinary meaning of akrodha does not directly or conventionally express, oppose, or resolve sarvanāśa. The link requires supplementation.",
+          "adjudication": "The opposition is not direct or conventional; it requires interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "akrodha",
+          "gloss": "non-anger",
+          "occurrence_index": 2,
+          "varna": "dh",
+          "frozen_mapping": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "Non-anger (akrodha) may be seen as a regulatory or opposing state to the emotional agitation that can accompany tṛṣṇā, but this is not a direct or conventional relationship.",
+          "opposing_evidence": "The ordinary meaning of akrodha does not directly or conventionally express, regulate, or oppose tṛṣṇā. The link requires supplementation.",
+          "adjudication": "The opposition is not direct or conventional; it requires interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "asūyā",
+      "gloss": "envy/detraction",
+      "category": "afflictive",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "asūyā",
+          "gloss": "envy/detraction",
+          "occurrence_index": 0,
+          "varna": "s",
+          "frozen_mapping": "the sentient / sattvic impulse clung to — clarity, purity or harmony owned as superiority or attachment (the subtle 'golden chain' of spiritual attainment)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Asūyā, as envy or detraction, may naturally oppose the sattvic impulse of clarity and harmony when it is clung to as a form of spiritual attachment or superiority. Envy is a known obstacle to sattva.",
+          "opposing_evidence": "The mapping describes a sattvic impulse, which is not directly expressed or embodied by asūyā. The connection requires a conceptual bridge to opposition rather than direct embodiment.",
+          "adjudication": "Asūyā directly and conventionally opposes the sattvic impulse when it is clung to as superiority or attachment, requiring little interpretive work.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "asūyā",
+          "gloss": "envy/detraction",
+          "occurrence_index": 1,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Asūyā, as envy or detraction, may imply a lack of trust in others' success, which can manifest as a form of self-doubt or wavering in one's own worth.",
+          "opposing_evidence": "The mapping describes a specific psychological state (aviśvāsa) that is not directly or conventionally expressed by asūyā. The link requires a constructed interpretive bridge.",
+          "adjudication": "The connection between asūyā and aviśvāsa requires a constructed interpretive bridge, as the mapping is not directly or conventionally implied by the bare word.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 50.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 1,
+        "50": 0,
+        "75": 1,
+        "100": 0
+      },
+      "weak_components_le_25": 1,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "audārya",
+      "gloss": "magnanimity",
+      "category": "virtue_calm",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "audārya",
+          "gloss": "magnanimity",
+          "occurrence_index": 0,
+          "varna": "d",
+          "frozen_mapping": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Magnanimity is conventionally understood as the opposite of petty or reactive behavior, including peevishness and irritability. The bare word 'audārya' directly and conventionally opposes the mapping.",
+          "opposing_evidence": "The mapping is not a direct feature of the word's ordinary meaning; it requires recognizing the oppositional relationship rather than a direct embodiment.",
+          "adjudication": "The opposition is direct and conventional, requiring little interpretive work.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "audārya",
+          "gloss": "magnanimity",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Magnanimity is associated with strength, resilience, and the absence of defeatist thinking. The bare word 'audārya' naturally opposes the mapping of total defeat and annihilation.",
+          "opposing_evidence": "The mapping is not a direct feature of the word's ordinary meaning; it requires recognizing the oppositional relationship rather than a direct embodiment.",
+          "adjudication": "The opposition is direct and conventional, requiring little interpretive work.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "audārya",
+          "gloss": "magnanimity",
+          "occurrence_index": 2,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Magnanimity is conventionally associated with self-confidence and trust in oneself and others. The bare word 'audārya' directly and conventionally opposes the mapping of self-doubt and wavering.",
+          "opposing_evidence": "The mapping is not a direct feature of the word's ordinary meaning; it requires recognizing the oppositional relationship rather than a direct embodiment.",
+          "adjudication": "The opposition is direct and conventional, requiring little interpretive work.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 75.0,
+      "min_dbr": 75,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 0,
+        "75": 3,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "STRONG_RESONANCE"
+    },
+    {
+      "word": "bhrama",
+      "gloss": "delusion/confusion",
+      "category": "afflictive",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "bhrama",
+          "gloss": "delusion/confusion",
+          "occurrence_index": 0,
+          "varna": "bh",
+          "frozen_mapping": "mūrcchā — hypnotic entrancement, the loss of common sense / discernment under the spell of a ripu (deluded obsession that suspends judgment)",
+          "relationship": "implication",
+          "dbr_score": 75,
+          "supporting_evidence": "Bhrama as 'delusion' directly accounts for mūrcchā as a form of deluded entrancement; both involve a suspension of clear discernment.",
+          "opposing_evidence": "Mūrcchā implies a more intense, trance-like state than the general 'delusion' of bhrama, which may not necessarily involve hypnotic entrancement.",
+          "adjudication": "Bhrama implies a state of delusion that can lead to mūrcchā, but the latter is a more specific and intense form of the former.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "bhrama",
+          "gloss": "delusion/confusion",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "generation",
+          "dbr_score": 50,
+          "supporting_evidence": "Bhrama as 'delusion' can generate a defeatist mindset, as delusion may lead to misperceptions of total loss or annihilation.",
+          "opposing_evidence": "Sarvanāśa is a specific emotional and cognitive collapse, not a general delusion; bhrama alone does not directly entail this state without supplementation.",
+          "adjudication": "Bhrama may generate sarvanāśa as a possible consequence, but the link is not direct or conventional without interpretive work.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "bhrama",
+          "gloss": "delusion/confusion",
+          "occurrence_index": 2,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "natural_consequence",
+          "dbr_score": 50,
+          "supporting_evidence": "Bhrama as 'delusion' can lead to unrestrained indulgence or dissolution, as delusion may cause one to lose restraint and fall into destructive patterns.",
+          "opposing_evidence": "Praśraya/praṇāśa implies a process of giving in and dissolving, which is not a direct or conventional feature of the ordinary meaning of bhrama.",
+          "adjudication": "Bhrama may naturally lead to praśraya/praṇāśa as a consequence, but the connection is not direct or immediate without interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 58.33,
+      "min_dbr": 50,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 2,
+        "75": 1,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "chāyā",
+      "gloss": "shadow",
+      "category": "natural_action_abstract",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "chāyā",
+          "gloss": "shadow",
+          "occurrence_index": 0,
+          "varna": "ch",
+          "frozen_mapping": "collapse of mental function under strain — the mind that had functioned properly begins to malfunction or stops altogether",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "A shadow is the absence or diminishment of light, which can be metaphorically extended to the absence or diminishment of mental clarity or function. This is a natural, broadly recognizable association.",
+          "opposing_evidence": "The direct link between 'shadow' and 'mental collapse' is not conventional or dictionary-defined; it requires metaphorical interpretation.",
+          "adjudication": "The association is natural and recognizable, but not direct or conventional.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "chāyā",
+          "gloss": "shadow",
+          "occurrence_index": 1,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A shadow is uncertain, indistinct, and lacks clarity — qualities that can be associated with wavering or lack of confidence, though this is not a direct or conventional link.",
+          "opposing_evidence": "The connection between 'shadow' and 'self-doubt' is not direct or conventional; it requires metaphorical or interpretive supplementation.",
+          "adjudication": "The link requires metaphorical interpretation and is not directly or conventionally accounted for by the bare word.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 37.5,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 1,
+        "50": 1,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 1,
+      "verdict": "WEAK_RESONANCE"
+    },
+    {
+      "word": "cintā",
+      "gloss": "anxiety",
+      "category": "afflictive",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "cintā",
+          "gloss": "anxiety",
+          "occurrence_index": 0,
+          "varna": "c",
+          "frozen_mapping": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "Anxiety can manifest as a rigid, overactive mental state that distorts discernment into judgmentalism, especially when the mind is agitated and self-protective.",
+          "opposing_evidence": "Anxiety is not inherently judgmental or prideful; it is a general emotional state and does not directly entail the specific distortion of viveka into superiority.",
+          "adjudication": "Anxiety may imply a distortion of discernment, but the specific form of judgmentalism or pride is not directly or conventionally entailed by the ordinary meaning of cintā.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "cintā",
+          "gloss": "anxiety",
+          "occurrence_index": 1,
+          "varna": "n",
+          "frozen_mapping": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Anxiety can lead to fixation or obsessive thought patterns, which may resemble the mental state of moha, especially when the mind is preoccupied and irrational.",
+          "opposing_evidence": "Anxiety is not synonymous with infatuation or blind attachment; the two are distinct psychological states, and one does not directly account for the other without supplementation.",
+          "adjudication": "Anxiety may imply obsessive thought, but the specific form of moha as blind attachment or infatuation is not directly or conventionally entailed by the ordinary meaning of cintā.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "cintā",
+          "gloss": "anxiety",
+          "occurrence_index": 2,
+          "varna": "t",
+          "frozen_mapping": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Anxiety can lead to mental exhaustion and a kind of emotional paralysis, which may resemble the inert, dull state of jāḍya.",
+          "opposing_evidence": "Anxiety is typically associated with agitation and overactivity, not with inertness or torpor; the two are opposites in conventional psychological terms.",
+          "adjudication": "Anxiety is conventionally understood as the opposite of jāḍya, and this opposition is direct and available from the ordinary meaning of cintā.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 50.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 1,
+        "50": 1,
+        "75": 1,
+        "100": 0
+      },
+      "weak_components_le_25": 1,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "cāpa",
+      "gloss": "bow",
+      "category": "concrete_object",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "cāpa",
+          "gloss": "bow",
+          "occurrence_index": 0,
+          "varna": "c",
+          "frozen_mapping": "viveka distorted — discernment hardening into judgmentalism / separation-pride (discrimination used to feel superior to others)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A bow is an instrument of aiming and striking, often used to target or separate one object from another. This can symbolically imply a form of directed discernment or separation, which may harden into judgmentalism.",
+          "opposing_evidence": "The ordinary meaning of 'bow' does not inherently imply distortion, pride, or superiority. The link to judgmentalism requires interpretive supplementation.",
+          "adjudication": "The symbolic implication is weak and requires interpretive supplementation to connect 'bow' to distorted discernment and superiority.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "cāpa",
+          "gloss": "bow",
+          "occurrence_index": 1,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "A bow is not directly related to hatred or revulsion, but it can be seen as a tool of aggression or violence, which may imply a form of opposition to peace or harmony.",
+          "opposing_evidence": "The ordinary meaning of 'bow' does not naturally imply hatred, revulsion, or downfall. The connection requires a constructed narrative or metaphor.",
+          "adjudication": "The link between 'bow' and hatred/revulsion requires metaphorical or narrative supplementation and is not directly or conventionally implied by the bare word.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 2,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 2,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "dama",
+      "gloss": "self-restraint",
+      "category": "virtue_calm",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "dama",
+          "gloss": "self-restraint",
+          "occurrence_index": 0,
+          "varna": "d",
+          "frozen_mapping": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Self-restraint is conventionally understood as the opposite of reactive irritability and peevishness, which are expressions of uncontrolled emotion.",
+          "opposing_evidence": "The mapping describes a specific kind of reactive behavior, not a general lack of restraint; the connection requires interpreting 'self-restraint' as opposition to a specific subtype of emotional reactivity.",
+          "adjudication": "Self-restraint directly and conventionally opposes reactive irritability, though the mapping specifies a particular form of reactivity.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "dama",
+          "gloss": "self-restraint",
+          "occurrence_index": 1,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Self-restraint is the opposite of unrestrained indulgence, and its absence can lead to dissolution or collapse, making it a direct conventional opposition.",
+          "opposing_evidence": "The mapping describes an extreme consequence of unrestrained behavior, not the behavior itself; the link requires interpreting 'self-restraint' as opposition to a process rather than a state.",
+          "adjudication": "Self-restraint directly opposes unrestrained indulgence, though the mapping refers to the outcome of such indulgence rather than the behavior itself.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 75.0,
+      "min_dbr": 75,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 0,
+        "75": 2,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "STRONG_RESONANCE"
+    },
+    {
+      "word": "darpaṇa",
+      "gloss": "mirror",
+      "category": "concrete_object",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 0,
+          "varna": "d",
+          "frozen_mapping": "peevishness / reactive irritability — perverse, contrary reactivity discharged at others (taking offence at kindness, calm under harshness)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "A mirror reflects without distortion, but it does not inherently reflect peevishness or reactivity. No direct symbolic or conventional link.",
+          "opposing_evidence": "The ordinary meaning of 'mirror' does not include or imply peevishness or reactive irritability. No natural or conventional symbolic resonance.",
+          "adjudication": "No direct or conventional symbolic link between 'mirror' and peevishness.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "A mirror reflects the present state, but it does not inherently reflect or generate a sense of total defeat.",
+          "opposing_evidence": "The ordinary meaning of 'mirror' does not include or imply a sense of annihilation or defeat. No natural or conventional symbolic resonance.",
+          "adjudication": "No direct or conventional symbolic link between 'mirror' and sarvanāśa.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 2,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "A mirror reflects without judgment, but it does not inherently reflect hatred or revulsion.",
+          "opposing_evidence": "The ordinary meaning of 'mirror' does not include or imply hatred or revulsion. No natural or conventional symbolic resonance.",
+          "adjudication": "No direct or conventional symbolic link between 'mirror' and ghṛṇā.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "darpaṇa",
+          "gloss": "mirror",
+          "occurrence_index": 3,
+          "varna": "ṇ",
+          "frozen_mapping": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "A mirror reflects the image of others, but it does not inherently reflect envy or covetous resentment.",
+          "opposing_evidence": "The ordinary meaning of 'mirror' does not include or imply envy or resentment. No natural or conventional symbolic resonance.",
+          "adjudication": "No direct or conventional symbolic link between 'mirror' and envy.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 0.0,
+      "min_dbr": 0,
+      "counts": {
+        "0": 4,
+        "25": 0,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 4,
+      "verdict": "NO_RESONANCE"
+    },
+    {
+      "word": "dhvani",
+      "gloss": "sound",
+      "category": "natural_action_abstract",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "dhvani",
+          "gloss": "sound",
+          "occurrence_index": 0,
+          "varna": "dh",
+          "frozen_mapping": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The bare word 'dhvani' does not directly or conventionally account for 'tṛṣṇā' or unquenchable craving. There is no natural or direct symbolic resonance between sound and limitless thirst for acquisition.",
+          "opposing_evidence": "There is no conventional or direct symbolic link between 'sound' and 'unquenchable craving'; any connection would require metaphorical or narrative supplementation.",
+          "adjudication": "No direct or conventional symbolic resonance between 'sound' and 'unquenchable craving' without supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "dhvani",
+          "gloss": "sound",
+          "occurrence_index": 1,
+          "varna": "v",
+          "frozen_mapping": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The bare word 'dhvani' does not directly or conventionally account for 'rigid ensconcement' or 'stuck fixity'. There is no natural or direct symbolic resonance between sound and rigidity or fixity.",
+          "opposing_evidence": "There is no conventional or direct symbolic link between 'sound' and 'rigid holding'; any connection would require metaphorical or narrative supplementation.",
+          "adjudication": "No direct or conventional symbolic resonance between 'sound' and 'rigid ensconcement' without supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "dhvani",
+          "gloss": "sound",
+          "occurrence_index": 2,
+          "varna": "n",
+          "frozen_mapping": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The bare word 'dhvani' does not directly or conventionally account for 'moha' or 'blind attachment'. There is no natural or direct symbolic resonance between sound and infatuation or fixation.",
+          "opposing_evidence": "There is no conventional or direct symbolic link between 'sound' and 'blind attachment'; any connection would require metaphorical or narrative supplementation.",
+          "adjudication": "No direct or conventional symbolic resonance between 'sound' and 'blind attachment' without supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 0.0,
+      "min_dbr": 0,
+      "counts": {
+        "0": 3,
+        "25": 0,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "NO_RESONANCE"
+    },
+    {
+      "word": "dhṛti",
+      "gloss": "fortitude",
+      "category": "virtue_calm",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "dhṛti",
+          "gloss": "fortitude",
+          "occurrence_index": 0,
+          "varna": "dh",
+          "frozen_mapping": "tṛṣṇā — limitless thirst to acquire: unquenchable craving for wealth, name, fame, power and prestige (not thirst for water)",
+          "relationship": "opposition",
+          "dbr_score": 75,
+          "supporting_evidence": "Fortitude is a direct conventional opposition to unquenchable craving and limitless thirst for external acquisition, as the latter undermines inner stability and self-restraint.",
+          "opposing_evidence": "The ordinary meaning of 'fortitude' does not directly entail or contain the concept of 'thirst for acquisition'; the link requires a conceptual bridge between inner strength and the absence of craving.",
+          "adjudication": "Fortitude directly and conventionally opposes unquenchable craving, requiring little interpretive work.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "dhṛti",
+          "gloss": "fortitude",
+          "occurrence_index": 1,
+          "varna": "t",
+          "frozen_mapping": "jāḍya — inertia, staticity, dullness, torpor: the deep sleep of mind, intellectual dullness and spiritual inertness",
+          "relationship": "resolution",
+          "dbr_score": 50,
+          "supporting_evidence": "Fortitude is a direct conventional resolution of inertia and torpor, as it implies active endurance and overcoming mental and spiritual dullness.",
+          "opposing_evidence": "The ordinary meaning of 'fortitude' does not naturally imply the state of 'jāḍya' without a narrative of overcoming it, which introduces supplementation.",
+          "adjudication": "Fortitude naturally resolves jāḍya as a recognized opposition, but the link requires a conventional understanding of overcoming, not direct containment.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 62.5,
+      "min_dbr": 50,
+      "counts": {
+        "0": 0,
+        "25": 0,
+        "50": 1,
+        "75": 1,
+        "100": 0
+      },
+      "weak_components_le_25": 0,
+      "verdict": "MODERATE_RESONANCE"
+    },
+    {
+      "word": "jaṅghā",
+      "gloss": "shank",
+      "category": "animal_body_living",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "jaṅghā",
+          "gloss": "shank",
+          "occurrence_index": 0,
+          "varna": "j",
+          "frozen_mapping": "the inflated 'I did / I control this' — the 'I'-feeling swollen into sole doership (as in Aurangzeb: 'had I not been there the world would have been destroyed')",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The word 'jaṅghā' as 'shank' does not directly or conventionally express an inflated sense of doership or ego. There is no natural or direct symbolic resonance.",
+          "opposing_evidence": "The anatomical meaning of 'shank' has no conventional or symbolic link to ego inflation or doership. No direct or natural relationship exists.",
+          "adjudication": "No direct or conventional symbolic resonance between 'shank' and an inflated sense of doership.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "jaṅghā",
+          "gloss": "shank",
+          "occurrence_index": 1,
+          "varna": "ṅ",
+          "frozen_mapping": "dambha as vanity — the self displayed and performed for others' eyes; conduct staged to be seen and admired",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The word 'jaṅghā' as 'shank' does not naturally or conventionally express vanity or performance for others' admiration.",
+          "opposing_evidence": "There is no direct or natural symbolic link between the anatomical term 'shank' and the concept of vanity or performative self-display.",
+          "adjudication": "No direct or conventional symbolic resonance between 'shank' and vanity or performative self-display.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "jaṅghā",
+          "gloss": "shank",
+          "occurrence_index": 2,
+          "varna": "gh",
+          "frozen_mapping": "mamatā bounded by the relative factors (time, space, individuality) — partial, possessive 'mine-ness' that clings to its own (own child, own country, own moment) while excluding or even harming what lies outside it",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The word 'jaṅghā' as 'shank' does not naturally or conventionally express possessive 'mine-ness' or bounded attachment.",
+          "opposing_evidence": "There is no direct or natural symbolic link between the anatomical term 'shank' and the concept of possessive 'mine-ness' or exclusionary attachment.",
+          "adjudication": "No direct or conventional symbolic resonance between 'shank' and possessive 'mine-ness' or exclusionary attachment.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 0.0,
+      "min_dbr": 0,
+      "counts": {
+        "0": 3,
+        "25": 0,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "NO_RESONANCE"
+    },
+    {
+      "word": "kapāla",
+      "gloss": "skull",
+      "category": "animal_body_living",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "kapāla",
+          "gloss": "skull",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The skull is a symbol of mortality and impermanence, which can indirectly relate to the futility of grasping hope, but this requires interpretive supplementation.",
+          "opposing_evidence": "The ordinary meaning of 'skull' does not directly or conventionally express grasping hope or attached desire without added interpretation.",
+          "adjudication": "The skull does not directly or conventionally account for grasping hope or attached desire without interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kapāla",
+          "gloss": "skull",
+          "occurrence_index": 1,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The skull is a symbol of death and decay, which can evoke revulsion or hatred, but this is not a direct or conventional association.",
+          "opposing_evidence": "The skull does not directly or conventionally express hatred or revulsion without interpretive supplementation.",
+          "adjudication": "The skull does not directly or conventionally account for hatred or revulsion without interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kapāla",
+          "gloss": "skull",
+          "occurrence_index": 2,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The skull is a symbol of death and destruction, which can be associated with cruelty, but this is not a direct or conventional association.",
+          "opposing_evidence": "The skull does not directly or conventionally express cruelty or crude behavior without interpretive supplementation.",
+          "adjudication": "The skull does not directly or conventionally account for cruelty or crude behavior without interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 0.0,
+      "min_dbr": 0,
+      "counts": {
+        "0": 3,
+        "25": 0,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "NO_RESONANCE"
+    },
+    {
+      "word": "kuṇḍala",
+      "gloss": "earring",
+      "category": "concrete_object",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "The word 'kuṇḍala' as an earring is a physical object that can be desired or clung to, and may symbolize attachment or desire in a metaphorical sense.",
+          "opposing_evidence": "The direct link between 'kuṇḍala' and the concept of grasping hope is not conventional or natural without metaphorical supplementation.",
+          "adjudication": "The connection requires metaphorical interpretation and is not directly or conventionally implied by the bare word.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 1,
+          "varna": "ṇ",
+          "frozen_mapping": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "The word 'kuṇḍala' as an earring may be an object of envy, and thus may imply the emotion of covetousness.",
+          "opposing_evidence": "The bare word 'kuṇḍala' does not naturally or conventionally express the emotion of envy without external context or supplementation.",
+          "adjudication": "The link is indirect and requires external context to imply envy, which limits the score.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 2,
+          "varna": "ḍ",
+          "frozen_mapping": "lajjā as inhibition — action held back by others' regard; shrinking, self-conscious shame that blocks natural conduct",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "An earring is a visible ornament that may cause self-consciousness or inhibit natural conduct in certain contexts.",
+          "opposing_evidence": "The bare word 'kuṇḍala' does not directly or conventionally express the concept of inhibition or self-conscious shame without added context.",
+          "adjudication": "The connection is plausible but requires contextual supplementation, which limits the score.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kuṇḍala",
+          "gloss": "earring",
+          "occurrence_index": 3,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "There is no direct or conventional link between an earring and the concept of cruelty.",
+          "opposing_evidence": "The bare word 'kuṇḍala' does not imply or account for cruelty in any direct or conventional way.",
+          "adjudication": "No defensible relationship exists between the bare word and the mapping without importing outside meaning.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 18.75,
+      "min_dbr": 0,
+      "counts": {
+        "0": 1,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 4,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "kārpaṇya",
+      "gloss": "miserliness/pettiness",
+      "category": "afflictive",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 50,
+          "supporting_evidence": "Miserliness is a form of grasping and attachment, particularly toward material objects or outcomes, which aligns with the grasping nature of āśā.",
+          "opposing_evidence": "Miserliness is not inherently about hope or future-oriented grasping; it is more about hoarding and reluctance to part with what is already possessed.",
+          "adjudication": "Miserliness implies a form of grasping, but not necessarily the forward-looking, outcome-oriented grasping of āśā.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "natural_consequence",
+          "dbr_score": 25,
+          "supporting_evidence": "Miserliness can lead to a mindset of scarcity and loss, which may culminate in a sense of total defeat or annihilation.",
+          "opposing_evidence": "Miserliness is not inherently a thought of total defeat; it is more about hoarding and fear of loss, not the nihilistic collapse of sarvanāśa.",
+          "adjudication": "The link requires a narrative bridge from miserliness to total defeat; it is not a direct or conventional association.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 2,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Miserliness can breed resentment and hatred, especially when others possess what the miser lacks, aligning with the downward pull of ghṛṇā.",
+          "opposing_evidence": "Miserliness is not primarily a form of hatred or revulsion; it is more about attachment and fear of loss than active hatred.",
+          "adjudication": "The connection requires a narrative or emotional bridge from miserliness to hatred; it is not a direct or conventional implication.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 3,
+          "varna": "ṇ",
+          "frozen_mapping": "envy — the sting at another's success; covetous resentment at another's good fortune",
+          "relationship": "characteristic_expression",
+          "dbr_score": 75,
+          "supporting_evidence": "Miserliness and envy are closely related; both involve a sense of lack and resentment toward others' possessions or success.",
+          "opposing_evidence": "While related, miserliness is not the same as envy; the former is about hoarding, the latter about coveting what others have.",
+          "adjudication": "Miserliness characteristically expresses a mindset that can easily manifest as envy, especially in the context of others' success.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kārpaṇya",
+          "gloss": "miserliness/pettiness",
+          "occurrence_index": 4,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Miserliness can be rooted in a lack of trust in the future or in others, which aligns with the self-doubt and wavering of aviśvāsa.",
+          "opposing_evidence": "Miserliness is not primarily about self-doubt or wavering; it is more about attachment and fear of loss than about uncertainty or lack of confidence.",
+          "adjudication": "The link requires a narrative bridge from miserliness to self-doubt; it is not a direct or conventional implication.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 40.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 1,
+        "75": 1,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "WEAK_RESONANCE"
+    },
+    {
+      "word": "kūrma",
+      "gloss": "tortoise",
+      "category": "animal_body_living",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "kūrma",
+          "gloss": "tortoise",
+          "occurrence_index": 0,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "The tortoise is a symbol of slow, deliberate, and grounded movement, not typically associated with grasping or clinging hope. However, in some symbolic traditions, the tortoise can represent persistence or attachment to a goal, which may loosely imply a form of clinging hope.",
+          "opposing_evidence": "The tortoise is not inherently a symbol of grasping or attached desire; the link requires a constructed symbolic interpretation rather than a direct or conventional association.",
+          "adjudication": "The connection requires a constructed symbolic interpretation and is not a direct or conventional association.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kūrma",
+          "gloss": "tortoise",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "The tortoise is a symbol of endurance and resilience, not of annihilation or defeat. However, in a symbolic context, the slow and methodical nature of the tortoise could be interpreted as a metaphor for a gradual collapse or surrender.",
+          "opposing_evidence": "The tortoise is not conventionally associated with annihilation or defeat; the link requires a constructed symbolic interpretation.",
+          "adjudication": "The tortoise symbolically opposes the idea of annihilation, but the link requires a constructed interpretation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "kūrma",
+          "gloss": "tortoise",
+          "occurrence_index": 2,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "The tortoise is a symbol of restraint and measured action, which could be interpreted as a contrast to unrestrained indulgence. In this sense, it may symbolically oppose the idea of dissolution through excess.",
+          "opposing_evidence": "The tortoise is not inherently a symbol of unrestrained indulgence or dissolution; the link requires a constructed symbolic interpretation.",
+          "adjudication": "The tortoise may symbolically oppose unrestrained indulgence, but the link requires a constructed interpretation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "lalāṭa",
+      "gloss": "forehead",
+      "category": "animal_body_living",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "lalāṭa",
+          "gloss": "forehead",
+          "occurrence_index": 0,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "The forehead is a prominent and visible part of the body, often associated with dignity, authority, or expression of emotion. In some symbolic systems, the forehead can represent the seat of will or moral judgment, which may be used to imply a confrontation or assertion of dominance, potentially linked to cruelty.",
+          "opposing_evidence": "The ordinary meaning of 'forehead' does not directly or conventionally imply cruelty, nor does it naturally entail or embody the concept of physical harm or cruel behavior. The link requires interpretive supplementation or metaphor.",
+          "adjudication": "The connection between 'forehead' and 'cruelty' is not direct or conventional; it requires metaphorical or interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "lalāṭa",
+          "gloss": "forehead",
+          "occurrence_index": 1,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "As in the first occurrence, the forehead's symbolic role in expression and authority may be interpreted as a metaphor for the assertion of power or dominance, which could imply cruelty.",
+          "opposing_evidence": "The ordinary meaning of 'forehead' does not directly or conventionally imply cruelty, nor does it naturally entail or embody the concept of physical harm or cruel behavior. The link requires interpretive supplementation or metaphor.",
+          "adjudication": "The connection between 'forehead' and 'cruelty' is not direct or conventional; it requires metaphorical or interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "lalāṭa",
+          "gloss": "forehead",
+          "occurrence_index": 2,
+          "varna": "ṭ",
+          "frozen_mapping": "vitarka — overstating one's case to the point of garrulousness; bad-tempered, exaggerated over-talk beyond what is warranted (the abusive over-response)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "The 'ṭ' sound is sharp and abrupt, which may be used to imply a harsh or overbearing tone in speech, potentially linked to the abusive over-response described in the mapping.",
+          "opposing_evidence": "The phonetic quality of 'ṭ' does not directly or conventionally imply the specific behavior of 'vitarka' as described. The link requires interpretive supplementation or metaphor.",
+          "adjudication": "The connection between the 'ṭ' sound and 'vitarka' is not direct or conventional; it requires metaphorical or interpretive supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "mukura",
+      "gloss": "mirror",
+      "category": "concrete_object",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "mukura",
+          "gloss": "mirror",
+          "occurrence_index": 0,
+          "varna": "m",
+          "frozen_mapping": "praśraya / praṇāśa — giving latitude to the point of dissolution; unrestrained indulgence that runs to annihilating collapse",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror reflects without judgment or restraint, potentially revealing the full extent of a situation, including its dissolution or collapse.",
+          "opposing_evidence": "The concept of unrestrained indulgence leading to collapse is not a conventional or direct property of a mirror; it requires interpretive supplementation.",
+          "adjudication": "The mirror's reflective nature may imply unrestrained exposure, but the mapping requires interpretive supplementation to reach the idea of collapse.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "mukura",
+          "gloss": "mirror",
+          "occurrence_index": 1,
+          "varna": "k",
+          "frozen_mapping": "āśā as grasping / clinging hope — goaded toward a specific outcome or object; the downward pull of attached desire",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect one's image or desires, potentially reinforcing attachment and the clinging hope for a specific outcome.",
+          "opposing_evidence": "The idea of 'clinging hope' and 'attached desire' is not a direct or conventional property of a mirror; it requires metaphorical or narrative supplementation.",
+          "adjudication": "The mirror's reflective nature may imply the reinforcement of desire, but the mapping requires interpretive supplementation to reach the idea of clinging hope.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "mukura",
+          "gloss": "mirror",
+          "occurrence_index": 2,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "A mirror can reflect the totality of one's state, potentially revealing a sense of total loss or defeat.",
+          "opposing_evidence": "The concept of total defeat or annihilation is not a direct or conventional property of a mirror; it requires interpretive supplementation.",
+          "adjudication": "The mirror's reflective nature may imply the revelation of total loss, but the mapping requires interpretive supplementation to reach the idea of annihilation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 25.0,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "pavana",
+      "gloss": "wind",
+      "category": "natural_action_abstract",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "pavana",
+          "gloss": "wind",
+          "occurrence_index": 0,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "no_relationship",
+          "dbr_score": 0,
+          "supporting_evidence": "The first varna 'p' in 'pavana' may symbolically resonate with the concept of 'pat' (falling, downfall), which is part of the mapping for ghṛṇā. This is a minimal, phonetic-level resonance.",
+          "opposing_evidence": "The connection is tenuous and requires phonetic interpretation rather than semantic or conceptual resonance. The ordinary meaning of 'p' as a consonant does not directly account for the complex psychological state of ghṛṇā.",
+          "adjudication": "The bare word 'p' does not directly or naturally account for the mapping of ghṛṇā without phonetic supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "pavana",
+          "gloss": "wind",
+          "occurrence_index": 1,
+          "varna": "v",
+          "frozen_mapping": "ensconcement gone rigid — over-holding, clinging to one's holding; stuck fixity that resists the movement toward subtlety",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "The varna 'v' in 'pavana' may symbolically suggest 'stagnation' or 'fixity' in contrast to the natural movement of wind, which is fluid and dynamic. This opposition is a natural conceptual bridge.",
+          "opposing_evidence": "The ordinary meaning of 'v' as a phoneme does not inherently imply rigidity or fixity. The link requires interpretive supplementation to connect it to the mapping.",
+          "adjudication": "The link requires interpretive supplementation to connect 'v' to the concept of rigidity, which limits the score to 25.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "pavana",
+          "gloss": "wind",
+          "occurrence_index": 2,
+          "varna": "n",
+          "frozen_mapping": "moha — blind attachment / infatuation: the mind fixated on an object, place, time or idea, losing rationality (geo-sentiment; nostalgia for an age; the thief drawn back to the scene; fascination for a battered object)",
+          "relationship": "opposition",
+          "dbr_score": 25,
+          "supporting_evidence": "The varna 'n' in 'pavana' may suggest 'fixation' or 'stillness' in contrast to the movement of wind, which could symbolically resonate with the concept of moha as a mental fixation.",
+          "opposing_evidence": "The ordinary meaning of 'n' as a phoneme does not directly imply mental fixation or infatuation. The link requires interpretive supplementation to connect it to the mapping.",
+          "adjudication": "The link requires interpretive supplementation to connect 'n' to the concept of moha, which limits the score to 25.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 16.67,
+      "min_dbr": 0,
+      "counts": {
+        "0": 1,
+        "25": 2,
+        "50": 0,
+        "75": 0,
+        "100": 0
+      },
+      "weak_components_le_25": 3,
+      "verdict": "MINIMAL_RESONANCE"
+    },
+    {
+      "word": "pralaya",
+      "gloss": "dissolution",
+      "category": "natural_action_abstract",
+      "judge_model": "Qwen/Qwen3-32B",
+      "components": [
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 0,
+          "varna": "p",
+          "frozen_mapping": "ghṛṇā — the fetter of hatred / revulsion: hatred arising (mainly from frustrated moha) and the downward pull toward the crude (pat / patati -> downfall)",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Dissolution can imply a downward movement or collapse, which may align with the 'downward pull toward the crude' in ghṛṇā.",
+          "opposing_evidence": "Dissolution is not a direct synonym for hatred or revulsion, nor does it naturally entail the emotional or moral descent described in ghṛṇā without supplementation.",
+          "adjudication": "The link requires interpreting 'dissolution' as implying a moral or emotional descent, which is not a direct or conventional association.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 1,
+          "varna": "r",
+          "frozen_mapping": "sarvanāśa — the defeatist annihilation-thought ('I have nothing, everything is gone, I am undone'); destructive collapse, the sense of total defeat",
+          "relationship": "implication",
+          "dbr_score": 100,
+          "supporting_evidence": "Dissolution is a natural synonym for total destruction or collapse, and can directly imply a sense of annihilation or total defeat.",
+          "opposing_evidence": "None significant; the mapping is a direct and conventional implication of dissolution.",
+          "adjudication": "Dissolution directly and conventionally implies total destruction or annihilation, matching the mapping without supplementation.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 2,
+          "varna": "l",
+          "frozen_mapping": "kruratā — cruelty: physical harm inflicted on the weak; crude, cruel thought and behaviour",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Dissolution may imply a breakdown of restraint or morality, which could loosely connect to cruelty or crude behavior.",
+          "opposing_evidence": "Dissolution does not naturally entail cruelty or physical harm without added context or interpretation.",
+          "adjudication": "The link requires interpreting 'dissolution' as implying a moral breakdown leading to cruelty, which is not a direct or conventional association.",
+          "judge_model": "Qwen/Qwen3-32B"
+        },
+        {
+          "word": "pralaya",
+          "gloss": "dissolution",
+          "occurrence_index": 3,
+          "varna": "y",
+          "frozen_mapping": "aviśvāsa — self-doubt that cannot commit: lack of confidence and wavering ('shall I be able to do it?'), distrust of self and others",
+          "relationship": "implication",
+          "dbr_score": 25,
+          "supporting_evidence": "Dissolution may imply a loss of stability or certainty, which could loosely connect to wavering or lack of confidence.",
+          "opposing_evidence": "Dissolution does not naturally entail self-doubt or wavering without added context or interpretation.",
+          "adjudication": "The link requires interpreting 'dissolution' as implying a psychological state of uncertainty, which is not a direct or conventional association.",
+          "judge_model": "Qwen/Qwen3-32B"
+        }
+      ],
+      "mean_dbr": 43.75,
+      "min_dbr": 25,
+      "counts": {
+        "0": 0,
+        "25": 3,
+        "50": 0,
+        "75": 0,
+        "100": 1
+      },
+      "weak_components_le_25": 3,
+      "verdict": "WEAK_RESONANCE"
+    }
+  ]
+}

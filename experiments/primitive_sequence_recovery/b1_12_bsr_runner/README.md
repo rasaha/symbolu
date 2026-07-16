@@ -50,3 +50,11 @@ mappings, the old 60-word scores, or any prior artifact. The runner reads frozen
 (never during word selection — that firewall is upstream). Retries fire only for structural invalidity
 (malformed JSON, missing field/evidence, invalid score, invented relationship, modified gloss) — never because a
 score is unfavorable — and every retry is logged in `run_{a,b}_raw_outputs.jsonl`.
+
+**Relationship-token canonicalization.** The relationship type is a controlled vocabulary. Orthographic
+typos of a taxonomy token (e.g. Mistral's deterministic `constituitive_property` → `constitutive_property`)
+are canonicalized **only** when the intent is unambiguous — an exact match, case/separator normalization, or a
+*unique* nearest taxonomy token within edit distance ≤ 2 (`bsr_rubric.canonicalize_relationship`). Semantically
+distinct or ambiguous tokens (e.g. `causation`, `vibes`) are **not** coerced and still fail as
+`invented_relationship`. This never touches scores, evidence, or which relationship the model chose; every
+coercion (`from`/`to`/occurrence) is recorded in the per-attempt `coercions` field of the raw log.

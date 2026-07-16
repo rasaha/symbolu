@@ -1,0 +1,1018 @@
+{
+  "schema": "symbol_u_utility_scenario_set_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_scenarios": 50,
+  "scenario_set_sha256": "0e4519925f8bf8208502f98e55fed53b50411a9d92c42acc7eef36596521fb8c",
+  "scenarios": [
+    {
+      "scenario_id": "S001",
+      "user_message": "I've got a flight next week and I'm honestly scared something will go wrong on it.",
+      "frozen_concern_ids": [
+        "C0001"
+      ],
+      "rationale": "Direct fear: anticipates a specific harm (flight), affect is dread. Inclusion 'anticipates harm/danger'.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0001",
+            "concept_iast": "bhaya",
+            "concept_devanagari": "भय"
+          }
+        ]
+      },
+      "category": "fear_and_insecurity"
+    },
+    {
+      "scenario_id": "S002",
+      "user_message": "My daughter just started driving to school on her own. She's careful, but every time she pulls out of the drive I sit there braced for a phone call.",
+      "frozen_concern_ids": [
+        "C0001"
+      ],
+      "rationale": "Contextual fear: threat is a possible accident; the parent is braced/alarmed. Distinct from grief (no loss) and doubt.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0001",
+            "concept_iast": "bhaya",
+            "concept_devanagari": "भय"
+          }
+        ]
+      },
+      "category": "fear_and_insecurity"
+    },
+    {
+      "scenario_id": "S003",
+      "user_message": "I can't stop worrying about the review meeting on Monday — it's honestly all I think about.",
+      "frozen_concern_ids": [
+        "C0002"
+      ],
+      "rationale": "Direct anxiety: ongoing, future-directed worry with rumination. Excl acute present threat.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0002",
+            "concept_iast": "cintā",
+            "concept_devanagari": "चिन्ता"
+          }
+        ]
+      },
+      "category": "fear_and_insecurity"
+    },
+    {
+      "scenario_id": "S004",
+      "user_message": "Work's fine, home's fine, nothing's actually wrong — but my head won't switch off lately and I keep running through everything that could go sideways.",
+      "frozen_concern_ids": [
+        "C0002"
+      ],
+      "rationale": "Ambiguous-but-resolvable: no concrete danger, but diffuse future-directed rumination = anxiety, not fear (no present threat) or confusion (clarity isn't lost).",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0002",
+            "concept_iast": "cintā",
+            "concept_devanagari": "चिन्ता"
+          }
+        ]
+      },
+      "category": "fear_and_insecurity"
+    },
+    {
+      "scenario_id": "S005",
+      "user_message": "My coworker took credit for my project in front of the whole team today and I'm furious.",
+      "frozen_concern_ids": [
+        "C0003"
+      ],
+      "rationale": "Direct anger: hostile arousal triggered by a wrong, in the moment.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0003",
+            "concept_iast": "krodha",
+            "concept_devanagari": "क्रोध"
+          }
+        ]
+      },
+      "category": "anger_and_conflict"
+    },
+    {
+      "scenario_id": "S006",
+      "user_message": "I asked my landlord three times to fix the heating. Today he showed up, glanced at it, and left. I shut the door harder than I meant to.",
+      "frozen_concern_ids": [
+        "C0003"
+      ],
+      "rationale": "Contextual anger: heat/impulse in the moment triggered by obstruction; not settled aversion.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0003",
+            "concept_iast": "krodha",
+            "concept_devanagari": "क्रोध"
+          }
+        ]
+      },
+      "category": "anger_and_conflict"
+    },
+    {
+      "scenario_id": "S007",
+      "user_message": "I still can't get past how my brother treated me last year. I just resent him now.",
+      "frozen_concern_ids": [
+        "C0004"
+      ],
+      "rationale": "Direct resentment: persistent, cold ill-will that endures. Excl momentary anger.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0004",
+            "concept_iast": "dveṣa",
+            "concept_devanagari": "द्वेष"
+          }
+        ]
+      },
+      "category": "anger_and_conflict"
+    },
+    {
+      "scenario_id": "S008",
+      "user_message": "Every time my friend bails on plans last minute I say it's fine, but it's built up over months. I don't really feel like reaching out anymore.",
+      "frozen_concern_ids": [
+        "C0004"
+      ],
+      "rationale": "Contextual resentment: dislike endured over time, cold rather than hot.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0004",
+            "concept_iast": "dveṣa",
+            "concept_devanagari": "द्वेष"
+          }
+        ]
+      },
+      "category": "anger_and_conflict"
+    },
+    {
+      "scenario_id": "S009",
+      "user_message": "We're moving to a bigger place next month — good news — but I keep finding reasons to put off packing up the old flat. I've been here eight years.",
+      "frozen_concern_ids": [
+        "C0005"
+      ],
+      "rationale": "Contextual attachment: distress centres on letting go of a place held onto; identification with it.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0005",
+            "concept_iast": "āsakti",
+            "concept_devanagari": "आसक्ति"
+          }
+        ]
+      },
+      "category": "attachment_and_loss"
+    },
+    {
+      "scenario_id": "S010",
+      "user_message": "Everyone says sell my dad's old car — it just sits there costing insurance. I keep meaning to and then I leave it another month.",
+      "frozen_concern_ids": [
+        "C0005",
+        "C0019"
+      ],
+      "rationale": "Ambiguous-but-resolvable: could read as laziness, but the pull is not-letting-go of a kept object (attachment); secondary laziness present.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0005",
+            "concept_iast": "āsakti",
+            "concept_devanagari": "आसक्ति"
+          },
+          {
+            "concern_id": "C0019",
+            "concept_iast": "ālasya",
+            "concept_devanagari": "आलस्य"
+          }
+        ]
+      },
+      "category": "attachment_and_loss"
+    },
+    {
+      "scenario_id": "S011",
+      "user_message": "My mum passed away in March and some days the sadness just flattens me.",
+      "frozen_concern_ids": [
+        "C0006"
+      ],
+      "rationale": "Direct grief: sorrow following a loss; low mournful affect.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0006",
+            "concept_iast": "śoka",
+            "concept_devanagari": "शोक"
+          }
+        ]
+      },
+      "category": "attachment_and_loss"
+    },
+    {
+      "scenario_id": "S012",
+      "user_message": "It's been six months since we had to put our dog down. I thought I'd be okay by now, but I still tear up when I see his leash by the door.",
+      "frozen_concern_ids": [
+        "C0006"
+      ],
+      "rationale": "Contextual grief: a loss has occurred; mourning persists. Distinct from separation-longing (the being is not merely absent).",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0006",
+            "concept_iast": "śoka",
+            "concept_devanagari": "शोक"
+          }
+        ]
+      },
+      "category": "attachment_and_loss"
+    },
+    {
+      "scenario_id": "S013",
+      "user_message": "I really want that promotion. I think about it constantly — how it would feel to finally get it.",
+      "frozen_concern_ids": [
+        "C0007"
+      ],
+      "rationale": "Direct craving: pull toward something not yet possessed.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0007",
+            "concept_iast": "kāma",
+            "concept_devanagari": "काम"
+          }
+        ]
+      },
+      "category": "desire_and_ambition"
+    },
+    {
+      "scenario_id": "S014",
+      "user_message": "I keep reopening the listing for a watch I can't really justify. I don't need it. I just really, really want it.",
+      "frozen_concern_ids": [
+        "C0007"
+      ],
+      "rationale": "Contextual craving: prospective object, wanting to obtain. Excl holding what one has (attachment).",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0007",
+            "concept_iast": "kāma",
+            "concept_devanagari": "काम"
+          }
+        ]
+      },
+      "category": "desire_and_ambition"
+    },
+    {
+      "scenario_id": "S015",
+      "user_message": "I got the raise I asked for and within a week I was already thinking it wasn't enough.",
+      "frozen_concern_ids": [
+        "C0008"
+      ],
+      "rationale": "Direct greed: never-enough quality; desire is insatiable.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0008",
+            "concept_iast": "lobha",
+            "concept_devanagari": "लोभ"
+          }
+        ]
+      },
+      "category": "desire_and_ambition"
+    },
+    {
+      "scenario_id": "S016",
+      "user_message": "Business is better than I planned, but instead of easing off I keep chasing more accounts, more, more. My partner says I never call it enough.",
+      "frozen_concern_ids": [
+        "C0008"
+      ],
+      "rationale": "Contextual greed: excessive accumulation past need.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0008",
+            "concept_iast": "lobha",
+            "concept_devanagari": "लोभ"
+          }
+        ]
+      },
+      "category": "desire_and_ambition"
+    },
+    {
+      "scenario_id": "S017",
+      "user_message": "I've read the setup instructions three times and I still don't understand what I'm meant to do.",
+      "frozen_concern_ids": [
+        "C0009"
+      ],
+      "rationale": "Direct confusion: clarity is lost about a task.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0009",
+            "concept_iast": "moha",
+            "concept_devanagari": "मोह"
+          }
+        ]
+      },
+      "category": "confusion_and_uncertainty"
+    },
+    {
+      "scenario_id": "S018",
+      "user_message": "Everyone's giving me advice about the reorg and none of it lines up. I can't tell what I think anymore, or which option is even the real choice.",
+      "frozen_concern_ids": [
+        "C0009",
+        "C0010"
+      ],
+      "rationale": "Ambiguous-but-resolvable: global loss of clarity (confusion) with a secondary either/or (doubt); primary is the fog, not a defined choice.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0009",
+            "concept_iast": "moha",
+            "concept_devanagari": "मोह"
+          },
+          {
+            "concern_id": "C0010",
+            "concept_iast": "saṃśaya",
+            "concept_devanagari": "संशय"
+          }
+        ]
+      },
+      "category": "confusion_and_uncertainty"
+    },
+    {
+      "scenario_id": "S019",
+      "user_message": "I've got the job offer but now I'm genuinely unsure whether to take it or stay where I am.",
+      "frozen_concern_ids": [
+        "C0010"
+      ],
+      "rationale": "Direct doubt: hesitation between defined alternatives.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0010",
+            "concept_iast": "saṃśaya",
+            "concept_devanagari": "संशय"
+          }
+        ]
+      },
+      "category": "confusion_and_uncertainty"
+    },
+    {
+      "scenario_id": "S020",
+      "user_message": "On paper the move makes sense. My gut keeps saying wait. I go back and forth on it every hour.",
+      "frozen_concern_ids": [
+        "C0010"
+      ],
+      "rationale": "Ambiguous-but-resolvable: oscillation between two named options = doubt, not global confusion (the options are clear).",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0010",
+            "concept_iast": "saṃśaya",
+            "concept_devanagari": "संशय"
+          }
+        ]
+      },
+      "category": "confusion_and_uncertainty"
+    },
+    {
+      "scenario_id": "S021",
+      "user_message": "I know I should apologise, but I really hate admitting I was the one who got it wrong.",
+      "frozen_concern_ids": [
+        "C0011"
+      ],
+      "rationale": "Direct pride: resistance rooted in self-elevation / not wanting to be seen as lesser.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0011",
+            "concept_iast": "garva",
+            "concept_devanagari": "गर्व"
+          }
+        ]
+      },
+      "category": "self_worth_and_identity"
+    },
+    {
+      "scenario_id": "S022",
+      "user_message": "In the debrief I kept steering it back to what I'd handled well. Afterwards I realised I hadn't once acknowledged anyone else's part.",
+      "frozen_concern_ids": [
+        "C0011"
+      ],
+      "rationale": "Contextual pride: comparison/superiority emphasis.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0011",
+            "concept_iast": "garva",
+            "concept_devanagari": "गर्व"
+          }
+        ]
+      },
+      "category": "self_worth_and_identity"
+    },
+    {
+      "scenario_id": "S023",
+      "user_message": "I completely blanked during the presentation and now I just want to hide.",
+      "frozen_concern_ids": [
+        "C0012"
+      ],
+      "rationale": "Direct shame: painful self-exposure with a shrinking/hiding impulse.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0012",
+            "concept_iast": "lajjā",
+            "concept_devanagari": "लज्जा"
+          }
+        ]
+      },
+      "category": "self_worth_and_identity"
+    },
+    {
+      "scenario_id": "S024",
+      "user_message": "I forgot my friend's birthday — genuinely forgot. When she mentioned it lightly I went hot in the face and changed the subject.",
+      "frozen_concern_ids": [
+        "C0012"
+      ],
+      "rationale": "Contextual shame: self-conscious exposure, wish to withdraw.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0012",
+            "concept_iast": "lajjā",
+            "concept_devanagari": "लज्जा"
+          }
+        ]
+      },
+      "category": "self_worth_and_identity"
+    },
+    {
+      "scenario_id": "S025",
+      "user_message": "My partner's away on a three-month posting. We talk every day, but the flat feels wrong without them and I keep counting the weeks.",
+      "frozen_concern_ids": [
+        "C0013"
+      ],
+      "rationale": "Contextual separation-longing: a specific loved one is absent (not lost); yearning for reunion.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0013",
+            "concept_iast": "viraha",
+            "concept_devanagari": "विरह"
+          }
+        ]
+      },
+      "category": "loneliness_and_relationship_needs"
+    },
+    {
+      "scenario_id": "S026",
+      "user_message": "My best friend moved abroad in spring. We're still close, still text, but there's this ache I can't quite name when I pass the cafe we used to go to.",
+      "frozen_concern_ids": [
+        "C0013"
+      ],
+      "rationale": "Ambiguous-but-resolvable: reads near grief, but the friend is alive and merely absent -> separation-longing.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0013",
+            "concept_iast": "viraha",
+            "concept_devanagari": "विरह"
+          }
+        ]
+      },
+      "category": "loneliness_and_relationship_needs"
+    },
+    {
+      "scenario_id": "S027",
+      "user_message": "My parents are getting older and I'm the only one nearby, so looking after them falls to me.",
+      "frozen_concern_ids": [
+        "C0014"
+      ],
+      "rationale": "Direct duty: a felt obligation tied to a role.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0014",
+            "concept_iast": "kartavya",
+            "concept_devanagari": "कर्तव्य"
+          }
+        ]
+      },
+      "category": "responsibility_and_duty"
+    },
+    {
+      "scenario_id": "S028",
+      "user_message": "Nobody else will run the fundraiser, so it's fallen to me again. It's mine to see through, even though I'm already stretched thin.",
+      "frozen_concern_ids": [
+        "C0014",
+        "C0015"
+      ],
+      "rationale": "Contextual duty (primary) with a secondary sense of burden; framed as 'mine to see through'.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0014",
+            "concept_iast": "kartavya",
+            "concept_devanagari": "कर्तव्य"
+          },
+          {
+            "concern_id": "C0015",
+            "concept_iast": "bhāra",
+            "concept_devanagari": "भार"
+          }
+        ]
+      },
+      "category": "responsibility_and_duty"
+    },
+    {
+      "scenario_id": "S029",
+      "user_message": "Between work, the kids, and my mother's appointments, it's all on me and it's just too much to carry.",
+      "frozen_concern_ids": [
+        "C0015",
+        "C0014"
+      ],
+      "rationale": "Direct burden (primary): responsibility experienced as weight/strain; secondary duty (the role) present.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0015",
+            "concept_iast": "bhāra",
+            "concept_devanagari": "भार"
+          },
+          {
+            "concern_id": "C0014",
+            "concept_iast": "kartavya",
+            "concept_devanagari": "कर्तव्य"
+          }
+        ]
+      },
+      "category": "responsibility_and_duty"
+    },
+    {
+      "scenario_id": "S030",
+      "user_message": "I said yes to chairing another group this week. I don't even remember agreeing. It just keeps piling on and I keep nodding.",
+      "frozen_concern_ids": [
+        "C0015"
+      ],
+      "rationale": "Ambiguous-but-resolvable: could read as duty, but the emphasis is heaviness/overload -> burden.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0015",
+            "concept_iast": "bhāra",
+            "concept_devanagari": "भार"
+          }
+        ]
+      },
+      "category": "responsibility_and_duty"
+    },
+    {
+      "scenario_id": "S031",
+      "user_message": "I keep checking my bank balance even though nothing's changed. Money's just constantly on my mind.",
+      "frozen_concern_ids": [
+        "C0016"
+      ],
+      "rationale": "Direct money-concern: money/wealth is the explicit focus.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0016",
+            "concept_iast": "dhana",
+            "concept_devanagari": "धन"
+          }
+        ]
+      },
+      "category": "money_and_material_concerns"
+    },
+    {
+      "scenario_id": "S032",
+      "user_message": "We got through the month, but the car needs tyres and I've started shuffling which bill to pay late. I keep checking the account and turning it over at night.",
+      "frozen_concern_ids": [
+        "C0016",
+        "C0002"
+      ],
+      "rationale": "Contextual money-concern (primary) with secondary anxious rumination.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0016",
+            "concept_iast": "dhana",
+            "concept_devanagari": "धन"
+          },
+          {
+            "concern_id": "C0002",
+            "concept_iast": "cintā",
+            "concept_devanagari": "चिन्ता"
+          }
+        ]
+      },
+      "category": "money_and_material_concerns"
+    },
+    {
+      "scenario_id": "S033",
+      "user_message": "After rent this month there's basically nothing left for groceries.",
+      "frozen_concern_ids": [
+        "C0017"
+      ],
+      "rationale": "Direct poverty: material lack/deprivation is the focus.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0017",
+            "concept_iast": "dāridrya",
+            "concept_devanagari": "दारिद्र्य"
+          }
+        ]
+      },
+      "category": "money_and_material_concerns"
+    },
+    {
+      "scenario_id": "S034",
+      "user_message": "The hours got cut at work and now I'm choosing between the electric bill and my kid's school trip. I lie awake scared we'll end up with nothing.",
+      "frozen_concern_ids": [
+        "C0017",
+        "C0001"
+      ],
+      "rationale": "Contextual poverty (primary lack/deprivation) with secondary fear of ending up with nothing.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0017",
+            "concept_iast": "dāridrya",
+            "concept_devanagari": "दारिद्र्य"
+          },
+          {
+            "concern_id": "C0001",
+            "concept_iast": "bhaya",
+            "concept_devanagari": "भय"
+          }
+        ]
+      },
+      "category": "money_and_material_concerns"
+    },
+    {
+      "scenario_id": "S035",
+      "user_message": "I've got a certification exam in two months and I've mapped out a study plan. Right now it's just head-down, grinding through the chapters each evening.",
+      "frozen_concern_ids": [
+        "C0018"
+      ],
+      "rationale": "Contextual diligence: active effort/industrious application.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0018",
+            "concept_iast": "udyoga",
+            "concept_devanagari": "उद्योग"
+          }
+        ]
+      },
+      "category": "work_and_purpose"
+    },
+    {
+      "scenario_id": "S036",
+      "user_message": "Some nights I really push at the side project; other nights I just open the file and stare. I want to stick with it, but I'm not sure what it's building toward.",
+      "frozen_concern_ids": [
+        "C0018",
+        "C0020"
+      ],
+      "rationale": "Ambiguous-but-resolvable: about effort/application (diligence, primary) with a secondary question of aim (purpose).",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0018",
+            "concept_iast": "udyoga",
+            "concept_devanagari": "उद्योग"
+          },
+          {
+            "concern_id": "C0020",
+            "concept_iast": "lakṣya",
+            "concept_devanagari": "लक्ष्य"
+          }
+        ]
+      },
+      "category": "work_and_purpose"
+    },
+    {
+      "scenario_id": "S037",
+      "user_message": "The same three tasks have been on my list for a week and I just can't make myself start any of them.",
+      "frozen_concern_ids": [
+        "C0019"
+      ],
+      "rationale": "Direct laziness: disinclination to effort; can't get started.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0019",
+            "concept_iast": "ālasya",
+            "concept_devanagari": "आलस्य"
+          }
+        ]
+      },
+      "category": "work_and_purpose"
+    },
+    {
+      "scenario_id": "S038",
+      "user_message": "It's Sunday, the flat's a mess, I meant to meal-prep and do laundry, and instead I've been on the couch scrolling for four hours.",
+      "frozen_concern_ids": [
+        "C0019"
+      ],
+      "rationale": "Contextual laziness: avoidance of exertion / inertia.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0019",
+            "concept_iast": "ālasya",
+            "concept_devanagari": "आलस्य"
+          }
+        ]
+      },
+      "category": "work_and_purpose"
+    },
+    {
+      "scenario_id": "S039",
+      "user_message": "I've got a stable job but I keep asking what I'm actually working toward.",
+      "frozen_concern_ids": [
+        "C0020"
+      ],
+      "rationale": "Direct purpose: seeking a defined aim/direction.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0020",
+            "concept_iast": "lakṣya",
+            "concept_devanagari": "लक्ष्य"
+          }
+        ]
+      },
+      "category": "work_and_purpose"
+    },
+    {
+      "scenario_id": "S040",
+      "user_message": "I ticked every box I set five years ago. Now I'm not sure what the next thing is even for, or which direction is mine to pick.",
+      "frozen_concern_ids": [
+        "C0020",
+        "C0010"
+      ],
+      "rationale": "Ambiguous-but-resolvable: reads near doubt, but the pull is toward a goal/direction -> purpose (primary), doubt secondary.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0020",
+            "concept_iast": "lakṣya",
+            "concept_devanagari": "लक्ष्य"
+          },
+          {
+            "concern_id": "C0010",
+            "concept_iast": "saṃśaya",
+            "concept_devanagari": "संशय"
+          }
+        ]
+      },
+      "category": "work_and_purpose"
+    },
+    {
+      "scenario_id": "S041",
+      "user_message": "I've really been wanting to understand how mortgages actually work before we buy.",
+      "frozen_concern_ids": [
+        "C0021"
+      ],
+      "rationale": "Direct curiosity: an active wish to know/understand.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0021",
+            "concept_iast": "jijñāsā",
+            "concept_devanagari": "जिज्ञासा"
+          }
+        ]
+      },
+      "category": "learning_and_understanding"
+    },
+    {
+      "scenario_id": "S042",
+      "user_message": "My kid asked me why the sky goes red at sunset and I realised I didn't actually know. Now I can't stop wanting to look it up.",
+      "frozen_concern_ids": [
+        "C0021"
+      ],
+      "rationale": "Contextual curiosity: a question is being pursued.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0021",
+            "concept_iast": "jijñāsā",
+            "concept_devanagari": "जिज्ञासा"
+          }
+        ]
+      },
+      "category": "learning_and_understanding"
+    },
+    {
+      "scenario_id": "S043",
+      "user_message": "After a year of practice I can finally read music fluently — it just clicks now.",
+      "frozen_concern_ids": [
+        "C0022"
+      ],
+      "rationale": "Direct knowledge: possession/grasp of an understanding.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0022",
+            "concept_iast": "jñāna",
+            "concept_devanagari": "ज्ञान"
+          }
+        ]
+      },
+      "category": "learning_and_understanding"
+    },
+    {
+      "scenario_id": "S044",
+      "user_message": "I used to nod along in budget meetings pretending I followed the numbers. This quarter I actually understand the whole model and it feels good.",
+      "frozen_concern_ids": [
+        "C0022"
+      ],
+      "rationale": "Contextual knowledge: framed as now understanding. Distinct from curiosity (already knowing).",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0022",
+            "concept_iast": "jñāna",
+            "concept_devanagari": "ज्ञान"
+          }
+        ]
+      },
+      "category": "learning_and_understanding"
+    },
+    {
+      "scenario_id": "S045",
+      "user_message": "We're six months into trying to adopt and it's all waiting — forms, reviews, more waiting. I'm trying to hold steady but it's testing me.",
+      "frozen_concern_ids": [
+        "C0023"
+      ],
+      "rationale": "Contextual patience: forbearance/endurance under a drawn-out difficulty.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0023",
+            "concept_iast": "kṣamā",
+            "concept_devanagari": "क्षमा"
+          }
+        ]
+      },
+      "category": "calm_patience_and_regulation"
+    },
+    {
+      "scenario_id": "S046",
+      "user_message": "My teenager barely speaks to me right now. I'm trying to ride it out like everyone says, but some days the constant coldness just gets under my skin.",
+      "frozen_concern_ids": [
+        "C0023",
+        "C0004"
+      ],
+      "rationale": "Ambiguous-but-resolvable: holding steady through difficulty (patience, primary) with secondary resentment building.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0023",
+            "concept_iast": "kṣamā",
+            "concept_devanagari": "क्षमा"
+          },
+          {
+            "concern_id": "C0004",
+            "concept_iast": "dveṣa",
+            "concept_devanagari": "द्वेष"
+          }
+        ]
+      },
+      "category": "calm_patience_and_regulation"
+    },
+    {
+      "scenario_id": "S047",
+      "user_message": "Honestly, things are pretty good right now and I feel settled with where I am.",
+      "frozen_concern_ids": [
+        "C0024"
+      ],
+      "rationale": "Direct contentment: satisfaction / enough-ness.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0024",
+            "concept_iast": "santoṣa",
+            "concept_devanagari": "सन्तोष"
+          }
+        ]
+      },
+      "category": "calm_patience_and_regulation"
+    },
+    {
+      "scenario_id": "S048",
+      "user_message": "We didn't get the bigger house, and a year ago that would've stung. Now I look around our little place and it genuinely feels like enough.",
+      "frozen_concern_ids": [
+        "C0024"
+      ],
+      "rationale": "Contextual contentment: 'enough' quality; satisfied with what one has.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0024",
+            "concept_iast": "santoṣa",
+            "concept_devanagari": "सन्तोष"
+          }
+        ]
+      },
+      "category": "calm_patience_and_regulation"
+    },
+    {
+      "scenario_id": "S049",
+      "user_message": "After the deadline finally passed I took the weekend off-grid, and my mind feels quiet for the first time in weeks.",
+      "frozen_concern_ids": [
+        "C0025"
+      ],
+      "rationale": "Contextual calm: a quiet, undisturbed mind; absence of disturbance.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0025",
+            "concept_iast": "śānti",
+            "concept_devanagari": "शान्ति"
+          }
+        ]
+      },
+      "category": "calm_patience_and_regulation"
+    },
+    {
+      "scenario_id": "S050",
+      "user_message": "I don't need anything fixed. I just want ten minutes somewhere my head isn't buzzing and racing through the week.",
+      "frozen_concern_ids": [
+        "C0025",
+        "C0002"
+      ],
+      "rationale": "Ambiguous-but-resolvable: a wish for a quiet/undisturbed mind (calm, primary) with secondary anxious racing.",
+      "expected_bridge_output": {
+        "status": "OK",
+        "concepts": [
+          {
+            "concern_id": "C0025",
+            "concept_iast": "śānti",
+            "concept_devanagari": "शान्ति"
+          },
+          {
+            "concern_id": "C0002",
+            "concept_iast": "cintā",
+            "concept_devanagari": "चिन्ता"
+          }
+        ]
+      },
+      "category": "calm_patience_and_regulation"
+    }
+  ]
+}

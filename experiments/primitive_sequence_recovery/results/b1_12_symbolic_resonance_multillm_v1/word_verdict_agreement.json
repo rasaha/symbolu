@@ -1,0 +1,27 @@
+{
+  "exact_verdict_agreement": 0.5,
+  "n_words": 20,
+  "rows": [
+    {"word": "bhūmi", "category": "natural_action_abstract", "verdict_A": "MINIMAL_RESONANCE", "verdict_B": "MINIMAL_RESONANCE", "mean_A": 25.0, "mean_B": 25.0, "agree": true, "evaluator_sensitive": false},
+    {"word": "bāhu", "category": "animal_body_living", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "WEAK_RESONANCE", "mean_A": 50.0, "mean_B": 37.5, "agree": false, "evaluator_sensitive": false},
+    {"word": "droha", "category": "afflictive", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 50.0, "mean_B": 58.33, "agree": true, "evaluator_sensitive": false},
+    {"word": "dīpa", "category": "concrete_object", "verdict_A": "NO_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 12.5, "mean_B": 50.0, "agree": false, "evaluator_sensitive": true},
+    {"word": "garva", "category": "afflictive", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 50.0, "mean_B": 66.67, "agree": true, "evaluator_sensitive": false},
+    {"word": "kapaṭa", "category": "afflictive", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 50.0, "mean_B": 58.33, "agree": true, "evaluator_sensitive": false},
+    {"word": "kleśa", "category": "afflictive", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 50.0, "mean_B": 50.0, "agree": true, "evaluator_sensitive": false},
+    {"word": "kāka", "category": "animal_body_living", "verdict_A": "MINIMAL_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 25.0, "mean_B": 50.0, "agree": false, "evaluator_sensitive": true},
+    {"word": "mayūra", "category": "animal_body_living", "verdict_A": "MINIMAL_RESONANCE", "verdict_B": "WEAK_RESONANCE", "mean_A": 25.0, "mean_B": 33.33, "agree": false, "evaluator_sensitive": false},
+    {"word": "naukā", "category": "concrete_object", "verdict_A": "WEAK_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 37.5, "mean_B": 50.0, "agree": false, "evaluator_sensitive": false},
+    {"word": "nāsā", "category": "animal_body_living", "verdict_A": "MINIMAL_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 25.0, "mean_B": 50.0, "agree": false, "evaluator_sensitive": true},
+    {"word": "prema", "category": "virtue_calm", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 50.0, "mean_B": 50.0, "agree": true, "evaluator_sensitive": false},
+    {"word": "pāṭha", "category": "natural_action_abstract", "verdict_A": "MINIMAL_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 25.0, "mean_B": 50.0, "agree": false, "evaluator_sensitive": true},
+    {"word": "rūpa", "category": "natural_action_abstract", "verdict_A": "WEAK_RESONANCE", "verdict_B": "WEAK_RESONANCE", "mean_A": 37.5, "mean_B": 37.5, "agree": true, "evaluator_sensitive": false},
+    {"word": "santoṣa", "category": "virtue_calm", "verdict_A": "WEAK_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 43.75, "mean_B": 62.5, "agree": false, "evaluator_sensitive": false},
+    {"word": "setu", "category": "concrete_object", "verdict_A": "WEAK_RESONANCE", "verdict_B": "WEAK_RESONANCE", "mean_A": 37.5, "mean_B": 37.5, "agree": true, "evaluator_sensitive": false},
+    {"word": "sneha", "category": "virtue_calm", "verdict_A": "MODERATE_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 50.0, "mean_B": 66.67, "agree": true, "evaluator_sensitive": false},
+    {"word": "snāna", "category": "natural_action_abstract", "verdict_A": "WEAK_RESONANCE", "verdict_B": "WEAK_RESONANCE", "mean_A": 41.67, "mean_B": 33.33, "agree": true, "evaluator_sensitive": false},
+    {"word": "titikṣā", "category": "virtue_calm", "verdict_A": "WEAK_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 37.5, "mean_B": 56.25, "agree": false, "evaluator_sensitive": false},
+    {"word": "vastra", "category": "concrete_object", "verdict_A": "WEAK_RESONANCE", "verdict_B": "MODERATE_RESONANCE", "mean_A": 31.25, "mean_B": 50.0, "agree": false, "evaluator_sensitive": false}
+  ],
+  "evaluator_sensitive_words": ["dīpa", "kāka", "nāsā", "pāṭha"]
+}

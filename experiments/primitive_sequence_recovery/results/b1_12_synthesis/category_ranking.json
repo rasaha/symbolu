@@ -1,0 +1,47 @@
+[
+  {
+    "category": "virtue_calm",
+    "n_components": 24,
+    "avg_score": 57.3,
+    "score_stdev": 19.7,
+    "mean_cross_eval_absdiff": 16.7,
+    "exact_agree": 0.542,
+    "no_relationship_rate": 0.0
+  },
+  {
+    "category": "afflictive",
+    "n_components": 25,
+    "avg_score": 48.5,
+    "score_stdev": 19.0,
+    "mean_cross_eval_absdiff": 17,
+    "exact_agree": 0.4,
+    "no_relationship_rate": 0.0
+  },
+  {
+    "category": "natural_action_abstract",
+    "n_components": 21,
+    "avg_score": 29.2,
+    "score_stdev": 18.8,
+    "mean_cross_eval_absdiff": 10.7,
+    "exact_agree": 0.619,
+    "no_relationship_rate": 0.119
+  },
+  {
+    "category": "concrete_object",
+    "n_components": 23,
+    "avg_score": 27.7,
+    "score_stdev": 16.7,
+    "mean_cross_eval_absdiff": 12.0,
+    "exact_agree": 0.565,
+    "no_relationship_rate": 0.152
+  },
+  {
+    "category": "animal_body_living",
+    "n_components": 21,
+    "avg_score": 26.2,
+    "score_stdev": 18.9,
+    "mean_cross_eval_absdiff": 16.7,
+    "exact_agree": 0.476,
+    "no_relationship_rate": 0.238
+  }
+]

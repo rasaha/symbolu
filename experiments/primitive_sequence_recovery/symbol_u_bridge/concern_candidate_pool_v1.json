@@ -1,0 +1,351 @@
+{
+  "schema": "symbol_u_bridge_candidate_pool_v1",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_candidates": 45,
+  "n_included": 25,
+  "n_excluded": 20,
+  "selection_firewall": "authored from ordinary meaning/lexical clarity/attestation/personal-assistant relevance/semantic fit; NOT from varna glosses, B1.12 scores, mapping stability, Tier-1 varnas, or anticipated benefit",
+  "pool_sha256": "a408ce5c75a2f93dfbc399d703fa857d56ca8343292646103b0021b3c61d0e4b",
+  "candidates": [
+    {
+      "iast": "bhaya",
+      "devanagari": "भय",
+      "proposed_label": "fear",
+      "category": "fear_and_insecurity",
+      "status": "INCLUDED",
+      "concern_id": "C0001"
+    },
+    {
+      "iast": "cintā",
+      "devanagari": "चिन्ता",
+      "proposed_label": "anxiety",
+      "category": "fear_and_insecurity",
+      "status": "INCLUDED",
+      "concern_id": "C0002"
+    },
+    {
+      "iast": "krodha",
+      "devanagari": "क्रोध",
+      "proposed_label": "anger",
+      "category": "anger_and_conflict",
+      "status": "INCLUDED",
+      "concern_id": "C0003"
+    },
+    {
+      "iast": "dveṣa",
+      "devanagari": "द्वेष",
+      "proposed_label": "resentment",
+      "category": "anger_and_conflict",
+      "status": "INCLUDED",
+      "concern_id": "C0004"
+    },
+    {
+      "iast": "āsakti",
+      "devanagari": "आसक्ति",
+      "proposed_label": "attachment",
+      "category": "attachment_and_loss",
+      "status": "INCLUDED",
+      "concern_id": "C0005"
+    },
+    {
+      "iast": "śoka",
+      "devanagari": "शोक",
+      "proposed_label": "grief",
+      "category": "attachment_and_loss",
+      "status": "INCLUDED",
+      "concern_id": "C0006"
+    },
+    {
+      "iast": "kāma",
+      "devanagari": "काम",
+      "proposed_label": "craving",
+      "category": "desire_and_ambition",
+      "status": "INCLUDED",
+      "concern_id": "C0007"
+    },
+    {
+      "iast": "lobha",
+      "devanagari": "लोभ",
+      "proposed_label": "greed",
+      "category": "desire_and_ambition",
+      "status": "INCLUDED",
+      "concern_id": "C0008"
+    },
+    {
+      "iast": "moha",
+      "devanagari": "मोह",
+      "proposed_label": "confusion",
+      "category": "confusion_and_uncertainty",
+      "status": "INCLUDED",
+      "concern_id": "C0009"
+    },
+    {
+      "iast": "saṃśaya",
+      "devanagari": "संशय",
+      "proposed_label": "doubt",
+      "category": "confusion_and_uncertainty",
+      "status": "INCLUDED",
+      "concern_id": "C0010"
+    },
+    {
+      "iast": "garva",
+      "devanagari": "गर्व",
+      "proposed_label": "pride",
+      "category": "self_worth_and_identity",
+      "status": "INCLUDED",
+      "concern_id": "C0011"
+    },
+    {
+      "iast": "lajjā",
+      "devanagari": "लज्जा",
+      "proposed_label": "shame",
+      "category": "self_worth_and_identity",
+      "status": "INCLUDED",
+      "concern_id": "C0012"
+    },
+    {
+      "iast": "viraha",
+      "devanagari": "विरह",
+      "proposed_label": "separation-longing",
+      "category": "loneliness_and_relationship_needs",
+      "status": "INCLUDED",
+      "concern_id": "C0013"
+    },
+    {
+      "iast": "kartavya",
+      "devanagari": "कर्तव्य",
+      "proposed_label": "duty",
+      "category": "responsibility_and_duty",
+      "status": "INCLUDED",
+      "concern_id": "C0014"
+    },
+    {
+      "iast": "bhāra",
+      "devanagari": "भार",
+      "proposed_label": "burden",
+      "category": "responsibility_and_duty",
+      "status": "INCLUDED",
+      "concern_id": "C0015"
+    },
+    {
+      "iast": "dhana",
+      "devanagari": "धन",
+      "proposed_label": "money-concern",
+      "category": "money_and_material_concerns",
+      "status": "INCLUDED",
+      "concern_id": "C0016"
+    },
+    {
+      "iast": "dāridrya",
+      "devanagari": "दारिद्र्य",
+      "proposed_label": "poverty",
+      "category": "money_and_material_concerns",
+      "status": "INCLUDED",
+      "concern_id": "C0017"
+    },
+    {
+      "iast": "udyoga",
+      "devanagari": "उद्योग",
+      "proposed_label": "diligence",
+      "category": "work_and_purpose",
+      "status": "INCLUDED",
+      "concern_id": "C0018"
+    },
+    {
+      "iast": "ālasya",
+      "devanagari": "आलस्य",
+      "proposed_label": "laziness",
+      "category": "work_and_purpose",
+      "status": "INCLUDED",
+      "concern_id": "C0019"
+    },
+    {
+      "iast": "lakṣya",
+      "devanagari": "लक्ष्य",
+      "proposed_label": "purpose",
+      "category": "work_and_purpose",
+      "status": "INCLUDED",
+      "concern_id": "C0020"
+    },
+    {
+      "iast": "jijñāsā",
+      "devanagari": "जिज्ञासा",
+      "proposed_label": "curiosity",
+      "category": "learning_and_understanding",
+      "status": "INCLUDED",
+      "concern_id": "C0021"
+    },
+    {
+      "iast": "jñāna",
+      "devanagari": "ज्ञान",
+      "proposed_label": "knowledge",
+      "category": "learning_and_understanding",
+      "status": "INCLUDED",
+      "concern_id": "C0022"
+    },
+    {
+      "iast": "kṣamā",
+      "devanagari": "क्षमा",
+      "proposed_label": "patience",
+      "category": "calm_patience_and_regulation",
+      "status": "INCLUDED",
+      "concern_id": "C0023"
+    },
+    {
+      "iast": "santoṣa",
+      "devanagari": "सन्तोष",
+      "proposed_label": "contentment",
+      "category": "calm_patience_and_regulation",
+      "status": "INCLUDED",
+      "concern_id": "C0024"
+    },
+    {
+      "iast": "śānti",
+      "devanagari": "शान्ति",
+      "proposed_label": "calm",
+      "category": "calm_patience_and_regulation",
+      "status": "INCLUDED",
+      "concern_id": "C0025"
+    },
+    {
+      "iast": "dharma",
+      "devanagari": "धर्म",
+      "proposed_label": "duty",
+      "status": "EXCLUDED",
+      "exclusion_reason": "EXCESSIVE_POLYSEMY"
+    },
+    {
+      "iast": "karma",
+      "devanagari": "कर्म",
+      "proposed_label": "work/action",
+      "status": "EXCLUDED",
+      "exclusion_reason": "EXCESSIVE_POLYSEMY"
+    },
+    {
+      "iast": "ahaṃkāra",
+      "devanagari": "अहंकार",
+      "proposed_label": "ego",
+      "status": "EXCLUDED",
+      "exclusion_reason": "TECHNICAL_OR_DOCTRINAL"
+    },
+    {
+      "iast": "ātman",
+      "devanagari": "आत्मन्",
+      "proposed_label": "self/identity",
+      "status": "EXCLUDED",
+      "exclusion_reason": "TECHNICAL_OR_DOCTRINAL"
+    },
+    {
+      "iast": "loneliness",
+      "devanagari": "—",
+      "proposed_label": "loneliness",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NO_CLEAR_SANSKRIT_CONCEPT"
+    },
+    {
+      "iast": "validation",
+      "devanagari": "—",
+      "proposed_label": "need for recognition",
+      "status": "EXCLUDED",
+      "exclusion_reason": "TOO_CONTEXT_DEPENDENT"
+    },
+    {
+      "iast": "mamatā",
+      "devanagari": "ममता",
+      "proposed_label": "possessiveness",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    },
+    {
+      "iast": "rāga",
+      "devanagari": "राग",
+      "proposed_label": "passion/attachment",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    },
+    {
+      "iast": "icchā",
+      "devanagari": "इच्छा",
+      "proposed_label": "wish",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    },
+    {
+      "iast": "māna",
+      "devanagari": "मान",
+      "proposed_label": "pride/honor",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    },
+    {
+      "iast": "saṃyama",
+      "devanagari": "संयम",
+      "proposed_label": "restraint",
+      "status": "EXCLUDED",
+      "exclusion_reason": "TECHNICAL_OR_DOCTRINAL"
+    },
+    {
+      "iast": "vairāgya",
+      "devanagari": "वैराग्य",
+      "proposed_label": "dispassion",
+      "status": "EXCLUDED",
+      "exclusion_reason": "TECHNICAL_OR_DOCTRINAL"
+    },
+    {
+      "iast": "duḥkha",
+      "devanagari": "दुःख",
+      "proposed_label": "suffering",
+      "status": "EXCLUDED",
+      "exclusion_reason": "TOO_CONTEXT_DEPENDENT"
+    },
+    {
+      "iast": "īrṣyā",
+      "devanagari": "ईर्ष्या",
+      "proposed_label": "jealousy",
+      "status": "EXCLUDED",
+      "exclusion_reason": "NOT_SUITABLE_FOR_SEED_SCOPE"
+    },
+    {
+      "iast": "bhrama",
+      "devanagari": "भ्रम",
+      "proposed_label": "confusion",
+      "status": "EXCLUDED",
+      "exclusion_reason": "DUPLICATE_CONCERN"
+    },
+    {
+      "iast": "aniścaya",
+      "devanagari": "अनिश्चय",
+      "proposed_label": "indecision",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    },
+    {
+      "iast": "spṛhā",
+      "devanagari": "स्पृहा",
+      "proposed_label": "ambition/longing",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    },
+    {
+      "iast": "prayatna",
+      "devanagari": "प्रयत्न",
+      "proposed_label": "effort",
+      "status": "EXCLUDED",
+      "exclusion_reason": "DUPLICATE_CONCERN"
+    },
+    {
+      "iast": "vidyā",
+      "devanagari": "विद्या",
+      "proposed_label": "knowledge",
+      "status": "EXCLUDED",
+      "exclusion_reason": "DUPLICATE_CONCERN"
+    },
+    {
+      "iast": "utkaṇṭhā",
+      "devanagari": "उत्कण्ठा",
+      "proposed_label": "longing",
+      "status": "EXCLUDED",
+      "exclusion_reason": "OVERLAPPING_DEFINITION"
+    }
+  ]
+}

@@ -1,0 +1,428 @@
+{
+  "schema": "b1_12_bsr_candidate_source_list_v2",
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "n_source": 70,
+  "selection_firewall": "category by ordinary meaning; coverage by parser+lexicon UNIT-SET membership only; mapping gloss text NOT read",
+  "candidates": [
+    {
+      "iast": "īrṣyā",
+      "dev": "ईर्ष्या",
+      "gloss": "jealousy",
+      "category": "afflictive"
+    },
+    {
+      "iast": "mada",
+      "dev": "मद",
+      "gloss": "pride/intoxication",
+      "category": "afflictive"
+    },
+    {
+      "iast": "dveṣa",
+      "dev": "द्वेष",
+      "gloss": "hatred/aversion",
+      "category": "afflictive"
+    },
+    {
+      "iast": "śoka",
+      "dev": "शोक",
+      "gloss": "grief",
+      "category": "afflictive"
+    },
+    {
+      "iast": "rāga",
+      "dev": "राग",
+      "gloss": "passion/craving",
+      "category": "afflictive"
+    },
+    {
+      "iast": "cintā",
+      "dev": "चिन्ता",
+      "gloss": "anxiety",
+      "category": "afflictive"
+    },
+    {
+      "iast": "bhrama",
+      "dev": "भ्रम",
+      "gloss": "delusion/confusion",
+      "category": "afflictive"
+    },
+    {
+      "iast": "asūyā",
+      "dev": "असूया",
+      "gloss": "envy/detraction",
+      "category": "afflictive"
+    },
+    {
+      "iast": "mātsarya",
+      "dev": "मात्सर्य",
+      "gloss": "envious greed",
+      "category": "afflictive"
+    },
+    {
+      "iast": "kārpaṇya",
+      "dev": "कार्पण्य",
+      "gloss": "miserliness/pettiness",
+      "category": "afflictive"
+    },
+    {
+      "iast": "matsya",
+      "dev": "मत्स्य",
+      "gloss": "fish",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "markaṭa",
+      "dev": "मर्कट",
+      "gloss": "ape",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "mahiṣa",
+      "dev": "महिष",
+      "gloss": "buffalo",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "uṣṭra",
+      "dev": "उष्ट्र",
+      "gloss": "camel",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "vṛka",
+      "dev": "वृक",
+      "gloss": "wolf",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "kūrma",
+      "dev": "कूर्म",
+      "gloss": "tortoise",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "maṇḍūka",
+      "dev": "मण्डूक",
+      "gloss": "frog",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "śṛgāla",
+      "dev": "शृगाल",
+      "gloss": "jackal",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "kapāla",
+      "dev": "कपाल",
+      "gloss": "skull",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "grīvā",
+      "dev": "ग्रीवा",
+      "gloss": "neck",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "jaṅghā",
+      "dev": "जङ्घा",
+      "gloss": "shank",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "oṣṭha",
+      "dev": "ओष्ठ",
+      "gloss": "lip",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "lalāṭa",
+      "dev": "ललाट",
+      "gloss": "forehead",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "pṛṣṭha",
+      "dev": "पृष्ठ",
+      "gloss": "back",
+      "category": "animal_body_living"
+    },
+    {
+      "iast": "ratha",
+      "dev": "रथ",
+      "gloss": "chariot",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "ghaṭa",
+      "dev": "घट",
+      "gloss": "pot",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "maṇi",
+      "dev": "मणि",
+      "gloss": "jewel",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "pustaka",
+      "dev": "पुस्तक",
+      "gloss": "book",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "śara",
+      "dev": "शर",
+      "gloss": "arrow",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "darpaṇa",
+      "dev": "दर्पण",
+      "gloss": "mirror",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "kuṇḍala",
+      "dev": "कुण्डल",
+      "gloss": "earring",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "khaḍga",
+      "dev": "खड्ग",
+      "gloss": "sword",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "mukura",
+      "dev": "मुकुर",
+      "gloss": "mirror",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "cāpa",
+      "dev": "चाप",
+      "gloss": "bow",
+      "category": "concrete_object"
+    },
+    {
+      "iast": "megha",
+      "dev": "मेघ",
+      "gloss": "cloud",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "vāyu",
+      "dev": "वायु",
+      "gloss": "wind",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "parvata",
+      "dev": "पर्वत",
+      "gloss": "mountain",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "samudra",
+      "dev": "समुद्र",
+      "gloss": "ocean",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "vṛṣṭi",
+      "dev": "वृष्टि",
+      "gloss": "rain",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "gamana",
+      "dev": "गमन",
+      "gloss": "going/movement",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "smṛti",
+      "dev": "स्मृति",
+      "gloss": "memory",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "nidrā",
+      "dev": "निद्रा",
+      "gloss": "sleep",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "taḍit",
+      "dev": "तडित्",
+      "gloss": "lightning",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "pavana",
+      "dev": "पवन",
+      "gloss": "wind",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "kāla",
+      "dev": "काल",
+      "gloss": "time",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "tejas",
+      "dev": "तेजस्",
+      "gloss": "radiance",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "tuṣāra",
+      "dev": "तुषार",
+      "gloss": "frost",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "pralaya",
+      "dev": "प्रलय",
+      "gloss": "dissolution",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "sṛṣṭi",
+      "dev": "सृष्टि",
+      "gloss": "creation",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "vega",
+      "dev": "वेग",
+      "gloss": "impulse/speed",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "dhvani",
+      "dev": "ध्वनि",
+      "gloss": "sound",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "chāyā",
+      "dev": "छाया",
+      "gloss": "shadow",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "taraṅga",
+      "dev": "तरङ्ग",
+      "gloss": "wave",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "hima",
+      "dev": "हिम",
+      "gloss": "snow/frost",
+      "category": "natural_action_abstract"
+    },
+    {
+      "iast": "kṣamā",
+      "dev": "क्षमा",
+      "gloss": "forgiveness",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "karuṇā",
+      "dev": "करुणा",
+      "gloss": "compassion",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "maitrī",
+      "dev": "मैत्री",
+      "gloss": "friendliness",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "dhṛti",
+      "dev": "धृति",
+      "gloss": "fortitude",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "vinaya",
+      "dev": "विनय",
+      "gloss": "humility",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "śraddhā",
+      "dev": "श्रद्धा",
+      "gloss": "faith",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "dāna",
+      "dev": "दान",
+      "gloss": "generosity",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "viveka",
+      "dev": "विवेक",
+      "gloss": "discernment",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "audārya",
+      "dev": "औदार्य",
+      "gloss": "magnanimity",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "ārjava",
+      "dev": "आर्जव",
+      "gloss": "straightforwardness",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "mārdava",
+      "dev": "मार्दव",
+      "gloss": "gentleness",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "tyāga",
+      "dev": "त्याग",
+      "gloss": "renunciation",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "dama",
+      "dev": "दम",
+      "gloss": "self-restraint",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "śama",
+      "dev": "शम",
+      "gloss": "tranquillity",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "akrodha",
+      "dev": "अक्रोध",
+      "gloss": "non-anger",
+      "category": "virtue_calm"
+    },
+    {
+      "iast": "kṣānti",
+      "dev": "क्षान्ति",
+      "gloss": "patience",
+      "category": "virtue_calm"
+    }
+  ]
+}

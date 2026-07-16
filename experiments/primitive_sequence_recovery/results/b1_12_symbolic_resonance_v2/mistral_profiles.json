@@ -1,0 +1,125 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "profiles": [
+    {
+      "word": "akrodha",
+      "gloss": "non-anger",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "non-anger"
+    },
+    {
+      "word": "asūyā",
+      "gloss": "envy/detraction",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "envy/detraction"
+    },
+    {
+      "word": "audārya",
+      "gloss": "magnanimity",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "magnanimity"
+    },
+    {
+      "word": "bhrama",
+      "gloss": "delusion/confusion",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "delusion/confusion"
+    },
+    {
+      "word": "chāyā",
+      "gloss": "shadow",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "shadow"
+    },
+    {
+      "word": "cintā",
+      "gloss": "anxiety",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "anxiety"
+    },
+    {
+      "word": "cāpa",
+      "gloss": "bow",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "a bow"
+    },
+    {
+      "word": "dama",
+      "gloss": "self-restraint",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "self-restraint"
+    },
+    {
+      "word": "darpaṇa",
+      "gloss": "mirror",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "mirror"
+    },
+    {
+      "word": "dhvani",
+      "gloss": "sound",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "sound"
+    },
+    {
+      "word": "dhṛti",
+      "gloss": "fortitude",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "fortitude"
+    },
+    {
+      "word": "jaṅghā",
+      "gloss": "shank",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "shank"
+    },
+    {
+      "word": "kapāla",
+      "gloss": "skull",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "skull"
+    },
+    {
+      "word": "kuṇḍala",
+      "gloss": "earring",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "earring"
+    },
+    {
+      "word": "kārpaṇya",
+      "gloss": "miserliness/pettiness",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "miserliness/pettiness"
+    },
+    {
+      "word": "kūrma",
+      "gloss": "tortoise",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "tortoise"
+    },
+    {
+      "word": "lalāṭa",
+      "gloss": "forehead",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "forehead"
+    },
+    {
+      "word": "mukura",
+      "gloss": "mirror",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "a reflective surface that shows an image"
+    },
+    {
+      "word": "pavana",
+      "gloss": "wind",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "wind"
+    },
+    {
+      "word": "pralaya",
+      "gloss": "dissolution",
+      "judge_model": "mistralai/Mistral-Small-3.1-24B-Instruct-2503",
+      "profile": "dissolution"
+    }
+  ]
+}
