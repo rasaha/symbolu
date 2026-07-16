@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "symbol_u/utility_study/judge.schema.json",
+  "title": "Symbol-U Assistant Utility — Blind judgment record",
+  "description": "One judge's blind rating of one response. The record carries NO arm label; response_key maps to arm only in a sealed key file revealed after judging. Arm order is randomized per scenario.",
+  "type": "object",
+  "required": ["judgment_id", "scenario_id", "response_key", "judge_id", "judge_type", "ratings", "overinterpretation_flags"],
+  "additionalProperties": false,
+  "properties": {
+    "judgment_id": {"type": "string"},
+    "scenario_id": {"type": "string", "pattern": "^S[0-9]{3}$"},
+    "response_key": {"type": "string", "description": "blind id; arm mapping is sealed until unblinding"},
+    "judge_id": {"type": "string"},
+    "judge_type": {"enum": ["llm", "human"]},
+    "ratings": {"type": "object", "description": "metric_id -> integer 1-5",
+      "properties": {"overall_usefulness": {"type": "integer", "minimum": 1, "maximum": 5}},
+      "required": ["overall_usefulness"]},
+    "overinterpretation_flags": {"type": "array", "items": {"type": "object",
+      "required": ["category", "severity"],
+      "properties": {"claim": {"type": "string"},
+        "category": {"enum": ["invented_unconscious_motive", "asserted_hidden_cause", "symbolic_hypothesis_as_fact",
+                              "excessive_philosophical_elaboration", "unnecessary_sanskrit_discussion"]},
+        "severity": {"enum": ["minor", "major"]}}}},
+    "blind_guess_arm": {"type": ["string", "null"], "description": "optional: judge's guess of which arm (to test blinding integrity)"},
+    "notes": {"type": "string"}
+  }
+}
