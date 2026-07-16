@@ -1,0 +1,44 @@
+[
+  {
+    "study": "V1_crossover",
+    "n_components": 54,
+    "exact_score_agree": 0.5,
+    "within_one_step": 0.944,
+    "mean_abs_diff": 13.89,
+    "signed_bias_A_minus_B": -11.11,
+    "rel_exact": 27,
+    "rel_compatible": 8,
+    "rel_incompatible": 19,
+    "rel_exact_frac": 0.5,
+    "score_dist_pooled": {
+      "0": 1,
+      "25": 41,
+      "50": 47,
+      "75": 19,
+      "100": 0
+    },
+    "mean_score_pooled": 44.4,
+    "no_relationship_components": 0
+  },
+  {
+    "study": "V2_independent",
+    "n_components": 60,
+    "exact_score_agree": 0.533,
+    "within_one_step": 0.85,
+    "mean_abs_diff": 15.42,
+    "signed_bias_A_minus_B": -4.58,
+    "rel_exact": 36,
+    "rel_compatible": 7,
+    "rel_incompatible": 17,
+    "rel_exact_frac": 0.6,
+    "score_dist_pooled": {
+      "0": 22,
+      "25": 59,
+      "50": 18,
+      "75": 20,
+      "100": 1
+    },
+    "mean_score_pooled": 33.1,
+    "no_relationship_components": 22
+  }
+]

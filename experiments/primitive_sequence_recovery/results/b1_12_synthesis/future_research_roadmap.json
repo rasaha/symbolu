@@ -1,0 +1,22 @@
+{
+  "label": "EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE",
+  "note": "New, separate studies. NOT a reopening of B1.12 and NOT a revision of its methodology. Ranked by expected information gain (EIG), ignoring statistical significance per the synthesis objective.",
+  "roadmap": [
+    {"rank": 1, "study": "Per-varna saturation", "eig": "highest",
+     "why": "16 of 27 covered varnas have n<=2; per-mapping rankings are currently low-power",
+     "design_sketch": "many attested words per SINGLE varna, target n>=10 mapped components per mapping, same frozen scale",
+     "resolves": "Part-5 under-sampling; strongest/weakest-mapping claims with power"},
+    {"rank": 2, "study": "Human-vs-LLM calibration on borderline components", "eig": "high",
+     "why": "separates genuine symbolic ambiguity (akrodha semantic-radius) from the fixable 'direct-vs-supplemented' threshold (kapala)",
+     "design_sketch": "human raters score the >=50-gap components under the SAME frozen rubric; compare to each model",
+     "resolves": "Part-7 unknowns 1 and 2"},
+    {"rank": 3, "study": "Alternate/shuffled-mapping control", "eig": "high",
+     "why": "the only test that distinguishes real affective-word resonance from evaluator projection",
+     "design_sketch": "score each word against its correct mapping AND wrong mappings; correct>>wrong => content, else projection",
+     "resolves": "whether high affective resonance is structure or fitting"},
+    {"rank": 4, "study": "Third independent judge", "eig": "medium",
+     "why": "tests whether 0.50 verdict agreement is a two-model artifact or a stable ceiling",
+     "design_sketch": "add one more open-weight family as a third independent judge on an existing frozen word list",
+     "resolves": "generality of the SIGNIFICANT_ROLE_DEPENDENCE ceiling"}
+  ]
+}

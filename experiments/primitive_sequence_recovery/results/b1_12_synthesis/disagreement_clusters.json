@@ -1,0 +1,16 @@
+{
+  "n_disagreeing": 55,
+  "by_cause": {
+    "calibration_same_relationship": 24,
+    "no_relationship_split": 10,
+    "relationship_swap_compatible": 9,
+    "relationship_swap_incompatible": 6,
+    "opposition_vs_other": 6
+  },
+  "large_ge50_by_cause": {
+    "opposition_vs_other": 5,
+    "no_relationship_split": 3,
+    "relationship_swap_compatible": 2,
+    "calibration_same_relationship": 2
+  }
+}

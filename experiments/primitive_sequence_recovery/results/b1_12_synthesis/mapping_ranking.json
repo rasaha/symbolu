@@ -1,0 +1,272 @@
+[
+  {
+    "varna": "g",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 62.5,
+    "score_stdev": 12.5,
+    "mean_cross_eval_absdiff": 25,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "restless striving that cannot stop \u2014 effort compulsively driven on, un"
+  },
+  {
+    "varna": "\u1e63",
+    "n_components": 2,
+    "n_words": 2,
+    "avg_resonance": 62.5,
+    "score_stdev": 12.5,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "k\u0101ma \u2014 worldly / physical desire and longing: grasping for wealth, opu"
+  },
+  {
+    "varna": "h",
+    "n_components": 3,
+    "n_words": 3,
+    "avg_resonance": 58.3,
+    "score_stdev": 18.6,
+    "mean_cross_eval_absdiff": 16.7,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "outward / visible vision \u2014 fixation on the manifest, physically-seen, "
+  },
+  {
+    "varna": "d",
+    "n_components": 5,
+    "n_words": 5,
+    "avg_resonance": 52.5,
+    "score_stdev": 30.5,
+    "mean_cross_eval_absdiff": 5,
+    "no_relationship_rate": 0.2,
+    "mapping_gloss": "peevishness / reactive irritability \u2014 perverse, contrary reactivity di"
+  },
+  {
+    "varna": "s",
+    "n_components": 7,
+    "n_words": 7,
+    "avg_resonance": 51.8,
+    "score_stdev": 14.8,
+    "mean_cross_eval_absdiff": 10.7,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "the sentient / sattvic impulse clung to \u2014 clarity, purity or harmony o"
+  },
+  {
+    "varna": "\u1e6d",
+    "n_components": 2,
+    "n_words": 2,
+    "avg_resonance": 50,
+    "score_stdev": 25.0,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "vitarka \u2014 overstating one's case to the point of garrulousness; bad-te"
+  },
+  {
+    "varna": "k",
+    "n_components": 12,
+    "n_words": 11,
+    "avg_resonance": 41.7,
+    "score_stdev": 18.6,
+    "mean_cross_eval_absdiff": 20.8,
+    "no_relationship_rate": 0.042,
+    "mapping_gloss": "\u0101\u015b\u0101 as grasping / clinging hope \u2014 goaded toward a specific outcome or "
+  },
+  {
+    "varna": "dh",
+    "n_components": 3,
+    "n_words": 3,
+    "avg_resonance": 41.7,
+    "score_stdev": 34.4,
+    "mean_cross_eval_absdiff": 16.7,
+    "no_relationship_rate": 0.333,
+    "mapping_gloss": "t\u1e5b\u1e63\u1e47\u0101 \u2014 limitless thirst to acquire: unquenchable craving for wealth, "
+  },
+  {
+    "varna": "r",
+    "n_components": 14,
+    "n_words": 14,
+    "avg_resonance": 41.1,
+    "score_stdev": 20.3,
+    "mean_cross_eval_absdiff": 17.9,
+    "no_relationship_rate": 0.036,
+    "mapping_gloss": "sarvan\u0101\u015ba \u2014 the defeatist annihilation-thought ('I have nothing, every"
+  },
+  {
+    "varna": "t",
+    "n_components": 7,
+    "n_words": 6,
+    "avg_resonance": 41.1,
+    "score_stdev": 17.9,
+    "mean_cross_eval_absdiff": 25,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "j\u0101\u1e0dya \u2014 inertia, staticity, dullness, torpor: the deep sleep of mind, "
+  },
+  {
+    "varna": "v",
+    "n_components": 4,
+    "n_words": 4,
+    "avg_resonance": 40.6,
+    "score_stdev": 24.8,
+    "mean_cross_eval_absdiff": 6.2,
+    "no_relationship_rate": 0.125,
+    "mapping_gloss": "ensconcement gone rigid \u2014 over-holding, clinging to one's holding; stu"
+  },
+  {
+    "varna": "bh",
+    "n_components": 2,
+    "n_words": 2,
+    "avg_resonance": 37.5,
+    "score_stdev": 21.7,
+    "mean_cross_eval_absdiff": 25,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "m\u016brcch\u0101 \u2014 hypnotic entrancement, the loss of common sense / discernmen"
+  },
+  {
+    "varna": "\u015b",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 37.5,
+    "score_stdev": 12.5,
+    "mean_cross_eval_absdiff": 25,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "artha as possessive acquisition \u2014 worldly purpose pursued and possesse"
+  },
+  {
+    "varna": "y",
+    "n_components": 6,
+    "n_words": 6,
+    "avg_resonance": 37.5,
+    "score_stdev": 19.1,
+    "mean_cross_eval_absdiff": 8.3,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "avi\u015bv\u0101sa \u2014 self-doubt that cannot commit: lack of confidence and waver"
+  },
+  {
+    "varna": "\u1e6dh",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 37.5,
+    "score_stdev": 12.5,
+    "mean_cross_eval_absdiff": 25,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "anut\u0101pa as gripping remorse \u2014 the 'after-heat' that torments, replayin"
+  },
+  {
+    "varna": "ch",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 37.5,
+    "score_stdev": 12.5,
+    "mean_cross_eval_absdiff": 25,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "collapse of mental function under strain \u2014 the mind that had functione"
+  },
+  {
+    "varna": "m",
+    "n_components": 7,
+    "n_words": 7,
+    "avg_resonance": 35.7,
+    "score_stdev": 20.5,
+    "mean_cross_eval_absdiff": 14.3,
+    "no_relationship_rate": 0.071,
+    "mapping_gloss": "pra\u015braya / pra\u1e47\u0101\u015ba \u2014 giving latitude to the point of dissolution; unre"
+  },
+  {
+    "varna": "\u1e47",
+    "n_components": 3,
+    "n_words": 3,
+    "avg_resonance": 33.3,
+    "score_stdev": 23.6,
+    "mean_cross_eval_absdiff": 16.7,
+    "no_relationship_rate": 0.167,
+    "mapping_gloss": "envy \u2014 the sting at another's success; covetous resentment at another'"
+  },
+  {
+    "varna": "n",
+    "n_components": 9,
+    "n_words": 8,
+    "avg_resonance": 31.9,
+    "score_stdev": 18.3,
+    "mean_cross_eval_absdiff": 19.4,
+    "no_relationship_rate": 0.056,
+    "mapping_gloss": "moha \u2014 blind attachment / infatuation: the mind fixated on an object, "
+  },
+  {
+    "varna": "c",
+    "n_components": 2,
+    "n_words": 2,
+    "avg_resonance": 31.2,
+    "score_stdev": 10.8,
+    "mean_cross_eval_absdiff": 12.5,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "viveka distorted \u2014 discernment hardening into judgmentalism / separati"
+  },
+  {
+    "varna": "p",
+    "n_components": 11,
+    "n_words": 11,
+    "avg_resonance": 30.7,
+    "score_stdev": 21.2,
+    "mean_cross_eval_absdiff": 15.9,
+    "no_relationship_rate": 0.136,
+    "mapping_gloss": "gh\u1e5b\u1e47\u0101 \u2014 the fetter of hatred / revulsion: hatred arising (mainly from "
+  },
+  {
+    "varna": "b",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 25,
+    "score_stdev": 0.0,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "avaj\u00f1\u0101 \u2014 neglect / disregard of what actually has value; indifference "
+  },
+  {
+    "varna": "l",
+    "n_components": 6,
+    "n_words": 5,
+    "avg_resonance": 25,
+    "score_stdev": 17.7,
+    "mean_cross_eval_absdiff": 8.3,
+    "no_relationship_rate": 0.25,
+    "mapping_gloss": "krurat\u0101 \u2014 cruelty: physical harm inflicted on the weak; crude, cruel t"
+  },
+  {
+    "varna": "\u1e0d",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 25,
+    "score_stdev": 0.0,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 0.0,
+    "mapping_gloss": "lajj\u0101 as inhibition \u2014 action held back by others' regard; shrinking, s"
+  },
+  {
+    "varna": "j",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 0,
+    "score_stdev": 0.0,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 1.0,
+    "mapping_gloss": "the inflated 'I did / I control this' \u2014 the 'I'-feeling swollen into s"
+  },
+  {
+    "varna": "\u1e45",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 0,
+    "score_stdev": 0.0,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 1.0,
+    "mapping_gloss": "dambha as vanity \u2014 the self displayed and performed for others' eyes; "
+  },
+  {
+    "varna": "gh",
+    "n_components": 1,
+    "n_words": 1,
+    "avg_resonance": 0,
+    "score_stdev": 0.0,
+    "mean_cross_eval_absdiff": 0,
+    "no_relationship_rate": 1.0,
+    "mapping_gloss": "mamat\u0101 bounded by the relative factors (time, space, individuality) \u2014 "
+  }
+]
