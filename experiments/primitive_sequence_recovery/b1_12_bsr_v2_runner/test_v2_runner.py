@@ -24,6 +24,22 @@ def test_validate_judge():
     bad3 = json.loads(json.dumps(good)); bad3["components"][0]["supporting_evidence"] = "  "
     assert R.validate_judge(bad3, occ)[1] == "missing_evidence:supporting"
 
+def test_no_relationship_valid_only_at_zero():
+    # V2.1 amendment: no_relationship valid IFF dbr_score == 0
+    occ = [0]
+    ok0 = {"profile": "shank", "components": [
+        {"occurrence_index": 0, "relationship": "no_relationship", "supporting_evidence": "x", "opposing_evidence": "y",
+         "dbr_score": 0, "adjudication": "no defensible relationship"}]}
+    assert R.validate_judge(ok0, occ) == (True, "")
+    bad = json.loads(json.dumps(ok0)); bad["components"][0]["dbr_score"] = 25
+    assert R.validate_judge(bad, occ)[1] == "no_relationship_requires_zero"
+    # honest synonyms canonicalize to no_relationship
+    assert R.canonicalize_relationship("none") == ("no_relationship", True)
+    assert R.canonicalize_relationship("N/A") == ("no_relationship", True)
+    # positive types still fine at score 0
+    pos0 = json.loads(json.dumps(ok0)); pos0["components"][0]["relationship"] = "opposition"
+    assert R.validate_judge(pos0, occ) == (True, "")
+
 def test_opposition_full_range_allowed():
     # the v2 correction: opposition is a legitimate, full-range relationship (no polarity cap in validation)
     occ = [0]

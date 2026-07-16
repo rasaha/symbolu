@@ -179,8 +179,9 @@ def main():
     dump("wordlist_manifest.json", json.load(open(verify_inputs.WORDLIST_DIR / "wordlist_manifest.json", encoding="utf-8")))
     dump("run_manifest.json", {"schema": "b1_12_bsr_v2_run_manifest", "label": LABEL, "status": "COMPLETED",
          "mode": "vllm_independent_two_model_no_crossover",
-         "controlling_preregistration": "VARNA_SYMBOLIC_RESONANCE_PREREG_V2.md",
-         "freeze_record": "B1_12_V2_PREREG_FREEZE.md",
+         "controlling_preregistration": "VARNA_SYMBOLIC_RESONANCE_PREREG_V2_1.md",
+         "amends": "VARNA_SYMBOLIC_RESONANCE_PREREG_V2.md",
+         "freeze_record": "B1_12_V2_1_PREREG_FREEZE.md",
          "wordlist_sha256": det["wordlist_sha256"], "model_identity_dependence": ag["model_identity_dependence"],
          "no_forced_consensus": True})
     print("COMPLETED model_identity_dependence=", ag["model_identity_dependence"])

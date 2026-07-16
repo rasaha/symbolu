@@ -1,8 +1,13 @@
 # B1.12 V2 — Independent-judge runner (RunPod)
 
-Executes the **frozen** `VARNA_SYMBOLIC_RESONANCE_PREREG_V2.md` (SHA `831e48ec…`) + freeze record
-`B1_12_V2_PREREG_FREEZE.md` on the fresh 20-word list `../b1_12_symbolic_resonance_wordlist_v2/`
-(SHA `7a558008…`). `EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE`.
+Executes the **frozen** `VARNA_SYMBOLIC_RESONANCE_PREREG_V2_1.md` (SHA `1c89584d…`; the minimal amendment of
+`VARNA_SYMBOLIC_RESONANCE_PREREG_V2.md` `831e48ec…`) + freeze record `B1_12_V2_1_PREREG_FREEZE.md` on the fresh
+20-word list `../b1_12_symbolic_resonance_wordlist_v2/` (SHA `7a558008…`).
+`EXPLORATORY / DEVELOPMENT_ONLY / NOT_CONFIRMATORY_EVIDENCE`.
+
+**V2.1 amendment (only change vs V2):** one relationship value `no_relationship`, valid **iff** `dbr_score == 0`,
+resolving the Phase-3 contradiction (a score-0 non-relationship had no valid label). Honest synonyms
+(`none`/`no`/`n/a`/…) canonicalize to it, logged. Everything else in V2 is unchanged.
 
 ## Design (Option A — reliability fix, single tightened DBR axis)
 - **Two independent judges, NO crossover.** Qwen and Mistral each judge all 20 words on their own; neither model

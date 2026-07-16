@@ -14,6 +14,10 @@ RELATIONSHIP_TYPES = (
     "implication", "natural_consequence", "generation",
     "opposition", "resolution", "regulation", "containment",
 )
+# V2.1 amendment: a single null relationship, VALID ONLY when dbr_score == 0 (see PREREG_V2_1).
+NULL_RELATIONSHIP = "no_relationship"
+# honest synonyms a judge may emit for a score-0 non-relationship -> canonicalized to NULL_RELATIONSHIP
+_NULL_ALIASES = {"none", "no", "na", "n/a", "no_relation", "no relation", "no relationship", "norelationship", "null", "nil"}
 _COMPAT_GROUPS = (
     {"embodiment", "constitutive_property", "characteristic_expression"},
     {"implication", "natural_consequence", "generation"},
@@ -42,13 +46,16 @@ def canonicalize_relationship(rel):
     distance <=2 of the normalized string. Anything ambiguous or semantically distinct returns
     (None, False) so the caller rejects it as invented_relationship. Returns (canonical|None, coerced).
     """
-    if rel in RELATIONSHIP_TYPES:
+    if rel in RELATIONSHIP_TYPES or rel == NULL_RELATIONSHIP:
         return rel, False
     if not isinstance(rel, str):
         return None, False
     norm = re.sub(r"[^a-z]+", "_", rel.strip().lower()).strip("_")
     if norm in RELATIONSHIP_TYPES:
         return norm, True
+    # V2.1: honest "no relationship" synonyms -> the null relationship (validity vs score is checked in validate_judge)
+    if rel.strip().lower() in _NULL_ALIASES or norm in {a.replace(" ", "_").replace("/", "_") for a in _NULL_ALIASES}:
+        return NULL_RELATIONSHIP, True
     if not norm:
         return None, False
     ranked = sorted(((t, _lev(norm, t)) for t in RELATIONSHIP_TYPES), key=lambda x: x[1])
@@ -131,10 +138,16 @@ def validate_judge(obj, occ_indices):
             return False, "missing_evidence:supporting"
         if not str(c.get("opposing_evidence", "")).strip():
             return False, "missing_evidence:opposing"
-        if c.get("relationship") not in RELATIONSHIP_TYPES:
-            return False, "invented_relationship"
-        if c.get("dbr_score") not in BSR_SCALE:
+        rel = c.get("relationship")
+        score = c.get("dbr_score")
+        if score not in BSR_SCALE:
             return False, "invalid_score"
+        # V2.1: no_relationship is valid ONLY at score 0; the ten positive types are valid at any score.
+        if rel == NULL_RELATIONSHIP:
+            if score != 0:
+                return False, "no_relationship_requires_zero"
+        elif rel not in RELATIONSHIP_TYPES:
+            return False, "invented_relationship"
         if not str(c.get("adjudication", "")).strip():
             return False, "missing_evidence:adjudication"
     return True, ""

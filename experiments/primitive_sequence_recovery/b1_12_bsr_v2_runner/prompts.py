@@ -22,6 +22,9 @@ _RULES = f"""FROZEN BARE-WORD SYMBOLIC RESONANCE (DBR) RULES — B1.12 V2 (VARNA
 - Semantic supplementation (added actors, scenarios, metaphors, exceptional subtypes, invented narrative chains)
   is what lowers a score — for EVERY relationship type equally, never polarity.
 - Relationship types (use ONLY these; do not invent): {_TAXO}.
+- ONE extra value, `no_relationship`, is available for the honest case where the bare word does NOT account for the
+  mapping by ANY relationship. Use `no_relationship` IF AND ONLY IF you assign dbr_score 0. Never use it with a
+  non-zero score; never invent a positive relationship for something you are scoring 0.
 - This is symbolic resonance ONLY — not truth, uniqueness, shuffled comparison, order, or transcendence."""
 
 _SCALE = """DBR SCALE (use ONLY these five integers), scoring how strongly and directly the bare word accounts for
@@ -33,7 +36,7 @@ the mapping — independent of whether the accounting is by embodiment, implicat
       special scenario. HARD RULE: if accounting for it "requires interpretation / external context / a special
       case / an invented bridge," the score is 25, NOT 50. If your own opposing evidence names an invented bridge,
       the score may not exceed 25; if the whole link is an invented causal/narrative chain, score 0.
-  0 = no defensible relationship without importing outside meaning
+  0 = no defensible relationship without importing outside meaning (set relationship to `no_relationship`)
 Examples (direction is irrelevant; only directness/conventionality/sufficiency/absence-of-supplementation matter):
  - love vs a "hatred" mapping: direct conventional opposition, ordinary meaning suffices -> high (75-100).
  - peace vs an "agitation" mapping: direct opposition/resolution -> high (75-100).
@@ -61,7 +64,7 @@ For this bare word, produce STRICT JSON ONLY (no prose outside JSON):
       "mapping": "<exact mapping text as given>",
       "supporting_evidence": "<strongest STORY-FREE reason the bare word accounts for this mapping (any relationship)>",
       "opposing_evidence": "<strongest reason it does NOT, or where supplementation would be needed>",
-      "relationship": "<one of: {_TAXO}>",
+      "relationship": "<one of: {_TAXO}; or no_relationship IF AND ONLY IF dbr_score is 0>",
       "dbr_score": <0|25|50|75|100>,
       "adjudication": "<one concise, story-free sentence justifying the score>"
     }}
