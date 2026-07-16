@@ -45,3 +45,44 @@ is visible, not implicit.
 - Prior expectation that "gather is ~25%" — **must be re-measured**; the profile overrides it.
 - The modeled byte ceilings (`cost_accounting.py`) — those bound the *format-change* upside (xmin/prot-int8) and are reported for context, but the **kernel-project** decision is driven by measured decode-kernel-time shares, not modeled bytes.
 - Diagnostic-only ablation timings (protection-disabled, artificially-contiguous) — used for cost *separation*, never as production-achievable numbers.
+
+---
+
+# Part H — FROZEN thresholds for the two-half-kernel unzip-bound probe
+
+`07_unzip_bound_probe.sh` (→ `unzip_bound_probe.py`) times three specialisations of the *same* INT4
+unzip inner loop — **FETCH**-only (loads+unpack, no affine), **MATH**-only (affine+select on
+register-resident operands, no per-token HBM), **FULL** (fetch+affine) — because `ncu` is blocked
+(`ERR_NVGPUCTRPERM`) and cannot separate the two. `08_classify_unzip_bound.py` classifies from the three
+times **f, m, F** at the decision context (the largest measured — least launch/timer noise). These
+constants are **frozen here before any GPU number is viewed**.
+
+| Constant | Value | Meaning | Rationale |
+|---|---|---|---|
+| `OVR` | **1.5** | one side must be ≥ 1.5× the other to "dominate" | below 1.5× the two costs are comparable → not a clean memory/compute call |
+| `HIDE` | **1.25** | `F ≤ 1.25·max(f,m)` ⇒ the smaller op is **hidden** under the larger (overlapped) | 25% slack for launch/measurement noise; if the full time barely exceeds the larger half, the smaller half is latency-hidden |
+| `ADD` | **0.75** | `F ≥ 0.75·(f+m)` ⇒ times roughly **add** (serial; neither hidden) | if the full time approaches the sum, fetch and math are both on the critical path |
+| `SAT_HI` | **0.60** | achieved read BW ≥ 60% of peak HBM ⇒ **bandwidth-saturated** | ≥60% of peak is near the practical achievable ceiling for a streaming kernel → faster HBM is the only lever |
+| `SAT_LO` | **0.40** | achieved read BW ≤ 40% of peak HBM ⇒ **under-utilised** | well below peak ⇒ scattered/uncoalesced access is wasting the bus → coalescing/compaction is the lever |
+
+**Decision rule (frozen, `classify_times`):** HIDDEN is tested *before* SERIAL (when one half is tiny,
+`F ≈ larger` **and** `F > ADD·(f+m)` hold at once because `f+m ≈ larger`; the hidden regime is the correct
+memory/compute-bound signal, so it must win). Then:
+1. `F ≤ HIDE·max(f,m)` → **hidden**: `MEMORY-BOUND` if `f ≥ OVR·m`, `COMPUTE-BOUND` if `m ≥ OVR·f`, else `BALANCED-OVERLAPPED`.
+2. else `F ≥ ADD·(f+m)` → **serial**: `BOTH-TIGHTENABLE` (a software-pipelined fused read kernel can overlap them).
+3. else → **partial**: `MEMORY/COMPUTE-BOUND` if one dominates, else `PARTIALLY-OVERLAPPED`.
+
+**Roofline cross-check (secondary, needs peak assumptions — the three-times verdict does not):** achieved
+read GB/s = `fetch_bytes / f`; util = achieved / peak HBM. A `MEMORY-BOUND` verdict that is **SATURATED**
+(≥ `SAT_HI`) ⇒ the lever is faster HBM (H100/H200), **not** layout; **UNDER-UTILISED** (≤ `SAT_LO`) ⇒ the
+lever is coalescing/compacting the streams (a 6F-style compact-protect read kernel) *before* buying hardware.
+
+**Scope / honesty:** the probe measures only the **unzip** (unpack + dequant + protect-overlay). The
+attention matmuls (`tl.dot`) are deliberately excluded — they run at bf16 speed regardless of the format,
+so they are not the format's tax. `MATH` is an **upper bound** on the true dequant compute (it re-fabricates
+a per-row perturbation the real kernel gets for free from its loads), so a `MEMORY-BOUND` verdict is robust
+(math is, if anything, over-counted). The compact/production path is the primary verdict; the single
+route-A full-fp16-K ablation (`FULL_full − FULL_compact`) quantifies the fp16-pool penalty a compact-protect
+read kernel would remove. Correctness of the kernel's addressing + arithmetic is anchored on CPU by
+`validate_kernel_interp.py` (Triton interpreter mode, exact match vs a numpy reference) — no GPU needed for
+the correctness half; the pod supplies only timing.
