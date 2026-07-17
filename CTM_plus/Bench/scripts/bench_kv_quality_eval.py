@@ -20,6 +20,10 @@
 from __future__ import annotations
 import argparse, math, os, sys
 
+# prompt_logprobs computes a rank over the FULL vocab for every prompt position (~[ctx x vocab], several
+# GB at ctx=8000). Reduce allocator fragmentation so that peak allocates cleanly.
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 PPL_GO = 0.01   # FROZEN before measurement: fp8 quality GO if perplexity within 1% of bf16 (delta <= 1%)
 
 # Varied English so absolute PPL is meaningful; the bf16-vs-fp8 DELTA is the gate regardless of the text.
@@ -103,7 +107,10 @@ def main(argv=None):
     ap.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct")
     ap.add_argument("--context-tokens", type=int, default=8000)
     ap.add_argument("--ppl-start-frac", type=float, default=0.5, help="measure PPL over tokens after this fraction (tail attends to the most KV)")
-    ap.add_argument("--gpu-util", type=float, default=0.70)
+    # LOW by design: prompt_logprobs needs ACTIVATION headroom (ranks over the full vocab for every
+    # prompt position, several GB), NOT a big KV pool — one sequence's KV is <1 GB. At high gpu_util
+    # vLLM reserves ~40 GB of idle KV cache that starves the logprobs peak and OOMs.
+    ap.add_argument("--gpu-util", type=float, default=0.30)
     ap.add_argument("--text-file", default=None, help="held-out text file; default = built-in varied prose tiled to length")
     ap.add_argument("--dtypes", default="auto,fp8", help="comma list: auto (bf16), fp8, fp8_e5m2")
     ap.add_argument("--selftest", action="store_true")
