@@ -64,9 +64,33 @@ for B in 8 32; do python CTM_plus/Bench/scripts/bench_decode_gather_fusion_headr
     --model Qwen/Qwen2.5-7B-Instruct --context-tokens 16000 --gen 64 --batch $B; done
 ```
 
+## Measured SATURATION sweep (ctx=16000, added 2026-07-16) — the aggregate-governing regime
+
+| batch | GATHER (view_gather) | **FUSEABLE removable** | KERNEL | seqids_blockids (separate) | verdict |
+|---:|--:|--:|--:|--:|---|
+| 1  | 26.0% | 58.8% | 41.2% | 0% | GO |
+| 8  | 34.7% | **47.7%** | 52.3% | (483.7k us) | GO |
+| 32 | 39.1% | **43.2%** | 56.8% | (680.4k us) | GO |
+
+**Key update — it does NOT collapse to the modeled ~25%.** As B grows the KERNEL share rises
+(41%→57%) but FUSEABLE **plateaus at ~43%** at saturation, well above the 35% GO threshold. The
+measured gather is a BIGGER chunk of the read path than the Amdahl model's 25% gather-share input, so
+the earlier "~16–19% aggregate" forensic projection was **too pessimistic**.
+
+### Honest aggregate translation (the one remaining unmeasured input)
+This bench profiles the int4 READ path only (excludes model GEMMs). Aggregate gain =
+`FUSEABLE(43%) × read-path-share-of-decode-step × realizable`:
+- conservative (read-path ~34% of step per 6M.4): ~15% aggregate → ~0.26×;
+- if read-path ~50%+ at long context: ~20%+ → ~0.28–0.31×.
+Still a **net loss vs bf16** (irreducible packed KV read), but a stronger recovery than the audit
+implied. **To LOCK it, measure the read-path-vs-GEMM share of the whole decode step** (a whole-step
+torch.profiler / nsys trace — the 6M.4 attribution), which converts the measured read-path headroom to
+a measured aggregate.
+
 ## Status
-- **Measured** (B=1): the three rows above — GPU-event timing on the K0-recovered kernel.
-- **Modeled** (saturation): the Amdahl table — not a measured TPS.
-- **Pending**: the B∈{8,32} saturation sweep (the aggregate-governing number).
-- No kernel implemented. No modeled number quoted as measured TPS. Correctness gate
-  (`verify_phase6e_byte_eq.sh --cuda`) not yet run this session.
+- **Measured** (B=1 ctx-sweep + B∈{1,8,32} at ctx16k): the tables above — GPU-event timing on the
+  K0-recovered kernel. Gather fusion (K2/6F) is **GO at every measured point**.
+- **Modeled** (saturation Amdahl): ~0.26–0.29× aggregate — CONSISTENT lower bound.
+- **Pending to lock aggregate**: the whole-step read-path-vs-GEMM split.
+- Correctness gate (`verify_phase6e_byte_eq.sh --cuda`) not yet run this session.
+- No kernel implemented. No modeled number quoted as measured TPS.
