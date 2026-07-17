@@ -99,11 +99,15 @@ FlashInfer (above) or the latency is invalid:**
 |---|--:|--:|--:|---|
 | **Llama-3.1-8B** | 1.00× | 2.0× | **+0.16%** (+0.0016 nats/tok, wikitext, n=3931) | ✅ clean speed tier |
 | **Mistral-7B-Instruct-v0.3** | 1.00× | 2.0× | **−0.13%** (−0.0013 nats/tok, wikitext, n=4001) | ✅ clean speed tier |
-| **Qwen2.5-7B** | 1.00× | 2.0× | **+5777%** (+4.07 nats/tok) | ❌ fp8-hostile |
+| **Qwen3-8B** | 1.00× | 2.0× | **+0.39%** (+0.0039 nats/tok, wikitext, n=4000) | ✅ clean speed tier |
+| **Qwen2.5-7B** | 1.00× | 2.0× | **+5777%** (+4.07 nats/tok) | ❌ fp8-hostile (superseded) |
 
-**fp8-clean is the norm (2 of 3 tested); Qwen2.5 is the exception.** Same stack + backend (FlashInfer)
-produced all three, so the Qwen failure is the **model** (fp8-hostile per-channel KV outliers), NOT a
-stack artifact. Runtime calibration (`calculate_kv_scales=True`) is a
+**fp8-clean is the norm (3 of 4 tested); only Qwen2.5 fails — and its own successor Qwen3-8B is clean.**
+The ~1000× Qwen2.5→Qwen3 swing on the identical eval confirms the **mechanism**: Qwen3's added
+**QK-normalization** suppresses the per-channel KV outliers that saturated fp8 on Qwen2.5. So the failure
+is model-specific *and* generationally self-correcting (normalization is becoming standard in new models).
+Same stack + FlashInfer produced all four ⇒ model, not artifact. (Qwen3 needs vLLM ≥0.8.4 / transformers
+4.51 — 0.7.3 predates it; tested in a separate venv, V0 engine, driver-matched cu124 build.) Runtime calibration (`calculate_kv_scales=True`) is a
 verified NO-OP here (applied scales stay `[1.0,…]`, PPL unchanged), so Qwen can't be cheaply rescued — a
 per-tensor scale can't protect per-channel outliers (the exact problem `int4-PROTECTED` solves).
 
