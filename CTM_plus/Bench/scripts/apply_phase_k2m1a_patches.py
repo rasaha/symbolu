@@ -239,17 +239,31 @@ def patch_api():
 
 
 def patch_cu():
+    # ONE .cu per factor -> separate translation units -> they compile in PARALLEL across
+    # MAX_JOBS (cicc is single-threaded per TU, so cramming all factors into the packed .cu
+    # serialized them through one cicc — the cause of the 40+ min tail). The production packed
+    # .cu is left with only its control instantiation.
+    # Migrate an older-style application that appended the m1 instantiations into the packed .cu.
     src = PACKED_CU.read_text()
-    if "run_mha_fwd_splitkv_dispatch_int4kv_packed_m1" in src:
-        print("  SKIP .cu (already has _m1)"); return
-    anchor = ("template void run_mha_fwd_splitkv_dispatch_int4kv_packed<cutlass::bfloat16_t, 128, false>(\n"
-              "    Flash_fwd_params &params, cudaStream_t stream);")
-    insts = "\n".join(
-        f"template void run_mha_fwd_splitkv_dispatch_int4kv_packed_m1<cutlass::bfloat16_t, 128, false, {f}>(\n"
-        f"    Flash_fwd_params &params, cudaStream_t stream);" for f in FACTORS)
-    src = _sub(src, anchor, anchor + "\n\n// K2-M1 instantiations (unroll sweep)\n" + insts,
-               "cu _m1 instantiations")
-    PACKED_CU.write_text(src); print(f"  PATCHED .cu (+_m1 factors {FACTORS})")
+    if "packed_m1" in src:
+        a = src.find("\n\n// K2-M1 instantiations")
+        b = src.rfind("} // namespace FLASH_NAMESPACE")
+        if a >= 0 and b > a:
+            PACKED_CU.write_text(src[:a] + "\n\n" + src[b:])
+            print("  MIGRATED packed .cu (removed inlined m1 instantiations -> separate TUs)")
+    for f in FACTORS:
+        cu = SRC / f"flash_fwd_split_hdim128_bf16_int4kv_packed_m1u{f}_sm80.cu"
+        if cu.exists():
+            print(f"  SKIP {cu.name} (exists)"); continue
+        cu.write_text(
+            f"// K2-M1 factor {f} instantiation — separate TU so factors compile in parallel.\n"
+            '#include "namespace_config.h"\n'
+            '#include "flash_fwd_launch_template.h"\n\n'
+            "namespace FLASH_NAMESPACE {\n\n"
+            f"template void run_mha_fwd_splitkv_dispatch_int4kv_packed_m1<cutlass::bfloat16_t, 128, false, {f}>(\n"
+            "    Flash_fwd_params &params, cudaStream_t stream);\n\n"
+            "} // namespace FLASH_NAMESPACE\n")
+        print(f"  CREATED {cu.name}")
 
 
 def main():

@@ -54,6 +54,9 @@ echo "== apply K2-M1 patch onto the recovered base tree =="
 echo "== build (TORCH_CUDA_ARCH_LIST=8.0) — contains production + M1, M1 gated by KVPRO_K2_M1 =="
 export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.0}" MAX_JOBS="${MAX_JOBS:-16}" NVCC_THREADS="${NVCC_THREADS:-2}"
 export VLLM_FA_LOCAL_VERSION="+k2m1"   # distinct wheel name so it can't be confused with prod
+# Force a clean CMake configure so the NEW per-factor .cu files are globbed + compiled (in
+# parallel). Without this, a stale build/ dir keeps the old file list -> M1 symbols missing -> link error.
+rm -rf "$FA_DIR/build"
 ( cd "$FA_DIR" && "$PY" setup.py bdist_wheel ) || { echo "[ERR] build failed — see build log"; exit 1; }
 NEWW="$(ls -t "$FA_DIR"/dist/vllm_flash_attn-*k2m1*.whl 2>/dev/null | head -1 || ls -t "$FA_DIR"/dist/*.whl | head -1)"
 echo "  built: $NEWW"
