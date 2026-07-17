@@ -20,11 +20,14 @@ vendored_dir() { "$PY" -c 'import os,vllm.vllm_flash_attn as m;print(os.path.dir
 
 if [ "${1:-}" = "--restore" ]; then
   echo "== restore known-good production kernel =="
-  if [ -f "$BK/prod_wheel.whl" ]; then
-    pip install --force-reinstall --no-deps "$BK/prod_wheel.whl" && echo "restored from $BK/prod_wheel.whl"
-  elif [ -d "$BK/vllm_flash_attn_prod" ]; then
-    D="$(vendored_dir)"; [ -n "$D" ] && cp -rf "$BK/vllm_flash_attn_prod/." "$D/" && echo "restored .so into $D"
-  else echo "[ERR] no backup found in $BK"; exit 1; fi
+  D="$(vendored_dir)"
+  if [ -d "$BK/vllm_flash_attn_prod" ] && [ -n "$D" ]; then
+    cp -rf "$BK/vllm_flash_attn_prod/." "$D/" && echo "restored .so from $BK/vllm_flash_attn_prod -> $D"
+  else
+    W="$(ls -t "$BK"/vllm_flash_attn-*.whl 2>/dev/null | head -1 || true)"
+    if [ -n "$W" ]; then pip install --force-reinstall --no-deps "$W" && echo "restored from $W"
+    else echo "[ERR] no usable backup in $BK (have: $(ls "$BK" 2>/dev/null))"; exit 1; fi
+  fi
   exit 0
 fi
 
@@ -40,7 +43,7 @@ fi
 echo "== preserve known-good production kernel =="
 if [ -z "$(ls -A "$BK" 2>/dev/null)" ]; then
   PRODW="$(ls -t /workspace/dev/**/dist/vllm_flash_attn-*.whl 2>/dev/null | head -1 || true)"
-  if [ -n "${PRODW:-}" ]; then cp "$PRODW" "$BK/prod_wheel.whl" && echo "  backed up wheel -> $BK/prod_wheel.whl"; fi
+  if [ -n "${PRODW:-}" ]; then cp "$PRODW" "$BK/$(basename "$PRODW")" && echo "  backed up wheel -> $BK/$(basename "$PRODW")"; fi
   D="$(vendored_dir)"; [ -n "$D" ] && cp -r "$D" "$BK/vllm_flash_attn_prod" && echo "  backed up installed .so -> $BK/vllm_flash_attn_prod"
   "$PY" "$SYMBOLU/scripts/kvpro_kernel_recovery/02_hash_installed_kernel.py" > "$BK/prod_hashes.json" 2>/dev/null || true
 else echo "  backup already present in $BK (not overwriting)"; fi
