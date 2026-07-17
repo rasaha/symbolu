@@ -97,7 +97,26 @@ def main(argv=None):
     base = ("The quarterly logistics review noted that warehouse seven shipped on schedule "
             "while the northern depot lagged by two days. ")
 
+    def _has_flashinfer():
+        try:
+            import flashinfer  # noqa: F401
+            return True
+        except Exception:
+            return False
+
     def measure(dtype):
+        # CRITICAL: vLLM 0.7.3's FlashAttention-2 backend CANNOT do fp8 KV -> it silently falls back
+        # to XFormers, which is ~7x slower (a backend artifact, NOT fp8's cost). fp8 KV must run on
+        # FlashInfer to be fair. bf16 stays on its default (FA2) fast path.
+        if dtype.startswith("fp8"):
+            if _has_flashinfer():
+                os.environ["VLLM_ATTENTION_BACKEND"] = "FLASHINFER"
+            else:
+                print("  WARNING: flashinfer NOT installed -> fp8 KV will use XFormers (SLOW; the "
+                      "latency below is INVALID). Install a matching flashinfer and re-run:\n"
+                      "    pip install flashinfer-python   # (or the wheel matching torch2.5.1+cu12x)")
+        else:
+            os.environ.pop("VLLM_ATTENTION_BACKEND", None)
         # stock vLLM, eager (so decode kernels are visible / comparable); fp8 needs no custom build.
         llm = LLM(model=args.model, max_model_len=mml, gpu_memory_utilization=args.gpu_util,
                   dtype="bfloat16", kv_cache_dtype=dtype, enforce_eager=True,

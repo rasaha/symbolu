@@ -34,10 +34,34 @@ unpack, no per-group scale/xmin, no protected-channel sidecar. So it should be n
 stack (would need a quant method + custom kernel — which defeats the "cheap speed tier" goal), so the
 evaluation leads with fp8 and only falls back to int8-integer if fp8's quality is inadequate.
 
+## ⚠ Backend requirement (measured gotcha — read before trusting any fp8 number)
+
+**vLLM 0.7.3's FlashAttention-2 backend CANNOT serve fp8 KV.** When `kv_cache_dtype="fp8"` it logs
+`Cannot use FlashAttention-2 backend for FP8 KV cache … Using XFormers backend` and **silently falls
+back to XFormers**, which is ~7× slower. That fallback latency is a *backend artifact, not fp8's cost.*
+
+- **First run (INVALID):** ctx16k B=8 — bf16 **16.50 ms/tok** (FA2, 45010 blocks) vs fp8 **119.50 ms/tok
+  = 7.24× bf16** (XFormers, 90272 blocks, token-match 1.6%). The 7.24× and the 1.6% are both XFormers
+  artifacts — bf16 ran on the fast FA2 path while fp8 ran on the slow XFormers path, so the comparison
+  is apples-to-oranges and **does not measure fp8**.
+- **Fix (in `bench_kv_tier_eval.py`):** for any `fp8*` dtype the bench now sets
+  `VLLM_ATTENTION_BACKEND=FLASHINFER` (and warns + flags the result INVALID if flashinfer is not
+  installed); bf16 stays on its FA2 default. fp8 KV is only fairly measured on **FlashInfer**.
+- The 1.6% token-match is *also* suspect under XFormers (different backend, not just different KV
+  precision). Re-measure quality on FlashInfer, and remember uncalibrated fp8-e4m3 uses a default scale
+  — a real quality gate needs **calibrated scales**, not this proxy.
+
+**Re-run (valid) once FlashInfer is present:**
+```bash
+python -c "import flashinfer" 2>/dev/null || pip install flashinfer-python   # match torch2.5.1+cu12x
+python CTM_plus/Bench/scripts/bench_kv_tier_eval.py --context-tokens 16000 --batch 8 --gen 64 --dtypes auto,fp8
+```
+
 ## The evaluation (before funding more int4 or committing the speed tier)
 
 Run `bench_kv_tier_eval.py` on the A100 to measure, at matched operating points, `kv_cache_dtype ∈
-{auto(bf16), fp8}` (+ the int4 number from `K2_M1_VERDICT.md` for context):
+{auto(bf16), fp8}` (+ the int4 number from `K2_M1_VERDICT.md` for context). **fp8 must run on
+FlashInfer (above) or the latency is invalid:**
 
 1. **decode latency** (prefill-subtracted ms/tok, eager) — is fp8 within ~10–20% of bf16?
 2. **quality** — token divergence vs bf16 (greedy): first-divergence position + fraction-matching
