@@ -93,10 +93,16 @@ FlashInfer (above) or the latency is invalid:**
 
 ### Pre-registered decision
 
-**Status (2026-07-17): latency ✅ (1.00×) · capacity ✅ (2.0×) · quality ❌ UNCALIBRATED fp8 is
-CATASTROPHIC on Qwen2.5-7B — calibration is the untested make-or-break lever.** fp8 is fast and dense
-but NOT a clean speed tier as-shipped (default scale=1.0). Speed-tier viability now hinges entirely on
-whether runtime KV-scale calibration (`--calibrate` / `calculate_kv_scales=True`) rescues quality.
+**Status (2026-07-17): latency ✅ (1.00×) · capacity ✅ (2.0×) · quality ❌ fp8 CATASTROPHIC on
+Qwen2.5-7B, and runtime calibration is a VERIFIED NO-OP on this stack.** fp8 is fast and dense but NOT a
+clean speed tier on Qwen. `calculate_kv_scales=True` was confirmed passed yet left the applied KV scales
+at `[1.0,1.0,1.0,1.0]` and the PPL byte-identical (798.6) — runtime calibration does nothing on
+vLLM 0.7.3 + FlashInfer + fp8. Remaining fp8 options: (a) **OFFLINE** scales (`--quantization-param-path`
+— real infra, uncertain: a per-tensor scale can't protect per-channel KV outliers, the exact problem
+`int4-PROTECTED` was built for); (b) accept fp8 is **MODEL-DEPENDENT** (prior work: Llama-3.1-8B fp8
+behaved — likely because its "calc-scales" was the same no-op and Llama's KV is simply robust, not
+because calibration worked); (c) **bf16 is the speed path on Qwen**. **Next (cheap, decisive): test fp8
+quality on Llama-3.1-8B — resolves "fp8 viable for some models" vs "broadly broken here."**
 
 #### Quality — MEASURED (uncalibrated fp8, Qwen2.5-7B), 4 independent metrics agree
 

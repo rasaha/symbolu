@@ -171,10 +171,10 @@ def main(argv=None):
             return "\n\n".join(t for t in ds["text"] if t.strip()), "wikitext-2-raw-v1"
         except Exception as e:
             print(f"  WARNING: could not load wikitext ({type(e).__name__}: {e}).\n"
-                  "  Falling back to built-in prose, which must be TILED -> repetitive -> bf16 PPL ~1.0\n"
-                  "  -> the delta metric is INVALID. Fix with:  pip install datasets   (or pass\n"
-                  "  --text-file <a few thousand tokens of real held-out text>).")
-            return _PROSE, "built-in prose (TILED — INVALID)"
+                  "  Falling back to built-in prose (~1000 tokens); context is CAPPED to it (no tiling),\n"
+                  "  so the run stays VALID but shallow. For deeper long-context, fix the loader:\n"
+                  "  pip install datasets hf_transfer   (or unset HF_HUB_ENABLE_HF_TRANSFER; or --text-file).")
+            return _PROSE, "built-in prose (~1k tok, capped)"
 
     text, source = _load_text()
     full = tk(text)["input_ids"]
