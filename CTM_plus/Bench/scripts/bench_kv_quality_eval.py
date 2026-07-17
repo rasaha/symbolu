@@ -141,6 +141,10 @@ def main(argv=None):
     ap.add_argument("--gpu-util", type=float, default=0.30)
     ap.add_argument("--text-file", default=None, help="held-out text file; default = wikitext-2 (needs `datasets`), else tiled prose (INVALID)")
     ap.add_argument("--dtypes", default="auto,fp8", help="comma list: auto (bf16), fp8, fp8_e5m2")
+    ap.add_argument("--calibrate", action="store_true",
+                    help="fp8: compute KV scales at runtime (calculate_kv_scales=True). DEFAULT fp8 uses "
+                         "scale=1.0, which SATURATES models with KV outliers (e.g. Qwen) -> catastrophic PPL. "
+                         "This is the make-or-break lever for fp8 quality; compare a --calibrate run to a plain one.")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
@@ -203,8 +207,13 @@ def main(argv=None):
                       "not the served path. `pip install flashinfer-python`")
         else:
             os.environ.pop("VLLM_ATTENTION_BACKEND", None)
-        llm = LLM(model=args.model, max_model_len=mml, gpu_memory_utilization=args.gpu_util,
-                  dtype="bfloat16", kv_cache_dtype=dtype, enforce_eager=True, max_num_seqs=1)
+        llm_kw = dict(model=args.model, max_model_len=mml, gpu_memory_utilization=args.gpu_util,
+                      dtype="bfloat16", kv_cache_dtype=dtype, enforce_eager=True, max_num_seqs=1)
+        if args.calibrate and dtype.startswith("fp8"):
+            # runtime KV-scale calculation (vLLM 0.7.3+): rescues models whose KV outliers saturate the
+            # default scale=1.0. Same lever bench_8bit_kv_gate.py used for fp8_e4m3.
+            llm_kw["calculate_kv_scales"] = True
+        llm = LLM(**llm_kw)
         try:
             blocks = llm.llm_engine.cache_config.num_gpu_blocks
         except Exception:
@@ -241,7 +250,8 @@ def main(argv=None):
         r = measure(dt)
         results[dt] = r
         b = r["blocks"]
-        print(f"  {dt:<10} PPL {r['ppl']:9.4f}  (NLL {r['nll']:.4f} nats/tok)  over {r['n']:>5} tok   "
+        calib = "[calib]" if (args.calibrate and dt.startswith("fp8")) else ""
+        print(f"  {dt:<10}{calib:<8} PPL {r['ppl']:9.4f}  (NLL {r['nll']:.4f} nats/tok)  over {r['n']:>5} tok   "
               f"KV blocks {b if b is not None else '?':>7}")
     # Guard: a near-1.0 baseline means the text is too predictable (tiled/repetitive) -> the relative
     # delta is a division-by-~0 artifact, NOT a quality signal. Refuse to emit a verdict on it.

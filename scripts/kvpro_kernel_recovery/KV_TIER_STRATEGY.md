@@ -93,9 +93,24 @@ FlashInfer (above) or the latency is invalid:**
 
 ### Pre-registered decision
 
-**Status (2026-07-17): latency ✅ (1.00×) · capacity ✅ (2.0×) · quality ⏳ pending PPL
-(`bench_kv_quality_eval.py`). Two of three legs pass; fp8 is a confirmed speed candidate awaiting the
-perplexity gate.**
+**Status (2026-07-17): latency ✅ (1.00×) · capacity ✅ (2.0×) · quality ❌ UNCALIBRATED fp8 is
+CATASTROPHIC on Qwen2.5-7B — calibration is the untested make-or-break lever.** fp8 is fast and dense
+but NOT a clean speed tier as-shipped (default scale=1.0). Speed-tier viability now hinges entirely on
+whether runtime KV-scale calibration (`--calibrate` / `calculate_kv_scales=True`) rescues quality.
+
+#### Quality — MEASURED (uncalibrated fp8, Qwen2.5-7B), 4 independent metrics agree
+
+| metric | source | fp8 (uncalibrated) vs bf16 | note |
+|---|---|---|---|
+| perplexity (teacher-forced, real text) | `bench_kv_quality_eval.py` 2026-07-17 | PPL **13.6 → 799** (**+4.07 nats/tok**) | not confounded; healthy baseline |
+| greedy token-match | `bench_kv_tier_eval.py` this session | **~2%** | (was mis-read as "benign drift" — it wasn't) |
+| needle-in-haystack | `verify_phase5b_5_needle_fp8.py` → `INT4_PROTECTED_VC_BRIEF.md:648` | **1/15** | retrieval catastrophe |
+| greedy bit-exactness | `bench_phase5c_v1.py` → `PHASE5C_SHIP_REPORT.md:12,43` | **0/6, ~12% overlap** | 2026-05-25 |
+
+Cross-**backend** (XFormers + FlashInfer) and cross-**session** — so it is fp8, not a harness artifact.
+**Likely cause:** default scale=1.0 saturates Qwen's KV outliers. **Rescued on Llama-3.1-8B** with
+calculated scales (needles pass — `NEXT_POD_SESSION_INT4_GPU_RUNS.md:456`), so calibration is the
+candidate fix, UNTESTED on Qwen. fp8 **MMLU/task-accuracy** was never measured (int4-only).
 
 - **fp8 GO as speed tier** if decode ≈ bf16 (≤ ~1.2×) **and** quality loss is acceptable for the
   target workload (fraction-matching high / small perplexity delta). → ship two tiers: int4=capacity,
