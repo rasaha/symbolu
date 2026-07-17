@@ -15,8 +15,10 @@
 
 **The problem.** At long context (32K+), the **KV-cache — not model weights — dominates LLM serving
 cost and caps concurrency.** The obvious fix, 4-bit KV, hasn't shipped *at quality*: fp8 and naive int4
-buy density by spending accuracy (fp8: needle 1/15; naive int4: token-agreement vs bf16 collapses to
-0.53). The gap between "4-bit density" and "maintained quality" is the market.
+buy density by spending accuracy on outlier-heavy models (fp8: needle 1/15 on Qwen2.5 — though fp8 is a
+clean 2× speed tier on newer models like Llama/Mistral/Qwen3; naive int4: token-agreement vs bf16
+collapses to 0.53), and fp8 tops out at 2× where the market wants 4-bit. The gap between "4-bit density"
+and "maintained quality" is the market.
 
 **The product.** **KVPro** is a quality-safe KV-cache compressor. Its first codec, **int4_protected**,
 uses the **protected-channels** mechanism — keep the ~4% highest-attention K channels at bf16, quantize
@@ -792,7 +794,8 @@ where KV becomes *transported* data.** The emerging movement-bound architectures
 disaggregated prefill/decode, cross-request prefix caches, HBM→CPU/NVMe KV offload —
 all ship and store the KV cache as their primary payload. A 4-bit KV that *holds
 quality* is the right thing to move and cache: **~1.8× less KV transported than bf16
-without the fidelity loss fp8 takes** (fp8: needle 1/15). Byte-clean CPU swap-restore
+without the fidelity loss fp8 takes on outlier-heavy models** (fp8: needle 1/15 on Qwen2.5; a clean 2×
+tier on Llama/Mistral/Qwen3 — see `FP8_KV_SPEED_TIER_REPORT.md`). Byte-clean CPU swap-restore
 is already validated (TIER5A). **PROJECTED, not built:** the high-value transport legs
 — tensor/context-parallel KV exchange and disaggregated/cross-node KV — are
 unimplemented, and TP is explicitly unvalidated. We claim the *mechanism* on these,
@@ -843,6 +846,50 @@ It's a **capacity-and-bandwidth play, not a raw-speed one** (it spends some
 Layer-1 compute on dequant — the disclosed tax). In the stack's own terms: *it
 doesn't make the fuel line faster — it makes the engine sip instead of guzzle,
 and packs 2× the fuel in the tank, without losing octane (quality).*
+
+### The two-tier memory analogy — int4-protected is the *NAND* of KV, fp8 is the *HBM*
+
+The memory industry runs two tiers because no single substrate is both dense-and-durable *and* fast: a
+**capacity/storage substrate** (NAND flash — SanDisk / Kioxia) and a **bandwidth substrate** (HBM —
+SK Hynix / Micron / Samsung). The KV cache needs the same split, and KVPro's stack now provides both.
+The mapping is by **role**:
+
+| industry tier | KV format | density (net, today) | decode speed | quality across models | role |
+|---|---|--:|--:|---|---|
+| **HBM / bandwidth** — *SK Hynix · Micron role* | **fp8** | 2× | **1.00× bf16** (MEASURED) | **fragile** — clean on Llama/Mistral/Qwen3, **collapses on Qwen2.5** (needle 1/15) | fast hot working set |
+| **NAND / capacity** — *SanDisk role* | **int4-protected** | ~1.8–2× (4-bit nominal; sidecar-diet roadmap → 4×) | slower — kernel-bound (**0.13–0.67× bf16**) | **robust** — 15/15 needle == bf16 on 4 models, **100% on Qwen2.5** where fp8 dies | durable / offloaded / reused KV; latency-tolerant |
+| baseline | bf16 | 1× | 1× | perfect | max fidelity / fallback |
+
+**Why fp8 is the HBM tier — fast, but fragile (MEASURED 2026-07-17, `FP8_KV_SPEED_TIER_REPORT.md`).**
+fp8 KV runs at **1.00× bf16 decode / 2× capacity** with **≈bf16 quality on Llama-3.1-8B (+0.16%),
+Mistral-7B (−0.13%), Qwen3-8B (+0.39%)** — a genuine commodity speed tier, no custom kernel. But it uses
+a **single per-tensor scale**, so it **collapses on outlier-heavy models — Qwen2.5-7B: +4–6.6 nats/token,
+needle 1/15** — with no cheap fix (runtime scale-calc verified a no-op; failure reproduced on both
+vLLM 0.7.3 and 0.8.5, so it is the model, not the stack). Like HBM: it's the fast feed — and, like HBM,
+not where you keep durable data.
+
+**Why int4-protected is the NAND tier — durable, dense-capable, quality-safe.** Its **protected-channel**
+mechanism is exactly what fp8 lacks: keep the ~4% outlier K channels at bf16, so it **holds the hard tail
+where fp8 (and denser rivals SAW-INT4 / KVarN) collapse** — including **100% needle on the very Qwen2.5
+that breaks fp8**. Net density today is ~2× (4-bit nominal, minus the honest sidecar tax; the v2
+sidecar-diet targets the 4-bit ceiling), it is **byte-faithful to snapshot/restore**, and it is the
+smallest quality-safe payload to **offload and reuse** — which is where the analogy stops being an
+analogy: **int4-protected is the format you actually put on the CPU / NVMe / NAND shelf** in the WarmTier
+hierarchy below. Like NAND, it trades access speed for durable, quality-safe capacity.
+
+**KVPro governs the two-tier decision — the real moat.** The same calibration + quality-gate methodology
+tells an operator *when fp8 is safe as the HBM tier vs. when it silently collapses* (a naive "just turn
+fp8 on" ships a **4-nat regression on Qwen2.5**), *and* supplies the **quality-safe int4-protected
+capacity tier** for the hard-tail / outlier / offload cases fp8 can't hold. KVPro is not one codec — it
+is the **capacity tier + the quality governance for the whole KV memory stack**: fp8 where it's proven,
+int4-protected where the hard tail or durable capacity demands it, bf16 where fidelity is non-negotiable.
+
+> **Honest framing.** (1) NAND↔int4 / HBM↔fp8 is a **role** mapping — both formats live in HBM today
+> (they are compression formats, not media); it becomes *literal* only in the offload hierarchy below,
+> where int4-protected is the payload spilled to CPU/NVMe/NAND. (2) On raw *net* density the two are
+> similar today (~2×); int4-protected's edge is **quality-robustness + the 4-bit ceiling + byte-faithful
+> offload**, not out-packing fp8 right now. (3) int4 decode is kernel-bound (**0.13–0.67× bf16**) — a
+> capacity / data-movement play, not a raw-speed one; fp8's **1.00×** is the measured speed tier.
 
 ### KVPro WarmTier — where compression unlocks cheaper KV reuse (LMCache *and* NAND)
 
