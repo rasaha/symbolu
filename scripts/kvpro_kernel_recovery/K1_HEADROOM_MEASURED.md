@@ -87,10 +87,22 @@ implied. **To LOCK it, measure the read-path-vs-GEMM share of the whole decode s
 torch.profiler / nsys trace — the 6M.4 attribution), which converts the measured read-path headroom to
 a measured aggregate.
 
+> **LOCKED (2026-07-17) → see `K2_AGGREGATE_LOCK_MEASURED.md`.** The whole-step profile is in.
+> Corrected formula: `X` = removable share **of the whole step** = (read-path share) × (fuseable
+> fraction); new ratio = `base × 1/(1−ρX)` — my earlier `0.22/(1−X)` shorthand mislabelled `X`
+> (it must include the ×0.43 fuseable fraction) and conflated speedup with the BF16 ratio.
+> Measured result: at ctx≈14.7k B=32 the decode step is **~96 % read path** (GEMMs are almost all
+> *prefill* — the old "GEMM-bound saturation" assumption was regime-wrong), fuseable ≈ **38 % of the
+> step** → 6F gives a **measured ~1.4× decode speedup (clears the 15 % gate)**. But the int4 decode
+> **attention kernel is 12× bf16** (12.46 s vs 1.02 s) and 6F doesn't touch it → decision is
+> **BUILD_K2 re-scoped**: fuse the gather *inside* an attention-kernel rewrite, gated on a cheap
+> occupancy/SoL diagnosis of the 12×.
+
 ## Status
 - **Measured** (B=1 ctx-sweep + B∈{1,8,32} at ctx16k): the tables above — GPU-event timing on the
   K0-recovered kernel. Gather fusion (K2/6F) is **GO at every measured point**.
 - **Modeled** (saturation Amdahl): ~0.26–0.29× aggregate — CONSISTENT lower bound.
-- **Pending to lock aggregate**: the whole-step read-path-vs-GEMM split.
+- **Aggregate LOCKED**: whole-step profile done — `K2_AGGREGATE_LOCK_MEASURED.md` (6F clears the
+  build gate on measured data; the real ceiling is the int4 attention kernel, not the gather).
 - Correctness gate (`verify_phase6e_byte_eq.sh --cuda`) not yet run this session.
 - No kernel implemented. No modeled number quoted as measured TPS.
