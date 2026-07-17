@@ -1,0 +1,26 @@
+# cuobjdump -res-usage — int4 decode attention kernel (recovered K0 kernel, A100 pod)
+# .so: /workspace/venv-vllm/lib/python3.12/site-packages/vllm/vllm_flash_attn/_vllm_fa2_C.abi3.so (139M)
+# Date: 2026-07-17. Permission-free (no HW counters; ncu was ERR_NVGPUCTRPERM-blocked).
+# Verdict: decode attention (flash_fwd_splitkv_kernel) is register-capped at 255/thread with
+# local-memory spills -> 12% occupancy on A100 (8/64 warps). Confirms the roofline's
+# latency/occupancy-bound diagnosis. Combine pass is not the bottleneck.
+
+## decode attention — flash_fwd_splitkv_kernel (representative instantiations)
+REG:255 STACK:16  SHARED:0  LOCAL:0   # ...Lb1ELb0ELb0ELb1ELb1ELb0ELb0ELb0ELb0ELb0E
+REG:255 STACK:120 SHARED:0  LOCAL:0   # ...Lb1ELb0ELb0ELb1ELb1ELb1ELb0ELb0ELb0ELb0E  (worst spill)
+REG:254 STACK:8   SHARED:0  LOCAL:0   # ...Lb1ELb0ELb1ELb1ELb1ELb0ELb0ELb0ELb0ELb0E
+REG:255 STACK:80  SHARED:0  LOCAL:0   # ...Lb1ELb0ELb1ELb1ELb1ELb1ELb0ELb0ELb0ELb0E
+# ... all ~30 instantiations: REG 254-255, STACK 0-120 (spilling), SHARED 0.
+
+## split-KV combine pass — flash_fwd_splitkv_combine_kernel (NOT the bottleneck)
+REG:62 STACK:0 SHARED:2560   # num_splits=7
+REG:60 STACK:0 SHARED:1280   # num_splits=6
+REG:56 STACK:0 SHARED:640    # num_splits=5
+REG:56 STACK:0 SHARED:320    # num_splits=4
+REG:56 STACK:0 SHARED:160    # num_splits=3
+REG:60 STACK:0 SHARED:80     # num_splits=2
+REG:62 STACK:0 SHARED:48     # num_splits=1
+
+## occupancy from registers (A100 sm_80: 65536 reg/SM, 2048 thr/SM, 64 warps/SM max)
+# 255 regs/thread -> floor(65536/(255*32)) = 8 warps/SM -> 8/64 = 12% occupancy.
+# STACK>0 -> already spilling to local memory (HBM-backed) -> compounds the stall.

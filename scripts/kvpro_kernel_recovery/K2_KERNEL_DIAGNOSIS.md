@@ -7,6 +7,44 @@
 > **LATENCY/OCCUPANCY-BOUND**, i.e. stalled, not fundamentally limited. The cost is
 > **recoverable**: a competent int4 kernel targets ~1.75× bf16 (~1.0 ms), a **~7×
 > kernel speedup**, which flips int4 decode from **~12× slower → ~1.8× slower** than bf16.
+>
+> **CONFIRMED (2026-07-17, pod `cuobjdump -res-usage`):** the decode attention kernel is
+> **register-capped at 255/thread with local-memory spills → 12 % occupancy** — the exact
+> mechanism the roofline predicted. Feasibility is closed; see the CONFIRMED section below.
+
+## CONFIRMED — static occupancy (permission-free, ncu not needed)
+
+`cuobjdump -res-usage` on the installed `_vllm_fa2_C.abi3.so` (recovered K0 kernel):
+
+| kernel | REG/thread | STACK (spill) | SHARED | → occupancy (A100) |
+|---|--:|--:|--:|--:|
+| **`flash_fwd_splitkv_kernel`** (decode attention, all instantiations) | **254–255** | **8–120 B** | 0 | **12 % (8/64 warps)** |
+| `flash_fwd_splitkv_combine_kernel` (2nd-pass combine) | 56–62 | 0 | 48–2560 B | ~50 %+ (not the bottleneck) |
+
+255 reg/thread is the **hard CUDA ceiling**; on A100 it pins the kernel to **8 warps/SM = 12 %
+occupancy**, and the non-zero **STACK means it already spills registers to local memory**
+(HBM-backed → every spill is an HBM round-trip). This *is* the roofline's 2 %-bandwidth stall.
+
+**Honest nuance — why bf16 survives the same kernel.** bf16 decode uses this *same*
+255-reg/12 %-occupancy `flash_fwd_splitkv` yet is memory-bound at 82 % peak, because its loads are
+**coalesced and independent** (high memory-level parallelism hides latency even at 12 % occupancy).
+The int4 path adds a **dependent per-element reconstruction chain** (unpack nibble → apply
+scale/xmin → splice protect → use) that needs *more* latency hiding exactly where the kernel has
+the least, and pushes register use past 255 into spills. So the int4 penalty is
+**occupancy × dependent-reconstruction**, not occupancy alone — which sharpens the rewrite target.
+
+**K2 rewrite target (now concrete, evidence-backed):**
+1. **cut register pressure → raise occupancy**: stage the dequant through shared memory instead of
+   holding a full K tile in registers; fewer live temporaries. More warps to hide latency.
+2. **restore memory-level parallelism**: vectorized nibble loads, decouple load-from-use,
+   batch-dequant a K tile into smem before the matmul — make int4's loads independent like bf16's.
+3. **eliminate the spills** (STACK → 0).
+The in-kernel paged gather (6F) rides inside (2) for free.
+
+**Decision: BUILD_K2 — feasibility CLOSED.** Roofline said recoverable; the static occupancy read
+gives the mechanism (255-reg / 12 %-occ / spilling) and a concrete target with a credible ~7×
+ceiling. The remaining go/no-go is **resourcing** (multi-week CUDA eng + the V0→V1 forward-port),
+not technical feasibility. No further diagnosis is required before starting the kernel work.
 
 ## The roofline (validated against bf16)
 
