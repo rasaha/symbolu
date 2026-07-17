@@ -98,10 +98,12 @@ FlashInfer (above) or the latency is invalid:**
 | model | latency | capacity | quality (PPL vs bf16) | verdict |
 |---|--:|--:|--:|---|
 | **Llama-3.1-8B** | 1.00× | 2.0× | **+0.16%** (+0.0016 nats/tok, wikitext, n=3931) | ✅ clean speed tier |
+| **Mistral-7B-Instruct-v0.3** | 1.00× | 2.0× | **−0.13%** (−0.0013 nats/tok, wikitext, n=4001) | ✅ clean speed tier |
 | **Qwen2.5-7B** | 1.00× | 2.0× | **+5777%** (+4.07 nats/tok) | ❌ fp8-hostile |
 
-Same stack + backend (FlashInfer) produced BOTH numbers, so the Qwen failure is the **model** (fp8-hostile
-per-channel KV outliers), NOT a stack artifact. Runtime calibration (`calculate_kv_scales=True`) is a
+**fp8-clean is the norm (2 of 3 tested); Qwen2.5 is the exception.** Same stack + backend (FlashInfer)
+produced all three, so the Qwen failure is the **model** (fp8-hostile per-channel KV outliers), NOT a
+stack artifact. Runtime calibration (`calculate_kv_scales=True`) is a
 verified NO-OP here (applied scales stay `[1.0,…]`, PPL unchanged), so Qwen can't be cheaply rescued — a
 per-tensor scale can't protect per-channel outliers (the exact problem `int4-PROTECTED` solves).
 
